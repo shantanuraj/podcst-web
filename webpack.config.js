@@ -47,7 +47,6 @@ module.exports = env => {
   return {
     entry: {
       'vendor': [
-        'lodash-es',
         'preact',
         'preact-redux',
         'preact-router',
