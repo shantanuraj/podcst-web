@@ -5,6 +5,7 @@ import {
 
 import {
   cssRule,
+  style,
 } from 'typestyle';
 
 /**
@@ -24,3 +25,8 @@ export const fixGlobalStyles = () => {
     textDecoration: 'none',
   });
 };
+
+export const normalizeEl = style({
+  height: '100%',
+  width: '100%',
+});

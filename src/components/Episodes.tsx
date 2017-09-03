@@ -1,10 +1,45 @@
 import { h, Component } from 'preact';
+import {
+  style,
+} from 'typestyle';
 
 import {
   PodcastsState,
 } from '../stores/podcasts';
 
+import {
+  normalizeEl,
+} from '../utils/styles';
+
 import Loading from './Loading';
+
+const darkBg = style({
+  backgroundColor: '#292929',
+  color: 'white',
+});
+
+const podcastInfo = style({
+  display: 'flex',
+  justifyContent: 'space-between',
+});
+
+const podcastInfoTitles = style({
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  padding: 16,
+  paddingTop: 8,
+  $nest: {
+    '& a': {
+      color: '#82ffb5',
+    },
+  },
+});
+
+const podcastTitle = style({
+  fontSize: '40px',
+  fontWeight: 'bold',
+});
 
 interface EpisodesProps {
   feed: string;
@@ -43,9 +78,40 @@ class Episodes extends Component<EpisodesProps, any> {
       );
     }
 
+    const {
+      author,
+      cover,
+      description,
+      title,
+    } = info;
+
+    const infoCover = style({
+      backgroundImage: `url(${cover})`,
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: 'cover',
+      width: '300px',
+      height: '300px',
+      minWidth: '300px',
+    });
+
     return (
-      <div>
-        Fetched {info.episodes.length} episodes
+      <div class={`${normalizeEl} ${darkBg}`}>
+        <div class={podcastInfo}>
+          <div
+            class={infoCover}
+            role="img"
+            aria-label={`${title} by ${author}`}
+          />
+          <div class={podcastInfoTitles}>
+            <h1 class={podcastTitle}>{title}</h1>
+            <h2>{author}</h2>
+            <p
+              dangerouslySetInnerHTML={{
+                __html: description.trim()
+              }}
+            />
+          </div>
+        </div>
       </div>
     );
   }
