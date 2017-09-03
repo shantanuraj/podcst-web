@@ -15,16 +15,11 @@ import {
   FeedState,
 } from '../stores/feed';
 
+import PodcastsGridItem from './PodcastsGridItem';
+
 const grid = style({
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))',
-});
-
-const gridItem = cover => style({
-  height: '200px',
-  backgroundImage: `url(${cover})`,
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
 });
 
 interface PodcastsGridProps extends FeedState {
@@ -57,17 +52,8 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
   }
 
   renderPodcast(podcast: App.Podcast) {
-    const {
-      author,
-      title,
-    } = podcast;
     return (
-      <div
-        role="img"
-        aria-label={`${title} by ${author}`}
-        class={gridItem(podcast.cover)}
-      >
-      </div>
+      <PodcastsGridItem {...podcast} />
     );
   }
 
