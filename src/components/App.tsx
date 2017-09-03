@@ -5,23 +5,22 @@
 import {
   h,
 } from 'preact';
-import {
-  Provider,
-} from 'preact-redux';
-import Router from 'preact-router';
 
-import configureStore from '../stores';
+import Router from 'preact-router';
 
 import ConnectedLoader from '../containers/ConnectedLoader';
 
-const store = configureStore();
+import Home from './Home';
+import Toolbar from './Toolbar';
 
 const App = () => (
-  <Provider store={store}>
+  <div>
+    <Toolbar />
     <ConnectedLoader />
     <Router>
+      <Home path="/" />
     </Router>
-  </Provider>
+  </div>
 );
 
 export default App;

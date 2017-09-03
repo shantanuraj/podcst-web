@@ -10,10 +10,12 @@ interface LoaderProps {
   loading: boolean;
 }
 
-export default ({
+const Loader = ({
   loading,
 }: LoaderProps) => (
   loading ?
     <div /> :
     null
 );
+
+export default Loader;
