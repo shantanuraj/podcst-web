@@ -1,34 +1,85 @@
 /**
- * Podcast typings
+ * Shared Explicit state type
  */
-export interface SubscriptionMap {
-  [feed: string]: Podcast
-}
+type ExplicitState = 'explicit' | 'cleaned' | 'notExplicit';
 
-export interface Podcast {
-  title: string;
-  link: string;
-  published: number;
-  description: string;
-  author: string;
-  cover: string;
-  keywords: string[];
-  explicit: boolean;
-  episodes: Episode[];
-}
+/**
+ * Application type dependencies
+ */
+declare namespace App {
+  /**
+   * Adapted Podcast interface
+   */
+  interface Podcast {
+    /**
+     * iTunes id of the podcast
+     */
+    id: number;
+    /**
+     * Podcast author
+     */
+    author: string;
+    /**
+     * Podcast rss feed
+     */
+    feed: string;
+    /**
+     * Podcast title
+     */
+    title: string;
+    /**
+     * Podcast large cover art
+     */
+    cover: string;
+    /**
+     * Podcast small cover art
+     */
+    thumbnail: string;
+    /**
+     * List of categories podcast appears in
+     */
+    categories: number[];
+    /**
+     * Podcast's explicitness
+     */
+    explicit: ExplicitState;
+    /**
+     * Podcast's episode count
+     */
+    count: number;
+  }
 
-export interface Episode {
-  title: string;
-  summary?: string;
-  showNotes: string;
-  published?: number;
-  cover: string;
-  explicit: boolean;
-  duration?: number;
-  link?: string;
-  file: FileInfo;
-  author?: string;
-  episodeArt?: string;
+  /**
+   * Adapted Episode interface
+   */
+  interface Episode {
+    title: string;
+    summary: string | null;
+    published: number | null;
+    cover: string | null;
+    explicit: boolean;
+    duration: number | null;
+    link: string | null;
+    file: FileInfo;
+    author: string | null;
+    episodeArt: string | null;
+    showNotes: string;
+  }
+
+  /**
+   * Episode listing
+   */
+  interface EpisodeListing {
+    title: string;
+    link: string;
+    published: number | null;
+    description: string;
+    author: string;
+    cover: string;
+    keywords: string[];
+    explicit: boolean;
+    episodes: Episode[];
+  }
 }
 
 interface FileInfo {
