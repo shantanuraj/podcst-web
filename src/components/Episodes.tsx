@@ -1,5 +1,6 @@
 import { h, Component } from 'preact';
 import {
+  media,
   style,
 } from 'typestyle';
 
@@ -16,16 +17,24 @@ import {
 } from '../utils/styles';
 
 import Loading from './Loading';
+import Episode from './Episode';
 
 const darkBg = style({
   backgroundColor: '#292929',
   color: 'white',
 });
 
-const podcastInfo = style({
-  display: 'flex',
-  justifyContent: 'space-between',
-});
+const podcastInfo = style(
+  {
+    display: 'flex',
+    justifyContent: 'space-between',
+  },
+  media({
+    maxWidth: 601,
+  }, {
+    flexDirection: 'column',
+  }),
+);
 
 const podcastInfoTitles = style({
   display: 'flex',
@@ -43,6 +52,10 @@ const podcastInfoTitles = style({
 const podcastTitle = style({
   fontSize: '40px',
   fontWeight: 'bold',
+});
+
+const episodesView = style({
+  padding: 32,
 });
 
 interface EpisodesProps {
@@ -86,18 +99,27 @@ class Episodes extends Component<EpisodesProps, any> {
       author,
       cover,
       description,
+      episodes,
       link,
       title,
     } = info;
 
-    const infoCover = style({
-      backgroundImage: `url(${cover})`,
-      backgroundRepeat: 'no-repeat',
-      backgroundSize: 'cover',
-      width: '300px',
-      height: '300px',
-      minWidth: '300px',
-    });
+    const infoCover = style(
+      {
+        backgroundImage: `url(${cover})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: 'cover',
+        width: '300px',
+        height: '300px',
+        minWidth: '300px',
+      },
+      media({
+        maxWidth: 601,
+      }, {
+        width: '100vw',
+        height: '100vw',
+      }),
+    );
 
     return (
       <div class={`${normalizeEl} ${darkBg}`}>
@@ -116,6 +138,9 @@ class Episodes extends Component<EpisodesProps, any> {
               }}
             />
           </div>
+        </div>
+        <div class={episodesView}>
+          {episodes.map(Episode)}
         </div>
       </div>
     );
