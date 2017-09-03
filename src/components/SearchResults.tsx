@@ -7,6 +7,10 @@ import {
 } from 'preact';
 
 import {
+  Link,
+} from 'preact-router';
+
+import {
   style,
 } from 'typestyle';
 
@@ -55,23 +59,25 @@ const resultAuthorText = style({
 });
 
 const renderPodcast = (podcast: App.Podcast) => (
-  <div class={result}>
-    <img class={resultImage} src={podcast.thumbnail} />
-    <div class={resultText}>
-      <p
-        class={resultPodcastTitle}
-        title={podcast.title}
-      >
-        {podcast.title}
-      </p>
-      <p
-        class={resultAuthorText}
-        title={podcast.author}
-      >
-        {podcast.author}
-      </p>
+  <Link href={`/episodes?feed=${podcast.feed}`}>
+    <div class={result}>
+      <img class={resultImage} src={podcast.thumbnail} />
+      <div class={resultText}>
+        <p
+          class={resultPodcastTitle}
+          title={podcast.title}
+        >
+          {podcast.title}
+        </p>
+        <p
+          class={resultAuthorText}
+          title={podcast.author}
+        >
+          {podcast.author}
+        </p>
+      </div>
     </div>
-  </div>
+  </Link>
 );
 
 interface SearchResultsProps {

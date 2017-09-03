@@ -7,6 +7,10 @@ import {
 } from 'preact';
 
 import {
+  Link,
+} from 'preact-router';
+
+import {
   style,
 } from 'typestyle';
 
@@ -51,23 +55,26 @@ const podcastAuthor = style({
 const PodcastsGridItem = (podcast: App.Podcast) => {
   const {
     author,
+    feed,
     title,
   } = podcast;
   return (
-    <div
-      role="img"
-      aria-label={`${title} by ${author}`}
-      class={gridItem(podcast.cover)}
-    >
-      <div>
-        <div class={podcastTitle}>
-          {title}
-        </div>
-        <div class={podcastAuthor}>
-          {author}
+    <Link href={`/episodes?feed=${feed}`}>
+      <div
+        role="img"
+        aria-label={`${title} by ${author}`}
+        class={gridItem(podcast.cover)}
+      >
+        <div>
+          <div class={podcastTitle}>
+            {title}
+          </div>
+          <div class={podcastAuthor}>
+            {author}
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
