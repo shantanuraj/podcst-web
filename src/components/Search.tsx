@@ -25,9 +25,19 @@ interface SearchProps {
   class?: string;
 }
 
+const results = style({
+  backgroundColor: '#292929',
+  position: 'absolute',
+  height: '500px',
+  maxHeight: '500px',
+  width: '100%',
+  boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
+});
+
 const Search = (props: SearchProps) => (
   <div class={props.class}>
     <input placeholder={'Search'} class={search} type="text" />
+    <div class={results} />
   </div>
 );
 

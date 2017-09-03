@@ -29,7 +29,7 @@ const toolbar = style({
   paddingLeft: 16,
   fontSize: 20,
   color: 'white',
-  boxShadow: `0 2px 2px -2px rgba(0,0,0,.15)`,
+  boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
 });
 
 const search = style({
