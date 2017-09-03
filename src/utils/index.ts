@@ -15,7 +15,7 @@ export const onEvent = (fn: (val: string) => void) => {
 
 const URL_REGEX = /^https?\:\//;
 
-const HOST_REGEX = /^https?\:\/\/(.*)/;
+const HOST_REGEX = /^https?\:\/\/(www\.)?(.*)/
 
 /**
  * Linkify text
@@ -39,4 +39,24 @@ export const linkifyText = (text: string): string => {
 /**
  * Strip host from link
  */
-export const stripHost = (link: string): string => (link.match(HOST_REGEX) as RegExpMatchArray)[1];
+export const stripHost = (link: string): string => (link.match(HOST_REGEX) as RegExpMatchArray)[2].split('/')[0];
+
+const months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/**
+ * Get month name for month number
+ */
+export const monthName = (monthNumber: number) => months[monthNumber - 1];
