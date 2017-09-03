@@ -10,6 +10,7 @@
     "dev": "webpack-dev-server --config webpack.config.js --env.dev --hot --inline --host 0.0.0.0"
   },
   "dependencies": {
+    "csstips": "^0.2.2",
     "preact": "^8.2.1",
     "preact-redux": "^2.0.2",
     "preact-router": "^2.5.5",
