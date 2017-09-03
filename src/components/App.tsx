@@ -10,8 +10,7 @@ import Router from 'preact-router';
 
 import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
-
-import Episodes from './Episodes';
+import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 
 import Home from './Home';
 import Toolbar from './Toolbar';
@@ -24,7 +23,7 @@ const App = () => (
       <Router>
         <Home path="/" />
         <ConnectedPodcastsGrid path="/feed/:feed" />
-        <Episodes path="/episodes" />
+        <ConnectedEpisodes path="/episodes" />
       </Router>
     </div>
   </div>

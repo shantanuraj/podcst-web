@@ -18,8 +18,8 @@ interface GetEpisodesAction {
 }
 const GET_EPISODES: GetEpisodesAction['type'] = 'GET_EPISODES';
 export const getEpisodes = (feed: string): GetEpisodesAction => ({
-    type: GET_EPISODES,
-    feed,
+  type: GET_EPISODES,
+  feed,
 });
 
 interface GetEpisodesSuccessAction {
