@@ -15,7 +15,7 @@ const { version }         = require('./package.json');
 const getPath = (env) => {
   const key = Object.keys(env)[0];
   if (key === 'dev') {
-    return '';
+    return '/';
   } else {
     return `//texts.sixth.io/${key}/`;
   }
