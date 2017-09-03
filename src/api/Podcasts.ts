@@ -18,8 +18,8 @@ export default class Podcasts {
     };
   }
 
-  public static top(): Observable<App.Podcast[]> {
-    return ajax(Podcasts.api('/top'))
+  public static feed(type: FeedType): Observable<App.Podcast[]> {
+    return ajax(Podcasts.api(`/${type}`))
       .map(res => res.response as App.Podcast[])
       .catch(err => {
         console.error(err);
@@ -36,7 +36,7 @@ export default class Podcasts {
       });
   }
 
-  public static feed(url: string): Observable<App.EpisodeListing | null> {
+  public static episodes(url: string): Observable<App.EpisodeListing | null> {
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
       .map(res => res.response as App.EpisodeListing | null)
       .catch(err => {

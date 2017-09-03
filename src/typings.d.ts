@@ -3,6 +3,9 @@
  */
 type ExplicitState = 'explicit' | 'cleaned' | 'notExplicit';
 
+type FeedType =
+  'top';
+
 /**
  * Application type dependencies
  */
@@ -87,3 +90,5 @@ interface FileInfo {
   length: string;
   type: string;
 }
+
+
