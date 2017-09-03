@@ -19,7 +19,7 @@ export default class Podcasts {
   }
 
   public static feed(type: FeedType): Observable<App.Podcast[]> {
-    return ajax(Podcasts.api(`/${type}`))
+    return ajax(Podcasts.api(`/${type}?limit=100`))
       .map(res => res.response as App.Podcast[])
       .catch(err => {
         console.error(err);
