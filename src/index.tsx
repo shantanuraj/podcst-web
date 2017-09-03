@@ -13,6 +13,9 @@ import {
 
 // Patch Rx operators
 import './utils/patch_operators';
+import {
+  fixGlobalStyles,
+} from './utils/styles';
 
 import configureStore from './stores';
 
@@ -25,5 +28,7 @@ const PodcastApp = () => (
     <App />
   </Provider>
 );
+
+fixGlobalStyles();
 
 render(<PodcastApp />, document.body);
