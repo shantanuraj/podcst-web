@@ -60,6 +60,9 @@ module.exports = env => {
     },
     output,
     context: resolve(__dirname, 'src'),
+    devServer: {
+      historyApiFallback: true,
+    },
     devtool: isProdOrStaging ? 'source-map' : 'eval',
     resolve: {
         // Add `.ts` and `.tsx` as a resolvable extension.
