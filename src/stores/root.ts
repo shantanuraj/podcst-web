@@ -18,6 +18,13 @@ import {
 } from './router';
 
 import {
+  PodcastsAction,
+  PodcastsState,
+  podcasts,
+  getEpisodesEpic,
+} from './podcasts';
+
+import {
   FeedActions,
   FeedState,
   feed,
@@ -37,7 +44,8 @@ import {
 export type Actions =
   RouterActions |
   FeedActions |
-  SearchActions;
+  SearchActions |
+  PodcastsAction;
 
 /**
  * Combined application state interface
@@ -46,6 +54,7 @@ export interface State {
   router: RouterState;
   feed: FeedState;
   search: SearchState;
+  podcasts: PodcastsState;
 };
 
 export const getDefaultState = (): State => ({
@@ -63,16 +72,19 @@ export const getDefaultState = (): State => ({
     query: '',
     searching: false,
   },
+  podcasts: {},
 });
 
 export const rootEpic = combineEpics<Actions, State>(
   routerEpic,
   getFeedEpic,
   searchPodcastsEpic,
+  getEpisodesEpic,
 );
 
 export const rootReducer = combineReducers<State>({
   router,
   feed,
   search,
+  podcasts,
 });
