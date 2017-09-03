@@ -8,8 +8,24 @@ import {
 } from 'preact';
 
 import {
+  style,
+} from 'typestyle';
+
+import {
   FeedState,
 } from '../stores/feed';
+
+const grid = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))',
+});
+
+const gridItem = cover => style({
+  height: '200px',
+  backgroundImage: `url(${cover})`,
+  backgroundRepeat: 'no-repeat',
+  backgroundSize: 'cover',
+});
 
 interface PodcastsGridProps extends FeedState {
   feed: FeedType;
@@ -40,10 +56,25 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     );
   }
 
+  renderPodcast(podcast: App.Podcast) {
+    const {
+      author,
+      title,
+    } = podcast;
+    return (
+      <div
+        role="img"
+        aria-label={`${title} by ${author}`}
+        class={gridItem(podcast.cover)}
+      >
+      </div>
+    );
+  }
+
   renderLoaded(podcasts: App.Podcast[]) {
     return (
-      <div>
-        Got {podcasts.length} podcasts
+      <div class={grid}>
+        {podcasts.map(this.renderPodcast)}
       </div>
     );
   }
