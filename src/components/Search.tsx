@@ -18,6 +18,8 @@ import {
   SearchState,
 } from '../stores/search';
 
+import SearchResults from './SearchResults';
+
 const search = style({
   padding: 16,
   height: 'inherit',
@@ -34,48 +36,6 @@ interface SearchProps extends SearchState {
   searchPodcasts: (query: string) => void;
 }
 
-const results = style({
-  backgroundColor: '#292929',
-  position: 'absolute',
-  maxHeight: '500px',
-  width: '100%',
-  boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
-  overflow: 'scroll',
-});
-
-const result = style({
-  display: 'flex',
-});
-
-const resultImage = style({
-  height: '50px',
-  width: '50px',
-});
-
-const resultText = style({
-  paddingLeft: 8,
-  fontSize: 16,
-});
-
-const resultAuthorText = style({
-  marginTop: 8,
-  fontSize: 12,
-});
-
-const renderPodcast = (podcast: App.Podcast) => (
-  <div class={result}>
-    <img class={resultImage} src={podcast.thumbnail} />
-    <div class={resultText}>
-      <p>{podcast.title}</p>
-      <p class={resultAuthorText}>{podcast.author}</p>
-    </div>
-  </div>
-);
-
-const renderPodcasts = (podcasts: App.Podcast[]) => (
-  podcasts.map(renderPodcast)
-);
-
 const Search = ({
   className,
   podcasts,
@@ -90,13 +50,7 @@ const Search = ({
       placeholder={'Search'}
       value={query}
     />
-    {
-      query && podcasts.length ?
-        <div class={results}>
-          {renderPodcasts(podcasts)}
-        </div> :
-        null
-    }
+    {query && podcasts.length ? <SearchResults podcasts={podcasts} /> : null}
   </div>
 );
 
