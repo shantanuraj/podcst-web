@@ -57,7 +57,7 @@ class Episodes extends Component<EpisodesProps, any> {
     info,
   }: EpisodesProps) {
     const feedInfo = info[feed];
-    if (!feedInfo) {
+    if (!feedInfo || feedInfo.loading) {
       return this.renderLoading();
     }
 
