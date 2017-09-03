@@ -5,7 +5,9 @@
 import {
   h,
 } from 'preact';
-
+import {
+  style,
+} from 'typestyle';
 import Router from 'preact-router';
 
 import ConnectedLoader from '../containers/ConnectedLoader';
@@ -15,11 +17,16 @@ import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import Home from './Home';
 import Toolbar from './Toolbar';
 
+const normalize = style({
+  height: '100%',
+  width: '100%',
+});
+
 const App = () => (
-  <div>
+  <div class={normalize}>
     <Toolbar />
     <ConnectedLoader />
-    <div style={{ paddingTop: 64 }}>
+    <div class={normalize} style={{ paddingTop: 64 }}>
       <Router>
         <Home path="/" />
         <ConnectedPodcastsGrid path="/feed/:feed" />
