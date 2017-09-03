@@ -6,6 +6,10 @@ import {
   Epic,
 } from 'redux-observable';
 
+import {
+  State,
+} from './root';
+
 import Podcasts from '../api/Podcasts';
 
 interface GetFeedAction {
@@ -49,7 +53,7 @@ export interface FeedState {
 }
 
 // Get feed epic
-export const getFeedEpic: Epic<FeedActions, FeedState> = action$ =>
+export const getFeedEpic: Epic<FeedActions, State> = action$ =>
   action$
     .ofType(GET_FEED)
     .mergeMap((action: GetFeedAction) =>
