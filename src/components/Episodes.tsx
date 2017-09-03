@@ -8,6 +8,10 @@ import {
 } from '../stores/podcasts';
 
 import {
+  stripHost,
+} from '../utils';
+
+import {
   normalizeEl,
 } from '../utils/styles';
 
@@ -82,6 +86,7 @@ class Episodes extends Component<EpisodesProps, any> {
       author,
       cover,
       description,
+      link,
       title,
     } = info;
 
@@ -104,7 +109,7 @@ class Episodes extends Component<EpisodesProps, any> {
           />
           <div class={podcastInfoTitles}>
             <h1 class={podcastTitle}>{title}</h1>
-            <h2>{author}</h2>
+            <h2>{author} - <a href={link}>{stripHost(link)}</a></h2>
             <p
               dangerouslySetInnerHTML={{
                 __html: description.trim()

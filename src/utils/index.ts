@@ -15,6 +15,8 @@ export const onEvent = (fn: (val: string) => void) => {
 
 const URL_REGEX = /^https?\:\//;
 
+const HOST_REGEX = /^https?\:\/\/(.*)/;
+
 /**
  * Linkify text
  */
@@ -33,3 +35,8 @@ export const linkifyText = (text: string): string => {
 
   return linkifed.join('');
 }
+
+/**
+ * Strip host from link
+ */
+export const stripHost = (link: string): string => (link.match(HOST_REGEX) as RegExpMatchArray)[1];
