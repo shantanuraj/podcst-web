@@ -1,23 +1,38 @@
 /**
- * ShareText Text interface
+ * Podcast typings
  */
-declare module ShareText {
-
-  export interface Text {
-    date: number;
-    thread: number;
-    address: string;
-    message: string;
-    sent: boolean;
-  }
-
-  export type TextThread = [string, ShareText.Text[]];
+export interface SubscriptionMap {
+  [feed: string]: Podcast
 }
 
-declare module ShareTextApi {
+export interface Podcast {
+  title: string;
+  link: string;
+  published: number;
+  description: string;
+  author: string;
+  cover: string;
+  keywords: string[];
+  explicit: boolean;
+  episodes: Episode[];
+}
 
-  export interface Texts {
-    texts: ShareText.Text[];
-  }
+export interface Episode {
+  title: string;
+  summary?: string;
+  showNotes: string;
+  published?: number;
+  cover: string;
+  explicit: boolean;
+  duration?: number;
+  link?: string;
+  file: FileInfo;
+  author?: string;
+  episodeArt?: string;
+}
 
+interface FileInfo {
+  url: string;
+  length: string;
+  type: string;
 }
