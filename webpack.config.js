@@ -55,6 +55,7 @@ module.exports = env => {
         'rxjs/add/operator/map',
         'rxjs/add/operator/mergeMap',
         'rxjs/observable/dom/ajax',
+        'typestyle',
       ],
       'app': './index.tsx',
     },

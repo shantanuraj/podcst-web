@@ -13,7 +13,7 @@ import {
 import Loader from '../components/Loader';
 
 const mapState = (state: State) => ({
-  loading: !state.feed.top.loading,
+  loading: state.feed.top.loading,
 });
 
 const ConnectedLoader = connect(
