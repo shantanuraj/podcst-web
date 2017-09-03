@@ -45,11 +45,13 @@ export type FeedActions =
   GetFeedAction |
   GetFeedSuccessAction;
 
+export interface FeedData {
+  podcasts: App.Podcast[];
+  loading: boolean;
+}
+
 export interface FeedState {
-  top: {
-    podcasts: App.Podcast[];
-    loading: boolean;
-  };
+  top: FeedData;
 }
 
 // Get feed epic
