@@ -15,6 +15,7 @@ import {
   FeedState,
 } from '../stores/feed';
 
+import Loading from './Loading';
 import PodcastsGridItem from './PodcastsGridItem';
 
 const grid = style({
@@ -44,11 +45,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
   }
 
   renderLoading() {
-    return (
-      <div>
-        Loading...
-      </div>
-    );
+    return <Loading />;
   }
 
   renderPodcast(podcast: App.Podcast) {

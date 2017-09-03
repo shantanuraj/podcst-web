@@ -4,6 +4,8 @@ import {
   PodcastsState,
 } from '../stores/podcasts';
 
+import Loading from './Loading';
+
 interface EpisodesProps {
   feed: string;
   info: PodcastsState;
@@ -29,11 +31,7 @@ class Episodes extends Component<EpisodesProps, any> {
   }
 
   renderLoading() {
-    return (
-      <div>
-        Loading...
-      </div>
-    );
+    return <Loading />
   }
 
   renderLoaded(info: App.EpisodeListing | null) {
