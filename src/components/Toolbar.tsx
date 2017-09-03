@@ -33,7 +33,7 @@ const toolbar = style({
   boxShadow: `0 2px 2px -2px rgba(0,0,0,.15)`,
 });
 
-const link = style({
+const navLink = style({
   padding: '0 16px',
   textDecoration: 'none',
   color: 'white',
@@ -44,15 +44,31 @@ const search = style({
   marginLeft: 'auto',
 });
 
+
+interface LinkMap {
+  [link: string]: string;
+}
+
+const linkMap: LinkMap = {
+  '/': 'Podcasts',
+  '/feed/top': 'Top',
+}
+
+const renderLink = (link: string, title: string) => (
+  <Link class={navLink} href={link}>
+    {title}
+  </Link>
+);
+
+const renderLinks = (linkMap: LinkMap) =>
+  Object
+  .keys(linkMap)
+  .map(link => renderLink(link, linkMap[link]));
+
 const Toolbar = () => (
   <header class={toolbar}>
     <nav>
-      <Link class={link} href="/">
-        Podcasts
-      </Link>
-      <Link class={link} href="/feed/top">
-        Top
-      </Link>
+      {renderLinks(linkMap)}
     </nav>
     <Search class={search} />
   </header>
