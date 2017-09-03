@@ -24,12 +24,20 @@ import {
   getFeedEpic,
 } from './feed';
 
+import {
+  SearchActions,
+  SearchState,
+  search,
+  searchPodcastsEpic,
+} from './search';
+
 /**
  * Combined application actions interface
  */
 export type Actions =
   RouterActions |
-  FeedActions;
+  FeedActions |
+  SearchActions;
 
 /**
  * Combined application state interface
@@ -37,6 +45,7 @@ export type Actions =
 export interface State {
   router: RouterState;
   feed: FeedState;
+  search: SearchState;
 };
 
 export const getDefaultState = (): State => ({
@@ -49,14 +58,21 @@ export const getDefaultState = (): State => ({
       podcasts: [],
     },
   },
+  search: {
+    podcasts: [],
+    query: '',
+    searching: false,
+  },
 });
 
 export const rootEpic = combineEpics<Actions, State>(
   routerEpic,
   getFeedEpic,
+  searchPodcastsEpic,
 );
 
 export const rootReducer = combineReducers<State>({
   router,
   feed,
+  search,
 });

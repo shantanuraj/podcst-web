@@ -13,7 +13,7 @@ import {
 import NavLinks, {
   LinkMap,
 } from './NavLinks';
-import Search from './Search';
+import ConnectedSearch from '../containers/ConnectedSearch';
 
 const toolbar = style({
   display: 'flex',
@@ -45,7 +45,7 @@ const linkMap: LinkMap = {
 const Toolbar = () => (
   <header class={toolbar}>
     <NavLinks links={linkMap} />
-    <Search class={search} />
+    <ConnectedSearch className={search} />
   </header>
 );
 

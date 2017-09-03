@@ -10,6 +10,14 @@ import {
   style,
 } from 'typestyle';
 
+import {
+  onEvent,
+} from '../utils';
+
+import {
+  SearchState,
+} from '../stores/search';
+
 const search = style({
   padding: 16,
   height: 'inherit',
@@ -21,8 +29,9 @@ const search = style({
   color: 'white',
 });
 
-interface SearchProps {
-  class?: string;
+interface SearchProps extends SearchState {
+  className: string;
+  searchPodcasts: (query: string) => void;
 }
 
 const results = style({
@@ -32,12 +41,40 @@ const results = style({
   maxHeight: '500px',
   width: '100%',
   boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
+  overflow: 'scroll',
 });
 
-const Search = (props: SearchProps) => (
-  <div class={props.class}>
-    <input placeholder={'Search'} class={search} type="text" />
-    <div class={results} />
+const renderPodcast = (podcast: App.Podcast) => (
+  <div>
+    {podcast.title}
+  </div>
+);
+
+const renderPodcasts = (podcasts: App.Podcast[]) => (
+  podcasts.map(renderPodcast)
+);
+
+const Search = ({
+  className,
+  podcasts,
+  query,
+  searchPodcasts,
+}: SearchProps) => (
+  <div class={className}>
+    <input
+      class={search}
+      type="text"
+      onInput={onEvent(searchPodcasts)}
+      placeholder={'Search'}
+      value={query}
+    />
+    {
+      query && podcasts.length ?
+        <div class={results}>
+          {renderPodcasts(podcasts)}
+        </div> :
+        null
+    }
   </div>
 );
 
