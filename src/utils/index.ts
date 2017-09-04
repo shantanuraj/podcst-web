@@ -59,4 +59,4 @@ const months = [
 /**
  * Get month name for month number
  */
-export const monthName = (monthNumber: number) => months[monthNumber - 1];
+export const monthName = (monthNumber: number) => months[monthNumber];

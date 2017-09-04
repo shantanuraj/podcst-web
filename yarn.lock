@@ -2,6 +2,10 @@
 # yarn lockfile v1
 
 
+"@types/howler@^2.0.3":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@types/howler/-/howler-2.0.3.tgz#4adef7852a408b871e82d2a35822c889a00304be"
+
 "@types/lodash-es@^4.14.6":
   version "4.14.6"
   resolved "https://registry.yarnpkg.com/@types/lodash-es/-/lodash-es-4.14.6.tgz#c11d48d77f46b0aa9fae2a152b8259c23891efd1"
@@ -2053,6 +2057,10 @@ home-or-tmp@^2.0.0:
 hosted-git-info@^2.1.4:
   version "2.5.0"
   resolved "https://registry.yarnpkg.com/hosted-git-info/-/hosted-git-info-2.5.0.tgz#6d60e34b3abbc8313062c3b798ef8d901a07af3c"
+
+howler@^2.0.4:
+  version "2.0.4"
+  resolved "https://registry.yarnpkg.com/howler/-/howler-2.0.4.tgz#cbd5db875f9833e1aa6084568951d788fc687f92"
 
 hpack.js@^2.1.6:
   version "2.1.6"

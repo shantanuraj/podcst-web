@@ -27,7 +27,6 @@ const darkBg = style({
 const podcastInfo = style(
   {
     display: 'flex',
-    justifyContent: 'space-between',
   },
   media({
     maxWidth: 601,
@@ -61,7 +60,11 @@ const episodesView = style({
 interface EpisodesProps {
   feed: string;
   info: PodcastsState;
+  state: EpisodePlayerState;
+  currentEpisode: App.Episode | null;
   getEpisodes: (feed: string) => void;
+  playEpisode: (episode: App.Episode) => void;
+  pauseEpisode: () => void;
 }
 
 class Episodes extends Component<EpisodesProps, any> {
@@ -84,6 +87,25 @@ class Episodes extends Component<EpisodesProps, any> {
 
   renderLoading() {
     return <Loading />
+  }
+
+  renderEpisode = (episode: App.Episode) => {
+    const {
+      currentEpisode,
+      playEpisode,
+      pauseEpisode,
+      state,
+    } = this.props;
+
+    const isPlaying = currentEpisode === episode && state === 'playing';
+    return (
+      <Episode
+        isPlaying={isPlaying}
+        episode={episode}
+        pause={pauseEpisode}
+        play={playEpisode}
+      />
+    );
   }
 
   renderLoaded(info: App.EpisodeListing | null) {
@@ -132,15 +154,11 @@ class Episodes extends Component<EpisodesProps, any> {
           <div class={podcastInfoTitles}>
             <h1 class={podcastTitle}>{title}</h1>
             <h2>{author} - <a href={link}>{stripHost(link)}</a></h2>
-            <p
-              dangerouslySetInnerHTML={{
-                __html: description.trim()
-              }}
-            />
+            <p dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
         <div class={episodesView}>
-          {episodes.map(Episode)}
+          {episodes.map(this.renderEpisode)}
         </div>
       </div>
     );

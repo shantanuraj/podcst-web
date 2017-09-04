@@ -91,4 +91,7 @@ interface FileInfo {
   type: string;
 }
 
-
+type EpisodePlayerState =
+  'playing' |
+  'paused'  |
+  'stopped';

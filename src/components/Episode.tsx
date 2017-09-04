@@ -14,7 +14,7 @@ import {
   monthName,
 } from '../utils';
 
-const episode = style({
+const episodeContainer = style({
   padding: 16,
 });
 
@@ -32,6 +32,7 @@ const episodeRow = style({
 
 const infoContainer = style({
   display: 'flex',
+  alignItems: 'center',
 });
 
 const subContainer = style({
@@ -44,12 +45,13 @@ const playInfo = style({
   alignItems: 'center',
 });
 
-const playButton = style({
+const playButton = (isPlaying: boolean) => style({
   display: 'inline-block',
+  minWidth: '65px',
   borderRadius: '3px',
   padding: '8px',
-  background: 'transparent',
-  color: 'white',
+  background: isPlaying ? '#82ffb5' : 'transparent',
+  color: isPlaying ? '#292929' : 'white',
   border: '2px solid #82ffb5',
   $nest: {
     '& :active, :focus': {
@@ -58,19 +60,52 @@ const playButton = style({
   },
 });
 
+interface EpisodeProps {
+  episode: App.Episode;
+  play: (episode: App.Episode) => void;
+  pause: () => void;
+  isPlaying: boolean;
+}
+
+const renderButton = (
+  episode: App.Episode,
+  play: (episode: App.Episode) => void,
+  pause: () => void,
+  isPlaying: boolean,
+) => {
+  if (isPlaying) {
+    return (
+      <button onClick={pause} class={playButton(isPlaying)}>
+        Pause
+      </button>
+    );
+  }
+  return (
+    <button onClick={() => play(episode)} class={playButton(isPlaying)}>
+      Play
+    </button>
+  );
+}
+
 const Episode = ({
-  title,
-  published,
-  duration,
-}: App.Episode) => {
+  episode,
+  play,
+  pause,
+  isPlaying
+}: EpisodeProps) => {
+  const {
+    title,
+    published,
+    duration,
+  } = episode;
 
   const pub = new Date(published || Date.now());
-  const day = pub.getDay();
+  const day = pub.getDate();
   const month = monthName(pub.getMonth());
   const episodeLength = duration ? `${Math.floor(duration / 60)} mins` : '';
 
   return (
-    <div class={episode}>
+    <div class={episodeContainer}>
       <div class={episodeRow}>
         <div class={infoContainer}>
           <div class={subContainer}>
@@ -84,9 +119,7 @@ const Episode = ({
           <div class={subContainer}>
             {episodeLength}
           </div>
-          <button class={playButton}>
-            Play
-          </button>
+          {renderButton(episode, play, pause, isPlaying)}
         </div>
       </div>
       <div class={lineBreak} />
