@@ -65,7 +65,7 @@ interface EpisodeProps {
   currentEpisode: App.Episode | null;
   state: EpisodePlayerState;
   play: (episode: App.Episode) => void;
-  resume: (episode: App.Episode) => void;
+  resume: () => void;
   pause: () => void;
 }
 
@@ -82,7 +82,6 @@ const renderButton = ({
   const isPaused  = isCurrent && state === 'paused';
 
   const play_ = () => play(episode);
-  const resume_ = () => resume(episode);
 
   if (isPlaying) {
     return (
@@ -92,7 +91,7 @@ const renderButton = ({
     );
   }
   return (
-    <button onClick={isPaused ? resume_ : play_} class={playButton(isPlaying)}>
+    <button onClick={isPaused ? resume : play_} class={playButton(isPlaying)}>
       {isPaused ? 'Resume' : 'Play'}
     </button>
   );

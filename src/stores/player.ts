@@ -59,22 +59,18 @@ const pauseEpisodeAudio = (): PauseAudioAction => ({
  */
 interface ResumeEpisodeAction {
   type: 'RESUME_EPISODE',
-  episode: App.Episode,
 }
 const RESUME_EPISODE: ResumeEpisodeAction['type'] = 'RESUME_EPISODE';
-export const resumeEpisode = (episode: App.Episode): ResumeEpisodeAction => ({
+export const resumeEpisode = (): ResumeEpisodeAction => ({
   type: RESUME_EPISODE,
-  episode,
 });
 
 interface ResumeEpisodeAudioAction {
   type: 'RESUME_EPISODE_AUDIO',
-  episode: App.Episode,
 }
 const RESUME_EPISODE_AUDIO: ResumeEpisodeAudioAction['type'] = 'RESUME_EPISODE_AUDIO';
-const resumeEpisodeAudio = (episode: App.Episode): ResumeEpisodeAudioAction => ({
+const resumeEpisodeAudio = (): ResumeEpisodeAudioAction => ({
   type: RESUME_EPISODE_AUDIO,
-  episode,
 });
 
 /**
@@ -172,7 +168,7 @@ export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
 
         case RESUME_EPISODE:
           Audio.resume();
-          return resumeEpisodeAudio(action.episode);
+          return resumeEpisodeAudio();
 
         case STOP_EPISODE:
           Audio.stop();

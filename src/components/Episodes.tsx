@@ -64,7 +64,7 @@ interface EpisodesProps {
   currentEpisode: App.Episode | null;
   getEpisodes: (feed: string) => void;
   playEpisode: (episode: App.Episode) => void;
-  resumeEpisode: (episode: App.Episode) => void;
+  resumeEpisode: () => void;
   pauseEpisode: () => void;
 }
 

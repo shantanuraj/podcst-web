@@ -15,6 +15,7 @@ import {
 import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
+import ConnectedPlayer from '../containers/ConnectedPlayer';
 
 import Home from './Home';
 import Toolbar from './Toolbar';
@@ -30,6 +31,7 @@ const App = () => (
         <ConnectedEpisodes path="/episodes" />
       </Router>
     </div>
+    <ConnectedPlayer />
   </div>
 );
 
