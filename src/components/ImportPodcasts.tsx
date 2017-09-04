@@ -33,6 +33,19 @@ const importButton = style({
   },
 });
 
+const onChange = (cb: (file: string) => void) => {
+  return (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const file = (target.files as FileList)[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      cb(reader.result);
+      target.value = '';
+    }
+    reader.readAsText(file);
+  };
+}
+
 const ImportPodcasts = () => (
   <div class={container}>
     <button class={importButton}>
@@ -43,6 +56,7 @@ const ImportPodcasts = () => (
           class="axis-import-input"
           name="file"
           type="file"
+          onChange={onChange(res => console.log(res))}
         />
         <label for="opml-import">
           Upload OPML File
