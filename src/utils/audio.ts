@@ -20,7 +20,7 @@ let globalHowl: Howl;
 const Audio = {
   play(episode: App.Episode) {
     if (globalHowl) {
-      Audio.pause();
+      Audio.stop();
     }
     globalHowl = new Howl({
       src: [episode.file.url],
