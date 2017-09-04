@@ -302,7 +302,7 @@ export const player = (state: PlayerState = {
       };
     }
     case SKIP_TO_NEXT_EPISODE: {
-      const currentEpisode = (state.currentEpisode + 1) / state.queue.length;
+      const currentEpisode = (state.currentEpisode + 1) % state.queue.length;
       const {
         duration,
       } = state.queue[currentEpisode];

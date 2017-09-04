@@ -4,6 +4,7 @@
 
 import {
   h,
+  Component,
 } from 'preact';
 
 import {
@@ -71,57 +72,119 @@ const episodeImage = (image: string) => style({
   marginRight: '16px',
 });
 
-const Player = ({
-  duration,
-  currentEpisode,
-  pause,
-  queue,
-  resume,
-  seekPosition,
-  state,
-  onSeek,
-}: PlayerProps) => {
-  const episode = queue[currentEpisode];
+const Key: KeyboardShortcutsMap = {
+  32: 'play',
+  37: 'prev',
+  80: 'prev',
+  39: 'next',
+  78: 'next',
+}
 
-  if (state === 'stopped' || !episode) {
-    return null;
+const ignoreKeyboardSelector = 'header *';
+
+class Player extends Component<PlayerProps, any> {
+
+  componentDidMount() {
+    window.addEventListener('keydown', this.keyboardControls);
   }
 
-  const {
-    author,
-    cover,
-    episodeArt,
-    title,
-  } = episode;
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.keyboardControls);
+  }
 
-  const duration_ = duration || episode.duration || 0;
+  keyboardControls = (e: KeyboardEvent) => {
+    const {
+      keyCode,
+      target,
+    } = e;
 
-  return (
-    <div class={player}>
-      <Icon
-        onClick={state === 'playing' ? pause : resume }
-        icon={state === 'playing' ? 'pause' : 'play'}
-      />
-      <div
-        class={episodeImage(episodeArt || cover as string)}
-        role="img"
-        aria-label={`${title} episode art`}
-      />
-      <div class={episodeInfo}>
-        <p>
-          {title}
-        </p>
-        <p>
-          {author}
-        </p>
+    if ((target as HTMLElement).matches(ignoreKeyboardSelector)) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    const {
+      state,
+      pause,
+      resume,
+      skipToNext,
+      skipToPrev,
+    } = this.props;
+
+    switch(Key[keyCode]) {
+      case 'play': {
+        state === 'paused' ?
+          resume() : pause();
+        break;
+      }
+      case 'next': {
+        skipToNext();
+        break;
+      }
+      case 'prev': {
+        skipToPrev();
+        break;
+      }
+    }
+
+    return false;
+  }
+
+  render({
+    duration,
+    currentEpisode,
+    pause,
+    queue,
+    resume,
+    seekPosition,
+    state,
+    onSeek,
+  }: PlayerProps) {
+    const episode = queue[currentEpisode];
+
+    if (state === 'stopped' || !episode) {
+      return null;
+    }
+
+    const {
+      author,
+      cover,
+      episodeArt,
+      title,
+    } = episode;
+
+    const duration_ = duration || episode.duration || 0;
+
+    return (
+      <div class={player}>
+        <Icon
+          onClick={state === 'playing' ? pause : resume }
+          icon={state === 'playing' ? 'pause' : 'play'}
+        />
+        <div
+          class={episodeImage(episodeArt || cover as string)}
+          role="img"
+          aria-label={`${title} episode art`}
+        />
+        <div class={episodeInfo}>
+          <p>
+            {title}
+          </p>
+          <p>
+            {author}
+          </p>
+        </div>
+        <Seekbar
+          onSeek={onSeek}
+          duration={duration_}
+          seekPosition={seekPosition}
+        />
       </div>
-      <Seekbar
-        onSeek={onSeek}
-        duration={duration_}
-        seekPosition={seekPosition}
-      />
-    </div>
-  );
-};
+    );
+  }
+}
 
 export default Player;

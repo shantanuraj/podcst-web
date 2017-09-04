@@ -96,6 +96,10 @@ type EpisodePlayerState =
   'paused'  |
   'stopped';
 
+interface KeyboardShortcutsMap {
+  [keyCode: number]: 'play' | 'next' | 'prev';
+}
+
 interface PodcastWebpackModule {
   hot?: {
     accept: () => void;
