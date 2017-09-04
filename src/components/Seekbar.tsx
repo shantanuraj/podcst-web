@@ -24,13 +24,13 @@ const seekbarContainer = style({
   height: '100%',
 });
 
-const seekbar = style({
+const seekbar = (duration: number, seekPosition: number) => style({
   position: 'absolute',
   top: 0,
   left: 0,
   width: '50%',
-  height: '100%',
-  backgroundColor: `rgba(0, 0, 0, 0.75)`,
+  height: `${Math.floor(seekPosition / duration) * 100}%`,
+  backgroundColor: `rgba(0, 0, 0, 0.5)`,
 });
 
 interface SeekbarProps {
@@ -44,7 +44,7 @@ const Seekbar = ({
 }: SeekbarProps) => (
   <div class={seekbarContainer}>
     {formatTime(duration, seekPosition)}
-    <div class={seekbar}/>
+    <div class={seekbar(duration, seekPosition)}/>
   </div>
 );
 
