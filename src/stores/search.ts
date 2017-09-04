@@ -6,6 +6,10 @@ import {
   Epic,
 } from 'redux-observable';
 
+import {
+  Observable,
+} from 'rxjs/Observable';
+
 import Podcasts from '../api/Podcasts';
 
 import {
@@ -46,8 +50,10 @@ export const searchPodcastsEpic: Epic<SearchActions, State> = action$ =>
   action$.ofType(SEARCH_PODCASTS)
     .debounceTime(200)
     .switchMap((action: SearchPodcastsAction) => {
-      return Podcasts.search(action.query)
-        .map(searchPodcastsSuccess);
+      return action.query.length === 0 ?
+        Observable.of(searchPodcastsSuccess([])) :
+        Podcasts.search(action.query)
+          .map(searchPodcastsSuccess);
     });
 
 export const search = (state: SearchState = {
