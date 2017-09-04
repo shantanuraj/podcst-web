@@ -4,6 +4,7 @@
 
 import {
   h,
+  Component,
 } from 'preact';
 
 import {
@@ -37,28 +38,61 @@ interface SearchProps extends SearchState {
   dismissSearch: () => void;
 }
 
-const Search = ({
-  className,
-  dismissSearch,
-  podcasts,
-  query,
-  searchPodcasts,
-}: SearchProps) => (
-  <div class={className}>
-    <input
-      class={search}
-      type="text"
-      onInput={onEvent(searchPodcasts)}
-      placeholder={'Search'}
-      value={query}
-    />
-    {query && podcasts.length ?
-      <SearchResults
-        dismissSearch={dismissSearch}
-        podcasts={podcasts}
-      /> : null
+class Search extends Component<SearchProps, any> {
+  private el: HTMLElement | null;
+
+  componentDidMount() {
+    document.addEventListener('click', this.dismissSearch);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('click', this.dismissSearch);
+  }
+
+  saveRef = (el: HTMLElement | undefined) => {
+    if (el) {
+      this.el = el;
     }
-  </div>
-);
+  }
+
+  dismissSearch = (e: MouseEvent) => {
+    const {
+      dismissSearch,
+    } = this.props;
+    const target = e.target as HTMLElement;
+    if (this.el && !this.el.contains(target)) {
+      dismissSearch();
+    }
+  }
+
+  render({
+    className,
+    dismissSearch,
+    podcasts,
+    query,
+    searchPodcasts,
+  }: SearchProps) {
+    return (
+      <div
+        class={className}
+        ref={this.saveRef}
+      >
+        <input
+          class={search}
+          type="text"
+          onInput={onEvent(searchPodcasts)}
+          placeholder={'Search'}
+          value={query}
+        />
+        {query && podcasts.length ?
+          <SearchResults
+            dismissSearch={dismissSearch}
+            podcasts={podcasts}
+          /> : null
+        }
+      </div>
+    );
+  }
+}
 
 export default Search;
