@@ -20,6 +20,7 @@ import {
   resumeEpisode,
   skipToNextEpisode,
   skipToPrevEpisode,
+  manualSeekUpdate,
 } from '../stores/player';
 
 import Player from '../components/Player';
@@ -31,6 +32,7 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   resume: resumeEpisode,
   skipToNext: skipToNextEpisode,
   skipToPrev: skipToPrevEpisode,
+  onSeek: manualSeekUpdate,
 }, dispatch);
 
 const ConnectedPlayer = connect(

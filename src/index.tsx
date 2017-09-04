@@ -21,7 +21,7 @@ import configureStore from './stores';
 
 import App from './components/App';
 
-const store = configureStore();
+export const store = configureStore();
 
 const PodcastApp = () => (
   <Provider store={store}>

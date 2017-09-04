@@ -57,12 +57,14 @@ interface PlayerProps extends PlayerState {
   resume: () => void;
   skipToNext: () => void;
   skipToPrev: () => void;
+  onSeek: (seekPosition: number, duration: number) => void;
 }
 
 const episodeImage = (image: string) => style({
   backgroundImage: `url(${image})`,
   backgroundRepeat: 'no-repeat',
-  backgroundSize: 'contain',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
   height: 'inherit',
   width: 'inherit',
   maxWidth: '64px',
@@ -70,12 +72,14 @@ const episodeImage = (image: string) => style({
 });
 
 const Player = ({
+  duration,
   currentEpisode,
   pause,
   queue,
   resume,
   seekPosition,
   state,
+  onSeek,
 }: PlayerProps) => {
   const episode = queue[currentEpisode];
 
@@ -86,12 +90,11 @@ const Player = ({
   const {
     author,
     cover,
-    duration,
     episodeArt,
     title,
   } = episode;
 
-  const duration_ = duration || 0;
+  const duration_ = duration || episode.duration || 0;
 
   return (
     <div class={player}>
@@ -113,6 +116,7 @@ const Player = ({
         </p>
       </div>
       <Seekbar
+        onSeek={onSeek}
         duration={duration_}
         seekPosition={seekPosition}
       />

@@ -28,7 +28,9 @@ import {
   PlayerActions,
   PlayerState,
   player,
+  manualSeekUpdateEpic,
   playerAudioEpic,
+  seekUpdateEpic,
 } from './player';
 
 import {
@@ -87,6 +89,7 @@ export const getDefaultState = (): State => ({
     queue: [],
     state: 'stopped',
     seekPosition: 0,
+    duration: 0,
   },
 });
 
@@ -96,6 +99,8 @@ export const rootEpic = combineEpics<Actions, State>(
   searchPodcastsEpic,
   getEpisodesEpic,
   playerAudioEpic,
+  seekUpdateEpic,
+  manualSeekUpdateEpic,
 );
 
 export const rootReducer = combineReducers<State>({

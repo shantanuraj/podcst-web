@@ -123,6 +123,51 @@ const skipAudio = (): SkipAudioAction => ({
 });
 
 /**
+ * Seek update action
+ */
+interface SeekUpdateAction {
+  type: 'SEEK_UPDATE',
+  seekPosition: number;
+  duration: number;
+}
+const SEEK_UPDATE: SeekUpdateAction['type'] = 'SEEK_UPDATE';
+export const seekUpdate = (seekPosition: number, duration: number) => ({
+  type: SEEK_UPDATE,
+  seekPosition,
+  duration,
+});
+
+/**
+ * Manual seek update action
+ */
+interface ManualSeekUpdateAction {
+  type: 'MANUAL_SEEK_UPDATE',
+  seekPosition: number;
+  duration: number;
+}
+const MANUAL_SEEK_UPDATE: ManualSeekUpdateAction['type'] = 'MANUAL_SEEK_UPDATE';
+export const manualSeekUpdate = (seekPosition: number, duration: number) => ({
+  type: MANUAL_SEEK_UPDATE,
+  seekPosition,
+  duration,
+});
+
+/**
+ * Seek update success action
+ */
+interface SeekUpdateSuccessAction {
+  type: 'SEEK_UPDATE_SUCCESS',
+  seekPosition: number;
+  duration: number;
+}
+const SEEK_UPDATE_SUCCESS: SeekUpdateSuccessAction['type'] = 'SEEK_UPDATE_SUCCESS';
+export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
+  type: SEEK_UPDATE_SUCCESS,
+  seekPosition,
+  duration,
+});
+
+/**
  * Noop action
  */
 interface NoopAction {
@@ -145,6 +190,9 @@ export type PlayerActions =
   SkipToNextAction |
   SkipToPrevAction |
   SkipAudioAction |
+  SeekUpdateAction |
+  SeekUpdateSuccessAction |
+  ManualSeekUpdateAction |
   NoopAction;
 
 export interface PlayerState {
@@ -152,11 +200,34 @@ export interface PlayerState {
   queue: App.Episode[];
   state: EpisodePlayerState;
   seekPosition: number;
+  duration: number;
 }
+
+export const seekUpdateEpic: Epic<PlayerActions, State> = action$ =>
+  action$
+    .ofType(SEEK_UPDATE)
+    .throttleTime(1000)
+    .map(
+      (action: SeekUpdateAction) =>
+        seekUpdateSuccess(action.seekPosition, action.duration)
+    );
+
+export const manualSeekUpdateEpic: Epic<PlayerActions, State> = action$ =>
+  action$
+    .ofType(MANUAL_SEEK_UPDATE)
+    .map(
+      (action: ManualSeekUpdateAction) => {
+        Audio.seekTo(action.seekPosition);
+        return noop();
+      }
+    );
 
 export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
   action$
-    .filter(action => action.type !== NOOP)
+    .filter(action => (
+      action.type !== NOOP &&
+      action.type !== SEEK_UPDATE
+    ))
     .map((action: PlayerActions) => {
       switch (action.type) {
         case PLAY_EPISODE:
@@ -194,44 +265,75 @@ export const player = (state: PlayerState = {
   queue: [],
   state: 'stopped',
   seekPosition: 0,
+  duration: 0,
 }, action: PlayerActions): PlayerState => {
   switch (action.type) {
-    case PLAY_EPISODE:
+    case PLAY_EPISODE: {
       const queue = state.queue.concat(action.episode);
       const currentEpisode = queue.length - 1;
+      const {
+        duration,
+      } = queue[currentEpisode];
       return {
         ...state,
         currentEpisode,
+        duration: duration || 0,
         state: 'playing',
         queue,
       };
-    case PAUSE_EPISODE:
+    }
+    case PAUSE_EPISODE: {
       return {
         ...state,
         state: 'paused',
       };
-    case RESUME_EPISODE:
+    }
+    case RESUME_EPISODE: {
       return {
         ...state,
         state: 'playing',
       };
-    case STOP_EPISODE:
+    }
+    case STOP_EPISODE: {
       return {
         ...state,
+        seekPosition: 0,
         state: 'stopped',
       };
-    case SKIP_TO_NEXT_EPISODE:
+    }
+    case SKIP_TO_NEXT_EPISODE: {
+      const currentEpisode = (state.currentEpisode + 1) / state.queue.length;
+      const {
+        duration,
+      } = state.queue[currentEpisode];
       return {
         ...state,
-        currentEpisode: (state.currentEpisode + 1) / state.queue.length,
+        currentEpisode,
+        duration: duration || 0,
       };
-    case SKIP_TO_PREV_EPISODE:
+    }
+    case SKIP_TO_PREV_EPISODE: {
+      const currentEpisode = state.currentEpisode === 0 ?
+        state.queue.length - 1 :
+        (state.currentEpisode - 1) / state.queue.length;
+      const {
+        duration,
+      } = state.queue[currentEpisode];
       return {
         ...state,
-        currentEpisode: state.currentEpisode === 0 ?
-          state.queue.length - 1 :
-          (state.currentEpisode - 1) / state.queue.length,
+        currentEpisode,
+        duration: duration || 0,
       };
+    }
+    case MANUAL_SEEK_UPDATE:
+    case SEEK_UPDATE_SUCCESS: {
+      const episode = state.queue[state.currentEpisode];
+      return {
+        ...state,
+        seekPosition: action.seekPosition,
+        duration: action.duration || episode.duration || 0,
+      };
+    }
     default:
       return state;
   }
