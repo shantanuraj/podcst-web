@@ -86,6 +86,7 @@ export const getDefaultState = (): State => ({
     currentEpisode: 0,
     queue: [],
     state: 'stopped',
+    seekPosition: 0,
   },
 });
 

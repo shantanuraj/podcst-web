@@ -151,6 +151,7 @@ export interface PlayerState {
   currentEpisode: number;
   queue: App.Episode[];
   state: EpisodePlayerState;
+  seekPosition: number;
 }
 
 export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
@@ -192,6 +193,7 @@ export const player = (state: PlayerState = {
   currentEpisode: 0,
   queue: [],
   state: 'stopped',
+  seekPosition: 0,
 }, action: PlayerActions): PlayerState => {
   switch (action.type) {
     case PLAY_EPISODE:

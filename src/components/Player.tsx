@@ -11,6 +11,10 @@ import {
 } from 'typestyle';
 
 import {
+  formatTime,
+} from '../utils';
+
+import {
   PlayerState,
 } from '../stores/player';
 
@@ -82,6 +86,7 @@ const Player = ({
   pause,
   queue,
   resume,
+  seekPosition,
   state,
 }: PlayerProps) => {
   const episode = queue[currentEpisode];
@@ -93,9 +98,12 @@ const Player = ({
   const {
     author,
     cover,
+    duration,
     episodeArt,
     title,
   } = episode;
+
+  const duration_ = duration || 0;
 
   return (
     <div class={player}>
@@ -117,6 +125,7 @@ const Player = ({
         </p>
       </div>
       <div class={seekbarContainer}>
+        {formatTime(duration_, seekPosition)}
       </div>
     </div>
   );
