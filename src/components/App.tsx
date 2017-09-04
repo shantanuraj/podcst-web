@@ -24,7 +24,7 @@ const App = () => (
   <div class={normalizeEl}>
     <Toolbar />
     <ConnectedLoader />
-    <div class={normalizeEl} style={{ paddingTop: 64 }}>
+    <div class={normalizeEl} style={{ paddingTop: 64, marginBottom: 64, }}>
       <Router>
         <Home path="/" />
         <ConnectedPodcastsGrid path="/feed/:feed" />
