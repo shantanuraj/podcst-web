@@ -40,20 +40,43 @@ interface PlayerProps extends PlayerState {
   skipToPrev: () => void;
 }
 
+const episodeImage = (image: string) => style({
+  backgroundImage: `url(${image})`,
+  backgroundRepeat: 'no-repeat',
+  backgroundSize: 'contain',
+  height: 'inherit',
+  width: 'inherit',
+});
+
 const Player = ({
+  currentEpisode,
   pause,
+  queue,
   resume,
   state,
 }: PlayerProps) => {
-  if (state === 'stopped') {
+  const episode = queue[currentEpisode];
+
+  if (state === 'stopped' || !episode) {
     return null;
   }
+
+  const {
+    cover,
+    episodeArt,
+    title,
+  } = episode;
 
   return (
     <div class={player}>
       <Icon
         onClick={state === 'playing' ? pause : resume }
         icon={state === 'playing' ? 'pause' : 'play'}
+      />
+      <div
+        class={episodeImage(episodeArt || cover as string)}
+        role="img"
+        aria-label={`${title} episode art`}
       />
     </div>
   );
