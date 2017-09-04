@@ -11,14 +11,11 @@ import {
 } from 'typestyle';
 
 import {
-  formatTime,
-} from '../utils';
-
-import {
   PlayerState,
 } from '../stores/player';
 
 import Icon from '../svg/Icon';
+import Seekbar from './Seekbar';
 
 const player = style({
   display: 'flex',
@@ -72,15 +69,6 @@ const episodeImage = (image: string) => style({
   marginRight: '16px',
 });
 
-const seekbarContainer = style({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  flexGrow: 1,
-  height: '100%',
-});
-
 const Player = ({
   currentEpisode,
   pause,
@@ -124,9 +112,10 @@ const Player = ({
           {author}
         </p>
       </div>
-      <div class={seekbarContainer}>
-        {formatTime(duration_, seekPosition)}
-      </div>
+      <Seekbar
+        duration={duration_}
+        seekPosition={seekPosition}
+      />
     </div>
   );
 };
