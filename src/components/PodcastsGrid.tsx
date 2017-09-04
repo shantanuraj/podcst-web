@@ -24,13 +24,25 @@ const grid = style({
   marginBottom: '64px',
 });
 
-interface PodcastsGridProps extends FeedState {
+interface FeedStateProps extends FeedState {
+  mode: 'feed';
   feed: FeedType;
   getFeed: (feed: FeedType) => void;
 }
 
+interface SubsStateProps {
+  mode: 'subs';
+  subs: SubscriptionsMap;
+}
+
+type PodcastsGridProps = FeedStateProps | SubsStateProps;
+
 class PodcastsGrid extends Component<PodcastsGridProps, any> {
   componentDidMount() {
+    if (this.props.mode === 'subs') {
+      return;
+    }
+
     const {
       feed,
       getFeed,
@@ -49,13 +61,13 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     return <Loading />;
   }
 
-  renderPodcast(podcast: App.Podcast) {
+  renderPodcast(podcast: App.RenderablePodcast) {
     return (
-      <PodcastsGridItem {...podcast} />
+      <PodcastsGridItem podcast={podcast} />
     );
   }
 
-  renderLoaded(podcasts: App.Podcast[]) {
+  renderLoaded(podcasts: App.RenderablePodcast[]) {
     return (
       <div class={grid}>
         {podcasts.map(this.renderPodcast)}
@@ -64,16 +76,35 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
   }
 
   render({
-    feed,
+    mode,
   }: PodcastsGridProps) {
-    const {
-      loading,
-      podcasts,
-    } = this.props[feed];
 
-    if (loading || podcasts.length === 0) {
-      return this.renderLoading();
+    if (mode === 'feed') {
+      const {
+        feed,
+      } = this.props as FeedStateProps;
+      const {
+        loading,
+        podcasts,
+      } = this.props[feed];
+
+      if (loading || podcasts.length === 0) {
+        return this.renderLoading();
+      }
+
+      this.renderLoaded(podcasts);
     }
+
+    const {
+      subs,
+    } = this.props as SubsStateProps;
+
+    const podcasts = Object
+      .keys(subs)
+      .map(feed => ({
+        ...subs[feed],
+        feed,
+      }));
 
     return this.renderLoaded(podcasts);
   }

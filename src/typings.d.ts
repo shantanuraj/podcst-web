@@ -83,12 +83,29 @@ declare namespace App {
     explicit: boolean;
     episodes: Episode[];
   }
+
+  type RenderablePodcast = Podcast | (EpisodeListing & {
+    feed: string;
+  });
+}
+
+interface SubscriptionsMap {
+  [feed: string]: App.EpisodeListing;
 }
 
 interface FileInfo {
   url: string;
   length: string;
   type: string;
+}
+
+interface OPMLFeed {
+  title: string;
+  feed: string;
+}
+
+interface OPMLJson {
+  feeds: OPMLFeed[];
 }
 
 type EpisodePlayerState =

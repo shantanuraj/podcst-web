@@ -225,8 +225,12 @@ export const manualSeekUpdateEpic: Epic<PlayerActions, State> = action$ =>
 export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
   action$
     .filter(action => (
-      action.type !== NOOP &&
-      action.type !== SEEK_UPDATE
+      action.type === PLAY_EPISODE ||
+      action.type === PAUSE_EPISODE ||
+      action.type === RESUME_EPISODE ||
+      action.type === STOP_EPISODE ||
+      action.type === SKIP_TO_NEXT_EPISODE ||
+      action.type === SKIP_TO_PREV_EPISODE
     ))
     .map((action: PlayerActions) => {
       switch (action.type) {

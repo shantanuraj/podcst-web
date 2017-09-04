@@ -69,7 +69,7 @@ export const feed = (state: FeedState = {
   top: {
     loading: false,
     podcasts: [],
-  }
+  },
 }, action: FeedActions): FeedState => {
   switch (action.type) {
     case 'GET_FEED':

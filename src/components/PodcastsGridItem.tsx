@@ -52,7 +52,13 @@ const podcastAuthor = style({
   fontWeight: 'lighter',
 });
 
-const PodcastsGridItem = (podcast: App.Podcast) => {
+interface PodcastsGridItemProps {
+  podcast: App.RenderablePodcast;
+}
+
+const PodcastsGridItem = ({
+  podcast,
+}: PodcastsGridItemProps) => {
   const {
     author,
     feed,

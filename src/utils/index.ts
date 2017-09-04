@@ -75,3 +75,26 @@ export const formatTime = (
 
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
+
+/**
+ * Parse OPML XML element to JSON
+ */
+const adaptFeed = (el: HTMLElement): OPMLFeed => ({
+  title: el.getAttribute('text') as string,
+  feed: el.getAttribute('xmlUrl') as string,
+});
+
+/**
+ * Parse OPML XML to JSON feed
+ */
+export const opmltoJSON = (file: string): OPMLJson => {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(file, 'text/xml');
+  const feeds = Array.from(
+    xml.querySelectorAll('outline[type="rss"]')
+  ) as HTMLElement[];
+
+  return {
+    feeds: feeds.map(adaptFeed),
+  };
+};

@@ -47,6 +47,13 @@ import {
   searchPodcastsEpic,
 } from './search';
 
+import {
+  SubscriptionsActions,
+  SubscriptionsState,
+  subscriptions,
+  parseOPMLEpic,
+} from './subscriptions';
+
 /**
  * Combined application actions interface
  */
@@ -55,7 +62,8 @@ export type Actions =
   FeedActions |
   SearchActions |
   PodcastsAction |
-  PlayerActions;
+  PlayerActions |
+  SubscriptionsActions;
 
 /**
  * Combined application state interface
@@ -66,6 +74,7 @@ export interface State {
   search: SearchState;
   podcasts: PodcastsState;
   player: PlayerState;
+  subscriptions: SubscriptionsState;
 };
 
 export const getDefaultState = (): State => ({
@@ -91,6 +100,9 @@ export const getDefaultState = (): State => ({
     seekPosition: 0,
     duration: 0,
   },
+  subscriptions: {
+    subs: {},
+  },
 });
 
 export const rootEpic = combineEpics<Actions, State>(
@@ -101,6 +113,7 @@ export const rootEpic = combineEpics<Actions, State>(
   playerAudioEpic,
   seekUpdateEpic,
   manualSeekUpdateEpic,
+  parseOPMLEpic,
 );
 
 export const rootReducer = combineReducers<State>({
@@ -109,4 +122,5 @@ export const rootReducer = combineReducers<State>({
   search,
   podcasts,
   player,
+  subscriptions,
 });

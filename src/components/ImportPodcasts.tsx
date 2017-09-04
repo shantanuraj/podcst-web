@@ -46,7 +46,13 @@ const onChange = (cb: (file: string) => void) => {
   };
 }
 
-const ImportPodcasts = () => (
+interface ImportPodcastsProps {
+  parseOPML: (contents: string) => void;
+}
+
+const ImportPodcasts = ({
+  parseOPML,
+}: ImportPodcastsProps) => (
   <div class={container}>
     <button class={importButton}>
       <div>
@@ -56,7 +62,7 @@ const ImportPodcasts = () => (
           class="axis-import-input"
           name="file"
           type="file"
-          onChange={onChange(res => console.log(res))}
+          onChange={onChange(parseOPML)}
         />
         <label for="opml-import">
           Upload OPML File
