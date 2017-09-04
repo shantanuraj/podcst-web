@@ -16,6 +16,7 @@ import {
 } from '../stores/root';
 
 import {
+  dismissSearch,
   searchPodcasts,
 } from '../stores/search';
 
@@ -24,6 +25,7 @@ import Search from '../components/Search';
 const mapState = (state: State) => state.search;
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+  dismissSearch,
   searchPodcasts,
 }, dispatch);
 

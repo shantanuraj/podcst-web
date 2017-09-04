@@ -58,8 +58,19 @@ const resultAuthorText = style({
   fontWeight: 300,
 });
 
-const renderPodcast = (podcast: App.Podcast) => (
-  <Link href={`/episodes?feed=${podcast.feed}`}>
+interface SearchResultsProps {
+  podcasts: App.Podcast[];
+  dismissSearch: () => void;
+}
+
+const renderPodcast = (
+  podcast: App.Podcast,
+  dismissSearch: SearchResultsProps['dismissSearch'],
+) => (
+  <Link
+    onClick={dismissSearch}
+    href={`/episodes?feed=${podcast.feed}`}
+  >
     <div class={result}>
       <img class={resultImage} src={podcast.thumbnail} />
       <div class={resultText}>
@@ -80,15 +91,19 @@ const renderPodcast = (podcast: App.Podcast) => (
   </Link>
 );
 
-interface SearchResultsProps {
-  podcasts: App.Podcast[];
-}
+const renderPodcasts = (
+  podcasts: App.Podcast[],
+  dismissSearch: SearchResultsProps['dismissSearch'],
+) => (
+  podcasts.map(podcast => renderPodcast(podcast, dismissSearch))
+);
 
 const SearchResults = ({
+  dismissSearch,
   podcasts,
 }: SearchResultsProps) => (
-  <div class={results}>
-    {podcasts.map(renderPodcast)}
+  <div onClick={dismissSearch} class={results}>
+    {renderPodcasts(podcasts, dismissSearch)}
   </div>
 );
 

@@ -34,10 +34,12 @@ const search = style({
 interface SearchProps extends SearchState {
   className: string;
   searchPodcasts: (query: string) => void;
+  dismissSearch: () => void;
 }
 
 const Search = ({
   className,
+  dismissSearch,
   podcasts,
   query,
   searchPodcasts,
@@ -50,7 +52,12 @@ const Search = ({
       placeholder={'Search'}
       value={query}
     />
-    {query && podcasts.length ? <SearchResults podcasts={podcasts} /> : null}
+    {query && podcasts.length ?
+      <SearchResults
+        dismissSearch={dismissSearch}
+        podcasts={podcasts}
+      /> : null
+    }
   </div>
 );
 
