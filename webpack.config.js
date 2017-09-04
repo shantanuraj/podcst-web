@@ -55,6 +55,7 @@ module.exports = env => {
         'rxjs/observable/dom/ajax',
         'rxjs/add/observable/of',
         'rxjs/add/operator/catch',
+        'rxjs/add/operator/debounceTime',
         'rxjs/add/operator/filter',
         'rxjs/add/operator/map',
         'rxjs/add/operator/mergeMap',

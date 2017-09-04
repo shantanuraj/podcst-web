@@ -69,7 +69,7 @@ interface EpisodesProps {
 }
 
 class Episodes extends Component<EpisodesProps, any> {
-  componentDidMount() {
+  loadIfNeeded = () => {
     const {
       feed,
       getEpisodes,
@@ -84,6 +84,14 @@ class Episodes extends Component<EpisodesProps, any> {
     ) {
       getEpisodes(feed);
     }
+  }
+
+  componentDidMount() {
+    this.loadIfNeeded();
+  }
+
+  componentDidUpdate() {
+    this.loadIfNeeded();
   }
 
   renderLoading() {
