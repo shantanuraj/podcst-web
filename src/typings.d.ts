@@ -95,3 +95,11 @@ type EpisodePlayerState =
   'playing' |
   'paused'  |
   'stopped';
+
+interface PodcastWebpackModule {
+  hot?: {
+    accept: () => void;
+  };
+}
+
+declare let module: PodcastWebpackModule;

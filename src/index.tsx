@@ -2,6 +2,10 @@
  * Root app file
  */
 
+if (module.hot) {
+  module.hot.accept();
+}
+
 import {
   h,
   render,
