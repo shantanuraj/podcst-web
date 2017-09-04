@@ -33,6 +33,24 @@ const player = style({
   boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
 });
 
+const episodeInfo = style({
+  display: 'flex',
+  height: '100%',
+  flexDirection: 'column',
+  justifyContent: 'space-evenly' as any,
+  marginRight: '16px',
+  $nest: {
+    '&>*': {
+      fontSize: '14px',
+      fontWeight: 'bold',
+    },
+    '&>*:last-child': {
+      fontSize: '10px',
+      fontWeight: 'lighter',
+    },
+  },
+});
+
 interface PlayerProps extends PlayerState {
   pause: () => void;
   resume: () => void;
@@ -46,6 +64,17 @@ const episodeImage = (image: string) => style({
   backgroundSize: 'contain',
   height: 'inherit',
   width: 'inherit',
+  maxWidth: '64px',
+  marginRight: '16px',
+});
+
+const seekbarContainer = style({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  flexGrow: 1,
+  height: '100%',
 });
 
 const Player = ({
@@ -62,6 +91,7 @@ const Player = ({
   }
 
   const {
+    author,
     cover,
     episodeArt,
     title,
@@ -78,6 +108,16 @@ const Player = ({
         role="img"
         aria-label={`${title} episode art`}
       />
+      <div class={episodeInfo}>
+        <p>
+          {title}
+        </p>
+        <p>
+          {author}
+        </p>
+      </div>
+      <div class={seekbarContainer}>
+      </div>
     </div>
   );
 };

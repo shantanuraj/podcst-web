@@ -18,7 +18,9 @@ const Audio = {
       autoplay: true,
       onload() {
         console.log('Loaded audio');
-      }
+      },
+      onplay() {
+      },
     });
   },
   pause() {

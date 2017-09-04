@@ -60,3 +60,18 @@ const months = [
  * Get month name for month number
  */
 export const monthName = (monthNumber: number) => months[monthNumber];
+
+/**
+ * Format remaining time
+ */
+export const formatTime = (
+  total: number,
+  currentTime: number,
+) => {
+  const time = Math.round(total - currentTime);
+
+  const minutes = Math.floor(time / 60) || 0;
+  const seconds = (time - minutes * 60) || 0;
+
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+};
