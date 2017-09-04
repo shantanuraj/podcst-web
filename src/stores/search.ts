@@ -44,7 +44,8 @@ export type SearchActions =
 
 export const searchPodcastsEpic: Epic<SearchActions, State> = action$ =>
   action$.ofType(SEARCH_PODCASTS)
-    .mergeMap((action: SearchPodcastsAction) => {
+    .debounceTime(200)
+    .switchMap((action: SearchPodcastsAction) => {
       return Podcasts.search(action.query)
         .map(searchPodcastsSuccess);
     });
