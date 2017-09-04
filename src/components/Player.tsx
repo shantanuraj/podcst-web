@@ -98,7 +98,10 @@ class Player extends Component<PlayerProps, any> {
       target,
     } = e;
 
-    if ((target as HTMLElement).matches(ignoreKeyboardSelector)) {
+    if (
+      (target as HTMLElement).matches(ignoreKeyboardSelector) ||
+      !Object.keys(Key).find(key => parseInt(key) === keyCode)
+    ) {
       return;
     }
 
