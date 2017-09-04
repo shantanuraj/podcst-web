@@ -10,8 +10,10 @@ interface HomeProps {
   path: string;
 }
 
+import ImportPodcasts from './ImportPodcasts';
+
 const Home = (_props: HomeProps) => (
-  <div />
+  <ImportPodcasts />
 );
 
 export default Home;
