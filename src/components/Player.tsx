@@ -14,6 +14,8 @@ import {
   PlayerState,
 } from '../stores/player';
 
+import Icon from '../svg/Icon';
+
 const player = style({
   display: 'flex',
   alignItems: 'center',
@@ -39,11 +41,22 @@ interface PlayerProps extends PlayerState {
 }
 
 const Player = ({
+  pause,
+  resume,
   state,
-}: PlayerProps) => (
-  state === 'stopped' ?
-    null :
-    <div class={player} />
-);
+}: PlayerProps) => {
+  if (state === 'stopped') {
+    return null;
+  }
+
+  return (
+    <div class={player}>
+      <Icon
+        onClick={state === 'playing' ? pause : resume }
+        icon={state === 'playing' ? 'pause' : 'play'}
+      />
+    </div>
+  );
+};
 
 export default Player;
