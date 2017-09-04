@@ -48,7 +48,7 @@ export type SearchActions =
 
 export const searchPodcastsEpic: Epic<SearchActions, State> = action$ =>
   action$.ofType(SEARCH_PODCASTS)
-    .debounceTime(200)
+    .throttleTime(200)
     .switchMap((action: SearchPodcastsAction) => {
       return action.query.length === 0 ?
         Observable.of(searchPodcastsSuccess([])) :
