@@ -47,7 +47,7 @@ const playInfo = style({
 
 const playButton = (isPlaying: boolean) => style({
   display: 'inline-block',
-  minWidth: '65px',
+  minWidth: '80px',
   borderRadius: '3px',
   padding: '8px',
   background: isPlaying ? '#82ffb5' : 'transparent',
@@ -62,17 +62,28 @@ const playButton = (isPlaying: boolean) => style({
 
 interface EpisodeProps {
   episode: App.Episode;
+  currentEpisode: App.Episode | null;
+  state: EpisodePlayerState;
   play: (episode: App.Episode) => void;
+  resume: (episode: App.Episode) => void;
   pause: () => void;
-  isPlaying: boolean;
 }
 
-const renderButton = (
-  episode: App.Episode,
-  play: (episode: App.Episode) => void,
-  pause: () => void,
-  isPlaying: boolean,
-) => {
+const renderButton = ({
+  currentEpisode,
+  episode,
+  play,
+  pause,
+  resume,
+  state,
+}: EpisodeProps) => {
+  const isCurrent = currentEpisode === episode;
+  const isPlaying = isCurrent && state === 'playing';
+  const isPaused  = isCurrent && state === 'paused';
+
+  const play_ = () => play(episode);
+  const resume_ = () => resume(episode);
+
   if (isPlaying) {
     return (
       <button onClick={pause} class={playButton(isPlaying)}>
@@ -81,18 +92,17 @@ const renderButton = (
     );
   }
   return (
-    <button onClick={() => play(episode)} class={playButton(isPlaying)}>
-      Play
+    <button onClick={isPaused ? resume_ : play_} class={playButton(isPlaying)}>
+      {isPaused ? 'Resume' : 'Play'}
     </button>
   );
 }
 
-const Episode = ({
-  episode,
-  play,
-  pause,
-  isPlaying
-}: EpisodeProps) => {
+const Episode = (props: EpisodeProps) => {
+  const {
+    episode,
+  } = props;
+
   const {
     title,
     published,
@@ -119,7 +129,7 @@ const Episode = ({
           <div class={subContainer}>
             {episodeLength}
           </div>
-          {renderButton(episode, play, pause, isPlaying)}
+          {renderButton(props)}
         </div>
       </div>
       <div class={lineBreak} />

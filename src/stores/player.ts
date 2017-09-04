@@ -12,6 +12,9 @@ import {
 
 import Audio from '../utils/audio';
 
+/**
+ * Play related actions
+ */
 interface PlayEpisodeAction {
   type: 'PLAY_EPISODE',
   episode: App.Episode,
@@ -32,6 +35,9 @@ const playEpisodeAudio = (episode: App.Episode): PlayEpisodeAudioAction => ({
   episode,
 });
 
+/**
+ * Pause related actions
+ */
 interface PauseAction {
   type: 'PAUSE_EPISODE',
 }
@@ -48,6 +54,32 @@ const pauseEpisodeAudio = (): PauseAudioAction => ({
   type: PAUSE_EPISODE_AUDIO,
 });
 
+/**
+ * Resume related actions
+ */
+interface ResumeEpisodeAction {
+  type: 'RESUME_EPISODE',
+  episode: App.Episode,
+}
+const RESUME_EPISODE: ResumeEpisodeAction['type'] = 'RESUME_EPISODE';
+export const resumeEpisode = (episode: App.Episode): ResumeEpisodeAction => ({
+  type: RESUME_EPISODE,
+  episode,
+});
+
+interface ResumeEpisodeAudioAction {
+  type: 'RESUME_EPISODE_AUDIO',
+  episode: App.Episode,
+}
+const RESUME_EPISODE_AUDIO: ResumeEpisodeAudioAction['type'] = 'RESUME_EPISODE_AUDIO';
+const resumeEpisodeAudio = (episode: App.Episode): ResumeEpisodeAudioAction => ({
+  type: RESUME_EPISODE_AUDIO,
+  episode,
+});
+
+/**
+ * Stop related actions
+ */
 interface StopAction {
   type: 'STOP_EPISODE',
 }
@@ -64,6 +96,9 @@ const stopEpisodeAudio = (): StopAudioAction => ({
   type: STOP_EPISODE_AUDIO,
 });
 
+/**
+ * Skip to next action helpers
+ */
 interface SkipToNextAction {
   type: 'SKIP_TO_NEXT_EPISODE',
 }
@@ -72,6 +107,9 @@ export const skipToNextEpisode = (): SkipToNextAction => ({
   type: SKIP_TO_NEXT_EPISODE,
 });
 
+/**
+ * Skip to previous action helpers
+ */
 interface SkipToPrevAction {
   type: 'SKIP_TO_PREV_EPISODE',
 }
@@ -88,6 +126,9 @@ const skipAudio = (): SkipAudioAction => ({
   type: SKIP_AUDIO,
 });
 
+/**
+ * Noop action
+ */
 interface NoopAction {
   type: 'NOOP',
 }
@@ -101,6 +142,8 @@ export type PlayerActions =
   PlayEpisodeAudioAction |
   PauseAction |
   PauseAudioAction |
+  ResumeEpisodeAction |
+  ResumeEpisodeAudioAction |
   StopAction |
   StopAudioAction |
   SkipToNextAction |
@@ -122,12 +165,19 @@ export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
         case PLAY_EPISODE:
           Audio.play(action.episode);
           return playEpisodeAudio(action.episode);
+
         case PAUSE_EPISODE:
           Audio.pause();
           return pauseEpisodeAudio();
+
+        case RESUME_EPISODE:
+          Audio.resume();
+          return resumeEpisodeAudio(action.episode);
+
         case STOP_EPISODE:
           Audio.stop();
           return stopEpisodeAudio();
+
         case SKIP_TO_NEXT_EPISODE:
         case SKIP_TO_PREV_EPISODE:
           const {
@@ -136,6 +186,7 @@ export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
           } = state.getState().player;
           Audio.skipTo(queue[currentEpisode]);
           return skipAudio();
+
         default:
           return noop();
       }
@@ -160,6 +211,11 @@ export const player = (state: PlayerState = {
       return {
         ...state,
         state: 'paused',
+      };
+    case RESUME_EPISODE:
+      return {
+        ...state,
+        state: 'playing',
       };
     case STOP_EPISODE:
       return {

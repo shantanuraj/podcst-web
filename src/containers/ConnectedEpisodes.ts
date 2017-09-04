@@ -22,6 +22,7 @@ import {
 import {
   playEpisode,
   pauseEpisode,
+  resumeEpisode,
 } from '../stores/player';
 
 import Episodes from '../components/Episodes';
@@ -36,6 +37,7 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   getEpisodes,
   playEpisode,
   pauseEpisode,
+  resumeEpisode,
 }, dispatch);
 
 const ConnectedEpisodes = connect(

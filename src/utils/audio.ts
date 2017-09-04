@@ -24,6 +24,9 @@ const Audio = {
   pause() {
     globalHowl && globalHowl.pause();
   },
+  resume() {
+    globalHowl && globalHowl.play();
+  },
   stop() {
     globalHowl && globalHowl.stop();
   },

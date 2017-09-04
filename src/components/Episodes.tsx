@@ -64,6 +64,7 @@ interface EpisodesProps {
   currentEpisode: App.Episode | null;
   getEpisodes: (feed: string) => void;
   playEpisode: (episode: App.Episode) => void;
+  resumeEpisode: (episode: App.Episode) => void;
   pauseEpisode: () => void;
 }
 
@@ -94,16 +95,18 @@ class Episodes extends Component<EpisodesProps, any> {
       currentEpisode,
       playEpisode,
       pauseEpisode,
+      resumeEpisode,
       state,
     } = this.props;
 
-    const isPlaying = currentEpisode === episode && state === 'playing';
     return (
       <Episode
-        isPlaying={isPlaying}
         episode={episode}
         pause={pauseEpisode}
         play={playEpisode}
+        resume={resumeEpisode}
+        state={state}
+        currentEpisode={currentEpisode}
       />
     );
   }
