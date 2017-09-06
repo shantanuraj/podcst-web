@@ -40,6 +40,11 @@ const search = style({
   color: 'white',
 });
 
+const Key: KeyboardShortcutsMap = {
+  83: 'focus',
+  27: 'dismiss',
+};
+
 interface SearchProps extends SearchState {
   className: string;
   searchPodcasts: (query: string) => void;
@@ -48,21 +53,21 @@ interface SearchProps extends SearchState {
 
 class Search extends Component<SearchProps, any> {
   private el: HTMLElement | null = null;
-  private dismissSub: Subscription | null = null;
-  private focusSub: Subscription | null = null;
+  private clicksSub: Subscription | null = null;
+  private keyboardSub: Subscription | null = null;
 
   componentDidMount() {
-    this.dismissSearch();
-    this.focusSearch();
+    this.watchClicks();
+    this.watchKeyboard();
   }
 
   componentWillUnmount() {
-    this.dismissSub && this.dismissSub.unsubscribe();
-    this.focusSub && this.focusSub.unsubscribe();
+    this.clicksSub && this.clicksSub.unsubscribe();
+    this.keyboardSub && this.keyboardSub.unsubscribe();
   }
 
-  dismissSearch = () => {
-    this.dismissSub = Observable.fromEvent(document, 'click')
+  watchClicks = () => {
+    this.clicksSub = Observable.fromEvent(document, 'click')
       .filter(({ target, }: MouseEvent) =>
         !!this.el &&
         !this.el.contains(target as HTMLElement)
@@ -70,20 +75,34 @@ class Search extends Component<SearchProps, any> {
       .subscribe(this.props.dismissSearch);
   }
 
-  focusSearch = () => {
-    this.focusSub = Observable.fromEvent(document, 'keydown')
-      .filter(({ keyCode, target, }: KeyboardEvent) =>
-        !!this.el &&
-        !this.el.contains(target as HTMLElement) &&
-        keyCode === 83
-      )
+  watchKeyboard = () => {
+    this.keyboardSub = Observable.fromEvent(document, 'keydown')
+      .filter(({ keyCode, }: KeyboardEvent) => Key[keyCode] !== undefined)
       .map((event: KeyboardEvent) => ({
-        event,
-        input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement
+        input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement,
+        keyCode: event.keyCode,
+        preventDefault: () => event.preventDefault(),
+        target: event.target as HTMLElement,
       }))
-      .subscribe(({ event, input }) => {
-        event.preventDefault();
-        input.focus();
+      .subscribe(({ input, keyCode, preventDefault, target }) => {
+        console.log(
+          keyCode,
+          target,
+        );
+
+        switch (Key[keyCode]) {
+          case 'focus': {
+            if (this.el && !this.el.contains(target)) {
+              preventDefault();
+              input.focus();
+            }
+            return;
+          }
+          case 'dismiss': {
+            preventDefault();
+            return this.props.dismissSearch();
+          }
+        }
       });
   }
 
