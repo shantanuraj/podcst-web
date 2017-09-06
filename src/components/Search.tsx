@@ -12,6 +12,14 @@ import {
 } from 'typestyle';
 
 import {
+  Observable,
+} from 'rxjs/Observable';
+
+import {
+  Subscription,
+} from 'rxjs/Subscription';
+
+import {
   onEvent,
 } from '../utils';
 
@@ -39,29 +47,29 @@ interface SearchProps extends SearchState {
 }
 
 class Search extends Component<SearchProps, any> {
-  private el: HTMLElement | null;
+  private el: HTMLElement | null = null;
+  private dismissSub: Subscription | null = null;
 
   componentDidMount() {
-    document.addEventListener('click', this.dismissSearch);
+    this.dismissSearch();
   }
 
   componentWillUnmount() {
-    document.removeEventListener('click', this.dismissSearch);
+    this.dismissSub && this.dismissSub.unsubscribe();
+  }
+
+  dismissSearch = () => {
+    this.dismissSub = Observable.fromEvent(document, 'click')
+      .filter(({ target, }: MouseEvent) =>
+        !!this.el &&
+        !this.el.contains(target as HTMLElement)
+      )
+      .subscribe(this.props.dismissSearch);
   }
 
   saveRef = (el: HTMLElement | undefined) => {
     if (el) {
       this.el = el;
-    }
-  }
-
-  dismissSearch = (e: MouseEvent) => {
-    const {
-      dismissSearch,
-    } = this.props;
-    const target = e.target as HTMLElement;
-    if (this.el && !this.el.contains(target)) {
-      dismissSearch();
     }
   }
 
