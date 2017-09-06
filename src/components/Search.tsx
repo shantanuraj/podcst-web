@@ -49,13 +49,16 @@ interface SearchProps extends SearchState {
 class Search extends Component<SearchProps, any> {
   private el: HTMLElement | null = null;
   private dismissSub: Subscription | null = null;
+  private focusSub: Subscription | null = null;
 
   componentDidMount() {
     this.dismissSearch();
+    this.focusSearch();
   }
 
   componentWillUnmount() {
     this.dismissSub && this.dismissSub.unsubscribe();
+    this.focusSub && this.focusSub.unsubscribe();
   }
 
   dismissSearch = () => {
@@ -65,6 +68,23 @@ class Search extends Component<SearchProps, any> {
         !this.el.contains(target as HTMLElement)
       )
       .subscribe(this.props.dismissSearch);
+  }
+
+  focusSearch = () => {
+    this.focusSub = Observable.fromEvent(document, 'keydown')
+      .filter(({ keyCode, target, }: KeyboardEvent) =>
+        !!this.el &&
+        !this.el.contains(target as HTMLElement) &&
+        keyCode === 83
+      )
+      .map((event: KeyboardEvent) => ({
+        event,
+        input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement
+      }))
+      .subscribe(({ event, input }) => {
+        event.preventDefault();
+        input.focus();
+      });
   }
 
   saveRef = (el: HTMLElement | undefined) => {
