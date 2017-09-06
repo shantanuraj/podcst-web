@@ -92,7 +92,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
         return this.renderLoading();
       }
 
-      this.renderLoaded(podcasts);
+      return this.renderLoaded(podcasts);
     }
 
     const {

@@ -30,7 +30,7 @@ const App = () => (
     >
       <Router>
         <ConnectedHome path="/" />
-        <ConnectedPodcastsGrid path="/feed/:feed" />
+        <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
         <ConnectedEpisodes path="/episodes" />
       </Router>
     </div>

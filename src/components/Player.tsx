@@ -3,6 +3,14 @@
  */
 
 import {
+  Observable,
+} from 'rxjs/Observable';
+
+import {
+  Subscription,
+} from 'rxjs/Subscription';
+
+import {
   h,
   Component,
 } from 'preact';
@@ -84,31 +92,53 @@ const ignoreKeyboardSelector = 'header *';
 
 class Player extends Component<PlayerProps, any> {
 
+  private sub: Subscription | null = null;
+
   componentDidMount() {
-    window.addEventListener('keydown', this.keyboardControls);
+    this.subscribe();
   }
 
   componentWillUnmount() {
-    window.removeEventListener('keydown', this.keyboardControls);
+    this.unsubscribe();
+  }
+
+  componentDidUpdate() {
+    const {
+      state
+    } = this.props;
+
+    if (state === 'stopped') {
+      this.unsubscribe();
+    } else if (this.sub === null) {
+      this.subscribe();
+    }
+  }
+
+  subscribe() {
+    this.sub = Observable.fromEvent(window, 'keydown')
+      .filter(({
+        keyCode,
+        target,
+      }: KeyboardEvent) =>
+        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
+        !!Object.keys(Key).find(key => parseInt(key) === keyCode)
+      )
+      .subscribe(this.keyboardControls);
+  }
+
+  unsubscribe() {
+    if (this.sub) {
+      this.sub.unsubscribe();
+    }
   }
 
   keyboardControls = (e: KeyboardEvent) => {
     const {
+      preventDefault,
       keyCode,
-      target,
     } = e;
 
-    if (
-      (target as HTMLElement).matches(ignoreKeyboardSelector) ||
-      !Object.keys(Key).find(key => parseInt(key) === keyCode)
-    ) {
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-
+    preventDefault.call(e);
     const {
       state,
       pause,
