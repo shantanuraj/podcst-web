@@ -25,7 +25,7 @@ const results = style({
 const result = style({
   display: 'flex',
   $nest: {
-    '&:hover': {
+    '&:hover, &:focus': {
       backgroundColor: 'white',
       color: 'black',
     },
