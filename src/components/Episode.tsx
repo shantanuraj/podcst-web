@@ -15,14 +15,15 @@ import {
 } from '../utils';
 
 const episodeContainer = style({
-  padding: 16,
-});
-
-const lineBreak = style({
-  marginTop: 16,
-  width: 'auto',
-  height: '1px',
-  borderBottom: '1px #eaeaea solid',
+  paddingTop: 16,
+  paddingBottom: 16,
+  paddingLeft: 32,
+  paddingRight: 32,
+  $nest: {
+    '&:nth-child(even)': {
+      backgroundColor: '#333',
+    },
+  },
 });
 
 const episodeRow = style({
@@ -131,7 +132,6 @@ const Episode = (props: EpisodeProps) => {
           {renderButton(props)}
         </div>
       </div>
-      <div class={lineBreak} />
     </div>
   );
 };

@@ -54,7 +54,8 @@ const podcastTitle = style({
 });
 
 const episodesView = style({
-  padding: 32,
+  paddingTop: 32,
+  paddingBottom: 32,
 });
 
 interface EpisodesProps {
