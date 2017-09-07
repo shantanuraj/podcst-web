@@ -113,8 +113,17 @@ type EpisodePlayerState =
   'paused'  |
   'stopped';
 
+type KeyboardShortcuts =
+  'play' |
+  'next' |
+  'prev' |
+  'dismiss' |
+  'focus' |
+  'up' |
+  'down';
+
 interface KeyboardShortcutsMap {
-  [keyCode: number]: 'play' | 'next' | 'prev' | 'dismiss' | 'focus';
+  [keyCode: number]: KeyboardShortcuts;
 }
 
 interface PodcastWebpackModule {

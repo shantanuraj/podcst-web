@@ -85,11 +85,6 @@ class Search extends Component<SearchProps, any> {
         target: event.target as HTMLElement,
       }))
       .subscribe(({ input, keyCode, preventDefault, target }) => {
-        console.log(
-          keyCode,
-          target,
-        );
-
         switch (Key[keyCode]) {
           case 'focus': {
             if (this.el && !this.el.contains(target)) {
