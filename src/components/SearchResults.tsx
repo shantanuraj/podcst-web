@@ -4,6 +4,7 @@
 
 import {
   h,
+  Component,
 } from 'preact';
 
 import {
@@ -63,48 +64,52 @@ interface SearchResultsProps {
   dismissSearch: () => void;
 }
 
-const renderPodcast = (
-  podcast: App.Podcast,
-  dismissSearch: SearchResultsProps['dismissSearch'],
-) => (
-  <Link
-    onClick={dismissSearch}
-    href={`/episodes?feed=${podcast.feed}`}
-  >
-    <div class={result}>
-      <img class={resultImage} src={podcast.thumbnail} />
-      <div class={resultText}>
-        <p
-          class={resultPodcastTitle}
-          title={podcast.title}
-        >
-          {podcast.title}
-        </p>
-        <p
-          class={resultAuthorText}
-          title={podcast.author}
-        >
-          {podcast.author}
-        </p>
+class SearchResults extends Component<SearchResultsProps, any> {
+  renderPodcast = (
+    podcast: App.Podcast,
+    dismissSearch: SearchResultsProps['dismissSearch'],
+  ) => (
+    <Link
+      onClick={dismissSearch}
+      href={`/episodes?feed=${podcast.feed}`}
+    >
+      <div class={result}>
+        <img class={resultImage} src={podcast.thumbnail} />
+        <div class={resultText}>
+          <p
+            class={resultPodcastTitle}
+            title={podcast.title}
+          >
+            {podcast.title}
+          </p>
+          <p
+            class={resultAuthorText}
+            title={podcast.author}
+          >
+            {podcast.author}
+          </p>
+        </div>
       </div>
-    </div>
-  </Link>
-);
+    </Link>
+  )
 
-const renderPodcasts = (
-  podcasts: App.Podcast[],
-  dismissSearch: SearchResultsProps['dismissSearch'],
-) => (
-  podcasts.map(podcast => renderPodcast(podcast, dismissSearch))
-);
+  renderPodcasts = (
+    podcasts: App.Podcast[],
+    dismissSearch: SearchResultsProps['dismissSearch'],
+  ) => (
+    podcasts.map(podcast => this.renderPodcast(podcast, dismissSearch))
+  )
 
-const SearchResults = ({
-  dismissSearch,
-  podcasts,
-}: SearchResultsProps) => (
-  <div onClick={dismissSearch} class={results}>
-    {renderPodcasts(podcasts, dismissSearch)}
-  </div>
-);
+  render({
+    dismissSearch,
+    podcasts,
+  }: SearchResultsProps) {
+    return (
+      <div onClick={dismissSearch} class={results}>
+        {this.renderPodcasts(podcasts, dismissSearch)}
+      </div>
+    );
+  }
+}
 
 export default SearchResults;
