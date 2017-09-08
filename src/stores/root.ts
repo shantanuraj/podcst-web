@@ -91,6 +91,7 @@ export const getDefaultState = (): State => ({
     podcasts: [],
     query: '',
     searching: false,
+    focusedResult: 0,
   },
   podcasts: {},
   player: {

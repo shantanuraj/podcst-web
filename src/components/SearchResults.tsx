@@ -70,6 +70,7 @@ const resultAuthorText = style({
 interface SearchResultsProps {
   podcasts: App.Podcast[];
   dismissSearch: () => void;
+  navigateResult: (direction: 'up' | 'down') => void;
 }
 
 const Key: KeyboardShortcutsMap = {
@@ -101,7 +102,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
           switch (Key[e.keyCode]) {
             case 'up':
             case 'down':
-              console.log('Nav:', Key[e.keyCode]);
+              this.props.navigateResult(Key[e.keyCode] as 'up' | 'down');
           }
         });
       }

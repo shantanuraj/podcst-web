@@ -18,6 +18,7 @@ import {
 import {
   dismissSearch,
   searchPodcasts,
+  navigateResult,
 } from '../stores/search';
 
 import Search from '../components/Search';
@@ -27,6 +28,7 @@ const mapState = (state: State) => state.search;
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   dismissSearch,
   searchPodcasts,
+  navigateResult,
 }, dispatch);
 
 const ConnectedSearch = connect(

@@ -36,24 +36,36 @@ export const searchPodcastsSuccess = (podcasts: App.Podcast[]) => ({
   podcasts,
 });
 
-interface DismissSearch {
+interface DismissSearchAction {
   type: 'DISMISS_SEARCH';
 }
-const DISMISS_SEARCH: DismissSearch['type'] = 'DISMISS_SEARCH';
+const DISMISS_SEARCH: DismissSearchAction['type'] = 'DISMISS_SEARCH';
 export const dismissSearch = () => ({
   type: DISMISS_SEARCH,
+});
+
+interface NavigateResultAction {
+  type: 'NAVIGATE_RESULT',
+  direction: 'up' | 'down',
+}
+const NAVIGATE_RESULT: NavigateResultAction['type'] = 'NAVIGATE_RESULT';
+export const navigateResult = (direction: NavigateResultAction['direction']): NavigateResultAction => ({
+  type: NAVIGATE_RESULT,
+  direction,
 });
 
 export interface SearchState {
   query: SearchPodcastsAction['query'];
   podcasts: App.Podcast[];
   searching: boolean;
+  focusedResult: number;
 }
 
 export type SearchActions =
   SearchPodcastsAction |
   SearchPodcastsSuccessAction |
-  DismissSearch;
+  DismissSearchAction |
+  NavigateResultAction;
 
 export const searchPodcastsEpic: Epic<SearchActions, State> = action$ =>
   action$.ofType(SEARCH_PODCASTS)
@@ -69,6 +81,7 @@ export const search = (state: SearchState = {
   query: '',
   podcasts: [],
   searching: false,
+  focusedResult: 0,
 }, action: SearchActions): SearchState => {
   switch(action.type) {
     case SEARCH_PODCASTS: {
@@ -79,6 +92,16 @@ export const search = (state: SearchState = {
     }
     case DISMISS_SEARCH: {
       return {...state, query: '', podcasts: [], searching: false};
+    }
+    case NAVIGATE_RESULT: {
+      const { direction } = action;
+      const {
+        focusedResult,
+        podcasts,
+      } = state;
+      const newPos = (focusedResult + (direction === 'up' ? -1 : 1)) % podcasts.length;
+      const navigatedResult = (newPos > -1) ? newPos :  (podcasts.length > 0 ? podcasts.length - 1 : 0);
+      return {...state, focusedResult: navigatedResult};
     }
     default:
       return state;
