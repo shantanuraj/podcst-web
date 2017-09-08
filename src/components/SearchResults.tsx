@@ -3,6 +3,14 @@
  */
 
 import {
+  Observable,
+} from 'rxjs/Observable'
+
+import {
+  Subscription,
+} from 'rxjs/Subscription'
+
+import {
   h,
   Component,
 } from 'preact';
@@ -64,7 +72,42 @@ interface SearchResultsProps {
   dismissSearch: () => void;
 }
 
+const Key: KeyboardShortcutsMap = {
+  38: 'up',
+  40: 'down',
+};
+
 class SearchResults extends Component<SearchResultsProps, any> {
+
+  el: HTMLDivElement | null;
+  navigationSub: Subscription | null;
+
+  componentDidMount() {
+    this.watchKeyboard();
+  }
+
+  componentWillUnmount() {
+    this.navigationSub && this.navigationSub.unsubscribe();
+  }
+
+  watchKeyboard() {
+    if (this.el) {
+      const parent = this.el.parentElement;
+      if (parent) {
+        this.navigationSub = Observable.fromEvent(parent, 'keydown')
+        .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
+        .subscribe((e: KeyboardEvent) => {
+          e.preventDefault();
+          switch (Key[e.keyCode]) {
+            case 'up':
+            case 'down':
+              console.log('Nav:', Key[e.keyCode]);
+          }
+        });
+      }
+    }
+  }
+
   renderPodcast = (
     podcast: App.Podcast,
     dismissSearch: SearchResultsProps['dismissSearch'],
@@ -105,7 +148,11 @@ class SearchResults extends Component<SearchResultsProps, any> {
     podcasts,
   }: SearchResultsProps) {
     return (
-      <div onClick={dismissSearch} class={results}>
+      <div
+        class={results}
+        onClick={dismissSearch}
+        ref={el => this.el = el as HTMLDivElement}
+      >
         {this.renderPodcasts(podcasts, dismissSearch)}
       </div>
     );
