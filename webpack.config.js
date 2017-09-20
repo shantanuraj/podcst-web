@@ -17,7 +17,7 @@ const getPath = (env) => {
   if (key === 'dev') {
     return '/';
   } else {
-    return `//texts.sixth.io/${key}/`;
+    return `https://static.podcst.io/${key}/`;
   }
 }
 
