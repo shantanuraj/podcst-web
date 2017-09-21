@@ -88,16 +88,12 @@ const renderButton = ({
 
   const play_ = () => play(episode);
 
-  if (isPlaying) {
-    return (
-      <button onClick={pause} class={playButton} data-is-playing={isPlaying}>
-        Pause
-      </button>
-    );
-  }
+  const handler = isPlaying ? pause : (isPaused ? resume : play_);
+  const text = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play');
+
   return (
-    <button onClick={isPaused ? resume : play_} class={playButton} data-is-playing={isPlaying}>
-      {isPaused ? 'Resume' : 'Play'}
+    <button onClick={handler} class={playButton} data-is-playing={isPlaying}>
+      {text}
     </button>
   );
 }
