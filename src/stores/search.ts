@@ -91,7 +91,7 @@ export const search = (state: SearchState = {
       return {...state, podcasts: action.podcasts, searching: false};
     }
     case DISMISS_SEARCH: {
-      return {...state, query: '', podcasts: [], searching: false};
+      return {...state, query: '', podcasts: [], searching: false, focusedResult: 0};
     }
     case NAVIGATE_RESULT: {
       const { direction } = action;

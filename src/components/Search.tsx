@@ -114,6 +114,7 @@ class Search extends Component<SearchProps, any> {
     podcasts,
     query,
     searchPodcasts,
+    focusedResult,
     navigateResult,
   }: SearchProps) {
     return (
@@ -130,6 +131,7 @@ class Search extends Component<SearchProps, any> {
         />
         {query && podcasts.length ?
           <SearchResults
+            focusedResult={focusedResult}
             navigateResult={navigateResult}
             dismissSearch={dismissSearch}
             podcasts={podcasts}

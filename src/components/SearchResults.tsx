@@ -34,7 +34,7 @@ const results = style({
 const result = style({
   display: 'flex',
   $nest: {
-    '&:hover, &:focus': {
+    '&:hover, &:focus, &[data-focus]': {
       backgroundColor: 'white',
       color: 'black',
     },
@@ -69,6 +69,7 @@ const resultAuthorText = style({
 
 interface SearchResultsProps {
   podcasts: App.Podcast[];
+  focusedResult: number;
   dismissSearch: () => void;
   navigateResult: (direction: 'up' | 'down') => void;
 }
@@ -111,13 +112,14 @@ class SearchResults extends Component<SearchResultsProps, any> {
 
   renderPodcast = (
     podcast: App.Podcast,
+    isFocussed: boolean,
     dismissSearch: SearchResultsProps['dismissSearch'],
   ) => (
     <Link
       onClick={dismissSearch}
       href={`/episodes?feed=${podcast.feed}`}
     >
-      <div class={result}>
+      <div data-focus={isFocussed} class={result}>
         <img class={resultImage} src={podcast.thumbnail} />
         <div class={resultText}>
           <p
@@ -139,13 +141,19 @@ class SearchResults extends Component<SearchResultsProps, any> {
 
   renderPodcasts = (
     podcasts: App.Podcast[],
+    focusedResult: number,
     dismissSearch: SearchResultsProps['dismissSearch'],
   ) => (
-    podcasts.map(podcast => this.renderPodcast(podcast, dismissSearch))
+    podcasts.map((podcast, i) => this.renderPodcast(
+      podcast,
+      focusedResult === i,
+      dismissSearch
+    ))
   )
 
   render({
     dismissSearch,
+    focusedResult,
     podcasts,
   }: SearchResultsProps) {
     return (
@@ -154,7 +162,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
         onClick={dismissSearch}
         ref={el => this.el = el as HTMLDivElement}
       >
-        {this.renderPodcasts(podcasts, dismissSearch)}
+        {this.renderPodcasts(podcasts, focusedResult, dismissSearch)}
       </div>
     );
   }
