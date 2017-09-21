@@ -138,3 +138,13 @@ declare let module: PodcastWebpackModule;
 type Require = (package: string) => void;
 
 declare let require: Require;
+
+interface Process {
+  env: {
+    APP_VERSION: string;
+    IN_BROWSER: string;
+    NODE_ENV: 'development' | 'produciton';
+  }
+}
+
+declare let process: Process;

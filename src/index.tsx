@@ -28,7 +28,10 @@ import App from './components/App';
 
 export const store = configureStore();
 
-const PodcastApp = () => (
+interface PodcastAppProps {
+  version: string;
+}
+const PodcastApp = (_props: PodcastAppProps) => (
   <Provider store={store}>
     <App />
   </Provider>
@@ -36,4 +39,8 @@ const PodcastApp = () => (
 
 fixGlobalStyles();
 
-render(<PodcastApp />, document.body);
+const appVersion = process.env.APP_VERSION;
+
+render(<PodcastApp version={appVersion} />, document.body);
+
+console.log(`Initalized Podcst.io version: ${appVersion}`);
