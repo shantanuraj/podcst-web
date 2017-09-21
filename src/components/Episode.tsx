@@ -55,10 +55,8 @@ const playButton = style({
   color: 'white',
   border: '2px solid #82ffb5',
   $nest: {
-    '& :active, :focus': {
+    '&:active, &:focus, &[data-is-playing]': {
       outline: 0,
-    },
-    '&[data-is-playing]': {
       backgroundColor: '#82ffb5',
       color: '#292929',
     },

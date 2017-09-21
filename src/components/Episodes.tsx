@@ -48,9 +48,33 @@ const podcastInfoTitles = style({
   },
 });
 
+const infoMargins = style({
+  marginTop: 8,
+  marginBottom: 8,
+});
+
 const podcastTitle = style({
   fontSize: '40px',
   fontWeight: 'bold',
+  marginTop: 8,
+  marginBottom: 8,
+});
+
+const subscribeButton = style({
+  display: 'inline-block',
+  minWidth: '80px',
+  borderRadius: '3px',
+  padding: '8px',
+  background: 'transparent',
+  color: 'white',
+  border: '2px solid #82ffb5',
+  $nest: {
+    '&:hover, &:focus': {
+      outline: 0,
+      backgroundColor: '#82ffb5',
+      color: '#292929',
+    },
+  },
 });
 
 const episodesView = style({
@@ -165,8 +189,11 @@ class Episodes extends Component<EpisodesProps, any> {
           />
           <div class={podcastInfoTitles}>
             <h1 class={podcastTitle}>{title}</h1>
-            <h2>{author} - <a href={link}>{stripHost(link)}</a></h2>
-            <p dangerouslySetInnerHTML={{ __html: description.trim() }} />
+            <h2 class={infoMargins}>{author} - <a href={link}>{stripHost(link)}</a></h2>
+            <div class={infoMargins}>
+              <button class={subscribeButton}>Subscribe</button>
+            </div>
+            <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
         <div class={episodesView}>
