@@ -46,17 +46,21 @@ const playInfo = style({
   alignItems: 'center',
 });
 
-const playButton = (isPlaying: boolean) => style({
+const playButton = style({
   display: 'inline-block',
   minWidth: '80px',
   borderRadius: '3px',
   padding: '8px',
-  background: isPlaying ? '#82ffb5' : 'transparent',
-  color: isPlaying ? '#292929' : 'white',
+  background: 'transparent',
+  color: 'white',
   border: '2px solid #82ffb5',
   $nest: {
     '& :active, :focus': {
       outline: 0,
+    },
+    '&[data-is-playing]': {
+      backgroundColor: '#82ffb5',
+      color: '#292929',
     },
   },
 });
@@ -86,13 +90,13 @@ const renderButton = ({
 
   if (isPlaying) {
     return (
-      <button onClick={pause} class={playButton(isPlaying)}>
+      <button onClick={pause} class={playButton} data-is-playing={isPlaying}>
         Pause
       </button>
     );
   }
   return (
-    <button onClick={isPaused ? resume : play_} class={playButton(isPlaying)}>
+    <button onClick={isPaused ? resume : play_} class={playButton} data-is-playing={isPlaying}>
       {isPaused ? 'Resume' : 'Play'}
     </button>
   );
