@@ -21,6 +21,10 @@ import {
   navigateResult,
 } from '../stores/search';
 
+import {
+  navigate,
+} from '../stores/router';
+
 import Search from '../components/Search';
 
 const mapState = (state: State) => state.search;
@@ -29,6 +33,7 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   dismissSearch,
   searchPodcasts,
   navigateResult,
+  onResultSelect: (feed: string) => navigate(`/episodes?feed=${feed}`),
 }, dispatch);
 
 const ConnectedSearch = connect(

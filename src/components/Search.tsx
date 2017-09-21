@@ -50,6 +50,7 @@ interface SearchProps extends SearchState {
   searchPodcasts: (query: string) => void;
   dismissSearch: () => void;
   navigateResult: (direction: 'up' | 'down') => void;
+  onResultSelect: (feed: string) => void;
 }
 
 class Search extends Component<SearchProps, any> {
@@ -116,6 +117,7 @@ class Search extends Component<SearchProps, any> {
     searchPodcasts,
     focusedResult,
     navigateResult,
+    onResultSelect,
   }: SearchProps) {
     return (
       <div
@@ -135,6 +137,7 @@ class Search extends Component<SearchProps, any> {
             navigateResult={navigateResult}
             dismissSearch={dismissSearch}
             podcasts={podcasts}
+            onResultSelect={onResultSelect}
           /> : null
         }
       </div>

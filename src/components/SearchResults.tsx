@@ -72,11 +72,13 @@ interface SearchResultsProps {
   focusedResult: number;
   dismissSearch: () => void;
   navigateResult: (direction: 'up' | 'down') => void;
+  onResultSelect: (feed: string) => void;
 }
 
 const Key: KeyboardShortcutsMap = {
   38: 'up',
   40: 'down',
+  13: 'select',
 };
 
 class SearchResults extends Component<SearchResultsProps, any> {
@@ -102,8 +104,24 @@ class SearchResults extends Component<SearchResultsProps, any> {
           e.preventDefault();
           switch (Key[e.keyCode]) {
             case 'up':
-            case 'down':
-              this.props.navigateResult(Key[e.keyCode] as 'up' | 'down');
+            case 'down': {
+              return this.props.navigateResult(
+                Key[e.keyCode] as 'up' | 'down'
+              );
+            }
+            case 'select': {
+              const {
+                podcasts,
+                focusedResult,
+                onResultSelect,
+                dismissSearch,
+              } = this.props;
+              const selectedPodcast = podcasts[focusedResult];
+              return (
+                onResultSelect(selectedPodcast.feed),
+                dismissSearch()
+              );
+            }
           }
         });
       }

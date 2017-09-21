@@ -120,7 +120,8 @@ type KeyboardShortcuts =
   'dismiss' |
   'focus' |
   'up' |
-  'down';
+  'down' |
+  'select';
 
 interface KeyboardShortcutsMap {
   [keyCode: number]: KeyboardShortcuts;
