@@ -3,6 +3,7 @@
  */
 
 if (module.hot) {
+  require('preact/devtools');
   module.hot.accept();
 }
 

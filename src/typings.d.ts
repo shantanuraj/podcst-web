@@ -133,3 +133,7 @@ interface PodcastWebpackModule {
 }
 
 declare let module: PodcastWebpackModule;
+
+type Require = (package: string) => void;
+
+declare let require: Require;
