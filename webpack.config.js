@@ -9,6 +9,7 @@ const webpack             = require('webpack');
 const HtmlWebpackPlugin   = require('html-webpack-plugin');
 const CleanWebpackPlugin  = require('clean-webpack-plugin');
 const CopyWebpackPlugin   = require('copy-webpack-plugin');
+const WorkboxPlugin       = require('workbox-webpack-plugin');
 const WebpackChunkHash    = require('webpack-chunk-hash');
 const { version }         = require('./package.json');
 
@@ -21,6 +22,9 @@ const getPath = (env) => {
   }
 }
 
+const srcDir  = resolve(__dirname, 'src');
+const distDir = resolve(__dirname, 'dist');
+
 module.exports = env => {
   const isProd    = !!env.prod;
   const isStaging = !!env.staging;
@@ -31,7 +35,7 @@ module.exports = env => {
   const ifProd = plugin => addPlugin(isProdOrStaging, plugin);
 
   const output = {
-    path: resolve(process.cwd(), 'dist'),
+    path: distDir,
     filename: '[name].js',
     chunkFilename: '[name].js',
     publicPath: getPath(env),
@@ -67,7 +71,7 @@ module.exports = env => {
       'app': './index.tsx',
     },
     output,
-    context: resolve(__dirname, 'src'),
+    context: srcDir,
     devServer: {
       historyApiFallback: true,
     },
@@ -104,6 +108,11 @@ module.exports = env => {
         },
       })),
       new HtmlWebpackPlugin({ template: '../public/index.html' }),
+      ifProd(new WorkboxPlugin({
+        globDirectory: distDir,
+        globPatterns: ['**/*.{html,js,css}'],
+        swDest: resolve(distDir, 'sw.js'),
+      })),
     ]),
     module: {
         rules: [
