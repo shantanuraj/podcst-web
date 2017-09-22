@@ -21,6 +21,7 @@ import {
 
 import {
   addSubscription,
+  removeSubscription,
 } from '../stores/subscriptions';
 
 import {
@@ -35,6 +36,7 @@ const mapState = (state: State) => ({
   info: state.podcasts,
   state: state.player.state,
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,
+  subscriptions: state.subscriptions.subs,
 });
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
@@ -43,6 +45,7 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   pauseEpisode,
   resumeEpisode,
   addSubscription,
+  removeSubscription,
 }, dispatch);
 
 const ConnectedEpisodes = connect(

@@ -83,17 +83,21 @@ const podcastTitle = style(
 
 const subscribeButton = style({
   display: 'inline-block',
-  minWidth: '80px',
+  minWidth: '120px',
   borderRadius: '3px',
   padding: '8px',
   background: 'transparent',
   color: 'white',
   border: '2px solid #82ffb5',
+  outline: 0,
   $nest: {
-    '&:hover': {
-      outline: 0,
+    '&:hover, &[data-is-subscribed]': {
       backgroundColor: '#82ffb5',
       color: '#292929',
+    },
+    '&[data-is-subscribed]:hover': {
+      background: 'transparent',
+      color: 'white',
     },
   },
 });
@@ -108,11 +112,13 @@ interface EpisodesProps {
   info: PodcastsState;
   state: EpisodePlayerState;
   currentEpisode: App.Episode | null;
+  subscriptions: SubscriptionsMap;
   getEpisodes: (feed: string) => void;
   playEpisode: (episode: App.Episode) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
   addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
+  removeSubscription: (feed: string) => void;
 }
 
 class Episodes extends Component<EpisodesProps, any> {
@@ -177,7 +183,11 @@ class Episodes extends Component<EpisodesProps, any> {
 
     const {
       addSubscription,
+      removeSubscription,
+      subscriptions,
     } = this.props;
+
+    const isSubscribed = !!subscriptions[feed];
 
     const {
       author,
@@ -188,7 +198,11 @@ class Episodes extends Component<EpisodesProps, any> {
       title,
     } = info;
 
-    const subscribe = () => addSubscription(feed, {...info, feed});
+    const handler = () => {
+      isSubscribed ?
+        removeSubscription(feed) :
+        addSubscription(feed, {...info, feed})
+    };
 
     return (
       <div class={`${normalizeEl} ${darkBg}`}>
@@ -202,7 +216,13 @@ class Episodes extends Component<EpisodesProps, any> {
             <h1 class={podcastTitle}>{title}</h1>
             <h2 class={infoMargins}>{author} - <a href={link}>{stripHost(link)}</a></h2>
             <div class={infoMargins}>
-              <button onClick={subscribe} class={subscribeButton}>Subscribe</button>
+              <button
+                class={subscribeButton}
+                data-is-subscribed={isSubscribed}
+                onClick={handler}
+              >
+                {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
+              </button>
             </div>
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
