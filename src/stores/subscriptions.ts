@@ -12,11 +12,17 @@ import {
 
 import {
   State,
+  noop,
+  NoopAction,
 } from './root';
 
 import {
   opmltoJSON,
 } from '../utils';
+
+import {
+  Storage,
+} from '../utils/storage';
 
 import Podcasts from '../api/Podcasts';
 
@@ -58,7 +64,8 @@ export const parseOPML = (file: string): ParseOPMLAction => ({
 export type SubscriptionsActions =
   AddSubscriptionAction |
   RemoveSubscriptionAction |
-  ParseOPMLAction;
+  ParseOPMLAction |
+  NoopAction;
 
 export interface SubscriptionsState {
   subs: SubscriptionsMap;
@@ -81,6 +88,12 @@ export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
     })
     .flatMap(e => e)
     .flatMap(e => e);
+
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, State> =
+  (action$, state) => action$
+    .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
+    .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))
+    .map(noop);
 
 export const subscriptions = (
   state: SubscriptionsState = {

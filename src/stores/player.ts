@@ -8,6 +8,8 @@ import {
 
 import {
   State,
+  noop,
+  NoopAction,
 } from './root';
 
 import Audio from '../utils/audio';
@@ -165,17 +167,6 @@ export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
   type: SEEK_UPDATE_SUCCESS,
   seekPosition,
   duration,
-});
-
-/**
- * Noop action
- */
-interface NoopAction {
-  type: 'NOOP',
-}
-const NOOP: NoopAction['type'] = 'NOOP';
-const noop = (): NoopAction => ({
-  type: NOOP,
 });
 
 export type PlayerActions =

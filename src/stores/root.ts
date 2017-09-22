@@ -52,12 +52,25 @@ import {
   SubscriptionsState,
   subscriptions,
   parseOPMLEpic,
+  subscriptionStateChangeEpic,
 } from './subscriptions';
+
+/**
+ * Noop action
+ */
+export interface NoopAction {
+  type: 'NOOP',
+}
+const NOOP: NoopAction['type'] = 'NOOP';
+export const noop = (): NoopAction => ({
+  type: NOOP,
+});
 
 /**
  * Combined application actions interface
  */
 export type Actions =
+  NoopAction |
   RouterActions |
   FeedActions |
   SearchActions |
@@ -115,6 +128,7 @@ export const rootEpic = combineEpics<Actions, State>(
   seekUpdateEpic,
   manualSeekUpdateEpic,
   parseOPMLEpic,
+  subscriptionStateChangeEpic,
 );
 
 export const rootReducer = combineReducers<State>({
