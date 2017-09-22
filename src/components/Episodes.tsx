@@ -24,6 +24,23 @@ const darkBg = style({
   color: 'white',
 });
 
+const infoCover = (cover: string) => style(
+  {
+    backgroundImage: `url(${cover})`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'cover',
+    width: '300px',
+    height: '300px',
+    minWidth: '300px',
+  },
+  media({
+    maxWidth: 601,
+  }, {
+    width: '100vw',
+    height: '100vw',
+  }),
+);
+
 const podcastInfo = style(
   {
     display: 'flex',
@@ -69,7 +86,7 @@ const subscribeButton = style({
   color: 'white',
   border: '2px solid #82ffb5',
   $nest: {
-    '&:hover, &:focus': {
+    '&:hover': {
       outline: 0,
       backgroundColor: '#82ffb5',
       color: '#292929',
@@ -91,6 +108,7 @@ interface EpisodesProps {
   playEpisode: (episode: App.Episode) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
+  addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
 }
 
 class Episodes extends Component<EpisodesProps, any> {
@@ -144,7 +162,7 @@ class Episodes extends Component<EpisodesProps, any> {
     );
   }
 
-  renderLoaded(info: App.EpisodeListing | null) {
+  renderLoaded(feed: string, info: App.EpisodeListing | null) {
     if (!info) {
       return (
         <div>
@@ -152,6 +170,10 @@ class Episodes extends Component<EpisodesProps, any> {
         </div>
       );
     }
+
+    const {
+      addSubscription,
+    } = this.props;
 
     const {
       author,
@@ -162,28 +184,13 @@ class Episodes extends Component<EpisodesProps, any> {
       title,
     } = info;
 
-    const infoCover = style(
-      {
-        backgroundImage: `url(${cover})`,
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: 'cover',
-        width: '300px',
-        height: '300px',
-        minWidth: '300px',
-      },
-      media({
-        maxWidth: 601,
-      }, {
-        width: '100vw',
-        height: '100vw',
-      }),
-    );
+    const subscribe = () => addSubscription(feed, {...info, feed});
 
     return (
       <div class={`${normalizeEl} ${darkBg}`}>
         <div class={podcastInfo}>
           <div
-            class={infoCover}
+            class={infoCover(cover)}
             role="img"
             aria-label={`${title} by ${author}`}
           />
@@ -191,7 +198,7 @@ class Episodes extends Component<EpisodesProps, any> {
             <h1 class={podcastTitle}>{title}</h1>
             <h2 class={infoMargins}>{author} - <a href={link}>{stripHost(link)}</a></h2>
             <div class={infoMargins}>
-              <button class={subscribeButton}>Subscribe</button>
+              <button onClick={subscribe} class={subscribeButton}>Subscribe</button>
             </div>
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
@@ -212,7 +219,7 @@ class Episodes extends Component<EpisodesProps, any> {
       return this.renderLoading();
     }
 
-    return this.renderLoaded(feedInfo.episodes);
+    return this.renderLoaded(feed, feedInfo.episodes);
   }
 }
 

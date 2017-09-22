@@ -20,6 +20,10 @@ import {
 } from '../stores/podcasts';
 
 import {
+  addSubscription,
+} from '../stores/subscriptions';
+
+import {
   playEpisode,
   pauseEpisode,
   resumeEpisode,
@@ -38,6 +42,7 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   playEpisode,
   pauseEpisode,
   resumeEpisode,
+  addSubscription,
 }, dispatch);
 
 const ConnectedEpisodes = connect(
