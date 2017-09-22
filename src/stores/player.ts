@@ -8,9 +8,12 @@ import {
 
 import {
   State,
+} from './root';
+
+import {
   noop,
   NoopAction,
-} from './root';
+} from './utils';
 
 import Audio from '../utils/audio';
 

@@ -11,6 +11,10 @@ import {
 } from 'redux';
 
 import {
+  NoopAction,
+} from './utils';
+
+import {
   RouterActions,
   RouterState,
   router,
@@ -56,17 +60,6 @@ import {
 } from './subscriptions';
 
 /**
- * Noop action
- */
-export interface NoopAction {
-  type: 'NOOP',
-}
-const NOOP: NoopAction['type'] = 'NOOP';
-export const noop = (): NoopAction => ({
-  type: NOOP,
-});
-
-/**
  * Combined application actions interface
  */
 export type Actions =
@@ -89,35 +82,6 @@ export interface State {
   player: PlayerState;
   subscriptions: SubscriptionsState;
 };
-
-export const getDefaultState = (): State => ({
-  router: {
-    path: '/',
-  },
-  feed: {
-    top: {
-      loading: false,
-      podcasts: [],
-    },
-  },
-  search: {
-    podcasts: [],
-    query: '',
-    searching: false,
-    focusedResult: 0,
-  },
-  podcasts: {},
-  player: {
-    currentEpisode: 0,
-    queue: [],
-    state: 'stopped',
-    seekPosition: 0,
-    duration: 0,
-  },
-  subscriptions: {
-    subs: {},
-  },
-});
 
 export const rootEpic = combineEpics<Actions, State>(
   routerEpic,

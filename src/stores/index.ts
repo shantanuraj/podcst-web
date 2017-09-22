@@ -16,8 +16,11 @@ import {
   State,
   rootEpic,
   rootReducer,
-  getDefaultState,
 } from './root';
+
+import {
+  getDefaultState,
+} from './utils';
 
 const epicMiddleware = createEpicMiddleware(rootEpic);
 
