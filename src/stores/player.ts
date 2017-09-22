@@ -215,12 +215,8 @@ export const seekUpdateEpic: Epic<PlayerActions, State> = action$ =>
 export const manualSeekUpdateEpic: Epic<PlayerActions, State> = action$ =>
   action$
     .ofType(MANUAL_SEEK_UPDATE)
-    .map(
-      (action: ManualSeekUpdateAction) => {
-        Audio.seekTo(action.seekPosition);
-        return noop();
-      }
-    );
+    .do((action: ManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
+    .map(noop);
 
 export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
   action$
