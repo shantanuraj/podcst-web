@@ -90,7 +90,7 @@ declare namespace App {
 }
 
 interface SubscriptionsMap {
-  [feed: string]: App.EpisodeListing;
+  [feed: string]: App.RenderablePodcast;
 }
 
 interface FileInfo {

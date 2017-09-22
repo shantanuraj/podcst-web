@@ -23,12 +23,12 @@ import Podcasts from '../api/Podcasts';
 interface AddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
   feed: string;
-  podcasts: App.EpisodeListing;
+  podcasts: App.RenderablePodcast;
 }
 const ADD_SUBSCRIPTION: AddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
 export const addSubscription = (
   feed: string,
-  podcasts: App.EpisodeListing
+  podcasts: App.RenderablePodcast
 ): AddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
@@ -75,7 +75,7 @@ export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
         feeds.map(({ feed }) =>
           Podcasts.episodes(feed)
             .filter(e => e !== null)
-            .map((e: App.EpisodeListing) => addSubscription(feed, e))
+            .map((e: App.EpisodeListing) => addSubscription(feed, { ...e, feed, }))
         )
       );
     })
