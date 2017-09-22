@@ -28,7 +28,7 @@ interface AddSubscriptionAction {
 const ADD_SUBSCRIPTION: AddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
 export const addSubscription = (
   feed: string,
-  podcasts: App.RenderablePodcast
+  podcasts: App.RenderablePodcast,
 ): AddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
