@@ -228,33 +228,38 @@ export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
       action.type === SKIP_TO_NEXT_EPISODE ||
       action.type === SKIP_TO_PREV_EPISODE
     ))
-    .map((action: PlayerActions) => {
+    .do((action: PlayerActions) => {
       switch (action.type) {
         case PLAY_EPISODE:
-          Audio.play(action.episode);
-          return playEpisodeAudio(action.episode);
-
+          return Audio.play(action.episode);
         case PAUSE_EPISODE:
-          Audio.pause();
-          return pauseEpisodeAudio();
-
+          return Audio.pause();
         case RESUME_EPISODE:
-          Audio.resume();
-          return resumeEpisodeAudio();
-
+          return Audio.resume();
         case STOP_EPISODE:
-          Audio.stop();
-          return stopEpisodeAudio();
-
+          return Audio.stop();
         case SKIP_TO_NEXT_EPISODE:
         case SKIP_TO_PREV_EPISODE:
           const {
             currentEpisode,
             queue,
           } = state.getState().player;
-          Audio.skipTo(queue[currentEpisode]);
+          return Audio.skipTo(queue[currentEpisode]);
+      }
+    })
+    .map((action: PlayerActions) => {
+      switch (action.type) {
+        case PLAY_EPISODE:
+          return playEpisodeAudio(action.episode);
+        case PAUSE_EPISODE:
+          return pauseEpisodeAudio();
+        case RESUME_EPISODE:
+          return resumeEpisodeAudio();
+        case STOP_EPISODE:
+          return stopEpisodeAudio();
+        case SKIP_TO_NEXT_EPISODE:
+        case SKIP_TO_PREV_EPISODE:
           return skipAudio();
-
         default:
           return noop();
       }
