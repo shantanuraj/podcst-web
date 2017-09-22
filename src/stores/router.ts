@@ -61,10 +61,8 @@ export interface RouterState {
 export const routerEpic: Epic<RouterActions, State> = action$ =>
   action$.ofType(NAVIGATE)
     .map(action => action.route)
-    .map(route => {
-      routeTo(route);
-      return navigationComplete(route);
-    });
+    .do(routeTo)
+    .map(navigationComplete);
 
 /**
  * Router reducer
