@@ -2,6 +2,7 @@ import { h, Component } from 'preact';
 import {
   media,
   style,
+  types,
 } from 'typestyle';
 
 import {
@@ -65,17 +66,20 @@ const podcastInfoTitles = style({
   },
 });
 
-const infoMargins = style({
+const margins: types.NestedCSSProperties = {
   marginTop: 8,
   marginBottom: 8,
-});
+};
 
-const podcastTitle = style({
-  fontSize: '40px',
-  fontWeight: 'bold',
-  marginTop: 8,
-  marginBottom: 8,
-});
+const infoMargins = style(margins);
+
+const podcastTitle = style(
+  margins,
+  {
+    fontSize: '40px',
+    fontWeight: 'bold',
+  },
+);
 
 const subscribeButton = style({
   display: 'inline-block',
