@@ -23,7 +23,7 @@ import {
   PlayerState,
 } from '../stores/player';
 
-import Icon from '../svg/Icon';
+import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
 
 const player = style({
@@ -42,25 +42,6 @@ const player = style({
   boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
 });
 
-const episodeInfo = style({
-  display: 'flex',
-  height: '100%',
-  flexDirection: 'column',
-  justifyContent: 'space-evenly' as any,
-  paddingLeft: 16,
-  paddingRight: 16,
-  $nest: {
-    '&>*': {
-      fontSize: '14px',
-      fontWeight: 'bold',
-    },
-    '&>*:last-child': {
-      fontSize: '10px',
-      fontWeight: 'lighter',
-    },
-  },
-});
-
 interface PlayerProps extends PlayerState {
   pause: () => void;
   resume: () => void;
@@ -68,16 +49,6 @@ interface PlayerProps extends PlayerState {
   skipToPrev: () => void;
   onSeek: (seekPosition: number, duration: number) => void;
 }
-
-const episodeImage = (image: string) => style({
-  backgroundImage: `url(${image})`,
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  height: 'inherit',
-  width: 'inherit',
-  maxWidth: '64px',
-});
 
 const Key: KeyboardShortcutsMap = {
   32: 'play',
@@ -181,34 +152,16 @@ class Player extends Component<PlayerProps, any> {
       return null;
     }
 
-    const {
-      author,
-      cover,
-      episodeArt,
-      title,
-    } = episode;
-
     const duration_ = duration || episode.duration || 0;
 
     return (
       <div class={player}>
-        <Icon
-          onClick={state === 'playing' ? pause : resume }
-          icon={state === 'playing' ? 'pause' : 'play'}
+        <PlayerInfo
+          episode={episode}
+          pause={pause}
+          resume={resume}
+          state={state}
         />
-        <div
-          class={episodeImage(episodeArt || cover as string)}
-          role="img"
-          aria-label={`${title} episode art`}
-        />
-        <div class={episodeInfo}>
-          <p>
-            {title}
-          </p>
-          <p>
-            {author}
-          </p>
-        </div>
         <Seekbar
           onSeek={onSeek}
           duration={duration_}
