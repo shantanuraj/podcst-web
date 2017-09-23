@@ -125,6 +125,7 @@ class Search extends Component<SearchProps, any> {
         ref={this.saveRef}
       >
         <input
+          aria-label="Search podcasts"
           class={search}
           type="text"
           onInput={onEvent(searchPodcasts)}
