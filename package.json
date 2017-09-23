@@ -8,6 +8,8 @@
     "build:dev": "webpack --env.dev",
     "build:staging": "webpack --env.staging",
     "build:prod": "webpack --env.prod",
+    "postbuild:staging": "./fix-sw.sh staging",
+    "postbuild:prod": "./fix-sw.sh prod",
     "predeploy:staging": "yarn build:staging",
     "predeploy:prod": "yarn build:prod",
     "deploy:staging": "aws s3 sync dist s3://static.podcst.io/staging/",
