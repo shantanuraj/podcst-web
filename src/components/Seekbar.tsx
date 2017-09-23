@@ -8,6 +8,7 @@ import {
 } from 'preact';
 
 import {
+  media,
   style,
 } from 'typestyle';
 
@@ -15,15 +16,22 @@ import {
   formatTime,
 } from '../utils';
 
-const seekbarContainer = style({
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  flexGrow: 1,
-  height: '100%',
-});
+const seekbarContainer = style(
+  {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexGrow: 1,
+    height: '100%',
+    backgroundColor: '#292929',
+  },
+  media({ maxWidth: 600 }, {
+    opacity: 0.8,
+    backgroundColor: 'rgba(41, 41, 41, 0.8)',
+  }),
+);
 
 const seekbar = style({
   position: 'absolute',
