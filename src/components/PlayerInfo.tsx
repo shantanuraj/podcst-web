@@ -7,16 +7,23 @@ import {
 } from 'preact';
 
 import {
+  media,
   style,
 } from 'typestyle';
 
 import Icon from '../svg/Icon';
 
-const infoContainer = style({
-  height: '100%',
-  display: 'flex',
-  alignItems: 'center',
-});
+const infoContainer = style(
+  {
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#292929',
+  },
+  media({ maxWidth: 600 }, {
+    boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
+  }),
+);
 
 const episodeImage = (image: string) => style({
   backgroundImage: `url(${image})`,
