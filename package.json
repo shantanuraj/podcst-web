@@ -1,6 +1,6 @@
 {
   "name": "podcst-web",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "main": "dist/index.js",
   "license": "MIT",
   "private": true,
@@ -8,12 +8,12 @@
     "build:dev": "webpack --env.dev",
     "build:staging": "webpack --env.staging",
     "build:prod": "webpack --env.prod",
-    "postbuild:staging": "./fix-sw.sh staging",
-    "postbuild:prod": "./fix-sw.sh prod",
+    "postbuild:staging": "./shell/fix-sw.sh staging",
+    "postbuild:prod": "./shell/fix-sw.sh prod",
     "predeploy:staging": "yarn build:staging",
     "predeploy:prod": "yarn build:prod",
-    "deploy:staging": "aws s3 sync dist s3://static.podcst.io/staging/",
-    "deploy:prod": "aws s3 sync dist s3://static.podcst.io/prod/",
+    "deploy:staging": "./shell/sync.sh staging",
+    "deploy:prod": "./shell/sync.sh prod",
     "dev": "webpack-dev-server --config webpack.config.js --env.dev --hot --inline --host 0.0.0.0"
   },
   "dependencies": {
