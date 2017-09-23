@@ -41,6 +41,11 @@ export const linkifyText = (text: string): string => {
  */
 export const stripHost = (link: string): string => (link.match(HOST_REGEX) as RegExpMatchArray)[2].split('/')[0];
 
+/**
+ * Scroll to top helper
+ */
+export const scrollToTop = () => (process.env.IN_BROWSER && window.scrollTo(0, 0), console.log('Scrolled'));
+
 const months = [
   'Jan',
   'Feb',

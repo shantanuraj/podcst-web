@@ -10,6 +10,7 @@ import {
 } from '../stores/podcasts';
 
 import {
+  scrollToTop,
   stripHost,
 } from '../utils';
 
@@ -141,6 +142,7 @@ class Episodes extends Component<EpisodesProps, any> {
 
   componentDidMount() {
     this.loadIfNeeded();
+    scrollToTop();
   }
 
   componentDidUpdate() {
