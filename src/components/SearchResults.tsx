@@ -27,6 +27,7 @@ const results = style({
   backgroundColor: '#292929',
   position: 'absolute',
   maxHeight: '500px',
+  width: '100%',
   boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
   overflow: 'scroll',
 });
