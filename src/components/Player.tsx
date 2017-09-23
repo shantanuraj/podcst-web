@@ -37,7 +37,6 @@ const player = style({
   height: '64px',
   width: '100%',
   zIndex: 500,
-  paddingLeft: 16,
   fontSize: 20,
   color: 'white',
   boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
@@ -48,7 +47,8 @@ const episodeInfo = style({
   height: '100%',
   flexDirection: 'column',
   justifyContent: 'space-evenly' as any,
-  marginRight: '16px',
+  paddingLeft: 16,
+  paddingRight: 16,
   $nest: {
     '&>*': {
       fontSize: '14px',
@@ -77,7 +77,6 @@ const episodeImage = (image: string) => style({
   height: 'inherit',
   width: 'inherit',
   maxWidth: '64px',
-  marginRight: '16px',
 });
 
 const Key: KeyboardShortcutsMap = {
