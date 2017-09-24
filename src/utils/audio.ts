@@ -8,6 +8,7 @@ import {
 
 import {
   seekUpdate,
+  setBuffer,
   stopEpisode,
 } from '../stores/player';
 
@@ -27,7 +28,7 @@ const Audio = {
       autoplay: true,
       html5: true,
       onload() {
-        console.log('Loaded audio');
+        store.dispatch(setBuffer(false));
       },
       onplay() {
         const updateSeek = () => requestAnimationFrame(() => {
