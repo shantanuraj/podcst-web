@@ -51,6 +51,8 @@ module.exports = env => {
   return {
     entry: {
       'vendor': [
+        'csstips',
+        'howler',
         'preact',
         'preact-redux',
         'preact-router',
