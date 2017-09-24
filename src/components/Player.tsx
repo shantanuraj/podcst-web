@@ -125,7 +125,6 @@ class Player extends Component<PlayerProps, any> {
 
     // Space for scroll check
     if (!(keyCode === 32 && state === 'stopped')) {
-      console.log('Blocked');
       preventDefault.call(e);
     }
 
