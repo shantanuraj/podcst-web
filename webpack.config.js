@@ -85,6 +85,7 @@ module.exports = env => {
     plugins: removeEmpty([
       new CleanWebpackPlugin('./dist'),
       new CopyWebpackPlugin([{ from: '../public' }]),
+      new webpack.optimize.ModuleConcatenationPlugin(),
       new webpack.optimize.CommonsChunkPlugin({
         name: ['vendor', 'manifest'],
         minChunks: Infinity,
