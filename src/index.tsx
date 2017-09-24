@@ -21,6 +21,9 @@ import './utils/patch_operators';
 import {
   fixGlobalStyles,
 } from './utils/styles';
+import {
+  setupMediaSession,
+} from './utils/chrome-media-utils';
 
 import configureStore from './stores';
 
@@ -38,6 +41,10 @@ const PodcastApp = (_props: PodcastAppProps) => (
 );
 
 fixGlobalStyles();
+
+if ('mediaSession' in navigator) {
+  setupMediaSession(store);
+}
 
 const appVersion = process.env.APP_VERSION;
 

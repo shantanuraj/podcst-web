@@ -45,6 +45,7 @@ const seekbar = style({
 interface SeekbarProps {
   duration: number;
   seekPosition: number;
+  buffering: boolean;
   onSeek: (seekPosition: number, duration: number) => void;
 }
 
@@ -83,12 +84,13 @@ class Seekbar extends Component<SeekbarProps, any> {
   }
 
   render({
+    buffering,
     duration,
     seekPosition,
   }: SeekbarProps) {
     return (
       <div ref={this.saveRef} class={seekbarContainer}>
-        {formatTime(duration, seekPosition)}
+        {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
         <div
           style={{
             width: `${(seekPosition / duration * 100)}%`,

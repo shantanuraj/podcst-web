@@ -3,6 +3,7 @@
  */
 
 import {
+  Epic,
   combineEpics,
 } from 'redux-observable';
 
@@ -13,6 +14,11 @@ import {
 import {
   NoopAction,
 } from './utils';
+
+import {
+  ChromeMediaActions,
+  chromeMediaMetadaUpdateEpic,
+} from './chrome-media';
 
 import {
   RouterActions,
@@ -69,7 +75,8 @@ export type Actions =
   SearchActions |
   PodcastsAction |
   PlayerActions |
-  SubscriptionsActions;
+  SubscriptionsActions |
+  ChromeMediaActions;
 
 /**
  * Combined application state interface
@@ -83,7 +90,7 @@ export interface State {
   subscriptions: SubscriptionsState;
 };
 
-export const rootEpic = combineEpics<Actions, State>(
+const epics = [
   routerEpic,
   getFeedEpic,
   searchPodcastsEpic,
@@ -93,7 +100,10 @@ export const rootEpic = combineEpics<Actions, State>(
   manualSeekUpdateEpic,
   parseOPMLEpic,
   subscriptionStateChangeEpic,
-);
+  ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
+].filter(epic => epic !== null);
+
+export const rootEpic = combineEpics<Actions, State>(...(epics as Epic<Actions, State, any>[]));
 
 export const rootReducer = combineReducers<State>({
   router,

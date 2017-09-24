@@ -20,23 +20,13 @@ import Audio from '../utils/audio';
 /**
  * Play related actions
  */
-interface PlayEpisodeAction {
+export interface PlayEpisodeAction {
   type: 'PLAY_EPISODE',
   episode: App.Episode,
 }
-const PLAY_EPISODE: PlayEpisodeAction['type'] = 'PLAY_EPISODE';
+export const PLAY_EPISODE: PlayEpisodeAction['type'] = 'PLAY_EPISODE';
 export const playEpisode = (episode: App.Episode): PlayEpisodeAction => ({
   type: PLAY_EPISODE,
-  episode,
-});
-
-interface PlayEpisodeAudioAction {
-  type: 'PLAY_EPISODE_AUDIO',
-  episode: App.Episode,
-}
-const PLAY_EPISODE_AUDIO: PlayEpisodeAudioAction['type'] = 'PLAY_EPISODE_AUDIO';
-const playEpisodeAudio = (episode: App.Episode): PlayEpisodeAudioAction => ({
-  type: PLAY_EPISODE_AUDIO,
   episode,
 });
 
@@ -136,7 +126,7 @@ interface SeekUpdateAction {
   duration: number;
 }
 const SEEK_UPDATE: SeekUpdateAction['type'] = 'SEEK_UPDATE';
-export const seekUpdate = (seekPosition: number, duration: number) => ({
+export const seekUpdate = (seekPosition: number, duration: number): SeekUpdateAction => ({
   type: SEEK_UPDATE,
   seekPosition,
   duration,
@@ -151,7 +141,7 @@ interface ManualSeekUpdateAction {
   duration: number;
 }
 const MANUAL_SEEK_UPDATE: ManualSeekUpdateAction['type'] = 'MANUAL_SEEK_UPDATE';
-export const manualSeekUpdate = (seekPosition: number, duration: number) => ({
+export const manualSeekUpdate = (seekPosition: number, duration: number): ManualSeekUpdateAction => ({
   type: MANUAL_SEEK_UPDATE,
   seekPosition,
   duration,
@@ -172,9 +162,18 @@ export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
   duration,
 });
 
+interface SetBufferAction {
+  type: 'SET_BUFFER',
+  buffering: boolean;
+}
+const SET_BUFFER: SetBufferAction['type'] = 'SET_BUFFER';
+export const setBuffer = (buffering: boolean): SetBufferAction => ({
+  type: SET_BUFFER,
+  buffering,
+});
+
 export type PlayerActions =
   PlayEpisodeAction |
-  PlayEpisodeAudioAction |
   PauseAction |
   PauseAudioAction |
   ResumeEpisodeAction |
@@ -187,6 +186,7 @@ export type PlayerActions =
   SeekUpdateAction |
   SeekUpdateSuccessAction |
   ManualSeekUpdateAction |
+  SetBufferAction |
   NoopAction;
 
 export interface PlayerState {
@@ -195,6 +195,7 @@ export interface PlayerState {
   state: EpisodePlayerState;
   seekPosition: number;
   duration: number;
+  buffering: boolean;
 }
 
 export const seekUpdateEpic: Epic<PlayerActions, State> = action$ =>
@@ -244,7 +245,7 @@ export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
     .map((action: PlayerActions) => {
       switch (action.type) {
         case PLAY_EPISODE:
-          return playEpisodeAudio(action.episode);
+          return setBuffer(true);
         case PAUSE_EPISODE:
           return pauseEpisodeAudio();
         case RESUME_EPISODE:
@@ -265,6 +266,7 @@ export const player = (state: PlayerState = {
   state: 'stopped',
   seekPosition: 0,
   duration: 0,
+  buffering: false,
 }, action: PlayerActions): PlayerState => {
   switch (action.type) {
     case PLAY_EPISODE: {
@@ -282,13 +284,17 @@ export const player = (state: PlayerState = {
       };
     }
     case PAUSE_EPISODE: {
-      return {
+      return state.queue.length === 0 || state.state === 'stopped'?
+      state :
+      {
         ...state,
         state: 'paused',
       };
     }
     case RESUME_EPISODE: {
-      return {
+      return state.queue.length === 0 || state.state === 'stopped'?
+      state :
+      {
         ...state,
         state: 'playing',
       };
@@ -333,6 +339,12 @@ export const player = (state: PlayerState = {
         duration: action.duration || episode.duration || 0,
       };
     }
+    case SET_BUFFER:
+      const { buffering } = action;
+      return {
+        ...state,
+        buffering,
+      }
     default:
       return state;
   }

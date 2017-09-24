@@ -44,7 +44,7 @@ export const stripHost = (link: string): string => (link.match(HOST_REGEX) as Re
 /**
  * Scroll to top helper
  */
-export const scrollToTop = () => (process.env.IN_BROWSER && window.scrollTo(0, 0), console.log('Scrolled'));
+export const scrollToTop = () => process.env.IN_BROWSER && window.scrollTo(0, 0);
 
 const months = [
   'Jan',
