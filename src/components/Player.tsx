@@ -115,7 +115,6 @@ class Player extends Component<PlayerProps, any> {
       keyCode,
     } = e;
 
-    preventDefault.call(e);
     const {
       state,
       pause,
@@ -123,6 +122,13 @@ class Player extends Component<PlayerProps, any> {
       skipToNext,
       skipToPrev,
     } = this.props;
+
+    console.log(keyCode, state);
+    // Space for scroll check
+    if (!(keyCode === 32 && state === 'stopped')) {
+      console.log('Blocked');
+      preventDefault.call(e);
+    }
 
     switch(Key[keyCode]) {
       case 'play': {

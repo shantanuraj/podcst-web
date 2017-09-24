@@ -282,13 +282,17 @@ export const player = (state: PlayerState = {
       };
     }
     case PAUSE_EPISODE: {
-      return {
+      return state.queue.length === 0 || state.state === 'stopped'?
+      state :
+      {
         ...state,
         state: 'paused',
       };
     }
     case RESUME_EPISODE: {
-      return {
+      return state.queue.length === 0 || state.state === 'stopped'?
+      state :
+      {
         ...state,
         state: 'playing',
       };
