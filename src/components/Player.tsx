@@ -156,6 +156,7 @@ class Player extends Component<PlayerProps, any> {
     seekPosition,
     state,
     onSeek,
+    buffering,
   }: PlayerProps) {
     const episode = queue[currentEpisode];
 
@@ -174,6 +175,7 @@ class Player extends Component<PlayerProps, any> {
           state={state}
         />
         <Seekbar
+          buffering={buffering}
           onSeek={onSeek}
           duration={duration_}
           seekPosition={seekPosition}
