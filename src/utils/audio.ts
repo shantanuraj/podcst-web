@@ -30,15 +30,15 @@ const Audio = {
         console.log('Loaded audio');
       },
       onplay() {
-        const updateSeek = () => {
+        const updateSeek = () => requestAnimationFrame(() => {
           const seekPosition = globalHowl.seek() as number;
 
           store.dispatch(seekUpdate(seekPosition, globalHowl.duration()));
 
           if (globalHowl.playing()) {
-            requestAnimationFrame(updateSeek);
+            setTimeout(updateSeek, 750);
           }
-        }
+        });
         updateSeek();
       },
       onend() {
