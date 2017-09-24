@@ -59,6 +59,17 @@ export const navigateResult =
     direction,
   });
 
+interface FocusResultAction {
+  type: 'FOCUS_RESULT',
+  focusedResult: number;
+}
+const FOCUS_RESULT: FocusResultAction['type'] = 'FOCUS_RESULT';
+export const focusResult =
+  (focusedResult: number): FocusResultAction => ({
+    type: FOCUS_RESULT,
+    focusedResult,
+  });
+
 export interface SearchState {
   query: SearchPodcastsAction['query'];
   podcasts: App.Podcast[];
@@ -70,7 +81,8 @@ export type SearchActions =
   SearchPodcastsAction |
   SearchPodcastsSuccessAction |
   DismissSearchAction |
-  NavigateResultAction;
+  NavigateResultAction |
+  FocusResultAction;
 
 export const searchPodcastsEpic: Epic<SearchActions, State> = action$ =>
   action$.ofType(SEARCH_PODCASTS)
@@ -107,6 +119,10 @@ export const search = (state: SearchState = {
       const newPos = (focusedResult + (direction === 'up' ? -1 : 1)) % podcasts.length;
       const navigatedResult = (newPos > -1) ? newPos :  (podcasts.length > 0 ? podcasts.length - 1 : 0);
       return {...state, focusedResult: navigatedResult};
+    }
+    case FOCUS_RESULT: {
+      const { focusedResult } = action;
+      return {...state, focusedResult};
     }
     default:
       return state;

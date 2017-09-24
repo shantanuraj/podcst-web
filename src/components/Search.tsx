@@ -47,10 +47,11 @@ const Key: KeyboardShortcutsMap = {
 
 interface SearchProps extends SearchState {
   className: string;
-  searchPodcasts: (query: string) => void;
-  dismissSearch: () => void;
-  navigateResult: (direction: 'up' | 'down') => void;
-  onResultSelect: (feed: string) => void;
+  searchPodcasts(query: string);
+  dismissSearch();
+  navigateResult(direction: 'up' | 'down');
+  focusResult(focusedResult: number);
+  onResultSelect(feed: string);
 }
 
 class Search extends Component<SearchProps, any> {
@@ -116,6 +117,7 @@ class Search extends Component<SearchProps, any> {
     query,
     searchPodcasts,
     focusedResult,
+    focusResult,
     navigateResult,
     onResultSelect,
   }: SearchProps) {
@@ -134,6 +136,7 @@ class Search extends Component<SearchProps, any> {
         />
         {query && podcasts.length ?
           <SearchResults
+            focusResult={focusResult}
             focusedResult={focusedResult}
             navigateResult={navigateResult}
             dismissSearch={dismissSearch}

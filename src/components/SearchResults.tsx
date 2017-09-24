@@ -35,7 +35,7 @@ const results = style({
 const result = style({
   display: 'flex',
   $nest: {
-    '&:hover, &:focus, &[data-focus]': {
+    '&[data-focus]': {
       backgroundColor: 'white',
       color: 'black',
     },
@@ -71,9 +71,10 @@ const resultAuthorText = style({
 interface SearchResultsProps {
   podcasts: App.Podcast[];
   focusedResult: number;
-  dismissSearch: () => void;
-  navigateResult: (direction: 'up' | 'down') => void;
-  onResultSelect: (feed: string) => void;
+  dismissSearch();
+  navigateResult(direction: 'up' | 'down');
+  focusResult(focusedResult: number);
+  onResultSelect(feed: string);
 }
 
 const Key: KeyboardShortcutsMap = {
@@ -132,13 +133,18 @@ class SearchResults extends Component<SearchResultsProps, any> {
   renderPodcast = (
     podcast: App.Podcast,
     isFocussed: boolean,
+    focusResult: () => void,
     dismissSearch: SearchResultsProps['dismissSearch'],
   ) => (
     <Link
       onClick={dismissSearch}
       href={`/episodes?feed=${podcast.feed}`}
     >
-      <div data-focus={isFocussed} class={result}>
+      <div
+        class={result}
+        data-focus={isFocussed}
+        onMouseEnter={focusResult}
+      >
         <img class={resultImage} src={podcast.thumbnail} />
         <div class={resultText}>
           <p
@@ -161,17 +167,20 @@ class SearchResults extends Component<SearchResultsProps, any> {
   renderPodcasts = (
     podcasts: App.Podcast[],
     focusedResult: number,
+    focusResult: SearchResultsProps['focusResult'],
     dismissSearch: SearchResultsProps['dismissSearch'],
   ) => (
     podcasts.map((podcast, i) => this.renderPodcast(
       podcast,
       focusedResult === i,
+      () => focusResult(i),
       dismissSearch
     ))
   )
 
   render({
     dismissSearch,
+    focusResult,
     focusedResult,
     podcasts,
   }: SearchResultsProps) {
@@ -181,7 +190,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
         onClick={dismissSearch}
         ref={el => this.el = el as HTMLDivElement}
       >
-        {this.renderPodcasts(podcasts, focusedResult, dismissSearch)}
+        {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch)}
       </div>
     );
   }
