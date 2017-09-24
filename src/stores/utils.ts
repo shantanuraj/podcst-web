@@ -45,6 +45,7 @@ export const getDefaultState = (): State => ({
     state: 'stopped',
     seekPosition: 0,
     duration: 0,
+    buffering: false,
   },
   subscriptions: {
     subs: Storage.getSubscriptions(),

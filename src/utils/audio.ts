@@ -8,6 +8,7 @@ import {
 
 import {
   seekUpdate,
+  setBuffer,
   stopEpisode,
 } from '../stores/player';
 
@@ -27,18 +28,18 @@ const Audio = {
       autoplay: true,
       html5: true,
       onload() {
-        console.log('Loaded audio');
+        store.dispatch(setBuffer(false));
       },
       onplay() {
-        const updateSeek = () => {
+        const updateSeek = () => requestAnimationFrame(() => {
           const seekPosition = globalHowl.seek() as number;
 
           store.dispatch(seekUpdate(seekPosition, globalHowl.duration()));
 
           if (globalHowl.playing()) {
-            requestAnimationFrame(updateSeek);
+            setTimeout(updateSeek, 750);
           }
-        }
+        });
         updateSeek();
       },
       onend() {
