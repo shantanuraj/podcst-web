@@ -20,11 +20,11 @@ import Audio from '../utils/audio';
 /**
  * Play related actions
  */
-interface PlayEpisodeAction {
+export interface PlayEpisodeAction {
   type: 'PLAY_EPISODE',
   episode: App.Episode,
 }
-const PLAY_EPISODE: PlayEpisodeAction['type'] = 'PLAY_EPISODE';
+export const PLAY_EPISODE: PlayEpisodeAction['type'] = 'PLAY_EPISODE';
 export const playEpisode = (episode: App.Episode): PlayEpisodeAction => ({
   type: PLAY_EPISODE,
   episode,
@@ -136,7 +136,7 @@ interface SeekUpdateAction {
   duration: number;
 }
 const SEEK_UPDATE: SeekUpdateAction['type'] = 'SEEK_UPDATE';
-export const seekUpdate = (seekPosition: number, duration: number) => ({
+export const seekUpdate = (seekPosition: number, duration: number): SeekUpdateAction => ({
   type: SEEK_UPDATE,
   seekPosition,
   duration,
@@ -151,7 +151,7 @@ interface ManualSeekUpdateAction {
   duration: number;
 }
 const MANUAL_SEEK_UPDATE: ManualSeekUpdateAction['type'] = 'MANUAL_SEEK_UPDATE';
-export const manualSeekUpdate = (seekPosition: number, duration: number) => ({
+export const manualSeekUpdate = (seekPosition: number, duration: number): ManualSeekUpdateAction => ({
   type: MANUAL_SEEK_UPDATE,
   seekPosition,
   duration,

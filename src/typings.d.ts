@@ -147,4 +147,42 @@ interface Process {
   }
 }
 
+interface Artwork {
+  src: string;
+  sizes: '96x96' | '128x128' | '192x192' | '256x256' | '384x384' | '512x512';
+  type: 'image/png' | 'image/jpeg';
+}
+
+interface ChromeMediaMetadataProps {
+  title: string;
+  artist: string;
+  album: string;
+  artwork: Artwork[];
+}
+
+interface ChromeMediaMetadata {
+  new(props: ChromeMediaMetadataProps): ChromeMediaMetadata;
+}
+
+type ChromeMediaSessionEvents =
+  'play' |
+  'pause' |
+  'seekbackward' |
+  'seekforward' |
+  'previoustrack' |
+  'nexttrack';
+
+type ChromeEventHandler = () => void;
+
+interface ChromeMediaSession {
+  setActionHandler(ChromeMediaSessionEvents, ChromeEventHandler);
+  metadata: ChromeMediaMetadata;
+}
+
+interface ChromeNavigator extends Navigator {
+  mediaSession: ChromeMediaSession;
+}
+
 declare let process: Process;
+
+declare let MediaMetadata: ChromeMediaMetadata;
