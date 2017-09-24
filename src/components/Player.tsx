@@ -123,7 +123,6 @@ class Player extends Component<PlayerProps, any> {
       skipToPrev,
     } = this.props;
 
-    console.log(keyCode, state);
     // Space for scroll check
     if (!(keyCode === 32 && state === 'stopped')) {
       console.log('Blocked');
