@@ -19,6 +19,7 @@ import {
   dismissSearch,
   searchPodcasts,
   navigateResult,
+  focusResult,
 } from '../stores/search';
 
 import {
@@ -33,6 +34,7 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   dismissSearch,
   searchPodcasts,
   navigateResult,
+  focusResult,
   onResultSelect: (feed: string) => navigate(`/episodes?feed=${feed}`),
 }, dispatch);
 

@@ -55,7 +55,7 @@ const playButton = style({
   color: 'white',
   border: '2px solid #82ffb5',
   $nest: {
-    '&:hover, &:focus, &:active, &[data-is-playing]': {
+    '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {
       outline: 0,
       backgroundColor: '#82ffb5',
       color: '#292929',
@@ -90,7 +90,12 @@ const renderButton = ({
   const text = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play');
 
   return (
-    <button onClick={handler} class={playButton} data-is-playing={isPlaying}>
+    <button
+      class={playButton}
+      data-is-playing={isPlaying}
+      data-is-paused={isPaused}
+      onClick={handler}
+    >
       {text}
     </button>
   );

@@ -24,6 +24,7 @@ const iconStyle = style({
   fill: '#82ffb5',
   height: '32px',
   width: '32px',
+  marginLeft: '16px',
   marginRight: '16px',
 });
 
