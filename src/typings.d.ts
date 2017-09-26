@@ -95,7 +95,7 @@ declare namespace App {
     background: string;
     backgroundDark: string;
     backgroundLight: string;
-    loadingBackgroundColors: string[];
+    loaderAnimation: string;
     text: string;
     subTitle: string;
   }

@@ -74,8 +74,8 @@ class App extends Component<AppProps, never> {
     const { theme } = this.props;
     return (
       <div class={normalizeEl}>
-        <Toolbar {...theme} />
-        <ConnectedLoader />
+        <Toolbar theme={theme} />
+        <ConnectedLoader theme={theme} />
         <main
           class={normalizeEl}
           style={{ paddingTop: 64, marginBottom: 64, }}

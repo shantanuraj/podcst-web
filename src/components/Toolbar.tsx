@@ -42,7 +42,13 @@ const linkMap: LinkMap = {
   '/feed/top': 'Top',
 };
 
-const Toolbar = (theme: App.Theme) => (
+interface ToolbarProps {
+  theme: App.Theme;
+}
+
+const Toolbar = ({
+  theme,
+}: ToolbarProps) => (
   <header class={toolbar(theme)}>
     <NavLinks links={linkMap} />
     <ConnectedSearch theme={theme} className={search} />
