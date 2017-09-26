@@ -118,9 +118,9 @@ export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
  * On Theme change
  */
 export const onThemeChangeEpic: Epic<Actions, State> = (action$, store) =>
-    action$.ofType(CHANGE_THEME)
-      .do(() => fixGlobalStyles(store.getState().app.theme))
-      .map(noop);
+  action$.ofType(CHANGE_THEME)
+    .do(() => fixGlobalStyles(store.getState().app.theme))
+    .map(noop);
 
 /**
  * App reducer
