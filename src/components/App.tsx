@@ -26,11 +26,17 @@ import ConnectedPlayer from '../containers/ConnectedPlayer';
 
 import Toolbar from './Toolbar';
 
-interface AppProps extends ThemeState {}
+interface AppProps extends ThemeState {
+  version: string;
+}
 
 class App extends Component<AppProps, never> {
   componentWillMount() {
-    fixGlobalStyles();
+    fixGlobalStyles(this.props.theme);
+  }
+
+  componentDidMount() {
+    console.log(`Initalized Podcst.io version: ${this.props.version}`);
   }
 
   render() {

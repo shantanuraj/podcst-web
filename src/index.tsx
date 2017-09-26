@@ -28,12 +28,15 @@ import ConnectedApp from './containers/ConnectedApp';
 
 export const store = configureStore();
 
+const version = process.env.APP_VERSION;
+
 interface PodcastAppProps {
   version: string;
 }
-const PodcastApp = (_props: PodcastAppProps) => (
+
+const PodcastApp = ({ version }: PodcastAppProps) => (
   <Provider store={store}>
-    <ConnectedApp />
+    <ConnectedApp version={version} />
   </Provider>
 );
 
@@ -41,8 +44,4 @@ if ('mediaSession' in navigator) {
   setupMediaSession(store);
 }
 
-const appVersion = process.env.APP_VERSION;
-
-render(<PodcastApp version={appVersion} />, document.body);
-
-console.log(`Initalized Podcst.io version: ${appVersion}`);
+render(<PodcastApp version={version} />, document.body);
