@@ -65,18 +65,25 @@ import {
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
+import {
+  ThemeActions,
+  ThemeState,
+  theme,
+} from './theme';
+
 /**
  * Combined application actions interface
  */
 export type Actions =
-  NoopAction |
   RouterActions |
   FeedActions |
   SearchActions |
   PodcastsAction |
   PlayerActions |
   SubscriptionsActions |
-  ChromeMediaActions;
+  ChromeMediaActions |
+  ThemeActions |
+  NoopAction;
 
 /**
  * Combined application state interface
@@ -88,6 +95,7 @@ export interface State {
   podcasts: PodcastsState;
   player: PlayerState;
   subscriptions: SubscriptionsState;
+  theme: ThemeState;
 };
 
 const epics = [
@@ -112,4 +120,5 @@ export const rootReducer = combineReducers<State>({
   podcasts,
   player,
   subscriptions,
+  theme,
 });

@@ -19,15 +19,12 @@ import {
 // Patch Rx operators
 import './utils/patch_operators';
 import {
-  fixGlobalStyles,
-} from './utils/styles';
-import {
   setupMediaSession,
 } from './utils/chrome-media-utils';
 
 import configureStore from './stores';
 
-import App from './components/App';
+import ConnectedApp from './containers/ConnectedApp';
 
 export const store = configureStore();
 
@@ -36,11 +33,9 @@ interface PodcastAppProps {
 }
 const PodcastApp = (_props: PodcastAppProps) => (
   <Provider store={store}>
-    <App />
+    <ConnectedApp />
   </Provider>
 );
-
-fixGlobalStyles();
 
 if ('mediaSession' in navigator) {
   setupMediaSession(store);

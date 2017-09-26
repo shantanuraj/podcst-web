@@ -10,6 +10,10 @@ import {
   Storage,
 } from '../utils/storage';
 
+import {
+  ThemeProvider,
+} from '../styles';
+
 /**
  * Noop action
  */
@@ -49,5 +53,8 @@ export const getDefaultState = (): State => ({
   },
   subscriptions: {
     subs: Storage.getSubscriptions(),
+  },
+  theme: {
+    theme: ThemeProvider('default'),
   },
 });
