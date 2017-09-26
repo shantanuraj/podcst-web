@@ -53,6 +53,16 @@ const episodeInfo = style({
   },
 });
 
+const playButton = style({
+  height: '100%',
+  width: '64px',
+  background: 'inherit',
+  border: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+});
+
 interface PlayerInfoProps {
   episode: App.Episode;
   state: EpisodePlayerState;
@@ -74,11 +84,14 @@ const PlayerInfo = ({
   theme,
 }: PlayerInfoProps) => (
   <div class={infoContainer(theme)}>
-    <Icon
-      theme={theme}
-      onClick={state === 'playing' ? pause : resume }
-      icon={state === 'playing' ? 'pause' : 'play'}
-    />
+    <button
+      class={playButton}
+      onClick={state === 'playing' ? pause : resume }>
+      <Icon
+        theme={theme}
+        icon={state === 'playing' ? 'pause' : 'play'}
+      />
+    </button>
     <div
       class={episodeImage(episodeArt || cover as string)}
       role="img"
