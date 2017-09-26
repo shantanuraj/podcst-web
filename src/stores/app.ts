@@ -115,7 +115,7 @@ export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
     );
 
 /**
- * On Theme change
+ * On Theme change epic
  */
 export const onThemeChangeEpic: Epic<Actions, State> = (action$, store) =>
   action$.ofType(CHANGE_THEME)
