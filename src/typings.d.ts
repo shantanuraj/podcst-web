@@ -88,7 +88,7 @@ declare namespace App {
     feed: string;
   });
 
-  type ThemeMode = 'dark' | 'light' | 'default';
+  type ThemeMode = 'dark' | 'light';
 
   interface Theme {
     accent: string;
@@ -134,6 +134,7 @@ type KeyboardShortcuts =
   'focus' |
   'up' |
   'down' |
+  'change-theme' |
   'select';
 
 interface KeyboardShortcutsMap {

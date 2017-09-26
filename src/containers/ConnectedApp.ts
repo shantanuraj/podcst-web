@@ -16,6 +16,7 @@ import {
 } from '../stores/root';
 
 import {
+  appInit,
   changeTheme,
 } from '../stores/app';
 
@@ -34,6 +35,7 @@ import App from '../components/App';
 const mapState = (state: State) => state.app;
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+  appInit,
   changeTheme,
   pauseEpisode,
   resumeEpisode,

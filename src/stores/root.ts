@@ -63,8 +63,10 @@ import {
 import {
   AppActions,
   AppState,
-  chromeMediaMetadaUpdateEpic,
   app,
+  chromeMediaMetadaUpdateEpic,
+  onThemeChangeEpic,
+  changeThemeEpic,
 } from './app';
 
 /**
@@ -103,6 +105,8 @@ const epics = [
   manualSeekUpdateEpic,
   parseOPMLEpic,
   subscriptionStateChangeEpic,
+  changeThemeEpic,
+  onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
 ].filter(epic => epic !== null);
 

@@ -30,6 +30,7 @@ import Toolbar from './Toolbar';
 
 interface AppProps extends AppState {
   version: string;
+  appInit();
   pauseEpisode();
   resumeEpisode();
   seekUpdate(seekPosition: number, duration: number);
@@ -47,6 +48,7 @@ class App extends Component<AppProps, never> {
   }
 
   componentDidMount() {
+    this.props.appInit();
     console.log(`Initalized Podcst.io version: ${this.props.version}`);
   }
 

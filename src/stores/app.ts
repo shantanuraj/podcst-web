@@ -5,12 +5,24 @@
  */
 
 import {
+  Observable,
+} from 'rxjs/Observable';
+
+import {
   Epic,
 } from 'redux-observable';
 
 import {
+  ignoreKeyboardSelector,
+} from '../utils';
+
+import {
   updateMetadata,
 } from '../utils/chrome-media-utils';
+
+import {
+  fixGlobalStyles,
+} from '../utils/styles';
 
 import {
   ThemeProvider,
@@ -25,6 +37,10 @@ import {
   PLAY_EPISODE,
   PlayEpisodeAction,
 } from './player';
+
+import {
+  noop,
+} from './utils';
 
 interface UpdateChromeMetadataAction {
   type: 'UPDATE_CHROME_METADATA',
@@ -45,7 +61,17 @@ export const changeTheme = (mode: App.ThemeMode): ChangeThemeAction => ({
   mode,
 });
 
+type AppInit = 'APP_INIT';
+interface AppInitAction {
+  type: AppInit,
+}
+const APP_INIT: AppInitAction['type'] = 'APP_INIT';
+export const appInit = (): AppInitAction => ({
+  type: APP_INIT,
+});
+
 export type AppActions =
+  AppInitAction |
   UpdateChromeMetadataAction |
   ChangeThemeAction;
 
@@ -53,6 +79,7 @@ export type AppActions =
  * App specific state
  */
 export interface AppState {
+  mode: App.ThemeMode;
   theme: App.Theme;
 }
 
@@ -65,14 +92,46 @@ export const chromeMediaMetadaUpdateEpic: Epic<Actions, State> = action$ =>
     .map(updateChromeMetadatAction);
 
 /**
+ * Keyboard shortcut map
+ */
+const Key: KeyboardShortcutsMap = {
+  84: 'change-theme',
+};
+
+/**
+ * Theme change shortcut epic
+ */
+export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
+  action$.ofType(APP_INIT)
+    .switchMap(() =>
+      Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+        .filter(event =>
+          Key[event.keyCode] === 'change-theme' &&
+          !(event.target as HTMLElement).matches(ignoreKeyboardSelector)
+        )
+        .map(() => changeTheme(
+          store.getState().app.mode === 'dark' ? 'light' : 'dark',
+        ))
+    );
+
+/**
+ * On Theme change
+ */
+export const onThemeChangeEpic: Epic<Actions, State> = (action$, store) =>
+    action$.ofType(CHANGE_THEME)
+      .do(() => fixGlobalStyles(store.getState().app.theme))
+      .map(noop);
+
+/**
  * App reducer
  */
 export const app = (state: AppState = {
-  theme: ThemeProvider('default'),
+  mode: 'dark',
+  theme: ThemeProvider('dark'),
 }, action: AppActions): AppState => {
   switch (action.type) {
     case CHANGE_THEME:
-      return { ...state, theme: ThemeProvider(action.mode) };
+      return {...state, mode: action.mode, theme: ThemeProvider(action.mode)};
     default:
       return state;
   }

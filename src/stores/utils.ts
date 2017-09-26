@@ -28,7 +28,8 @@ export const noop = (): NoopAction => ({ type: NOOP });
  */
 export const getDefaultState = (): State => ({
   app: {
-    theme: ThemeProvider('default'),
+    mode: 'dark',
+    theme: ThemeProvider('dark'),
   },
   router: {
     path: '/',

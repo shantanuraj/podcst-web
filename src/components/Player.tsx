@@ -21,6 +21,10 @@ import {
 } from 'typestyle';
 
 import {
+  ignoreKeyboardSelector,
+} from '../utils';
+
+import {
   PlayerState,
 } from '../stores/player';
 
@@ -65,8 +69,6 @@ const Key: KeyboardShortcutsMap = {
   39: 'next',
   78: 'next',
 }
-
-const ignoreKeyboardSelector = 'header *';
 
 class Player extends Component<PlayerProps, any> {
 
