@@ -21,9 +21,9 @@ import {
 import Loading from './Loading';
 import Episode from './Episode';
 
-const darkBg = style({
-  backgroundColor: '#292929',
-  color: 'white',
+const episodesContainer = (theme: App.Theme) => style({
+  backgroundColor: theme.background,
+  color: theme.text,
 });
 
 const infoCover = (cover: string) => style(
@@ -54,7 +54,7 @@ const podcastInfo = style(
   }),
 );
 
-const podcastInfoTitles = style({
+const podcastInfoTitles = (theme: App.Theme) => style({
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'center',
@@ -62,7 +62,7 @@ const podcastInfoTitles = style({
   paddingTop: 8,
   $nest: {
     '& a': {
-      color: '#82ffb5',
+      color: theme.accent,
     },
   },
 });
@@ -82,7 +82,7 @@ const podcastTitle = style(
   },
 );
 
-const subscribeButton = style({
+const subscribeButton = (theme: App.Theme) => style({
   display: 'inline-block',
   minWidth: '120px',
   borderRadius: '3px',
@@ -92,13 +92,13 @@ const subscribeButton = style({
   border: '2px solid #82ffb5',
   outline: 0,
   $nest: {
-    '&:hover, &[data-is-subscribed]': {
-      backgroundColor: '#82ffb5',
-      color: '#292929',
+    '&:focus, &:hover, &[data-is-subscribed]': {
+      backgroundColor: theme.accent,
+      color: theme.background,
     },
     '&[data-is-subscribed]:hover': {
       background: 'transparent',
-      color: 'white',
+      color: theme.text,
     },
   },
 });
@@ -109,6 +109,7 @@ const episodesView = style({
 });
 
 interface EpisodesProps {
+  theme: App.Theme;
   feed: string;
   info: PodcastsState;
   state: EpisodePlayerState;
@@ -160,6 +161,7 @@ class Episodes extends Component<EpisodesProps, any> {
       pauseEpisode,
       resumeEpisode,
       state,
+      theme,
     } = this.props;
 
     return (
@@ -169,6 +171,7 @@ class Episodes extends Component<EpisodesProps, any> {
         play={playEpisode}
         resume={resumeEpisode}
         state={state}
+        theme={theme}
         currentEpisode={currentEpisode}
       />
     );
@@ -187,6 +190,7 @@ class Episodes extends Component<EpisodesProps, any> {
       addSubscription,
       removeSubscription,
       subscriptions,
+      theme,
     } = this.props;
 
     const isSubscribed = !!subscriptions[feed];
@@ -207,19 +211,19 @@ class Episodes extends Component<EpisodesProps, any> {
     };
 
     return (
-      <div class={`${normalizeEl} ${darkBg}`}>
+      <div class={`${normalizeEl} ${episodesContainer(theme)}`}>
         <div class={podcastInfo}>
           <div
             class={infoCover(cover)}
             role="img"
             aria-label={`${title} by ${author}`}
           />
-          <div class={podcastInfoTitles}>
+          <div class={podcastInfoTitles(theme)}>
             <h1 class={podcastTitle}>{title}</h1>
             <h2 class={infoMargins}>{author} - <a href={link}>{stripHost(link)}</a></h2>
             <div class={infoMargins}>
               <button
-                class={subscribeButton}
+                class={subscribeButton(theme)}
                 data-is-subscribed={isSubscribed}
                 onClick={handler}
               >
