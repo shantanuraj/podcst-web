@@ -19,12 +19,23 @@ import {
   changeTheme,
 } from '../stores/app';
 
+import {
+  pauseEpisode,
+  resumeEpisode,
+  skipToNextEpisode,
+  skipToPrevEpisode,
+} from '../stores/player';
+
 import App from '../components/App';
 
 const mapState = (state: State) => state.app;
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   changeTheme,
+  pauseEpisode,
+  resumeEpisode,
+  skipToNextEpisode,
+  skipToPrevEpisode,
 }, dispatch);
 
 const ConnectedApp = connect(

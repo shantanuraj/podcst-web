@@ -106,7 +106,9 @@ const epics = [
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
 ].filter(epic => epic !== null);
 
-export const rootEpic = combineEpics<Actions, State>(...(epics as Epic<Actions, State, any>[]));
+export const rootEpic = combineEpics<Actions, State>(
+  ...(epics as Epic<Actions, State, any>[])
+);
 
 export const rootReducer = combineReducers<State>({
   app,

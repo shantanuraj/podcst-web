@@ -28,11 +28,16 @@ import Toolbar from './Toolbar';
 
 interface AppProps extends AppState {
   version: string;
+  pauseEpisode();
+  resumeEpisode();
+  skipToNextEpisode();
+  skipToPrevEpisode();
 }
 
 class App extends Component<AppProps, never> {
   componentWillMount() {
     fixGlobalStyles(this.props.theme);
+    this.setupMediaSession();
   }
 
   componentDidMount() {
@@ -41,7 +46,21 @@ class App extends Component<AppProps, never> {
 
   setupMediaSession() {
     if ('mediaSession' in navigator) {
+      const {
+        mediaSession,
+      } = navigator as ChromeNavigator;
 
+      const {
+        pauseEpisode,
+        resumeEpisode,
+        skipToNextEpisode,
+        skipToPrevEpisode,
+      } = this.props;
+
+      mediaSession.setActionHandler('play', resumeEpisode);
+      mediaSession.setActionHandler('pause', pauseEpisode);
+      mediaSession.setActionHandler('previoustrack', skipToPrevEpisode);
+      mediaSession.setActionHandler('nexttrack', skipToNextEpisode);
     }
   }
 

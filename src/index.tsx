@@ -18,12 +18,7 @@ import {
 
 // Patch Rx operators
 import './utils/patch_operators';
-import {
-  setupMediaSession,
-} from './utils/chrome-media-utils';
-
 import configureStore from './stores';
-
 import ConnectedApp from './containers/ConnectedApp';
 
 export const store = configureStore();
@@ -39,9 +34,5 @@ const PodcastApp = ({ version }: PodcastAppProps) => (
     <ConnectedApp version={version} />
   </Provider>
 );
-
-if ('mediaSession' in navigator) {
-  setupMediaSession(store);
-}
 
 render(<PodcastApp version={version} />, document.body);
