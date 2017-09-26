@@ -13,12 +13,12 @@ import {
 
 import Icon from '../svg/Icon';
 
-const infoContainer = style(
+const infoContainer = (theme: App.Theme) => style(
   {
     height: '100%',
     display: 'flex',
     alignItems: 'center',
-    backgroundColor: '#292929',
+    backgroundColor: theme.background,
   },
   media({ maxWidth: 600 }, {
     boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
@@ -56,6 +56,7 @@ const episodeInfo = style({
 interface PlayerInfoProps {
   episode: App.Episode;
   state: EpisodePlayerState;
+  theme: App.Theme;
   pause();
   resume();
 }
@@ -70,9 +71,11 @@ const PlayerInfo = ({
   pause,
   resume,
   state,
+  theme,
 }: PlayerInfoProps) => (
-  <div class={infoContainer}>
+  <div class={infoContainer(theme)}>
     <Icon
+      theme={theme}
       onClick={state === 'playing' ? pause : resume }
       icon={state === 'playing' ? 'pause' : 'play'}
     />

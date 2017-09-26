@@ -21,13 +21,17 @@ import {
 } from 'typestyle';
 
 import {
+  ignoreKeyboardSelector,
+} from '../utils';
+
+import {
   PlayerState,
 } from '../stores/player';
 
 import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
 
-const player = style(
+const player = (theme: App.Theme) => style(
   {
     display: 'flex',
     alignItems: 'center',
@@ -39,7 +43,7 @@ const player = style(
     width: '100%',
     zIndex: 500,
     fontSize: 20,
-    color: 'white',
+    color: theme.text,
     boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
   },
   media({ maxWidth: 600 }, {
@@ -50,6 +54,7 @@ const player = style(
 );
 
 interface PlayerProps extends PlayerState {
+  theme: App.Theme;
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;
@@ -64,8 +69,6 @@ const Key: KeyboardShortcutsMap = {
   39: 'next',
   78: 'next',
 }
-
-const ignoreKeyboardSelector = 'header *';
 
 class Player extends Component<PlayerProps, any> {
 
@@ -157,6 +160,7 @@ class Player extends Component<PlayerProps, any> {
     state,
     onSeek,
     buffering,
+    theme,
   }: PlayerProps) {
     const episode = queue[currentEpisode];
 
@@ -167,18 +171,20 @@ class Player extends Component<PlayerProps, any> {
     const duration_ = duration || episode.duration || 0;
 
     return (
-      <div class={player}>
+      <div class={player(theme)}>
         <PlayerInfo
           episode={episode}
           pause={pause}
           resume={resume}
           state={state}
+          theme={theme}
         />
         <Seekbar
           buffering={buffering}
           onSeek={onSeek}
           duration={duration_}
           seekPosition={seekPosition}
+          theme={theme}
         />
       </div>
     );

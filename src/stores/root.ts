@@ -16,11 +16,6 @@ import {
 } from './utils';
 
 import {
-  ChromeMediaActions,
-  chromeMediaMetadaUpdateEpic,
-} from './chrome-media';
-
-import {
   RouterActions,
   RouterState,
   router,
@@ -65,23 +60,33 @@ import {
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
+import {
+  AppActions,
+  AppState,
+  app,
+  chromeMediaMetadaUpdateEpic,
+  onThemeChangeEpic,
+  changeThemeEpic,
+} from './app';
+
 /**
  * Combined application actions interface
  */
 export type Actions =
-  NoopAction |
   RouterActions |
   FeedActions |
   SearchActions |
   PodcastsAction |
   PlayerActions |
   SubscriptionsActions |
-  ChromeMediaActions;
+  AppActions |
+  NoopAction;
 
 /**
  * Combined application state interface
  */
 export interface State {
+  app: AppState;
   router: RouterState;
   feed: FeedState;
   search: SearchState;
@@ -100,12 +105,17 @@ const epics = [
   manualSeekUpdateEpic,
   parseOPMLEpic,
   subscriptionStateChangeEpic,
+  changeThemeEpic,
+  onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
 ].filter(epic => epic !== null);
 
-export const rootEpic = combineEpics<Actions, State>(...(epics as Epic<Actions, State, any>[]));
+export const rootEpic = combineEpics<Actions, State>(
+  ...(epics as Epic<Actions, State, any>[])
+);
 
 export const rootReducer = combineReducers<State>({
+  app,
   router,
   feed,
   search,

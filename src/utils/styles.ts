@@ -11,12 +11,12 @@ import {
 /**
  * Global styles
  */
-export const fixGlobalStyles = () => {
+export const fixGlobalStyles = (theme: App.Theme) => {
   normalize();
   setupPage('body');
   cssRule('body', {
     fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`,
-    backgroundColor: `#292929`,
+    backgroundColor: theme.background,
   });
   cssRule('p', {
     margin: 0,

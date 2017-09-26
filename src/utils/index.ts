@@ -82,6 +82,11 @@ export const formatTime = (
 };
 
 /**
+ * Element selector for ignoring keyboard events
+ */
+export const ignoreKeyboardSelector = 'header *';
+
+/**
  * Parse OPML XML element to JSON
  */
 const adaptFeed = (el: HTMLElement): OPMLFeed => ({

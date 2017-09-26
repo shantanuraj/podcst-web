@@ -23,8 +23,8 @@ import {
   style,
 } from 'typestyle';
 
-const results = style({
-  backgroundColor: '#292929',
+const results = (theme: App.Theme) => style({
+  backgroundColor: theme.background,
   position: 'absolute',
   maxHeight: '500px',
   width: '100%',
@@ -32,12 +32,11 @@ const results = style({
   overflow: 'scroll',
 });
 
-const result = style({
+const result = (theme: App.Theme) => style({
   display: 'flex',
   $nest: {
     '&[data-focus]': {
-      backgroundColor: 'white',
-      color: 'black',
+      backgroundColor: theme.backgroundLight,
     },
   },
 });
@@ -71,6 +70,7 @@ const resultAuthorText = style({
 interface SearchResultsProps {
   podcasts: App.Podcast[];
   focusedResult: number;
+  theme: App.Theme;
   dismissSearch();
   navigateResult(direction: 'up' | 'down');
   focusResult(focusedResult: number);
@@ -135,13 +135,14 @@ class SearchResults extends Component<SearchResultsProps, any> {
     isFocussed: boolean,
     focusResult: () => void,
     dismissSearch: SearchResultsProps['dismissSearch'],
+    theme: SearchResultsProps['theme'],
   ) => (
     <Link
       onClick={dismissSearch}
       href={`/episodes?feed=${podcast.feed}`}
     >
       <div
-        class={result}
+        class={result(theme)}
         data-focus={isFocussed}
         onMouseEnter={focusResult}
       >
@@ -169,12 +170,14 @@ class SearchResults extends Component<SearchResultsProps, any> {
     focusedResult: number,
     focusResult: SearchResultsProps['focusResult'],
     dismissSearch: SearchResultsProps['dismissSearch'],
+    theme: SearchResultsProps['theme'],
   ) => (
     podcasts.map((podcast, i) => this.renderPodcast(
       podcast,
       focusedResult === i,
       () => focusResult(i),
-      dismissSearch
+      dismissSearch,
+      theme,
     ))
   )
 
@@ -183,14 +186,21 @@ class SearchResults extends Component<SearchResultsProps, any> {
     focusResult,
     focusedResult,
     podcasts,
+    theme,
   }: SearchResultsProps) {
     return (
       <div
-        class={results}
+        class={results(theme)}
         onClick={dismissSearch}
         ref={el => this.el = el as HTMLDivElement}
       >
-        {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch)}
+        {this.renderPodcasts(
+          podcasts,
+          focusedResult,
+          focusResult,
+          dismissSearch,
+          theme
+        )}
       </div>
     );
   }

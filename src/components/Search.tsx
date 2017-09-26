@@ -29,15 +29,14 @@ import {
 
 import SearchResults from './SearchResults';
 
-const search = style({
+const search = (theme: App.Theme) => style({
   padding: 16,
   height: 'inherit',
   boxShadow: 'inset 0 2px 5px rgba(0,0,0,.2)',
-  backgroundColor: '#131313',
-  border: '1px solid #131313',
-  borderRadius: '4px',
+  backgroundColor: theme.backgroundDark,
+  border: `1px solid ${theme.backgroundDark}`,
   outline: 'none',
-  color: 'white',
+  color: theme.textLight,
 });
 
 const Key: KeyboardShortcutsMap = {
@@ -52,6 +51,7 @@ interface SearchProps extends SearchState {
   navigateResult(direction: 'up' | 'down');
   focusResult(focusedResult: number);
   onResultSelect(feed: string);
+  theme: App.Theme;
 }
 
 class Search extends Component<SearchProps, any> {
@@ -120,6 +120,7 @@ class Search extends Component<SearchProps, any> {
     focusResult,
     navigateResult,
     onResultSelect,
+    theme,
   }: SearchProps) {
     return (
       <div
@@ -128,7 +129,7 @@ class Search extends Component<SearchProps, any> {
       >
         <input
           aria-label="Search podcasts"
-          class={search}
+          class={search(theme)}
           type="text"
           onInput={onEvent(searchPodcasts)}
           placeholder={'Search'}
@@ -142,6 +143,7 @@ class Search extends Component<SearchProps, any> {
             dismissSearch={dismissSearch}
             podcasts={podcasts}
             onResultSelect={onResultSelect}
+            theme={theme}
           /> : null
         }
       </div>
