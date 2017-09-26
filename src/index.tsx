@@ -18,36 +18,21 @@ import {
 
 // Patch Rx operators
 import './utils/patch_operators';
-import {
-  fixGlobalStyles,
-} from './utils/styles';
-import {
-  setupMediaSession,
-} from './utils/chrome-media-utils';
-
 import configureStore from './stores';
+import ConnectedApp from './containers/ConnectedApp';
 
-import App from './components/App';
+const store = configureStore();
 
-export const store = configureStore();
+const version = process.env.APP_VERSION;
 
 interface PodcastAppProps {
   version: string;
 }
-const PodcastApp = (_props: PodcastAppProps) => (
+
+const PodcastApp = ({ version }: PodcastAppProps) => (
   <Provider store={store}>
-    <App />
+    <ConnectedApp version={version} />
   </Provider>
 );
 
-fixGlobalStyles();
-
-if ('mediaSession' in navigator) {
-  setupMediaSession(store);
-}
-
-const appVersion = process.env.APP_VERSION;
-
-render(<PodcastApp version={appVersion} />, document.body);
-
-console.log(`Initalized Podcst.io version: ${appVersion}`);
+render(<PodcastApp version={version} />, document.body);

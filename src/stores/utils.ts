@@ -10,6 +10,10 @@ import {
   Storage,
 } from '../utils/storage';
 
+import {
+  ThemeProvider,
+} from '../styles';
+
 /**
  * Noop action
  */
@@ -23,6 +27,9 @@ export const noop = (): NoopAction => ({ type: NOOP });
  * App default state
  */
 export const getDefaultState = (): State => ({
+  app: {
+    theme: ThemeProvider('default'),
+  },
   router: {
     path: '/',
   },

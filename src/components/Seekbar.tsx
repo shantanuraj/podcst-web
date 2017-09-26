@@ -16,7 +16,7 @@ import {
   formatTime,
 } from '../utils';
 
-const seekbarContainer = style(
+const seekbarContainer = (theme: App.Theme) => style(
   {
     position: 'relative',
     display: 'flex',
@@ -25,11 +25,11 @@ const seekbarContainer = style(
     cursor: 'pointer',
     flexGrow: 1,
     height: '100%',
-    backgroundColor: '#292929',
+    backgroundColor: theme.background,
   },
   media({ maxWidth: 600 }, {
     opacity: 0.8,
-    backgroundColor: 'rgba(41, 41, 41, 0.8)',
+    backgroundColor: theme.background + 'cc',
   }),
 );
 
@@ -46,6 +46,7 @@ interface SeekbarProps {
   duration: number;
   seekPosition: number;
   buffering: boolean;
+  theme: App.Theme;
   onSeek: (seekPosition: number, duration: number) => void;
 }
 
@@ -87,9 +88,10 @@ class Seekbar extends Component<SeekbarProps, any> {
     buffering,
     duration,
     seekPosition,
+    theme,
   }: SeekbarProps) {
     return (
-      <div ref={this.saveRef} class={seekbarContainer}>
+      <div ref={this.saveRef} class={seekbarContainer(theme)}>
         {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
         <div
           style={{

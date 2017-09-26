@@ -18,11 +18,11 @@ const container = style({
   justifyContent: 'center',
 });
 
-const importButton = style({
+const importButton = (theme: App.Theme) => style({
   background: 'transparent',
-  border: '2px solid #82ffb5',
+  border: `2px solid ${theme.accent}`,
   borderRadius: '3px',
-  color: 'white',
+  color: theme.text,
   display: 'inline-block',
   minWidth: '200px',
   padding: '8px',
@@ -48,18 +48,19 @@ const onChange = (cb: (file: string) => void) => {
 
 interface ImportPodcastsProps {
   parseOPML: (contents: string) => void;
+  theme: App.Theme;
 }
 
 const ImportPodcasts = ({
   parseOPML,
+  theme,
 }: ImportPodcastsProps) => (
   <div class={container}>
-    <button class={importButton}>
+    <button class={importButton(theme)}>
       <div>
         <input
           id="opml-import"
           accept=".xml, .opml"
-          class="axis-import-input"
           name="file"
           type="file"
           onChange={onChange(parseOPML)}

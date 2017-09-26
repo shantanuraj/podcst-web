@@ -14,14 +14,14 @@ import {
   monthName,
 } from '../utils';
 
-const episodeContainer = style({
+const episodeContainer = (theme: App.Theme) => style({
   paddingTop: 16,
   paddingBottom: 16,
   paddingLeft: 32,
   paddingRight: 32,
   $nest: {
     '&:nth-child(even)': {
-      backgroundColor: '#333',
+      backgroundColor: theme.backgroundLight,
     },
   },
 });
@@ -36,9 +36,9 @@ const infoContainer = style({
   alignItems: 'center',
 });
 
-const subContainer = style({
+const subContainer = (theme: App.Theme) => style({
   marginRight: 16,
-  color: '#ccc',
+  color: theme.subTitle,
 });
 
 const playInfo = style({
@@ -46,19 +46,19 @@ const playInfo = style({
   alignItems: 'center',
 });
 
-const playButton = style({
+const playButton = (theme: App.Theme) => style({
   display: 'inline-block',
   minWidth: '80px',
   borderRadius: '3px',
   padding: '8px',
   background: 'transparent',
-  color: 'white',
-  border: '2px solid #82ffb5',
+  color: theme.text,
+  border: `2px solid ${theme.accent}`,
   $nest: {
     '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {
       outline: 0,
-      backgroundColor: '#82ffb5',
-      color: '#292929',
+      backgroundColor: theme.accent,
+      color: theme.background,
     },
   },
 });
@@ -67,6 +67,7 @@ interface EpisodeProps {
   episode: App.Episode;
   currentEpisode: App.Episode | null;
   state: EpisodePlayerState;
+  theme: App.Theme;
   play: (episode: App.Episode) => void;
   resume: () => void;
   pause: () => void;
@@ -79,6 +80,7 @@ const renderButton = ({
   pause,
   resume,
   state,
+  theme,
 }: EpisodeProps) => {
   const isCurrent = currentEpisode === episode;
   const isPlaying = isCurrent && state === 'playing';
@@ -91,7 +93,7 @@ const renderButton = ({
 
   return (
     <button
-      class={playButton}
+      class={playButton(theme)}
       data-is-playing={isPlaying}
       data-is-paused={isPaused}
       onClick={handler}
@@ -104,6 +106,7 @@ const renderButton = ({
 const Episode = (props: EpisodeProps) => {
   const {
     episode,
+    theme,
   } = props;
 
   const {
@@ -116,12 +119,13 @@ const Episode = (props: EpisodeProps) => {
   const day = pub.getDate();
   const month = monthName(pub.getMonth());
   const episodeLength = duration ? `${Math.floor(duration / 60)} mins` : '';
+  const subContainerTheme = subContainer(theme);
 
   return (
-    <div class={episodeContainer}>
+    <div class={episodeContainer(theme)}>
       <div class={episodeRow}>
         <div class={infoContainer}>
-          <div class={subContainer}>
+          <div class={subContainerTheme}>
             {`${month} ${day}`}
           </div>
           <div>
@@ -129,7 +133,7 @@ const Episode = (props: EpisodeProps) => {
           </div>
         </div>
         <div class={playInfo}>
-          <div class={subContainer}>
+          <div class={subContainerTheme}>
             {episodeLength}
           </div>
           {renderButton(props)}

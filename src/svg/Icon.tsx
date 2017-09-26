@@ -15,13 +15,14 @@ import PauseIcon from './PauseIcon';
 
 interface IconProps {
   icon: 'play' | 'pause';
+  theme: App.Theme;
   onClick?: (e?: Event) => void;
 }
 
 const noop = () => {};
 
-const iconStyle = style({
-  fill: '#82ffb5',
+const iconStyle = (theme: App.Theme) => style({
+  fill: theme.accent,
   height: '32px',
   width: '32px',
   marginLeft: '16px',
@@ -31,9 +32,10 @@ const iconStyle = style({
 const Icon = ({
   icon,
   onClick,
+  theme,
 }: IconProps) => (
   <div
-    class={iconStyle}
+    class={iconStyle(theme)}
     onClick={onClick || noop}
   >
     { icon === 'play' ? <PlayIcon /> : <PauseIcon /> }

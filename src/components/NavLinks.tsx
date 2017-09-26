@@ -14,34 +14,38 @@ import {
   style,
 } from 'typestyle';
 
-const navLink = style({
+const navLink = (theme: App.Theme) => style({
   padding: '0 16px',
   textDecoration: 'none',
-  color: 'white',
+  color: theme.text,
 });
 
 export interface LinkMap {
   [link: string]: string;
 }
 
-const renderLink = (link: string, title: string) => (
-  <Link class={navLink} href={link}>
+const renderLink = (theme: App.Theme, link: string, title: string) => (
+  <Link class={navLink(theme)} href={link}>
     {title}
   </Link>
 );
 
-const renderLinks = (linkMap: LinkMap) =>
+const renderLinks = (theme: App.Theme, linkMap: LinkMap) =>
   Object
   .keys(linkMap)
-  .map(link => renderLink(link, linkMap[link]));
+  .map(link => renderLink(theme, link, linkMap[link]));
 
 interface NavLinksProps {
   links: LinkMap,
+  theme: App.Theme,
 }
 
-const NavLinks = ({ links }: NavLinksProps) => (
+const NavLinks = ({
+  theme,
+  links,
+}: NavLinksProps) => (
   <nav>
-    {renderLinks(links)}
+    {renderLinks(theme, links)}
   </nav>
 );
 

@@ -87,6 +87,19 @@ declare namespace App {
   type RenderablePodcast = Podcast | (EpisodeListing & {
     feed: string;
   });
+
+  type ThemeMode = 'dark' | 'light' | 'default';
+
+  interface Theme {
+    accent: string;
+    background: string;
+    backgroundDark: string;
+    backgroundLight: string;
+    loaderAnimation: string;
+    text: string;
+    textLight: string;
+    subTitle: string;
+  }
 }
 
 interface SubscriptionsMap {

@@ -4,35 +4,6 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 
-import {
-  Store,
-} from 'redux';
-
-import {
-  Actions,
-  State,
-} from '../stores/root';
-
-import {
-  resumeEpisode,
-  pauseEpisode,
-  skipToNextEpisode,
-  skipToPrevEpisode,
-} from '../stores/player';
-
-export const setupMediaSession = (store: Store<State>) => {
-  const dispatchable = (actionable: () => Actions) => () => store.dispatch(actionable());
-
-  const {
-    mediaSession,
-  } = navigator as ChromeNavigator;
-
-  mediaSession.setActionHandler('play', dispatchable(resumeEpisode));
-  mediaSession.setActionHandler('pause', dispatchable(pauseEpisode));
-  mediaSession.setActionHandler('previoustrack', dispatchable(skipToPrevEpisode));
-  mediaSession.setActionHandler('nexttrack', dispatchable(skipToNextEpisode));
-}
-
 export const updateMetadata = (episode: App.Episode) => {
   const {
     mediaSession,
