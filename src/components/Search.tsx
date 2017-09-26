@@ -144,6 +144,7 @@ class Search extends Component<SearchProps, any> {
             dismissSearch={dismissSearch}
             podcasts={podcasts}
             onResultSelect={onResultSelect}
+            theme={theme}
           /> : null
         }
       </div>
