@@ -85,7 +85,7 @@ const PlayerInfo = ({
 }: PlayerInfoProps) => (
   <div class={infoContainer(theme)}>
     <button
-      aria-label="Play"
+      aria-label={state === 'playing' ? 'Pause' : 'Play'}
       class={playButton}
       onClick={state === 'playing' ? pause : resume }>
       <Icon
