@@ -22,8 +22,11 @@ import {
 import {
   pauseEpisode,
   resumeEpisode,
+  seekUpdate,
+  setBuffer,
   skipToNextEpisode,
   skipToPrevEpisode,
+  stopEpisode,
 } from '../stores/player';
 
 import App from '../components/App';
@@ -34,8 +37,11 @@ const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   changeTheme,
   pauseEpisode,
   resumeEpisode,
+  seekUpdate,
+  setBuffer,
   skipToNextEpisode,
   skipToPrevEpisode,
+  stopEpisode,
 }, dispatch);
 
 const ConnectedApp = connect(

@@ -14,6 +14,8 @@ import {
   fixGlobalStyles,
 } from '../utils/styles';
 
+import Audio from '../utils/audio';
+
 import {
   AppState,
 } from '../stores/app';
@@ -30,14 +32,18 @@ interface AppProps extends AppState {
   version: string;
   pauseEpisode();
   resumeEpisode();
+  seekUpdate(seekPosition: number, duration: number);
+  setBuffer(buffering: boolean);
   skipToNextEpisode();
   skipToPrevEpisode();
+  stopEpisode();
 }
 
 class App extends Component<AppProps, never> {
   componentWillMount() {
     fixGlobalStyles(this.props.theme);
     this.setupMediaSession();
+    Audio.init(this.props);
   }
 
   componentDidMount() {

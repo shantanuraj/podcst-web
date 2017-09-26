@@ -21,7 +21,7 @@ import './utils/patch_operators';
 import configureStore from './stores';
 import ConnectedApp from './containers/ConnectedApp';
 
-export const store = configureStore();
+const store = configureStore();
 
 const version = process.env.APP_VERSION;
 
