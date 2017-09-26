@@ -15,11 +15,11 @@ import NavLinks, {
 } from './NavLinks';
 import ConnectedSearch from '../containers/ConnectedSearch';
 
-const toolbar = style({
+const toolbar = (theme: App.Theme) => style({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-start',
-  backgroundColor: '#292929',
+  backgroundColor: theme.background,
   position: 'fixed',
   top: 0,
   left: 0,
@@ -28,7 +28,7 @@ const toolbar = style({
   zIndex: 500,
   paddingLeft: 16,
   fontSize: 20,
-  color: 'white',
+  color: theme.text,
   boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
 });
 
@@ -42,8 +42,8 @@ const linkMap: LinkMap = {
   '/feed/top': 'Top',
 };
 
-const Toolbar = () => (
-  <header class={toolbar}>
+const Toolbar = (props: App.Theme) => (
+  <header class={toolbar(props)}>
     <NavLinks links={linkMap} />
     <ConnectedSearch className={search} />
   </header>

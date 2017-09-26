@@ -71,9 +71,10 @@ class App extends Component<AppProps, never> {
   }
 
   render() {
+    const { theme } = this.props;
     return (
       <div class={normalizeEl}>
-        <Toolbar />
+        <Toolbar {...theme} />
         <ConnectedLoader />
         <main
           class={normalizeEl}
