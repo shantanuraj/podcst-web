@@ -81,12 +81,12 @@ class App extends Component<AppProps, never> {
           style={{ paddingTop: 64, marginBottom: 64, }}
         >
           <Router>
-            <ConnectedHome path="/" />
-            <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
-            <ConnectedEpisodes path="/episodes" />
+            <ConnectedHome theme={theme} path="/" />
+            <ConnectedPodcastsGrid theme={theme} mode="feed" path="/feed/:feed" />
+            <ConnectedEpisodes theme={theme} path="/episodes" />
           </Router>
         </main>
-        <ConnectedPlayer />
+        <ConnectedPlayer theme={theme} />
       </div>
     );
   }
