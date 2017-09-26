@@ -10,19 +10,21 @@ import {
   SubscriptionsState,
 } from '../stores/subscriptions';
 
-interface HomeProps extends SubscriptionsState {
-  parseOPML: (contents: string) => void;
-}
-
 import ImportPodcasts from './ImportPodcasts';
 import PodcastsGrid from './PodcastsGrid';
+
+interface HomeProps extends SubscriptionsState {
+  parseOPML: (contents: string) => void;
+  theme: App.Theme;
+}
 
 const Home = ({
   parseOPML,
   subs,
+  theme,
 }: HomeProps) => (
   Object.keys(subs).length === 0 ?
-    <ImportPodcasts parseOPML={parseOPML} /> :
+    <ImportPodcasts theme={theme} parseOPML={parseOPML} /> :
     <PodcastsGrid
       mode="subs"
       subs={subs}
