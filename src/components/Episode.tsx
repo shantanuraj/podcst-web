@@ -52,7 +52,7 @@ const playButton = (theme: App.Theme) => style({
   borderRadius: '3px',
   padding: '8px',
   background: 'transparent',
-  color: 'white',
+  color: theme.text,
   border: `2px solid ${theme.accent}`,
   $nest: {
     '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {

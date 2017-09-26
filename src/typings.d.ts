@@ -97,6 +97,7 @@ declare namespace App {
     backgroundLight: string;
     loaderAnimation: string;
     text: string;
+    textLight: string;
     subTitle: string;
   }
 }

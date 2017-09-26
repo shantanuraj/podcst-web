@@ -6,26 +6,27 @@ import {
   keyframes,
 } from 'typestyle';
 
-const background = '#292929';
-const accent = '#82ffb5';
+const background = '#FFFFFF';
+const accent = '#8649B2';
 
 const backgroundDark = '#131313';
-const backgroundLight = '#333333';
+const backgroundLight = '#E3E3E3';
 
 const loaderAnimation = keyframes({
   '0%': {
-    backgroundColor: '#5cffa0',
+    backgroundColor: '#C069FF',
   },
   '50%': {
-    backgroundColor: '#00B778',
+    backgroundColor: '#60347F',
   },
   '100%': {
-    backgroundColor: '#82ffb5',
+    backgroundColor: '#8649B2',
   },
 });
 
-const text = '#ffffff';
-const subTitle = '#cccccc';
+const text = '#000000';
+const subTitle = '#555555';
+const textLight = background;
 
 const theme: App.Theme = {
   accent,
@@ -35,6 +36,7 @@ const theme: App.Theme = {
   loaderAnimation,
   subTitle,
   text,
+  textLight,
 };
 
 export default theme;

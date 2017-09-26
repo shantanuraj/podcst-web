@@ -25,6 +25,7 @@ const loaderAnimation = keyframes({
 });
 
 const text = '#ffffff';
+const textLight = text;
 const subTitle = '#cccccc';
 
 const theme: App.Theme = {
@@ -35,6 +36,7 @@ const theme: App.Theme = {
   loaderAnimation,
   subTitle,
   text,
+  textLight,
 };
 
 export default theme;

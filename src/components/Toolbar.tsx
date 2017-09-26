@@ -50,7 +50,7 @@ const Toolbar = ({
   theme,
 }: ToolbarProps) => (
   <header class={toolbar(theme)}>
-    <NavLinks links={linkMap} />
+    <NavLinks theme={theme} links={linkMap} />
     <ConnectedSearch theme={theme} className={search} />
   </header>
 );

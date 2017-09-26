@@ -88,8 +88,8 @@ const subscribeButton = (theme: App.Theme) => style({
   borderRadius: '3px',
   padding: '8px',
   background: 'transparent',
-  color: 'white',
-  border: '2px solid #82ffb5',
+  color: theme.text,
+  border: `2px solid ${theme.accent}`,
   outline: 0,
   $nest: {
     '&:focus, &:hover, &[data-is-subscribed]': {

@@ -22,7 +22,7 @@ const importButton = (theme: App.Theme) => style({
   background: 'transparent',
   border: `2px solid ${theme.accent}`,
   borderRadius: '3px',
-  color: 'white',
+  color: theme.text,
   display: 'inline-block',
   minWidth: '200px',
   padding: '8px',

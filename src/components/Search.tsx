@@ -35,9 +35,8 @@ const search = (theme: App.Theme) => style({
   boxShadow: 'inset 0 2px 5px rgba(0,0,0,.2)',
   backgroundColor: theme.backgroundDark,
   border: `1px solid ${theme.backgroundDark}`,
-  borderRadius: '4px',
   outline: 'none',
-  color: theme.text,
+  color: theme.textLight,
 });
 
 const Key: KeyboardShortcutsMap = {

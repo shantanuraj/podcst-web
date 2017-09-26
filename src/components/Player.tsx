@@ -27,7 +27,7 @@ import {
 import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
 
-const player = style(
+const player = (theme: App.Theme) => style(
   {
     display: 'flex',
     alignItems: 'center',
@@ -39,7 +39,7 @@ const player = style(
     width: '100%',
     zIndex: 500,
     fontSize: 20,
-    color: 'white',
+    color: theme.text,
     boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
   },
   media({ maxWidth: 600 }, {
@@ -169,7 +169,7 @@ class Player extends Component<PlayerProps, any> {
     const duration_ = duration || episode.duration || 0;
 
     return (
-      <div class={player}>
+      <div class={player(theme)}>
         <PlayerInfo
           episode={episode}
           pause={pause}
