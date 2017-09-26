@@ -17,11 +17,11 @@ import {
 
 import {
   changeTheme,
-} from '../stores/theme';
+} from '../stores/app';
 
 import App from '../components/App';
 
-const mapState = (state: State) => state.theme;
+const mapState = (state: State) => state.app;
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   changeTheme,

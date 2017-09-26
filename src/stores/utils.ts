@@ -27,6 +27,9 @@ export const noop = (): NoopAction => ({ type: NOOP });
  * App default state
  */
 export const getDefaultState = (): State => ({
+  app: {
+    theme: ThemeProvider('default'),
+  },
   router: {
     path: '/',
   },
@@ -53,8 +56,5 @@ export const getDefaultState = (): State => ({
   },
   subscriptions: {
     subs: Storage.getSubscriptions(),
-  },
-  theme: {
-    theme: ThemeProvider('default'),
   },
 });

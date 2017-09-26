@@ -16,11 +16,6 @@ import {
 } from './utils';
 
 import {
-  ChromeMediaActions,
-  chromeMediaMetadaUpdateEpic,
-} from './chrome-media';
-
-import {
   RouterActions,
   RouterState,
   router,
@@ -66,10 +61,11 @@ import {
 } from './subscriptions';
 
 import {
-  ThemeActions,
-  ThemeState,
-  theme,
-} from './theme';
+  AppActions,
+  AppState,
+  chromeMediaMetadaUpdateEpic,
+  app,
+} from './app';
 
 /**
  * Combined application actions interface
@@ -81,21 +77,20 @@ export type Actions =
   PodcastsAction |
   PlayerActions |
   SubscriptionsActions |
-  ChromeMediaActions |
-  ThemeActions |
+  AppActions |
   NoopAction;
 
 /**
  * Combined application state interface
  */
 export interface State {
+  app: AppState;
   router: RouterState;
   feed: FeedState;
   search: SearchState;
   podcasts: PodcastsState;
   player: PlayerState;
   subscriptions: SubscriptionsState;
-  theme: ThemeState;
 };
 
 const epics = [
@@ -114,11 +109,11 @@ const epics = [
 export const rootEpic = combineEpics<Actions, State>(...(epics as Epic<Actions, State, any>[]));
 
 export const rootReducer = combineReducers<State>({
+  app,
   router,
   feed,
   search,
   podcasts,
   player,
   subscriptions,
-  theme,
 });

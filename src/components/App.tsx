@@ -15,8 +15,8 @@ import {
 } from '../utils/styles';
 
 import {
-  ThemeState,
-} from '../stores/theme';
+  AppState,
+} from '../stores/app';
 
 import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
@@ -26,7 +26,7 @@ import ConnectedPlayer from '../containers/ConnectedPlayer';
 
 import Toolbar from './Toolbar';
 
-interface AppProps extends ThemeState {
+interface AppProps extends AppState {
   version: string;
 }
 
@@ -37,6 +37,12 @@ class App extends Component<AppProps, never> {
 
   componentDidMount() {
     console.log(`Initalized Podcst.io version: ${this.props.version}`);
+  }
+
+  setupMediaSession() {
+    if ('mediaSession' in navigator) {
+
+    }
   }
 
   render() {
