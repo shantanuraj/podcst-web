@@ -103,15 +103,14 @@ const Key: KeyboardShortcutsMap = {
  */
 export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
   action$.ofType(APP_INIT)
-    .switchMap(() =>
-      Observable.fromEvent<KeyboardEvent>(document, 'keyup')
-        .filter(event =>
-          Key[event.keyCode] === 'change-theme' &&
-          !(event.target as HTMLElement).matches(ignoreKeyboardSelector)
-        )
-        .map(() => changeTheme(
-          store.getState().app.mode === 'dark' ? 'light' : 'dark',
-        ))
+    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+      .filter(event =>
+        Key[event.keyCode] === 'change-theme' &&
+        !(event.target as HTMLElement).matches(ignoreKeyboardSelector)
+      )
+      .map(() => changeTheme(
+        store.getState().app.mode === 'dark' ? 'light' : 'dark',
+      ))
     );
 
 /**
