@@ -50,6 +50,7 @@ const player = style(
 );
 
 interface PlayerProps extends PlayerState {
+  theme: App.Theme;
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;
@@ -157,6 +158,7 @@ class Player extends Component<PlayerProps, any> {
     state,
     onSeek,
     buffering,
+    theme,
   }: PlayerProps) {
     const episode = queue[currentEpisode];
 
@@ -173,12 +175,14 @@ class Player extends Component<PlayerProps, any> {
           pause={pause}
           resume={resume}
           state={state}
+          theme={theme}
         />
         <Seekbar
           buffering={buffering}
           onSeek={onSeek}
           duration={duration_}
           seekPosition={seekPosition}
+          theme={theme}
         />
       </div>
     );
