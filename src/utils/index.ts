@@ -75,7 +75,10 @@ export const formatTime = (total: number, currentTime: number) => {
   const date = new Date(0);
   date.setSeconds(time);
 
-  return date.toISOString().substr(11, 8);
+  const res = date.toISOString().substr(11, 8);
+  const [ hh ] = res.split(':');
+
+  return res.slice((hh === '00') ? 3 : 0);
 };
 
 /**
