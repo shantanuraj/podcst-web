@@ -66,8 +66,11 @@ import {
   app,
   chromeMediaMetadaUpdateEpic,
   onThemeChangeEpic,
-  changeThemeEpic,
 } from './app';
+
+import {
+  changeThemeEpic,
+} from './keyboard';
 
 /**
  * Combined application actions interface
