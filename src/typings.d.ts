@@ -99,6 +99,7 @@ declare namespace App {
     text: string;
     textLight: string;
     subTitle: string;
+    backgroundSearch: string;
   }
 }
 
