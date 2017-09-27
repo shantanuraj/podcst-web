@@ -118,7 +118,10 @@ const Episode = (props: EpisodeProps) => {
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
   const month = monthName(pub.getMonth());
-  const episodeLength = duration ? `${Math.floor(duration / 60)} mins` : '';
+  const minutes = Math.floor((duration || 0) / 60);
+  const episodeLength = duration ?
+    `${minutes} min${minutes > 0 ? 's' : ''}` :
+    '';
   const subContainerTheme = subContainer(theme);
 
   return (
