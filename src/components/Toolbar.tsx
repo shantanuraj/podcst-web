@@ -7,6 +7,7 @@ import {
 } from 'preact';
 
 import {
+  media,
   style,
 } from 'typestyle';
 
@@ -18,6 +19,7 @@ import NavLinks, {
   LinkMap,
 } from './NavLinks';
 import ConnectedSearch from '../containers/ConnectedSearch';
+import Icon from '../svg/Icon';
 
 const toolbar = (theme: App.Theme) => style({
   display: 'flex',
@@ -44,7 +46,11 @@ const secondaryItems = style({
 const link = style({
   paddingLeft: 16,
   paddingRight: 16,
-});
+}, media({ maxWidth: 600 }, {
+  $nest: { '& span': { display: 'none' } },
+}), media({ minWidth: 601 }, {
+  $nest: { '& div': { display: 'none' } },
+}));
 
 const search = style({
   height: 'inherit',
@@ -67,7 +73,8 @@ const Toolbar = ({
     <NavLinks theme={theme} links={linkMap} />
     <div class={secondaryItems}>
       <Link class={link} href="/settings">
-        Settings
+        <Icon icon="settings" theme={theme} />
+        <span>Settings</span>
       </Link>
       <ConnectedSearch theme={theme} className={search} />
     </div>
