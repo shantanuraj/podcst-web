@@ -17,6 +17,10 @@ import {
 } from '../utils/styles';
 
 import {
+  Storage,
+} from '../utils/storage';
+
+import {
   ThemeProvider,
 } from '../styles';
 
@@ -89,6 +93,7 @@ export const chromeMediaMetadaUpdateEpic: Epic<Actions, State> = action$ =>
 export const onThemeChangeEpic: Epic<Actions, State> = (action$, store) =>
   action$.ofType(CHANGE_THEME)
     .do(() => fixGlobalStyles(store.getState().app.theme))
+    .do(() => Storage.saveAppState(store.getState().app))
     .map(noop);
 
 /**
