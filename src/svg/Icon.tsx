@@ -12,10 +12,23 @@ import {
 
 import PlayIcon from './PlayIcon';
 import PauseIcon from './PauseIcon';
+import SettingsIcon from './SettingsIcon';
 
 interface IconProps {
-  icon: 'play' | 'pause';
+  icon: 'play' | 'pause' | 'settings';
   theme: App.Theme;
+}
+
+const getIcon = (icon: IconProps['icon']): JSX.Element => {
+  if (icon === 'play') {
+    return <PlayIcon />
+  } else if (icon === 'pause') {
+    return <PauseIcon />
+  } else if (icon === 'settings') {
+    return <SettingsIcon />
+  }
+
+  return <PlayIcon />
 }
 
 const iconStyle = (theme: App.Theme) => style({
@@ -31,7 +44,7 @@ const Icon = ({
   <div
     class={iconStyle(theme)}
   >
-    { icon === 'play' ? <PlayIcon /> : <PauseIcon /> }
+    {getIcon(icon)}
   </div>
 );
 
