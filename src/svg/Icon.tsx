@@ -12,10 +12,19 @@ import {
 
 import PlayIcon from './PlayIcon';
 import PauseIcon from './PauseIcon';
+import NightIcon from './NightIcon';
+import DayIcon from './DayIcon';
 import SettingsIcon from './SettingsIcon';
 
+type IconType =
+  'play' |
+  'pause' |
+  'settings' |
+  'night' |
+  'day';
+
 interface IconProps {
-  icon: 'play' | 'pause' | 'settings';
+  icon: IconType;
   color: string;
 }
 
@@ -26,6 +35,10 @@ const getIcon = (icon: IconProps['icon']): JSX.Element => {
     return <PauseIcon />
   } else if (icon === 'settings') {
     return <SettingsIcon />
+  } else if (icon === 'night') {
+    return <NightIcon />
+  } else if (icon === 'day') {
+    return <DayIcon />
   }
 
   return <PlayIcon />
