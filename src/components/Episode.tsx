@@ -146,8 +146,8 @@ const Episode = (props: EpisodeProps) => {
           {title}
         </div>
         <div class={subContainerTheme}>
-          <p>{minutes}</p>
-          <p>{minutesSuffix}</p>
+          <p>{minutes || ''}</p>
+          <p>{minutes ? minutesSuffix : ''}</p>
         </div>
         <div class={container}>
           {renderButton(props)}
