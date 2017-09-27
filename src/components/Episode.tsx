@@ -39,6 +39,15 @@ const infoContainer = style({
 const subContainer = (theme: App.Theme) => style({
   marginRight: 16,
   color: theme.subTitle,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  $nest: {
+    '& > p': {
+      margin: 2,
+    },
+  },
 });
 
 const playInfo = style({
@@ -119,9 +128,7 @@ const Episode = (props: EpisodeProps) => {
   const day = pub.getDate();
   const month = monthName(pub.getMonth());
   const minutes = Math.floor((duration || 0) / 60);
-  const episodeLength = duration ?
-    `${minutes} min${minutes > 0 ? 's' : ''}` :
-    '';
+  const minutesSuffix = `min${minutes > 0 ? 's' : ''}`;
   const subContainerTheme = subContainer(theme);
 
   return (
@@ -129,7 +136,8 @@ const Episode = (props: EpisodeProps) => {
       <div class={episodeRow}>
         <div class={infoContainer}>
           <div class={subContainerTheme}>
-            {`${month} ${day}`}
+            <p>{month}</p>
+            <p>{day}</p>
           </div>
           <div>
             {title}
@@ -137,7 +145,8 @@ const Episode = (props: EpisodeProps) => {
         </div>
         <div class={playInfo}>
           <div class={subContainerTheme}>
-            {episodeLength}
+            <p>{minutes}</p>
+            <p>{minutesSuffix}</p>
           </div>
           {renderButton(props)}
         </div>
