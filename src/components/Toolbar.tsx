@@ -10,6 +10,10 @@ import {
   style,
 } from 'typestyle';
 
+import {
+  Link,
+} from 'preact-router';
+
 import NavLinks, {
   LinkMap,
 } from './NavLinks';
@@ -32,9 +36,15 @@ const toolbar = (theme: App.Theme) => style({
   boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
 });
 
+const secondaryItems = style({
+  display: 'flex',
+  alignItems: 'center',
+  height: '100%',
+});
+
 const search = style({
   height: 'inherit',
-  marginLeft: 'auto',
+  marginLeft: 32,
 });
 
 const linkMap: LinkMap = {
@@ -51,7 +61,12 @@ const Toolbar = ({
 }: ToolbarProps) => (
   <header class={toolbar(theme)}>
     <NavLinks theme={theme} links={linkMap} />
-    <ConnectedSearch theme={theme} className={search} />
+    <div class={secondaryItems}>
+      <Link href="/settings">
+        Settings
+      </Link>
+      <ConnectedSearch theme={theme} className={search} />
+    </div>
   </header>
 );
 

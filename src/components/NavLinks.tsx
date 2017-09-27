@@ -14,6 +14,10 @@ import {
   style,
 } from 'typestyle';
 
+const navLinks = style({
+  flex: 1,
+});
+
 const navLink = (theme: App.Theme) => style({
   padding: '0 16px',
   textDecoration: 'none',
@@ -44,7 +48,7 @@ const NavLinks = ({
   theme,
   links,
 }: NavLinksProps) => (
-  <nav>
+  <nav class={navLinks}>
     {renderLinks(theme, links)}
   </nav>
 );
