@@ -16,7 +16,7 @@ import SettingsIcon from './SettingsIcon';
 
 interface IconProps {
   icon: 'play' | 'pause' | 'settings';
-  theme: App.Theme;
+  color: string;
 }
 
 const getIcon = (icon: IconProps['icon']): JSX.Element => {
@@ -31,18 +31,18 @@ const getIcon = (icon: IconProps['icon']): JSX.Element => {
   return <PlayIcon />
 }
 
-const iconStyle = (theme: App.Theme) => style({
-  fill: theme.accent,
+const iconStyle = (fill) => style({
+  fill,
   height: '36px',
   width: '36px',
 });
 
 const Icon = ({
   icon,
-  theme,
+  color,
 }: IconProps) => (
   <div
-    class={iconStyle(theme)}
+    class={iconStyle(color)}
   >
     {getIcon(icon)}
   </div>

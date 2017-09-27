@@ -73,7 +73,7 @@ const Toolbar = ({
     <NavLinks theme={theme} links={linkMap} />
     <div class={secondaryItems}>
       <Link class={link} href="/settings">
-        <Icon icon="settings" theme={theme} />
+        <Icon icon="settings" color={theme.text} />
         <span>Settings</span>
       </Link>
       <ConnectedSearch theme={theme} className={search} />
