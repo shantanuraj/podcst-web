@@ -3,26 +3,13 @@
  */
 
 import {
-  Observable,
-} from 'rxjs/Observable';
-
-import {
-  Subscription,
-} from 'rxjs/Subscription';
-
-import {
   h,
-  Component,
 } from 'preact';
 
 import {
   media,
   style,
 } from 'typestyle';
-
-import {
-  ignoreKeyboardSelector,
-} from '../utils';
 
 import {
   PlayerState,
@@ -62,133 +49,44 @@ interface PlayerProps extends PlayerState {
   onSeek: (seekPosition: number, duration: number) => void;
 }
 
-const Key: KeyboardShortcutsMap = {
-  32: 'play',
-  37: 'prev',
-  80: 'prev',
-  39: 'next',
-  78: 'next',
-}
+const Player = ({
+  duration,
+  currentEpisode,
+  pause,
+  queue,
+  resume,
+  seekPosition,
+  state,
+  onSeek,
+  buffering,
+  theme,
+}: PlayerProps) => {
+  const episode = queue[currentEpisode];
 
-class Player extends Component<PlayerProps, any> {
-
-  private sub: Subscription | null = null;
-
-  componentDidMount() {
-    this.subscribe();
+  if (state === 'stopped' || !episode) {
+    return null;
   }
 
-  componentWillUnmount() {
-    this.unsubscribe();
-  }
+  const duration_ = duration || episode.duration || 0;
 
-  componentDidUpdate() {
-    const {
-      state
-    } = this.props;
-
-    if (state === 'stopped') {
-      this.unsubscribe();
-    } else if (this.sub === null) {
-      this.subscribe();
-    }
-  }
-
-  subscribe() {
-    this.sub = Observable.fromEvent(window, 'keydown')
-      .filter(({
-        keyCode,
-        target,
-      }: KeyboardEvent) =>
-        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!Object.keys(Key).find(key => parseInt(key) === keyCode)
-      )
-      .subscribe(this.keyboardControls);
-  }
-
-  unsubscribe() {
-    if (this.sub) {
-      this.sub.unsubscribe();
-    }
-  }
-
-  keyboardControls = (e: KeyboardEvent) => {
-    const {
-      preventDefault,
-      keyCode,
-    } = e;
-
-    const {
-      state,
-      pause,
-      resume,
-      skipToNext,
-      skipToPrev,
-    } = this.props;
-
-    // Space for scroll check
-    if (!(keyCode === 32 && state === 'stopped')) {
-      preventDefault.call(e);
-    }
-
-    switch(Key[keyCode]) {
-      case 'play': {
-        state === 'paused' ?
-          resume() : pause();
-        break;
-      }
-      case 'next': {
-        skipToNext();
-        break;
-      }
-      case 'prev': {
-        skipToPrev();
-        break;
-      }
-    }
-
-    return false;
-  }
-
-  render({
-    duration,
-    currentEpisode,
-    pause,
-    queue,
-    resume,
-    seekPosition,
-    state,
-    onSeek,
-    buffering,
-    theme,
-  }: PlayerProps) {
-    const episode = queue[currentEpisode];
-
-    if (state === 'stopped' || !episode) {
-      return null;
-    }
-
-    const duration_ = duration || episode.duration || 0;
-
-    return (
-      <div class={player(theme)}>
-        <PlayerInfo
-          episode={episode}
-          pause={pause}
-          resume={resume}
-          state={state}
-          theme={theme}
-        />
-        <Seekbar
-          buffering={buffering}
-          onSeek={onSeek}
-          duration={duration_}
-          seekPosition={seekPosition}
-          theme={theme}
-        />
-      </div>
-    );
-  }
+  return (
+    <div class={player(theme)}>
+      <PlayerInfo
+        episode={episode}
+        pause={pause}
+        resume={resume}
+        state={state}
+        theme={theme}
+      />
+      <Seekbar
+        buffering={buffering}
+        onSeek={onSeek}
+        duration={duration_}
+        seekPosition={seekPosition}
+        theme={theme}
+      />
+    </div>
+  );
 }
 
 export default Player;

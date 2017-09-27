@@ -74,7 +74,7 @@ const resumeEpisodeAudio = (): ResumeEpisodeAudioAction => ({
 interface StopAction {
   type: 'STOP_EPISODE',
 }
-const STOP_EPISODE: StopAction['type'] = 'STOP_EPISODE';
+export const STOP_EPISODE: StopAction['type'] = 'STOP_EPISODE';
 export const stopEpisode = (): StopAction => ({
   type: STOP_EPISODE,
 });

@@ -70,6 +70,7 @@ import {
 
 import {
   changeThemeEpic,
+  playerControlsEpic,
 } from './keyboard';
 
 /**
@@ -111,6 +112,7 @@ const epics = [
   changeThemeEpic,
   onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
+  playerControlsEpic,
 ].filter(epic => epic !== null);
 
 export const rootEpic = combineEpics<Actions, State>(
