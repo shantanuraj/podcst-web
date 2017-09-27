@@ -30,7 +30,6 @@ const toolbar = (theme: App.Theme) => style({
   height: '64px',
   width: '100%',
   zIndex: 500,
-  paddingLeft: 16,
   fontSize: 20,
   color: theme.text,
   boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
@@ -42,9 +41,14 @@ const secondaryItems = style({
   height: '100%',
 });
 
+const link = style({
+  paddingLeft: 16,
+  paddingRight: 16,
+});
+
 const search = style({
   height: 'inherit',
-  marginLeft: 32,
+  paddingLeft: 16,
 });
 
 const linkMap: LinkMap = {
@@ -62,7 +66,7 @@ const Toolbar = ({
   <header class={toolbar(theme)}>
     <NavLinks theme={theme} links={linkMap} />
     <div class={secondaryItems}>
-      <Link href="/settings">
+      <Link class={link} href="/settings">
         Settings
       </Link>
       <ConnectedSearch theme={theme} className={search} />
