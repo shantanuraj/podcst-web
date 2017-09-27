@@ -8,6 +8,8 @@ import {
   style,
 } from 'typestyle';
 
+const fontFamily = `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`;
+
 /**
  * Global styles
  */
@@ -15,7 +17,7 @@ export const fixGlobalStyles = (theme: App.Theme) => {
   normalize();
   setupPage('body');
   cssRule('body', {
-    fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`,
+    fontFamily,
     backgroundColor: theme.background,
   });
   cssRule('p', {
@@ -25,6 +27,7 @@ export const fixGlobalStyles = (theme: App.Theme) => {
     color: 'inherit',
     textDecoration: 'none',
   });
+  cssRule('input, button', { fontFamily });
 };
 
 export const normalizeEl = style({

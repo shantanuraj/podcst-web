@@ -67,6 +67,7 @@ module.exports = env => {
         'rxjs/add/operator/map',
         'rxjs/add/operator/mergeMap',
         'rxjs/add/operator/switchMap',
+        'rxjs/add/operator/takeUntil',
         'rxjs/add/operator/throttleTime',
         'typestyle',
       ],

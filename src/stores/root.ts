@@ -66,8 +66,12 @@ import {
   app,
   chromeMediaMetadaUpdateEpic,
   onThemeChangeEpic,
-  changeThemeEpic,
 } from './app';
+
+import {
+  changeThemeEpic,
+  playerControlsEpic,
+} from './keyboard';
 
 /**
  * Combined application actions interface
@@ -108,6 +112,7 @@ const epics = [
   changeThemeEpic,
   onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
+  playerControlsEpic,
 ].filter(epic => epic !== null);
 
 export const rootEpic = combineEpics<Actions, State>(
