@@ -31,7 +31,13 @@ const episodeRow = style({
   justifyContent: 'space-between',
 });
 
-const infoContainer = style({
+const container = style({
+  display: 'flex',
+  alignItems: 'center',
+});
+
+const episodeTitle = style({
+  flex: 1,
   display: 'flex',
   alignItems: 'center',
 });
@@ -39,11 +45,15 @@ const infoContainer = style({
 const subContainer = (theme: App.Theme) => style({
   marginRight: 16,
   color: theme.subTitle,
-});
-
-const playInfo = style({
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
+  justifyContent: 'center',
+  $nest: {
+    '& > p': {
+      margin: 4,
+    },
+  },
 });
 
 const playButton = (theme: App.Theme) => style({
@@ -118,23 +128,26 @@ const Episode = (props: EpisodeProps) => {
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
   const month = monthName(pub.getMonth());
-  const episodeLength = duration ? `${Math.floor(duration / 60)} mins` : '';
+  const minutes = Math.floor((duration || 0) / 60);
+  const minutesSuffix = `min${minutes > 0 ? 's' : ''}`;
   const subContainerTheme = subContainer(theme);
 
   return (
     <div class={episodeContainer(theme)}>
       <div class={episodeRow}>
-        <div class={infoContainer}>
+        <div class={container}>
           <div class={subContainerTheme}>
-            {`${month} ${day}`}
-          </div>
-          <div>
-            {title}
+            <p>{month}</p>
+            <p>{day}</p>
           </div>
         </div>
-        <div class={playInfo}>
+        <div class={episodeTitle}>
+          {title}
+        </div>
+        <div class={container}>
           <div class={subContainerTheme}>
-            {episodeLength}
+            <p>{minutes}</p>
+            <p>{minutesSuffix}</p>
           </div>
           {renderButton(props)}
         </div>

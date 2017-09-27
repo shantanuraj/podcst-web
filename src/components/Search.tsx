@@ -33,8 +33,8 @@ const search = (theme: App.Theme) => style({
   padding: 16,
   height: 'inherit',
   boxShadow: 'inset 0 2px 5px rgba(0,0,0,.2)',
-  backgroundColor: theme.backgroundDark,
-  border: `1px solid ${theme.backgroundDark}`,
+  backgroundColor: theme.backgroundSearch,
+  border: `1px solid ${theme.backgroundSearch}`,
   outline: 'none',
   color: theme.textLight,
 });

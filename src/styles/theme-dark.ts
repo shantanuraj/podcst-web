@@ -27,6 +27,7 @@ const loaderAnimation = keyframes({
 const text = '#ffffff';
 const textLight = text;
 const subTitle = '#cccccc';
+const backgroundSearch = backgroundDark;
 
 const theme: App.Theme = {
   accent,
@@ -37,6 +38,7 @@ const theme: App.Theme = {
   subTitle,
   text,
   textLight,
+  backgroundSearch,
 };
 
 export default theme;

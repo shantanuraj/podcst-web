@@ -69,16 +69,16 @@ export const monthName = (monthNumber: number) => months[monthNumber];
 /**
  * Format remaining time
  */
-export const formatTime = (
-  total: number,
-  currentTime: number,
-) => {
+export const formatTime = (total: number, currentTime: number) => {
   const time = Math.round(total - currentTime);
 
-  const minutes = Math.floor(time / 60) || 0;
-  const seconds = (time - minutes * 60) || 0;
+  const date = new Date(0);
+  date.setSeconds(time);
 
-  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  const res = date.toISOString().substr(11, 8);
+  const [ hh ] = res.split(':');
+
+  return res.slice((hh === '00') ? 3 : 0);
 };
 
 /**

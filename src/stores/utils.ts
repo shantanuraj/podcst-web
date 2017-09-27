@@ -27,7 +27,7 @@ export const noop = (): NoopAction => ({ type: NOOP });
  * App default state
  */
 export const getDefaultState = (): State => ({
-  app: {
+  app: Storage.getAppState() || {
     mode: 'dark',
     theme: ThemeProvider('dark'),
   },
