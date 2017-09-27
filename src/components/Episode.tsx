@@ -31,7 +31,13 @@ const episodeRow = style({
   justifyContent: 'space-between',
 });
 
-const infoContainer = style({
+const container = style({
+  display: 'flex',
+  alignItems: 'center',
+});
+
+const episodeTitle = style({
+  flex: 1,
   display: 'flex',
   alignItems: 'center',
 });
@@ -45,14 +51,9 @@ const subContainer = (theme: App.Theme) => style({
   justifyContent: 'center',
   $nest: {
     '& > p': {
-      margin: 2,
+      margin: 4,
     },
   },
-});
-
-const playInfo = style({
-  display: 'flex',
-  alignItems: 'center',
 });
 
 const playButton = (theme: App.Theme) => style({
@@ -134,16 +135,16 @@ const Episode = (props: EpisodeProps) => {
   return (
     <div class={episodeContainer(theme)}>
       <div class={episodeRow}>
-        <div class={infoContainer}>
+        <div class={container}>
           <div class={subContainerTheme}>
             <p>{month}</p>
             <p>{day}</p>
           </div>
-          <div>
-            {title}
-          </div>
         </div>
-        <div class={playInfo}>
+        <div class={episodeTitle}>
+          {title}
+        </div>
+        <div class={container}>
           <div class={subContainerTheme}>
             <p>{minutes}</p>
             <p>{minutesSuffix}</p>
