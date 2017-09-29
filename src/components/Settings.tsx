@@ -15,16 +15,17 @@ import {
 import NavLinks, {
   LinkMap,
 } from './NavLinks';
+import ThemePicker from './ThemePicker';
 
 const linkMap: LinkMap = {
   '/settings?section=theme': 'Change Theme',
   '/settings?section=shortcuts': 'Shortcuts',
-}
+};
 
-const componentsMap = {
-  'theme': <div>theme</div>,
+const componentsMap = (theme: App.Theme) => ({
+  'theme': <ThemePicker theme={theme} />,
   'shortcuts': <div>shortcuts</div>,
-}
+});
 
 interface SettingsProps {
   theme: App.Theme;
@@ -37,7 +38,7 @@ const fillVertically: types.NestedCSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   height: '100%',
-}
+};
 
 const container = (theme: App.Theme) => style({
   ...fillVertically,
@@ -69,7 +70,7 @@ const Settings = ({
   section,
 }: SettingsProps) => {
   if (section) {
-    return componentsMap[section];
+    return componentsMap(theme)[section];
   } else {
     return (
       <div class={container(theme)}>
