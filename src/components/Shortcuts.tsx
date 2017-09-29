@@ -61,6 +61,10 @@ const shortcuts: ShortcutInfo[] = [
     title: 'Previous',
     value: 'p / left',
   },
+  {
+    title: 'Seek to n%',
+    value: '0-9',
+  },
 ];
 
 const renderShortcut = (theme: App.Theme) => ({
