@@ -16,7 +16,7 @@ import NightIcon from './NightIcon';
 import DayIcon from './DayIcon';
 import SettingsIcon from './SettingsIcon';
 
-type IconType =
+export type IconType =
   'play' |
   'pause' |
   'settings' |

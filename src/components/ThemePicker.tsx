@@ -11,7 +11,9 @@ import {
   style,
 } from 'typestyle';
 
-import Icon from '../svg/Icon';
+import Icon, {
+  IconType,
+} from '../svg/Icon';
 
 const container = (theme: App.Theme) => style({
   display: 'flex',
@@ -41,27 +43,51 @@ interface ThemePickerProps {
   theme: App.Theme;
 }
 
+interface ThemeInfo {
+  theme: App.ThemeMode;
+  icon: IconType;
+  name: string;
+}
+
+const themes: ThemeInfo[] = [
+  {
+    theme: 'light',
+    icon: 'day',
+    name: 'Light',
+  },
+  {
+    theme: 'dark',
+    icon: 'night',
+    name: 'Dark',
+  },
+];
+
+const renderTheme = (
+  color: string,
+  {
+    icon,
+    name,
+    theme,
+  }: ThemeInfo,
+) => (
+  <div>
+    <input type="radio" id={theme} name="theme" value={theme} />
+    <label for={theme}>
+      <Icon color={color} icon={icon} />
+      {name}
+    </label>
+  </div>
+);
+
+const renderThemes = (color: string, themes: ThemeInfo[]) =>
+  themes.map(theme => renderTheme(color, theme));
+
 const ThemePicker = ({
   theme,
 }: ThemePickerProps) => (
-  <form class={container(theme)}>
+  <form onChange={e => console.log(e.target['value'])} class={container(theme)}>
     <span>Change theme</span>
-
-    <div>
-      <input type="radio" id="contactChoice1" name="contact" value="email" />
-      <label for="contactChoice1">
-        <Icon color={theme.text} icon="day" />
-        Light
-      </label>
-    </div>
-
-    <div>
-      <input type="radio" id="contactChoice2" name="contact" value="phone" />
-      <label for="contactChoice2">
-        <Icon color={theme.text} icon="night" />
-        Dark
-      </label>
-    </div>
+    {renderThemes(theme.text, themes)}
   </form>
 );
 
