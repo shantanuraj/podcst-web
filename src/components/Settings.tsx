@@ -16,6 +16,7 @@ import NavLinks, {
   LinkMap,
 } from './NavLinks';
 import ThemePicker from './ThemePicker';
+import Shortcuts from './Shortcuts';
 
 const linkMap: LinkMap = {
   '/settings?section=theme': 'Change Theme',
@@ -27,7 +28,7 @@ const componentsMap = ({
   changeTheme,
 }: SettingsProps) => ({
   'theme': <ThemePicker onThemeChange={changeTheme} theme={theme} />,
-  'shortcuts': <div>shortcuts</div>,
+  'shortcuts': <Shortcuts />,
 });
 
 interface SettingsProps {
