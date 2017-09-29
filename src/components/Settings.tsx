@@ -7,6 +7,7 @@ import {
 } from 'preact';
 
 import {
+  media,
   style,
   types,
 } from 'typestyle';
@@ -54,7 +55,14 @@ const container = (theme: App.Theme) => style({
       },
     },
   },
-});
+}, media({ maxWidth: 600 }, {
+  $nest: {
+    '& nav a': {
+      paddingLeft: 16,
+      paddingRight: 16,
+    },
+  },
+}));
 
 const Settings = ({
   theme,
