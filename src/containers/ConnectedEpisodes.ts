@@ -33,6 +33,7 @@ import {
 import Episodes from '../components/Episodes';
 
 const mapState = (state: State) => ({
+  theme: state.app.theme,
   info: state.podcasts,
   state: state.player.state,
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,

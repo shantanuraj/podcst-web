@@ -24,14 +24,16 @@ const linkMap: LinkMap = {
 };
 
 const componentsMap = ({
+  mode,
   theme,
   changeTheme,
 }: SettingsProps) => ({
-  'theme': <ThemePicker onThemeChange={changeTheme} theme={theme} />,
+  'theme': <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
   'shortcuts': <Shortcuts theme={theme} />,
 });
 
 interface SettingsProps {
+  mode: App.ThemeMode;
   theme: App.Theme;
   section: 'theme' | 'shortcuts';
   changeTheme(mode: App.ThemeMode);
