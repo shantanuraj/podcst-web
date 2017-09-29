@@ -12,26 +12,52 @@ import {
 
 import PlayIcon from './PlayIcon';
 import PauseIcon from './PauseIcon';
+import NightIcon from './NightIcon';
+import DayIcon from './DayIcon';
+import SettingsIcon from './SettingsIcon';
+
+export type IconType =
+  'play' |
+  'pause' |
+  'settings' |
+  'night' |
+  'day';
 
 interface IconProps {
-  icon: 'play' | 'pause';
-  theme: App.Theme;
+  icon: IconType;
+  color: string;
 }
 
-const iconStyle = (theme: App.Theme) => style({
-  fill: theme.accent,
+const getIcon = (icon: IconProps['icon']): JSX.Element => {
+  if (icon === 'play') {
+    return <PlayIcon />
+  } else if (icon === 'pause') {
+    return <PauseIcon />
+  } else if (icon === 'settings') {
+    return <SettingsIcon />
+  } else if (icon === 'night') {
+    return <NightIcon />
+  } else if (icon === 'day') {
+    return <DayIcon />
+  }
+
+  return <PlayIcon />
+}
+
+const iconStyle = (fill) => style({
+  fill,
   height: '36px',
   width: '36px',
 });
 
 const Icon = ({
   icon,
-  theme,
+  color,
 }: IconProps) => (
   <div
-    class={iconStyle(theme)}
+    class={iconStyle(color)}
   >
-    { icon === 'play' ? <PlayIcon /> : <PauseIcon /> }
+    {getIcon(icon)}
   </div>
 );
 

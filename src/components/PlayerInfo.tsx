@@ -89,7 +89,7 @@ const PlayerInfo = ({
       class={playButton}
       onClick={state === 'playing' ? pause : resume }>
       <Icon
-        theme={theme}
+        color={theme.accent}
         icon={state === 'playing' ? 'pause' : 'play'}
       />
     </button>
