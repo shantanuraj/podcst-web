@@ -48,6 +48,7 @@ const container = (theme: App.Theme) => style({
 
 interface ThemePickerProps {
   theme: App.Theme;
+  mode: App.ThemeMode;
   onThemeChange(mode: App.ThemeMode);
 }
 
@@ -72,6 +73,7 @@ const themes: ThemeInfo[] = [
 
 const renderTheme = (
   color: string,
+  selected: App.ThemeMode,
   {
     icon,
     name,
@@ -79,7 +81,12 @@ const renderTheme = (
   }: ThemeInfo,
 ) => (
   <div>
-    <input type="radio" id={theme} name="theme" value={theme} />
+    <input
+      type="radio"
+      id={theme}
+      name="theme"
+      checked={selected === theme}
+      value={theme} />
     <label for={theme}>
       <Icon color={color} icon={icon} />
       {name}
@@ -87,16 +94,20 @@ const renderTheme = (
   </div>
 );
 
-const renderThemes = (color: string, themes: ThemeInfo[]) =>
-  themes.map(theme => renderTheme(color, theme));
+const renderThemes = (
+  color: string,
+  selected: App.ThemeMode,
+  themes: ThemeInfo[]
+) => themes.map(theme => renderTheme(color, selected, theme));
 
 const ThemePicker = ({
+  mode,
   theme,
   onThemeChange,
 }: ThemePickerProps) => (
   <form onChange={onEvent(onThemeChange)} class={container(theme)}>
     <span>Change theme</span>
-    {renderThemes(theme.text, themes)}
+    {renderThemes(theme.text, mode, themes)}
   </form>
 );
 

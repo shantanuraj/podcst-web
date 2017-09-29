@@ -21,7 +21,10 @@ import {
 
 import Home from '../components/Home';
 
-const mapState = (state: State) => state.subscriptions;
+const mapState = (state: State) => ({
+  ...state.subscriptions,
+  theme: state.app.theme,
+});
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
   parseOPML,
