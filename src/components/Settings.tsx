@@ -28,7 +28,7 @@ const componentsMap = ({
   changeTheme,
 }: SettingsProps) => ({
   'theme': <ThemePicker onThemeChange={changeTheme} theme={theme} />,
-  'shortcuts': <Shortcuts />,
+  'shortcuts': <Shortcuts theme={theme} />,
 });
 
 interface SettingsProps {
