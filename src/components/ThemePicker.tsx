@@ -34,6 +34,9 @@ const container = (theme: App.Theme) => style({
       alignItems: 'center',
       padding: 16,
     },
+    '& label > div': {
+      marginRight: 16,
+    },
   },
 }, media({ maxWidth: 600 }, {
   padding: 16,
