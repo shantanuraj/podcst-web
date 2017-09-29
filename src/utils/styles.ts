@@ -20,7 +20,7 @@ export const fixGlobalStyles = (theme: App.Theme) => {
     fontFamily,
     backgroundColor: theme.background,
   });
-  cssRule('p', {
+  cssRule('p, pre', {
     margin: 0,
   });
   cssRule('a', {
