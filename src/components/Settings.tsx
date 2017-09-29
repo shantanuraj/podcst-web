@@ -38,11 +38,21 @@ const fillVertically: types.NestedCSSProperties = {
   height: '100%',
 }
 
-const container = style({
+const container = (theme: App.Theme) => style({
   ...fillVertically,
   $nest: {
-    '& nav': fillVertically,
-    '& nav a': { margin: 8 },
+    '& nav': {
+      ...fillVertically,
+      width: '100%',
+      justifyContent: 'flex-start',
+    },
+    '& nav a': {
+      padding: 32,
+      width: '100%',
+      '&:nth-child(even)': {
+        backgroundColor: theme.backgroundLight,
+      },
+    },
   },
 });
 
@@ -54,7 +64,7 @@ const Settings = ({
     return componentsMap[section];
   } else {
     return (
-      <div class={container}>
+      <div class={container(theme)}>
         <NavLinks links={linkMap} theme={theme} />
       </div>
     );
