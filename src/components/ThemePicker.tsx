@@ -15,6 +15,10 @@ import Icon, {
   IconType,
 } from '../svg/Icon';
 
+import {
+  onEvent,
+} from '../utils';
+
 const container = (theme: App.Theme) => style({
   display: 'flex',
   flexDirection: 'column',
@@ -44,6 +48,7 @@ const container = (theme: App.Theme) => style({
 
 interface ThemePickerProps {
   theme: App.Theme;
+  onThemeChange(mode: App.ThemeMode);
 }
 
 interface ThemeInfo {
@@ -87,8 +92,9 @@ const renderThemes = (color: string, themes: ThemeInfo[]) =>
 
 const ThemePicker = ({
   theme,
+  onThemeChange,
 }: ThemePickerProps) => (
-  <form onChange={e => console.log(e.target['value'])} class={container(theme)}>
+  <form onChange={onEvent(onThemeChange)} class={container(theme)}>
     <span>Change theme</span>
     {renderThemes(theme.text, themes)}
   </form>

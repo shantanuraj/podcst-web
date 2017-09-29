@@ -22,14 +22,18 @@ const linkMap: LinkMap = {
   '/settings?section=shortcuts': 'Shortcuts',
 };
 
-const componentsMap = (theme: App.Theme) => ({
-  'theme': <ThemePicker theme={theme} />,
+const componentsMap = ({
+  theme,
+  changeTheme,
+}: SettingsProps) => ({
+  'theme': <ThemePicker onThemeChange={changeTheme} theme={theme} />,
   'shortcuts': <div>shortcuts</div>,
 });
 
 interface SettingsProps {
   theme: App.Theme;
   section: 'theme' | 'shortcuts';
+  changeTheme(mode: App.ThemeMode);
 }
 
 const fillVertically: types.NestedCSSProperties = {
@@ -65,19 +69,21 @@ const container = (theme: App.Theme) => style({
   },
 }));
 
-const Settings = ({
-  theme,
-  section,
-}: SettingsProps) => {
+const Settings = (props: SettingsProps) => {
+  const {
+    theme,
+    section,
+  } = props;
+
   if (section) {
-    return componentsMap(theme)[section];
-  } else {
-    return (
-      <div class={container(theme)}>
-        <NavLinks links={linkMap} theme={theme} />
-      </div>
-    );
+    return componentsMap(props)[section];
   }
+
+  return (
+    <div class={container(theme)}>
+      <NavLinks links={linkMap} theme={theme} />
+    </div>
+  );
 }
 
 export default Settings;
