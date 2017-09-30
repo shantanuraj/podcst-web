@@ -31,7 +31,7 @@ const toolbar = (theme: App.Theme) => style({
   left: 0,
   height: '64px',
   width: '100%',
-  zIndex: 500,
+  zIndex: 501,
   fontSize: 20,
   color: theme.text,
   boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
