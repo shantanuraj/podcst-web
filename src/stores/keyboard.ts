@@ -35,6 +35,7 @@ import {
   resumeEpisode,
   skipToNextEpisode,
   skipToPrevEpisode,
+  manualSeekUpdate,
 } from './player';
 
 /**
@@ -71,6 +72,11 @@ const PlayerControlKeys: KeyboardShortcutsMap = {
 };
 
 /**
+ * Is Seek key if its between 0-9
+ */
+const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
+
+/**
  * Player controls epic
  */
 export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
@@ -78,14 +84,20 @@ export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) =>
         !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!PlayerControlKeys[keyCode]
+        !!PlayerControlKeys[keyCode] || isSeekKey(keyCode)
       )
       .map((e) => {
-        const { state } = store.getState().player;
+        const { state, duration } = store.getState().player;
 
         // Space for scroll check
         if (!(e.keyCode === 32 && state === 'stopped')) {
           e.preventDefault();
+        }
+
+        if (isSeekKey(e.keyCode)) {
+          const seekPercent = (e.keyCode - 48) / 10;
+          const seekTo = duration * seekPercent;
+          return manualSeekUpdate(seekTo, duration);
         }
 
         switch(PlayerControlKeys[e.keyCode]) {

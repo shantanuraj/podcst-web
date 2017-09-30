@@ -7,13 +7,19 @@ import {
 } from 'preact';
 
 import {
+  media,
   style,
 } from 'typestyle';
+
+import {
+  Link,
+} from 'preact-router';
 
 import NavLinks, {
   LinkMap,
 } from './NavLinks';
 import ConnectedSearch from '../containers/ConnectedSearch';
+import Icon from '../svg/Icon';
 
 const toolbar = (theme: App.Theme) => style({
   display: 'flex',
@@ -26,15 +32,40 @@ const toolbar = (theme: App.Theme) => style({
   height: '64px',
   width: '100%',
   zIndex: 500,
-  paddingLeft: 16,
   fontSize: 20,
   color: theme.text,
   boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
+  $nest: {
+    '& nav': {
+      padding: 16,
+    },
+  },
+}, media({ maxWidth: 600 }, {
+  $nest: {
+    '& nav': {
+      padding: 0,
+    },
+  },
+}));
+
+const secondaryItems = style({
+  display: 'flex',
+  alignItems: 'center',
+  height: '100%',
 });
+
+const link = style({
+  paddingLeft: 16,
+  paddingRight: 16,
+}, media({ maxWidth: 600 }, {
+  $nest: { '& span': { display: 'none' } },
+}), media({ minWidth: 601 }, {
+  $nest: { '& div': { display: 'none' } },
+}));
 
 const search = style({
   height: 'inherit',
-  marginLeft: 'auto',
+  paddingLeft: 16,
 });
 
 const linkMap: LinkMap = {
@@ -51,7 +82,13 @@ const Toolbar = ({
 }: ToolbarProps) => (
   <header class={toolbar(theme)}>
     <NavLinks theme={theme} links={linkMap} />
-    <ConnectedSearch theme={theme} className={search} />
+    <div class={secondaryItems}>
+      <Link class={link} href="/settings">
+        <Icon icon="settings" color={theme.text} />
+        <span>Settings</span>
+      </Link>
+      <ConnectedSearch theme={theme} className={search} />
+    </div>
   </header>
 );
 

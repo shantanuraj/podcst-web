@@ -8,6 +8,9 @@ import {
   style,
 } from 'typestyle';
 
+/**
+ * Font family for application
+ */
 const fontFamily = `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`;
 
 /**
@@ -20,7 +23,7 @@ export const fixGlobalStyles = (theme: App.Theme) => {
     fontFamily,
     backgroundColor: theme.background,
   });
-  cssRule('p', {
+  cssRule('p, pre', {
     margin: 0,
   });
   cssRule('a', {
@@ -30,6 +33,9 @@ export const fixGlobalStyles = (theme: App.Theme) => {
   cssRule('input, button', { fontFamily });
 };
 
+/**
+ * Normalize element to take entire viewport
+ */
 export const normalizeEl = style({
   height: '100%',
   width: '100%',

@@ -25,6 +25,7 @@ import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import ConnectedHome from '../containers/ConnectedHome';
 import ConnectedPlayer from '../containers/ConnectedPlayer';
+import ConnectedSettings from '../containers/ConnectedSettings';
 
 import Toolbar from './Toolbar';
 
@@ -73,7 +74,7 @@ class App extends Component<AppProps, never> {
   }
 
   render() {
-    const { theme } = this.props;
+    const { theme, version } = this.props;
     return (
       <div class={normalizeEl}>
         <Toolbar theme={theme} />
@@ -83,9 +84,10 @@ class App extends Component<AppProps, never> {
           style={{ paddingTop: 64, marginBottom: 64, }}
         >
           <Router>
-            <ConnectedHome theme={theme} path="/" />
+            <ConnectedHome path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
-            <ConnectedEpisodes theme={theme} path="/episodes" />
+            <ConnectedEpisodes path="/episodes" />
+            <ConnectedSettings version={version} path="/settings" />
           </Router>
         </main>
         <ConnectedPlayer theme={theme} />

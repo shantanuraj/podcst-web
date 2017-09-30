@@ -7,6 +7,7 @@ import {
 } from 'preact';
 
 import {
+  media,
   style,
 } from 'typestyle';
 
@@ -24,7 +25,7 @@ const episodeContainer = (theme: App.Theme) => style({
       backgroundColor: theme.backgroundLight,
     },
   },
-});
+}, media({ maxWidth: 600 }, { padding: 16 } ));
 
 const episodeRow = style({
   display: 'flex',
@@ -144,11 +145,11 @@ const Episode = (props: EpisodeProps) => {
         <div class={episodeTitle}>
           {title}
         </div>
+        <div class={subContainerTheme}>
+          <p>{minutes || ''}</p>
+          <p>{minutes ? minutesSuffix : ''}</p>
+        </div>
         <div class={container}>
-          <div class={subContainerTheme}>
-            <p>{minutes}</p>
-            <p>{minutesSuffix}</p>
-          </div>
           {renderButton(props)}
         </div>
       </div>
