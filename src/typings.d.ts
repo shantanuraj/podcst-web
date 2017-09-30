@@ -131,6 +131,8 @@ type KeyboardShortcuts =
   'play' |
   'next' |
   'prev' |
+  'seek-back' |
+  'seek-forward' |
   'dismiss' |
   'focus' |
   'up' |

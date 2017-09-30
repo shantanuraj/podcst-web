@@ -55,12 +55,12 @@ const shortcuts: ShortcutInfo[] = [
     value: 'space',
   },
   {
-    title: 'Next',
-    value: 'n / right',
+    title: 'Seek back',
+    value: 'left',
   },
   {
-    title: 'Previous',
-    value: 'p / left',
+    title: 'Seek ahead',
+    value: 'right',
   },
   {
     title: 'Seek to n%',
