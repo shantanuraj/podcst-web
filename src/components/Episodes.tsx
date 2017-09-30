@@ -44,9 +44,8 @@ const infoCover = (cover: string) => style(
 const podcastInfo = style(
   {
     display: 'flex',
-    paddingTop: 16,
-    paddingLeft: 16,
-    paddingRight: 16,
+    padding: 32,
+    paddingBottom: 0,
   },
   media({ maxWidth: 600 }, {
     flexDirection: 'column',
