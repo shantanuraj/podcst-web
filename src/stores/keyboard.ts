@@ -39,6 +39,11 @@ import {
 } from './player';
 
 /**
+ * Seek delta in seconds
+ */
+const SEEK_DELTA = 10;
+
+/**
  * Keyboard shortcut map for changing theme
  */
 const ChangeThemeKeys: KeyboardShortcutsMap = {
@@ -65,10 +70,10 @@ export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
  */
 const PlayerControlKeys: KeyboardShortcutsMap = {
   32: 'play',
-  37: 'prev',
   80: 'prev',
-  39: 'next',
   78: 'next',
+  37: 'seek-back',
+  39: 'seek-forward',
 };
 
 /**
@@ -87,7 +92,7 @@ export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
         !!PlayerControlKeys[keyCode] || isSeekKey(keyCode)
       )
       .map((e) => {
-        const { state, duration } = store.getState().player;
+        const { state, seekPosition, duration } = store.getState().player;
 
         // Space for scroll check
         if (!(e.keyCode === 32 && state === 'stopped')) {
@@ -100,10 +105,15 @@ export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
           return manualSeekUpdate(seekTo, duration);
         }
 
-        switch(PlayerControlKeys[e.keyCode]) {
+        const shortcut = PlayerControlKeys[e.keyCode];
+        switch(shortcut) {
           case 'play': return state === 'paused' ? resumeEpisode() : pauseEpisode();
           case 'next': return skipToNextEpisode();
           case 'prev': return skipToPrevEpisode();
+          case 'seek-back':
+          case 'seek-forward':
+            const seekTo = seekPosition + SEEK_DELTA * (shortcut === 'seek-forward' ? 1 : -1);
+            return manualSeekUpdate(seekTo, duration);
           default: return noop();
         }
       })
