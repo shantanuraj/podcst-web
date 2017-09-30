@@ -103,10 +103,17 @@ const subscribeButton = (theme: App.Theme) => style({
 });
 
 const episodesView = style({
-  paddingTop: 16,
-  paddingBottom: 16,
+  $nest: {
+    '&[data-is-player-visible]': {
+      paddingBottom: 64,
+    },
+  },
 }, media({ maxWidth: 600 }, {
-  padding: 0,
+  $nest: {
+    '&[data-is-player-visible]': {
+      paddingBottom: 128,
+    },
+  },
 }));
 
 interface EpisodesProps {
@@ -191,10 +198,12 @@ class Episodes extends Component<EpisodesProps, any> {
       addSubscription,
       removeSubscription,
       subscriptions,
+      state,
       theme,
     } = this.props;
 
     const isSubscribed = !!subscriptions[feed];
+    const isPlayerVisible = state !== 'stopped';
 
     const {
       author,
@@ -234,7 +243,7 @@ class Episodes extends Component<EpisodesProps, any> {
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
-        <div class={episodesView}>
+        <div data-is-player-visible={isPlayerVisible} class={episodesView}>
           {episodes.map(this.renderEpisode)}
         </div>
       </div>

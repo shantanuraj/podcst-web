@@ -35,7 +35,18 @@ const toolbar = (theme: App.Theme) => style({
   fontSize: 20,
   color: theme.text,
   boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
-});
+  $nest: {
+    '& nav': {
+      padding: 16,
+    },
+  },
+}, media({ maxWidth: 600 }, {
+  $nest: {
+    '& nav': {
+      padding: 0,
+    },
+  },
+}));
 
 const secondaryItems = style({
   display: 'flex',
