@@ -35,9 +35,7 @@ const infoCover = (cover: string) => style(
     height: '300px',
     minWidth: '300px',
   },
-  media({
-    maxWidth: 601,
-  }, {
+  media({ maxWidth: 600 }, {
     width: '100vw',
     height: '100vw',
   }),
@@ -46,11 +44,13 @@ const infoCover = (cover: string) => style(
 const podcastInfo = style(
   {
     display: 'flex',
+    paddingTop: 16,
+    paddingLeft: 16,
+    paddingRight: 16,
   },
-  media({
-    maxWidth: 601,
-  }, {
+  media({ maxWidth: 600 }, {
     flexDirection: 'column',
+    padding: 0,
   }),
 );
 
@@ -59,7 +59,6 @@ const podcastInfoTitles = (theme: App.Theme) => style({
   flexDirection: 'column',
   justifyContent: 'center',
   padding: 16,
-  paddingTop: 8,
   $nest: {
     '& a': {
       color: theme.accent,
@@ -104,9 +103,11 @@ const subscribeButton = (theme: App.Theme) => style({
 });
 
 const episodesView = style({
-  paddingTop: 32,
-  paddingBottom: 32,
-});
+  paddingTop: 16,
+  paddingBottom: 16,
+}, media({ maxWidth: 600 }, {
+  padding: 0,
+}));
 
 interface EpisodesProps {
   theme: App.Theme;
