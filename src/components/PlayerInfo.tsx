@@ -61,6 +61,7 @@ const playButton = style({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  outline: 0,
 });
 
 interface PlayerInfoProps {

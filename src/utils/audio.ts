@@ -48,7 +48,7 @@ class Audio {
           );
 
           if (globalHowl.playing()) {
-            setTimeout(updateSeek, 750);
+            setTimeout(updateSeek, 500);
           }
         });
         updateSeek();

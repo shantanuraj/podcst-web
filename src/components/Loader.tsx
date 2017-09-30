@@ -16,7 +16,7 @@ const loadingStyle = (theme: App.Theme) => style({
   left: 0,
   height: '4px',
   width: '100%',
-  zIndex: 501,
+  zIndex: 1000,
   animation: `${theme.loaderAnimation} 2s infinite`,
 });
 
