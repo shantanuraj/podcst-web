@@ -20,17 +20,21 @@ import {
 } from 'preact-router';
 
 import {
+  media,
   style,
 } from 'typestyle';
 
 const results = (theme: App.Theme) => style({
   backgroundColor: theme.background,
   position: 'absolute',
+  right: 0,
+  width: '30%',
   maxHeight: '500px',
-  width: '100%',
   boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
   overflow: 'scroll',
-});
+}, media({ maxWidth: 600 }, {
+  width: '75%',
+}));
 
 const result = (theme: App.Theme) => style({
   display: 'flex',
