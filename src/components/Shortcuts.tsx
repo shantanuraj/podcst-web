@@ -32,7 +32,8 @@ const item = (theme: App.Theme) => style(
     },
   },
 }, media({ maxWidth: 600 }, {
-  padding: 16,
+  paddingLeft: 16,
+  paddingRight: 16,
 }));
 
 interface ShortcutInfo {

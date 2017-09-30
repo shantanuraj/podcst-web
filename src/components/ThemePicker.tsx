@@ -22,28 +22,39 @@ import {
 const container = (theme: App.Theme) => style({
   display: 'flex',
   flexDirection: 'column',
-  padding: 32,
   color: theme.text,
   fontSize: 18,
+});
+
+const themesContainer = (theme: App.Theme) => style({
   $nest: {
-    '& > span': {
-      marginBottom: 16,
-    },
     '& > div': {
       display: 'flex',
       alignItems: 'center',
+      padding: 32,
+    },
+    '& > div:nth-child(even)': {
+      backgroundColor: theme.backgroundLight,
+    },
+    '& input': {
+      marginRight: 16,
     },
     '& label': {
       display: 'flex',
       alignItems: 'center',
-      padding: 16,
+      flex: 1,
     },
     '& label > div': {
       marginRight: 16,
     },
   },
 }, media({ maxWidth: 600 }, {
-  padding: 16,
+  $nest: {
+    '& > div': {
+      paddingLeft: 16,
+      paddingRight: 16,
+    },
+  },
 }));
 
 interface ThemePickerProps {
@@ -106,8 +117,9 @@ const ThemePicker = ({
   onThemeChange,
 }: ThemePickerProps) => (
   <form onChange={onEvent(onThemeChange)} class={container(theme)}>
-    <span>Change theme</span>
-    {renderThemes(theme.text, mode, themes)}
+    <div class={themesContainer(theme)}>
+      {renderThemes(theme.text, mode, themes)}
+    </div>
   </form>
 );
 

@@ -74,7 +74,7 @@ class App extends Component<AppProps, never> {
   }
 
   render() {
-    const { theme } = this.props;
+    const { theme, version } = this.props;
     return (
       <div class={normalizeEl}>
         <Toolbar theme={theme} />
@@ -87,7 +87,7 @@ class App extends Component<AppProps, never> {
             <ConnectedHome path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
             <ConnectedEpisodes path="/episodes" />
-            <ConnectedSettings path="/settings" />
+            <ConnectedSettings version={version} path="/settings" />
           </Router>
         </main>
         <ConnectedPlayer theme={theme} />
