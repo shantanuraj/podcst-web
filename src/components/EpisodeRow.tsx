@@ -74,7 +74,7 @@ const playButton = (theme: App.Theme) => style({
   },
 });
 
-interface EpisodeProps {
+interface EpisodeRowProps {
   episode: App.Episode;
   currentEpisode: App.Episode | null;
   state: EpisodePlayerState;
@@ -92,7 +92,7 @@ const renderButton = ({
   resume,
   state,
   theme,
-}: EpisodeProps) => {
+}: EpisodeRowProps) => {
   const isCurrent = currentEpisode === episode;
   const isPlaying = isCurrent && state === 'playing';
   const isPaused  = isCurrent && state === 'paused';
@@ -114,7 +114,7 @@ const renderButton = ({
   );
 }
 
-const Episode = (props: EpisodeProps) => {
+const EpisodeRow = (props: EpisodeRowProps) => {
   const {
     episode,
     theme,
@@ -157,4 +157,4 @@ const Episode = (props: EpisodeProps) => {
   );
 };
 
-export default Episode;
+export default EpisodeRow;

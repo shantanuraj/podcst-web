@@ -19,7 +19,7 @@ import {
 } from '../utils/styles';
 
 import Loading from './Loading';
-import Episode from './Episode';
+import EpisodeRow from './EpisodeRow';
 
 const episodesContainer = (theme: App.Theme) => style({
   backgroundColor: theme.background,
@@ -172,7 +172,7 @@ class Episodes extends Component<EpisodesProps, any> {
     } = this.props;
 
     return (
-      <Episode
+      <EpisodeRow
         episode={episode}
         pause={pauseEpisode}
         play={playEpisode}
