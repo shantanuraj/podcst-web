@@ -23,6 +23,7 @@ import {
 import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
+import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 import ConnectedHome from '../containers/ConnectedHome';
 import ConnectedPlayer from '../containers/ConnectedPlayer';
 import ConnectedSettings from '../containers/ConnectedSettings';
@@ -87,6 +88,7 @@ class App extends Component<AppProps, never> {
             <ConnectedHome path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
             <ConnectedEpisodes path="/episodes" />
+            <ConnectedEpisodeInfo path="/episode" />
             <ConnectedSettings version={version} path="/settings" />
           </Router>
         </main>
