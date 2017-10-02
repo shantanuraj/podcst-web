@@ -63,7 +63,7 @@ const shortcuts: ShortcutInfo[] = [
     value: 'right',
   },
   {
-    title: 'Seek to n%',
+    title: 'Seek to n %',
     value: '0-9',
   },
 ];
