@@ -14,13 +14,13 @@ interface IAudioCallbacks {
   stopEpisode();
 }
 
-const noop = () => { throw new Error('Audio.init not called!'); };
+const throwErr = () => { throw new Error('Audio.init not called!'); };
 
 class Audio {
   public static callbacks: IAudioCallbacks = {
-    seekUpdate: noop,
-    setBuffer: noop,
-    stopEpisode: noop,
+    seekUpdate: throwErr,
+    setBuffer: throwErr,
+    stopEpisode: throwErr,
   };
 
   public static init(callbacks: IAudioCallbacks) {
