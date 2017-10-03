@@ -74,7 +74,7 @@ const playButton = (theme: App.Theme) => style({
   },
 });
 
-interface EpisodeRowProps {
+interface IEpisodeRowProps {
   episode: App.Episode;
   currentEpisode: App.Episode | null;
   state: EpisodePlayerState;
@@ -92,14 +92,14 @@ const renderButton = ({
   resume,
   state,
   theme,
-}: EpisodeRowProps) => {
+}: IEpisodeRowProps) => {
   const isCurrent = currentEpisode === episode;
   const isPlaying = isCurrent && state === 'playing';
   const isPaused  = isCurrent && state === 'paused';
 
-  const play_ = () => play(episode);
+  const playEpisode = () => play(episode);
 
-  const handler = isPlaying ? pause : (isPaused ? resume : play_);
+  const handler = isPlaying ? pause : (isPaused ? resume : playEpisode);
   const text = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play');
 
   return (
@@ -114,7 +114,7 @@ const renderButton = ({
   );
 };
 
-const EpisodeRow = (props: EpisodeRowProps) => {
+const EpisodeRow = (props: IEpisodeRowProps) => {
   const {
     episode,
     theme,
