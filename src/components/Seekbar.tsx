@@ -65,25 +65,6 @@ class Seekbar extends Component<ISeekbarProps, any> {
     }
   }
 
-  private seekHandler = (e: MouseEvent) => {
-    const {
-      duration,
-      onSeek,
-    } = this.props;
-
-    if (this.el) {
-      const seekFraction = e.offsetX / this.el.offsetWidth;
-      const newSeekPosition = Math.floor(seekFraction * duration);
-      onSeek(newSeekPosition, duration);
-    }
-  }
-
-  private saveRef = (el: HTMLElement | undefined) => {
-    if (el) {
-      this.el = el as HTMLDivElement;
-    }
-  }
-
   public render({
     buffering,
     duration,
@@ -101,6 +82,25 @@ class Seekbar extends Component<ISeekbarProps, any> {
         />
       </div>
     );
+  }
+
+  private seekHandler = (e: MouseEvent) => {
+    const {
+      duration,
+      onSeek,
+    } = this.props;
+
+    if (this.el) {
+      const seekFraction = e.offsetX / this.el.offsetWidth;
+      const newSeekPosition = Math.floor(seekFraction * duration);
+      onSeek(newSeekPosition, duration);
+    }
+  }
+
+  private saveRef = (el: HTMLElement | undefined) => {
+    if (el) {
+      this.el = el as HTMLDivElement;
+    }
   }
 }
 
