@@ -7,13 +7,13 @@ import {
 } from 'preact';
 
 import {
-  SubscriptionsState,
+  ISubscriptionsState,
 } from '../stores/subscriptions';
 
 import ImportPodcasts from './ImportPodcasts';
 import PodcastsGrid from './PodcastsGrid';
 
-interface HomeProps extends SubscriptionsState {
+interface HomeProps extends ISubscriptionsState {
   parseOPML: (contents: string) => void;
   theme: App.Theme;
 }

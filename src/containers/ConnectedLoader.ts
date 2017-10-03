@@ -11,7 +11,7 @@ import {
 } from '../stores/root';
 
 import {
-  FeedData,
+  IFeedData,
 } from '../stores/feed';
 
 import Loader from '../components/Loader';
@@ -28,7 +28,7 @@ const mapState = (state: State) => {
   };
 
   const loadingFeed = Object.keys(feed)
-    .find((key) => (feed[key] as FeedData).loading);
+    .find((key) => (feed[key] as IFeedData).loading);
   if (loadingFeed) {
     return stateLoading;
   }

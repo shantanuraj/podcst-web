@@ -12,7 +12,7 @@ import {
   types,
 } from 'typestyle';
 
-import { AppState } from '../stores/app';
+import { IAppState } from '../stores/app';
 
 import NavLinks, {
   LinkMap,
@@ -35,7 +35,7 @@ const componentsMap = ({
   shortcuts: <Shortcuts theme={theme} />,
 });
 
-interface SettingsProps extends AppState {
+interface SettingsProps extends IAppState {
   section: 'theme' | 'shortcuts';
   version: string;
   changeTheme(mode: App.ThemeMode);

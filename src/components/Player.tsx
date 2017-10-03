@@ -12,7 +12,7 @@ import {
 } from 'typestyle';
 
 import {
-  PlayerState,
+  IPlayerState,
 } from '../stores/player';
 
 import PlayerInfo from './PlayerInfo';
@@ -40,7 +40,7 @@ const player = (theme: App.Theme) => style(
   }),
 );
 
-interface PlayerProps extends PlayerState {
+interface PlayerProps extends IPlayerState {
   theme: App.Theme;
   pause: () => void;
   resume: () => void;

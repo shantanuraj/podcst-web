@@ -22,7 +22,7 @@ import {
 import Audio from '../utils/audio';
 
 import {
-  AppState,
+  IAppState,
 } from '../stores/app';
 
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
@@ -40,7 +40,7 @@ const container = style({
   marginBottom: 64,
 });
 
-interface AppProps extends AppState {
+interface AppProps extends IAppState {
   version: string;
   appInit();
   pauseEpisode();

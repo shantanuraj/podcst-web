@@ -24,7 +24,7 @@ import {
 } from '../utils';
 
 import {
-  SearchState,
+  ISearchState,
 } from '../stores/search';
 
 import SearchResults from './SearchResults';
@@ -44,7 +44,7 @@ const Key: KeyboardShortcutsMap = {
   27: 'dismiss',
 };
 
-interface SearchProps extends SearchState {
+interface SearchProps extends ISearchState {
   className: string;
   searchPodcasts(query: string);
   dismissSearch();

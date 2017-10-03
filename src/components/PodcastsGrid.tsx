@@ -12,7 +12,7 @@ import {
 } from 'typestyle';
 
 import {
-  FeedState,
+  IFeedState,
 } from '../stores/feed';
 
 import Loading from './Loading';
@@ -24,7 +24,7 @@ const grid = style({
   marginBottom: '64px',
 });
 
-interface FeedStateProps extends FeedState {
+interface FeedStateProps extends IFeedState {
   mode: 'feed';
   feed: FeedType;
   getFeed: (feed: FeedType) => void;

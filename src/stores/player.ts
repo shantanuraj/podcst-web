@@ -12,7 +12,7 @@ import {
 
 import {
   noop,
-  NoopAction,
+  INoopAction,
 } from './utils';
 
 import Audio from '../utils/audio';
@@ -20,12 +20,12 @@ import Audio from '../utils/audio';
 /**
  * Play related actions
  */
-export interface PlayEpisodeAction {
+export interface IPlayEpisodeAction {
   type: 'PLAY_EPISODE';
   episode: App.Episode;
 }
-export const PLAY_EPISODE: PlayEpisodeAction['type'] = 'PLAY_EPISODE';
-export const playEpisode = (episode: App.Episode): PlayEpisodeAction => ({
+export const PLAY_EPISODE: IPlayEpisodeAction['type'] = 'PLAY_EPISODE';
+export const playEpisode = (episode: App.Episode): IPlayEpisodeAction => ({
   type: PLAY_EPISODE,
   episode,
 });
@@ -33,100 +33,100 @@ export const playEpisode = (episode: App.Episode): PlayEpisodeAction => ({
 /**
  * Pause related actions
  */
-interface PauseAction {
+interface IPauseAction {
   type: 'PAUSE_EPISODE';
 }
-const PAUSE_EPISODE: PauseAction['type'] = 'PAUSE_EPISODE';
-export const pauseEpisode = (): PauseAction => ({
+const PAUSE_EPISODE: IPauseAction['type'] = 'PAUSE_EPISODE';
+export const pauseEpisode = (): IPauseAction => ({
   type: PAUSE_EPISODE,
 });
 
-interface PauseAudioAction {
+interface IPauseAudioAction {
   type: 'PAUSE_EPISODE_AUDIO';
 }
-const PAUSE_EPISODE_AUDIO: PauseAudioAction['type'] = 'PAUSE_EPISODE_AUDIO';
-const pauseEpisodeAudio = (): PauseAudioAction => ({
+const PAUSE_EPISODE_AUDIO: IPauseAudioAction['type'] = 'PAUSE_EPISODE_AUDIO';
+const pauseEpisodeAudio = (): IPauseAudioAction => ({
   type: PAUSE_EPISODE_AUDIO,
 });
 
 /**
  * Resume related actions
  */
-interface ResumeEpisodeAction {
+interface IResumeEpisodeAction {
   type: 'RESUME_EPISODE';
 }
-const RESUME_EPISODE: ResumeEpisodeAction['type'] = 'RESUME_EPISODE';
-export const resumeEpisode = (): ResumeEpisodeAction => ({
+const RESUME_EPISODE: IResumeEpisodeAction['type'] = 'RESUME_EPISODE';
+export const resumeEpisode = (): IResumeEpisodeAction => ({
   type: RESUME_EPISODE,
 });
 
-interface ResumeEpisodeAudioAction {
+interface IResumeEpisodeAudioAction {
   type: 'RESUME_EPISODE_AUDIO';
 }
-const RESUME_EPISODE_AUDIO: ResumeEpisodeAudioAction['type'] = 'RESUME_EPISODE_AUDIO';
-const resumeEpisodeAudio = (): ResumeEpisodeAudioAction => ({
+const RESUME_EPISODE_AUDIO: IResumeEpisodeAudioAction['type'] = 'RESUME_EPISODE_AUDIO';
+const resumeEpisodeAudio = (): IResumeEpisodeAudioAction => ({
   type: RESUME_EPISODE_AUDIO,
 });
 
 /**
  * Stop related actions
  */
-interface StopAction {
+interface IStopAction {
   type: 'STOP_EPISODE';
 }
-export const STOP_EPISODE: StopAction['type'] = 'STOP_EPISODE';
-export const stopEpisode = (): StopAction => ({
+export const STOP_EPISODE: IStopAction['type'] = 'STOP_EPISODE';
+export const stopEpisode = (): IStopAction => ({
   type: STOP_EPISODE,
 });
 
-interface StopAudioAction {
+interface IStopAudioAction {
   type: 'STOP_EPISODE_AUDIO';
 }
-const STOP_EPISODE_AUDIO: StopAudioAction['type'] = 'STOP_EPISODE_AUDIO';
-const stopEpisodeAudio = (): StopAudioAction => ({
+const STOP_EPISODE_AUDIO: IStopAudioAction['type'] = 'STOP_EPISODE_AUDIO';
+const stopEpisodeAudio = (): IStopAudioAction => ({
   type: STOP_EPISODE_AUDIO,
 });
 
 /**
  * Skip to next action helpers
  */
-interface SkipToNextAction {
+interface ISkipToNextAction {
   type: 'SKIP_TO_NEXT_EPISODE';
 }
-const SKIP_TO_NEXT_EPISODE: SkipToNextAction['type'] = 'SKIP_TO_NEXT_EPISODE';
-export const skipToNextEpisode = (): SkipToNextAction => ({
+const SKIP_TO_NEXT_EPISODE: ISkipToNextAction['type'] = 'SKIP_TO_NEXT_EPISODE';
+export const skipToNextEpisode = (): ISkipToNextAction => ({
   type: SKIP_TO_NEXT_EPISODE,
 });
 
 /**
  * Skip to previous action helpers
  */
-interface SkipToPrevAction {
+interface ISkipToPrevAction {
   type: 'SKIP_TO_PREV_EPISODE';
 }
-const SKIP_TO_PREV_EPISODE: SkipToPrevAction['type'] = 'SKIP_TO_PREV_EPISODE';
-export const skipToPrevEpisode = (): SkipToPrevAction => ({
+const SKIP_TO_PREV_EPISODE: ISkipToPrevAction['type'] = 'SKIP_TO_PREV_EPISODE';
+export const skipToPrevEpisode = (): ISkipToPrevAction => ({
   type: SKIP_TO_PREV_EPISODE,
 });
 
-interface SkipAudioAction {
+interface ISkipAudioAction {
   type: 'SKIP_AUDIO';
 }
-const SKIP_AUDIO: SkipAudioAction['type'] = 'SKIP_AUDIO';
-const skipAudio = (): SkipAudioAction => ({
+const SKIP_AUDIO: ISkipAudioAction['type'] = 'SKIP_AUDIO';
+const skipAudio = (): ISkipAudioAction => ({
   type: SKIP_AUDIO,
 });
 
 /**
  * Seek update action
  */
-interface SeekUpdateAction {
+interface ISeekUpdateAction {
   type: 'SEEK_UPDATE';
   seekPosition: number;
   duration: number;
 }
-const SEEK_UPDATE: SeekUpdateAction['type'] = 'SEEK_UPDATE';
-export const seekUpdate = (seekPosition: number, duration: number): SeekUpdateAction => ({
+const SEEK_UPDATE: ISeekUpdateAction['type'] = 'SEEK_UPDATE';
+export const seekUpdate = (seekPosition: number, duration: number): ISeekUpdateAction => ({
   type: SEEK_UPDATE,
   duration,
   seekPosition,
@@ -135,13 +135,13 @@ export const seekUpdate = (seekPosition: number, duration: number): SeekUpdateAc
 /**
  * Manual seek update action
  */
-interface ManualSeekUpdateAction {
+interface IManualSeekUpdateAction {
   type: 'MANUAL_SEEK_UPDATE';
   seekPosition: number;
   duration: number;
 }
-const MANUAL_SEEK_UPDATE: ManualSeekUpdateAction['type'] = 'MANUAL_SEEK_UPDATE';
-export const manualSeekUpdate = (seekPosition: number, duration: number): ManualSeekUpdateAction => ({
+const MANUAL_SEEK_UPDATE: IManualSeekUpdateAction['type'] = 'MANUAL_SEEK_UPDATE';
+export const manualSeekUpdate = (seekPosition: number, duration: number): IManualSeekUpdateAction => ({
   type: MANUAL_SEEK_UPDATE,
   duration,
   seekPosition,
@@ -150,46 +150,46 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): Manual
 /**
  * Seek update success action
  */
-interface SeekUpdateSuccessAction {
+interface ISeekUpdateSuccessAction {
   type: 'SEEK_UPDATE_SUCCESS';
   seekPosition: number;
   duration: number;
 }
-const SEEK_UPDATE_SUCCESS: SeekUpdateSuccessAction['type'] = 'SEEK_UPDATE_SUCCESS';
+const SEEK_UPDATE_SUCCESS: ISeekUpdateSuccessAction['type'] = 'SEEK_UPDATE_SUCCESS';
 export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
   type: SEEK_UPDATE_SUCCESS,
   duration,
   seekPosition,
 });
 
-interface SetBufferAction {
+interface ISetBufferAction {
   type: 'SET_BUFFER';
   buffering: boolean;
 }
-const SET_BUFFER: SetBufferAction['type'] = 'SET_BUFFER';
-export const setBuffer = (buffering: boolean): SetBufferAction => ({
+const SET_BUFFER: ISetBufferAction['type'] = 'SET_BUFFER';
+export const setBuffer = (buffering: boolean): ISetBufferAction => ({
   type: SET_BUFFER,
   buffering,
 });
 
 export type PlayerActions =
-  PlayEpisodeAction |
-  PauseAction |
-  PauseAudioAction |
-  ResumeEpisodeAction |
-  ResumeEpisodeAudioAction |
-  StopAction |
-  StopAudioAction |
-  SkipToNextAction |
-  SkipToPrevAction |
-  SkipAudioAction |
-  SeekUpdateAction |
-  SeekUpdateSuccessAction |
-  ManualSeekUpdateAction |
-  SetBufferAction |
-  NoopAction;
+  IPlayEpisodeAction |
+  IPauseAction |
+  IPauseAudioAction |
+  IResumeEpisodeAction |
+  IResumeEpisodeAudioAction |
+  IStopAction |
+  IStopAudioAction |
+  ISkipToNextAction |
+  ISkipToPrevAction |
+  ISkipAudioAction |
+  ISeekUpdateAction |
+  ISeekUpdateSuccessAction |
+  IManualSeekUpdateAction |
+  ISetBufferAction |
+  INoopAction;
 
-export interface PlayerState {
+export interface IPlayerState {
   currentEpisode: number;
   queue: App.Episode[];
   state: EpisodePlayerState;
@@ -203,14 +203,14 @@ export const seekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
     .ofType(SEEK_UPDATE)
     .throttleTime(1000)
     .map(
-      (action: SeekUpdateAction) =>
+      (action: ISeekUpdateAction) =>
         seekUpdateSuccess(action.seekPosition, action.duration),
     );
 
 export const manualSeekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
   action$
     .ofType(MANUAL_SEEK_UPDATE)
-    .do((action: ManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
+    .do((action: IManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
     .map(noop);
 
 export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
@@ -260,14 +260,17 @@ export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
       }
     });
 
-export const player = (state: PlayerState = {
-  buffering: false,
-  currentEpisode: 0,
-  duration: 0,
-  queue: [],
-  seekPosition: 0,
-  state: 'stopped',
-},                     action: PlayerActions): PlayerState => {
+export const player = (
+  state: IPlayerState = {
+    buffering: false,
+    currentEpisode: 0,
+    duration: 0,
+    queue: [],
+    seekPosition: 0,
+    state: 'stopped',
+  },
+  action: PlayerActions,
+): IPlayerState => {
   switch (action.type) {
     case PLAY_EPISODE: {
       const queue = state.queue.concat(action.episode);

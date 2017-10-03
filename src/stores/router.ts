@@ -16,7 +16,7 @@ import {
 
 type Navigate = 'NAVIGATE';
 const NAVIGATE: Navigate = 'NAVIGATE';
-interface NavigateAction {
+interface INavigateAction {
   type: Navigate;
   route: string;
 }
@@ -24,14 +24,14 @@ interface NavigateAction {
 /**
  * Action creator for navigating between routes
  */
-export const navigate = (route: string): NavigateAction => ({
+export const navigate = (route: string): INavigateAction => ({
   type: NAVIGATE,
   route,
 });
 
 type NavigationComplete = 'NAVIGATION_COMPLETE';
 const NAVIGATION_COMPLETE: NavigationComplete = 'NAVIGATION_COMPLETE';
-interface NavigationCompleteAction {
+interface INavigationCompleteAction {
   type: NavigationComplete;
   route: string;
 }
@@ -39,19 +39,19 @@ interface NavigationCompleteAction {
 /**
  * Action creator for navigating between routes
  */
-const navigationComplete = (route: string): NavigationCompleteAction => ({
+const navigationComplete = (route: string): INavigationCompleteAction => ({
   type: NAVIGATION_COMPLETE,
   route,
 });
 
 export type RouterActions =
-  NavigateAction |
-  NavigationCompleteAction;
+  INavigateAction |
+  INavigationCompleteAction;
 
 /**
  * Router specific state
  */
-export interface RouterState {
+export interface IRouterState {
   path: string;
 }
 
@@ -67,9 +67,12 @@ export const routerEpic: Epic<RouterActions, State> = (action$) =>
 /**
  * Router reducer
  */
-export const router = (state: RouterState = {
-  path: '/',
-},                     action: RouterActions): RouterState => {
+export const router = (
+  state: IRouterState = {
+    path: '/',
+  },
+  action: RouterActions,
+): IRouterState => {
   switch (action.type) {
     case NAVIGATE:
       return { ...state, path: action.route };

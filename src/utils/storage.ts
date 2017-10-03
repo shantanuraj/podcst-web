@@ -3,14 +3,14 @@
  */
 
 import {
-  AppState,
+  IAppState,
 } from '../stores/app';
 
 const STORE_KEY = 'store@PLAY_PODCST_IO';
 
 interface Storeable {
   subscriptions: SubscriptionsMap;
-  app: AppState;
+  app: IAppState;
 }
 
 const storage = process.env.IN_BROWSER ?
@@ -43,7 +43,7 @@ export const Storage = {
   getSubscriptions() {
     return getValue('subscriptions') || {};
   },
-  saveAppState(appState: AppState) {
+  saveAppState(appState: IAppState) {
     setValue('app', appState);
   },
   getAppState() {

@@ -17,11 +17,11 @@ import {
 /**
  * Noop action
  */
-export interface NoopAction {
+export interface INoopAction {
   type: 'NOOP';
 }
-const NOOP: NoopAction['type'] = 'NOOP';
-export const noop = (): NoopAction => ({ type: NOOP });
+const NOOP: INoopAction['type'] = 'NOOP';
+export const noop = (): INoopAction => ({ type: NOOP });
 
 /**
  * App default state

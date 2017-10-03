@@ -6,7 +6,7 @@ import {
 } from 'typestyle';
 
 import {
-  PodcastsState,
+  IPodcastsState,
 } from '../stores/podcasts';
 
 import {
@@ -118,7 +118,7 @@ const episodesView = style({
 interface EpisodesProps {
   theme: App.Theme;
   feed: string;
-  info: PodcastsState;
+  info: IPodcastsState;
   state: EpisodePlayerState;
   currentEpisode: App.Episode | null;
   subscriptions: SubscriptionsMap;

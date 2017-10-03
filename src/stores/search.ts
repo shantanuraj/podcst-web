@@ -16,90 +16,90 @@ import {
   State,
 } from './root';
 
-interface SearchPodcastsAction {
+interface ISearchPodcastsAction {
   type: 'SEARCH_PODCASTS';
   query: string;
 }
-const SEARCH_PODCASTS: SearchPodcastsAction['type'] = 'SEARCH_PODCASTS';
+const SEARCH_PODCASTS: ISearchPodcastsAction['type'] = 'SEARCH_PODCASTS';
 export const searchPodcasts =
-  (query: SearchPodcastsAction['query']):
-  SearchPodcastsAction | DismissSearchAction =>
+  (query: ISearchPodcastsAction['query']):
+  ISearchPodcastsAction | IDismissSearchAction =>
   query ? ({
     type: SEARCH_PODCASTS,
     query,
   }) : dismissSearch();
 
-interface SearchPodcastsSuccessAction {
+interface ISearchPodcastsSuccessAction {
   type: 'SEARCH_PODCASTS_SUCCESS';
   podcasts: App.Podcast[];
 }
-const SEARCH_PODCASTS_SUCCESS: SearchPodcastsSuccessAction['type'] = 'SEARCH_PODCASTS_SUCCESS';
+const SEARCH_PODCASTS_SUCCESS: ISearchPodcastsSuccessAction['type'] = 'SEARCH_PODCASTS_SUCCESS';
 export const searchPodcastsSuccess =
-  (podcasts: App.Podcast[]): SearchPodcastsSuccessAction => ({
+  (podcasts: App.Podcast[]): ISearchPodcastsSuccessAction => ({
     type: SEARCH_PODCASTS_SUCCESS,
     podcasts,
   });
 
-interface DismissSearchAction {
+interface IDismissSearchAction {
   type: 'DISMISS_SEARCH';
 }
-const DISMISS_SEARCH: DismissSearchAction['type'] = 'DISMISS_SEARCH';
-export const dismissSearch = (): DismissSearchAction => ({
+const DISMISS_SEARCH: IDismissSearchAction['type'] = 'DISMISS_SEARCH';
+export const dismissSearch = (): IDismissSearchAction => ({
   type: DISMISS_SEARCH,
 });
 
-interface NavigateResultAction {
+interface INavigateResultAction {
   type: 'NAVIGATE_RESULT';
   direction: 'up' | 'down';
 }
-const NAVIGATE_RESULT: NavigateResultAction['type'] = 'NAVIGATE_RESULT';
+const NAVIGATE_RESULT: INavigateResultAction['type'] = 'NAVIGATE_RESULT';
 export const navigateResult =
-  (direction: NavigateResultAction['direction']): NavigateResultAction => ({
+  (direction: INavigateResultAction['direction']): INavigateResultAction => ({
     type: NAVIGATE_RESULT,
     direction,
   });
 
-interface FocusResultAction {
+interface IFocusResultAction {
   type: 'FOCUS_RESULT';
   focusedResult: number;
 }
-const FOCUS_RESULT: FocusResultAction['type'] = 'FOCUS_RESULT';
+const FOCUS_RESULT: IFocusResultAction['type'] = 'FOCUS_RESULT';
 export const focusResult =
-  (focusedResult: number): FocusResultAction => ({
+  (focusedResult: number): IFocusResultAction => ({
     type: FOCUS_RESULT,
     focusedResult,
   });
 
-export interface SearchState {
-  query: SearchPodcastsAction['query'];
+export interface ISearchState {
+  query: ISearchPodcastsAction['query'];
   podcasts: App.Podcast[];
   searching: boolean;
   focusedResult: number;
 }
 
 export type SearchActions =
-  SearchPodcastsAction |
-  SearchPodcastsSuccessAction |
-  DismissSearchAction |
-  NavigateResultAction |
-  FocusResultAction;
+  ISearchPodcastsAction |
+  ISearchPodcastsSuccessAction |
+  IDismissSearchAction |
+  INavigateResultAction |
+  IFocusResultAction;
 
 export const searchPodcastsEpic: Epic<SearchActions, State> = (action$) =>
   action$.ofType(SEARCH_PODCASTS)
     .debounceTime(200)
-    .switchMap((action: SearchPodcastsAction) => {
+    .switchMap((action: ISearchPodcastsAction) => {
       return action.query.length === 0 ?
         Observable.of(searchPodcastsSuccess([])) :
         Podcasts.search(action.query)
           .map(searchPodcastsSuccess);
     });
 
-export const search = (state: SearchState = {
+export const search = (state: ISearchState = {
   query: '',
   podcasts: [],
   searching: false,
   focusedResult: 0,
-},                     action: SearchActions): SearchState => {
+},                     action: SearchActions): ISearchState => {
   switch (action.type) {
     case SEARCH_PODCASTS: {
       return {...state, query: action.query, searching: true};

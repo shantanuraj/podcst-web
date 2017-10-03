@@ -12,21 +12,21 @@ import {
 } from 'redux';
 
 import {
-  NoopAction,
+  INoopAction,
 } from './utils';
 
 import {
   router,
   RouterActions,
   routerEpic,
-  RouterState,
+  IRouterState,
 } from './router';
 
 import {
   getEpisodesEpic,
   podcasts,
   PodcastsAction,
-  PodcastsState,
+  IPodcastsState,
 } from './podcasts';
 
 import {
@@ -34,14 +34,14 @@ import {
   player,
   PlayerActions,
   playerAudioEpic,
-  PlayerState,
+  IPlayerState,
   seekUpdateEpic,
 } from './player';
 
 import {
   feed,
   FeedActions,
-  FeedState,
+  IFeedState,
   getFeedEpic,
 } from './feed';
 
@@ -49,21 +49,21 @@ import {
   search,
   SearchActions,
   searchPodcastsEpic,
-  SearchState,
+  ISearchState,
 } from './search';
 
 import {
   parseOPMLEpic,
   subscriptions,
   SubscriptionsActions,
-  SubscriptionsState,
+  ISubscriptionsState,
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
 import {
   app,
   AppActions,
-  AppState,
+  IAppState,
   chromeMediaMetadaUpdateEpic,
   onThemeChangeEpic,
 } from './app';
@@ -84,19 +84,19 @@ export type Actions =
   PlayerActions |
   SubscriptionsActions |
   AppActions |
-  NoopAction;
+  INoopAction;
 
 /**
  * Combined application state interface
  */
 export interface State {
-  app: AppState;
-  router: RouterState;
-  feed: FeedState;
-  search: SearchState;
-  podcasts: PodcastsState;
-  player: PlayerState;
-  subscriptions: SubscriptionsState;
+  app: IAppState;
+  router: IRouterState;
+  feed: IFeedState;
+  search: ISearchState;
+  podcasts: IPodcastsState;
+  player: IPlayerState;
+  subscriptions: ISubscriptionsState;
 }
 
 const epics = [
