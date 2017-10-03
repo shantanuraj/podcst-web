@@ -41,10 +41,10 @@ const onChange = (cb: (file: string) => void) => {
     reader.onload = () => {
       cb(reader.result);
       target.value = '';
-    }
+    };
     reader.readAsText(file);
   };
-}
+};
 
 interface ImportPodcastsProps {
   parseOPML: (contents: string) => void;

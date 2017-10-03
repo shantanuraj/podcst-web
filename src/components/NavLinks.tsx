@@ -37,11 +37,11 @@ const renderLink = (theme: App.Theme, link: string, title: string) => (
 const renderLinks = (theme: App.Theme, linkMap: LinkMap) =>
   Object
   .keys(linkMap)
-  .map(link => renderLink(theme, link, linkMap[link]));
+  .map((link) => renderLink(theme, link, linkMap[link]));
 
 interface NavLinksProps {
-  links: LinkMap,
-  theme: App.Theme,
+  links: LinkMap;
+  theme: App.Theme;
 }
 
 const NavLinks = ({

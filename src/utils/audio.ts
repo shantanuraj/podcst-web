@@ -17,17 +17,17 @@ interface AudioCallbacks {
 const noop = () => console.log('Audio.init not called!');
 
 class Audio {
-  static callbacks: AudioCallbacks = {
+  public static callbacks: AudioCallbacks = {
     seekUpdate: noop,
     setBuffer: noop,
     stopEpisode: noop,
   };
 
-  static init(callbacks: AudioCallbacks) {
+  public static init(callbacks: AudioCallbacks) {
     Audio.callbacks = callbacks;
   }
 
-  static play(episode: App.Episode) {
+  public static play(episode: App.Episode) {
     if (globalHowl) {
       Audio.stop();
     }
@@ -44,7 +44,7 @@ class Audio {
 
           Audio.callbacks.seekUpdate(
             seekPosition,
-            globalHowl.duration()
+            globalHowl.duration(),
           );
 
           if (globalHowl.playing()) {
@@ -55,28 +55,28 @@ class Audio {
       },
       onend() {
         Audio.callbacks.stopEpisode();
-      }
+      },
     });
   }
 
-  static pause() {
+  public static pause() {
     globalHowl && globalHowl.pause();
   }
 
-  static resume() {
+  public static resume() {
     globalHowl && globalHowl.play();
   }
 
-  static stop() {
+  public static stop() {
     globalHowl && globalHowl.stop();
   }
 
-  static skipTo(episode: App.Episode) {
+  public static skipTo(episode: App.Episode) {
     Audio.pause();
     Audio.play(episode);
   }
 
-  static seekTo(position: number) {
+  public static seekTo(position: number) {
     globalHowl && globalHowl.seek(position);
   }
 }

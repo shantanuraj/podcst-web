@@ -15,11 +15,11 @@ import {
   Link,
 } from 'preact-router';
 
+import ConnectedSearch from '../containers/ConnectedSearch';
+import Icon from '../svg/Icon';
 import NavLinks, {
   LinkMap,
 } from './NavLinks';
-import ConnectedSearch from '../containers/ConnectedSearch';
-import Icon from '../svg/Icon';
 
 const toolbar = (theme: App.Theme) => style({
   display: 'flex',

@@ -3,8 +3,8 @@
  */
 
 import {
-  Epic,
   combineEpics,
+  Epic,
 } from 'redux-observable';
 
 import {
@@ -16,54 +16,54 @@ import {
 } from './utils';
 
 import {
-  RouterActions,
-  RouterState,
   router,
+  RouterActions,
   routerEpic,
+  RouterState,
 } from './router';
 
 import {
+  getEpisodesEpic,
+  podcasts,
   PodcastsAction,
   PodcastsState,
-  podcasts,
-  getEpisodesEpic,
 } from './podcasts';
 
 import {
-  PlayerActions,
-  PlayerState,
-  player,
   manualSeekUpdateEpic,
+  player,
+  PlayerActions,
   playerAudioEpic,
+  PlayerState,
   seekUpdateEpic,
 } from './player';
 
 import {
+  feed,
   FeedActions,
   FeedState,
-  feed,
   getFeedEpic,
 } from './feed';
 
 import {
-  SearchActions,
-  SearchState,
   search,
+  SearchActions,
   searchPodcastsEpic,
+  SearchState,
 } from './search';
 
 import {
+  parseOPMLEpic,
+  subscriptions,
   SubscriptionsActions,
   SubscriptionsState,
-  subscriptions,
-  parseOPMLEpic,
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
 import {
+  app,
   AppActions,
   AppState,
-  app,
   chromeMediaMetadaUpdateEpic,
   onThemeChangeEpic,
 } from './app';
@@ -97,7 +97,7 @@ export interface State {
   podcasts: PodcastsState;
   player: PlayerState;
   subscriptions: SubscriptionsState;
-};
+}
 
 const epics = [
   routerEpic,
@@ -113,10 +113,10 @@ const epics = [
   onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
-].filter(epic => epic !== null);
+].filter((epic) => epic !== null);
 
 export const rootEpic = combineEpics<Actions, State>(
-  ...(epics as Epic<Actions, State, any>[])
+  ...(epics as Array<Epic<Actions, State, any>>),
 );
 
 export const rootReducer = combineReducers<State>({

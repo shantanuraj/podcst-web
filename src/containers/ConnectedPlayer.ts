@@ -16,11 +16,11 @@ import {
 } from '../stores/root';
 
 import {
+  manualSeekUpdate,
   pauseEpisode,
   resumeEpisode,
   skipToNextEpisode,
   skipToPrevEpisode,
-  manualSeekUpdate,
 } from '../stores/player';
 
 import Player from '../components/Player';

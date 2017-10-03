@@ -3,7 +3,7 @@
  */
 
 import {
-  h
+  h,
 } from 'preact';
 
 const EpisodeInfo = () => (

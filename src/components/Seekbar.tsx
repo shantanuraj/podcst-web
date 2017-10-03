@@ -3,8 +3,8 @@
  */
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -53,13 +53,13 @@ interface SeekbarProps {
 class Seekbar extends Component<SeekbarProps, any> {
   private el: HTMLDivElement | null = null;
 
-  componentDidMount() {
+  public componentDidMount() {
     if (this.el) {
       this.el.addEventListener('click', this.seekHandler);
     }
   }
 
-  componentWillMount() {
+  public componentWillMount() {
     if (this.el) {
       this.el.removeEventListener('click', this.seekHandler);
     }
@@ -84,7 +84,7 @@ class Seekbar extends Component<SeekbarProps, any> {
     }
   }
 
-  render({
+  public render({
     buffering,
     duration,
     seekPosition,

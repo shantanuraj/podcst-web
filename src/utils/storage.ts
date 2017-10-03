@@ -26,7 +26,7 @@ const getStore = (): Storeable => JSON.parse(storage.getItem(STORE_KEY) as strin
 const getValue = <K extends keyof Storeable>(key: K): Storeable[K] | null => {
   const store = getStore();
   return store[key] || null;
-}
+};
 
 const setValue = <K extends keyof Storeable>(key: K, val: Storeable[K]) => {
   const store: Storeable = {
@@ -34,7 +34,7 @@ const setValue = <K extends keyof Storeable>(key: K, val: Storeable[K]) => {
     [key]: val,
   };
   storage.setItem(STORE_KEY, JSON.stringify(store));
-}
+};
 
 export const Storage = {
   saveSubscriptions(subs: Storeable['subscriptions']) {

@@ -108,8 +108,8 @@ const renderTheme = (
 const renderThemes = (
   color: string,
   selected: App.ThemeMode,
-  themes: ThemeInfo[]
-) => themes.map(theme => renderTheme(color, selected, theme));
+  themes: ThemeInfo[],
+) => themes.map((theme) => renderTheme(color, selected, theme));
 
 const ThemePicker = ({
   mode,

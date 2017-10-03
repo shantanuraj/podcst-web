@@ -3,7 +3,7 @@
  */
 
 import {
-  Epic
+  Epic,
 } from 'redux-observable';
 
 import Podcasts from '../api/Podcasts';
@@ -46,16 +46,16 @@ export interface PodcastsState {
     episodes: App.EpisodeListing | null;
     loading: boolean;
   };
-};
+}
 
 // Get episodes epic
-export const getEpisodesEpic: Epic<PodcastsAction, State> = action$ =>
+export const getEpisodesEpic: Epic<PodcastsAction, State> = (action$) =>
   action$
     .ofType(GET_EPISODES)
     .mergeMap((action: GetEpisodesAction) =>
       Podcasts
         .episodes(action.feed)
-        .map(episodes => getEpisodesSuccess(action.feed, episodes))
+        .map((episodes) => getEpisodesSuccess(action.feed, episodes)),
     );
 
 export const podcasts = (state: PodcastsState = {}, action: PodcastsAction): PodcastsState => {
@@ -74,4 +74,4 @@ export const podcasts = (state: PodcastsState = {}, action: PodcastsAction): Pod
     default:
       return state;
   }
-}
+};

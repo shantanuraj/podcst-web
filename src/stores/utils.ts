@@ -18,7 +18,7 @@ import {
  * Noop action
  */
 export interface NoopAction {
-  type: 'NOOP',
+  type: 'NOOP';
 }
 const NOOP: NoopAction['type'] = 'NOOP';
 export const noop = (): NoopAction => ({ type: NOOP });

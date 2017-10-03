@@ -28,7 +28,7 @@ const loading = style({
   width: '100%',
   background: `linear-gradient(-45deg, #80CBC4, #A7FFEB, #F48FB1, #FFEE58)`,
   backgroundSize: '400% 400%',
-  animation: `${pulseAnimation} 4s ease infinite`
+  animation: `${pulseAnimation} 4s ease infinite`,
 });
 
 const Loading = () => (

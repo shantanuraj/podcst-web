@@ -58,9 +58,9 @@ export interface RouterState {
 /**
  * Fetch texts epic
  */
-export const routerEpic: Epic<RouterActions, State> = action$ =>
+export const routerEpic: Epic<RouterActions, State> = (action$) =>
   action$.ofType(NAVIGATE)
-    .map(action => action.route)
+    .map((action) => action.route)
     .do(routeTo)
     .map(navigationComplete);
 
@@ -69,11 +69,11 @@ export const routerEpic: Epic<RouterActions, State> = action$ =>
  */
 export const router = (state: RouterState = {
   path: '/',
-}, action: RouterActions): RouterState => {
+},                     action: RouterActions): RouterState => {
   switch (action.type) {
     case NAVIGATE:
       return { ...state, path: action.route };
     default:
       return state;
   }
-}
+};

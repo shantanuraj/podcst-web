@@ -13,7 +13,7 @@ import {
 import Podcasts from '../api/Podcasts';
 
 interface GetFeedAction {
-  type: 'GET_FEED',
+  type: 'GET_FEED';
   feed: FeedType;
 }
 
@@ -25,7 +25,7 @@ export const getFeed = (feed: FeedType): GetFeedAction => ({
 });
 
 interface GetFeedSuccessAction {
-  type: 'GET_FEED_SUCCESS',
+  type: 'GET_FEED_SUCCESS';
   feed: FeedType;
   podcasts: App.Podcast[];
 }
@@ -55,13 +55,13 @@ export interface FeedState {
 }
 
 // Get feed epic
-export const getFeedEpic: Epic<FeedActions, State> = action$ =>
+export const getFeedEpic: Epic<FeedActions, State> = (action$) =>
   action$
     .ofType(GET_FEED)
     .mergeMap((action: GetFeedAction) =>
       Podcasts
         .feed(action.feed)
-        .map(podcasts => getFeedSuccess(action.feed, podcasts))
+        .map((podcasts) => getFeedSuccess(action.feed, podcasts)),
     );
 
 // Feed reducer
@@ -70,7 +70,7 @@ export const feed = (state: FeedState = {
     loading: false,
     podcasts: [],
   },
-}, action: FeedActions): FeedState => {
+},                   action: FeedActions): FeedState => {
   switch (action.type) {
     case 'GET_FEED':
       return {
@@ -92,4 +92,4 @@ export const feed = (state: FeedState = {
     default:
       return state;
   }
-}
+};

@@ -7,8 +7,8 @@ import {
 } from 'preact-redux';
 
 import {
-  Dispatch,
   bindActionCreators,
+  Dispatch,
 } from 'redux';
 
 import {

@@ -3,8 +3,8 @@
  */
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -59,28 +59,28 @@ class Search extends Component<SearchProps, any> {
   private clicksSub: Subscription | null = null;
   private keyboardSub: Subscription | null = null;
 
-  componentDidMount() {
+  public componentDidMount() {
     this.watchClicks();
     this.watchKeyboard();
   }
 
-  componentWillUnmount() {
+  public componentWillUnmount() {
     this.clicksSub && this.clicksSub.unsubscribe();
     this.keyboardSub && this.keyboardSub.unsubscribe();
   }
 
-  watchClicks = () => {
+  public watchClicks = () => {
     this.clicksSub = Observable.fromEvent(document, 'click')
-      .filter(({ target, }: MouseEvent) =>
+      .filter(({ target }: MouseEvent) =>
         !!this.el &&
-        !this.el.contains(target as HTMLElement)
+        !this.el.contains(target as HTMLElement),
       )
       .subscribe(this.props.dismissSearch);
   }
 
-  watchKeyboard = () => {
+  public watchKeyboard = () => {
     this.keyboardSub = Observable.fromEvent(document, 'keydown')
-      .filter(({ keyCode, }: KeyboardEvent) => Key[keyCode] !== undefined)
+      .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
       .map((event: KeyboardEvent) => ({
         input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement,
         keyCode: event.keyCode,
@@ -104,13 +104,13 @@ class Search extends Component<SearchProps, any> {
       });
   }
 
-  saveRef = (el: HTMLElement | undefined) => {
+  public saveRef = (el: HTMLElement | undefined) => {
     if (el) {
       this.el = el;
     }
   }
 
-  render({
+  public render({
     className,
     dismissSearch,
     podcasts,

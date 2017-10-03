@@ -28,13 +28,13 @@ const mapState = (state: State) => {
   };
 
   const loadingFeed = Object.keys(feed)
-    .find(key => (feed[key] as FeedData).loading);
+    .find((key) => (feed[key] as FeedData).loading);
   if (loadingFeed) {
     return stateLoading;
   }
 
   const loadingPodcast = Object.keys(podcasts)
-    .find(key => podcasts[key].loading);
+    .find((key) => podcasts[key].loading);
   if (loadingPodcast) {
     return stateLoading;
   }

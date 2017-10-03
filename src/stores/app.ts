@@ -39,7 +39,7 @@ import {
 } from './utils';
 
 interface UpdateChromeMetadataAction {
-  type: 'UPDATE_CHROME_METADATA',
+  type: 'UPDATE_CHROME_METADATA';
 }
 const UPDATE_CHROME_METADATA: UpdateChromeMetadataAction['type'] = 'UPDATE_CHROME_METADATA';
 const updateChromeMetadatAction = (): UpdateChromeMetadataAction => ({
@@ -48,8 +48,8 @@ const updateChromeMetadatAction = (): UpdateChromeMetadataAction => ({
 
 type ChangeTheme = 'CHANGE_THEME';
 interface ChangeThemeAction {
-  type: ChangeTheme,
-  mode: App.ThemeMode,
+  type: ChangeTheme;
+  mode: App.ThemeMode;
 }
 const CHANGE_THEME: ChangeThemeAction['type'] = 'CHANGE_THEME';
 export const changeTheme = (mode: App.ThemeMode): ChangeThemeAction => ({
@@ -59,7 +59,7 @@ export const changeTheme = (mode: App.ThemeMode): ChangeThemeAction => ({
 
 type AppInit = 'APP_INIT';
 interface AppInitAction {
-  type: AppInit,
+  type: AppInit;
 }
 export const APP_INIT: AppInitAction['type'] = 'APP_INIT';
 export const appInit = (): AppInitAction => ({
@@ -82,7 +82,7 @@ export interface AppState {
 /**
  * Chrome MediaSession Metadata epic
  */
-export const chromeMediaMetadaUpdateEpic: Epic<Actions, State> = action$ =>
+export const chromeMediaMetadaUpdateEpic: Epic<Actions, State> = (action$) =>
   action$.ofType(PLAY_EPISODE)
     .do((action: PlayEpisodeAction) => updateMetadata(action.episode))
     .map(updateChromeMetadatAction);
@@ -102,11 +102,11 @@ export const onThemeChangeEpic: Epic<Actions, State> = (action$, store) =>
 export const app = (state: AppState = {
   mode: 'dark',
   theme: ThemeProvider('dark'),
-}, action: AppActions): AppState => {
+},                  action: AppActions): AppState => {
   switch (action.type) {
     case CHANGE_THEME:
       return {...state, mode: action.mode, theme: ThemeProvider(action.mode)};
     default:
       return state;
   }
-}
+};

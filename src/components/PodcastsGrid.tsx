@@ -3,8 +3,8 @@
  */
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -38,7 +38,7 @@ interface SubsStateProps {
 type PodcastsGridProps = FeedStateProps | SubsStateProps;
 
 class PodcastsGrid extends Component<PodcastsGridProps, any> {
-  componentDidMount() {
+  public componentDidMount() {
     if (this.props.mode === 'subs') {
       return;
     }
@@ -57,17 +57,17 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     }
   }
 
-  renderLoading() {
+  public renderLoading() {
     return <Loading />;
   }
 
-  renderPodcast(podcast: App.RenderablePodcast) {
+  public renderPodcast(podcast: App.RenderablePodcast) {
     return (
       <PodcastsGridItem podcast={podcast} />
     );
   }
 
-  renderLoaded(podcasts: App.RenderablePodcast[]) {
+  public renderLoaded(podcasts: App.RenderablePodcast[]) {
     return (
       <div class={grid}>
         {podcasts.map(this.renderPodcast)}
@@ -75,7 +75,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     );
   }
 
-  render({
+  public render({
     mode,
   }: PodcastsGridProps) {
 
@@ -101,7 +101,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
 
     const podcasts = Object
       .keys(subs)
-      .map(feed => ({
+      .map((feed) => ({
         ...subs[feed],
         feed,
       }));

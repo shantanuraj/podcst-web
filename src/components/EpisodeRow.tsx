@@ -112,7 +112,7 @@ const renderButton = ({
       {text}
     </button>
   );
-}
+};
 
 const EpisodeRow = (props: EpisodeRowProps) => {
   const {

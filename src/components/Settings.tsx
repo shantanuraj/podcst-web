@@ -17,8 +17,8 @@ import { AppState } from '../stores/app';
 import NavLinks, {
   LinkMap,
 } from './NavLinks';
-import ThemePicker from './ThemePicker';
 import Shortcuts from './Shortcuts';
+import ThemePicker from './ThemePicker';
 
 const linkMap = (version: string): LinkMap => ({
   '/settings?section=theme': 'Change Theme',
@@ -31,8 +31,8 @@ const componentsMap = ({
   theme,
   changeTheme,
 }: SettingsProps) => ({
-  'theme': <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
-  'shortcuts': <Shortcuts theme={theme} />,
+  theme: <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
+  shortcuts: <Shortcuts theme={theme} />,
 });
 
 interface SettingsProps extends AppState {
@@ -58,8 +58,8 @@ const container = (theme: App.Theme) => style({
       justifyContent: 'flex-start',
     },
     '& nav a': {
-      padding: 32,
-      width: '100%',
+      "padding": 32,
+      "width": '100%',
       '&:nth-child(even)': {
         backgroundColor: theme.backgroundLight,
       },
@@ -90,6 +90,6 @@ const Settings = (props: SettingsProps) => {
       <NavLinks links={linkMap(version)} theme={theme} />
     </div>
   );
-}
+};
 
 export default Settings;

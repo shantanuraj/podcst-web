@@ -4,15 +4,15 @@
 
 import {
   Observable,
-} from 'rxjs/Observable'
+} from 'rxjs/Observable';
 
 import {
   Subscription,
-} from 'rxjs/Subscription'
+} from 'rxjs/Subscription';
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -89,18 +89,18 @@ const Key: KeyboardShortcutsMap = {
 
 class SearchResults extends Component<SearchResultsProps, any> {
 
-  el: HTMLDivElement | null;
-  navigationSub: Subscription | null;
+  public el: HTMLDivElement | null;
+  public navigationSub: Subscription | null;
 
-  componentDidMount() {
+  public componentDidMount() {
     this.watchKeyboard();
   }
 
-  componentWillUnmount() {
+  public componentWillUnmount() {
     this.navigationSub && this.navigationSub.unsubscribe();
   }
 
-  watchKeyboard() {
+  public watchKeyboard() {
     if (this.el) {
       const parent = this.el.parentElement;
       if (parent) {
@@ -112,7 +112,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
             case 'up':
             case 'down': {
               return this.props.navigateResult(
-                Key[e.keyCode] as 'up' | 'down'
+                Key[e.keyCode] as 'up' | 'down',
               );
             }
             case 'select': {
@@ -134,7 +134,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
     }
   }
 
-  renderPodcast = (
+  public renderPodcast = (
     podcast: App.Podcast,
     isFocussed: boolean,
     focusResult: () => void,
@@ -169,7 +169,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
     </Link>
   )
 
-  renderPodcasts = (
+  public renderPodcasts = (
     podcasts: App.Podcast[],
     focusedResult: number,
     focusResult: SearchResultsProps['focusResult'],
@@ -185,7 +185,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
     ))
   )
 
-  render({
+  public render({
     dismissSearch,
     focusResult,
     focusedResult,
@@ -196,14 +196,14 @@ class SearchResults extends Component<SearchResultsProps, any> {
       <div
         class={results(theme)}
         onClick={dismissSearch}
-        ref={el => this.el = el as HTMLDivElement}
+        ref={(el) => this.el = el as HTMLDivElement}
       >
         {this.renderPodcasts(
           podcasts,
           focusedResult,
           focusResult,
           dismissSearch,
-          theme
+          theme,
         )}
       </div>
     );

@@ -17,9 +17,9 @@ import {
 } from 'preact-redux';
 
 // Patch Rx operators
-import './utils/patch_operators';
-import configureStore from './stores';
 import ConnectedApp from './containers/ConnectedApp';
+import configureStore from './stores';
+import './utils/patch_operators';
 
 const store = configureStore();
 

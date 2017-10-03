@@ -3,8 +3,8 @@
  */
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -15,8 +15,8 @@ import {
 import Router from 'preact-router';
 
 import {
-  normalizeEl,
   fixGlobalStyles,
+  normalizeEl,
 } from '../utils/styles';
 
 import Audio from '../utils/audio';
@@ -25,12 +25,12 @@ import {
   AppState,
 } from '../stores/app';
 
-import ConnectedLoader from '../containers/ConnectedLoader';
-import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
-import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
+import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import ConnectedHome from '../containers/ConnectedHome';
+import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPlayer from '../containers/ConnectedPlayer';
+import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
 import ConnectedSettings from '../containers/ConnectedSettings';
 
 import Toolbar from './Toolbar';
@@ -53,18 +53,18 @@ interface AppProps extends AppState {
 }
 
 class App extends Component<AppProps, never> {
-  componentWillMount() {
+  public componentWillMount() {
     fixGlobalStyles(this.props.theme);
     this.setupMediaSession();
     Audio.init(this.props);
   }
 
-  componentDidMount() {
+  public componentDidMount() {
     this.props.appInit();
     console.log(`Initalized Podcst.io version: ${this.props.version}`);
   }
 
-  setupMediaSession() {
+  public setupMediaSession() {
     if ('mediaSession' in navigator) {
       const {
         mediaSession,
@@ -84,7 +84,7 @@ class App extends Component<AppProps, never> {
     }
   }
 
-  render() {
+  public render() {
     const { theme, version } = this.props;
     return (
       <div class={normalizeEl}>

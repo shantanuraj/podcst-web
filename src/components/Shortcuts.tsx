@@ -3,7 +3,7 @@
  */
 
 import {
-  h
+  h,
 } from 'preact';
 
 import {
@@ -80,7 +80,7 @@ const renderShortcut = (theme: App.Theme) => ({
 
 const renderShortcuts = (theme: App.Theme, shortcuts: ShortcutInfo[]) => (
   shortcuts.map(renderShortcut(theme))
-)
+);
 
 interface ShortcutsProps {
   theme: App.Theme;

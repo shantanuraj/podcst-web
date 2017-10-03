@@ -75,7 +75,7 @@ export interface SubscriptionsState {
 }
 
 export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
-  action$ => action$.ofType(PARSE_OPML)
+  (action$) => action$.ofType(PARSE_OPML)
     .mergeMap((action: ParseOPMLAction) => {
       const {
         feeds,
@@ -84,13 +84,13 @@ export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
       return Observable.of(
         feeds.map(({ feed }) =>
           Podcasts.episodes(feed)
-            .filter(e => e !== null)
-            .map((e: App.EpisodeListing) => addSubscription(feed, { ...e, feed, }))
-        )
+            .filter((e) => e !== null)
+            .map((e: App.EpisodeListing) => addSubscription(feed, { ...e, feed })),
+        ),
       );
     })
-    .flatMap(e => e)
-    .flatMap(e => e);
+    .flatMap((e) => e)
+    .flatMap((e) => e);
 
 export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, State> =
   (action$, state) => action$
@@ -123,4 +123,4 @@ export const subscriptions = (
     default:
       return state;
   }
-}
+};

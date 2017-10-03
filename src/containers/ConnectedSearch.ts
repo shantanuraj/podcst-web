@@ -7,8 +7,8 @@ import {
 } from 'preact-redux';
 
 import {
-  Dispatch,
   bindActionCreators,
+  Dispatch,
 } from 'redux';
 
 import {
@@ -17,9 +17,9 @@ import {
 
 import {
   dismissSearch,
-  searchPodcasts,
-  navigateResult,
   focusResult,
+  navigateResult,
+  searchPodcasts,
 } from '../stores/search';
 
 import {

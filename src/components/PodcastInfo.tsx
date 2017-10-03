@@ -1,4 +1,4 @@
-import { h, Component } from 'preact';
+import { Component, h } from 'preact';
 import {
   media,
   style,
@@ -18,8 +18,8 @@ import {
   normalizeEl,
 } from '../utils/styles';
 
-import Loading from './Loading';
 import EpisodeRow from './EpisodeRow';
+import Loading from './Loading';
 
 const episodesContainer = (theme: App.Theme) => style({
   backgroundColor: theme.background,
@@ -131,7 +131,7 @@ interface EpisodesProps {
 }
 
 class Episodes extends Component<EpisodesProps, any> {
-  loadIfNeeded = () => {
+  public loadIfNeeded = () => {
     const {
       feed,
       getEpisodes,
@@ -148,20 +148,20 @@ class Episodes extends Component<EpisodesProps, any> {
     }
   }
 
-  componentDidMount() {
+  public componentDidMount() {
     this.loadIfNeeded();
     scrollToTop();
   }
 
-  componentDidUpdate() {
+  public componentDidUpdate() {
     this.loadIfNeeded();
   }
 
-  renderLoading() {
-    return <Loading />
+  public renderLoading() {
+    return <Loading />;
   }
 
-  renderEpisode = (episode: App.Episode) => {
+  public renderEpisode = (episode: App.Episode) => {
     const {
       currentEpisode,
       playEpisode,
@@ -184,7 +184,7 @@ class Episodes extends Component<EpisodesProps, any> {
     );
   }
 
-  renderLoaded(feed: string, info: App.EpisodeListing | null) {
+  public renderLoaded(feed: string, info: App.EpisodeListing | null) {
     if (!info) {
       return (
         <div>
@@ -216,7 +216,7 @@ class Episodes extends Component<EpisodesProps, any> {
     const handler = () => {
       isSubscribed ?
         removeSubscription(feed) :
-        addSubscription(feed, {...info, feed})
+        addSubscription(feed, {...info, feed});
     };
 
     return (
@@ -249,7 +249,7 @@ class Episodes extends Component<EpisodesProps, any> {
     );
   }
 
-  render({
+  public render({
     feed,
     info,
   }: EpisodesProps) {

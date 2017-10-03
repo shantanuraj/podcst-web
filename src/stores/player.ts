@@ -21,8 +21,8 @@ import Audio from '../utils/audio';
  * Play related actions
  */
 export interface PlayEpisodeAction {
-  type: 'PLAY_EPISODE',
-  episode: App.Episode,
+  type: 'PLAY_EPISODE';
+  episode: App.Episode;
 }
 export const PLAY_EPISODE: PlayEpisodeAction['type'] = 'PLAY_EPISODE';
 export const playEpisode = (episode: App.Episode): PlayEpisodeAction => ({
@@ -34,7 +34,7 @@ export const playEpisode = (episode: App.Episode): PlayEpisodeAction => ({
  * Pause related actions
  */
 interface PauseAction {
-  type: 'PAUSE_EPISODE',
+  type: 'PAUSE_EPISODE';
 }
 const PAUSE_EPISODE: PauseAction['type'] = 'PAUSE_EPISODE';
 export const pauseEpisode = (): PauseAction => ({
@@ -42,7 +42,7 @@ export const pauseEpisode = (): PauseAction => ({
 });
 
 interface PauseAudioAction {
-  type: 'PAUSE_EPISODE_AUDIO',
+  type: 'PAUSE_EPISODE_AUDIO';
 }
 const PAUSE_EPISODE_AUDIO: PauseAudioAction['type'] = 'PAUSE_EPISODE_AUDIO';
 const pauseEpisodeAudio = (): PauseAudioAction => ({
@@ -53,7 +53,7 @@ const pauseEpisodeAudio = (): PauseAudioAction => ({
  * Resume related actions
  */
 interface ResumeEpisodeAction {
-  type: 'RESUME_EPISODE',
+  type: 'RESUME_EPISODE';
 }
 const RESUME_EPISODE: ResumeEpisodeAction['type'] = 'RESUME_EPISODE';
 export const resumeEpisode = (): ResumeEpisodeAction => ({
@@ -61,7 +61,7 @@ export const resumeEpisode = (): ResumeEpisodeAction => ({
 });
 
 interface ResumeEpisodeAudioAction {
-  type: 'RESUME_EPISODE_AUDIO',
+  type: 'RESUME_EPISODE_AUDIO';
 }
 const RESUME_EPISODE_AUDIO: ResumeEpisodeAudioAction['type'] = 'RESUME_EPISODE_AUDIO';
 const resumeEpisodeAudio = (): ResumeEpisodeAudioAction => ({
@@ -72,7 +72,7 @@ const resumeEpisodeAudio = (): ResumeEpisodeAudioAction => ({
  * Stop related actions
  */
 interface StopAction {
-  type: 'STOP_EPISODE',
+  type: 'STOP_EPISODE';
 }
 export const STOP_EPISODE: StopAction['type'] = 'STOP_EPISODE';
 export const stopEpisode = (): StopAction => ({
@@ -80,7 +80,7 @@ export const stopEpisode = (): StopAction => ({
 });
 
 interface StopAudioAction {
-  type: 'STOP_EPISODE_AUDIO',
+  type: 'STOP_EPISODE_AUDIO';
 }
 const STOP_EPISODE_AUDIO: StopAudioAction['type'] = 'STOP_EPISODE_AUDIO';
 const stopEpisodeAudio = (): StopAudioAction => ({
@@ -91,7 +91,7 @@ const stopEpisodeAudio = (): StopAudioAction => ({
  * Skip to next action helpers
  */
 interface SkipToNextAction {
-  type: 'SKIP_TO_NEXT_EPISODE',
+  type: 'SKIP_TO_NEXT_EPISODE';
 }
 const SKIP_TO_NEXT_EPISODE: SkipToNextAction['type'] = 'SKIP_TO_NEXT_EPISODE';
 export const skipToNextEpisode = (): SkipToNextAction => ({
@@ -102,7 +102,7 @@ export const skipToNextEpisode = (): SkipToNextAction => ({
  * Skip to previous action helpers
  */
 interface SkipToPrevAction {
-  type: 'SKIP_TO_PREV_EPISODE',
+  type: 'SKIP_TO_PREV_EPISODE';
 }
 const SKIP_TO_PREV_EPISODE: SkipToPrevAction['type'] = 'SKIP_TO_PREV_EPISODE';
 export const skipToPrevEpisode = (): SkipToPrevAction => ({
@@ -110,7 +110,7 @@ export const skipToPrevEpisode = (): SkipToPrevAction => ({
 });
 
 interface SkipAudioAction {
-  type: 'SKIP_AUDIO',
+  type: 'SKIP_AUDIO';
 }
 const SKIP_AUDIO: SkipAudioAction['type'] = 'SKIP_AUDIO';
 const skipAudio = (): SkipAudioAction => ({
@@ -121,7 +121,7 @@ const skipAudio = (): SkipAudioAction => ({
  * Seek update action
  */
 interface SeekUpdateAction {
-  type: 'SEEK_UPDATE',
+  type: 'SEEK_UPDATE';
   seekPosition: number;
   duration: number;
 }
@@ -136,7 +136,7 @@ export const seekUpdate = (seekPosition: number, duration: number): SeekUpdateAc
  * Manual seek update action
  */
 interface ManualSeekUpdateAction {
-  type: 'MANUAL_SEEK_UPDATE',
+  type: 'MANUAL_SEEK_UPDATE';
   seekPosition: number;
   duration: number;
 }
@@ -151,7 +151,7 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): Manual
  * Seek update success action
  */
 interface SeekUpdateSuccessAction {
-  type: 'SEEK_UPDATE_SUCCESS',
+  type: 'SEEK_UPDATE_SUCCESS';
   seekPosition: number;
   duration: number;
 }
@@ -163,7 +163,7 @@ export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
 });
 
 interface SetBufferAction {
-  type: 'SET_BUFFER',
+  type: 'SET_BUFFER';
   buffering: boolean;
 }
 const SET_BUFFER: SetBufferAction['type'] = 'SET_BUFFER';
@@ -198,16 +198,16 @@ export interface PlayerState {
   buffering: boolean;
 }
 
-export const seekUpdateEpic: Epic<PlayerActions, State> = action$ =>
+export const seekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
   action$
     .ofType(SEEK_UPDATE)
     .throttleTime(1000)
     .map(
       (action: SeekUpdateAction) =>
-        seekUpdateSuccess(action.seekPosition, action.duration)
+        seekUpdateSuccess(action.seekPosition, action.duration),
     );
 
-export const manualSeekUpdateEpic: Epic<PlayerActions, State> = action$ =>
+export const manualSeekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
   action$
     .ofType(MANUAL_SEEK_UPDATE)
     .do((action: ManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
@@ -215,7 +215,7 @@ export const manualSeekUpdateEpic: Epic<PlayerActions, State> = action$ =>
 
 export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
   action$
-    .filter(action => (
+    .filter((action) => (
       action.type === PLAY_EPISODE ||
       action.type === PAUSE_EPISODE ||
       action.type === RESUME_EPISODE ||
@@ -267,7 +267,7 @@ export const player = (state: PlayerState = {
   seekPosition: 0,
   duration: 0,
   buffering: false,
-}, action: PlayerActions): PlayerState => {
+},                     action: PlayerActions): PlayerState => {
   switch (action.type) {
     case PLAY_EPISODE: {
       const queue = state.queue.concat(action.episode);
@@ -284,7 +284,7 @@ export const player = (state: PlayerState = {
       };
     }
     case PAUSE_EPISODE: {
-      return state.queue.length === 0 || state.state === 'stopped'?
+      return state.queue.length === 0 || state.state === 'stopped' ?
       state :
       {
         ...state,
@@ -292,7 +292,7 @@ export const player = (state: PlayerState = {
       };
     }
     case RESUME_EPISODE: {
-      return state.queue.length === 0 || state.state === 'stopped'?
+      return state.queue.length === 0 || state.state === 'stopped' ?
       state :
       {
         ...state,
@@ -344,8 +344,8 @@ export const player = (state: PlayerState = {
       return {
         ...state,
         buffering,
-      }
+      };
     default:
       return state;
   }
-}
+};

@@ -49,8 +49,8 @@ export const dismissSearch = (): DismissSearchAction => ({
 });
 
 interface NavigateResultAction {
-  type: 'NAVIGATE_RESULT',
-  direction: 'up' | 'down',
+  type: 'NAVIGATE_RESULT';
+  direction: 'up' | 'down';
 }
 const NAVIGATE_RESULT: NavigateResultAction['type'] = 'NAVIGATE_RESULT';
 export const navigateResult =
@@ -60,7 +60,7 @@ export const navigateResult =
   });
 
 interface FocusResultAction {
-  type: 'FOCUS_RESULT',
+  type: 'FOCUS_RESULT';
   focusedResult: number;
 }
 const FOCUS_RESULT: FocusResultAction['type'] = 'FOCUS_RESULT';
@@ -84,7 +84,7 @@ export type SearchActions =
   NavigateResultAction |
   FocusResultAction;
 
-export const searchPodcastsEpic: Epic<SearchActions, State> = action$ =>
+export const searchPodcastsEpic: Epic<SearchActions, State> = (action$) =>
   action$.ofType(SEARCH_PODCASTS)
     .debounceTime(200)
     .switchMap((action: SearchPodcastsAction) => {
@@ -99,8 +99,8 @@ export const search = (state: SearchState = {
   podcasts: [],
   searching: false,
   focusedResult: 0,
-}, action: SearchActions): SearchState => {
-  switch(action.type) {
+},                     action: SearchActions): SearchState => {
+  switch (action.type) {
     case SEARCH_PODCASTS: {
       return {...state, query: action.query, searching: true};
     }
@@ -127,4 +127,4 @@ export const search = (state: SearchState = {
     default:
       return state;
   }
-}
+};

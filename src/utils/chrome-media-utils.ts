@@ -27,6 +27,6 @@ export const updateMetadata = (episode: App.Episode) => {
       { src: (episodeArt || cover) as string, sizes: '256x256', type: 'image/png' },
       { src: (episodeArt || cover) as string, sizes: '384x384', type: 'image/png' },
       { src: (episodeArt || cover) as string, sizes: '512x512', type: 'image/png' },
-    ]
+    ],
   });
-}
+};

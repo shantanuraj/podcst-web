@@ -7,8 +7,8 @@ import {
 } from 'preact-redux';
 
 import {
-  Dispatch,
   bindActionCreators,
+  Dispatch,
 } from 'redux';
 
 import {
@@ -25,8 +25,8 @@ import {
 } from '../stores/subscriptions';
 
 import {
-  playEpisode,
   pauseEpisode,
+  playEpisode,
   resumeEpisode,
 } from '../stores/player';
 
