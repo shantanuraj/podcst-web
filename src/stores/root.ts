@@ -16,55 +16,55 @@ import {
 } from './utils';
 
 import {
+  IRouterState,
   router,
   RouterActions,
   routerEpic,
-  IRouterState,
 } from './router';
 
 import {
   getEpisodesEpic,
+  IPodcastsState,
   podcasts,
   PodcastsAction,
-  IPodcastsState,
 } from './podcasts';
 
 import {
+  IPlayerState,
   manualSeekUpdateEpic,
   player,
   PlayerActions,
   playerAudioEpic,
-  IPlayerState,
   seekUpdateEpic,
 } from './player';
 
 import {
   feed,
   FeedActions,
-  IFeedState,
   getFeedEpic,
+  IFeedState,
 } from './feed';
 
 import {
+  ISearchState,
   search,
   SearchActions,
   searchPodcastsEpic,
-  ISearchState,
 } from './search';
 
 import {
+  ISubscriptionsState,
   parseOPMLEpic,
   subscriptions,
   SubscriptionsActions,
-  ISubscriptionsState,
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
 import {
   app,
   AppActions,
-  IAppState,
   chromeMediaMetadaUpdateEpic,
+  IAppState,
   onThemeChangeEpic,
 } from './app';
 

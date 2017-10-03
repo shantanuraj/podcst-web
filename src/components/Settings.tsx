@@ -58,8 +58,8 @@ const container = (theme: App.Theme) => style({
       justifyContent: 'flex-start',
     },
     '& nav a': {
-      "padding": 32,
-      "width": '100%',
+      padding: 32,
+      width: '100%',
       '&:nth-child(even)': {
         backgroundColor: theme.backgroundLight,
       },

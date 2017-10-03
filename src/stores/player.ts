@@ -11,8 +11,8 @@ import {
 } from './root';
 
 import {
-  noop,
   INoopAction,
+  noop,
 } from './utils';
 
 import Audio from '../utils/audio';
