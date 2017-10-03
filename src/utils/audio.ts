@@ -8,22 +8,22 @@ import {
 
 let globalHowl: Howl;
 
-interface AudioCallbacks {
+interface IAudioCallbacks {
   seekUpdate(seekPosition: number, duration: number);
   setBuffer(buffering: boolean);
   stopEpisode();
 }
 
-const noop = () => console.log('Audio.init not called!');
+const noop = () => { throw new Error('Audio.init not called!'); };
 
 class Audio {
-  public static callbacks: AudioCallbacks = {
+  public static callbacks: IAudioCallbacks = {
     seekUpdate: noop,
     setBuffer: noop,
     stopEpisode: noop,
   };
 
-  public static init(callbacks: AudioCallbacks) {
+  public static init(callbacks: IAudioCallbacks) {
     Audio.callbacks = callbacks;
   }
 
@@ -32,9 +32,9 @@ class Audio {
       Audio.stop();
     }
     globalHowl = new Howl({
-      src: [episode.file.url],
       autoplay: true,
       html5: true,
+      src: [episode.file.url],
       onload() {
         Audio.callbacks.setBuffer(false);
       },

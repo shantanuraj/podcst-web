@@ -16,11 +16,11 @@ const loaderAnimation = keyframes({
   '0%': {
     backgroundColor: '#5cffa0',
   },
-  '50%': {
-    backgroundColor: '#00B778',
-  },
   '100%': {
     backgroundColor: '#82ffb5',
+  },
+  '50%': {
+    backgroundColor: '#00B778',
   },
 });
 
@@ -34,11 +34,11 @@ const theme: App.Theme = {
   background,
   backgroundDark,
   backgroundLight,
+  backgroundSearch,
   loaderAnimation,
   subTitle,
   text,
   textLight,
-  backgroundSearch,
 };
 
 export default theme;
