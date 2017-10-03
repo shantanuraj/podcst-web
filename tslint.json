@@ -6,6 +6,7 @@
     "jsRules": {},
     "rules": {
         "no-unused-expression": [true, "allow-fast-null-checks"],
+        "object-literal-sort-keys": [true, "match-declaration-order"],
         "quotemark": [true, "single", "jsx-double"],
         "sort-keys": ["error", "asc", {"caseSensitive": true, "natural": true}]
     },
