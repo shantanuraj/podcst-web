@@ -7,6 +7,11 @@ import {
   Component,
 } from 'preact';
 
+import {
+  classes,
+  style,
+} from 'typestyle';
+
 import Router from 'preact-router';
 
 import {
@@ -29,6 +34,11 @@ import ConnectedPlayer from '../containers/ConnectedPlayer';
 import ConnectedSettings from '../containers/ConnectedSettings';
 
 import Toolbar from './Toolbar';
+
+const container = style({
+  paddingTop: 64,
+  marginBottom: 64,
+});
 
 interface AppProps extends AppState {
   version: string;
@@ -81,8 +91,7 @@ class App extends Component<AppProps, never> {
         <Toolbar theme={theme} />
         <ConnectedLoader theme={theme} />
         <main
-          class={normalizeEl}
-          style={{ paddingTop: 64, marginBottom: 64, }}
+          class={classes(normalizeEl, container)}
         >
           <Router>
             <ConnectedHome path="/" />
