@@ -44,17 +44,17 @@ const Key: KeyboardShortcutsMap = {
   27: 'dismiss',
 };
 
-interface SearchProps extends ISearchState {
+interface ISearchProps extends ISearchState {
   className: string;
+  theme: App.Theme;
   searchPodcasts(query: string);
   dismissSearch();
   navigateResult(direction: 'up' | 'down');
   focusResult(focusedResult: number);
   onResultSelect(feed: string);
-  theme: App.Theme;
 }
 
-class Search extends Component<SearchProps, any> {
+class Search extends Component<ISearchProps, any> {
   private el: HTMLElement | null = null;
   private clicksSub: Subscription | null = null;
   private keyboardSub: Subscription | null = null;
@@ -121,7 +121,7 @@ class Search extends Component<SearchProps, any> {
     navigateResult,
     onResultSelect,
     theme,
-  }: SearchProps) {
+  }: ISearchProps) {
     return (
       <div
         class={className}

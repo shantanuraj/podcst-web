@@ -71,7 +71,7 @@ const resultAuthorText = style({
   fontWeight: 300,
 });
 
-interface SearchResultsProps {
+interface ISearchResultsProps {
   podcasts: App.Podcast[];
   focusedResult: number;
   theme: App.Theme;
@@ -87,7 +87,7 @@ const Key: KeyboardShortcutsMap = {
   13: 'select',
 };
 
-class SearchResults extends Component<SearchResultsProps, any> {
+class SearchResults extends Component<ISearchResultsProps, any> {
 
   public el: HTMLDivElement | null;
   public navigationSub: Subscription | null;
@@ -138,8 +138,8 @@ class SearchResults extends Component<SearchResultsProps, any> {
     podcast: App.Podcast,
     isFocussed: boolean,
     focusResult: () => void,
-    dismissSearch: SearchResultsProps['dismissSearch'],
-    theme: SearchResultsProps['theme'],
+    dismissSearch: ISearchResultsProps['dismissSearch'],
+    theme: ISearchResultsProps['theme'],
   ) => (
     <Link
       onClick={dismissSearch}
@@ -172,9 +172,9 @@ class SearchResults extends Component<SearchResultsProps, any> {
   public renderPodcasts = (
     podcasts: App.Podcast[],
     focusedResult: number,
-    focusResult: SearchResultsProps['focusResult'],
-    dismissSearch: SearchResultsProps['dismissSearch'],
-    theme: SearchResultsProps['theme'],
+    focusResult: ISearchResultsProps['focusResult'],
+    dismissSearch: ISearchResultsProps['dismissSearch'],
+    theme: ISearchResultsProps['theme'],
   ) => (
     podcasts.map((podcast, i) => this.renderPodcast(
       podcast,
@@ -191,7 +191,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
     focusedResult,
     podcasts,
     theme,
-  }: SearchResultsProps) {
+  }: ISearchResultsProps) {
     return (
       <div
         class={results(theme)}

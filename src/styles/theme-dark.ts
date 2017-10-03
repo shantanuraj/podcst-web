@@ -16,11 +16,11 @@ const loaderAnimation = keyframes({
   '0%': {
     backgroundColor: '#5cffa0',
   },
-  '100%': {
-    backgroundColor: '#82ffb5',
-  },
   '50%': {
     backgroundColor: '#00B778',
+  },
+  '100%': {
+    backgroundColor: '#82ffb5',
   },
 });
 

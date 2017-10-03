@@ -42,7 +42,7 @@ const seekbar = style({
   transition: 'width 1s',
 });
 
-interface SeekbarProps {
+interface ISeekbarProps {
   duration: number;
   seekPosition: number;
   buffering: boolean;
@@ -50,7 +50,7 @@ interface SeekbarProps {
   onSeek: (seekPosition: number, duration: number) => void;
 }
 
-class Seekbar extends Component<SeekbarProps, any> {
+class Seekbar extends Component<ISeekbarProps, any> {
   private el: HTMLDivElement | null = null;
 
   public componentDidMount() {
@@ -89,15 +89,15 @@ class Seekbar extends Component<SeekbarProps, any> {
     duration,
     seekPosition,
     theme,
-  }: SeekbarProps) {
+  }: ISeekbarProps) {
     return (
       <div ref={this.saveRef} class={seekbarContainer(theme)}>
         {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
         <div
+          class={seekbar}
           style={{
             width: `${(seekPosition / duration * 100)}%`,
           }}
-          class={seekbar}
         />
       </div>
     );

@@ -20,7 +20,7 @@ const loadingStyle = (theme: App.Theme) => style({
   animation: `${theme.loaderAnimation} 2s infinite`,
 });
 
-interface LoaderProps {
+interface ILoaderProps {
   loading: boolean;
   theme: App.Theme;
 }
@@ -28,7 +28,7 @@ interface LoaderProps {
 const Loader = ({
   loading,
   theme,
-}: LoaderProps) => (
+}: ILoaderProps) => (
   loading ?
     <div class={loadingStyle(theme)} /> :
     null

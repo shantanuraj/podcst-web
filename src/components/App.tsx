@@ -40,7 +40,7 @@ const container = style({
   marginBottom: 64,
 });
 
-interface AppProps extends IAppState {
+interface IAppProps extends IAppState {
   version: string;
   appInit();
   pauseEpisode();
@@ -52,7 +52,7 @@ interface AppProps extends IAppState {
   stopEpisode();
 }
 
-class App extends Component<AppProps, never> {
+class App extends Component<IAppProps, never> {
   public componentWillMount() {
     fixGlobalStyles(this.props.theme);
     this.setupMediaSession();

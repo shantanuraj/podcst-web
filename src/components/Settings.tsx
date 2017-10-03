@@ -15,12 +15,12 @@ import {
 import { IAppState } from '../stores/app';
 
 import NavLinks, {
-  LinkMap,
+  ILinkMap,
 } from './NavLinks';
 import Shortcuts from './Shortcuts';
 import ThemePicker from './ThemePicker';
 
-const linkMap = (version: string): LinkMap => ({
+const linkMap = (version: string): ILinkMap => ({
   '/settings?section=theme': 'Change Theme',
   '/settings?section=shortcuts': 'Shortcuts',
   '#about': `Version: ${version}`,
@@ -30,12 +30,12 @@ const componentsMap = ({
   mode,
   theme,
   changeTheme,
-}: SettingsProps) => ({
+}: ISettingsProps) => ({
   theme: <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
   shortcuts: <Shortcuts theme={theme} />,
 });
 
-interface SettingsProps extends IAppState {
+interface ISettingsProps extends IAppState {
   section: 'theme' | 'shortcuts';
   version: string;
   changeTheme(mode: App.ThemeMode);
@@ -74,7 +74,7 @@ const container = (theme: App.Theme) => style({
   },
 }));
 
-const Settings = (props: SettingsProps) => {
+const Settings = (props: ISettingsProps) => {
   const {
     theme,
     section,

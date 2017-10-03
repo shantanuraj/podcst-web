@@ -115,7 +115,7 @@ const episodesView = style({
   },
 }));
 
-interface EpisodesProps {
+interface IEpisodesProps {
   theme: App.Theme;
   feed: string;
   info: IPodcastsState;
@@ -130,7 +130,7 @@ interface EpisodesProps {
   removeSubscription: (feed: string) => void;
 }
 
-class Episodes extends Component<EpisodesProps, any> {
+class Episodes extends Component<IEpisodesProps, any> {
   public loadIfNeeded = () => {
     const {
       feed,
@@ -252,7 +252,7 @@ class Episodes extends Component<EpisodesProps, any> {
   public render({
     feed,
     info,
-  }: EpisodesProps) {
+  }: IEpisodesProps) {
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading) {
       return this.renderLoading();

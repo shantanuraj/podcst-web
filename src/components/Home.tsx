@@ -13,7 +13,7 @@ import {
 import ImportPodcasts from './ImportPodcasts';
 import PodcastsGrid from './PodcastsGrid';
 
-interface HomeProps extends ISubscriptionsState {
+interface IHomeProps extends ISubscriptionsState {
   parseOPML: (contents: string) => void;
   theme: App.Theme;
 }
@@ -22,7 +22,7 @@ const Home = ({
   parseOPML,
   subs,
   theme,
-}: HomeProps) => (
+}: IHomeProps) => (
   Object.keys(subs).length === 0 ?
     <ImportPodcasts theme={theme} parseOPML={parseOPML} /> :
     <PodcastsGrid

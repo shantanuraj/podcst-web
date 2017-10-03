@@ -46,7 +46,7 @@ const onChange = (cb: (file: string) => void) => {
   };
 };
 
-interface ImportPodcastsProps {
+interface IImportPodcastsProps {
   parseOPML: (contents: string) => void;
   theme: App.Theme;
 }
@@ -54,7 +54,7 @@ interface ImportPodcastsProps {
 const ImportPodcasts = ({
   parseOPML,
   theme,
-}: ImportPodcastsProps) => (
+}: IImportPodcastsProps) => (
   <div class={container}>
     <button class={importButton(theme)}>
       <div>

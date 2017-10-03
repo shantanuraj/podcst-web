@@ -64,7 +64,7 @@ const playButton = style({
   outline: 0,
 });
 
-interface PlayerInfoProps {
+interface IPlayerInfoProps {
   episode: App.Episode;
   state: EpisodePlayerState;
   theme: App.Theme;
@@ -83,7 +83,7 @@ const PlayerInfo = ({
   resume,
   state,
   theme,
-}: PlayerInfoProps) => (
+}: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
     <button
       aria-label={state === 'playing' ? 'Pause' : 'Play'}
