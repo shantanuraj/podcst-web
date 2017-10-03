@@ -61,6 +61,7 @@ class App extends Component<IAppProps, never> {
 
   public componentDidMount() {
     this.props.appInit();
+    /* tslint:disable:no-console */
     console.log(`Initalized Podcst.io version: ${this.props.version}`);
   }
 

@@ -28,11 +28,11 @@ import Player from '../components/Player';
 const mapState = (state: State) => state.player;
 
 const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+  onSeek: manualSeekUpdate,
   pause: pauseEpisode,
   resume: resumeEpisode,
-  skipToNext: skipToNextEpisode,
   skipToPrev: skipToPrevEpisode,
-  onSeek: manualSeekUpdate,
+  skipToNext: skipToNextEpisode,
 }, dispatch);
 
 const ConnectedPlayer = connect(

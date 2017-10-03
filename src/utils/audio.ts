@@ -32,9 +32,9 @@ class Audio {
       Audio.stop();
     }
     globalHowl = new Howl({
-      autoplay: true,
-      html5: true,
       src: [episode.file.url],
+      html5: true,
+      autoplay: true,
       onload() {
         Audio.callbacks.setBuffer(false);
       },

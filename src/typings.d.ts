@@ -95,11 +95,11 @@ declare namespace App {
     background: string;
     backgroundDark: string;
     backgroundLight: string;
+    backgroundSearch: string;
     loaderAnimation: string;
+    subTitle: string;
     text: string;
     textLight: string;
-    subTitle: string;
-    backgroundSearch: string;
   }
 }
 

@@ -31,8 +31,8 @@ const infoCover = (cover: string) => style(
     backgroundImage: `url(${cover})`,
     backgroundRepeat: 'no-repeat',
     backgroundSize: 'cover',
-    width: '300px',
     height: '300px',
+    width: '300px',
     minWidth: '300px',
   },
   media({ maxWidth: 600 }, {
