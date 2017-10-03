@@ -12,14 +12,14 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import EpisodeInfo from '../components/EpisodeInfo';
 
-const mapState = (state: State) => state;
+const mapState = (state: IState) => state;
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
 }, dispatch);
 
 const ConnectedEpisodeInfo = connect(

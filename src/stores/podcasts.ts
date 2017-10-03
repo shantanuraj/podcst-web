@@ -9,7 +9,7 @@ import {
 import Podcasts from '../api/Podcasts';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 interface IGetEpisodesAction {
@@ -24,8 +24,8 @@ export const getEpisodes = (feed: string): IGetEpisodesAction => ({
 
 interface IGetEpisodesSuccessAction {
   type: 'GET_EPISODES_SUCCESS';
-  feed: App.Podcast['feed'];
   episodes: App.EpisodeListing | null;
+  feed: App.Podcast['feed'];
 }
 const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
 export const getEpisodesSuccess = (
@@ -49,7 +49,7 @@ export interface IPodcastsState {
 }
 
 // Get episodes epic
-export const getEpisodesEpic: Epic<PodcastsAction, State> = (action$) =>
+export const getEpisodesEpic: Epic<PodcastsAction, IState> = (action$) =>
   action$
     .ofType(GET_EPISODES)
     .mergeMap((action: IGetEpisodesAction) =>
@@ -68,8 +68,8 @@ export const podcasts = (state: IPodcastsState = {}, action: PodcastsAction): IP
     case GET_EPISODES_SUCCESS:
       return {...state, [action.feed]: {
         ...state[action.feed],
-        loading: false,
         episodes: action.episodes,
+        loading: false,
       }};
     default:
       return state;

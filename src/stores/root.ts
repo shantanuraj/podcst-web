@@ -89,7 +89,7 @@ export type Actions =
 /**
  * Combined application state interface
  */
-export interface State {
+export interface IState {
   app: IAppState;
   router: IRouterState;
   feed: IFeedState;
@@ -115,16 +115,16 @@ const epics = [
   playerControlsEpic,
 ].filter((epic) => epic !== null);
 
-export const rootEpic = combineEpics<Actions, State>(
-  ...(epics as Array<Epic<Actions, State, any>>),
+export const rootEpic = combineEpics<Actions, IState>(
+  ...(epics as Array<Epic<Actions, IState, any>>),
 );
 
-export const rootReducer = combineReducers<State>({
+export const rootReducer = combineReducers<IState>({
   app,
-  router,
   feed,
-  search,
-  podcasts,
   player,
+  podcasts,
+  router,
+  search,
   subscriptions,
 });

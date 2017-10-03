@@ -7,7 +7,7 @@ import {
 } from 'preact-redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -16,7 +16,7 @@ import {
 
 import Loader from '../components/Loader';
 
-const mapState = (state: State) => {
+const mapState = (state: IState) => {
   const {
     feed,
     podcasts,

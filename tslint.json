@@ -20,7 +20,7 @@
         ],
         "no-unused-expression": [true, "allow-fast-null-checks"],
         "object-literal-key-quotes": [true, "as-needed"],
-        "object-literal-sort-keys": [true, "match-declaration-order"],
+        "object-literal-sort-keys":  false,
         "quotemark": [true, "single", "jsx-double"],
         "sort-keys": ["error", "asc", {"caseSensitive": true, "natural": true}],
         "variable-name": [true, "ban-keywords", "check-format", "allow-pascal-case", "allow-leading-underscore"]

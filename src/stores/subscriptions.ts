@@ -11,7 +11,7 @@ import {
 } from 'redux-observable';
 
 import {
-  State,
+  IState,
 } from './root';
 
 import {
@@ -74,7 +74,7 @@ export interface ISubscriptionsState {
   subs: SubscriptionsMap;
 }
 
-export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
+export const parseOPMLEpic: Epic<SubscriptionsActions, IState> =
   (action$) => action$.ofType(PARSE_OPML)
     .mergeMap((action: IParseOPMLAction) => {
       const {
@@ -92,7 +92,7 @@ export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
     .flatMap((e) => e)
     .flatMap((e) => e);
 
-export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, State> =
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> =
   (action$, state) => action$
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
     .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))

@@ -12,7 +12,7 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -32,7 +32,7 @@ import {
 
 import Episodes from '../components/Episodes';
 
-const mapState = (state: State) => ({
+const mapState = (state: IState) => ({
   theme: state.app.theme,
   info: state.podcasts,
   state: state.player.state,
@@ -40,7 +40,7 @@ const mapState = (state: State) => ({
   subscriptions: state.subscriptions.subs,
 });
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   getEpisodes,
   playEpisode,
   pauseEpisode,

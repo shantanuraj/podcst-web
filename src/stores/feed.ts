@@ -7,7 +7,7 @@ import {
 } from 'redux-observable';
 
 import {
-  State,
+  IState,
 } from './root';
 
 import Podcasts from '../api/Podcasts';
@@ -46,8 +46,8 @@ export type FeedActions =
   IGetFeedSuccessAction;
 
 export interface IFeedData {
-  podcasts: App.Podcast[];
   loading: boolean;
+  podcasts: App.Podcast[];
 }
 
 export interface IFeedState {
@@ -55,7 +55,7 @@ export interface IFeedState {
 }
 
 // Get feed epic
-export const getFeedEpic: Epic<FeedActions, State> = (action$) =>
+export const getFeedEpic: Epic<FeedActions, IState> = (action$) =>
   action$
     .ofType(GET_FEED)
     .mergeMap((action: IGetFeedAction) =>

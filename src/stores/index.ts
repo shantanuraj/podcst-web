@@ -13,9 +13,9 @@ import {
 } from 'redux-observable';
 
 import {
+  IState,
   rootEpic,
   rootReducer,
-  State,
 } from './root';
 
 import {
@@ -29,7 +29,7 @@ const composeEnhancers =
   compose;
 
 export default function configureStore() {
-  const store = createStore<State>(
+  const store = createStore<IState>(
     rootReducer,
     getDefaultState(),
     composeEnhancers(

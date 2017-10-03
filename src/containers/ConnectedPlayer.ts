@@ -12,7 +12,7 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -25,9 +25,9 @@ import {
 
 import Player from '../components/Player';
 
-const mapState = (state: State) => state.player;
+const mapState = (state: IState) => state.player;
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   onSeek: manualSeekUpdate,
   pause: pauseEpisode,
   resume: resumeEpisode,

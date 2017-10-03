@@ -13,7 +13,7 @@ import {
 import Podcasts from '../api/Podcasts';
 
 import {
-  State,
+  IState,
 } from './root';
 
 interface ISearchPodcastsAction {
@@ -27,7 +27,7 @@ export const searchPodcasts =
   query ? ({
     type: SEARCH_PODCASTS,
     query,
-  }) : dismissSearch();
+  }) as ISearchPodcastsAction : dismissSearch();
 
 interface ISearchPodcastsSuccessAction {
   type: 'SEARCH_PODCASTS_SUCCESS';
@@ -71,10 +71,10 @@ export const focusResult =
   });
 
 export interface ISearchState {
-  query: ISearchPodcastsAction['query'];
-  podcasts: App.Podcast[];
-  searching: boolean;
   focusedResult: number;
+  podcasts: App.Podcast[];
+  query: ISearchPodcastsAction['query'];
+  searching: boolean;
 }
 
 export type SearchActions =
@@ -84,7 +84,7 @@ export type SearchActions =
   INavigateResultAction |
   IFocusResultAction;
 
-export const searchPodcastsEpic: Epic<SearchActions, State> = (action$) =>
+export const searchPodcastsEpic: Epic<SearchActions, IState> = (action$) =>
   action$.ofType(SEARCH_PODCASTS)
     .debounceTime(200)
     .switchMap((action: ISearchPodcastsAction) => {
@@ -95,10 +95,10 @@ export const searchPodcastsEpic: Epic<SearchActions, State> = (action$) =>
     });
 
 export const search = (state: ISearchState = {
-  query: '',
-  podcasts: [],
-  searching: false,
   focusedResult: 0,
+  podcasts: [],
+  query: '',
+  searching: false,
 },                     action: SearchActions): ISearchState => {
   switch (action.type) {
     case SEARCH_PODCASTS: {
@@ -108,7 +108,7 @@ export const search = (state: ISearchState = {
       return {...state, podcasts: action.podcasts, searching: false};
     }
     case DISMISS_SEARCH: {
-      return {...state, query: '', podcasts: [], searching: false, focusedResult: 0};
+      return {...state, focusedResult: 0, podcasts: [], query: '', searching: false};
     }
     case NAVIGATE_RESULT: {
       const { direction } = action;

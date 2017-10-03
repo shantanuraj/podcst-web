@@ -26,7 +26,7 @@ import {
 
 import {
   Actions,
-  State,
+  IState,
 } from './root';
 
 import {
@@ -82,7 +82,7 @@ export interface IAppState {
 /**
  * Chrome MediaSession Metadata epic
  */
-export const chromeMediaMetadaUpdateEpic: Epic<Actions, State> = (action$) =>
+export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$) =>
   action$.ofType(PLAY_EPISODE)
     .do((action: IPlayEpisodeAction) => updateMetadata(action.episode))
     .map(updateChromeMetadatAction);
@@ -90,7 +90,7 @@ export const chromeMediaMetadaUpdateEpic: Epic<Actions, State> = (action$) =>
 /**
  * On Theme change epic
  */
-export const onThemeChangeEpic: Epic<Actions, State> = (action$, store) =>
+export const onThemeChangeEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(CHANGE_THEME)
     .do(() => fixGlobalStyles(store.getState().app.theme))
     .do(() => Storage.saveAppState(store.getState().app))

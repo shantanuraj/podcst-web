@@ -7,7 +7,7 @@ import {
 } from 'redux-observable';
 
 import {
-  State,
+  IState,
 } from './root';
 
 import {
@@ -156,7 +156,7 @@ interface ISeekUpdateSuccessAction {
   seekPosition: number;
 }
 const SEEK_UPDATE_SUCCESS: ISeekUpdateSuccessAction['type'] = 'SEEK_UPDATE_SUCCESS';
-export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
+export const seekUpdateSuccess = (seekPosition: number, duration: number): ISeekUpdateSuccessAction => ({
   type: SEEK_UPDATE_SUCCESS,
   duration,
   seekPosition,
@@ -198,7 +198,7 @@ export interface IPlayerState {
   state: EpisodePlayerState;
 }
 
-export const seekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
+export const seekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
   action$
     .ofType(SEEK_UPDATE)
     .throttleTime(1000)
@@ -207,13 +207,13 @@ export const seekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
         seekUpdateSuccess(action.seekPosition, action.duration),
     );
 
-export const manualSeekUpdateEpic: Epic<PlayerActions, State> = (action$) =>
+export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
   action$
     .ofType(MANUAL_SEEK_UPDATE)
     .do((action: IManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
     .map(noop);
 
-export const playerAudioEpic: Epic<PlayerActions, State> = (action$, state) =>
+export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
   action$
     .filter((action) => (
       action.type === PLAY_EPISODE ||

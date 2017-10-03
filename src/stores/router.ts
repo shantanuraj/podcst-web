@@ -11,7 +11,7 @@ import {
 } from 'preact-router';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 type Navigate = 'NAVIGATE';
@@ -58,7 +58,7 @@ export interface IRouterState {
 /**
  * Fetch texts epic
  */
-export const routerEpic: Epic<RouterActions, State> = (action$) =>
+export const routerEpic: Epic<RouterActions, IState> = (action$) =>
   action$.ofType(NAVIGATE)
     .map((action) => action.route)
     .do(routeTo)

@@ -12,7 +12,7 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -28,13 +28,13 @@ import {
 
 import Search from '../components/Search';
 
-const mapState = (state: State) => state.search;
+const mapState = (state: IState) => state.search;
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   dismissSearch,
-  searchPodcasts,
-  navigateResult,
   focusResult,
+  navigateResult,
+  searchPodcasts,
   onResultSelect: (feed: string) => navigate(`/episodes?feed=${feed}`),
 }, dispatch);
 

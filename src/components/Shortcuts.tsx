@@ -41,7 +41,7 @@ interface IShortcutInfo {
   value: string;
 }
 
-const shortcuts: IShortcutInfo[] = [
+const appShortcuts: IShortcutInfo[] = [
   {
     title: 'Search',
     value: 's',
@@ -90,7 +90,7 @@ const Shortcuts = ({
   theme,
 }: IShortcutsProps) => (
   <div class={container}>
-    {renderShortcuts(theme, shortcuts)}
+    {renderShortcuts(theme, appShortcuts)}
   </div>
 );
 

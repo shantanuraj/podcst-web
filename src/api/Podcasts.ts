@@ -12,9 +12,9 @@ export default class Podcasts {
 
   private static api(url: string = '/') {
     return {
-      url: `${Podcasts.HOST}${url}`,
-      responseType: 'json',
       crossDomain: true,
+      responseType: 'json',
+      url: `${Podcasts.HOST}${url}`,
     };
   }
 

@@ -16,7 +16,7 @@ import {
 
 import {
   Actions,
-  State,
+  IState,
 } from './root';
 
 import {
@@ -53,7 +53,7 @@ const ChangeThemeKeys: KeyboardShortcutsMap = {
 /**
  * Theme change shortcut epic
  */
-export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
+export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(APP_INIT)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
       .filter((event) =>
@@ -84,7 +84,7 @@ const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
 /**
  * Player controls epic
  */
-export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
+export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) =>
