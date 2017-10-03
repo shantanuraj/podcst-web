@@ -3,6 +3,7 @@
  */
 
 if (module.hot) {
+  /* tslint:disable:no-var-requires */
   require('preact/devtools');
   module.hot.accept();
 }
@@ -23,16 +24,16 @@ import './utils/patch_operators';
 
 const store = configureStore();
 
-const version = process.env.APP_VERSION;
+const appVersion = process.env.APP_VERSION;
 
-interface PodcastAppProps {
+interface IPodcastAppProps {
   version: string;
 }
 
-const PodcastApp = ({ version }: PodcastAppProps) => (
+const PodcastApp = ({ version }: IPodcastAppProps) => (
   <Provider store={store}>
     <ConnectedApp version={version} />
   </Provider>
 );
 
-render(<PodcastApp version={version} />, document.body);
+render(<PodcastApp version={appVersion} />, document.body);
