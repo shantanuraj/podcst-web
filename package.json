@@ -14,7 +14,8 @@
     "predeploy:prod": "yarn build:prod",
     "deploy:staging": "./shell/sync.sh staging",
     "deploy:prod": "./shell/sync.sh prod",
-    "dev": "webpack-dev-server --config webpack.config.js --env.dev --hot --inline --host 0.0.0.0"
+    "dev": "webpack-dev-server --config webpack.config.js --env.dev --hot --inline --host 0.0.0.0",
+    "lint": "tslint --project tsconfig.json --fix"
   },
   "dependencies": {
     "csstips": "^0.2.2",
