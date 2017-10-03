@@ -1,5 +1,6 @@
 import { Component, h } from 'preact';
 import {
+  classes,
   media,
   style,
   types,
@@ -220,7 +221,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     };
 
     return (
-      <div class={`${normalizeEl} ${episodesContainer(theme)}`}>
+      <div class={classes(normalizeEl, episodesContainer(theme))}>
         <div class={podcastInfo}>
           <div
             class={infoCover(cover)}
