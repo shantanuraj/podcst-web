@@ -171,10 +171,10 @@ interface Artwork {
 }
 
 interface ChromeMediaMetadataProps {
-  title: string;
-  artist: string;
   album: string;
+  artist: string;
   artwork: Artwork[];
+  title: string;
 }
 
 interface ChromeMediaMetadata {

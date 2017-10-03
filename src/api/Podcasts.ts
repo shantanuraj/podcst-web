@@ -21,8 +21,7 @@ export default class Podcasts {
   public static feed(type: FeedType): Observable<App.Podcast[]> {
     return ajax(Podcasts.api(`/${type}?limit=100`))
       .map((res) => res.response as App.Podcast[])
-      .catch((err) => {
-        console.error(err);
+      .catch(() => {
         return Observable.of([]);
       });
   }
@@ -30,8 +29,7 @@ export default class Podcasts {
   public static search(term: string): Observable<App.Podcast[]> {
     return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`))
       .map((res) => res.response as App.Podcast[])
-      .catch((err) => {
-        console.error(err);
+      .catch(() => {
         return Observable.of([]);
       });
   }
@@ -39,8 +37,7 @@ export default class Podcasts {
   public static episodes(url: string): Observable<App.EpisodeListing | null> {
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
       .map((res) => res.response as App.EpisodeListing | null)
-      .catch((err) => {
-        console.error(err);
+      .catch(() => {
         return Observable.of(null);
       });
   }
