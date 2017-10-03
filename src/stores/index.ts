@@ -24,7 +24,9 @@ import {
 
 const epicMiddleware = createEpicMiddleware(rootEpic);
 
-const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+const composeEnhancers =
+  (window as ReduxDevToolsEnabledWindow).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ ||
+  compose;
 
 export default function configureStore() {
   const store = createStore<State>(

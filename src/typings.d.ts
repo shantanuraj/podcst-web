@@ -200,6 +200,10 @@ interface ChromeNavigator extends Navigator {
   mediaSession: ChromeMediaSession;
 }
 
+interface ReduxDevToolsEnabledWindow extends Window {
+  __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any;
+}
+
 declare let process: Process;
 
 declare let MediaMetadata: ChromeMediaMetadata;
