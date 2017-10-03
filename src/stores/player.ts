@@ -122,8 +122,8 @@ const skipAudio = (): ISkipAudioAction => ({
  */
 interface ISeekUpdateAction {
   type: 'SEEK_UPDATE';
-  seekPosition: number;
   duration: number;
+  seekPosition: number;
 }
 const SEEK_UPDATE: ISeekUpdateAction['type'] = 'SEEK_UPDATE';
 export const seekUpdate = (seekPosition: number, duration: number): ISeekUpdateAction => ({
@@ -137,8 +137,8 @@ export const seekUpdate = (seekPosition: number, duration: number): ISeekUpdateA
  */
 interface IManualSeekUpdateAction {
   type: 'MANUAL_SEEK_UPDATE';
-  seekPosition: number;
   duration: number;
+  seekPosition: number;
 }
 const MANUAL_SEEK_UPDATE: IManualSeekUpdateAction['type'] = 'MANUAL_SEEK_UPDATE';
 export const manualSeekUpdate = (seekPosition: number, duration: number): IManualSeekUpdateAction => ({
@@ -152,8 +152,8 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
  */
 interface ISeekUpdateSuccessAction {
   type: 'SEEK_UPDATE_SUCCESS';
-  seekPosition: number;
   duration: number;
+  seekPosition: number;
 }
 const SEEK_UPDATE_SUCCESS: ISeekUpdateSuccessAction['type'] = 'SEEK_UPDATE_SUCCESS';
 export const seekUpdateSuccess = (seekPosition: number, duration: number) => ({
@@ -190,12 +190,12 @@ export type PlayerActions =
   INoopAction;
 
 export interface IPlayerState {
-  currentEpisode: number;
-  queue: App.Episode[];
-  state: EpisodePlayerState;
-  seekPosition: number;
-  duration: number;
   buffering: boolean;
+  currentEpisode: number;
+  duration: number;
+  queue: App.Episode[];
+  seekPosition: number;
+  state: EpisodePlayerState;
 }
 
 export const seekUpdateEpic: Epic<PlayerActions, State> = (action$) =>

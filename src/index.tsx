@@ -3,7 +3,7 @@
  */
 
 if (module.hot) {
-  /* tslint:disable:no-var-requires */
+  // tslint:disable:no-var-requires
   require('preact/devtools');
   module.hot.accept();
 }

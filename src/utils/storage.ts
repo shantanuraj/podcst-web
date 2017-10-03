@@ -15,7 +15,7 @@ interface IStoreable {
 
 const storage = process.env.IN_BROWSER ?
   localStorage : {
-    /* tslint:disable:no-empty */
+    // tslint:disable:no-empty
     setItem(_k: string, _v: string) {},
     getItem(_k: string) { return '{}'; },
     clear(_x: string) {},

@@ -12,6 +12,7 @@ const accent = '#8649b2';
 const backgroundDark = '#131313';
 const backgroundLight = '#e3e3e3';
 
+// tslint:disable:object-literal-sort-keys
 const loaderAnimation = keyframes({
   '0%': {
     backgroundColor: '#c069ff',
