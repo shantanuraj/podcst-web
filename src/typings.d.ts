@@ -95,11 +95,11 @@ declare namespace App {
     background: string;
     backgroundDark: string;
     backgroundLight: string;
+    backgroundSearch: string;
     loaderAnimation: string;
+    subTitle: string;
     text: string;
     textLight: string;
-    subTitle: string;
-    backgroundSearch: string;
   }
 }
 
@@ -171,10 +171,10 @@ interface Artwork {
 }
 
 interface ChromeMediaMetadataProps {
-  title: string;
-  artist: string;
   album: string;
+  artist: string;
   artwork: Artwork[];
+  title: string;
 }
 
 interface ChromeMediaMetadata {
@@ -198,6 +198,10 @@ interface ChromeMediaSession {
 
 interface ChromeNavigator extends Navigator {
   mediaSession: ChromeMediaSession;
+}
+
+interface ReduxDevToolsEnabledWindow extends Window {
+  __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any;
 }
 
 declare let process: Process;

@@ -3,8 +3,8 @@
  */
 
 import {
-  Epic,
   combineEpics,
+  Epic,
 } from 'redux-observable';
 
 import {
@@ -12,59 +12,59 @@ import {
 } from 'redux';
 
 import {
-  NoopAction,
+  INoopAction,
 } from './utils';
 
 import {
-  RouterActions,
-  RouterState,
+  IRouterState,
   router,
+  RouterActions,
   routerEpic,
 } from './router';
 
 import {
-  PodcastsAction,
-  PodcastsState,
-  podcasts,
   getEpisodesEpic,
+  IPodcastsState,
+  podcasts,
+  PodcastsAction,
 } from './podcasts';
 
 import {
-  PlayerActions,
-  PlayerState,
-  player,
+  IPlayerState,
   manualSeekUpdateEpic,
+  player,
+  PlayerActions,
   playerAudioEpic,
   seekUpdateEpic,
 } from './player';
 
 import {
-  FeedActions,
-  FeedState,
   feed,
+  FeedActions,
   getFeedEpic,
+  IFeedState,
 } from './feed';
 
 import {
-  SearchActions,
-  SearchState,
+  ISearchState,
   search,
+  SearchActions,
   searchPodcastsEpic,
 } from './search';
 
 import {
-  SubscriptionsActions,
-  SubscriptionsState,
-  subscriptions,
+  ISubscriptionsState,
   parseOPMLEpic,
+  subscriptions,
+  SubscriptionsActions,
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
 import {
-  AppActions,
-  AppState,
   app,
+  AppActions,
   chromeMediaMetadaUpdateEpic,
+  IAppState,
   onThemeChangeEpic,
 } from './app';
 
@@ -84,20 +84,20 @@ export type Actions =
   PlayerActions |
   SubscriptionsActions |
   AppActions |
-  NoopAction;
+  INoopAction;
 
 /**
  * Combined application state interface
  */
-export interface State {
-  app: AppState;
-  router: RouterState;
-  feed: FeedState;
-  search: SearchState;
-  podcasts: PodcastsState;
-  player: PlayerState;
-  subscriptions: SubscriptionsState;
-};
+export interface IState {
+  app: IAppState;
+  router: IRouterState;
+  feed: IFeedState;
+  search: ISearchState;
+  podcasts: IPodcastsState;
+  player: IPlayerState;
+  subscriptions: ISubscriptionsState;
+}
 
 const epics = [
   routerEpic,
@@ -113,18 +113,18 @@ const epics = [
   onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
-].filter(epic => epic !== null);
+].filter((epic) => epic !== null);
 
-export const rootEpic = combineEpics<Actions, State>(
-  ...(epics as Epic<Actions, State, any>[])
+export const rootEpic = combineEpics<Actions, IState>(
+  ...(epics as Array<Epic<Actions, IState, any>>),
 );
 
-export const rootReducer = combineReducers<State>({
+export const rootReducer = combineReducers<IState>({
   app,
-  router,
   feed,
-  search,
-  podcasts,
   player,
+  podcasts,
+  router,
+  search,
   subscriptions,
 });

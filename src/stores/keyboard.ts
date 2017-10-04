@@ -16,7 +16,7 @@ import {
 
 import {
   Actions,
-  State,
+  IState,
 } from './root';
 
 import {
@@ -29,13 +29,13 @@ import {
 } from './app';
 
 import {
-  PLAY_EPISODE,
-  STOP_EPISODE,
+  manualSeekUpdate,
   pauseEpisode,
+  PLAY_EPISODE,
   resumeEpisode,
   skipToNextEpisode,
   skipToPrevEpisode,
-  manualSeekUpdate,
+  STOP_EPISODE,
 } from './player';
 
 /**
@@ -53,16 +53,16 @@ const ChangeThemeKeys: KeyboardShortcutsMap = {
 /**
  * Theme change shortcut epic
  */
-export const changeThemeEpic: Epic<Actions, State> = (action$, store) =>
+export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(APP_INIT)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
-      .filter(event =>
+      .filter((event) =>
         !!ChangeThemeKeys[event.keyCode] &&
-        !(event.target as HTMLElement).matches(ignoreKeyboardSelector)
+        !(event.target as HTMLElement).matches(ignoreKeyboardSelector),
       )
       .map(() => changeTheme(
         store.getState().app.mode === 'dark' ? 'light' : 'dark',
-      ))
+      )),
     );
 
 /**
@@ -84,12 +84,12 @@ const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
 /**
  * Player controls epic
  */
-export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
+export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) =>
         !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!PlayerControlKeys[keyCode] || isSeekKey(keyCode)
+        !!PlayerControlKeys[keyCode] || isSeekKey(keyCode),
       )
       .map((e) => {
         const { state, seekPosition, duration } = store.getState().player;
@@ -106,7 +106,7 @@ export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
         }
 
         const shortcut = PlayerControlKeys[e.keyCode];
-        switch(shortcut) {
+        switch (shortcut) {
           case 'play': return state === 'paused' ? resumeEpisode() : pauseEpisode();
           case 'next': return skipToNextEpisode();
           case 'prev': return skipToPrevEpisode();
@@ -117,5 +117,5 @@ export const playerControlsEpic: Epic<Actions, State> = (action$, store) =>
           default: return noop();
         }
       })
-      .takeUntil(action$.ofType(STOP_EPISODE))
-    )
+      .takeUntil(action$.ofType(STOP_EPISODE)),
+    );

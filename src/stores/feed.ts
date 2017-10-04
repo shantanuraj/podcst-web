@@ -7,84 +7,87 @@ import {
 } from 'redux-observable';
 
 import {
-  State,
+  IState,
 } from './root';
 
 import Podcasts from '../api/Podcasts';
 
-interface GetFeedAction {
-  type: 'GET_FEED',
-  feed: FeedType;
+interface IGetFeedAction {
+  type: 'GET_FEED';
+  feedType: FeedType;
 }
 
-const GET_FEED: GetFeedAction['type'] = 'GET_FEED';
+const GET_FEED: IGetFeedAction['type'] = 'GET_FEED';
 
-export const getFeed = (feed: FeedType): GetFeedAction => ({
+export const getFeed = (feedType: FeedType): IGetFeedAction => ({
   type: GET_FEED,
-  feed,
+  feedType,
 });
 
-interface GetFeedSuccessAction {
-  type: 'GET_FEED_SUCCESS',
-  feed: FeedType;
+interface IGetFeedSuccessAction {
+  type: 'GET_FEED_SUCCESS';
+  feedType: FeedType;
   podcasts: App.Podcast[];
 }
 
-const GET_FEED_SUCCESS: GetFeedSuccessAction['type'] = 'GET_FEED_SUCCESS';
+const GET_FEED_SUCCESS: IGetFeedSuccessAction['type'] = 'GET_FEED_SUCCESS';
 
 const getFeedSuccess = (
-  feed: FeedType,
+  feedType: FeedType,
   podcasts: App.Podcast[],
-): GetFeedSuccessAction => ({
+): IGetFeedSuccessAction => ({
   type: GET_FEED_SUCCESS,
-  feed,
+  feedType,
   podcasts,
 });
 
 export type FeedActions =
-  GetFeedAction |
-  GetFeedSuccessAction;
+  IGetFeedAction |
+  IGetFeedSuccessAction;
 
-export interface FeedData {
-  podcasts: App.Podcast[];
+export interface IFeedData {
   loading: boolean;
+  podcasts: App.Podcast[];
 }
 
-export interface FeedState {
-  top: FeedData;
+export interface IFeedState {
+  top: IFeedData;
 }
 
 // Get feed epic
-export const getFeedEpic: Epic<FeedActions, State> = action$ =>
+export const getFeedEpic: Epic<FeedActions, IState> = (action$) =>
   action$
     .ofType(GET_FEED)
-    .mergeMap((action: GetFeedAction) =>
+    .mergeMap((action: IGetFeedAction) =>
       Podcasts
-        .feed(action.feed)
-        .map(podcasts => getFeedSuccess(action.feed, podcasts))
+        .feed(action.feedType)
+        .map((podcasts) => getFeedSuccess(action.feedType, podcasts)),
     );
 
 // Feed reducer
-export const feed = (state: FeedState = {
-  top: {
-    loading: false,
-    podcasts: [],
+export const feed = (
+  state: IFeedState = {
+    top: {
+      loading: false,
+      podcasts: [],
+    },
   },
-}, action: FeedActions): FeedState => {
+  action: FeedActions,
+): IFeedState => {
   switch (action.type) {
     case 'GET_FEED':
       return {
         ...state,
-        [action.feed]: {
-          ...state[action.feed],
+        [action.feedType]: {
+          ...state[action.feedType],
           loading: true,
         },
       };
     case 'GET_FEED_SUCCESS':
       return {
         ...state,
-        [action.feed]: {
-          ...state[action.feed],
+        [action.feedType]: {
+          ...state[action.feedType],
           loading: false,
           podcasts: action.podcasts,
         },
@@ -92,4 +95,4 @@ export const feed = (state: FeedState = {
     default:
       return state;
   }
-}
+};

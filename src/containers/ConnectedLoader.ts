@@ -7,16 +7,16 @@ import {
 } from 'preact-redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
-  FeedData,
+  IFeedData,
 } from '../stores/feed';
 
 import Loader from '../components/Loader';
 
-const mapState = (state: State) => {
+const mapState = (state: IState) => {
   const {
     feed,
     podcasts,
@@ -28,13 +28,13 @@ const mapState = (state: State) => {
   };
 
   const loadingFeed = Object.keys(feed)
-    .find(key => (feed[key] as FeedData).loading);
+    .find((key) => (feed[key] as IFeedData).loading);
   if (loadingFeed) {
     return stateLoading;
   }
 
   const loadingPodcast = Object.keys(podcasts)
-    .find(key => podcasts[key].loading);
+    .find((key) => podcasts[key].loading);
   if (loadingPodcast) {
     return stateLoading;
   }

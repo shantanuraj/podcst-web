@@ -2,6 +2,7 @@ import {
   h,
 } from 'preact';
 
+/* tslint:disable:max-line-length */
 const SettingsIcon = () => (
   <svg
     viewBox="0 0 24 24"

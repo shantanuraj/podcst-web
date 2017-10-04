@@ -12,15 +12,15 @@ import {
   types,
 } from 'typestyle';
 
-import { AppState } from '../stores/app';
+import { IAppState } from '../stores/app';
 
 import NavLinks, {
-  LinkMap,
+  ILinkMap,
 } from './NavLinks';
-import ThemePicker from './ThemePicker';
 import Shortcuts from './Shortcuts';
+import ThemePicker from './ThemePicker';
 
-const linkMap = (version: string): LinkMap => ({
+const linkMap = (version: string): ILinkMap => ({
   '/settings?section=theme': 'Change Theme',
   '/settings?section=shortcuts': 'Shortcuts',
   '#about': `Version: ${version}`,
@@ -30,12 +30,12 @@ const componentsMap = ({
   mode,
   theme,
   changeTheme,
-}: SettingsProps) => ({
-  'theme': <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
-  'shortcuts': <Shortcuts theme={theme} />,
+}: ISettingsProps) => ({
+  theme: <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
+  shortcuts: <Shortcuts theme={theme} />,
 });
 
-interface SettingsProps extends AppState {
+interface ISettingsProps extends IAppState {
   section: 'theme' | 'shortcuts';
   version: string;
   changeTheme(mode: App.ThemeMode);
@@ -74,7 +74,7 @@ const container = (theme: App.Theme) => style({
   },
 }));
 
-const Settings = (props: SettingsProps) => {
+const Settings = (props: ISettingsProps) => {
   const {
     theme,
     section,
@@ -90,6 +90,6 @@ const Settings = (props: SettingsProps) => {
       <NavLinks links={linkMap(version)} theme={theme} />
     </div>
   );
-}
+};
 
 export default Settings;

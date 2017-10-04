@@ -15,11 +15,11 @@ import {
   Link,
 } from 'preact-router';
 
-import NavLinks, {
-  LinkMap,
-} from './NavLinks';
 import ConnectedSearch from '../containers/ConnectedSearch';
 import Icon from '../svg/Icon';
+import NavLinks, {
+  ILinkMap,
+} from './NavLinks';
 
 const toolbar = (theme: App.Theme) => style({
   display: 'flex',
@@ -68,18 +68,18 @@ const search = style({
   paddingLeft: 16,
 });
 
-const linkMap: LinkMap = {
+const linkMap: ILinkMap = {
   '/': 'Podcasts',
   '/feed/top': 'Top',
 };
 
-interface ToolbarProps {
+interface IToolbarProps {
   theme: App.Theme;
 }
 
 const Toolbar = ({
   theme,
-}: ToolbarProps) => (
+}: IToolbarProps) => (
   <header class={toolbar(theme)}>
     <NavLinks theme={theme} links={linkMap} />
     <div class={secondaryItems}>

@@ -57,19 +57,19 @@ const themesContainer = (theme: App.Theme) => style({
   },
 }));
 
-interface ThemePickerProps {
-  theme: App.Theme;
+interface IThemePickerProps {
   mode: App.ThemeMode;
+  theme: App.Theme;
   onThemeChange(mode: App.ThemeMode);
 }
 
-interface ThemeInfo {
+interface IThemeInfo {
   theme: App.ThemeMode;
   icon: IconType;
   name: string;
 }
 
-const themes: ThemeInfo[] = [
+const appThemes: IThemeInfo[] = [
   {
     theme: 'light',
     icon: 'day',
@@ -89,7 +89,7 @@ const renderTheme = (
     icon,
     name,
     theme,
-  }: ThemeInfo,
+  }: IThemeInfo,
 ) => (
   <div>
     <input
@@ -108,17 +108,17 @@ const renderTheme = (
 const renderThemes = (
   color: string,
   selected: App.ThemeMode,
-  themes: ThemeInfo[]
-) => themes.map(theme => renderTheme(color, selected, theme));
+  themes: IThemeInfo[],
+) => themes.map((theme) => renderTheme(color, selected, theme));
 
 const ThemePicker = ({
   mode,
   theme,
   onThemeChange,
-}: ThemePickerProps) => (
+}: IThemePickerProps) => (
   <form onChange={onEvent(onThemeChange)} class={container(theme)}>
     <div class={themesContainer(theme)}>
-      {renderThemes(theme.text, mode, themes)}
+      {renderThemes(theme.text, mode, appThemes)}
     </div>
   </form>
 );

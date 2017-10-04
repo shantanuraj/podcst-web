@@ -17,9 +17,8 @@ export const updateMetadata = (episode: App.Episode) => {
   } = episode;
 
   mediaSession.metadata = new MediaMetadata({
-    title,
-    artist: author as string,
     album: author as string,
+    artist: author as string,
     artwork: [
       { src: (episodeArt || cover) as string,  sizes: '96x96',   type: 'image/png' },
       { src: (episodeArt || cover) as string, sizes: '128x128', type: 'image/png' },
@@ -27,6 +26,7 @@ export const updateMetadata = (episode: App.Episode) => {
       { src: (episodeArt || cover) as string, sizes: '256x256', type: 'image/png' },
       { src: (episodeArt || cover) as string, sizes: '384x384', type: 'image/png' },
       { src: (episodeArt || cover) as string, sizes: '512x512', type: 'image/png' },
-    ]
+    ],
+    title,
   });
-}
+};

@@ -12,7 +12,7 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -21,9 +21,9 @@ import {
 
 import Settings from '../components/Settings';
 
-const mapState = (state: State) => state.app;
+const mapState = (state: IState) => state.app;
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   changeTheme,
 }, dispatch);
 

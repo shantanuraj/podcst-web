@@ -8,33 +8,33 @@ import {
 
 let globalHowl: Howl;
 
-interface AudioCallbacks {
+interface IAudioCallbacks {
   seekUpdate(seekPosition: number, duration: number);
   setBuffer(buffering: boolean);
   stopEpisode();
 }
 
-const noop = () => console.log('Audio.init not called!');
+const throwErr = () => { throw new Error('Audio.init not called!'); };
 
 class Audio {
-  static callbacks: AudioCallbacks = {
-    seekUpdate: noop,
-    setBuffer: noop,
-    stopEpisode: noop,
+  public static callbacks: IAudioCallbacks = {
+    seekUpdate: throwErr,
+    setBuffer: throwErr,
+    stopEpisode: throwErr,
   };
 
-  static init(callbacks: AudioCallbacks) {
+  public static init(callbacks: IAudioCallbacks) {
     Audio.callbacks = callbacks;
   }
 
-  static play(episode: App.Episode) {
+  public static play(episode: App.Episode) {
     if (globalHowl) {
       Audio.stop();
     }
     globalHowl = new Howl({
       src: [episode.file.url],
-      autoplay: true,
       html5: true,
+      autoplay: true,
       onload() {
         Audio.callbacks.setBuffer(false);
       },
@@ -44,7 +44,7 @@ class Audio {
 
           Audio.callbacks.seekUpdate(
             seekPosition,
-            globalHowl.duration()
+            globalHowl.duration(),
           );
 
           if (globalHowl.playing()) {
@@ -55,28 +55,28 @@ class Audio {
       },
       onend() {
         Audio.callbacks.stopEpisode();
-      }
+      },
     });
   }
 
-  static pause() {
+  public static pause() {
     globalHowl && globalHowl.pause();
   }
 
-  static resume() {
+  public static resume() {
     globalHowl && globalHowl.play();
   }
 
-  static stop() {
+  public static stop() {
     globalHowl && globalHowl.stop();
   }
 
-  static skipTo(episode: App.Episode) {
+  public static skipTo(episode: App.Episode) {
     Audio.pause();
     Audio.play(episode);
   }
 
-  static seekTo(position: number) {
+  public static seekTo(position: number) {
     globalHowl && globalHowl.seek(position);
   }
 }

@@ -7,11 +7,19 @@ import {
 } from 'preact';
 
 import {
+  Link,
+} from 'preact-router';
+
+import {
   media,
   style,
 } from 'typestyle';
 
 import Icon from '../svg/Icon';
+
+import {
+  IEpisodeInfo,
+} from '../stores/player';
 
 const infoContainer = (theme: App.Theme) => style(
   {
@@ -24,6 +32,11 @@ const infoContainer = (theme: App.Theme) => style(
     boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
   }),
 );
+
+const linkContainer = style({
+  height: '100%',
+  display: 'flex',
+});
 
 const episodeImage = (image: string) => style({
   backgroundImage: `url(${image})`,
@@ -64,8 +77,8 @@ const playButton = style({
   outline: 0,
 });
 
-interface PlayerInfoProps {
-  episode: App.Episode;
+interface IPlayerInfoProps {
+  episode: IEpisodeInfo;
   state: EpisodePlayerState;
   theme: App.Theme;
   pause();
@@ -76,6 +89,7 @@ const PlayerInfo = ({
   episode: {
     author,
     cover,
+    feed,
     episodeArt,
     title,
   },
@@ -83,7 +97,7 @@ const PlayerInfo = ({
   resume,
   state,
   theme,
-}: PlayerInfoProps) => (
+}: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
     <button
       aria-label={state === 'playing' ? 'Pause' : 'Play'}
@@ -94,19 +108,24 @@ const PlayerInfo = ({
         icon={state === 'playing' ? 'pause' : 'play'}
       />
     </button>
-    <div
-      class={episodeImage(episodeArt || cover as string)}
-      role="img"
-      aria-label={`${title} episode art`}
-    />
-    <div class={episodeInfo}>
-      <p>
-        {title}
-      </p>
-      <p>
-        {author}
-      </p>
-    </div>
+    <Link
+      class={linkContainer}
+      href={`/episode?feed=${feed}&title=${encodeURIComponent(title)}`}
+    >
+      <div
+        class={episodeImage(episodeArt || cover as string)}
+        role="img"
+        aria-label={`${title} episode art`}
+      />
+      <div class={episodeInfo}>
+        <p>
+          {title}
+        </p>
+        <p>
+          {author}
+        </p>
+      </div>
+    </Link>
   </div>
 );
 

@@ -3,62 +3,62 @@
  */
 
 import {
-  Epic
+  Epic,
 } from 'redux-observable';
 
 import Podcasts from '../api/Podcasts';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
-interface GetEpisodesAction {
+interface IGetEpisodesAction {
   type: 'GET_EPISODES';
   feed: App.Podcast['feed'];
 }
-const GET_EPISODES: GetEpisodesAction['type'] = 'GET_EPISODES';
-export const getEpisodes = (feed: string): GetEpisodesAction => ({
+const GET_EPISODES: IGetEpisodesAction['type'] = 'GET_EPISODES';
+export const getEpisodes = (feed: string): IGetEpisodesAction => ({
   type: GET_EPISODES,
   feed,
 });
 
-interface GetEpisodesSuccessAction {
+interface IGetEpisodesSuccessAction {
   type: 'GET_EPISODES_SUCCESS';
-  feed: App.Podcast['feed'];
   episodes: App.EpisodeListing | null;
+  feed: App.Podcast['feed'];
 }
-const GET_EPISODES_SUCCESS: GetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
+const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
 export const getEpisodesSuccess = (
   feed: string,
   episodes: App.EpisodeListing | null,
-): GetEpisodesSuccessAction => ({
+): IGetEpisodesSuccessAction => ({
   type: GET_EPISODES_SUCCESS,
   episodes,
   feed,
 });
 
 export type PodcastsAction =
-  GetEpisodesAction |
-  GetEpisodesSuccessAction;
+  IGetEpisodesAction |
+  IGetEpisodesSuccessAction;
 
-export interface PodcastsState {
+export interface IPodcastsState {
   [feed: string]: {
     episodes: App.EpisodeListing | null;
     loading: boolean;
   };
-};
+}
 
 // Get episodes epic
-export const getEpisodesEpic: Epic<PodcastsAction, State> = action$ =>
+export const getEpisodesEpic: Epic<PodcastsAction, IState> = (action$) =>
   action$
     .ofType(GET_EPISODES)
-    .mergeMap((action: GetEpisodesAction) =>
+    .mergeMap((action: IGetEpisodesAction) =>
       Podcasts
         .episodes(action.feed)
-        .map(episodes => getEpisodesSuccess(action.feed, episodes))
+        .map((episodes) => getEpisodesSuccess(action.feed, episodes)),
     );
 
-export const podcasts = (state: PodcastsState = {}, action: PodcastsAction): PodcastsState => {
+export const podcasts = (state: IPodcastsState = {}, action: PodcastsAction): IPodcastsState => {
   switch (action.type) {
     case GET_EPISODES:
       return {...state, [action.feed]: {
@@ -68,10 +68,10 @@ export const podcasts = (state: PodcastsState = {}, action: PodcastsAction): Pod
     case GET_EPISODES_SUCCESS:
       return {...state, [action.feed]: {
         ...state[action.feed],
-        loading: false,
         episodes: action.episodes,
+        loading: false,
       }};
     default:
       return state;
   }
-}
+};

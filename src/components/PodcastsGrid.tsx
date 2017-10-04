@@ -3,8 +3,8 @@
  */
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -12,7 +12,8 @@ import {
 } from 'typestyle';
 
 import {
-  FeedState,
+  IFeedData,
+  IFeedState,
 } from '../stores/feed';
 
 import Loading from './Loading';
@@ -24,21 +25,21 @@ const grid = style({
   marginBottom: '64px',
 });
 
-interface FeedStateProps extends FeedState {
+interface IFeedStateProps extends IFeedState {
   mode: 'feed';
   feed: FeedType;
   getFeed: (feed: FeedType) => void;
 }
 
-interface SubsStateProps {
+interface ISubsStateProps {
   mode: 'subs';
   subs: SubscriptionsMap;
 }
 
-type PodcastsGridProps = FeedStateProps | SubsStateProps;
+type PodcastsGridProps = IFeedStateProps | ISubsStateProps;
 
 class PodcastsGrid extends Component<PodcastsGridProps, any> {
-  componentDidMount() {
+  public componentDidMount() {
     if (this.props.mode === 'subs') {
       return;
     }
@@ -57,17 +58,17 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     }
   }
 
-  renderLoading() {
+  public renderLoading() {
     return <Loading />;
   }
 
-  renderPodcast(podcast: App.RenderablePodcast) {
+  public renderPodcast(podcast: App.RenderablePodcast) {
     return (
       <PodcastsGridItem podcast={podcast} />
     );
   }
 
-  renderLoaded(podcasts: App.RenderablePodcast[]) {
+  public renderLoaded(podcasts: App.RenderablePodcast[]) {
     return (
       <div class={grid}>
         {podcasts.map(this.renderPodcast)}
@@ -75,18 +76,18 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     );
   }
 
-  render({
+  public render({
     mode,
   }: PodcastsGridProps) {
 
     if (mode === 'feed') {
       const {
         feed,
-      } = this.props as FeedStateProps;
+      } = this.props as IFeedStateProps;
       const {
         loading,
         podcasts,
-      } = this.props[feed];
+      } = this.props[feed] as IFeedData;
 
       if (loading || podcasts.length === 0) {
         return this.renderLoading();
@@ -97,16 +98,16 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
 
     const {
       subs,
-    } = this.props as SubsStateProps;
+    } = this.props as ISubsStateProps;
 
-    const podcasts = Object
+    const renderablePodcasts = Object
       .keys(subs)
-      .map(feed => ({
+      .map((feed) => ({
         ...subs[feed],
         feed,
       }));
 
-    return this.renderLoaded(podcasts);
+    return this.renderLoaded(renderablePodcasts);
   }
 }
 

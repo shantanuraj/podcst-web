@@ -1,13 +1,18 @@
-import { h, Component } from 'preact';
+import { Component, h } from 'preact';
 import {
+  classes,
   media,
   style,
   types,
 } from 'typestyle';
 
 import {
-  PodcastsState,
+  IPodcastsState,
 } from '../stores/podcasts';
+
+import {
+  IEpisodeInfo,
+} from '../stores/player';
 
 import {
   scrollToTop,
@@ -18,8 +23,8 @@ import {
   normalizeEl,
 } from '../utils/styles';
 
+import EpisodeRow from './EpisodeRow';
 import Loading from './Loading';
-import Episode from './Episode';
 
 const episodesContainer = (theme: App.Theme) => style({
   backgroundColor: theme.background,
@@ -56,8 +61,10 @@ const podcastInfo = style(
 const podcastInfoTitles = (theme: App.Theme) => style({
   display: 'flex',
   flexDirection: 'column',
-  justifyContent: 'center',
+  alignItems: 'flex-start',
+  justifyContent: 'flex-start',
   padding: 16,
+  paddingTop: 0,
   $nest: {
     '& a': {
       color: theme.accent,
@@ -115,23 +122,23 @@ const episodesView = style({
   },
 }));
 
-interface EpisodesProps {
+interface IEpisodesProps {
   theme: App.Theme;
   feed: string;
-  info: PodcastsState;
+  info: IPodcastsState;
   state: EpisodePlayerState;
   currentEpisode: App.Episode | null;
   subscriptions: SubscriptionsMap;
   getEpisodes: (feed: string) => void;
-  playEpisode: (episode: App.Episode) => void;
+  playEpisode: (episode: IEpisodeInfo) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
   addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
   removeSubscription: (feed: string) => void;
 }
 
-class Episodes extends Component<EpisodesProps, any> {
-  loadIfNeeded = () => {
+class Episodes extends Component<IEpisodesProps, any> {
+  public loadIfNeeded = () => {
     const {
       feed,
       getEpisodes,
@@ -148,20 +155,20 @@ class Episodes extends Component<EpisodesProps, any> {
     }
   }
 
-  componentDidMount() {
+  public componentDidMount() {
     this.loadIfNeeded();
     scrollToTop();
   }
 
-  componentDidUpdate() {
+  public componentDidUpdate() {
     this.loadIfNeeded();
   }
 
-  renderLoading() {
-    return <Loading />
+  public renderLoading() {
+    return <Loading />;
   }
 
-  renderEpisode = (episode: App.Episode) => {
+  public renderEpisode = (episode: App.Episode) => {
     const {
       currentEpisode,
       playEpisode,
@@ -169,10 +176,12 @@ class Episodes extends Component<EpisodesProps, any> {
       resumeEpisode,
       state,
       theme,
+      feed,
     } = this.props;
 
     return (
-      <Episode
+      <EpisodeRow
+        feed={feed}
         episode={episode}
         pause={pauseEpisode}
         play={playEpisode}
@@ -184,7 +193,7 @@ class Episodes extends Component<EpisodesProps, any> {
     );
   }
 
-  renderLoaded(feed: string, info: App.EpisodeListing | null) {
+  public renderLoaded(feed: string, info: App.EpisodeListing | null) {
     if (!info) {
       return (
         <div>
@@ -216,11 +225,11 @@ class Episodes extends Component<EpisodesProps, any> {
     const handler = () => {
       isSubscribed ?
         removeSubscription(feed) :
-        addSubscription(feed, {...info, feed})
+        addSubscription(feed, {...info, feed});
     };
 
     return (
-      <div class={`${normalizeEl} ${episodesContainer(theme)}`}>
+      <div class={classes(normalizeEl, episodesContainer(theme))}>
         <div class={podcastInfo}>
           <div
             class={infoCover(cover)}
@@ -249,10 +258,10 @@ class Episodes extends Component<EpisodesProps, any> {
     );
   }
 
-  render({
+  public render({
     feed,
     info,
-  }: EpisodesProps) {
+  }: IEpisodesProps) {
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading) {
       return this.renderLoading();

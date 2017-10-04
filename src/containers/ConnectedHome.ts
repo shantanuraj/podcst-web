@@ -12,7 +12,7 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -21,12 +21,12 @@ import {
 
 import Home from '../components/Home';
 
-const mapState = (state: State) => ({
+const mapState = (state: IState) => ({
   ...state.subscriptions,
   theme: state.app.theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   parseOPML,
 }, dispatch);
 

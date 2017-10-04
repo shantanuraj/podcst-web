@@ -7,12 +7,12 @@ import {
 } from 'preact-redux';
 
 import {
-  Dispatch,
   bindActionCreators,
+  Dispatch,
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
@@ -21,9 +21,9 @@ import {
 
 import PodcastsGrid from '../components/PodcastsGrid';
 
-const mapState = (state: State) => state.feed;
+const mapState = (state: IState) => state.feed;
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   getFeed,
 }, dispatch);
 

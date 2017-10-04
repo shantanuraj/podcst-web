@@ -11,4 +11,4 @@ export const ThemeProvider = (mode: App.ThemeMode): App.Theme => {
   } else {
     return darkTheme;
   }
-}
+};

@@ -24,7 +24,7 @@ const navLink = (theme: App.Theme) => style({
   color: theme.text,
 });
 
-export interface LinkMap {
+export interface ILinkMap {
   [link: string]: string;
 }
 
@@ -34,20 +34,20 @@ const renderLink = (theme: App.Theme, link: string, title: string) => (
   </Link>
 );
 
-const renderLinks = (theme: App.Theme, linkMap: LinkMap) =>
+const renderLinks = (theme: App.Theme, linkMap: ILinkMap) =>
   Object
   .keys(linkMap)
-  .map(link => renderLink(theme, link, linkMap[link]));
+  .map((link) => renderLink(theme, link, linkMap[link]));
 
-interface NavLinksProps {
-  links: LinkMap,
-  theme: App.Theme,
+interface INavLinksProps {
+  links: ILinkMap;
+  theme: App.Theme;
 }
 
 const NavLinks = ({
   theme,
   links,
-}: NavLinksProps) => (
+}: INavLinksProps) => (
   <nav class={navLinks}>
     {renderLinks(theme, links)}
   </nav>

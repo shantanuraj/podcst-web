@@ -12,27 +12,27 @@ import {
 } from 'redux';
 
 import {
-  State,
+  IState,
 } from '../stores/root';
 
 import {
+  manualSeekUpdate,
   pauseEpisode,
   resumeEpisode,
   skipToNextEpisode,
   skipToPrevEpisode,
-  manualSeekUpdate,
 } from '../stores/player';
 
 import Player from '../components/Player';
 
-const mapState = (state: State) => state.player;
+const mapState = (state: IState) => state.player;
 
-const mapDispatch = (dispatch: Dispatch<State>) => bindActionCreators({
+const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
+  onSeek: manualSeekUpdate,
   pause: pauseEpisode,
   resume: resumeEpisode,
-  skipToNext: skipToNextEpisode,
   skipToPrev: skipToPrevEpisode,
-  onSeek: manualSeekUpdate,
+  skipToNext: skipToNextEpisode,
 }, dispatch);
 
 const ConnectedPlayer = connect(

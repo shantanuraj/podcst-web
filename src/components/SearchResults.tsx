@@ -4,15 +4,15 @@
 
 import {
   Observable,
-} from 'rxjs/Observable'
+} from 'rxjs/Observable';
 
 import {
   Subscription,
-} from 'rxjs/Subscription'
+} from 'rxjs/Subscription';
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -71,7 +71,7 @@ const resultAuthorText = style({
   fontWeight: 300,
 });
 
-interface SearchResultsProps {
+interface ISearchResultsProps {
   podcasts: App.Podcast[];
   focusedResult: number;
   theme: App.Theme;
@@ -87,20 +87,20 @@ const Key: KeyboardShortcutsMap = {
   13: 'select',
 };
 
-class SearchResults extends Component<SearchResultsProps, any> {
+class SearchResults extends Component<ISearchResultsProps, any> {
 
-  el: HTMLDivElement | null;
-  navigationSub: Subscription | null;
+  public el: HTMLDivElement | null;
+  public navigationSub: Subscription | null;
 
-  componentDidMount() {
+  public componentDidMount() {
     this.watchKeyboard();
   }
 
-  componentWillUnmount() {
+  public componentWillUnmount() {
     this.navigationSub && this.navigationSub.unsubscribe();
   }
 
-  watchKeyboard() {
+  public watchKeyboard() {
     if (this.el) {
       const parent = this.el.parentElement;
       if (parent) {
@@ -112,7 +112,7 @@ class SearchResults extends Component<SearchResultsProps, any> {
             case 'up':
             case 'down': {
               return this.props.navigateResult(
-                Key[e.keyCode] as 'up' | 'down'
+                Key[e.keyCode] as 'up' | 'down',
               );
             }
             case 'select': {
@@ -134,12 +134,12 @@ class SearchResults extends Component<SearchResultsProps, any> {
     }
   }
 
-  renderPodcast = (
+  public renderPodcast = (
     podcast: App.Podcast,
     isFocussed: boolean,
     focusResult: () => void,
-    dismissSearch: SearchResultsProps['dismissSearch'],
-    theme: SearchResultsProps['theme'],
+    dismissSearch: ISearchResultsProps['dismissSearch'],
+    theme: ISearchResultsProps['theme'],
   ) => (
     <Link
       onClick={dismissSearch}
@@ -169,12 +169,12 @@ class SearchResults extends Component<SearchResultsProps, any> {
     </Link>
   )
 
-  renderPodcasts = (
+  public renderPodcasts = (
     podcasts: App.Podcast[],
     focusedResult: number,
-    focusResult: SearchResultsProps['focusResult'],
-    dismissSearch: SearchResultsProps['dismissSearch'],
-    theme: SearchResultsProps['theme'],
+    focusResult: ISearchResultsProps['focusResult'],
+    dismissSearch: ISearchResultsProps['dismissSearch'],
+    theme: ISearchResultsProps['theme'],
   ) => (
     podcasts.map((podcast, i) => this.renderPodcast(
       podcast,
@@ -185,25 +185,25 @@ class SearchResults extends Component<SearchResultsProps, any> {
     ))
   )
 
-  render({
+  public render({
     dismissSearch,
     focusResult,
     focusedResult,
     podcasts,
     theme,
-  }: SearchResultsProps) {
+  }: ISearchResultsProps) {
     return (
       <div
         class={results(theme)}
         onClick={dismissSearch}
-        ref={el => this.el = el as HTMLDivElement}
+        ref={(el) => this.el = el as HTMLDivElement}
       >
         {this.renderPodcasts(
           podcasts,
           focusedResult,
           focusResult,
           dismissSearch,
-          theme
+          theme,
         )}
       </div>
     );
