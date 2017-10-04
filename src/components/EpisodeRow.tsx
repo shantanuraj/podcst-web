@@ -7,6 +7,10 @@ import {
 } from 'preact';
 
 import {
+  Link,
+} from 'preact-router';
+
+import {
   media,
   style,
 } from 'typestyle';
@@ -123,6 +127,7 @@ const renderButton = ({
 const EpisodeRow = (props: IEpisodeRowProps) => {
   const {
     episode,
+    feed,
     theme,
   } = props;
 
@@ -148,9 +153,12 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
             <p>{day}</p>
           </div>
         </div>
-        <div class={episodeTitle}>
+        <Link
+          class={episodeTitle}
+          href={`/episode?feed=${feed}&title=${title}`}
+        >
           {title}
-        </div>
+        </Link>
         <div class={subContainerTheme}>
           <p>{minutes || ''}</p>
           <p>{minutes ? minutesSuffix : ''}</p>
