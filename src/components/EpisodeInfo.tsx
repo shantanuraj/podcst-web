@@ -35,7 +35,6 @@ const podcastInfo = style(
   {
     display: 'flex',
     padding: 32,
-    paddingBottom: 0,
   },
   media({ maxWidth: 600 }, {
     flexDirection: 'column',
@@ -84,6 +83,14 @@ const podcastTitle = style(
     fontWeight: 'bold',
   },
 );
+
+const showNotesContainer = style({
+  padding: 32,
+  paddingTop: 0,
+  fontSize: 'large',
+}, media({ maxWidth: 600 }, {
+  padding: 16,
+}));
 
 interface IEpisodeInfoProps {
   feed: string;
@@ -145,6 +152,7 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
       author,
       cover,
       episodeArt,
+      showNotes,
       title,
     } = episode;
 
@@ -166,6 +174,10 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
             <h2 class={infoMargins}>by {author}</h2>
           </div>
         </div>
+        <div
+          class={showNotesContainer}
+          dangerouslySetInnerHTML={{__html: showNotes}}
+        />
       </div>
     );
   }
