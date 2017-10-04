@@ -91,6 +91,9 @@ const showNotesContainer = style({
   paddingTop: 0,
   fontSize: 'large',
   $nest: {
+    '&[data-is-player-visible]': {
+      paddingBottom: 64,
+    },
     '& *': {
       marginTop: 16,
       marginBottom: 16,
@@ -98,6 +101,11 @@ const showNotesContainer = style({
   },
 }, media({ maxWidth: 600 }, {
   padding: 16,
+  $nest: {
+    '&[data-is-player-visible]': {
+      paddingBottom: 128,
+    },
+  },
 }));
 
 interface IEpisodeInfoProps {
@@ -155,7 +163,10 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
       );
     }
 
-    const { theme } = this.props;
+    const {
+      state,
+      theme,
+    } = this.props;
     const {
       author,
       cover,
@@ -165,6 +176,7 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
     } = episode;
 
     const showArt = episodeArt || cover as string;
+    const isPlayerVisible = state !== 'stopped';
 
     return (
       <div class={container(theme)}>
@@ -183,6 +195,7 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
           </div>
         </div>
         <div
+          data-is-player-visible={isPlayerVisible}
           class={showNotesContainer}
           dangerouslySetInnerHTML={{__html: showNotes}}
         />
