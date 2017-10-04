@@ -12,7 +12,8 @@ import {
   style,
 } from 'typestyle';
 
-import Router from 'preact-router';
+import { Router } from 'preact-router';
+import Match from 'preact-router/match';
 
 import {
   fixGlobalStyles,
@@ -24,6 +25,10 @@ import Audio from '../utils/audio';
 import {
   IAppState,
 } from '../stores/app';
+
+import {
+  IMatchProps,
+} from '../stores/router';
 
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
@@ -45,6 +50,7 @@ interface IAppProps extends IAppState {
   appInit();
   pauseEpisode();
   resumeEpisode();
+  routerNavigate(props: IMatchProps);
   seekUpdate(seekPosition: number, duration: number);
   setBuffer(buffering: boolean);
   skipToNextEpisode();
@@ -86,7 +92,7 @@ class App extends Component<IAppProps, never> {
   }
 
   public render() {
-    const { theme, version } = this.props;
+    const { theme, version, routerNavigate } = this.props;
     return (
       <div class={normalizeEl}>
         <Toolbar theme={theme} />
@@ -103,6 +109,7 @@ class App extends Component<IAppProps, never> {
           </Router>
         </main>
         <ConnectedPlayer theme={theme} />
+        <Match>{routerNavigate}</Match>
       </div>
     );
   }

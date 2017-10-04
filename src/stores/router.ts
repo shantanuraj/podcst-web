@@ -14,31 +14,49 @@ import {
   IState,
 } from '../stores/root';
 
-type Navigate = 'NAVIGATE';
-const NAVIGATE: Navigate = 'NAVIGATE';
-interface INavigateAction {
-  type: Navigate;
-  route: string;
-}
-
 /**
  * Action creator for navigating between routes
  */
+interface INavigateAction {
+  type: 'NAVIGATE';
+  route: string;
+}
+const NAVIGATE: INavigateAction['type'] = 'NAVIGATE';
 export const navigate = (route: string): INavigateAction => ({
   type: NAVIGATE,
   route,
 });
 
-type NavigationComplete = 'NAVIGATION_COMPLETE';
-const NAVIGATION_COMPLETE: NavigationComplete = 'NAVIGATION_COMPLETE';
-interface INavigationCompleteAction {
-  type: NavigationComplete;
-  route: string;
+/**
+ * Props from Match component of preact-router
+ */
+export interface IMatchProps {
+  url: string;
+  path: string;
+  matches: boolean;
 }
 
 /**
- * Action creator for navigating between routes
+ * Router Navigate action to keep router state in sync
  */
+interface IRouterNavigateAction {
+  type: 'ROUTER_NAVIGATE';
+  route: string;
+}
+const ROUTER_NAVIGATE: IRouterNavigateAction['type'] = 'ROUTER_NAVIGATE';
+export const routerNavigate = (route: string): IRouterNavigateAction => ({
+  type: ROUTER_NAVIGATE,
+  route,
+});
+
+/**
+ * Action creator for completing navigation
+ */
+interface INavigationCompleteAction {
+  type: 'NAVIGATION_COMPLETE';
+  route: string;
+}
+const NAVIGATION_COMPLETE: INavigationCompleteAction['type'] = 'NAVIGATION_COMPLETE';
 const navigationComplete = (route: string): INavigationCompleteAction => ({
   type: NAVIGATION_COMPLETE,
   route,
@@ -46,6 +64,7 @@ const navigationComplete = (route: string): INavigationCompleteAction => ({
 
 export type RouterActions =
   INavigateAction |
+  IRouterNavigateAction |
   INavigationCompleteAction;
 
 /**
@@ -75,6 +94,7 @@ export const router = (
 ): IRouterState => {
   switch (action.type) {
     case NAVIGATE:
+    case ROUTER_NAVIGATE:
       return { ...state, path: action.route };
     default:
       return state;
