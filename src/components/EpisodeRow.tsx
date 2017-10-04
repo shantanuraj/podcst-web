@@ -155,7 +155,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
         </div>
         <Link
           class={episodeTitle}
-          href={`/episode?feed=${feed}&title=${title}`}
+          href={`/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`}
         >
           {title}
         </Link>
