@@ -6,12 +6,18 @@ import { Component, h } from 'preact';
 
 import {
   classes,
+  media,
   style,
+  types,
 } from 'typestyle';
 
 import {
   IPodcastsState,
 } from '../stores/podcasts';
+
+import {
+  scrollToTop,
+} from '../utils';
 
 import {
   normalizeEl,
@@ -22,9 +28,62 @@ import Loading from './Loading';
 const container = (theme: App.Theme) => style({
   color: theme.text,
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  flexDirection: 'column',
 });
+
+const podcastInfo = style(
+  {
+    display: 'flex',
+    padding: 32,
+    paddingBottom: 0,
+  },
+  media({ maxWidth: 600 }, {
+    flexDirection: 'column',
+    padding: 0,
+  }),
+);
+
+const podcastInfoTitles = (theme: App.Theme) => style({
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  padding: 16,
+  $nest: {
+    '& a': {
+      color: theme.accent,
+    },
+  },
+});
+
+const infoCover = (cover: string) => style(
+  {
+    backgroundImage: `url(${cover})`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'cover',
+    width: '300px',
+    height: '300px',
+    minWidth: '300px',
+  },
+  media({ maxWidth: 600 }, {
+    width: '100vw',
+    height: '100vw',
+  }),
+);
+
+const margins: types.NestedCSSProperties = {
+  marginTop: 8,
+  marginBottom: 8,
+};
+
+const infoMargins = style(margins);
+
+const podcastTitle = style(
+  margins,
+  {
+    fontSize: '40px',
+    fontWeight: 'bold',
+  },
+);
 
 interface IEpisodeInfoProps {
   feed: string;
@@ -58,6 +117,7 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
 
   public componentDidMount() {
     this.loadIfNeeded();
+    scrollToTop();
   }
 
   public componentDidUpdate() {
@@ -81,10 +141,31 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
     }
 
     const { theme } = this.props;
+    const {
+      author,
+      cover,
+      episodeArt,
+      title,
+    } = episode;
+
+    const showArt = episodeArt || cover as string;
 
     return (
       <div class={classes(normalizeEl, container(theme))}>
-        Loaded! {episode.title} by {podcast.author} from {podcast.title}
+        <div class={podcastInfo}>
+          <div
+            class={infoCover(showArt)}
+            role="img"
+            aria-label={`${title} episode art`}
+          />
+          <div class={podcastInfoTitles(theme)}>
+            <h1 class={podcastTitle}>
+              {episode.link ? <a href={podcast.link}>{title}</a> : {title}}
+            </h1>
+            <h2 class={infoMargins}>from <a href={podcast.link}>{podcast.title}</a></h2>
+            <h2 class={infoMargins}>by {author}</h2>
+          </div>
+        </div>
       </div>
     );
   }
