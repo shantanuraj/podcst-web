@@ -202,10 +202,7 @@ export const seekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
   action$
     .ofType(SEEK_UPDATE)
     .throttleTime(1000)
-    .map(
-      (action: ISeekUpdateAction) =>
-        seekUpdateSuccess(action.seekPosition, action.duration),
-    );
+    .map((action: ISeekUpdateAction) => seekUpdateSuccess(action.seekPosition, action.duration));
 
 export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
   action$
