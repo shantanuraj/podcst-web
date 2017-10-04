@@ -57,8 +57,10 @@ const podcastInfo = style(
 const podcastInfoTitles = (theme: App.Theme) => style({
   display: 'flex',
   flexDirection: 'column',
-  justifyContent: 'center',
+  alignItems: 'flex-start',
+  justifyContent: 'flex-start',
   padding: 16,
+  paddingTop: 0,
   $nest: {
     '& a': {
       color: theme.accent,
