@@ -17,6 +17,10 @@ import {
 
 import Icon from '../svg/Icon';
 
+import {
+  IEpisodeInfo,
+} from '../stores/player';
+
 const infoContainer = (theme: App.Theme) => style(
   {
     height: '100%',
@@ -74,7 +78,7 @@ const playButton = style({
 });
 
 interface IPlayerInfoProps {
-  episode: App.Episode;
+  episode: IEpisodeInfo;
   state: EpisodePlayerState;
   theme: App.Theme;
   pause();
@@ -85,6 +89,7 @@ const PlayerInfo = ({
   episode: {
     author,
     cover,
+    feed,
     episodeArt,
     title,
   },
@@ -105,7 +110,7 @@ const PlayerInfo = ({
     </button>
     <Link
       class={linkContainer}
-      href={`/episode?feed={}&title=${encodeURIComponent(title)}`}
+      href={`/episode?feed=${feed}&title=${encodeURIComponent(title)}`}
     >
       <div
         class={episodeImage(episodeArt || cover as string)}

@@ -11,6 +11,10 @@ import {
 } from '../stores/podcasts';
 
 import {
+  IEpisodeInfo,
+} from '../stores/player';
+
+import {
   scrollToTop,
   stripHost,
 } from '../utils';
@@ -126,7 +130,7 @@ interface IEpisodesProps {
   currentEpisode: App.Episode | null;
   subscriptions: SubscriptionsMap;
   getEpisodes: (feed: string) => void;
-  playEpisode: (episode: App.Episode) => void;
+  playEpisode: (episode: IEpisodeInfo) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
   addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
@@ -172,10 +176,12 @@ class Episodes extends Component<IEpisodesProps, any> {
       resumeEpisode,
       state,
       theme,
+      feed,
     } = this.props;
 
     return (
       <EpisodeRow
+        feed={feed}
         episode={episode}
         pause={pauseEpisode}
         play={playEpisode}

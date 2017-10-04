@@ -15,6 +15,10 @@ import {
   monthName,
 } from '../utils';
 
+import {
+  IEpisodeInfo,
+} from '../stores/player';
+
 const episodeContainer = (theme: App.Theme) => style({
   paddingTop: 16,
   paddingBottom: 16,
@@ -77,15 +81,17 @@ const playButton = (theme: App.Theme) => style({
 interface IEpisodeRowProps {
   episode: App.Episode;
   currentEpisode: App.Episode | null;
+  feed: string;
   state: EpisodePlayerState;
   theme: App.Theme;
-  play: (episode: App.Episode) => void;
+  play: (episode: IEpisodeInfo) => void;
   resume: () => void;
   pause: () => void;
 }
 
 const renderButton = ({
   currentEpisode,
+  feed,
   episode,
   play,
   pause,
@@ -97,7 +103,7 @@ const renderButton = ({
   const isPlaying = isCurrent && state === 'playing';
   const isPaused  = isCurrent && state === 'paused';
 
-  const playEpisode = () => play(episode);
+  const playEpisode = () => play({...episode, feed});
 
   const handler = isPlaying ? pause : (isPaused ? resume : playEpisode);
   const text = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play');
