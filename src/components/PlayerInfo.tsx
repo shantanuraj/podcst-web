@@ -7,6 +7,10 @@ import {
 } from 'preact';
 
 import {
+  Link,
+} from 'preact-router';
+
+import {
   media,
   style,
 } from 'typestyle';
@@ -24,6 +28,11 @@ const infoContainer = (theme: App.Theme) => style(
     boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
   }),
 );
+
+const linkContainer = style({
+  height: '100%',
+  display: 'flex',
+});
 
 const episodeImage = (image: string) => style({
   backgroundImage: `url(${image})`,
@@ -94,19 +103,24 @@ const PlayerInfo = ({
         icon={state === 'playing' ? 'pause' : 'play'}
       />
     </button>
-    <div
-      class={episodeImage(episodeArt || cover as string)}
-      role="img"
-      aria-label={`${title} episode art`}
-    />
-    <div class={episodeInfo}>
-      <p>
-        {title}
-      </p>
-      <p>
-        {author}
-      </p>
-    </div>
+    <Link
+      class={linkContainer}
+      href={`/episode?feed={}&title=${encodeURIComponent(title)}`}
+    >
+      <div
+        class={episodeImage(episodeArt || cover as string)}
+        role="img"
+        aria-label={`${title} episode art`}
+      />
+      <div class={episodeInfo}>
+        <p>
+          {title}
+        </p>
+        <p>
+          {author}
+        </p>
+      </div>
+    </Link>
   </div>
 );
 
