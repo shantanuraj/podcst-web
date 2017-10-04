@@ -5,7 +5,6 @@
 import { Component, h } from 'preact';
 
 import {
-  classes,
   media,
   style,
   types,
@@ -20,7 +19,7 @@ import {
 } from '../utils';
 
 import {
-  normalizeEl,
+
 } from '../utils/styles';
 
 import Loading from './Loading';
@@ -29,6 +28,11 @@ const container = (theme: App.Theme) => style({
   color: theme.text,
   display: 'flex',
   flexDirection: 'column',
+  $nest: {
+    '& a': {
+      color: theme.accent,
+    },
+  },
 });
 
 const podcastInfo = style(
@@ -42,18 +46,13 @@ const podcastInfo = style(
   }),
 );
 
-const podcastInfoTitles = (theme: App.Theme) => style({
+const podcastInfoTitles = style({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-start',
   justifyContent: 'flex-start',
   padding: 16,
   paddingTop: 0,
-  $nest: {
-    '& a': {
-      color: theme.accent,
-    },
-  },
 });
 
 const infoCover = (cover: string) => style(
@@ -90,6 +89,12 @@ const showNotesContainer = style({
   padding: 32,
   paddingTop: 0,
   fontSize: 'large',
+  $nest: {
+    '& *': {
+      marginTop: 16,
+      marginBottom: 16,
+    },
+  },
 }, media({ maxWidth: 600 }, {
   padding: 16,
 }));
@@ -161,14 +166,14 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
     const showArt = episodeArt || cover as string;
 
     return (
-      <div class={classes(normalizeEl, container(theme))}>
+      <div class={container(theme)}>
         <div class={podcastInfo}>
           <div
             class={infoCover(showArt)}
             role="img"
             aria-label={`${title} episode art`}
           />
-          <div class={podcastInfoTitles(theme)}>
+          <div class={podcastInfoTitles}>
             <h1 class={podcastTitle}>
               {episode.link ? <a href={podcast.link}>{title}</a> : {title}}
             </h1>
