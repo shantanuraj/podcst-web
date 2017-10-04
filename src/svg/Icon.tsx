@@ -10,10 +10,10 @@ import {
   style,
 } from 'typestyle';
 
-import PlayIcon from './PlayIcon';
-import PauseIcon from './PauseIcon';
-import NightIcon from './NightIcon';
 import DayIcon from './DayIcon';
+import NightIcon from './NightIcon';
+import PauseIcon from './PauseIcon';
+import PlayIcon from './PlayIcon';
 import SettingsIcon from './SettingsIcon';
 
 export type IconType =
@@ -30,19 +30,19 @@ interface IconProps {
 
 const getIcon = (icon: IconProps['icon']): JSX.Element => {
   if (icon === 'play') {
-    return <PlayIcon />
+    return <PlayIcon />;
   } else if (icon === 'pause') {
-    return <PauseIcon />
+    return <PauseIcon />;
   } else if (icon === 'settings') {
-    return <SettingsIcon />
+    return <SettingsIcon />;
   } else if (icon === 'night') {
-    return <NightIcon />
+    return <NightIcon />;
   } else if (icon === 'day') {
-    return <DayIcon />
+    return <DayIcon />;
   }
 
-  return <PlayIcon />
-}
+  return <PlayIcon />;
+};
 
 const iconStyle = (fill) => style({
   fill,

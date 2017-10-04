@@ -7,6 +7,10 @@ import {
 } from 'preact';
 
 import {
+  Link,
+} from 'preact-router';
+
+import {
   media,
   style,
 } from 'typestyle';
@@ -14,6 +18,10 @@ import {
 import {
   monthName,
 } from '../utils';
+
+import {
+  IEpisodeInfo,
+} from '../stores/player';
 
 const episodeContainer = (theme: App.Theme) => style({
   paddingTop: 16,
@@ -74,32 +82,34 @@ const playButton = (theme: App.Theme) => style({
   },
 });
 
-interface EpisodeProps {
+interface IEpisodeRowProps {
   episode: App.Episode;
   currentEpisode: App.Episode | null;
+  feed: string;
   state: EpisodePlayerState;
   theme: App.Theme;
-  play: (episode: App.Episode) => void;
+  play: (episode: IEpisodeInfo) => void;
   resume: () => void;
   pause: () => void;
 }
 
 const renderButton = ({
   currentEpisode,
+  feed,
   episode,
   play,
   pause,
   resume,
   state,
   theme,
-}: EpisodeProps) => {
+}: IEpisodeRowProps) => {
   const isCurrent = currentEpisode === episode;
   const isPlaying = isCurrent && state === 'playing';
   const isPaused  = isCurrent && state === 'paused';
 
-  const play_ = () => play(episode);
+  const playEpisode = () => play({...episode, feed});
 
-  const handler = isPlaying ? pause : (isPaused ? resume : play_);
+  const handler = isPlaying ? pause : (isPaused ? resume : playEpisode);
   const text = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play');
 
   return (
@@ -112,11 +122,12 @@ const renderButton = ({
       {text}
     </button>
   );
-}
+};
 
-const Episode = (props: EpisodeProps) => {
+const EpisodeRow = (props: IEpisodeRowProps) => {
   const {
     episode,
+    feed,
     theme,
   } = props;
 
@@ -142,9 +153,12 @@ const Episode = (props: EpisodeProps) => {
             <p>{day}</p>
           </div>
         </div>
-        <div class={episodeTitle}>
+        <Link
+          class={episodeTitle}
+          href={`/episode?feed=${feed}&title=${title}`}
+        >
           {title}
-        </div>
+        </Link>
         <div class={subContainerTheme}>
           <p>{minutes || ''}</p>
           <p>{minutes ? minutesSuffix : ''}</p>
@@ -157,4 +171,4 @@ const Episode = (props: EpisodeProps) => {
   );
 };
 
-export default Episode;
+export default EpisodeRow;

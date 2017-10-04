@@ -12,7 +12,7 @@ import {
 } from 'typestyle';
 
 import {
-  PlayerState,
+  IPlayerState,
 } from '../stores/player';
 
 import PlayerInfo from './PlayerInfo';
@@ -40,7 +40,7 @@ const player = (theme: App.Theme) => style(
   }),
 );
 
-interface PlayerProps extends PlayerState {
+interface IPlayerProps extends IPlayerState {
   theme: App.Theme;
   pause: () => void;
   resume: () => void;
@@ -60,14 +60,14 @@ const Player = ({
   onSeek,
   buffering,
   theme,
-}: PlayerProps) => {
+}: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
   if (state === 'stopped' || !episode) {
     return null;
   }
 
-  const duration_ = duration || episode.duration || 0;
+  const episodeDuration = duration || episode.duration || 0;
 
   return (
     <div class={player(theme)}>
@@ -81,12 +81,12 @@ const Player = ({
       <Seekbar
         buffering={buffering}
         onSeek={onSeek}
-        duration={duration_}
+        duration={episodeDuration}
         seekPosition={seekPosition}
         theme={theme}
       />
     </div>
   );
-}
+};
 
 export default Player;

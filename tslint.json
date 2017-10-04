@@ -1,0 +1,29 @@
+{
+    "defaultSeverity": "error",
+    "extends": [
+        "tslint:recommended"
+    ],
+    "jsRules": {},
+    "rules": {
+        "member-ordering": [
+            true,
+            {
+              "order": [
+                "static-field",
+                "instance-field",
+                "constructor",
+                "public-instance-method",
+                "protected-instance-method",
+                "private-instance-method"
+              ]
+            }
+        ],
+        "no-unused-expression": [true, "allow-fast-null-checks"],
+        "object-literal-key-quotes": [true, "as-needed"],
+        "object-literal-sort-keys":  false,
+        "quotemark": [true, "single", "jsx-double"],
+        "sort-keys": ["error", "asc", {"caseSensitive": true, "natural": true}],
+        "variable-name": [true, "ban-keywords", "check-format", "allow-pascal-case", "allow-leading-underscore"]
+    },
+    "rulesDirectory": []
+}

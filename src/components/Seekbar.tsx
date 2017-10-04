@@ -3,8 +3,8 @@
  */
 
 import {
-  h,
   Component,
+  h,
 } from 'preact';
 
 import {
@@ -42,7 +42,7 @@ const seekbar = style({
   transition: 'width 1s',
 });
 
-interface SeekbarProps {
+interface ISeekbarProps {
   duration: number;
   seekPosition: number;
   buffering: boolean;
@@ -50,19 +50,38 @@ interface SeekbarProps {
   onSeek: (seekPosition: number, duration: number) => void;
 }
 
-class Seekbar extends Component<SeekbarProps, any> {
+class Seekbar extends Component<ISeekbarProps, any> {
   private el: HTMLDivElement | null = null;
 
-  componentDidMount() {
+  public componentDidMount() {
     if (this.el) {
       this.el.addEventListener('click', this.seekHandler);
     }
   }
 
-  componentWillMount() {
+  public componentWillMount() {
     if (this.el) {
       this.el.removeEventListener('click', this.seekHandler);
     }
+  }
+
+  public render({
+    buffering,
+    duration,
+    seekPosition,
+    theme,
+  }: ISeekbarProps) {
+    return (
+      <div ref={this.saveRef} class={seekbarContainer(theme)}>
+        {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
+        <div
+          class={seekbar}
+          style={{
+            width: `${(seekPosition / duration * 100)}%`,
+          }}
+        />
+      </div>
+    );
   }
 
   private seekHandler = (e: MouseEvent) => {
@@ -82,25 +101,6 @@ class Seekbar extends Component<SeekbarProps, any> {
     if (el) {
       this.el = el as HTMLDivElement;
     }
-  }
-
-  render({
-    buffering,
-    duration,
-    seekPosition,
-    theme,
-  }: SeekbarProps) {
-    return (
-      <div ref={this.saveRef} class={seekbarContainer(theme)}>
-        {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
-        <div
-          style={{
-            width: `${(seekPosition / duration * 100)}%`,
-          }}
-          class={seekbar}
-        />
-      </div>
-    );
   }
 }
 

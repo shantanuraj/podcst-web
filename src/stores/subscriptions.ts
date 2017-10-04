@@ -11,12 +11,12 @@ import {
 } from 'redux-observable';
 
 import {
-  State,
+  IState,
 } from './root';
 
 import {
+  INoopAction,
   noop,
-  NoopAction,
 } from './utils';
 
 import {
@@ -29,54 +29,54 @@ import {
 
 import Podcasts from '../api/Podcasts';
 
-interface AddSubscriptionAction {
+interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
   feed: string;
   podcasts: App.RenderablePodcast;
 }
-const ADD_SUBSCRIPTION: AddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
+const ADD_SUBSCRIPTION: IAddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
 export const addSubscription = (
   feed: string,
   podcasts: App.RenderablePodcast,
-): AddSubscriptionAction => ({
+): IAddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
   podcasts,
 });
 
-interface RemoveSubscriptionAction {
+interface IRemoveSubscriptionAction {
   type: 'REMOVE_SUBSCRIPTION';
   feed: string;
 }
-const REMOVE_SUBSCRIPTION: RemoveSubscriptionAction['type'] = 'REMOVE_SUBSCRIPTION';
-export const removeSubscription = (feed: string): RemoveSubscriptionAction => ({
+const REMOVE_SUBSCRIPTION: IRemoveSubscriptionAction['type'] = 'REMOVE_SUBSCRIPTION';
+export const removeSubscription = (feed: string): IRemoveSubscriptionAction => ({
   type: REMOVE_SUBSCRIPTION,
   feed,
 });
 
-interface ParseOPMLAction {
+interface IParseOPMLAction {
   type: 'PARSE_OPML';
   file: string;
 }
-const PARSE_OPML: ParseOPMLAction['type'] = 'PARSE_OPML';
-export const parseOPML = (file: string): ParseOPMLAction => ({
+const PARSE_OPML: IParseOPMLAction['type'] = 'PARSE_OPML';
+export const parseOPML = (file: string): IParseOPMLAction => ({
   type: PARSE_OPML,
   file,
 });
 
 export type SubscriptionsActions =
-  AddSubscriptionAction |
-  RemoveSubscriptionAction |
-  ParseOPMLAction |
-  NoopAction;
+  IAddSubscriptionAction |
+  IRemoveSubscriptionAction |
+  IParseOPMLAction |
+  INoopAction;
 
-export interface SubscriptionsState {
+export interface ISubscriptionsState {
   subs: SubscriptionsMap;
 }
 
-export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
-  action$ => action$.ofType(PARSE_OPML)
-    .mergeMap((action: ParseOPMLAction) => {
+export const parseOPMLEpic: Epic<SubscriptionsActions, IState> =
+  (action$) => action$.ofType(PARSE_OPML)
+    .mergeMap((action: IParseOPMLAction) => {
       const {
         feeds,
       } = opmltoJSON(action.file);
@@ -84,26 +84,26 @@ export const parseOPMLEpic: Epic<SubscriptionsActions, State> =
       return Observable.of(
         feeds.map(({ feed }) =>
           Podcasts.episodes(feed)
-            .filter(e => e !== null)
-            .map((e: App.EpisodeListing) => addSubscription(feed, { ...e, feed, }))
-        )
+            .filter((e) => e !== null)
+            .map((e: App.EpisodeListing) => addSubscription(feed, { ...e, feed })),
+        ),
       );
     })
-    .flatMap(e => e)
-    .flatMap(e => e);
+    .flatMap((e) => e)
+    .flatMap((e) => e);
 
-export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, State> =
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> =
   (action$, state) => action$
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
     .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))
     .map(noop);
 
 export const subscriptions = (
-  state: SubscriptionsState = {
+  state: ISubscriptionsState = {
     subs: {},
   },
   action: SubscriptionsActions,
-): SubscriptionsState => {
+): ISubscriptionsState => {
   switch (action.type) {
     case ADD_SUBSCRIPTION:
       return {...state, subs: {
@@ -123,4 +123,4 @@ export const subscriptions = (
     default:
       return state;
   }
-}
+};

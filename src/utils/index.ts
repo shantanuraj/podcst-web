@@ -15,7 +15,7 @@ export const onEvent = (fn: (val: string) => void) => {
 
 const URL_REGEX = /^https?\:\//;
 
-const HOST_REGEX = /^https?\:\/\/(www\.)?(.*)/
+const HOST_REGEX = /^https?\:\/\/(www\.)?(.*)/;
 
 /**
  * Linkify text
@@ -34,7 +34,7 @@ export const linkifyText = (text: string): string => {
   });
 
   return linkifed.join('');
-}
+};
 
 /**
  * Strip host from link
@@ -101,7 +101,7 @@ export const opmltoJSON = (file: string): OPMLJson => {
   const parser = new DOMParser();
   const xml = parser.parseFromString(file, 'text/xml');
   const feeds = Array.from(
-    xml.querySelectorAll('outline[type="rss"]')
+    xml.querySelectorAll('outline[type="rss"]'),
   ) as HTMLElement[];
 
   return {

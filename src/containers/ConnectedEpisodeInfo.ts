@@ -1,5 +1,5 @@
 /**
- * Connected Episodes component
+ * Connected Loader component
  */
 
 import {
@@ -20,24 +20,17 @@ import {
 } from '../stores/podcasts';
 
 import {
-  addSubscription,
-  removeSubscription,
-} from '../stores/subscriptions';
-
-import {
   pauseEpisode,
   playEpisode,
   resumeEpisode,
 } from '../stores/player';
 
-import Episodes from '../components/Episodes';
+import EpisodeInfo from '../components/EpisodeInfo';
 
 const mapState = (state: IState) => ({
-  theme: state.app.theme,
   info: state.podcasts,
+  theme: state.app.theme,
   state: state.player.state,
-  currentEpisode: state.player.queue[state.player.currentEpisode] || null,
-  subscriptions: state.subscriptions.subs,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
@@ -45,13 +38,11 @@ const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   playEpisode,
   pauseEpisode,
   resumeEpisode,
-  addSubscription,
-  removeSubscription,
 }, dispatch);
 
-const ConnectedEpisodes = connect(
+const ConnectedEpisodeInfo = connect(
   mapState,
   mapDispatch,
-)(Episodes);
+)(EpisodeInfo);
 
-export default ConnectedEpisodes;
+export default ConnectedEpisodeInfo;

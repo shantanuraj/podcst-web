@@ -14,7 +14,7 @@ import {
   style,
 } from 'typestyle';
 
-const gridItem = cover => style({
+const gridItem = (cover) => style({
   height: '200px',
   padding: '8px',
   color: 'white',
@@ -39,7 +39,7 @@ const gridItem = cover => style({
       rgba(43, 43, 43, 0.6) 95%,
       rgba(19, 19, 19, 0.8) 100%
     ),
-    url(${cover});`
+    url(${cover});`,
 });
 
 const podcastTitle = style({
@@ -52,13 +52,13 @@ const podcastAuthor = style({
   fontWeight: 'lighter',
 });
 
-interface PodcastsGridItemProps {
+interface IPodcastsGridItemProps {
   podcast: App.RenderablePodcast;
 }
 
 const PodcastsGridItem = ({
   podcast,
-}: PodcastsGridItemProps) => {
+}: IPodcastsGridItemProps) => {
   const {
     author,
     feed,
@@ -82,6 +82,6 @@ const PodcastsGridItem = ({
       </div>
     </Link>
   );
-}
+};
 
 export default PodcastsGridItem;

@@ -12,6 +12,7 @@ const accent = '#82ffb5';
 const backgroundDark = '#131313';
 const backgroundLight = '#333333';
 
+// tslint:disable:object-literal-sort-keys
 const loaderAnimation = keyframes({
   '0%': {
     backgroundColor: '#5cffa0',
@@ -34,11 +35,11 @@ const theme: App.Theme = {
   background,
   backgroundDark,
   backgroundLight,
+  backgroundSearch,
   loaderAnimation,
   subTitle,
   text,
   textLight,
-  backgroundSearch,
 };
 
 export default theme;

@@ -3,7 +3,7 @@
  */
 
 import {
-  h
+  h,
 } from 'preact';
 
 import {
@@ -36,12 +36,12 @@ const item = (theme: App.Theme) => style(
   paddingRight: 16,
 }));
 
-interface ShortcutInfo {
+interface IShortcutInfo {
   title: string;
   value: string;
 }
 
-const shortcuts: ShortcutInfo[] = [
+const appShortcuts: IShortcutInfo[] = [
   {
     title: 'Search',
     value: 's',
@@ -63,7 +63,7 @@ const shortcuts: ShortcutInfo[] = [
     value: 'right',
   },
   {
-    title: 'Seek to n%',
+    title: 'Seek to n %',
     value: '0-9',
   },
 ];
@@ -71,26 +71,26 @@ const shortcuts: ShortcutInfo[] = [
 const renderShortcut = (theme: App.Theme) => ({
   title,
   value,
-}: ShortcutInfo) => (
+}: IShortcutInfo) => (
   <div class={item(theme)}>
     <span>{title}</span>
     <pre>{value}</pre>
   </div>
 );
 
-const renderShortcuts = (theme: App.Theme, shortcuts: ShortcutInfo[]) => (
+const renderShortcuts = (theme: App.Theme, shortcuts: IShortcutInfo[]) => (
   shortcuts.map(renderShortcut(theme))
-)
+);
 
-interface ShortcutsProps {
+interface IShortcutsProps {
   theme: App.Theme;
 }
 
 const Shortcuts = ({
   theme,
-}: ShortcutsProps) => (
+}: IShortcutsProps) => (
   <div class={container}>
-    {renderShortcuts(theme, shortcuts)}
+    {renderShortcuts(theme, appShortcuts)}
   </div>
 );
 
