@@ -58,6 +58,7 @@ const podcastInfoTitles = style({
 const infoCover = (cover: string) => style(
   {
     backgroundImage: `url(${cover})`,
+    backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
     backgroundSize: 'cover',
     width: '300px',
