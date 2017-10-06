@@ -38,6 +38,10 @@ import {
   STOP_EPISODE,
 } from './player';
 
+import {
+  navigate,
+} from './router';
+
 /**
  * Seek delta in seconds
  */
@@ -74,6 +78,7 @@ const PlayerControlKeys: KeyboardShortcutsMap = {
   78: 'next',
   37: 'seek-back',
   39: 'seek-forward',
+  69: 'episode-info',
 };
 
 /**
@@ -92,7 +97,13 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
         !!PlayerControlKeys[keyCode] || isSeekKey(keyCode),
       )
       .map((e) => {
-        const { state, seekPosition, duration } = store.getState().player;
+        const {
+          state,
+          seekPosition,
+          duration,
+          currentEpisode,
+          queue,
+        } = store.getState().player;
 
         // Space for scroll check
         if (!(e.keyCode === 32 && state === 'stopped')) {
@@ -105,6 +116,8 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
           return manualSeekUpdate(seekTo, duration);
         }
 
+        const episode = queue[currentEpisode];
+
         const shortcut = PlayerControlKeys[e.keyCode];
         switch (shortcut) {
           case 'play': return state === 'paused' ? resumeEpisode() : pauseEpisode();
@@ -114,6 +127,13 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
           case 'seek-forward':
             const seekTo = seekPosition + SEEK_DELTA * (shortcut === 'seek-forward' ? 1 : -1);
             return manualSeekUpdate(seekTo, duration);
+          case 'episode-info':
+            if (state !== 'stopped' && !!episode) {
+              const { feed, title } = episode;
+              return navigate(`/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`);
+            } else {
+              return noop();
+            }
           default: return noop();
         }
       })
