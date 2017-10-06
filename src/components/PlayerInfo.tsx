@@ -21,6 +21,10 @@ import {
   IEpisodeInfo,
 } from '../stores/player';
 
+import {
+  getEpisodeRoute,
+} from '../utils';
+
 const infoContainer = (theme: App.Theme) => style(
   {
     height: '100%',
@@ -110,7 +114,7 @@ const PlayerInfo = ({
     </button>
     <Link
       class={linkContainer}
-      href={`/episode?feed=${feed}&title=${encodeURIComponent(title)}`}
+      href={getEpisodeRoute(feed, title)}
     >
       <div
         class={episodeImage(episodeArt || cover as string)}

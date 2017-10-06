@@ -138,6 +138,7 @@ type KeyboardShortcuts =
   'up' |
   'down' |
   'change-theme' |
+  'episode-info' |
   'select';
 
 interface KeyboardShortcutsMap {

@@ -16,6 +16,7 @@ import {
 } from 'typestyle';
 
 import {
+  getEpisodeRoute,
   monthName,
 } from '../utils';
 
@@ -155,7 +156,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
         </div>
         <Link
           class={episodeTitle}
-          href={`/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`}
+          href={getEpisodeRoute(feed, title)}
         >
           {title}
         </Link>
