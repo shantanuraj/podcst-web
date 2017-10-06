@@ -11,6 +11,7 @@ import {
 } from 'redux-observable';
 
 import {
+  getEpisodeRoute,
   ignoreKeyboardSelector,
 } from '../utils';
 
@@ -130,7 +131,7 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
           case 'episode-info':
             if (state !== 'stopped' && !!episode) {
               const { feed, title } = episode;
-              return navigate(`/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`);
+              return navigate(getEpisodeRoute(feed, title));
             } else {
               return noop();
             }

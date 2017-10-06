@@ -108,3 +108,10 @@ export const opmltoJSON = (file: string): OPMLJson => {
     feeds: feeds.map(adaptFeed),
   };
 };
+
+/**
+ * Get episode route for info
+ */
+export const getEpisodeRoute = (feed: string, title: string) => {
+  return `/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`;
+};
