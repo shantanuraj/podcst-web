@@ -47,6 +47,10 @@ const appShortcuts: IShortcutInfo[] = [
     value: 's',
   },
   {
+    title: 'Show episode info',
+    value: 'e',
+  },
+  {
     title: 'Toggle theme',
     value: 't',
   },
@@ -65,6 +69,10 @@ const appShortcuts: IShortcutInfo[] = [
   {
     title: 'Seek to n %',
     value: '0-9',
+  },
+  {
+    title: 'Open settings',
+    value: ',',
   },
 ];
 

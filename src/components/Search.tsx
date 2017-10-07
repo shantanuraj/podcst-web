@@ -73,6 +73,7 @@ class Search extends Component<ISearchProps, any> {
     this.clicksSub = Observable.fromEvent(document, 'click')
       .filter(({ target }: MouseEvent) =>
         !!this.el &&
+        (this.props.searching || !!this.props.query) &&
         !this.el.contains(target as HTMLElement),
       )
       .subscribe(this.props.dismissSearch);
