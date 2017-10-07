@@ -140,3 +140,23 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
       })
       .takeUntil(action$.ofType(STOP_EPISODE)),
     );
+
+/**
+ * Keyboard shortcut map for opening settings
+ */
+const OpenSettingsKeys: KeyboardShortcutsMap = {
+  188: 'settings',
+};
+
+/**
+ * Open settings epic
+ */
+export const settingsShortcutEpic: Epic<Actions, IState> = (action$) =>
+  action$.ofType(APP_INIT)
+    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
+      .filter(({ keyCode, target }) =>
+        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
+        !!OpenSettingsKeys[keyCode],
+      )
+      .map(() => navigate('/settings')),
+    );

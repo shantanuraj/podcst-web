@@ -70,6 +70,10 @@ const appShortcuts: IShortcutInfo[] = [
     title: 'Seek to n %',
     value: '0-9',
   },
+  {
+    title: 'Open settings',
+    value: ',',
+  },
 ];
 
 const renderShortcut = (theme: App.Theme) => ({
