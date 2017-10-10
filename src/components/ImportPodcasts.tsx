@@ -46,10 +46,30 @@ const onChange = (cb: (file: string) => void) => {
   };
 };
 
-interface IImportPodcastsProps {
+interface IImportPodcastsInputProps {
   parseOPML: (contents: string) => void;
+}
+
+interface IImportPodcastsProps extends IImportPodcastsInputProps {
   theme: App.Theme;
 }
+
+export const ImportPodcastsInput = ({
+  parseOPML,
+}: IImportPodcastsInputProps) => (
+  <div>
+    <input
+      id="opml-import"
+      accept=".xml, .opml"
+      name="file"
+      type="file"
+      onChange={onChange(parseOPML)}
+    />
+    <label for="opml-import">
+      Upload OPML File
+    </label>
+  </div>
+);
 
 const ImportPodcasts = ({
   parseOPML,
@@ -57,18 +77,7 @@ const ImportPodcasts = ({
 }: IImportPodcastsProps) => (
   <div class={container}>
     <button class={importButton(theme)}>
-      <div>
-        <input
-          id="opml-import"
-          accept=".xml, .opml"
-          name="file"
-          type="file"
-          onChange={onChange(parseOPML)}
-        />
-        <label for="opml-import">
-          Upload OPML File
-        </label>
-      </div>
+      <ImportPodcastsInput parseOPML={parseOPML} />
     </button>
   </div>
 );
