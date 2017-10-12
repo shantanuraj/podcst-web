@@ -70,6 +70,13 @@ declare namespace App {
   }
 
   /**
+   * Adapted Episode with feed info
+   */
+  interface EpisodeInfo extends Episode {
+    feed: string;
+  }
+
+  /**
    * Episode listing
    */
   interface EpisodeListing {
@@ -82,6 +89,13 @@ declare namespace App {
     keywords: string[];
     explicit: boolean;
     episodes: Episode[];
+  }
+
+  /**
+   * Episode info listing
+   */
+  interface EpisodeInfoListing extends EpisodeListing {
+    episodes: EpisodeInfo[];
   }
 
   type RenderablePodcast = Podcast | (EpisodeListing & {

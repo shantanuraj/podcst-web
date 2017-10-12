@@ -4,12 +4,8 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 
-import {
-  IEpisodeInfo,
-} from '../stores/player';
-
 export const updateMetadata = (
-  episode: IEpisodeInfo,
+  episode: App.EpisodeInfo,
   info: App.EpisodeListing | null,
 ) => {
   const {

@@ -24,13 +24,13 @@ export const getEpisodes = (feed: string): IGetEpisodesAction => ({
 
 interface IGetEpisodesSuccessAction {
   type: 'GET_EPISODES_SUCCESS';
-  episodes: App.EpisodeListing | null;
+  episodes: App.EpisodeInfoListing | null;
   feed: App.Podcast['feed'];
 }
 const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
 export const getEpisodesSuccess = (
   feed: string,
-  episodes: App.EpisodeListing | null,
+  episodes: App.EpisodeInfoListing | null,
 ): IGetEpisodesSuccessAction => ({
   type: GET_EPISODES_SUCCESS,
   episodes,
@@ -43,12 +43,14 @@ export type PodcastsAction =
 
 export interface IPodcastsState {
   [feed: string]: {
-    episodes: App.EpisodeListing | null;
+    episodes: App.EpisodeInfoListing | null;
     loading: boolean;
   };
 }
 
-// Get episodes epic
+/**
+ * Get episodes epic
+ */
 export const getEpisodesEpic: Epic<PodcastsAction, IState> = (action$) =>
   action$
     .ofType(GET_EPISODES)

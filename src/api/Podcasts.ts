@@ -7,6 +7,10 @@ import {
 } from 'rxjs/Observable';
 import { ajax } from 'rxjs/observable/dom/ajax';
 
+import {
+  patchEpisodesResponse,
+} from '../utils';
+
 export default class Podcasts {
   private static HOST = 'https://data.podcst.io';
 
@@ -34,9 +38,11 @@ export default class Podcasts {
       });
   }
 
-  public static episodes(url: string): Observable<App.EpisodeListing | null> {
+  public static episodes(url: string): Observable<App.EpisodeInfoListing | null> {
+    const patchRes = patchEpisodesResponse(url);
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
       .map((res) => res.response as App.EpisodeListing | null)
+      .map(patchRes)
       .catch(() => {
         return Observable.of(null);
       });

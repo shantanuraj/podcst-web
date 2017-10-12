@@ -11,10 +11,6 @@ import {
 } from '../stores/podcasts';
 
 import {
-  IEpisodeInfo,
-} from '../stores/player';
-
-import {
   scrollToTop,
   stripHost,
 } from '../utils';
@@ -127,10 +123,10 @@ interface IEpisodesProps {
   feed: string;
   info: IPodcastsState;
   state: EpisodePlayerState;
-  currentEpisode: App.Episode | null;
+  currentEpisode: App.EpisodeInfo | null;
   subscriptions: SubscriptionsMap;
   getEpisodes: (feed: string) => void;
-  playEpisode: (episode: IEpisodeInfo) => void;
+  playEpisode: (episode: App.EpisodeInfo) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
   addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
@@ -168,7 +164,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     return <Loading />;
   }
 
-  public renderEpisode = (episode: App.Episode) => {
+  public renderEpisode = (episode: App.EpisodeInfo) => {
     const {
       currentEpisode,
       playEpisode,
@@ -179,12 +175,14 @@ class Episodes extends Component<IEpisodesProps, any> {
       feed,
     } = this.props;
 
+    const play = () => playEpisode(episode);
+
     return (
       <EpisodeRow
         feed={feed}
         episode={episode}
         pause={pauseEpisode}
-        play={playEpisode}
+        play={play}
         resume={resumeEpisode}
         state={state}
         theme={theme}
@@ -193,7 +191,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     );
   }
 
-  public renderLoaded(feed: string, info: App.EpisodeListing | null) {
+  public renderLoaded(feed: string, info: App.EpisodeInfoListing | null) {
     if (!info) {
       return (
         <div>
