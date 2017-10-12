@@ -12,7 +12,7 @@ import {
 
 import {
   getEpisodeRoute,
-  ignoreKeyboardSelector,
+  isNotIgnoreElement,
 } from '../utils';
 
 import {
@@ -61,10 +61,7 @@ const ChangeThemeKeys: KeyboardShortcutsMap = {
 export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(APP_INIT)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
-      .filter((event) =>
-        !!ChangeThemeKeys[event.keyCode] &&
-        !(event.target as HTMLElement).matches(ignoreKeyboardSelector),
-      )
+      .filter((event) => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target))
       .map(() => changeTheme(
         store.getState().app.mode === 'dark' ? 'light' : 'dark',
       )),
@@ -93,10 +90,7 @@ const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
 export const seekbarJumpsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
-      .filter(({ keyCode, target }) =>
-        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        isSeekKey(keyCode),
-      )
+      .filter(({ keyCode, target }) => isSeekKey(keyCode) && isNotIgnoreElement(target))
       .map((e) => {
         const { duration } = store.getState().player;
         const seekPercent = (e.keyCode - 48) / 10;
@@ -111,10 +105,7 @@ export const seekbarJumpsEpic: Epic<Actions, IState> = (action$, store) =>
 export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
-      .filter(({ keyCode, target }) =>
-        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!PlayerControlKeys[keyCode],
-      )
+      .filter(({ keyCode, target }) => !!PlayerControlKeys[keyCode] && isNotIgnoreElement(target))
       .map((e) => {
         const {
           state,
@@ -165,9 +156,6 @@ const OpenSettingsKeys: KeyboardShortcutsMap = {
 export const settingsShortcutEpic: Epic<Actions, IState> = (action$) =>
   action$.ofType(APP_INIT)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
-      .filter(({ keyCode, target }) =>
-        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!OpenSettingsKeys[keyCode],
-      )
+      .filter(({ keyCode, target }) => !!OpenSettingsKeys[keyCode] && isNotIgnoreElement(target))
       .map(() => navigate('/settings')),
     );

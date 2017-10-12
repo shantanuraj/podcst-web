@@ -84,7 +84,12 @@ export const formatTime = (total: number, currentTime: number) => {
 /**
  * Element selector for ignoring keyboard events
  */
-export const ignoreKeyboardSelector = 'header *';
+const ignoreKeyboardSelector = 'header *';
+
+/**
+ * Boolean check for ignore selector
+ */
+export const isNotIgnoreElement = (target: EventTarget) => !(target as HTMLElement).matches(ignoreKeyboardSelector);
 
 /**
  * Parse OPML XML element to JSON
