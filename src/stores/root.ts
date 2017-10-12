@@ -69,6 +69,13 @@ import {
 } from './app';
 
 import {
+  dismissToastEpic,
+  IToastState,
+  toast,
+  ToastActions,
+} from './toast';
+
+import {
   changeThemeEpic,
   playerControlsEpic,
   settingsShortcutEpic,
@@ -85,6 +92,7 @@ export type Actions =
   PlayerActions |
   SubscriptionsActions |
   AppActions |
+  ToastActions |
   INoopAction;
 
 /**
@@ -98,6 +106,7 @@ export interface IState {
   podcasts: IPodcastsState;
   player: IPlayerState;
   subscriptions: ISubscriptionsState;
+  toast: IToastState;
 }
 
 const epics = [
@@ -115,6 +124,7 @@ const epics = [
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
   settingsShortcutEpic,
+  dismissToastEpic,
 ].filter((epic) => epic !== null);
 
 export const rootEpic = combineEpics<Actions, IState>(
@@ -129,4 +139,5 @@ export const rootReducer = combineReducers<IState>({
   router,
   search,
   subscriptions,
+  toast,
 });

@@ -37,6 +37,7 @@ import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPlayer from '../containers/ConnectedPlayer';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
 import ConnectedSettings from '../containers/ConnectedSettings';
+import ConnectedToast from '../containers/ConnectedToast';
 
 import Toolbar from './Toolbar';
 
@@ -109,6 +110,7 @@ class App extends Component<IAppProps, never> {
           </Router>
         </main>
         <ConnectedPlayer theme={theme} />
+        <ConnectedToast />
         <Match>{routerNavigate}</Match>
       </div>
     );

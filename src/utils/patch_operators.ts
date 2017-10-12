@@ -2,6 +2,7 @@
  * Patch RxOperators
  */
 
+import 'rxjs/add/observable/concat';
 import 'rxjs/add/observable/fromEvent';
 import 'rxjs/add/observable/of';
 

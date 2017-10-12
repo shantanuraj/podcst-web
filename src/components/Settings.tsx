@@ -14,6 +14,7 @@ import {
 
 import { IAppState } from '../stores/app';
 
+import ImportPodcastsView from './ImportPodcastsView';
 import NavLinks, {
   ILinkMap,
 } from './NavLinks';
@@ -23,6 +24,7 @@ import ThemePicker from './ThemePicker';
 const linkMap = (version: string): ILinkMap => ({
   '/settings?section=theme': 'Change Theme',
   '/settings?section=shortcuts': 'Shortcuts',
+  '/settings?section=import': 'Import Podcasts',
   '#about': `Version: ${version}`,
 });
 
@@ -33,6 +35,7 @@ const componentsMap = ({
 }: ISettingsProps) => ({
   theme: <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
   shortcuts: <Shortcuts theme={theme} />,
+  import: <ImportPodcastsView theme={theme} />,
 });
 
 interface ISettingsProps extends IAppState {

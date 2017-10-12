@@ -75,7 +75,7 @@ export interface IRouterState {
 }
 
 /**
- * Fetch texts epic
+ * Router navigation epic
  */
 export const routerEpic: Epic<RouterActions, IState> = (action$) =>
   action$.ofType(NAVIGATE)

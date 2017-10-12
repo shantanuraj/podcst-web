@@ -58,4 +58,9 @@ export const getDefaultState = (): IState => ({
   subscriptions: {
     subs: Storage.getSubscriptions(),
   },
+  toast: {
+    isVisible: false,
+    message: null,
+    persistent: false,
+  },
 });
