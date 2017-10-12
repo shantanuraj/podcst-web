@@ -1,5 +1,5 @@
 /**
- * Connected Home component
+ * Connected Import Podcasts component
  */
 
 import {
@@ -19,20 +19,17 @@ import {
   parseOPML,
 } from '../stores/subscriptions';
 
-import Home from '../components/Home';
+import ImportPodcasts from '../components/ImportPodcasts';
 
-const mapState = (state: IState) => ({
-  ...state.subscriptions,
-  theme: state.app.theme,
-});
+const mapState = () => ({});
 
 const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
   parseOPML,
 }, dispatch);
 
-const ConnectedHome = connect(
+const ConnectedImportPodcasts = connect(
   mapState,
   mapDispatch,
-)(Home);
+)(ImportPodcasts);
 
-export default ConnectedHome;
+export default ConnectedImportPodcasts;
