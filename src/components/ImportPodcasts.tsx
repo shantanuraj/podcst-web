@@ -6,33 +6,6 @@ import {
   h,
 } from 'preact';
 
-import {
-  style,
-} from 'typestyle';
-
-const container = style({
-  height: '100%',
-  width: '100%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-});
-
-const importButton = (theme: App.Theme) => style({
-  background: 'transparent',
-  border: `2px solid ${theme.accent}`,
-  borderRadius: '3px',
-  color: theme.text,
-  display: 'inline-block',
-  minWidth: '200px',
-  padding: '8px',
-  $nest: {
-    '& input': {
-      display: 'none',
-    },
-  },
-});
-
 const onChange = (cb: (file: string) => void) => {
   return (e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -46,17 +19,13 @@ const onChange = (cb: (file: string) => void) => {
   };
 };
 
-interface IImportPodcastsInputProps {
+interface IImportPodcastsProps {
   parseOPML: (contents: string) => void;
 }
 
-interface IImportPodcastsProps extends IImportPodcastsInputProps {
-  theme: App.Theme;
-}
-
-export const ImportPodcastsInput = ({
+const ImportPodcasts = ({
   parseOPML,
-}: IImportPodcastsInputProps) => (
+}: IImportPodcastsProps) => (
   <div>
     <input
       id="opml-import"
@@ -68,17 +37,6 @@ export const ImportPodcastsInput = ({
     <label for="opml-import">
       Upload OPML File
     </label>
-  </div>
-);
-
-const ImportPodcasts = ({
-  parseOPML,
-  theme,
-}: IImportPodcastsProps) => (
-  <div class={container}>
-    <button class={importButton(theme)}>
-      <ImportPodcastsInput parseOPML={parseOPML} />
-    </button>
   </div>
 );
 

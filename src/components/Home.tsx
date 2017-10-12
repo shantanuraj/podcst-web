@@ -10,21 +10,19 @@ import {
   ISubscriptionsState,
 } from '../stores/subscriptions';
 
-import ImportPodcasts from './ImportPodcasts';
+import ImportPodcastsView from './ImportPodcastsView';
 import PodcastsGrid from './PodcastsGrid';
 
 interface IHomeProps extends ISubscriptionsState {
-  parseOPML: (contents: string) => void;
   theme: App.Theme;
 }
 
 const Home = ({
-  parseOPML,
   subs,
   theme,
 }: IHomeProps) => (
   Object.keys(subs).length === 0 ?
-    <ImportPodcasts theme={theme} parseOPML={parseOPML} /> :
+    <ImportPodcastsView theme={theme} /> :
     <PodcastsGrid
       mode="subs"
       subs={subs}

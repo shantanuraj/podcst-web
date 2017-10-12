@@ -14,6 +14,7 @@ import {
 
 import { IAppState } from '../stores/app';
 
+import ImportPodcastsView from './ImportPodcastsView';
 import NavLinks, {
   ILinkMap,
 } from './NavLinks';
@@ -34,7 +35,7 @@ const componentsMap = ({
 }: ISettingsProps) => ({
   theme: <ThemePicker mode={mode} onThemeChange={changeTheme} theme={theme} />,
   shortcuts: <Shortcuts theme={theme} />,
-  import: null,
+  import: <ImportPodcastsView theme={theme} />,
 });
 
 interface ISettingsProps extends IAppState {
