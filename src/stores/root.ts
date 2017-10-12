@@ -78,6 +78,7 @@ import {
 import {
   changeThemeEpic,
   playerControlsEpic,
+  seekbarJumpsEpic,
   settingsShortcutEpic,
 } from './keyboard';
 
@@ -123,6 +124,7 @@ const epics = [
   onThemeChangeEpic,
   ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
+  seekbarJumpsEpic,
   settingsShortcutEpic,
   dismissToastEpic,
 ].filter((epic) => epic !== null);
