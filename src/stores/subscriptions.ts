@@ -11,8 +11,13 @@ import {
 } from 'redux-observable';
 
 import {
+  Actions,
   IState,
 } from './root';
+
+import {
+  showToast,
+} from './toast';
 
 import {
   INoopAction,
@@ -20,6 +25,7 @@ import {
 } from './utils';
 
 import {
+  notNull,
   opmltoJSON,
 } from '../utils';
 
@@ -74,23 +80,26 @@ export interface ISubscriptionsState {
   subs: SubscriptionsMap;
 }
 
-export const parseOPMLEpic: Epic<SubscriptionsActions, IState> =
-  (action$) => action$.ofType(PARSE_OPML)
+export const parseOPMLEpic: Epic<Actions, IState> = (action$) =>
+  action$.ofType(PARSE_OPML)
     .mergeMap((action: IParseOPMLAction) => {
       const {
         feeds,
       } = opmltoJSON(action.file);
 
-      return Observable.of(
-        feeds.map(({ feed }) =>
-          Podcasts.episodes(feed)
-            .filter((e) => e !== null)
-            .map((e: App.EpisodeListing) => addSubscription(feed, { ...e, feed })),
-        ),
+      const addSubscriptions = feeds.map(({ feed }) => Podcasts.episodes(feed)
+        .filter(notNull)
+        .map((podcasts: App.EpisodeListing) => addSubscription(feed, {...podcasts, feed})),
       );
-    })
-    .flatMap((e) => e)
-    .flatMap((e) => e);
+
+      const actions = [
+        Observable.of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
+        ...addSubscriptions,
+        Observable.of(showToast('Import successful!')),
+      ];
+
+      return Observable.concat(...actions);
+    });
 
 export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> =
   (action$, state) => action$

@@ -115,3 +115,8 @@ export const opmltoJSON = (file: string): OPMLJson => {
 export const getEpisodeRoute = (feed: string, title: string) => {
   return `/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`;
 };
+
+/**
+ * Not null utility
+ */
+export const notNull = <T>(val: T | null) => val !== null;
