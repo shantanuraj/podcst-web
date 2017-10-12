@@ -1,5 +1,5 @@
 /**
- * Connected Loader component
+ * Connected Home component
  */
 
 import {
