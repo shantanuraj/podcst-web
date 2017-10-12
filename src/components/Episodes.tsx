@@ -191,7 +191,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     );
   }
 
-  public renderLoaded(feed: string, info: App.EpisodeInfoListing | null) {
+  public renderLoaded(feed: string, info: App.PodcastEpisodesInfo | null) {
     if (!info) {
       return (
         <div>

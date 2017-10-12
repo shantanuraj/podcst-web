@@ -6,7 +6,7 @@
 
 export const updateMetadata = (
   episode: App.EpisodeInfo,
-  info: App.EpisodeListing | null,
+  info: App.PodcastEpisodesInfo | null,
 ) => {
   const {
     mediaSession,

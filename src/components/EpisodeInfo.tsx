@@ -152,7 +152,7 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
   }
 
   public renderLoaded(
-    podcast: App.EpisodeListing,
+    podcast: App.PodcastEpisodesInfo,
     episode: App.Episode | undefined,
   ) {
     if (!episode) {

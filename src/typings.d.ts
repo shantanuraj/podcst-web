@@ -94,11 +94,11 @@ declare namespace App {
   /**
    * Episode info listing
    */
-  interface EpisodeInfoListing extends EpisodeListing {
+  interface PodcastEpisodesInfo extends EpisodeListing {
     episodes: EpisodeInfo[];
   }
 
-  type RenderablePodcast = Podcast | (EpisodeListing & {
+  type RenderablePodcast = Podcast | (PodcastEpisodesInfo & {
     feed: string;
   });
 

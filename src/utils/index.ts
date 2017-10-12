@@ -130,7 +130,7 @@ export const notNull = <T>(val: T | null) => val !== null;
  * Add feed prop to episodes
  */
 export const patchEpisodesResponse = (feed: string) =>
-  (res: App.EpisodeListing | null): App.EpisodeInfoListing | null => {
+  (res: App.EpisodeListing | null): App.PodcastEpisodesInfo | null => {
     if (res) {
       const episodes: App.EpisodeInfo[] = res
         .episodes

@@ -38,7 +38,7 @@ export default class Podcasts {
       });
   }
 
-  public static episodes(url: string): Observable<App.EpisodeInfoListing | null> {
+  public static episodes(url: string): Observable<App.PodcastEpisodesInfo | null> {
     const patchRes = patchEpisodesResponse(url);
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
       .map((res) => res.response as App.EpisodeListing | null)

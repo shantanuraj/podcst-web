@@ -24,13 +24,13 @@ export const getEpisodes = (feed: string): IGetEpisodesAction => ({
 
 interface IGetEpisodesSuccessAction {
   type: 'GET_EPISODES_SUCCESS';
-  episodes: App.EpisodeInfoListing | null;
+  episodes: App.PodcastEpisodesInfo | null;
   feed: App.Podcast['feed'];
 }
 const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
 export const getEpisodesSuccess = (
   feed: string,
-  episodes: App.EpisodeInfoListing | null,
+  episodes: App.PodcastEpisodesInfo | null,
 ): IGetEpisodesSuccessAction => ({
   type: GET_EPISODES_SUCCESS,
   episodes,
@@ -43,7 +43,7 @@ export type PodcastsAction =
 
 export interface IPodcastsState {
   [feed: string]: {
-    episodes: App.EpisodeInfoListing | null;
+    episodes: App.PodcastEpisodesInfo | null;
     loading: boolean;
   };
 }
