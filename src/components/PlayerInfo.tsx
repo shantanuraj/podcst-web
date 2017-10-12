@@ -18,10 +18,6 @@ import {
 import Icon from '../svg/Icon';
 
 import {
-  IEpisodeInfo,
-} from '../stores/player';
-
-import {
   getEpisodeRoute,
 } from '../utils';
 
@@ -82,7 +78,7 @@ const playButton = style({
 });
 
 interface IPlayerInfoProps {
-  episode: IEpisodeInfo;
+  episode: App.EpisodeInfo;
   state: EpisodePlayerState;
   theme: App.Theme;
   pause();

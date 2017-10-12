@@ -125,3 +125,18 @@ export const getEpisodeRoute = (feed: string, title: string) => {
  * Not null utility
  */
 export const notNull = <T>(val: T | null) => val !== null;
+
+/**
+ * Add feed prop to episodes
+ */
+export const patchEpisodesResponse = (feed: string) =>
+  (res: App.EpisodeListing | null): App.PodcastEpisodesInfo | null => {
+    if (res) {
+      const episodes: App.EpisodeInfo[] = res
+        .episodes
+        .map((episode) => ({ ...episode, feed }));
+      return { ...res, episodes };
+    } else {
+      return null;
+    }
+  };

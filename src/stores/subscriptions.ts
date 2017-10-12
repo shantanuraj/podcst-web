@@ -89,7 +89,7 @@ export const parseOPMLEpic: Epic<Actions, IState> = (action$) =>
 
       const addSubscriptions = feeds.map(({ feed }) => Podcasts.episodes(feed)
         .filter(notNull)
-        .map((podcasts: App.EpisodeListing) => addSubscription(feed, {...podcasts, feed})),
+        .map((podcasts: App.PodcastEpisodesInfo) => addSubscription(feed, {...podcasts, feed})),
       );
 
       const actions = [

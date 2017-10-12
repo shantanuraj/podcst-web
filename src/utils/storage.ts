@@ -6,7 +6,10 @@ import {
   IAppState,
 } from '../stores/app';
 
-const STORE_KEY = 'store@PLAY_PODCST_IO';
+const STORE_KEY = 'store@PLAY_PODCST_IO/2';
+const DEPRECATED_KEYS = [
+  'store@PLAY_PODCST_IO',
+];
 
 interface IStoreable {
   subscriptions: SubscriptionsMap;
@@ -18,9 +21,13 @@ const storage = process.env.IN_BROWSER ?
     // tslint:disable:no-empty
     setItem(_k: string, _v: string) {},
     getItem(_k: string) { return '{}'; },
+    removeItem(_k: string) {},
     clear(_x: string) {},
     length: 0,
   };
+
+// Handle deprecated keys
+DEPRECATED_KEYS.forEach(storage.removeItem);
 
 const getStore = (): IStoreable => JSON.parse(storage.getItem(STORE_KEY) as string) || {};
 
