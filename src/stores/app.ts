@@ -82,9 +82,15 @@ export interface IAppState {
 /**
  * Chrome MediaSession Metadata epic
  */
-export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$) =>
+export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE)
-    .do((action: IPlayEpisodeAction) => updateMetadata(action.episode))
+    .do((action: IPlayEpisodeAction) => updateMetadata(
+      action.episode,
+      (
+        store.getState().podcasts[action.episode.feed] &&
+        store.getState().podcasts[action.episode.feed].episodes
+      ) || null,
+    ))
     .map(updateChromeMetadatAction);
 
 /**

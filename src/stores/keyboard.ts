@@ -12,7 +12,7 @@ import {
 
 import {
   getEpisodeRoute,
-  ignoreKeyboardSelector,
+  isNotIgnoreElement,
 } from '../utils';
 
 import {
@@ -61,10 +61,7 @@ const ChangeThemeKeys: KeyboardShortcutsMap = {
 export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(APP_INIT)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
-      .filter((event) =>
-        !!ChangeThemeKeys[event.keyCode] &&
-        !(event.target as HTMLElement).matches(ignoreKeyboardSelector),
-      )
+      .filter((event) => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target))
       .map(() => changeTheme(
         store.getState().app.mode === 'dark' ? 'light' : 'dark',
       )),
@@ -88,15 +85,27 @@ const PlayerControlKeys: KeyboardShortcutsMap = {
 const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
 
 /**
+ * Player seekbar jump-controls epic
+ */
+export const seekbarJumpsEpic: Epic<Actions, IState> = (action$, store) =>
+  action$.ofType(PLAY_EPISODE)
+    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+      .filter(({ keyCode, target }) => isSeekKey(keyCode) && isNotIgnoreElement(target))
+      .map((e) => {
+        const { duration } = store.getState().player;
+        const seekPercent = (e.keyCode - 48) / 10;
+        const seekTo = duration * seekPercent;
+        return manualSeekUpdate(seekTo, duration);
+      }),
+    );
+
+/**
  * Player controls epic
  */
 export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
-      .filter(({ keyCode, target }) =>
-        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!PlayerControlKeys[keyCode] || isSeekKey(keyCode),
-      )
+      .filter(({ keyCode, target }) => !!PlayerControlKeys[keyCode] && isNotIgnoreElement(target))
       .map((e) => {
         const {
           state,
@@ -111,14 +120,7 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
           e.preventDefault();
         }
 
-        if (isSeekKey(e.keyCode)) {
-          const seekPercent = (e.keyCode - 48) / 10;
-          const seekTo = duration * seekPercent;
-          return manualSeekUpdate(seekTo, duration);
-        }
-
         const episode = queue[currentEpisode];
-
         const shortcut = PlayerControlKeys[e.keyCode];
         switch (shortcut) {
           case 'play': return state === 'paused' ? resumeEpisode() : pauseEpisode();
@@ -154,9 +156,6 @@ const OpenSettingsKeys: KeyboardShortcutsMap = {
 export const settingsShortcutEpic: Epic<Actions, IState> = (action$) =>
   action$.ofType(APP_INIT)
     .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
-      .filter(({ keyCode, target }) =>
-        !(target as HTMLElement).matches(ignoreKeyboardSelector) &&
-        !!OpenSettingsKeys[keyCode],
-      )
+      .filter(({ keyCode, target }) => !!OpenSettingsKeys[keyCode] && isNotIgnoreElement(target))
       .map(() => navigate('/settings')),
     );

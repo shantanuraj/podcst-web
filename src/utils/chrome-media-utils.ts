@@ -4,7 +4,14 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 
-export const updateMetadata = (episode: App.Episode) => {
+import {
+  IEpisodeInfo,
+} from '../stores/player';
+
+export const updateMetadata = (
+  episode: IEpisodeInfo,
+  info: App.EpisodeListing | null,
+) => {
   const {
     mediaSession,
   } = navigator as ChromeNavigator;
@@ -16,16 +23,18 @@ export const updateMetadata = (episode: App.Episode) => {
     cover,
   } = episode;
 
+  const artwork = episodeArt || cover || (info && info.cover) as string;
+
   mediaSession.metadata = new MediaMetadata({
-    album: author as string,
-    artist: author as string,
+    album: (info && info.title) || title,
+    artist: author || (info && info.author) as string,
     artwork: [
-      { src: (episodeArt || cover) as string,  sizes: '96x96',   type: 'image/png' },
-      { src: (episodeArt || cover) as string, sizes: '128x128', type: 'image/png' },
-      { src: (episodeArt || cover) as string, sizes: '192x192', type: 'image/png' },
-      { src: (episodeArt || cover) as string, sizes: '256x256', type: 'image/png' },
-      { src: (episodeArt || cover) as string, sizes: '384x384', type: 'image/png' },
-      { src: (episodeArt || cover) as string, sizes: '512x512', type: 'image/png' },
+      { src: artwork,  sizes: '96x96',   type: 'image/png' },
+      { src: artwork, sizes: '128x128', type: 'image/png' },
+      { src: artwork, sizes: '192x192', type: 'image/png' },
+      { src: artwork, sizes: '256x256', type: 'image/png' },
+      { src: artwork, sizes: '384x384', type: 'image/png' },
+      { src: artwork, sizes: '512x512', type: 'image/png' },
     ],
     title,
   });
