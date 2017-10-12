@@ -27,7 +27,7 @@ const storage = process.env.IN_BROWSER ?
   };
 
 // Handle deprecated keys
-DEPRECATED_KEYS.forEach(storage.removeItem);
+DEPRECATED_KEYS.forEach(storage.removeItem.bind(storage));
 
 const getStore = (): IStoreable => JSON.parse(storage.getItem(STORE_KEY) as string) || {};
 
