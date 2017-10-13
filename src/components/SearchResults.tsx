@@ -72,7 +72,7 @@ const resultAuthorText = style({
 });
 
 interface ISearchResultsProps {
-  podcasts: App.Podcast[];
+  podcasts: App.PodcastSearchResult[];
   focusedResult: number;
   theme: App.Theme;
   dismissSearch();
@@ -135,7 +135,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
   }
 
   public renderPodcast = (
-    podcast: App.Podcast,
+    podcast: App.PodcastSearchResult,
     isFocussed: boolean,
     focusResult: () => void,
     dismissSearch: ISearchResultsProps['dismissSearch'],
@@ -170,7 +170,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
   )
 
   public renderPodcasts = (
-    podcasts: App.Podcast[],
+    podcasts: App.PodcastSearchResult[],
     focusedResult: number,
     focusResult: ISearchResultsProps['focusResult'],
     dismissSearch: ISearchResultsProps['dismissSearch'],

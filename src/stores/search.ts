@@ -72,7 +72,7 @@ export const focusResult =
 
 export interface ISearchState {
   focusedResult: number;
-  podcasts: App.Podcast[];
+  podcasts: App.PodcastSearchResult[];
   query: ISearchPodcastsAction['query'];
   searching: boolean;
 }
