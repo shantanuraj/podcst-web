@@ -102,6 +102,16 @@ declare namespace App {
     feed: string;
   });
 
+  /**
+   * Podcasts Search result interface
+   */
+  interface PodcastSearchResult {
+    author: string;
+    feed: string;
+    thumbnail: string;
+    title: string;
+  }
+
   type ThemeMode = 'dark' | 'light';
 
   interface Theme {
