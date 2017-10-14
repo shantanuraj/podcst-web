@@ -188,7 +188,7 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
           />
           <div class={podcastInfoTitles}>
             <h1 class={podcastTitle}>
-              {episode.link ? <a href={podcast.link}>{title}</a> : title}
+              {episode.link ? <a href={episode.link}>{title}</a> : title}
             </h1>
             <h2 class={infoMargins}>from <a href={podcast.link}>{podcast.title}</a></h2>
             <h2 class={infoMargins}>by {author}</h2>
