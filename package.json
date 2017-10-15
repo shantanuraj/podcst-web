@@ -1,6 +1,6 @@
 {
   "name": "podcst-web",
-  "version": "0.12.3",
+  "version": "0.12.4",
   "main": "dist/index.js",
   "license": "MIT",
   "private": true,
