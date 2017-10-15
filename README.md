@@ -1,7 +1,8 @@
 # podcst-web
 
 [Milestones](milestones?direction=asc&sort=due_date&state=open) |
-[Issues](issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc)
+[Issues](issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) |
+[![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
 Podcst Web is a modern PWA to listen to podcasts.
 The aim of this project is to provide an excellent podcast listening experience,
