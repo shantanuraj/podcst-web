@@ -3,9 +3,13 @@
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
 Podcst Web is a modern PWA to listen to podcasts.
+
 The aim of this project is to provide an excellent podcast listening experience,
 on all types of devices (desktop, tablets, mobile).
+
 Another major focus is on accessibility, the app is and should be accessible to the visually impaired, and allow 100% keyboard navigation.
+
+> **Note:** This project only aims to support ever-green browsers.
 
 ## Architecture
 
@@ -50,7 +54,7 @@ yarn dev
 
 Once the url reported by the webpack-dev-server
 
-> **NOTE:** Code changes are hot-reloaded but *not* perfectly components render multiple times. You must click the `Reload (⌘R)` if you face any issues.
+> **Note:** Code changes are hot-reloaded but *not* perfectly components render multiple times. You must click the `Reload (⌘R)` if you face any issues.
 
 ## Building
 
@@ -106,7 +110,7 @@ yarn deploy:prod
 * [Howler](https://howlerjs.com/) - Manage play audio
 * [Workbox](https://workboxjs.org/) - Automated PWA generation
 * [Redux Observables](https://redux-observable.js.org/) - Sane tooling / philosophy to manage async redux actions
-* [typestyle](https://typestyle.github.io/) - Typechecked CSS in JS
+* [typestyle](https://typestyle.github.io/) - Type-checked CSS in JS
 
 ## Contributing
 
