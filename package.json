@@ -9,7 +9,11 @@
     "singleQuote": true,
     "trailingComma": "all"
   },
+  "lint-staged": {
+    "src/**/{*.ts,*.tsx}": ["prettier --write", "git add"]
+  },
   "scripts": {
+    "precommit": "lint-staged",
     "build:dev": "webpack --env.dev",
     "build:staging": "webpack --env.staging",
     "build:prod": "webpack --env.prod",
@@ -20,7 +24,7 @@
     "deploy:staging": "./shell/sync.sh staging",
     "deploy:prod": "./shell/sync.sh prod",
     "dev": "webpack-dev-server --config webpack.config.js --env.dev --hot --inline --host 0.0.0.0",
-    "format": "prettier --write",
+    "format": "prettier --write \"src/**/{*.ts,*.tsx}\"",
     "lint": "tslint --project tsconfig.json --fix"
   },
   "dependencies": {
@@ -47,6 +51,8 @@
     "css-loader": "^0.28.4",
     "file-loader": "^0.11.2",
     "html-webpack-plugin": "^2.30.1",
+    "husky": "^0.14.3",
+    "lint-staged": "^4.2.3",
     "prettier": "1.7.4",
     "style-loader": "^0.18.2",
     "ts-loader": "^2.3.2",
