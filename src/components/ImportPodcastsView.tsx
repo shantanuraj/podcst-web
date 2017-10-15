@@ -2,13 +2,9 @@
  * Import Podcasts component
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  style,
-} from 'typestyle';
+import { style } from 'typestyle';
 
 import ConnectedImportPodcasts from '../containers/ConnectedImportPodcasts';
 
@@ -20,28 +16,27 @@ const container = style({
   justifyContent: 'center',
 });
 
-const importButton = (theme: App.Theme) => style({
-  background: 'transparent',
-  border: `2px solid ${theme.accent}`,
-  borderRadius: '3px',
-  color: theme.text,
-  display: 'inline-block',
-  minWidth: '200px',
-  padding: '8px',
-  $nest: {
-    '& input': {
-      display: 'none',
+const importButton = (theme: App.Theme) =>
+  style({
+    background: 'transparent',
+    border: `2px solid ${theme.accent}`,
+    borderRadius: '3px',
+    color: theme.text,
+    display: 'inline-block',
+    minWidth: '200px',
+    padding: '8px',
+    $nest: {
+      '& input': {
+        display: 'none',
+      },
     },
-  },
-});
+  });
 
 interface IImportPodcastsViewProps {
   theme: App.Theme;
 }
 
-const ImportPodcastsView = ({
-  theme,
-}: IImportPodcastsViewProps) => (
+const ImportPodcastsView = ({ theme }: IImportPodcastsViewProps) => (
   <div class={container}>
     <button class={importButton(theme)}>
       <ConnectedImportPodcasts />

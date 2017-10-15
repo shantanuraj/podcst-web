@@ -2,18 +2,11 @@
  * Player reducer / actions
  */
 
-import {
-  Epic,
-} from 'redux-observable';
+import { Epic } from 'redux-observable';
 
-import {
-  IState,
-} from './root';
+import { IState } from './root';
 
-import {
-  INoopAction,
-  noop,
-} from './utils';
+import { INoopAction, noop } from './utils';
 
 import Audio from '../utils/audio';
 
@@ -173,21 +166,21 @@ export const setBuffer = (buffering: boolean): ISetBufferAction => ({
 });
 
 export type PlayerActions =
-  IPlayEpisodeAction |
-  IPauseAction |
-  IPauseAudioAction |
-  IResumeEpisodeAction |
-  IResumeEpisodeAudioAction |
-  IStopAction |
-  IStopAudioAction |
-  ISkipToNextAction |
-  ISkipToPrevAction |
-  ISkipAudioAction |
-  ISeekUpdateAction |
-  ISeekUpdateSuccessAction |
-  IManualSeekUpdateAction |
-  ISetBufferAction |
-  INoopAction;
+  | IPlayEpisodeAction
+  | IPauseAction
+  | IPauseAudioAction
+  | IResumeEpisodeAction
+  | IResumeEpisodeAudioAction
+  | IStopAction
+  | IStopAudioAction
+  | ISkipToNextAction
+  | ISkipToPrevAction
+  | ISkipAudioAction
+  | ISeekUpdateAction
+  | ISeekUpdateSuccessAction
+  | IManualSeekUpdateAction
+  | ISetBufferAction
+  | INoopAction;
 
 export interface IPlayerState {
   buffering: boolean;
@@ -198,13 +191,13 @@ export interface IPlayerState {
   state: EpisodePlayerState;
 }
 
-export const seekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
+export const seekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
     .ofType(SEEK_UPDATE)
     .throttleTime(1000)
     .map((action: ISeekUpdateAction) => seekUpdateSuccess(action.seekPosition, action.duration));
 
-export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
+export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
     .ofType(MANUAL_SEEK_UPDATE)
     .do((action: IManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
@@ -212,14 +205,15 @@ export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = (action$) =>
 
 export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
   action$
-    .filter((action) => (
-      action.type === PLAY_EPISODE ||
-      action.type === PAUSE_EPISODE ||
-      action.type === RESUME_EPISODE ||
-      action.type === STOP_EPISODE ||
-      action.type === SKIP_TO_NEXT_EPISODE ||
-      action.type === SKIP_TO_PREV_EPISODE
-    ))
+    .filter(
+      action =>
+        action.type === PLAY_EPISODE ||
+        action.type === PAUSE_EPISODE ||
+        action.type === RESUME_EPISODE ||
+        action.type === STOP_EPISODE ||
+        action.type === SKIP_TO_NEXT_EPISODE ||
+        action.type === SKIP_TO_PREV_EPISODE,
+    )
     .do((action: PlayerActions) => {
       switch (action.type) {
         case PLAY_EPISODE:
@@ -232,10 +226,7 @@ export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
           return Audio.stop();
         case SKIP_TO_NEXT_EPISODE:
         case SKIP_TO_PREV_EPISODE:
-          const {
-            currentEpisode,
-            queue,
-          } = state.getState().player;
+          const { currentEpisode, queue } = state.getState().player;
           return Audio.skipTo(queue[currentEpisode]);
       }
     })
@@ -272,9 +263,7 @@ export const player = (
     case PLAY_EPISODE: {
       const queue = state.queue.concat(action.episode);
       const currentEpisode = queue.length - 1;
-      const {
-        duration,
-      } = queue[currentEpisode];
+      const { duration } = queue[currentEpisode];
       return {
         ...state,
         currentEpisode,
@@ -284,20 +273,20 @@ export const player = (
       };
     }
     case PAUSE_EPISODE: {
-      return state.queue.length === 0 || state.state === 'stopped' ?
-      state :
-      {
-        ...state,
-        state: 'paused',
-      };
+      return state.queue.length === 0 || state.state === 'stopped'
+        ? state
+        : {
+            ...state,
+            state: 'paused',
+          };
     }
     case RESUME_EPISODE: {
-      return state.queue.length === 0 || state.state === 'stopped' ?
-      state :
-      {
-        ...state,
-        state: 'playing',
-      };
+      return state.queue.length === 0 || state.state === 'stopped'
+        ? state
+        : {
+            ...state,
+            state: 'playing',
+          };
     }
     case STOP_EPISODE: {
       return {
@@ -308,9 +297,7 @@ export const player = (
     }
     case SKIP_TO_NEXT_EPISODE: {
       const currentEpisode = (state.currentEpisode + 1) % state.queue.length;
-      const {
-        duration,
-      } = state.queue[currentEpisode];
+      const { duration } = state.queue[currentEpisode];
       return {
         ...state,
         currentEpisode,
@@ -318,12 +305,9 @@ export const player = (
       };
     }
     case SKIP_TO_PREV_EPISODE: {
-      const currentEpisode = state.currentEpisode === 0 ?
-        state.queue.length - 1 :
-        (state.currentEpisode - 1) / state.queue.length;
-      const {
-        duration,
-      } = state.queue[currentEpisode];
+      const currentEpisode =
+        state.currentEpisode === 0 ? state.queue.length - 1 : (state.currentEpisode - 1) / state.queue.length;
+      const { duration } = state.queue[currentEpisode];
       return {
         ...state,
         currentEpisode,

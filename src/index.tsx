@@ -8,14 +8,9 @@ if (module.hot) {
   module.hot.accept();
 }
 
-import {
-  h,
-  render,
-} from 'preact';
+import { h, render } from 'preact';
 
-import {
-  Provider,
-} from 'preact-redux';
+import { Provider } from 'preact-redux';
 
 // Patch Rx operators
 import ConnectedApp from './containers/ConnectedApp';

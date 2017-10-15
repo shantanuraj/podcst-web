@@ -2,36 +2,19 @@
  * Actions / Reducer for subscriptions
  */
 
-import {
-  Observable,
-} from 'rxjs/Observable';
+import { Observable } from 'rxjs/Observable';
 
-import {
-  Epic,
-} from 'redux-observable';
+import { Epic } from 'redux-observable';
 
-import {
-  Actions,
-  IState,
-} from './root';
+import { Actions, IState } from './root';
 
-import {
-  showToast,
-} from './toast';
+import { showToast } from './toast';
 
-import {
-  INoopAction,
-  noop,
-} from './utils';
+import { INoopAction, noop } from './utils';
 
-import {
-  notNull,
-  opmltoJSON,
-} from '../utils';
+import { notNull, opmltoJSON } from '../utils';
 
-import {
-  Storage,
-} from '../utils/storage';
+import { Storage } from '../utils/storage';
 
 import Podcasts from '../api/Podcasts';
 
@@ -41,10 +24,7 @@ interface IAddSubscriptionAction {
   podcasts: App.RenderablePodcast;
 }
 const ADD_SUBSCRIPTION: IAddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
-export const addSubscription = (
-  feed: string,
-  podcasts: App.RenderablePodcast,
-): IAddSubscriptionAction => ({
+export const addSubscription = (feed: string, podcasts: App.RenderablePodcast): IAddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
   podcasts,
@@ -70,39 +50,33 @@ export const parseOPML = (file: string): IParseOPMLAction => ({
   file,
 });
 
-export type SubscriptionsActions =
-  IAddSubscriptionAction |
-  IRemoveSubscriptionAction |
-  IParseOPMLAction |
-  INoopAction;
+export type SubscriptionsActions = IAddSubscriptionAction | IRemoveSubscriptionAction | IParseOPMLAction | INoopAction;
 
 export interface ISubscriptionsState {
   subs: SubscriptionsMap;
 }
 
-export const parseOPMLEpic: Epic<Actions, IState> = (action$) =>
-  action$.ofType(PARSE_OPML)
-    .mergeMap((action: IParseOPMLAction) => {
-      const {
-        feeds,
-      } = opmltoJSON(action.file);
+export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
+  action$.ofType(PARSE_OPML).mergeMap((action: IParseOPMLAction) => {
+    const { feeds } = opmltoJSON(action.file);
 
-      const addSubscriptions = feeds.map(({ feed }) => Podcasts.episodes(feed)
+    const addSubscriptions = feeds.map(({ feed }) =>
+      Podcasts.episodes(feed)
         .filter(notNull)
-        .map((podcasts: App.PodcastEpisodesInfo) => addSubscription(feed, {...podcasts, feed})),
-      );
+        .map((podcasts: App.PodcastEpisodesInfo) => addSubscription(feed, { ...podcasts, feed })),
+    );
 
-      const actions = [
-        Observable.of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
-        ...addSubscriptions,
-        Observable.of(showToast('Import successful!')),
-      ];
+    const actions = [
+      Observable.of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
+      ...addSubscriptions,
+      Observable.of(showToast('Import successful!')),
+    ];
 
-      return Observable.concat(...actions);
-    });
+    return Observable.concat(...actions);
+  });
 
-export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> =
-  (action$, state) => action$
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, state) =>
+  action$
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
     .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))
     .map(noop);
@@ -115,14 +89,17 @@ export const subscriptions = (
 ): ISubscriptionsState => {
   switch (action.type) {
     case ADD_SUBSCRIPTION:
-      return {...state, subs: {
-        ...state.subs,
-        [action.feed]: action.podcasts,
-      }};
+      return {
+        ...state,
+        subs: {
+          ...state.subs,
+          [action.feed]: action.podcasts,
+        },
+      };
     case REMOVE_SUBSCRIPTION:
-      return {...state, subs: Object
-        .keys(state.subs)
-        .reduce((subs, feed) => {
+      return {
+        ...state,
+        subs: Object.keys(state.subs).reduce((subs, feed) => {
           if (feed !== action.feed) {
             subs[feed] = state.subs[feed];
           }

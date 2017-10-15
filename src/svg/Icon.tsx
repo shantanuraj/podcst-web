@@ -2,13 +2,9 @@
  * SVG Icons
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  style,
-} from 'typestyle';
+import { style } from 'typestyle';
 
 import DayIcon from './DayIcon';
 import NightIcon from './NightIcon';
@@ -16,12 +12,7 @@ import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
 import SettingsIcon from './SettingsIcon';
 
-export type IconType =
-  'play' |
-  'pause' |
-  'settings' |
-  'night' |
-  'day';
+export type IconType = 'play' | 'pause' | 'settings' | 'night' | 'day';
 
 interface IconProps {
   icon: IconType;
@@ -44,21 +35,13 @@ const getIcon = (icon: IconProps['icon']): JSX.Element => {
   return <PlayIcon />;
 };
 
-const iconStyle = (fill) => style({
-  fill,
-  height: '36px',
-  width: '36px',
-});
+const iconStyle = fill =>
+  style({
+    fill,
+    height: '36px',
+    width: '36px',
+  });
 
-const Icon = ({
-  icon,
-  color,
-}: IconProps) => (
-  <div
-    class={iconStyle(color)}
-  >
-    {getIcon(icon)}
-  </div>
-);
+const Icon = ({ icon, color }: IconProps) => <div class={iconStyle(color)}>{getIcon(icon)}</div>;
 
 export default Icon;

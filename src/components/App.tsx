@@ -2,33 +2,20 @@
  * App component
  */
 
-import {
-  Component,
-  h,
-} from 'preact';
+import { Component, h } from 'preact';
 
-import {
-  classes,
-  style,
-} from 'typestyle';
+import { classes, style } from 'typestyle';
 
 import { Router } from 'preact-router';
 import Match from 'preact-router/match';
 
-import {
-  fixGlobalStyles,
-  normalizeEl,
-} from '../utils/styles';
+import { fixGlobalStyles, normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
-import {
-  IAppState,
-} from '../stores/app';
+import { IAppState } from '../stores/app';
 
-import {
-  IMatchProps,
-} from '../stores/router';
+import { IMatchProps } from '../stores/router';
 
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
@@ -74,16 +61,9 @@ class App extends Component<IAppProps, never> {
 
   public setupMediaSession() {
     if ('mediaSession' in navigator) {
-      const {
-        mediaSession,
-      } = navigator as ChromeNavigator;
+      const { mediaSession } = navigator as ChromeNavigator;
 
-      const {
-        pauseEpisode,
-        resumeEpisode,
-        skipToNextEpisode,
-        skipToPrevEpisode,
-      } = this.props;
+      const { pauseEpisode, resumeEpisode, skipToNextEpisode, skipToPrevEpisode } = this.props;
 
       mediaSession.setActionHandler('play', resumeEpisode);
       mediaSession.setActionHandler('pause', pauseEpisode);
@@ -98,9 +78,7 @@ class App extends Component<IAppProps, never> {
       <div class={normalizeEl}>
         <Toolbar theme={theme} />
         <ConnectedLoader theme={theme} />
-        <main
-          class={classes(normalizeEl, container)}
-        >
+        <main class={classes(normalizeEl, container)}>
           <Router>
             <ConnectedHome path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />

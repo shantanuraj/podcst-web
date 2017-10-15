@@ -23,7 +23,7 @@ const HOST_REGEX = /^https?\:\/\/(www\.)?(.*)/;
 export const linkifyText = (text: string): string => {
   const tokens = text.split(/\s/);
   const linkifed = tokens.map((token, i) => {
-    const hasSpace = i !== (tokens.length - 1);
+    const hasSpace = i !== tokens.length - 1;
     const maybeSpace = hasSpace ? ' ' : '';
 
     if (URL_REGEX.test(token)) {
@@ -46,20 +46,7 @@ export const stripHost = (link: string): string => (link.match(HOST_REGEX) as Re
  */
 export const scrollToTop = () => process.env.IN_BROWSER && window.scrollTo(0, 0);
 
-const months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
  * Get month name for month number
@@ -76,9 +63,9 @@ export const formatTime = (total: number, currentTime: number) => {
   date.setSeconds(time);
 
   const res = date.toISOString().substr(11, 8);
-  const [ hh ] = res.split(':');
+  const [hh] = res.split(':');
 
-  return res.slice((hh === '00') ? 3 : 0);
+  return res.slice(hh === '00' ? 3 : 0);
 };
 
 /**
@@ -105,9 +92,7 @@ const adaptFeed = (el: HTMLElement): OPMLFeed => ({
 export const opmltoJSON = (file: string): OPMLJson => {
   const parser = new DOMParser();
   const xml = parser.parseFromString(file, 'text/xml');
-  const feeds = Array.from(
-    xml.querySelectorAll('outline[type="rss"]'),
-  ) as HTMLElement[];
+  const feeds = Array.from(xml.querySelectorAll('outline[type="rss"]')) as HTMLElement[];
 
   return {
     feeds: feeds.map(adaptFeed),
@@ -129,14 +114,13 @@ export const notNull = <T>(val: T | null) => val !== null;
 /**
  * Add feed prop to episodes
  */
-export const patchEpisodesResponse = (feed: string) =>
-  (res: App.EpisodeListing | null): App.PodcastEpisodesInfo | null => {
-    if (res) {
-      const episodes: App.EpisodeInfo[] = res
-        .episodes
-        .map((episode) => ({ ...episode, feed }));
-      return { ...res, episodes };
-    } else {
-      return null;
-    }
-  };
+export const patchEpisodesResponse = (feed: string) => (
+  res: App.EpisodeListing | null,
+): App.PodcastEpisodesInfo | null => {
+  if (res) {
+    const episodes: App.EpisodeInfo[] = res.episodes.map(episode => ({ ...episode, feed }));
+    return { ...res, episodes };
+  } else {
+    return null;
+  }
+};

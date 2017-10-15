@@ -2,35 +2,29 @@
  * Episode view
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  Link,
-} from 'preact-router';
+import { Link } from 'preact-router';
 
-import {
-  media,
-  style,
-} from 'typestyle';
+import { media, style } from 'typestyle';
 
-import {
-  getEpisodeRoute,
-  monthName,
-} from '../utils';
+import { getEpisodeRoute, monthName } from '../utils';
 
-const episodeContainer = (theme: App.Theme) => style({
-  paddingTop: 16,
-  paddingBottom: 16,
-  paddingLeft: 32,
-  paddingRight: 32,
-  $nest: {
-    '&:nth-child(even)': {
-      backgroundColor: theme.backgroundLight,
+const episodeContainer = (theme: App.Theme) =>
+  style(
+    {
+      paddingTop: 16,
+      paddingBottom: 16,
+      paddingLeft: 32,
+      paddingRight: 32,
+      $nest: {
+        '&:nth-child(even)': {
+          backgroundColor: theme.backgroundLight,
+        },
+      },
     },
-  },
-}, media({ maxWidth: 600 }, { padding: 16 } ));
+    media({ maxWidth: 600 }, { padding: 16 }),
+  );
 
 const episodeRow = style({
   display: 'flex',
@@ -48,36 +42,38 @@ const episodeTitle = style({
   alignItems: 'center',
 });
 
-const subContainer = (theme: App.Theme) => style({
-  marginRight: 16,
-  color: theme.subTitle,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  $nest: {
-    '& > p': {
-      margin: 4,
+const subContainer = (theme: App.Theme) =>
+  style({
+    marginRight: 16,
+    color: theme.subTitle,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    $nest: {
+      '& > p': {
+        margin: 4,
+      },
     },
-  },
-});
+  });
 
-const playButton = (theme: App.Theme) => style({
-  display: 'inline-block',
-  minWidth: '80px',
-  borderRadius: '3px',
-  padding: '8px',
-  background: 'transparent',
-  color: theme.text,
-  border: `2px solid ${theme.accent}`,
-  $nest: {
-    '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {
-      outline: 0,
-      backgroundColor: theme.accent,
-      color: theme.background,
+const playButton = (theme: App.Theme) =>
+  style({
+    display: 'inline-block',
+    minWidth: '80px',
+    borderRadius: '3px',
+    padding: '8px',
+    background: 'transparent',
+    color: theme.text,
+    border: `2px solid ${theme.accent}`,
+    $nest: {
+      '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {
+        outline: 0,
+        backgroundColor: theme.accent,
+        color: theme.background,
+      },
     },
-  },
-});
+  });
 
 interface IEpisodeRowProps {
   episode: App.EpisodeInfo;
@@ -90,46 +86,25 @@ interface IEpisodeRowProps {
   pause: () => void;
 }
 
-const renderButton = ({
-  currentEpisode,
-  episode,
-  play,
-  pause,
-  resume,
-  state,
-  theme,
-}: IEpisodeRowProps) => {
+const renderButton = ({ currentEpisode, episode, play, pause, resume, state, theme }: IEpisodeRowProps) => {
   const isCurrent = currentEpisode === episode;
   const isPlaying = isCurrent && state === 'playing';
-  const isPaused  = isCurrent && state === 'paused';
+  const isPaused = isCurrent && state === 'paused';
 
-  const handler = isPlaying ? pause : (isPaused ? resume : play);
-  const text = isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play');
+  const handler = isPlaying ? pause : isPaused ? resume : play;
+  const text = isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play';
 
   return (
-    <button
-      class={playButton(theme)}
-      data-is-playing={isPlaying}
-      data-is-paused={isPaused}
-      onClick={handler}
-    >
+    <button class={playButton(theme)} data-is-playing={isPlaying} data-is-paused={isPaused} onClick={handler}>
       {text}
     </button>
   );
 };
 
 const EpisodeRow = (props: IEpisodeRowProps) => {
-  const {
-    episode,
-    feed,
-    theme,
-  } = props;
+  const { episode, feed, theme } = props;
 
-  const {
-    title,
-    published,
-    duration,
-  } = episode;
+  const { title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
@@ -147,19 +122,14 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
             <p>{day}</p>
           </div>
         </div>
-        <Link
-          class={episodeTitle}
-          href={getEpisodeRoute(feed, title)}
-        >
+        <Link class={episodeTitle} href={getEpisodeRoute(feed, title)}>
           {title}
         </Link>
         <div class={subContainerTheme}>
           <p>{minutes || ''}</p>
           <p>{minutes ? minutesSuffix : ''}</p>
         </div>
-        <div class={container}>
-          {renderButton(props)}
-        </div>
+        <div class={container}>{renderButton(props)}</div>
       </div>
     </div>
   );

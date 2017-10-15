@@ -2,32 +2,17 @@
  * Keyboard shortcuts epic root
  */
 
-import {
-  Observable,
-} from 'rxjs/Observable';
+import { Observable } from 'rxjs/Observable';
 
-import {
-  Epic,
-} from 'redux-observable';
+import { Epic } from 'redux-observable';
 
-import {
-  getEpisodeRoute,
-  isNotIgnoreElement,
-} from '../utils';
+import { getEpisodeRoute, isNotIgnoreElement } from '../utils';
 
-import {
-  Actions,
-  IState,
-} from './root';
+import { Actions, IState } from './root';
 
-import {
-  noop,
-} from './utils';
+import { noop } from './utils';
 
-import {
-  APP_INIT,
-  changeTheme,
-} from './app';
+import { APP_INIT, changeTheme } from './app';
 
 import {
   manualSeekUpdate,
@@ -39,9 +24,7 @@ import {
   STOP_EPISODE,
 } from './player';
 
-import {
-  navigate,
-} from './router';
+import { navigate } from './router';
 
 /**
  * Seek delta in seconds
@@ -59,13 +42,11 @@ const ChangeThemeKeys: KeyboardShortcutsMap = {
  * Theme change shortcut epic
  */
 export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
-  action$.ofType(APP_INIT)
-    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
-      .filter((event) => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target))
-      .map(() => changeTheme(
-        store.getState().app.mode === 'dark' ? 'light' : 'dark',
-      )),
-    );
+  action$.ofType(APP_INIT).switchMap(() =>
+    Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+      .filter(event => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target))
+      .map(() => changeTheme(store.getState().app.mode === 'dark' ? 'light' : 'dark')),
+  );
 
 /**
  * Keyboard shortcut map for controlling map
@@ -88,32 +69,26 @@ const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
  * Player seekbar jump-controls epic
  */
 export const seekbarJumpsEpic: Epic<Actions, IState> = (action$, store) =>
-  action$.ofType(PLAY_EPISODE)
-    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+  action$.ofType(PLAY_EPISODE).switchMap(() =>
+    Observable.fromEvent<KeyboardEvent>(document, 'keyup')
       .filter(({ keyCode, target }) => isSeekKey(keyCode) && isNotIgnoreElement(target))
-      .map((e) => {
+      .map(e => {
         const { duration } = store.getState().player;
         const seekPercent = (e.keyCode - 48) / 10;
         const seekTo = duration * seekPercent;
         return manualSeekUpdate(seekTo, duration);
       }),
-    );
+  );
 
 /**
  * Player controls epic
  */
 export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
-  action$.ofType(PLAY_EPISODE)
-    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
+  action$.ofType(PLAY_EPISODE).switchMap(() =>
+    Observable.fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) => !!PlayerControlKeys[keyCode] && isNotIgnoreElement(target))
-      .map((e) => {
-        const {
-          state,
-          seekPosition,
-          duration,
-          currentEpisode,
-          queue,
-        } = store.getState().player;
+      .map(e => {
+        const { state, seekPosition, duration, currentEpisode, queue } = store.getState().player;
 
         // Space for scroll check
         if (!(e.keyCode === 32 && state === 'stopped')) {
@@ -123,9 +98,12 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
         const episode = queue[currentEpisode];
         const shortcut = PlayerControlKeys[e.keyCode];
         switch (shortcut) {
-          case 'play': return state === 'paused' ? resumeEpisode() : pauseEpisode();
-          case 'next': return skipToNextEpisode();
-          case 'prev': return skipToPrevEpisode();
+          case 'play':
+            return state === 'paused' ? resumeEpisode() : pauseEpisode();
+          case 'next':
+            return skipToNextEpisode();
+          case 'prev':
+            return skipToPrevEpisode();
           case 'seek-back':
           case 'seek-forward':
             const seekTo = seekPosition + SEEK_DELTA * (shortcut === 'seek-forward' ? 1 : -1);
@@ -137,11 +115,12 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
             } else {
               return noop();
             }
-          default: return noop();
+          default:
+            return noop();
         }
       })
       .takeUntil(action$.ofType(STOP_EPISODE)),
-    );
+  );
 
 /**
  * Keyboard shortcut map for opening settings
@@ -153,9 +132,9 @@ const OpenSettingsKeys: KeyboardShortcutsMap = {
 /**
  * Open settings epic
  */
-export const settingsShortcutEpic: Epic<Actions, IState> = (action$) =>
-  action$.ofType(APP_INIT)
-    .switchMap(() => Observable.fromEvent<KeyboardEvent>(document, 'keydown')
+export const settingsShortcutEpic: Epic<Actions, IState> = action$ =>
+  action$.ofType(APP_INIT).switchMap(() =>
+    Observable.fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) => !!OpenSettingsKeys[keyCode] && isNotIgnoreElement(target))
       .map(() => navigate('/settings')),
-    );
+  );

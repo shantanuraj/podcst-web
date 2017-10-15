@@ -2,9 +2,7 @@
  * Light theme constants
  */
 
-import {
-  keyframes,
-} from 'typestyle';
+import { keyframes } from 'typestyle';
 
 const background = '#ffffff';
 const accent = '#8649b2';

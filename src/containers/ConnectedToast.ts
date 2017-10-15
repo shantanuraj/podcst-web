@@ -2,13 +2,9 @@
  * Connected Toast component
  */
 
-import {
-  connect,
-} from 'preact-redux';
+import { connect } from 'preact-redux';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
 import Toast from '../components/Toast';
 
@@ -17,8 +13,6 @@ const mapState = (state: IState) => ({
   theme: state.app.theme,
 });
 
-const ConnectedToast = connect(
-  mapState,
-)(Toast);
+const ConnectedToast = connect(mapState)(Toast);
 
 export default ConnectedToast;

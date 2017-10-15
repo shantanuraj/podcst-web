@@ -3,8 +3,7 @@
  */
 type ExplicitState = 'explicit' | 'cleaned' | 'notExplicit';
 
-type FeedType =
-  'top';
+type FeedType = 'top';
 
 /**
  * Application type dependencies
@@ -98,9 +97,11 @@ declare namespace App {
     episodes: EpisodeInfo[];
   }
 
-  type RenderablePodcast = Podcast | (PodcastEpisodesInfo & {
-    feed: string;
-  });
+  type RenderablePodcast =
+    | Podcast
+    | (PodcastEpisodesInfo & {
+        feed: string;
+      });
 
   /**
    * Podcasts Search result interface
@@ -146,25 +147,22 @@ interface OPMLJson {
   feeds: OPMLFeed[];
 }
 
-type EpisodePlayerState =
-  'playing' |
-  'paused'  |
-  'stopped';
+type EpisodePlayerState = 'playing' | 'paused' | 'stopped';
 
 type KeyboardShortcuts =
-  'play' |
-  'next' |
-  'prev' |
-  'seek-back' |
-  'seek-forward' |
-  'dismiss' |
-  'focus' |
-  'up' |
-  'down' |
-  'change-theme' |
-  'episode-info' |
-  'settings' |
-  'select';
+  | 'play'
+  | 'next'
+  | 'prev'
+  | 'seek-back'
+  | 'seek-forward'
+  | 'dismiss'
+  | 'focus'
+  | 'up'
+  | 'down'
+  | 'change-theme'
+  | 'episode-info'
+  | 'settings'
+  | 'select';
 
 interface KeyboardShortcutsMap {
   [keyCode: number]: KeyboardShortcuts;
@@ -187,7 +185,7 @@ interface Process {
     APP_VERSION: string;
     IN_BROWSER: string;
     NODE_ENV: 'development' | 'produciton';
-  }
+  };
 }
 
 interface Artwork {
@@ -204,16 +202,10 @@ interface ChromeMediaMetadataProps {
 }
 
 interface ChromeMediaMetadata {
-  new(props: ChromeMediaMetadataProps): ChromeMediaMetadata;
+  new (props: ChromeMediaMetadataProps): ChromeMediaMetadata;
 }
 
-type ChromeMediaSessionEvents =
-  'play' |
-  'pause' |
-  'seekbackward' |
-  'seekforward' |
-  'previoustrack' |
-  'nexttrack';
+type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';
 
 type ChromeEventHandler = () => void;
 

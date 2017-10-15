@@ -2,15 +2,11 @@
  * Actions and reducer for Podcasts store
  */
 
-import {
-  Epic,
-} from 'redux-observable';
+import { Epic } from 'redux-observable';
 
 import Podcasts from '../api/Podcasts';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
 interface IGetEpisodesAction {
   type: 'GET_EPISODES';
@@ -37,9 +33,7 @@ export const getEpisodesSuccess = (
   feed,
 });
 
-export type PodcastsAction =
-  IGetEpisodesAction |
-  IGetEpisodesSuccessAction;
+export type PodcastsAction = IGetEpisodesAction | IGetEpisodesSuccessAction;
 
 export interface IPodcastsState {
   [feed: string]: {
@@ -51,28 +45,32 @@ export interface IPodcastsState {
 /**
  * Get episodes epic
  */
-export const getEpisodesEpic: Epic<PodcastsAction, IState> = (action$) =>
+export const getEpisodesEpic: Epic<PodcastsAction, IState> = action$ =>
   action$
     .ofType(GET_EPISODES)
     .mergeMap((action: IGetEpisodesAction) =>
-      Podcasts
-        .episodes(action.feed)
-        .map((episodes) => getEpisodesSuccess(action.feed, episodes)),
+      Podcasts.episodes(action.feed).map(episodes => getEpisodesSuccess(action.feed, episodes)),
     );
 
 export const podcasts = (state: IPodcastsState = {}, action: PodcastsAction): IPodcastsState => {
   switch (action.type) {
     case GET_EPISODES:
-      return {...state, [action.feed]: {
-        ...state[action.feed],
-        loading: true,
-      }};
+      return {
+        ...state,
+        [action.feed]: {
+          ...state[action.feed],
+          loading: true,
+        },
+      };
     case GET_EPISODES_SUCCESS:
-      return {...state, [action.feed]: {
-        ...state[action.feed],
-        episodes: action.episodes,
-        loading: false,
-      }};
+      return {
+        ...state,
+        [action.feed]: {
+          ...state[action.feed],
+          episodes: action.episodes,
+          loading: false,
+        },
+      };
     default:
       return state;
   }

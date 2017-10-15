@@ -2,43 +2,40 @@
  * Player component
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  media,
-  style,
-} from 'typestyle';
+import { media, style } from 'typestyle';
 
-import {
-  IPlayerState,
-} from '../stores/player';
+import { IPlayerState } from '../stores/player';
 
 import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
 
-const player = (theme: App.Theme) => style(
-  {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    height: '64px',
-    width: '100%',
-    zIndex: 500,
-    fontSize: 20,
-    color: theme.text,
-    boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
-  },
-  media({ maxWidth: 600 }, {
-    height: '128px',
-    flexDirection: 'column-reverse',
-    alignItems: 'stretch',
-  }),
-);
+const player = (theme: App.Theme) =>
+  style(
+    {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      height: '64px',
+      width: '100%',
+      zIndex: 500,
+      fontSize: 20,
+      color: theme.text,
+      boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        height: '128px',
+        flexDirection: 'column-reverse',
+        alignItems: 'stretch',
+      },
+    ),
+  );
 
 interface IPlayerProps extends IPlayerState {
   theme: App.Theme;
@@ -71,13 +68,7 @@ const Player = ({
 
   return (
     <div class={player(theme)}>
-      <PlayerInfo
-        episode={episode}
-        pause={pause}
-        resume={resume}
-        state={state}
-        theme={theme}
-      />
+      <PlayerInfo episode={episode} pause={pause} resume={resume} state={state} theme={theme} />
       <Seekbar
         buffering={buffering}
         onSeek={onSeek}

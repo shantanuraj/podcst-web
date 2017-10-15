@@ -2,9 +2,7 @@
  * Import Podcasts component
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
 const onChange = (cb: (file: string) => void) => {
   return (e: Event) => {
@@ -23,20 +21,10 @@ interface IImportPodcastsProps {
   parseOPML: (contents: string) => void;
 }
 
-const ImportPodcasts = ({
-  parseOPML,
-}: IImportPodcastsProps) => (
+const ImportPodcasts = ({ parseOPML }: IImportPodcastsProps) => (
   <div>
-    <input
-      id="opml-import"
-      accept=".xml, .opml"
-      name="file"
-      type="file"
-      onChange={onChange(parseOPML)}
-    />
-    <label for="opml-import">
-      Upload OPML File
-    </label>
+    <input id="opml-import" accept=".xml, .opml" name="file" type="file" onChange={onChange(parseOPML)} />
+    <label for="opml-import">Upload OPML File</label>
   </div>
 );
 

@@ -2,39 +2,27 @@
  * Connected Loader component
  */
 
-import {
-  connect,
-} from 'preact-redux';
+import { connect } from 'preact-redux';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
-import {
-  IFeedData,
-} from '../stores/feed';
+import { IFeedData } from '../stores/feed';
 
 import Loader from '../components/Loader';
 
 const mapState = (state: IState) => {
-  const {
-    feed,
-    podcasts,
-    search,
-  } = state;
+  const { feed, podcasts, search } = state;
 
   const stateLoading = {
     loading: true,
   };
 
-  const loadingFeed = Object.keys(feed)
-    .find((key) => (feed[key] as IFeedData).loading);
+  const loadingFeed = Object.keys(feed).find(key => (feed[key] as IFeedData).loading);
   if (loadingFeed) {
     return stateLoading;
   }
 
-  const loadingPodcast = Object.keys(podcasts)
-    .find((key) => podcasts[key].loading);
+  const loadingPodcast = Object.keys(podcasts).find(key => podcasts[key].loading);
   if (loadingPodcast) {
     return stateLoading;
   }
@@ -48,8 +36,6 @@ const mapState = (state: IState) => {
   };
 };
 
-const ConnectedLoader = connect(
-  mapState,
-)(Loader);
+const ConnectedLoader = connect(mapState)(Loader);
 
 export default ConnectedLoader;

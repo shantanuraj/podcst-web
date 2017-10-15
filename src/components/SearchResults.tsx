@@ -2,48 +2,44 @@
  * Search results component
  */
 
-import {
-  Observable,
-} from 'rxjs/Observable';
+import { Observable } from 'rxjs/Observable';
 
-import {
-  Subscription,
-} from 'rxjs/Subscription';
+import { Subscription } from 'rxjs/Subscription';
 
-import {
-  Component,
-  h,
-} from 'preact';
+import { Component, h } from 'preact';
 
-import {
-  Link,
-} from 'preact-router';
+import { Link } from 'preact-router';
 
-import {
-  media,
-  style,
-} from 'typestyle';
+import { media, style } from 'typestyle';
 
-const results = (theme: App.Theme) => style({
-  backgroundColor: theme.background,
-  position: 'absolute',
-  right: 0,
-  width: '30%',
-  maxHeight: '500px',
-  boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
-  overflow: 'scroll',
-}, media({ maxWidth: 600 }, {
-  width: '75%',
-}));
-
-const result = (theme: App.Theme) => style({
-  display: 'flex',
-  $nest: {
-    '&[data-focus]': {
-      backgroundColor: theme.backgroundLight,
+const results = (theme: App.Theme) =>
+  style(
+    {
+      backgroundColor: theme.background,
+      position: 'absolute',
+      right: 0,
+      width: '30%',
+      maxHeight: '500px',
+      boxShadow: '0px 15px 20px 0px rgba(0,0,0,0.75)',
+      overflow: 'scroll',
     },
-  },
-});
+    media(
+      { maxWidth: 600 },
+      {
+        width: '75%',
+      },
+    ),
+  );
+
+const result = (theme: App.Theme) =>
+  style({
+    display: 'flex',
+    $nest: {
+      '&[data-focus]': {
+        backgroundColor: theme.backgroundLight,
+      },
+    },
+  });
 
 const resultImage = style({
   height: '50px',
@@ -88,7 +84,6 @@ const Key: KeyboardShortcutsMap = {
 };
 
 class SearchResults extends Component<ISearchResultsProps, any> {
-
   public el: HTMLDivElement | null;
   public navigationSub: Subscription | null;
 
@@ -105,31 +100,21 @@ class SearchResults extends Component<ISearchResultsProps, any> {
       const parent = this.el.parentElement;
       if (parent) {
         this.navigationSub = Observable.fromEvent(parent, 'keydown')
-        .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
-        .subscribe((e: KeyboardEvent) => {
-          e.preventDefault();
-          switch (Key[e.keyCode]) {
-            case 'up':
-            case 'down': {
-              return this.props.navigateResult(
-                Key[e.keyCode] as 'up' | 'down',
-              );
+          .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
+          .subscribe((e: KeyboardEvent) => {
+            e.preventDefault();
+            switch (Key[e.keyCode]) {
+              case 'up':
+              case 'down': {
+                return this.props.navigateResult(Key[e.keyCode] as 'up' | 'down');
+              }
+              case 'select': {
+                const { podcasts, focusedResult, onResultSelect, dismissSearch } = this.props;
+                const selectedPodcast = podcasts[focusedResult];
+                return onResultSelect(selectedPodcast.feed), dismissSearch();
+              }
             }
-            case 'select': {
-              const {
-                podcasts,
-                focusedResult,
-                onResultSelect,
-                dismissSearch,
-              } = this.props;
-              const selectedPodcast = podcasts[focusedResult];
-              return (
-                onResultSelect(selectedPodcast.feed),
-                dismissSearch()
-              );
-            }
-          }
-        });
+          });
       }
     }
   }
@@ -141,33 +126,20 @@ class SearchResults extends Component<ISearchResultsProps, any> {
     dismissSearch: ISearchResultsProps['dismissSearch'],
     theme: ISearchResultsProps['theme'],
   ) => (
-    <Link
-      onClick={dismissSearch}
-      href={`/episodes?feed=${podcast.feed}`}
-    >
-      <div
-        class={result(theme)}
-        data-focus={isFocussed}
-        onMouseEnter={focusResult}
-      >
+    <Link onClick={dismissSearch} href={`/episodes?feed=${podcast.feed}`}>
+      <div class={result(theme)} data-focus={isFocussed} onMouseEnter={focusResult}>
         <img class={resultImage} src={podcast.thumbnail} />
         <div class={resultText}>
-          <p
-            class={resultPodcastTitle}
-            title={podcast.title}
-          >
+          <p class={resultPodcastTitle} title={podcast.title}>
             {podcast.title}
           </p>
-          <p
-            class={resultAuthorText}
-            title={podcast.author}
-          >
+          <p class={resultAuthorText} title={podcast.author}>
             {podcast.author}
           </p>
         </div>
       </div>
     </Link>
-  )
+  );
 
   public renderPodcasts = (
     podcasts: App.PodcastSearchResult[],
@@ -175,36 +147,15 @@ class SearchResults extends Component<ISearchResultsProps, any> {
     focusResult: ISearchResultsProps['focusResult'],
     dismissSearch: ISearchResultsProps['dismissSearch'],
     theme: ISearchResultsProps['theme'],
-  ) => (
-    podcasts.map((podcast, i) => this.renderPodcast(
-      podcast,
-      focusedResult === i,
-      () => focusResult(i),
-      dismissSearch,
-      theme,
-    ))
-  )
+  ) =>
+    podcasts.map((podcast, i) =>
+      this.renderPodcast(podcast, focusedResult === i, () => focusResult(i), dismissSearch, theme),
+    );
 
-  public render({
-    dismissSearch,
-    focusResult,
-    focusedResult,
-    podcasts,
-    theme,
-  }: ISearchResultsProps) {
+  public render({ dismissSearch, focusResult, focusedResult, podcasts, theme }: ISearchResultsProps) {
     return (
-      <div
-        class={results(theme)}
-        onClick={dismissSearch}
-        ref={(el) => this.el = el as HTMLDivElement}
-      >
-        {this.renderPodcasts(
-          podcasts,
-          focusedResult,
-          focusResult,
-          dismissSearch,
-          theme,
-        )}
+      <div class={results(theme)} onClick={dismissSearch} ref={el => (this.el = el as HTMLDivElement)}>
+        {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch, theme)}
       </div>
     );
   }

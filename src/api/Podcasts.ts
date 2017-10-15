@@ -2,14 +2,10 @@
  * TextShare API
  */
 
-import {
-  Observable,
-} from 'rxjs/Observable';
+import { Observable } from 'rxjs/Observable';
 import { ajax } from 'rxjs/observable/dom/ajax';
 
-import {
-  patchEpisodesResponse,
-} from '../utils';
+import { patchEpisodesResponse } from '../utils';
 
 export default class Podcasts {
   private static HOST = 'https://data.podcst.io';
@@ -24,7 +20,7 @@ export default class Podcasts {
 
   public static feed(type: FeedType): Observable<App.Podcast[]> {
     return ajax(Podcasts.api(`/${type}?limit=100`))
-      .map((res) => res.response as App.Podcast[])
+      .map(res => res.response as App.Podcast[])
       .catch(() => {
         return Observable.of([]);
       });
@@ -32,7 +28,7 @@ export default class Podcasts {
 
   public static search(term: string): Observable<App.PodcastSearchResult[]> {
     return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`))
-      .map((res) => res.response as App.Podcast[])
+      .map(res => res.response as App.Podcast[])
       .catch(() => {
         return Observable.of([]);
       });
@@ -41,7 +37,7 @@ export default class Podcasts {
   public static episodes(url: string): Observable<App.PodcastEpisodesInfo | null> {
     const patchRes = patchEpisodesResponse(url);
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
-      .map((res) => res.response as App.EpisodeListing | null)
+      .map(res => res.response as App.EpisodeListing | null)
       .map(patchRes)
       .catch(() => {
         return Observable.of(null);

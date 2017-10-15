@@ -1,46 +1,39 @@
 import { Component, h } from 'preact';
-import {
-  classes,
-  media,
-  style,
-  types,
-} from 'typestyle';
+import { classes, media, style, types } from 'typestyle';
 
-import {
-  IPodcastsState,
-} from '../stores/podcasts';
+import { IPodcastsState } from '../stores/podcasts';
 
-import {
-  scrollToTop,
-  stripHost,
-} from '../utils';
+import { scrollToTop, stripHost } from '../utils';
 
-import {
-  normalizeEl,
-} from '../utils/styles';
+import { normalizeEl } from '../utils/styles';
 
 import EpisodeRow from './EpisodeRow';
 import Loading from './Loading';
 
-const episodesContainer = (theme: App.Theme) => style({
-  backgroundColor: theme.background,
-  color: theme.text,
-});
+const episodesContainer = (theme: App.Theme) =>
+  style({
+    backgroundColor: theme.background,
+    color: theme.text,
+  });
 
-const infoCover = (cover: string) => style(
-  {
-    backgroundImage: `url(${cover})`,
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: 'cover',
-    width: '300px',
-    height: '300px',
-    minWidth: '300px',
-  },
-  media({ maxWidth: 600 }, {
-    width: '100vw',
-    height: '100vw',
-  }),
-);
+const infoCover = (cover: string) =>
+  style(
+    {
+      backgroundImage: `url(${cover})`,
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: 'cover',
+      width: '300px',
+      height: '300px',
+      minWidth: '300px',
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        width: '100vw',
+        height: '100vw',
+      },
+    ),
+  );
 
 const podcastInfo = style(
   {
@@ -48,25 +41,29 @@ const podcastInfo = style(
     padding: 32,
     paddingBottom: 0,
   },
-  media({ maxWidth: 600 }, {
-    flexDirection: 'column',
-    padding: 0,
-  }),
+  media(
+    { maxWidth: 600 },
+    {
+      flexDirection: 'column',
+      padding: 0,
+    },
+  ),
 );
 
-const podcastInfoTitles = (theme: App.Theme) => style({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'flex-start',
-  justifyContent: 'flex-start',
-  padding: 16,
-  paddingTop: 0,
-  $nest: {
-    '& a': {
-      color: theme.accent,
+const podcastInfoTitles = (theme: App.Theme) =>
+  style({
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    padding: 16,
+    paddingTop: 0,
+    $nest: {
+      '& a': {
+        color: theme.accent,
+      },
     },
-  },
-});
+  });
 
 const margins: types.NestedCSSProperties = {
   marginTop: 8,
@@ -75,48 +72,52 @@ const margins: types.NestedCSSProperties = {
 
 const infoMargins = style(margins);
 
-const podcastTitle = style(
-  margins,
-  {
-    fontSize: '40px',
-    fontWeight: 'bold',
-  },
-);
-
-const subscribeButton = (theme: App.Theme) => style({
-  display: 'inline-block',
-  minWidth: '120px',
-  borderRadius: '3px',
-  padding: '8px',
-  background: 'transparent',
-  color: theme.text,
-  border: `2px solid ${theme.accent}`,
-  outline: 0,
-  $nest: {
-    '&:focus, &:hover, &[data-is-subscribed]': {
-      backgroundColor: theme.accent,
-      color: theme.background,
-    },
-    '&[data-is-subscribed]:hover': {
-      background: 'transparent',
-      color: theme.text,
-    },
-  },
+const podcastTitle = style(margins, {
+  fontSize: '40px',
+  fontWeight: 'bold',
 });
 
-const episodesView = style({
-  $nest: {
-    '&[data-is-player-visible]': {
-      paddingBottom: 64,
+const subscribeButton = (theme: App.Theme) =>
+  style({
+    display: 'inline-block',
+    minWidth: '120px',
+    borderRadius: '3px',
+    padding: '8px',
+    background: 'transparent',
+    color: theme.text,
+    border: `2px solid ${theme.accent}`,
+    outline: 0,
+    $nest: {
+      '&:focus, &:hover, &[data-is-subscribed]': {
+        backgroundColor: theme.accent,
+        color: theme.background,
+      },
+      '&[data-is-subscribed]:hover': {
+        background: 'transparent',
+        color: theme.text,
+      },
+    },
+  });
+
+const episodesView = style(
+  {
+    $nest: {
+      '&[data-is-player-visible]': {
+        paddingBottom: 64,
+      },
     },
   },
-}, media({ maxWidth: 600 }, {
-  $nest: {
-    '&[data-is-player-visible]': {
-      paddingBottom: 128,
+  media(
+    { maxWidth: 600 },
+    {
+      $nest: {
+        '&[data-is-player-visible]': {
+          paddingBottom: 128,
+        },
+      },
     },
-  },
-}));
+  ),
+);
 
 interface IEpisodesProps {
   theme: App.Theme;
@@ -135,21 +136,14 @@ interface IEpisodesProps {
 
 class Episodes extends Component<IEpisodesProps, any> {
   public loadIfNeeded = () => {
-    const {
-      feed,
-      getEpisodes,
-      info,
-    } = this.props;
+    const { feed, getEpisodes, info } = this.props;
 
     const feedInfo = info[feed];
 
-    if (
-      !feedInfo ||
-      (feedInfo && !feedInfo.episodes && !feedInfo.loading)
-    ) {
+    if (!feedInfo || (feedInfo && !feedInfo.episodes && !feedInfo.loading)) {
       getEpisodes(feed);
     }
-  }
+  };
 
   public componentDidMount() {
     this.loadIfNeeded();
@@ -165,15 +159,7 @@ class Episodes extends Component<IEpisodesProps, any> {
   }
 
   public renderEpisode = (episode: App.EpisodeInfo) => {
-    const {
-      currentEpisode,
-      playEpisode,
-      pauseEpisode,
-      resumeEpisode,
-      state,
-      theme,
-      feed,
-    } = this.props;
+    const { currentEpisode, playEpisode, pauseEpisode, resumeEpisode, state, theme, feed } = this.props;
 
     const play = () => playEpisode(episode);
 
@@ -189,60 +175,35 @@ class Episodes extends Component<IEpisodesProps, any> {
         currentEpisode={currentEpisode}
       />
     );
-  }
+  };
 
   public renderLoaded(feed: string, info: App.PodcastEpisodesInfo | null) {
     if (!info) {
-      return (
-        <div>
-          Couldn't get Podcasts episodes
-        </div>
-      );
+      return <div>Couldn't get Podcasts episodes</div>;
     }
 
-    const {
-      addSubscription,
-      removeSubscription,
-      subscriptions,
-      state,
-      theme,
-    } = this.props;
+    const { addSubscription, removeSubscription, subscriptions, state, theme } = this.props;
 
     const isSubscribed = !!subscriptions[feed];
     const isPlayerVisible = state !== 'stopped';
 
-    const {
-      author,
-      cover,
-      description,
-      episodes,
-      link,
-      title,
-    } = info;
+    const { author, cover, description, episodes, link, title } = info;
 
     const handler = () => {
-      isSubscribed ?
-        removeSubscription(feed) :
-        addSubscription(feed, {...info, feed});
+      isSubscribed ? removeSubscription(feed) : addSubscription(feed, { ...info, feed });
     };
 
     return (
       <div class={classes(normalizeEl, episodesContainer(theme))}>
         <div class={podcastInfo}>
-          <div
-            class={infoCover(cover)}
-            role="img"
-            aria-label={`${title} by ${author}`}
-          />
+          <div class={infoCover(cover)} role="img" aria-label={`${title} by ${author}`} />
           <div class={podcastInfoTitles(theme)}>
             <h1 class={podcastTitle}>{title}</h1>
-            <h2 class={infoMargins}>{author} - <a href={link}>{stripHost(link)}</a></h2>
+            <h2 class={infoMargins}>
+              {author} - <a href={link}>{stripHost(link)}</a>
+            </h2>
             <div class={infoMargins}>
-              <button
-                class={subscribeButton(theme)}
-                data-is-subscribed={isSubscribed}
-                onClick={handler}
-              >
+              <button class={subscribeButton(theme)} data-is-subscribed={isSubscribed} onClick={handler}>
                 {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
               </button>
             </div>
@@ -256,10 +217,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     );
   }
 
-  public render({
-    feed,
-    info,
-  }: IEpisodesProps) {
+  public render({ feed, info }: IEpisodesProps) {
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading) {
       return this.renderLoading();

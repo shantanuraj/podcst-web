@@ -2,9 +2,7 @@
  * Dark theme constants
  */
 
-import {
-  keyframes,
-} from 'typestyle';
+import { keyframes } from 'typestyle';
 
 const background = '#292929';
 const accent = '#82ffb5';

@@ -2,22 +2,13 @@
  * Connected Home component
  */
 
-import {
-  connect,
-} from 'preact-redux';
+import { connect } from 'preact-redux';
 
-import {
-  bindActionCreators,
-  Dispatch,
-} from 'redux';
+import { bindActionCreators, Dispatch } from 'redux';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
-import {
-  parseOPML,
-} from '../stores/subscriptions';
+import { parseOPML } from '../stores/subscriptions';
 
 import Home from '../components/Home';
 
@@ -26,13 +17,14 @@ const mapState = (state: IState) => ({
   theme: state.app.theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
-  parseOPML,
-}, dispatch);
+const mapDispatch = (dispatch: Dispatch<IState>) =>
+  bindActionCreators(
+    {
+      parseOPML,
+    },
+    dispatch,
+  );
 
-const ConnectedHome = connect(
-  mapState,
-  mapDispatch,
-)(Home);
+const ConnectedHome = connect(mapState, mapDispatch)(Home);
 
 export default ConnectedHome;

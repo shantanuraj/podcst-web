@@ -2,17 +2,11 @@
  * Utils for store
  */
 
-import {
-  IState,
-} from './root';
+import { IState } from './root';
 
-import {
-  Storage,
-} from '../utils/storage';
+import { Storage } from '../utils/storage';
 
-import {
-  ThemeProvider,
-} from '../styles';
+import { ThemeProvider } from '../styles';
 
 /**
  * Noop action
