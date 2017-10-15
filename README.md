@@ -1,7 +1,5 @@
 # podcst-web
 
-[Milestones](milestones?direction=asc&sort=due_date&state=open) |
-[Issues](issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) |
 [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
 Podcst Web is a modern PWA to listen to podcasts.
@@ -14,8 +12,8 @@ Another major focus is on accessibility, the app is and should be accessible to 
 This project uses the [gitflow](https://github.com/nvie/gitflow) branching model.
 See the [development](#development) section below for additional details.
 
-- [master](tree/master) is the production branch
-- [develop](tree/develop) is the active branch where commits are made
+- [master](https://github.com/shantanuraj/podcst-web/tree/master) is the production branch
+- [develop](https://github.com/shantanuraj/podcst-web/tree/develop) is the active branch where commits are made
 
 ### Prerequisites
 
@@ -88,7 +86,7 @@ yarn test
 The production releases of this website will be hosted on AWS
 
 The following steps, documented here for reference, they require authorized credentails for AWS.
-These can only be done by an AWS account administrator (such as [shantanuraj](/shantanuraj)).
+These can only be done by an AWS account administrator (such as [shantanuraj](https://github.com/shantanuraj)).
 
 
 ```shell
@@ -107,11 +105,8 @@ yarn deploy:prod
 * [Webpack 3](https://webpack.js.org/) - Bundling and transpiling TS to JS
 * [Howler](https://howlerjs.com/) - Manage play audio
 * [Workbox](https://workboxjs.org/) - Automated PWA generation
-* [Redux](http://redux.js.org/) - Manage application state
 * [Redux Observables](https://redux-observable.js.org/) - Sane tooling / philosophy to manage async redux actions
 * [typestyle](https://typestyle.github.io/) - Typechecked CSS in JS
-* [prettier](https://prettier.io/) - Opinionated Code Formatter
-* [tslint](https://palantir.github.io/tslint/) - Opinionated Code Linter
 
 ## Contributing
 
@@ -120,13 +115,13 @@ collaborating on this project.
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. For available versions of this softare, see the ([releases on this repository](releases)).
+We use [SemVer](http://semver.org/) for versioning. For available versions of this softare, see the ([releases on this repository](https://github.com/shantanuraj/podcst-web/releases)).
 
 ## Authors
 
 See the list of [contributors][Contributor List] who participated in this project.
 
-[Contributor List]:contributors
+[Contributor List]:https://github.com/shantanuraj/podcst-web/contributors
 
 ## License
 
