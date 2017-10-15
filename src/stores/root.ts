@@ -2,55 +2,21 @@
  * Redux store root entities
  */
 
-import {
-  combineEpics,
-  Epic,
-} from 'redux-observable';
+import { combineEpics, Epic } from 'redux-observable';
 
-import {
-  combineReducers,
-} from 'redux';
+import { combineReducers } from 'redux';
 
-import {
-  INoopAction,
-} from './utils';
+import { INoopAction } from './utils';
 
-import {
-  IRouterState,
-  router,
-  RouterActions,
-  routerEpic,
-} from './router';
+import { IRouterState, router, RouterActions, routerEpic } from './router';
 
-import {
-  getEpisodesEpic,
-  IPodcastsState,
-  podcasts,
-  PodcastsAction,
-} from './podcasts';
+import { getEpisodesEpic, IPodcastsState, podcasts, PodcastsAction } from './podcasts';
 
-import {
-  IPlayerState,
-  manualSeekUpdateEpic,
-  player,
-  PlayerActions,
-  playerAudioEpic,
-  seekUpdateEpic,
-} from './player';
+import { IPlayerState, manualSeekUpdateEpic, player, PlayerActions, playerAudioEpic, seekUpdateEpic } from './player';
 
-import {
-  feed,
-  FeedActions,
-  getFeedEpic,
-  IFeedState,
-} from './feed';
+import { feed, FeedActions, getFeedEpic, IFeedState } from './feed';
 
-import {
-  ISearchState,
-  search,
-  SearchActions,
-  searchPodcastsEpic,
-} from './search';
+import { ISearchState, search, SearchActions, searchPodcastsEpic } from './search';
 
 import {
   ISubscriptionsState,
@@ -60,41 +26,25 @@ import {
   subscriptionStateChangeEpic,
 } from './subscriptions';
 
-import {
-  app,
-  AppActions,
-  chromeMediaMetadaUpdateEpic,
-  IAppState,
-  onThemeChangeEpic,
-} from './app';
+import { app, AppActions, chromeMediaMetadaUpdateEpic, IAppState, onThemeChangeEpic } from './app';
 
-import {
-  dismissToastEpic,
-  IToastState,
-  toast,
-  ToastActions,
-} from './toast';
+import { dismissToastEpic, IToastState, toast, ToastActions } from './toast';
 
-import {
-  changeThemeEpic,
-  playerControlsEpic,
-  seekbarJumpsEpic,
-  settingsShortcutEpic,
-} from './keyboard';
+import { changeThemeEpic, playerControlsEpic, seekbarJumpsEpic, settingsShortcutEpic } from './keyboard';
 
 /**
  * Combined application actions interface
  */
 export type Actions =
-  RouterActions |
-  FeedActions |
-  SearchActions |
-  PodcastsAction |
-  PlayerActions |
-  SubscriptionsActions |
-  AppActions |
-  ToastActions |
-  INoopAction;
+  | RouterActions
+  | FeedActions
+  | SearchActions
+  | PodcastsAction
+  | PlayerActions
+  | SubscriptionsActions
+  | AppActions
+  | ToastActions
+  | INoopAction;
 
 /**
  * Combined application state interface
@@ -122,16 +72,14 @@ const epics = [
   subscriptionStateChangeEpic,
   changeThemeEpic,
   onThemeChangeEpic,
-  ('mediaSession' in navigator) ? chromeMediaMetadaUpdateEpic : null,
+  'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
   seekbarJumpsEpic,
   settingsShortcutEpic,
   dismissToastEpic,
-].filter((epic) => epic !== null);
+].filter(epic => epic !== null);
 
-export const rootEpic = combineEpics<Actions, IState>(
-  ...(epics as Array<Epic<Actions, IState, any>>),
-);
+export const rootEpic = combineEpics<Actions, IState>(...(epics as Array<Epic<Actions, IState, any>>));
 
 export const rootReducer = combineReducers<IState>({
   app,

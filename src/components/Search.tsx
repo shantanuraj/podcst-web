@@ -2,42 +2,30 @@
  * Search component for toolbar
  */
 
-import {
-  Component,
-  h,
-} from 'preact';
+import { Component, h } from 'preact';
 
-import {
-  style,
-} from 'typestyle';
+import { style } from 'typestyle';
 
-import {
-  Observable,
-} from 'rxjs/Observable';
+import { Observable } from 'rxjs/Observable';
 
-import {
-  Subscription,
-} from 'rxjs/Subscription';
+import { Subscription } from 'rxjs/Subscription';
 
-import {
-  onEvent,
-} from '../utils';
+import { onEvent } from '../utils';
 
-import {
-  ISearchState,
-} from '../stores/search';
+import { ISearchState } from '../stores/search';
 
 import SearchResults from './SearchResults';
 
-const search = (theme: App.Theme) => style({
-  padding: 16,
-  height: 'inherit',
-  boxShadow: 'inset 0 2px 5px rgba(0,0,0,.2)',
-  backgroundColor: theme.backgroundSearch,
-  border: `1px solid ${theme.backgroundSearch}`,
-  outline: 'none',
-  color: theme.textLight,
-});
+const search = (theme: App.Theme) =>
+  style({
+    padding: 16,
+    height: 'inherit',
+    boxShadow: 'inset 0 2px 5px rgba(0,0,0,.2)',
+    backgroundColor: theme.backgroundSearch,
+    border: `1px solid ${theme.backgroundSearch}`,
+    outline: 'none',
+    color: theme.textLight,
+  });
 
 const Key: KeyboardShortcutsMap = {
   83: 'focus',
@@ -71,13 +59,12 @@ class Search extends Component<ISearchProps, any> {
 
   public watchClicks = () => {
     this.clicksSub = Observable.fromEvent(document, 'click')
-      .filter(({ target }: MouseEvent) =>
-        !!this.el &&
-        (this.props.searching || !!this.props.query) &&
-        !this.el.contains(target as HTMLElement),
+      .filter(
+        ({ target }: MouseEvent) =>
+          !!this.el && (this.props.searching || !!this.props.query) && !this.el.contains(target as HTMLElement),
       )
       .subscribe(this.props.dismissSearch);
-  }
+  };
 
   public watchKeyboard = () => {
     this.keyboardSub = Observable.fromEvent(document, 'keydown')
@@ -103,13 +90,13 @@ class Search extends Component<ISearchProps, any> {
           }
         }
       });
-  }
+  };
 
   public saveRef = (el: HTMLElement | undefined) => {
     if (el) {
       this.el = el;
     }
-  }
+  };
 
   public render({
     className,
@@ -124,10 +111,7 @@ class Search extends Component<ISearchProps, any> {
     theme,
   }: ISearchProps) {
     return (
-      <div
-        class={className}
-        ref={this.saveRef}
-      >
+      <div class={className} ref={this.saveRef}>
         <input
           aria-label="Search podcasts"
           class={search(theme)}
@@ -136,7 +120,7 @@ class Search extends Component<ISearchProps, any> {
           placeholder={'Search'}
           value={query}
         />
-        {query && podcasts.length ?
+        {query && podcasts.length ? (
           <SearchResults
             focusResult={focusResult}
             focusedResult={focusedResult}
@@ -145,8 +129,8 @@ class Search extends Component<ISearchProps, any> {
             podcasts={podcasts}
             onResultSelect={onResultSelect}
             theme={theme}
-          /> : null
-        }
+          />
+        ) : null}
       </div>
     );
   }

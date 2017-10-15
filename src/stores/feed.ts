@@ -2,13 +2,9 @@
  * Feed actions / reducers
  */
 
-import {
-  Epic,
-} from 'redux-observable';
+import { Epic } from 'redux-observable';
 
-import {
-  IState,
-} from './root';
+import { IState } from './root';
 
 import Podcasts from '../api/Podcasts';
 
@@ -32,18 +28,13 @@ interface IGetFeedSuccessAction {
 
 const GET_FEED_SUCCESS: IGetFeedSuccessAction['type'] = 'GET_FEED_SUCCESS';
 
-const getFeedSuccess = (
-  feedType: FeedType,
-  podcasts: App.Podcast[],
-): IGetFeedSuccessAction => ({
+const getFeedSuccess = (feedType: FeedType, podcasts: App.Podcast[]): IGetFeedSuccessAction => ({
   type: GET_FEED_SUCCESS,
   feedType,
   podcasts,
 });
 
-export type FeedActions =
-  IGetFeedAction |
-  IGetFeedSuccessAction;
+export type FeedActions = IGetFeedAction | IGetFeedSuccessAction;
 
 export interface IFeedData {
   loading: boolean;
@@ -55,13 +46,11 @@ export interface IFeedState {
 }
 
 // Get feed epic
-export const getFeedEpic: Epic<FeedActions, IState> = (action$) =>
+export const getFeedEpic: Epic<FeedActions, IState> = action$ =>
   action$
     .ofType(GET_FEED)
     .mergeMap((action: IGetFeedAction) =>
-      Podcasts
-        .feed(action.feedType)
-        .map((podcasts) => getFeedSuccess(action.feedType, podcasts)),
+      Podcasts.feed(action.feedType).map(podcasts => getFeedSuccess(action.feedType, podcasts)),
     );
 
 // Feed reducer

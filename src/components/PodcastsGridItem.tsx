@@ -2,29 +2,24 @@
  * Podcasts Grid Item
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  Link,
-} from 'preact-router';
+import { Link } from 'preact-router';
 
-import {
-  style,
-} from 'typestyle';
+import { style } from 'typestyle';
 
-const gridItem = (cover) => style({
-  height: '200px',
-  padding: '8px',
-  color: 'white',
-  fontSize: '12px',
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'flex-end',
-  background: `
+const gridItem = cover =>
+  style({
+    height: '200px',
+    padding: '8px',
+    color: 'white',
+    fontSize: '12px',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'cover',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    background: `
     linear-gradient(
       to bottom,
       rgba(0, 0, 0, 0) 0%,
@@ -40,7 +35,7 @@ const gridItem = (cover) => style({
       rgba(19, 19, 19, 0.8) 100%
     ),
     url(${cover});`,
-});
+  });
 
 const podcastTitle = style({
   fontSize: '14px',
@@ -56,28 +51,14 @@ interface IPodcastsGridItemProps {
   podcast: App.RenderablePodcast;
 }
 
-const PodcastsGridItem = ({
-  podcast,
-}: IPodcastsGridItemProps) => {
-  const {
-    author,
-    feed,
-    title,
-  } = podcast;
+const PodcastsGridItem = ({ podcast }: IPodcastsGridItemProps) => {
+  const { author, feed, title } = podcast;
   return (
     <Link href={`/episodes?feed=${feed}`}>
-      <div
-        role="img"
-        aria-label={`${title} by ${author}`}
-        class={gridItem(podcast.cover)}
-      >
+      <div role="img" aria-label={`${title} by ${author}`} class={gridItem(podcast.cover)}>
         <div>
-          <div class={podcastTitle}>
-            {title}
-          </div>
-          <div class={podcastAuthor}>
-            {author}
-          </div>
+          <div class={podcastTitle}>{title}</div>
+          <div class={podcastAuthor}>{author}</div>
         </div>
       </div>
     </Link>

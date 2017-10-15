@@ -2,33 +2,17 @@
  * Connected Episodes component
  */
 
-import {
-  connect,
-} from 'preact-redux';
+import { connect } from 'preact-redux';
 
-import {
-  bindActionCreators,
-  Dispatch,
-} from 'redux';
+import { bindActionCreators, Dispatch } from 'redux';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
-import {
-  getEpisodes,
-} from '../stores/podcasts';
+import { getEpisodes } from '../stores/podcasts';
 
-import {
-  addSubscription,
-  removeSubscription,
-} from '../stores/subscriptions';
+import { addSubscription, removeSubscription } from '../stores/subscriptions';
 
-import {
-  pauseEpisode,
-  playEpisode,
-  resumeEpisode,
-} from '../stores/player';
+import { pauseEpisode, playEpisode, resumeEpisode } from '../stores/player';
 
 import Episodes from '../components/Episodes';
 
@@ -40,18 +24,19 @@ const mapState = (state: IState) => ({
   subscriptions: state.subscriptions.subs,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
-  getEpisodes,
-  playEpisode,
-  pauseEpisode,
-  resumeEpisode,
-  addSubscription,
-  removeSubscription,
-}, dispatch);
+const mapDispatch = (dispatch: Dispatch<IState>) =>
+  bindActionCreators(
+    {
+      getEpisodes,
+      playEpisode,
+      pauseEpisode,
+      resumeEpisode,
+      addSubscription,
+      removeSubscription,
+    },
+    dispatch,
+  );
 
-const ConnectedEpisodes = connect(
-  mapState,
-  mapDispatch,
-)(Episodes);
+const ConnectedEpisodes = connect(mapState, mapDispatch)(Episodes);
 
 export default ConnectedEpisodes;

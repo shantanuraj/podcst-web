@@ -2,29 +2,28 @@
  * Storage manager
  */
 
-import {
-  IAppState,
-} from '../stores/app';
+import { IAppState } from '../stores/app';
 
 const STORE_KEY = 'store@PLAY_PODCST_IO/2';
-const DEPRECATED_KEYS = [
-  'store@PLAY_PODCST_IO',
-];
+const DEPRECATED_KEYS = ['store@PLAY_PODCST_IO'];
 
 interface IStoreable {
   subscriptions: SubscriptionsMap;
   app: IAppState;
 }
 
-const storage = process.env.IN_BROWSER ?
-  localStorage : {
-    // tslint:disable:no-empty
-    setItem(_k: string, _v: string) {},
-    getItem(_k: string) { return '{}'; },
-    removeItem(_k: string) {},
-    clear(_x: string) {},
-    length: 0,
-  };
+const storage = process.env.IN_BROWSER
+  ? localStorage
+  : {
+      // tslint:disable:no-empty
+      setItem(_k: string, _v: string) {},
+      getItem(_k: string) {
+        return '{}';
+      },
+      removeItem(_k: string) {},
+      clear(_x: string) {},
+      length: 0,
+    };
 
 // Handle deprecated keys
 DEPRECATED_KEYS.forEach(storage.removeItem.bind(storage));

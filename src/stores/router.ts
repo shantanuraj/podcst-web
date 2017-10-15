@@ -2,17 +2,11 @@
  * Router actions / reducers
  */
 
-import {
-  Epic,
-} from 'redux-observable';
+import { Epic } from 'redux-observable';
 
-import {
-  route as routeTo,
-} from 'preact-router';
+import { route as routeTo } from 'preact-router';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
 /**
  * Action creator for navigating between routes
@@ -62,10 +56,7 @@ const navigationComplete = (route: string): INavigationCompleteAction => ({
   route,
 });
 
-export type RouterActions =
-  INavigateAction |
-  IRouterNavigateAction |
-  INavigationCompleteAction;
+export type RouterActions = INavigateAction | IRouterNavigateAction | INavigationCompleteAction;
 
 /**
  * Router specific state
@@ -77,9 +68,10 @@ export interface IRouterState {
 /**
  * Router navigation epic
  */
-export const routerEpic: Epic<RouterActions, IState> = (action$) =>
-  action$.ofType(NAVIGATE)
-    .map((action) => action.route)
+export const routerEpic: Epic<RouterActions, IState> = action$ =>
+  action$
+    .ofType(NAVIGATE)
+    .map(action => action.route)
     .do(routeTo)
     .map(navigationComplete);
 

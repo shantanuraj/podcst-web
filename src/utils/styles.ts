@@ -1,26 +1,20 @@
-import {
-  normalize,
-  setupPage,
-} from 'csstips';
+import { normalize, setupPage } from 'csstips';
 
-import {
-  cssRule,
-  style,
-} from 'typestyle';
+import { cssRule, style } from 'typestyle';
 
 /**
  * Font family for application
  */
-const fontFamily =  [
-'-apple-system',
-`BlinkMacSystemFont`,
-`"Segoe UI"`,
-`Helvetica`,
-`Arial`,
-`sans-serif`,
-`"Apple Color Emoji"`,
-`"Segoe UI Emoji"`,
-`"Segoe UI Symbol"`,
+const fontFamily = [
+  '-apple-system',
+  `BlinkMacSystemFont`,
+  `"Segoe UI"`,
+  `Helvetica`,
+  `Arial`,
+  `sans-serif`,
+  `"Apple Color Emoji"`,
+  `"Segoe UI Emoji"`,
+  `"Segoe UI Symbol"`,
 ].join(', ');
 
 /**

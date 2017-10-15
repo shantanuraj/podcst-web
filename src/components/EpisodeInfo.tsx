@@ -4,46 +4,40 @@
 
 import { Component, h } from 'preact';
 
-import {
-  media,
-  style,
-  types,
-} from 'typestyle';
+import { media, style, types } from 'typestyle';
 
-import {
-  IPodcastsState,
-} from '../stores/podcasts';
+import { IPodcastsState } from '../stores/podcasts';
 
-import {
-  scrollToTop,
-} from '../utils';
+import { scrollToTop } from '../utils';
 
-import {
-
-} from '../utils/styles';
+import {} from '../utils/styles';
 
 import Loading from './Loading';
 
-const container = (theme: App.Theme) => style({
-  color: theme.text,
-  display: 'flex',
-  flexDirection: 'column',
-  $nest: {
-    '& a': {
-      color: theme.accent,
+const container = (theme: App.Theme) =>
+  style({
+    color: theme.text,
+    display: 'flex',
+    flexDirection: 'column',
+    $nest: {
+      '& a': {
+        color: theme.accent,
+      },
     },
-  },
-});
+  });
 
 const podcastInfo = style(
   {
     display: 'flex',
     padding: 32,
   },
-  media({ maxWidth: 600 }, {
-    flexDirection: 'column',
-    padding: 0,
-  }),
+  media(
+    { maxWidth: 600 },
+    {
+      flexDirection: 'column',
+      padding: 0,
+    },
+  ),
 );
 
 const podcastInfoTitles = style({
@@ -55,21 +49,25 @@ const podcastInfoTitles = style({
   paddingTop: 0,
 });
 
-const infoCover = (cover: string) => style(
-  {
-    backgroundImage: `url(${cover})`,
-    backgroundPosition: 'center center',
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: 'cover',
-    width: '300px',
-    height: '300px',
-    minWidth: '300px',
-  },
-  media({ maxWidth: 600 }, {
-    width: '100vw',
-    height: '100vw',
-  }),
-);
+const infoCover = (cover: string) =>
+  style(
+    {
+      backgroundImage: `url(${cover})`,
+      backgroundPosition: 'center center',
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: 'cover',
+      width: '300px',
+      height: '300px',
+      minWidth: '300px',
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        width: '100vw',
+        height: '100vw',
+      },
+    ),
+  );
 
 const margins: types.NestedCSSProperties = {
   marginTop: 8,
@@ -78,35 +76,38 @@ const margins: types.NestedCSSProperties = {
 
 const infoMargins = style(margins);
 
-const podcastTitle = style(
-  margins,
-  {
-    fontSize: '40px',
-    fontWeight: 'bold',
-  },
-);
+const podcastTitle = style(margins, {
+  fontSize: '40px',
+  fontWeight: 'bold',
+});
 
-const showNotesContainer = style({
-  padding: 32,
-  paddingTop: 0,
-  fontSize: 'large',
-  $nest: {
-    '&[data-is-player-visible]': {
-      paddingBottom: 64,
-    },
-    '& *': {
-      marginTop: 16,
-      marginBottom: 16,
-    },
-  },
-}, media({ maxWidth: 600 }, {
-  padding: 16,
-  $nest: {
-    '&[data-is-player-visible]': {
-      paddingBottom: 128,
+const showNotesContainer = style(
+  {
+    padding: 32,
+    paddingTop: 0,
+    fontSize: 'large',
+    $nest: {
+      '&[data-is-player-visible]': {
+        paddingBottom: 64,
+      },
+      '& *': {
+        marginTop: 16,
+        marginBottom: 16,
+      },
     },
   },
-}));
+  media(
+    { maxWidth: 600 },
+    {
+      padding: 16,
+      $nest: {
+        '&[data-is-player-visible]': {
+          paddingBottom: 128,
+        },
+      },
+    },
+  ),
+);
 
 interface IEpisodeInfoProps {
   feed: string;
@@ -120,23 +121,16 @@ interface IEpisodeInfoProps {
   resumeEpisode: () => void;
 }
 
-class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
+class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
   public loadIfNeeded = () => {
-    const {
-      feed,
-      getEpisodes,
-      info,
-    } = this.props;
+    const { feed, getEpisodes, info } = this.props;
 
     const feedInfo = info[feed];
 
-    if (
-      !feedInfo ||
-      (feedInfo && !feedInfo.episodes && !feedInfo.loading)
-    ) {
+    if (!feedInfo || (feedInfo && !feedInfo.episodes && !feedInfo.loading)) {
       getEpisodes(feed);
     }
-  }
+  };
 
   public componentDidMount() {
     this.loadIfNeeded();
@@ -151,70 +145,46 @@ class EpisodeInfo extends Component <IEpisodeInfoProps, never> {
     return <Loading />;
   }
 
-  public renderLoaded(
-    podcast: App.PodcastEpisodesInfo,
-    episode: App.Episode | undefined,
-  ) {
+  public renderLoaded(podcast: App.PodcastEpisodesInfo, episode: App.Episode | undefined) {
     if (!episode) {
-      return (
-        <div>
-          Couldn't get Podcasts episode
-        </div>
-      );
+      return <div>Couldn't get Podcasts episode</div>;
     }
 
-    const {
-      state,
-      theme,
-    } = this.props;
-    const {
-      author,
-      cover,
-      episodeArt,
-      showNotes,
-      title,
-    } = episode;
+    const { state, theme } = this.props;
+    const { author, cover, episodeArt, showNotes, title } = episode;
 
-    const showArt = episodeArt || cover as string;
+    const showArt = episodeArt || (cover as string);
     const isPlayerVisible = state !== 'stopped';
 
     return (
       <div class={container(theme)}>
         <div class={podcastInfo}>
-          <div
-            class={infoCover(showArt)}
-            role="img"
-            aria-label={`${title} episode art`}
-          />
+          <div class={infoCover(showArt)} role="img" aria-label={`${title} episode art`} />
           <div class={podcastInfoTitles}>
-            <h1 class={podcastTitle}>
-              {episode.link ? <a href={episode.link}>{title}</a> : title}
-            </h1>
-            <h2 class={infoMargins}>from <a href={podcast.link}>{podcast.title}</a></h2>
+            <h1 class={podcastTitle}>{episode.link ? <a href={episode.link}>{title}</a> : title}</h1>
+            <h2 class={infoMargins}>
+              from <a href={podcast.link}>{podcast.title}</a>
+            </h2>
             <h2 class={infoMargins}>by {author}</h2>
           </div>
         </div>
         <div
           data-is-player-visible={isPlayerVisible}
           class={showNotesContainer}
-          dangerouslySetInnerHTML={{__html: showNotes}}
+          dangerouslySetInnerHTML={{ __html: showNotes }}
         />
       </div>
     );
   }
 
-  public render({
-    feed,
-    info,
-    title,
-  }: IEpisodeInfoProps) {
+  public render({ feed, info, title }: IEpisodeInfoProps) {
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading || !feedInfo.episodes) {
       return this.renderLoading();
     }
 
     const { episodes } = feedInfo.episodes;
-    const currentEpisode = episodes.find((episode) => episode.title === title);
+    const currentEpisode = episodes.find(episode => episode.title === title);
 
     return this.renderLoaded(feedInfo.episodes, currentEpisode);
   }

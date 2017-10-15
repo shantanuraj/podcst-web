@@ -2,9 +2,7 @@
  * Howler player
  */
 
-import {
-  Howl,
-} from 'howler';
+import { Howl } from 'howler';
 
 let globalHowl: Howl;
 
@@ -14,7 +12,9 @@ interface IAudioCallbacks {
   stopEpisode();
 }
 
-const throwErr = () => { throw new Error('Audio.init not called!'); };
+const throwErr = () => {
+  throw new Error('Audio.init not called!');
+};
 
 class Audio {
   public static callbacks: IAudioCallbacks = {
@@ -39,18 +39,16 @@ class Audio {
         Audio.callbacks.setBuffer(false);
       },
       onplay() {
-        const updateSeek = () => requestAnimationFrame(() => {
-          const seekPosition = globalHowl.seek() as number;
+        const updateSeek = () =>
+          requestAnimationFrame(() => {
+            const seekPosition = globalHowl.seek() as number;
 
-          Audio.callbacks.seekUpdate(
-            seekPosition,
-            globalHowl.duration(),
-          );
+            Audio.callbacks.seekUpdate(seekPosition, globalHowl.duration());
 
-          if (globalHowl.playing()) {
-            setTimeout(updateSeek, 500);
-          }
-        });
+            if (globalHowl.playing()) {
+              setTimeout(updateSeek, 500);
+            }
+          });
         updateSeek();
       },
       onend() {

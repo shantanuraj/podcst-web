@@ -2,19 +2,11 @@
  * Podcasts grid component
  */
 
-import {
-  Component,
-  h,
-} from 'preact';
+import { Component, h } from 'preact';
 
-import {
-  style,
-} from 'typestyle';
+import { style } from 'typestyle';
 
-import {
-  IFeedData,
-  IFeedState,
-} from '../stores/feed';
+import { IFeedData, IFeedState } from '../stores/feed';
 
 import Loading from './Loading';
 import PodcastsGridItem from './PodcastsGridItem';
@@ -44,14 +36,8 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
       return;
     }
 
-    const {
-      feed,
-      getFeed,
-    } = this.props;
-    const {
-      loading,
-      podcasts,
-    } = this.props[feed];
+    const { feed, getFeed } = this.props;
+    const { loading, podcasts } = this.props[feed];
 
     if (!loading && podcasts.length === 0) {
       getFeed(feed);
@@ -63,31 +49,17 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
   }
 
   public renderPodcast(podcast: App.RenderablePodcast) {
-    return (
-      <PodcastsGridItem podcast={podcast} />
-    );
+    return <PodcastsGridItem podcast={podcast} />;
   }
 
   public renderLoaded(podcasts: App.RenderablePodcast[]) {
-    return (
-      <div class={grid}>
-        {podcasts.map(this.renderPodcast)}
-      </div>
-    );
+    return <div class={grid}>{podcasts.map(this.renderPodcast)}</div>;
   }
 
-  public render({
-    mode,
-  }: PodcastsGridProps) {
-
+  public render({ mode }: PodcastsGridProps) {
     if (mode === 'feed') {
-      const {
-        feed,
-      } = this.props as IFeedStateProps;
-      const {
-        loading,
-        podcasts,
-      } = this.props[feed] as IFeedData;
+      const { feed } = this.props as IFeedStateProps;
+      const { loading, podcasts } = this.props[feed] as IFeedData;
 
       if (loading || podcasts.length === 0) {
         return this.renderLoading();
@@ -96,16 +68,12 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
       return this.renderLoaded(podcasts);
     }
 
-    const {
-      subs,
-    } = this.props as ISubsStateProps;
+    const { subs } = this.props as ISubsStateProps;
 
-    const renderablePodcasts = Object
-      .keys(subs)
-      .map((feed) => ({
-        ...subs[feed],
-        feed,
-      }));
+    const renderablePodcasts = Object.keys(subs).map(feed => ({
+      ...subs[feed],
+      feed,
+    }));
 
     return this.renderLoaded(renderablePodcasts);
   }

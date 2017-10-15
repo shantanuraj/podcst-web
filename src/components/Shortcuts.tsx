@@ -2,14 +2,9 @@
  * Shortcuts component
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  media,
-  style,
-} from 'typestyle';
+import { media, style } from 'typestyle';
 
 const container = style({
   display: 'flex',
@@ -17,24 +12,31 @@ const container = style({
   width: '100%',
 });
 
-const item = (theme: App.Theme) => style(
-  {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 32,
-    color: theme.text,
-    fontSize: 18,
-  }, {
-  $nest: {
-    '&:nth-child(even)': {
-      backgroundColor: theme.backgroundLight,
+const item = (theme: App.Theme) =>
+  style(
+    {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 32,
+      color: theme.text,
+      fontSize: 18,
     },
-  },
-}, media({ maxWidth: 600 }, {
-  paddingLeft: 16,
-  paddingRight: 16,
-}));
+    {
+      $nest: {
+        '&:nth-child(even)': {
+          backgroundColor: theme.backgroundLight,
+        },
+      },
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        paddingLeft: 16,
+        paddingRight: 16,
+      },
+    ),
+  );
 
 interface IShortcutInfo {
   title: string;
@@ -76,30 +78,19 @@ const appShortcuts: IShortcutInfo[] = [
   },
 ];
 
-const renderShortcut = (theme: App.Theme) => ({
-  title,
-  value,
-}: IShortcutInfo) => (
+const renderShortcut = (theme: App.Theme) => ({ title, value }: IShortcutInfo) => (
   <div class={item(theme)}>
     <span>{title}</span>
     <pre>{value}</pre>
   </div>
 );
 
-const renderShortcuts = (theme: App.Theme, shortcuts: IShortcutInfo[]) => (
-  shortcuts.map(renderShortcut(theme))
-);
+const renderShortcuts = (theme: App.Theme, shortcuts: IShortcutInfo[]) => shortcuts.map(renderShortcut(theme));
 
 interface IShortcutsProps {
   theme: App.Theme;
 }
 
-const Shortcuts = ({
-  theme,
-}: IShortcutsProps) => (
-  <div class={container}>
-    {renderShortcuts(theme, appShortcuts)}
-  </div>
-);
+const Shortcuts = ({ theme }: IShortcutsProps) => <div class={container}>{renderShortcuts(theme, appShortcuts)}</div>;
 
 export default Shortcuts;

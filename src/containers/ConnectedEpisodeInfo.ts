@@ -2,28 +2,15 @@
  * Connected Loader component
  */
 
-import {
-  connect,
-} from 'preact-redux';
+import { connect } from 'preact-redux';
 
-import {
-  bindActionCreators,
-  Dispatch,
-} from 'redux';
+import { bindActionCreators, Dispatch } from 'redux';
 
-import {
-  IState,
-} from '../stores/root';
+import { IState } from '../stores/root';
 
-import {
-  getEpisodes,
-} from '../stores/podcasts';
+import { getEpisodes } from '../stores/podcasts';
 
-import {
-  pauseEpisode,
-  playEpisode,
-  resumeEpisode,
-} from '../stores/player';
+import { pauseEpisode, playEpisode, resumeEpisode } from '../stores/player';
 
 import EpisodeInfo from '../components/EpisodeInfo';
 
@@ -33,16 +20,17 @@ const mapState = (state: IState) => ({
   state: state.player.state,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) => bindActionCreators({
-  getEpisodes,
-  playEpisode,
-  pauseEpisode,
-  resumeEpisode,
-}, dispatch);
+const mapDispatch = (dispatch: Dispatch<IState>) =>
+  bindActionCreators(
+    {
+      getEpisodes,
+      playEpisode,
+      pauseEpisode,
+      resumeEpisode,
+    },
+    dispatch,
+  );
 
-const ConnectedEpisodeInfo = connect(
-  mapState,
-  mapDispatch,
-)(EpisodeInfo);
+const ConnectedEpisodeInfo = connect(mapState, mapDispatch)(EpisodeInfo);
 
 export default ConnectedEpisodeInfo;

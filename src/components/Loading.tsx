@@ -2,14 +2,9 @@
  * Loading view
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  keyframes,
-  style,
-} from 'typestyle';
+import { keyframes, style } from 'typestyle';
 
 const pulseAnimation = keyframes({
   '0%': {
@@ -31,8 +26,6 @@ const loading = style({
   animation: `${pulseAnimation} 4s ease infinite`,
 });
 
-const Loading = () => (
-  <div class={loading} />
-);
+const Loading = () => <div class={loading} />;
 
 export default Loading;

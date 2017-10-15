@@ -2,50 +2,46 @@
  * Player Info bar
  */
 
-import {
-  h,
-} from 'preact';
+import { h } from 'preact';
 
-import {
-  Link,
-} from 'preact-router';
+import { Link } from 'preact-router';
 
-import {
-  media,
-  style,
-} from 'typestyle';
+import { media, style } from 'typestyle';
 
 import Icon from '../svg/Icon';
 
-import {
-  getEpisodeRoute,
-} from '../utils';
+import { getEpisodeRoute } from '../utils';
 
-const infoContainer = (theme: App.Theme) => style(
-  {
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    backgroundColor: theme.background,
-  },
-  media({ maxWidth: 600 }, {
-    boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
-  }),
-);
+const infoContainer = (theme: App.Theme) =>
+  style(
+    {
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      backgroundColor: theme.background,
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
+      },
+    ),
+  );
 
 const linkContainer = style({
   height: '100%',
   display: 'flex',
 });
 
-const episodeImage = (image: string) => style({
-  backgroundImage: `url(${image})`,
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  height: 'inherit',
-  width: '64px',
-});
+const episodeImage = (image: string) =>
+  style({
+    backgroundImage: `url(${image})`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    height: 'inherit',
+    width: '64px',
+  });
 
 const episodeInfo = style({
   display: 'flex',
@@ -86,13 +82,7 @@ interface IPlayerInfoProps {
 }
 
 const PlayerInfo = ({
-  episode: {
-    author,
-    cover,
-    feed,
-    episodeArt,
-    title,
-  },
+  episode: { author, cover, feed, episodeArt, title },
   pause,
   resume,
   state,
@@ -102,28 +92,15 @@ const PlayerInfo = ({
     <button
       aria-label={state === 'playing' ? 'Pause' : 'Play'}
       class={playButton}
-      onClick={state === 'playing' ? pause : resume }>
-      <Icon
-        color={theme.accent}
-        icon={state === 'playing' ? 'pause' : 'play'}
-      />
-    </button>
-    <Link
-      class={linkContainer}
-      href={getEpisodeRoute(feed, title)}
+      onClick={state === 'playing' ? pause : resume}
     >
-      <div
-        class={episodeImage(episodeArt || cover as string)}
-        role="img"
-        aria-label={`${title} episode art`}
-      />
+      <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} />
+    </button>
+    <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
+      <div class={episodeImage(episodeArt || (cover as string))} role="img" aria-label={`${title} episode art`} />
       <div class={episodeInfo}>
-        <p>
-          {title}
-        </p>
-        <p>
-          {author}
-        </p>
+        <p>{title}</p>
+        <p>{author}</p>
       </div>
     </Link>
   </div>
