@@ -22,6 +22,11 @@ const showNotesContainer = style(
       '& div *': {
         marginTop: 16,
         marginBottom: 16,
+        textAlign: 'start',
+      },
+      '& div fieldset,legend': {
+        border: 0,
+        padding: 0,
       },
     },
   },
