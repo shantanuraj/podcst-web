@@ -77,7 +77,7 @@ const search = style({
 });
 
 const linkMap: ILinkMap = {
-  '/': 'Podcasts',
+  '/subs': 'Podcasts',
   '/feed/top': 'Top',
 };
 

@@ -19,6 +19,7 @@ import { IMatchProps } from '../stores/router';
 
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
+import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
 import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPlayer from '../containers/ConnectedPlayer';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
@@ -80,8 +81,9 @@ class App extends Component<IAppProps, never> {
         <ConnectedLoader theme={theme} />
         <main class={classes(normalizeEl, container)}>
           <Router>
-            <ConnectedSubscriptions path="/" />
+            <ConnectedIndexRedirect path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
+            <ConnectedSubscriptions path="/subs" />
             <ConnectedEpisodes path="/episodes" />
             <ConnectedEpisodeInfo path="/episode" />
             <ConnectedSettings version={version} path="/settings" />
