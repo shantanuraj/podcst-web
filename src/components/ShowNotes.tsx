@@ -23,6 +23,7 @@ const showNotesContainer = style(
         marginTop: 16,
         marginBottom: 16,
         textAlign: 'start',
+        maxWidth: '100%',
       },
       '& div fieldset,legend': {
         border: 0,
