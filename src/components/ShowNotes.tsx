@@ -15,7 +15,11 @@ const showNotesContainer = style(
       '&[data-is-player-visible]': {
         paddingBottom: 64,
       },
-      '& *': {
+      '& h2': {
+        marginTop: 0,
+        marginBottom: 16,
+      },
+      '& div *': {
         marginTop: 16,
         marginBottom: 16,
       },
@@ -25,6 +29,7 @@ const showNotesContainer = style(
     { maxWidth: 600 },
     {
       padding: 16,
+      paddingTop: 0,
       $nest: {
         '&[data-is-player-visible]': {
           paddingBottom: 128,
@@ -40,11 +45,10 @@ interface IShowNotesProps {
 }
 
 const ShowNotes = ({ isPlayerVisible, showNotes }: IShowNotesProps) => (
-  <div
-    data-is-player-visible={isPlayerVisible}
-    class={showNotesContainer}
-    dangerouslySetInnerHTML={{ __html: showNotes }}
-  />
+  <div class={showNotesContainer}>
+    <h2>Show Notes</h2>
+    <div data-is-player-visible={isPlayerVisible} dangerouslySetInnerHTML={{ __html: showNotes }} />
+  </div>
 );
 
 export default ShowNotes;
