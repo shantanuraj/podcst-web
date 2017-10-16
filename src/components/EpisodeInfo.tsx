@@ -80,6 +80,18 @@ const podcastTitle = style(margins, {
   fontWeight: 'bold',
 });
 
+const showNotesContainer = style(
+  {
+    marginTop: 48,
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      marginTop: 24,
+    },
+  ),
+);
+
 interface IEpisodeInfoProps {
   feed: string;
   info: IPodcastsState;
@@ -137,9 +149,9 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
               from <a href={podcast.link}>{podcast.title}</a>
             </h2>
             <h2 class={infoMargins}>by {author}</h2>
+            <ShowNotes className={showNotesContainer} isPlayerVisible={isPlayerVisible} showNotes={showNotes} />
           </div>
         </div>
-        <ShowNotes isPlayerVisible={isPlayerVisible} showNotes={showNotes} />
       </div>
     );
   }

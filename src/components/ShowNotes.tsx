@@ -4,12 +4,10 @@
 
 import { h } from 'preact';
 
-import { media, style } from 'typestyle';
+import { classes, media, style } from 'typestyle';
 
 const showNotesContainer = style(
   {
-    padding: 32,
-    paddingTop: 0,
     fontSize: 'large',
     $nest: {
       '&[data-is-player-visible]': {
@@ -37,8 +35,6 @@ const showNotesContainer = style(
   media(
     { maxWidth: 600 },
     {
-      padding: 16,
-      paddingTop: 0,
       $nest: {
         '&[data-is-player-visible]': {
           paddingBottom: 128,
@@ -49,13 +45,14 @@ const showNotesContainer = style(
 );
 
 interface IShowNotesProps {
+  className?: string;
   isPlayerVisible: boolean;
   showNotes: string;
 }
 
-const ShowNotes = ({ isPlayerVisible, showNotes }: IShowNotesProps) => (
-  <div class={showNotesContainer}>
-    <h2>Show Notes</h2>
+const ShowNotes = ({ className, isPlayerVisible, showNotes }: IShowNotesProps) => (
+  <div class={classes(className, showNotesContainer)}>
+    <h3>Show Notes</h3>
     <div data-is-player-visible={isPlayerVisible} dangerouslySetInnerHTML={{ __html: showNotes }} />
   </div>
 );
