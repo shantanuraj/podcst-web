@@ -21,10 +21,10 @@ import Podcasts from '../api/Podcasts';
 interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
   feed: string;
-  podcasts: App.IRenderablePodcast;
+  podcasts: App.RenderablePodcast;
 }
 const ADD_SUBSCRIPTION: IAddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
-export const addSubscription = (feed: string, podcasts: App.IRenderablePodcast): IAddSubscriptionAction => ({
+export const addSubscription = (feed: string, podcasts: App.RenderablePodcast): IAddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
   podcasts,

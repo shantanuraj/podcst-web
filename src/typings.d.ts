@@ -99,7 +99,7 @@ declare namespace App {
     episodes: IEpisodeInfo[];
   }
 
-  type IRenderablePodcast =
+  type RenderablePodcast =
     | IPodcast
     | (IPodcastEpisodesInfo & {
         feed: string;
@@ -131,7 +131,7 @@ declare namespace App {
 }
 
 interface ISubscriptionsMap {
-  [feed: string]: App.IRenderablePodcast;
+  [feed: string]: App.RenderablePodcast;
 }
 
 interface IFileInfo {
@@ -203,10 +203,8 @@ interface IChromeMediaMetadataProps {
   title: string;
 }
 
-// TODO: Remove later
-/* tslint:disable:no-misused-new */
 interface IChromeMediaMetadata {
-  new (props: IChromeMediaMetadataProps): IChromeMediaMetadata;
+  new (props: IChromeMediaMetadataProps): {};
 }
 
 type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';

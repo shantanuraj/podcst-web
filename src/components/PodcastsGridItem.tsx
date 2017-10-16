@@ -48,7 +48,7 @@ const podcastAuthor = style({
 });
 
 interface IPodcastsGridItemProps {
-  podcast: App.IRenderablePodcast;
+  podcast: App.RenderablePodcast;
 }
 
 const PodcastsGridItem = ({ podcast }: IPodcastsGridItemProps) => {

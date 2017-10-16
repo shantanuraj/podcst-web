@@ -130,7 +130,7 @@ interface IEpisodesProps {
   playEpisode: (episode: App.IEpisodeInfo) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
-  addSubscription: (feed: string, podcasts: App.IRenderablePodcast) => void;
+  addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
   removeSubscription: (feed: string) => void;
 }
 

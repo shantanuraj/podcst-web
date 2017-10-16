@@ -48,11 +48,11 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     return <Loading />;
   }
 
-  public renderPodcast(podcast: App.IRenderablePodcast) {
+  public renderPodcast(podcast: App.RenderablePodcast) {
     return <PodcastsGridItem podcast={podcast} />;
   }
 
-  public renderLoaded(podcasts: App.IRenderablePodcast[]) {
+  public renderLoaded(podcasts: App.RenderablePodcast[]) {
     return <div class={grid}>{podcasts.map(this.renderPodcast)}</div>;
   }
 
