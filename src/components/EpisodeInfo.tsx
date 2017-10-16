@@ -10,9 +10,8 @@ import { IPodcastsState } from '../stores/podcasts';
 
 import { scrollToTop } from '../utils';
 
-import {} from '../utils/styles';
-
 import Loading from './Loading';
+import ShowNotes from './ShowNotes';
 
 const container = (theme: App.Theme) =>
   style({
@@ -81,34 +80,6 @@ const podcastTitle = style(margins, {
   fontWeight: 'bold',
 });
 
-const showNotesContainer = style(
-  {
-    padding: 32,
-    paddingTop: 0,
-    fontSize: 'large',
-    $nest: {
-      '&[data-is-player-visible]': {
-        paddingBottom: 64,
-      },
-      '& *': {
-        marginTop: 16,
-        marginBottom: 16,
-      },
-    },
-  },
-  media(
-    { maxWidth: 600 },
-    {
-      padding: 16,
-      $nest: {
-        '&[data-is-player-visible]': {
-          paddingBottom: 128,
-        },
-      },
-    },
-  ),
-);
-
 interface IEpisodeInfoProps {
   feed: string;
   info: IPodcastsState;
@@ -168,11 +139,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
             <h2 class={infoMargins}>by {author}</h2>
           </div>
         </div>
-        <div
-          data-is-player-visible={isPlayerVisible}
-          class={showNotesContainer}
-          dangerouslySetInnerHTML={{ __html: showNotes }}
-        />
+        <ShowNotes isPlayerVisible={isPlayerVisible} showNotes={showNotes} />
       </div>
     );
   }
