@@ -13,7 +13,7 @@ const showNotesContainer = style(
       '&[data-is-player-visible]': {
         paddingBottom: 64,
       },
-      '& h2': {
+      '& h3': {
         marginTop: 0,
         marginBottom: 16,
       },
