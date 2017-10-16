@@ -26,7 +26,7 @@ export default class Podcasts {
 
   public static search(term: string): Observable<App.PodcastSearchResult[]> {
     return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`))
-      .map(res => res.response as App.Podcast[])
+      .map(res => res.response as App.PodcastSearchResult[])
       .catch(() => Observable.of([]));
   }
 
