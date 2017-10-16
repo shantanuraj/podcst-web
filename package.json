@@ -10,11 +10,7 @@
     "trailingComma": "all"
   },
   "lint-staged": {
-    "src/**/{*.ts,*.tsx}": [
-      "prettier --write",
-      "tslint --project tsconfig.json --fix",
-      "git add"
-    ]
+    "src/**/{*.ts,*.tsx}": ["prettier --write", "tslint --project tsconfig.json --fix", "git add"]
   },
   "scripts": {
     "precommit": "lint-staged",
