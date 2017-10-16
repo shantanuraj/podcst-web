@@ -1,5 +1,5 @@
 /**
- * Connected Home component
+ * Connected Subscriptions component
  */
 
 import { connect } from 'preact-redux';
@@ -10,7 +10,7 @@ import { IState } from '../stores/root';
 
 import { parseOPML } from '../stores/subscriptions';
 
-import Home from '../components/Home';
+import Subscriptions from '../components/Subscriptions';
 
 const mapState = (state: IState) => ({
   ...state.subscriptions,
@@ -25,6 +25,6 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
     dispatch,
   );
 
-const ConnectedHome = connect(mapState, mapDispatch)(Home);
+const ConnectedSubscriptions = connect(mapState, mapDispatch)(Subscriptions);
 
-export default ConnectedHome;
+export default ConnectedSubscriptions;
