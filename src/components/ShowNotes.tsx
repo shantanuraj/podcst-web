@@ -25,6 +25,9 @@ const showNotesContainer = style(
         textAlign: 'start',
         maxWidth: '100%',
       },
+      '& div hr': {
+        display: 'none',
+      },
       '& div fieldset,legend': {
         border: 0,
         padding: 0,
