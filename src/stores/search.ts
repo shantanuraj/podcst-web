@@ -25,10 +25,10 @@ export const searchPodcasts = (query: ISearchPodcastsAction['query']): ISearchPo
 
 interface ISearchPodcastsSuccessAction {
   type: 'SEARCH_PODCASTS_SUCCESS';
-  podcasts: App.Podcast[];
+  podcasts: App.IPodcast[];
 }
 const SEARCH_PODCASTS_SUCCESS: ISearchPodcastsSuccessAction['type'] = 'SEARCH_PODCASTS_SUCCESS';
-export const searchPodcastsSuccess = (podcasts: App.Podcast[]): ISearchPodcastsSuccessAction => ({
+export const searchPodcastsSuccess = (podcasts: App.IPodcast[]): ISearchPodcastsSuccessAction => ({
   type: SEARCH_PODCASTS_SUCCESS,
   podcasts,
 });
@@ -63,7 +63,7 @@ export const focusResult = (focusedResult: number): IFocusResultAction => ({
 
 export interface ISearchState {
   focusedResult: number;
-  podcasts: App.PodcastSearchResult[];
+  podcasts: App.IPodcastSearchResult[];
   query: ISearchPodcastsAction['query'];
   searching: boolean;
 }

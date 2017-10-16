@@ -6,7 +6,7 @@ import { h } from 'preact';
 
 import { style } from 'typestyle';
 
-const loadingStyle = (theme: App.Theme) =>
+const loadingStyle = (theme: App.ITheme) =>
   style({
     position: 'fixed',
     top: 0,
@@ -19,7 +19,7 @@ const loadingStyle = (theme: App.Theme) =>
 
 interface ILoaderProps {
   loading: boolean;
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 const Loader = ({ loading, theme }: ILoaderProps) => (loading ? <div class={loadingStyle(theme)} /> : null);

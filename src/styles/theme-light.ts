@@ -28,7 +28,7 @@ const subTitle = '#555555';
 const textLight = background;
 const backgroundSearch = '#cccccc';
 
-const theme: App.Theme = {
+const theme: App.ITheme = {
   accent,
   background,
   backgroundDark,

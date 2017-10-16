@@ -23,12 +23,12 @@ export const getFeed = (feedType: FeedType): IGetFeedAction => ({
 interface IGetFeedSuccessAction {
   type: 'GET_FEED_SUCCESS';
   feedType: FeedType;
-  podcasts: App.Podcast[];
+  podcasts: App.IPodcast[];
 }
 
 const GET_FEED_SUCCESS: IGetFeedSuccessAction['type'] = 'GET_FEED_SUCCESS';
 
-const getFeedSuccess = (feedType: FeedType, podcasts: App.Podcast[]): IGetFeedSuccessAction => ({
+const getFeedSuccess = (feedType: FeedType, podcasts: App.IPodcast[]): IGetFeedSuccessAction => ({
   type: GET_FEED_SUCCESS,
   feedType,
   podcasts,
@@ -38,7 +38,7 @@ export type FeedActions = IGetFeedAction | IGetFeedSuccessAction;
 
 export interface IFeedData {
   loading: boolean;
-  podcasts: App.Podcast[];
+  podcasts: App.IPodcast[];
 }
 
 export interface IFeedState {

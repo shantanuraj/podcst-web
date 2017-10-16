@@ -16,7 +16,7 @@ import { ISearchState } from '../stores/search';
 
 import SearchResults from './SearchResults';
 
-const search = (theme: App.Theme) =>
+const search = (theme: App.ITheme) =>
   style({
     padding: 16,
     height: 'inherit',
@@ -27,14 +27,14 @@ const search = (theme: App.Theme) =>
     color: theme.textLight,
   });
 
-const Key: KeyboardShortcutsMap = {
+const Key: IKeyboardShortcutsMap = {
   83: 'focus',
   27: 'dismiss',
 };
 
 interface ISearchProps extends ISearchState {
   className: string;
-  theme: App.Theme;
+  theme: App.ITheme;
   searchPodcasts(query: string);
   dismissSearch();
   navigateResult(direction: 'up' | 'down');

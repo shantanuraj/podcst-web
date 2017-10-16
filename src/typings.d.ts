@@ -1,3 +1,5 @@
+/* tslint:disable:no-namespace */
+
 /**
  * Shared Explicit state type
  */
@@ -12,7 +14,7 @@ declare namespace App {
   /**
    * Adapted Podcast interface
    */
-  interface Podcast {
+  interface IPodcast {
     /**
      * iTunes id of the podcast
      */
@@ -54,15 +56,15 @@ declare namespace App {
   /**
    * Adapted Episode interface
    */
-  interface Episode {
+  interface IEpisode {
     title: string;
     summary: string | null;
     published: number | null;
-    cover: string | null;
+    cover: string;
     explicit: boolean;
     duration: number | null;
     link: string | null;
-    file: FileInfo;
+    file: IFileInfo;
     author: string | null;
     episodeArt: string | null;
     showNotes: string;
@@ -71,14 +73,14 @@ declare namespace App {
   /**
    * Adapted Episode with feed info
    */
-  interface EpisodeInfo extends Episode {
+  interface IEpisodeInfo extends IEpisode {
     feed: string;
   }
 
   /**
    * Episode listing
    */
-  interface EpisodeListing {
+  interface IEpisodeListing {
     title: string;
     link: string;
     published: number | null;
@@ -87,26 +89,26 @@ declare namespace App {
     cover: string;
     keywords: string[];
     explicit: boolean;
-    episodes: Episode[];
+    episodes: IEpisode[];
   }
 
   /**
    * Episode info listing
    */
-  interface PodcastEpisodesInfo extends EpisodeListing {
-    episodes: EpisodeInfo[];
+  interface IPodcastEpisodesInfo extends IEpisodeListing {
+    episodes: IEpisodeInfo[];
   }
 
-  type RenderablePodcast =
-    | Podcast
-    | (PodcastEpisodesInfo & {
+  type IRenderablePodcast =
+    | IPodcast
+    | (IPodcastEpisodesInfo & {
         feed: string;
       });
 
   /**
    * Podcasts Search result interface
    */
-  interface PodcastSearchResult {
+  interface IPodcastSearchResult {
     author: string;
     feed: string;
     thumbnail: string;
@@ -115,7 +117,7 @@ declare namespace App {
 
   type ThemeMode = 'dark' | 'light';
 
-  interface Theme {
+  interface ITheme {
     accent: string;
     background: string;
     backgroundDark: string;
@@ -128,23 +130,23 @@ declare namespace App {
   }
 }
 
-interface SubscriptionsMap {
-  [feed: string]: App.RenderablePodcast;
+interface ISubscriptionsMap {
+  [feed: string]: App.IRenderablePodcast;
 }
 
-interface FileInfo {
+interface IFileInfo {
   url: string;
   length: string;
   type: string;
 }
 
-interface OPMLFeed {
+interface IOPMLFeed {
   title: string;
   feed: string;
 }
 
-interface OPMLJson {
-  feeds: OPMLFeed[];
+interface IOPMLJson {
+  feeds: IOPMLFeed[];
 }
 
 type EpisodePlayerState = 'playing' | 'paused' | 'stopped';
@@ -164,23 +166,23 @@ type KeyboardShortcuts =
   | 'settings'
   | 'select';
 
-interface KeyboardShortcutsMap {
+interface IKeyboardShortcutsMap {
   [keyCode: number]: KeyboardShortcuts;
 }
 
-interface PodcastWebpackModule {
+interface IPodcastWebpackModule {
   hot?: {
     accept: () => void;
   };
 }
 
-declare let module: PodcastWebpackModule;
+declare let module: IPodcastWebpackModule;
 
 type Require = (package: string) => void;
 
 declare let require: Require;
 
-interface Process {
+interface IProcess {
   env: {
     APP_VERSION: string;
     IN_BROWSER: string;
@@ -188,40 +190,42 @@ interface Process {
   };
 }
 
-interface Artwork {
+interface IArtwork {
   src: string;
   sizes: '96x96' | '128x128' | '192x192' | '256x256' | '384x384' | '512x512';
   type: 'image/png' | 'image/jpeg';
 }
 
-interface ChromeMediaMetadataProps {
+interface IChromeMediaMetadataProps {
   album: string;
   artist: string;
-  artwork: Artwork[];
+  artwork: IArtwork[];
   title: string;
 }
 
-interface ChromeMediaMetadata {
-  new (props: ChromeMediaMetadataProps): ChromeMediaMetadata;
+// TODO: Remove later
+/* tslint:disable:no-misused-new */
+interface IChromeMediaMetadata {
+  new (props: IChromeMediaMetadataProps): IChromeMediaMetadata;
 }
 
 type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';
 
 type ChromeEventHandler = () => void;
 
-interface ChromeMediaSession {
+interface IChromeMediaSession {
+  metadata: IChromeMediaMetadata;
   setActionHandler(ChromeMediaSessionEvents, ChromeEventHandler);
-  metadata: ChromeMediaMetadata;
 }
 
-interface ChromeNavigator extends Navigator {
-  mediaSession: ChromeMediaSession;
+interface IChromeNavigator extends Navigator {
+  mediaSession: IChromeMediaSession;
 }
 
-interface ReduxDevToolsEnabledWindow extends Window {
+interface IReduxDevToolsEnabledWindow extends Window {
   __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any;
 }
 
-declare let process: Process;
+declare let process: IProcess;
 
-declare let MediaMetadata: ChromeMediaMetadata;
+declare let MediaMetadata: IChromeMediaMetadata;

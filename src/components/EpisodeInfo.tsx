@@ -13,7 +13,7 @@ import { scrollToTop } from '../utils';
 import Loading from './Loading';
 import ShowNotes from './ShowNotes';
 
-const container = (theme: App.Theme) =>
+const container = (theme: App.ITheme) =>
   style({
     color: theme.text,
     display: 'flex',
@@ -95,12 +95,12 @@ const showNotesContainer = style(
 interface IEpisodeInfoProps {
   feed: string;
   info: IPodcastsState;
-  theme: App.Theme;
+  theme: App.ITheme;
   state: EpisodePlayerState;
   title: string;
   getEpisodes: (feed: string) => void;
   pauseEpisode: () => void;
-  playEpisode: (episode: App.Episode) => void;
+  playEpisode: (episode: App.IEpisode) => void;
   resumeEpisode: () => void;
 }
 
@@ -128,7 +128,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
     return <Loading />;
   }
 
-  public renderLoaded(podcast: App.PodcastEpisodesInfo, episode: App.Episode | undefined) {
+  public renderLoaded(podcast: App.IPodcastEpisodesInfo, episode: App.IEpisode | undefined) {
     if (!episode) {
       return <div>Couldn't get Podcasts episode</div>;
     }
@@ -136,7 +136,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
     const { state, theme } = this.props;
     const { author, cover, episodeArt, showNotes, title } = episode;
 
-    const showArt = episodeArt || (cover as string);
+    const showArt = episodeArt || cover;
     const isPlayerVisible = state !== 'stopped';
 
     return (

@@ -55,7 +55,7 @@ export type AppActions = IAppInitAction | IUpdateChromeMetadataAction | IChangeT
  */
 export interface IAppState {
   mode: App.ThemeMode;
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 /**

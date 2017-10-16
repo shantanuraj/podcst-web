@@ -10,7 +10,7 @@ import ImportPodcastsView from './ImportPodcastsView';
 import PodcastsGrid from './PodcastsGrid';
 
 interface ISubscriptionsProps extends ISubscriptionsState {
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 const Subscriptions = ({ subs, theme }: ISubscriptionsProps) =>

@@ -8,7 +8,7 @@ import { media, style } from 'typestyle';
 
 import { formatTime } from '../utils';
 
-const seekbarContainer = (theme: App.Theme) =>
+const seekbarContainer = (theme: App.ITheme) =>
   style(
     {
       position: 'relative',
@@ -42,7 +42,7 @@ interface ISeekbarProps {
   duration: number;
   seekPosition: number;
   buffering: boolean;
-  theme: App.Theme;
+  theme: App.ITheme;
   onSeek: (seekPosition: number, duration: number) => void;
 }
 

@@ -25,7 +25,7 @@ interface IFeedStateProps extends IFeedState {
 
 interface ISubsStateProps {
   mode: 'subs';
-  subs: SubscriptionsMap;
+  subs: ISubscriptionsMap;
 }
 
 type PodcastsGridProps = IFeedStateProps | ISubsStateProps;
@@ -48,11 +48,11 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     return <Loading />;
   }
 
-  public renderPodcast(podcast: App.RenderablePodcast) {
+  public renderPodcast(podcast: App.IRenderablePodcast) {
     return <PodcastsGridItem podcast={podcast} />;
   }
 
-  public renderLoaded(podcasts: App.RenderablePodcast[]) {
+  public renderLoaded(podcasts: App.IRenderablePodcast[]) {
     return <div class={grid}>{podcasts.map(this.renderPodcast)}</div>;
   }
 

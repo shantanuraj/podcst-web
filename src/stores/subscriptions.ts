@@ -21,10 +21,10 @@ import Podcasts from '../api/Podcasts';
 interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
   feed: string;
-  podcasts: App.RenderablePodcast;
+  podcasts: App.IRenderablePodcast;
 }
 const ADD_SUBSCRIPTION: IAddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
-export const addSubscription = (feed: string, podcasts: App.RenderablePodcast): IAddSubscriptionAction => ({
+export const addSubscription = (feed: string, podcasts: App.IRenderablePodcast): IAddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
   podcasts,
@@ -53,7 +53,7 @@ export const parseOPML = (file: string): IParseOPMLAction => ({
 export type SubscriptionsActions = IAddSubscriptionAction | IRemoveSubscriptionAction | IParseOPMLAction | INoopAction;
 
 export interface ISubscriptionsState {
-  subs: SubscriptionsMap;
+  subs: ISubscriptionsMap;
 }
 
 export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
@@ -63,7 +63,7 @@ export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
     const addSubscriptions = feeds.map(({ feed }) =>
       Podcasts.episodes(feed)
         .filter(notNull)
-        .map((podcasts: App.PodcastEpisodesInfo) => addSubscription(feed, { ...podcasts, feed })),
+        .map((podcasts: App.IPodcastEpisodesInfo) => addSubscription(feed, { ...podcasts, feed })),
     );
 
     const actions = [

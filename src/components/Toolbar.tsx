@@ -12,7 +12,7 @@ import ConnectedSearch from '../containers/ConnectedSearch';
 import Icon from '../svg/Icon';
 import NavLinks, { ILinkMap } from './NavLinks';
 
-const toolbar = (theme: App.Theme) =>
+const toolbar = (theme: App.ITheme) =>
   style(
     {
       display: 'flex',
@@ -82,7 +82,7 @@ const linkMap: ILinkMap = {
 };
 
 interface IToolbarProps {
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 const Toolbar = ({ theme }: IToolbarProps) => (

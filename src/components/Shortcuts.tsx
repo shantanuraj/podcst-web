@@ -12,7 +12,7 @@ const container = style({
   width: '100%',
 });
 
-const item = (theme: App.Theme) =>
+const item = (theme: App.ITheme) =>
   style(
     {
       display: 'flex',
@@ -78,17 +78,17 @@ const appShortcuts: IShortcutInfo[] = [
   },
 ];
 
-const renderShortcut = (theme: App.Theme) => ({ title, value }: IShortcutInfo) => (
+const renderShortcut = (theme: App.ITheme) => ({ title, value }: IShortcutInfo) => (
   <div class={item(theme)}>
     <span>{title}</span>
     <pre>{value}</pre>
   </div>
 );
 
-const renderShortcuts = (theme: App.Theme, shortcuts: IShortcutInfo[]) => shortcuts.map(renderShortcut(theme));
+const renderShortcuts = (theme: App.ITheme, shortcuts: IShortcutInfo[]) => shortcuts.map(renderShortcut(theme));
 
 interface IShortcutsProps {
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 const Shortcuts = ({ theme }: IShortcutsProps) => <div class={container}>{renderShortcuts(theme, appShortcuts)}</div>;

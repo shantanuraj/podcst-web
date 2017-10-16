@@ -34,7 +34,7 @@ const SEEK_DELTA = 10;
 /**
  * Keyboard shortcut map for changing theme
  */
-const ChangeThemeKeys: KeyboardShortcutsMap = {
+const ChangeThemeKeys: IKeyboardShortcutsMap = {
   84: 'change-theme',
 };
 
@@ -51,7 +51,7 @@ export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
 /**
  * Keyboard shortcut map for controlling map
  */
-const PlayerControlKeys: KeyboardShortcutsMap = {
+const PlayerControlKeys: IKeyboardShortcutsMap = {
   32: 'play',
   80: 'prev',
   78: 'next',
@@ -125,7 +125,7 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
 /**
  * Keyboard shortcut map for opening settings
  */
-const OpenSettingsKeys: KeyboardShortcutsMap = {
+const OpenSettingsKeys: IKeyboardShortcutsMap = {
   188: 'settings',
 };
 

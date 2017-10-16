@@ -8,7 +8,7 @@ const STORE_KEY = 'store@PLAY_PODCST_IO/2';
 const DEPRECATED_KEYS = ['store@PLAY_PODCST_IO'];
 
 interface IStoreable {
-  subscriptions: SubscriptionsMap;
+  subscriptions: ISubscriptionsMap;
   app: IAppState;
 }
 

@@ -4,8 +4,8 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 
-export const updateMetadata = (episode: App.EpisodeInfo, info: App.PodcastEpisodesInfo | null) => {
-  const { mediaSession } = navigator as ChromeNavigator;
+export const updateMetadata = (episode: App.IEpisodeInfo, info: App.IPodcastEpisodesInfo | null) => {
+  const { mediaSession } = navigator as IChromeNavigator;
 
   const { title, author, episodeArt, cover } = episode;
 

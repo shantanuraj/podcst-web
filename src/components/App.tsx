@@ -62,7 +62,7 @@ class App extends Component<IAppProps, never> {
 
   public setupMediaSession() {
     if ('mediaSession' in navigator) {
-      const { mediaSession } = navigator as ChromeNavigator;
+      const { mediaSession } = navigator as IChromeNavigator;
 
       const { pauseEpisode, resumeEpisode, skipToNextEpisode, skipToPrevEpisode } = this.props;
 

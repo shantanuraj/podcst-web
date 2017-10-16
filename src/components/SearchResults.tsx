@@ -12,7 +12,7 @@ import { Link } from 'preact-router';
 
 import { media, style } from 'typestyle';
 
-const results = (theme: App.Theme) =>
+const results = (theme: App.ITheme) =>
   style(
     {
       backgroundColor: theme.background,
@@ -31,7 +31,7 @@ const results = (theme: App.Theme) =>
     ),
   );
 
-const result = (theme: App.Theme) =>
+const result = (theme: App.ITheme) =>
   style({
     display: 'flex',
     $nest: {
@@ -68,16 +68,16 @@ const resultAuthorText = style({
 });
 
 interface ISearchResultsProps {
-  podcasts: App.PodcastSearchResult[];
+  podcasts: App.IPodcastSearchResult[];
   focusedResult: number;
-  theme: App.Theme;
+  theme: App.ITheme;
   dismissSearch();
   navigateResult(direction: 'up' | 'down');
   focusResult(focusedResult: number);
   onResultSelect(feed: string);
 }
 
-const Key: KeyboardShortcutsMap = {
+const Key: IKeyboardShortcutsMap = {
   38: 'up',
   40: 'down',
   13: 'select',
@@ -120,7 +120,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
   }
 
   public renderPodcast = (
-    podcast: App.PodcastSearchResult,
+    podcast: App.IPodcastSearchResult,
     isFocussed: boolean,
     focusResult: () => void,
     dismissSearch: ISearchResultsProps['dismissSearch'],
@@ -142,7 +142,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
   );
 
   public renderPodcasts = (
-    podcasts: App.PodcastSearchResult[],
+    podcasts: App.IPodcastSearchResult[],
     focusedResult: number,
     focusResult: ISearchResultsProps['focusResult'],
     dismissSearch: ISearchResultsProps['dismissSearch'],

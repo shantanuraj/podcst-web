@@ -10,7 +10,11 @@
     "trailingComma": "all"
   },
   "lint-staged": {
-    "src/**/{*.ts,*.tsx}": ["prettier --write", "tslint --project tsconfig.json --fix", "git add"]
+    "src/**/{*.ts,*.tsx}": [
+      "prettier --write",
+      "tslint --project tsconfig.json --fix",
+      "git add"
+    ]
   },
   "scripts": {
     "precommit": "lint-staged",
@@ -58,7 +62,7 @@
     "ts-loader": "^2.3.2",
     "tslint": "^5.7.0",
     "tslint-config-prettier": "^1.5.0",
-    "typescript": "^2.5.2",
+    "typescript": "^2.5.3",
     "url-loader": "^0.5.9",
     "webpack": "^3.5.4",
     "webpack-chunk-hash": "^0.4.0",

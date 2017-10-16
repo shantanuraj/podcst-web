@@ -81,7 +81,7 @@ export const isNotIgnoreElement = (target: EventTarget) => !(target as HTMLEleme
 /**
  * Parse OPML XML element to JSON
  */
-const adaptFeed = (el: HTMLElement): OPMLFeed => ({
+const adaptFeed = (el: HTMLElement): IOPMLFeed => ({
   title: el.getAttribute('text') as string,
   feed: el.getAttribute('xmlUrl') as string,
 });
@@ -89,7 +89,7 @@ const adaptFeed = (el: HTMLElement): OPMLFeed => ({
 /**
  * Parse OPML XML to JSON feed
  */
-export const opmltoJSON = (file: string): OPMLJson => {
+export const opmltoJSON = (file: string): IOPMLJson => {
   const parser = new DOMParser();
   const xml = parser.parseFromString(file, 'text/xml');
   const feeds = Array.from(xml.querySelectorAll('outline[type="rss"]')) as HTMLElement[];
@@ -115,10 +115,10 @@ export const notNull = <T>(val: T | null) => val !== null;
  * Add feed prop to episodes
  */
 export const patchEpisodesResponse = (feed: string) => (
-  res: App.EpisodeListing | null,
-): App.PodcastEpisodesInfo | null => {
+  res: App.IEpisodeListing | null,
+): App.IPodcastEpisodesInfo | null => {
   if (res) {
-    const episodes: App.EpisodeInfo[] = res.episodes.map(episode => ({ ...episode, feed }));
+    const episodes: App.IEpisodeInfo[] = res.episodes.map(episode => ({ ...episode, feed }));
     return { ...res, episodes };
   } else {
     return null;

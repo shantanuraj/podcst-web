@@ -12,7 +12,7 @@ import Icon from '../svg/Icon';
 
 import { getEpisodeRoute } from '../utils';
 
-const infoContainer = (theme: App.Theme) =>
+const infoContainer = (theme: App.ITheme) =>
   style(
     {
       height: '100%',
@@ -74,9 +74,9 @@ const playButton = style({
 });
 
 interface IPlayerInfoProps {
-  episode: App.EpisodeInfo;
+  episode: App.IEpisodeInfo;
   state: EpisodePlayerState;
-  theme: App.Theme;
+  theme: App.ITheme;
   pause();
   resume();
 }
@@ -97,7 +97,7 @@ const PlayerInfo = ({
       <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} />
     </button>
     <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
-      <div class={episodeImage(episodeArt || (cover as string))} role="img" aria-label={`${title} episode art`} />
+      <div class={episodeImage(episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
       <div class={episodeInfo}>
         <p>{title}</p>
         <p>{author}</p>

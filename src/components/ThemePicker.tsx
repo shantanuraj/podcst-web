@@ -10,7 +10,7 @@ import Icon, { IconType } from '../svg/Icon';
 
 import { onEvent } from '../utils';
 
-const container = (theme: App.Theme) =>
+const container = (theme: App.ITheme) =>
   style({
     display: 'flex',
     flexDirection: 'column',
@@ -18,7 +18,7 @@ const container = (theme: App.Theme) =>
     fontSize: 18,
   });
 
-const themesContainer = (theme: App.Theme) =>
+const themesContainer = (theme: App.ITheme) =>
   style(
     {
       $nest: {
@@ -58,7 +58,7 @@ const themesContainer = (theme: App.Theme) =>
 
 interface IThemePickerProps {
   mode: App.ThemeMode;
-  theme: App.Theme;
+  theme: App.ITheme;
   onThemeChange(mode: App.ThemeMode);
 }
 
