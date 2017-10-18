@@ -18,6 +18,8 @@ import { feed, FeedActions, getFeedEpic, IFeedState } from './feed';
 
 import { ISearchState, search, SearchActions, searchPodcastsEpic } from './search';
 
+import { drawer, DrawerActions, drawerCloseEpic, IDrawerState } from './drawer';
+
 import {
   ISubscriptionsState,
   parseOPMLEpic,
@@ -30,7 +32,7 @@ import { app, AppActions, chromeMediaMetadaUpdateEpic, IAppState, onThemeChangeE
 
 import { dismissToastEpic, IToastState, toast, ToastActions } from './toast';
 
-import { changeThemeEpic, playerControlsEpic, seekbarJumpsEpic, settingsShortcutEpic } from './keyboard';
+import { changeThemeEpic, openViewEpic, playerControlsEpic, seekbarJumpsEpic } from './keyboard';
 
 /**
  * Combined application actions interface
@@ -44,6 +46,7 @@ export type Actions =
   | SubscriptionsActions
   | AppActions
   | ToastActions
+  | DrawerActions
   | INoopAction;
 
 /**
@@ -58,6 +61,7 @@ export interface IState {
   player: IPlayerState;
   subscriptions: ISubscriptionsState;
   toast: IToastState;
+  drawer: IDrawerState;
 }
 
 const epics = [
@@ -75,8 +79,9 @@ const epics = [
   'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
   seekbarJumpsEpic,
-  settingsShortcutEpic,
+  openViewEpic,
   dismissToastEpic,
+  drawerCloseEpic,
 ].filter(epic => epic !== null);
 
 export const rootEpic = combineEpics<Actions, IState>(...(epics as Array<Epic<Actions, IState, any>>));
@@ -90,4 +95,5 @@ export const rootReducer = combineReducers<IState>({
   search,
   subscriptions,
   toast,
+  drawer,
 });

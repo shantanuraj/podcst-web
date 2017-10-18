@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Podcst</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#212121">
   <meta property="og:title" content="Podcst | Plays your favourite podcasts on all devices" />
   <meta property="og:site_name" content="Podcst" />
@@ -28,17 +29,20 @@
   <meta name=apple-mobile-web-app-status-bar-style content="black">
   <link rel="apple-touch-icon" sizes="192x192" href="//play.podcst.io/launcher-192.png" />
 </head>
+
 <body>
+  <div id="root"></div>
   <script>
     if (location.protocol === 'https:' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(registration) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').then(function (registration) {
           console.log('SW Scope:', registration.scope);
-        }).catch(function(err) {
+        }).catch(function (err) {
           console.log('SW Error:', err);
         });
       });
     }
   </script>
 </body>
+
 </html>

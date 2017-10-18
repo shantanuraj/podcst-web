@@ -164,6 +164,7 @@ type KeyboardShortcuts =
   | 'change-theme'
   | 'episode-info'
   | 'settings'
+  | 'toggle-drawer'
   | 'select';
 
 interface IKeyboardShortcutsMap {
