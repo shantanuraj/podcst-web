@@ -49,6 +49,14 @@ class Search extends Component<ISearchProps, any> {
   private clicksSub: Subscription | null = null;
   private keyboardSub: Subscription | null = null;
 
+  public canDissmissSearch = (target: EventTarget | HTMLElement, checkInside: boolean = false) => {
+    const hasEl = !!this.el;
+    const isSearching = this.props.searching || !!this.props.query;
+    const targetPositionCheck = !!this.el && this.el.contains(target as HTMLElement) === checkInside;
+
+    return hasEl && isSearching && targetPositionCheck;
+  };
+
   public componentDidMount() {
     this.watchClicks();
     this.watchKeyboard();
@@ -60,11 +68,8 @@ class Search extends Component<ISearchProps, any> {
   }
 
   public watchClicks = () => {
-    this.clicksSub = Observable.fromEvent(document, 'click')
-      .filter(
-        ({ target }: MouseEvent) =>
-          !!this.el && (this.props.searching || !!this.props.query) && !this.el.contains(target as HTMLElement),
-      )
+    this.clicksSub = Observable.fromEvent<MouseEvent>(document, 'click')
+      .filter(e => this.canDissmissSearch(e.target))
       .subscribe(this.props.dismissSearch);
   };
 
@@ -87,8 +92,11 @@ class Search extends Component<ISearchProps, any> {
             return;
           }
           case 'dismiss': {
-            preventDefault();
-            return this.props.dismissSearch();
+            if (this.canDissmissSearch(target, true)) {
+              preventDefault();
+              return this.props.dismissSearch();
+            }
+            return;
           }
         }
       });
