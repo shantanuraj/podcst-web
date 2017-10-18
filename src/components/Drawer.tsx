@@ -72,10 +72,10 @@ interface IDrawerMenuProps extends IDrawerState {
   toggleDrawer: () => void;
 }
 
-const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
+const DrawerMenu = ({ isVisible, theme, toggleDrawer }: IDrawerMenuProps) => (
   <aside data-is-drawer-visible={!isVisible} class={drawer(theme)}>
     <nav>
-      <header class={drawerHeader(theme)}>
+      <header onClick={toggleDrawer} class={drawerHeader(theme)}>
         <Icons color={theme.text} icon="back" />
         <span>Back</span>
       </header>
