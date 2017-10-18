@@ -72,7 +72,7 @@ const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
     <nav>
       <header class={drawerHeader(theme)}>
         <span role="img" aria-label="Close drawer">
-          <Icons color={theme.text} icon="back" />
+          <Icons color={theme.text} icon="back" size={24} />
         </span>
       </header>
       <NavLinks links={linkMap} theme={theme} />
