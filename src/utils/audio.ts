@@ -27,7 +27,7 @@ class Audio {
     Audio.callbacks = callbacks;
   }
 
-  public static play(episode: App.Episode) {
+  public static play(episode: App.IEpisode) {
     if (globalHowl) {
       Audio.stop();
     }
@@ -69,7 +69,7 @@ class Audio {
     globalHowl && globalHowl.stop();
   }
 
-  public static skipTo(episode: App.Episode) {
+  public static skipTo(episode: App.IEpisode) {
     Audio.pause();
     Audio.play(episode);
   }

@@ -16,7 +16,7 @@ const container = style({
   justifyContent: 'center',
 });
 
-const importButton = (theme: App.Theme) =>
+const importButton = (theme: App.ITheme) =>
   style({
     background: 'transparent',
     border: `2px solid ${theme.accent}`,
@@ -33,7 +33,7 @@ const importButton = (theme: App.Theme) =>
   });
 
 interface IImportPodcastsViewProps {
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 const ImportPodcastsView = ({ theme }: IImportPodcastsViewProps) => (

@@ -10,7 +10,7 @@ import { normalizeEl } from '../utils/styles';
 import EpisodeRow from './EpisodeRow';
 import Loading from './Loading';
 
-const episodesContainer = (theme: App.Theme) =>
+const episodesContainer = (theme: App.ITheme) =>
   style({
     backgroundColor: theme.background,
     color: theme.text,
@@ -50,7 +50,7 @@ const podcastInfo = style(
   ),
 );
 
-const podcastInfoTitles = (theme: App.Theme) =>
+const podcastInfoTitles = (theme: App.ITheme) =>
   style({
     display: 'flex',
     flexDirection: 'column',
@@ -77,7 +77,7 @@ const podcastTitle = style(margins, {
   fontWeight: 'bold',
 });
 
-const subscribeButton = (theme: App.Theme) =>
+const subscribeButton = (theme: App.ITheme) =>
   style({
     display: 'inline-block',
     minWidth: '120px',
@@ -120,14 +120,14 @@ const episodesView = style(
 );
 
 interface IEpisodesProps {
-  theme: App.Theme;
+  theme: App.ITheme;
   feed: string;
   info: IPodcastsState;
   state: EpisodePlayerState;
-  currentEpisode: App.EpisodeInfo | null;
-  subscriptions: SubscriptionsMap;
+  currentEpisode: App.IEpisodeInfo | null;
+  subscriptions: ISubscriptionsMap;
   getEpisodes: (feed: string) => void;
-  playEpisode: (episode: App.EpisodeInfo) => void;
+  playEpisode: (episode: App.IEpisodeInfo) => void;
   resumeEpisode: () => void;
   pauseEpisode: () => void;
   addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
@@ -158,7 +158,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     return <Loading />;
   }
 
-  public renderEpisode = (episode: App.EpisodeInfo) => {
+  public renderEpisode = (episode: App.IEpisodeInfo) => {
     const { currentEpisode, playEpisode, pauseEpisode, resumeEpisode, state, theme, feed } = this.props;
 
     const play = () => playEpisode(episode);
@@ -177,7 +177,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     );
   };
 
-  public renderLoaded(feed: string, info: App.PodcastEpisodesInfo | null) {
+  public renderLoaded(feed: string, info: App.IPodcastEpisodesInfo | null) {
     if (!info) {
       return <div>Couldn't get Podcasts episodes</div>;
     }

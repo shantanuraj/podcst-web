@@ -10,7 +10,7 @@ import { media, style } from 'typestyle';
 
 import { getEpisodeRoute, monthName } from '../utils';
 
-const episodeContainer = (theme: App.Theme) =>
+const episodeContainer = (theme: App.ITheme) =>
   style(
     {
       paddingTop: 16,
@@ -42,7 +42,7 @@ const episodeTitle = style({
   alignItems: 'center',
 });
 
-const subContainer = (theme: App.Theme) =>
+const subContainer = (theme: App.ITheme) =>
   style({
     marginRight: 16,
     color: theme.subTitle,
@@ -57,7 +57,7 @@ const subContainer = (theme: App.Theme) =>
     },
   });
 
-const playButton = (theme: App.Theme) =>
+const playButton = (theme: App.ITheme) =>
   style({
     display: 'inline-block',
     minWidth: '80px',
@@ -76,11 +76,11 @@ const playButton = (theme: App.Theme) =>
   });
 
 interface IEpisodeRowProps {
-  episode: App.EpisodeInfo;
-  currentEpisode: App.EpisodeInfo | null;
+  episode: App.IEpisodeInfo;
+  currentEpisode: App.IEpisodeInfo | null;
   feed: string;
   state: EpisodePlayerState;
-  theme: App.Theme;
+  theme: App.ITheme;
   play: () => void;
   resume: () => void;
   pause: () => void;

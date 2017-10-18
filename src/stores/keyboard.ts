@@ -12,6 +12,8 @@ import { Actions, IState } from './root';
 
 import { noop } from './utils';
 
+import { Keys } from '../utils/constants';
+
 import { APP_INIT, changeTheme } from './app';
 
 import {
@@ -26,6 +28,8 @@ import {
 
 import { navigate } from './router';
 
+import { toggleDrawer } from './drawer';
+
 /**
  * Seek delta in seconds
  */
@@ -34,8 +38,8 @@ const SEEK_DELTA = 10;
 /**
  * Keyboard shortcut map for changing theme
  */
-const ChangeThemeKeys: KeyboardShortcutsMap = {
-  84: 'change-theme',
+const ChangeThemeKeys: IKeyboardShortcutsMap = {
+  [Keys.t]: 'change-theme',
 };
 
 /**
@@ -51,13 +55,13 @@ export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
 /**
  * Keyboard shortcut map for controlling map
  */
-const PlayerControlKeys: KeyboardShortcutsMap = {
-  32: 'play',
-  80: 'prev',
-  78: 'next',
-  37: 'seek-back',
-  39: 'seek-forward',
-  69: 'episode-info',
+const PlayerControlKeys: IKeyboardShortcutsMap = {
+  [Keys.space]: 'play',
+  [Keys.p]: 'prev',
+  [Keys.n]: 'next',
+  [Keys.left]: 'seek-back',
+  [Keys.right]: 'seek-forward',
+  [Keys.e]: 'episode-info',
 };
 
 /**
@@ -125,16 +129,26 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
 /**
  * Keyboard shortcut map for opening settings
  */
-const OpenSettingsKeys: KeyboardShortcutsMap = {
-  188: 'settings',
+const OpenViewKeys: IKeyboardShortcutsMap = {
+  [Keys.comma]: 'settings',
+  [Keys.d]: 'toggle-drawer',
 };
 
 /**
  * Open settings epic
  */
-export const settingsShortcutEpic: Epic<Actions, IState> = action$ =>
+export const openViewEpic: Epic<Actions, IState> = action$ =>
   action$.ofType(APP_INIT).switchMap(() =>
     Observable.fromEvent<KeyboardEvent>(document, 'keydown')
-      .filter(({ keyCode, target }) => !!OpenSettingsKeys[keyCode] && isNotIgnoreElement(target))
-      .map(() => navigate('/settings')),
+      .filter(({ keyCode, target }) => !!OpenViewKeys[keyCode] && isNotIgnoreElement(target))
+      .map(({ keyCode }) => {
+        switch (OpenViewKeys[keyCode]) {
+          case 'settings':
+            return navigate('/settings');
+          case 'toggle-drawer':
+            return toggleDrawer();
+          default:
+            return noop();
+        }
+      }),
   );

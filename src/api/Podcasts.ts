@@ -18,22 +18,22 @@ export default class Podcasts {
     };
   }
 
-  public static feed(type: FeedType): Observable<App.Podcast[]> {
+  public static feed(type: FeedType): Observable<App.IPodcast[]> {
     return ajax(Podcasts.api(`/${type}?limit=100`))
-      .map(res => res.response as App.Podcast[])
+      .map(res => res.response as App.IPodcast[])
       .catch(() => Observable.of([]));
   }
 
-  public static search(term: string): Observable<App.PodcastSearchResult[]> {
+  public static search(term: string): Observable<App.IPodcastSearchResult[]> {
     return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`))
-      .map(res => res.response as App.PodcastSearchResult[])
+      .map(res => res.response as App.IPodcastSearchResult[])
       .catch(() => Observable.of([]));
   }
 
-  public static episodes(url: string): Observable<App.PodcastEpisodesInfo | null> {
+  public static episodes(url: string): Observable<App.IPodcastEpisodesInfo | null> {
     const patchRes = patchEpisodesResponse(url);
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
-      .map(res => res.response as App.EpisodeListing | null)
+      .map(res => res.response as App.IEpisodeListing | null)
       .map(patchRes)
       .catch(() => Observable.of(null));
   }

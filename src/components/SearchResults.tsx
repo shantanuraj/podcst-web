@@ -12,7 +12,9 @@ import { Link } from 'preact-router';
 
 import { media, style } from 'typestyle';
 
-const results = (theme: App.Theme) =>
+import { Keys } from '../utils/constants';
+
+const results = (theme: App.ITheme) =>
   style(
     {
       backgroundColor: theme.background,
@@ -31,7 +33,7 @@ const results = (theme: App.Theme) =>
     ),
   );
 
-const result = (theme: App.Theme) =>
+const result = (theme: App.ITheme) =>
   style({
     display: 'flex',
     $nest: {
@@ -68,19 +70,19 @@ const resultAuthorText = style({
 });
 
 interface ISearchResultsProps {
-  podcasts: App.PodcastSearchResult[];
+  podcasts: App.IPodcastSearchResult[];
   focusedResult: number;
-  theme: App.Theme;
+  theme: App.ITheme;
   dismissSearch();
   navigateResult(direction: 'up' | 'down');
   focusResult(focusedResult: number);
   onResultSelect(feed: string);
 }
 
-const Key: KeyboardShortcutsMap = {
-  38: 'up',
-  40: 'down',
-  13: 'select',
+const SearchNavKeys: IKeyboardShortcutsMap = {
+  [Keys.up]: 'up',
+  [Keys.down]: 'down',
+  [Keys.enter]: 'select',
 };
 
 class SearchResults extends Component<ISearchResultsProps, any> {
@@ -100,19 +102,18 @@ class SearchResults extends Component<ISearchResultsProps, any> {
       const parent = this.el.parentElement;
       if (parent) {
         this.navigationSub = Observable.fromEvent(parent, 'keydown')
-          .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
+          .filter(({ keyCode }: KeyboardEvent) => SearchNavKeys[keyCode] !== undefined)
           .subscribe((e: KeyboardEvent) => {
             e.preventDefault();
-            switch (Key[e.keyCode]) {
+            const clicked = SearchNavKeys[e.keyCode];
+            switch (clicked) {
               case 'up':
-              case 'down': {
-                return this.props.navigateResult(Key[e.keyCode] as 'up' | 'down');
-              }
-              case 'select': {
+              case 'down':
+                return this.props.navigateResult(clicked);
+              case 'select':
                 const { podcasts, focusedResult, onResultSelect, dismissSearch } = this.props;
                 const selectedPodcast = podcasts[focusedResult];
                 return onResultSelect(selectedPodcast.feed), dismissSearch();
-              }
             }
           });
       }
@@ -120,7 +121,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
   }
 
   public renderPodcast = (
-    podcast: App.PodcastSearchResult,
+    podcast: App.IPodcastSearchResult,
     isFocussed: boolean,
     focusResult: () => void,
     dismissSearch: ISearchResultsProps['dismissSearch'],
@@ -142,7 +143,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
   );
 
   public renderPodcasts = (
-    podcasts: App.PodcastSearchResult[],
+    podcasts: App.IPodcastSearchResult[],
     focusedResult: number,
     focusResult: ISearchResultsProps['focusResult'],
     dismissSearch: ISearchResultsProps['dismissSearch'],

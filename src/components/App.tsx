@@ -17,6 +17,7 @@ import { IAppState } from '../stores/app';
 
 import { IMatchProps } from '../stores/router';
 
+import ConnectedDrawer from '../containers/ConnectedDrawer';
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
@@ -34,6 +35,11 @@ const container = style({
   marginBottom: 64,
 });
 
+const mainContainer = style({
+  display: 'flex',
+  flexDirection: 'row',
+});
+
 interface IAppProps extends IAppState {
   version: string;
   appInit();
@@ -45,6 +51,7 @@ interface IAppProps extends IAppState {
   skipToNextEpisode();
   skipToPrevEpisode();
   stopEpisode();
+  toggleDrawer();
 }
 
 class App extends Component<IAppProps, never> {
@@ -62,7 +69,7 @@ class App extends Component<IAppProps, never> {
 
   public setupMediaSession() {
     if ('mediaSession' in navigator) {
-      const { mediaSession } = navigator as ChromeNavigator;
+      const { mediaSession } = navigator as IChromeNavigator;
 
       const { pauseEpisode, resumeEpisode, skipToNextEpisode, skipToPrevEpisode } = this.props;
 
@@ -74,11 +81,12 @@ class App extends Component<IAppProps, never> {
   }
 
   public render() {
-    const { theme, version, routerNavigate } = this.props;
+    const { theme, version, routerNavigate, toggleDrawer } = this.props;
     return (
-      <div class={normalizeEl}>
-        <Toolbar theme={theme} />
+      <div class={classes(normalizeEl, mainContainer)}>
+        <Toolbar theme={theme} toggleDrawer={toggleDrawer} />
         <ConnectedLoader theme={theme} />
+        <ConnectedDrawer />
         <main class={classes(normalizeEl, container)}>
           <Router>
             <ConnectedIndexRedirect path="/" />

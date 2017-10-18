@@ -8,7 +8,7 @@ import { media, style } from 'typestyle';
 
 import { IToastState } from '../stores/toast';
 
-const toastContainer = (theme: App.Theme) =>
+const toastContainer = (theme: App.ITheme) =>
   style(
     {
       position: 'fixed',
@@ -32,7 +32,7 @@ const toastContainer = (theme: App.Theme) =>
   );
 
 interface IToastProps extends IToastState {
-  theme: App.Theme;
+  theme: App.ITheme;
 }
 
 const Toast = ({ isVisible, message, theme }: IToastProps) =>

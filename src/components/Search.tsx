@@ -12,11 +12,13 @@ import { Subscription } from 'rxjs/Subscription';
 
 import { onEvent } from '../utils';
 
+import { Keys } from '../utils/constants';
+
 import { ISearchState } from '../stores/search';
 
 import SearchResults from './SearchResults';
 
-const search = (theme: App.Theme) =>
+const search = (theme: App.ITheme) =>
   style({
     padding: 16,
     height: 'inherit',
@@ -27,14 +29,14 @@ const search = (theme: App.Theme) =>
     color: theme.textLight,
   });
 
-const Key: KeyboardShortcutsMap = {
-  83: 'focus',
-  27: 'dismiss',
+const Key: IKeyboardShortcutsMap = {
+  [Keys.s]: 'focus',
+  [Keys.escape]: 'dismiss',
 };
 
 interface ISearchProps extends ISearchState {
   className: string;
-  theme: App.Theme;
+  theme: App.ITheme;
   searchPodcasts(query: string);
   dismissSearch();
   navigateResult(direction: 'up' | 'down');
@@ -47,6 +49,14 @@ class Search extends Component<ISearchProps, any> {
   private clicksSub: Subscription | null = null;
   private keyboardSub: Subscription | null = null;
 
+  public canDissmissSearch = (target: EventTarget | HTMLElement, checkInside: boolean = false) => {
+    const hasEl = !!this.el;
+    const isSearching = this.props.searching || !!this.props.query;
+    const targetPositionCheck = !!this.el && this.el.contains(target as HTMLElement) === checkInside;
+
+    return hasEl && isSearching && targetPositionCheck;
+  };
+
   public componentDidMount() {
     this.watchClicks();
     this.watchKeyboard();
@@ -58,11 +68,8 @@ class Search extends Component<ISearchProps, any> {
   }
 
   public watchClicks = () => {
-    this.clicksSub = Observable.fromEvent(document, 'click')
-      .filter(
-        ({ target }: MouseEvent) =>
-          !!this.el && (this.props.searching || !!this.props.query) && !this.el.contains(target as HTMLElement),
-      )
+    this.clicksSub = Observable.fromEvent<MouseEvent>(document, 'click')
+      .filter(e => this.canDissmissSearch(e.target))
       .subscribe(this.props.dismissSearch);
   };
 
@@ -85,8 +92,11 @@ class Search extends Component<ISearchProps, any> {
             return;
           }
           case 'dismiss': {
-            preventDefault();
-            return this.props.dismissSearch();
+            if (this.canDissmissSearch(target, true)) {
+              preventDefault();
+              return this.props.dismissSearch();
+            }
+            return;
           }
         }
       });

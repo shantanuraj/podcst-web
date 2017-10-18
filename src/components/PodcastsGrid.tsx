@@ -25,7 +25,7 @@ interface IFeedStateProps extends IFeedState {
 
 interface ISubsStateProps {
   mode: 'subs';
-  subs: SubscriptionsMap;
+  subs: ISubscriptionsMap;
 }
 
 type PodcastsGridProps = IFeedStateProps | ISubsStateProps;

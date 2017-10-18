@@ -4,33 +4,33 @@
 
 'use strict';
 
-const { resolve }         = require('path');
-const webpack             = require('webpack');
-const HtmlWebpackPlugin   = require('html-webpack-plugin');
-const CleanWebpackPlugin  = require('clean-webpack-plugin');
-const CopyWebpackPlugin   = require('copy-webpack-plugin');
-const WorkboxPlugin       = require('workbox-webpack-plugin');
-const WebpackChunkHash    = require('webpack-chunk-hash');
-const { version }         = require('./package.json');
+const { resolve } = require('path');
+const webpack = require('webpack');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CleanWebpackPlugin = require('clean-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const WorkboxPlugin = require('workbox-webpack-plugin');
+const WebpackChunkHash = require('webpack-chunk-hash');
+const { version } = require('./package.json');
 
-const getPath = (env) => {
+const getPath = env => {
   const key = Object.keys(env)[0];
   if (key === 'dev') {
     return '/';
   } else {
     return `https://static.podcst.io/${key}/`;
   }
-}
+};
 
-const srcDir  = resolve(__dirname, 'src');
+const srcDir = resolve(__dirname, 'src');
 const distDir = resolve(__dirname, 'dist');
 
 module.exports = env => {
-  const isProd    = !!env.prod;
+  const isProd = !!env.prod;
   const isStaging = !!env.staging;
   const isProdOrStaging = isProd || isStaging;
 
-  const addPlugin = (add, plugin) => add ? plugin : undefined;
+  const addPlugin = (add, plugin) => (add ? plugin : undefined);
   const removeEmpty = plugins => plugins.filter(plugin => !!plugin);
   const ifProd = plugin => addPlugin(isProdOrStaging, plugin);
 
@@ -50,7 +50,7 @@ module.exports = env => {
 
   return {
     entry: {
-      'vendor': [
+      vendor: [
         'csstips',
         'howler',
         'preact',
@@ -61,6 +61,7 @@ module.exports = env => {
         'rxjs/observable/dom/ajax',
         'rxjs/add/observable/concat',
         'rxjs/add/observable/fromEvent',
+        'rxjs/add/observable/merge',
         'rxjs/add/observable/of',
         'rxjs/add/operator/catch',
         'rxjs/add/operator/debounceTime',
@@ -73,7 +74,7 @@ module.exports = env => {
         'rxjs/add/operator/throttleTime',
         'typestyle',
       ],
-      'app': './index.tsx',
+      app: './index.tsx',
     },
     output,
     context: srcDir,
@@ -82,8 +83,8 @@ module.exports = env => {
     },
     devtool: isProdOrStaging ? 'source-map' : 'eval',
     resolve: {
-        // Add `.ts` and `.tsx` as a resolvable extension.
-        extensions: ['.webpack.js', '.web.js', '.ts', '.tsx', '.js', '.json'],
+      // Add `.ts` and `.tsx` as a resolvable extension.
+      extensions: ['.webpack.js', '.web.js', '.ts', '.tsx', '.js', '.json'],
     },
     plugins: removeEmpty([
       new CleanWebpackPlugin('./dist'),
@@ -103,59 +104,55 @@ module.exports = env => {
           IN_BROWSER: '"true"',
         },
       }),
-      ifProd(new webpack.LoaderOptionsPlugin({
-        minimize: true,
-        debug: false,
-      })),
-      ifProd(new webpack.optimize.UglifyJsPlugin({
-        compress: {
-          screw_ie8: true,
-          warnings: false,
-        },
-      })),
+      ifProd(
+        new webpack.LoaderOptionsPlugin({
+          minimize: true,
+          debug: false,
+        }),
+      ),
+      ifProd(
+        new webpack.optimize.UglifyJsPlugin({
+          compress: {
+            screw_ie8: true,
+            warnings: false,
+          },
+        }),
+      ),
       new HtmlWebpackPlugin({ template: '../public/index.html' }),
-      ifProd(new WorkboxPlugin({
-        globDirectory: distDir,
-        globPatterns: ['**/*.{html,js,css}'],
-        swDest: resolve(distDir, 'sw.js'),
-      })),
+      ifProd(
+        new WorkboxPlugin({
+          globDirectory: distDir,
+          globPatterns: ['**/*.{html,js,css}'],
+          swDest: resolve(distDir, 'sw.js'),
+        }),
+      ),
     ]),
     module: {
-        rules: [
-          // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
-          {
-            test: /\.tsx?$/,
-            use: [
-              {
-                loader: 'babel-loader',
-                options: {
-                  cacheDirectory: true,
-                  plugins: [
-                    'transform-class-properties',
-                    'transform-object-assign',
-                  ],
-                  presets: [
-                    'env',
-                  ],
-                },
+      rules: [
+        // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
+        {
+          test: /\.tsx?$/,
+          use: [
+            {
+              loader: 'babel-loader',
+              options: {
+                cacheDirectory: true,
+                plugins: ['transform-class-properties', 'transform-object-assign'],
+                presets: ['env'],
               },
-              'ts-loader',
-            ],
-          },
-          {
-            test: /\.css$/,
-            use: [
-              { loader: "style-loader" },
-              { loader: "css-loader" },
-            ],
-          },
-          {
-            test: /\.(png|woff|woff2|eot|ttf|svg)$/,
-            use: [
-              { loader: 'url-loader?limit=100000' },
-            ],
-          },
-        ]
-    }
+            },
+            'ts-loader',
+          ],
+        },
+        {
+          test: /\.css$/,
+          use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
+        },
+        {
+          test: /\.(png|woff|woff2|eot|ttf|svg)$/,
+          use: [{ loader: 'url-loader?limit=100000' }],
+        },
+      ],
+    },
   };
-}
+};

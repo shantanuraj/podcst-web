@@ -11,7 +11,7 @@ import { IPlayerState } from '../stores/player';
 import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
 
-const player = (theme: App.Theme) =>
+const player = (theme: App.ITheme) =>
   style(
     {
       display: 'flex',
@@ -38,7 +38,7 @@ const player = (theme: App.Theme) =>
   );
 
 interface IPlayerProps extends IPlayerState {
-  theme: App.Theme;
+  theme: App.ITheme;
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;

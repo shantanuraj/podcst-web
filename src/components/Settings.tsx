@@ -40,7 +40,7 @@ const fillVertically: types.NestedCSSProperties = {
   height: '100%',
 };
 
-const container = (theme: App.Theme) =>
+const container = (theme: App.ITheme) =>
   style(
     {
       ...fillVertically,

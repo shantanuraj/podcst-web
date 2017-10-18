@@ -20,10 +20,10 @@ const fontFamily = [
 /**
  * Global styles
  */
-export const fixGlobalStyles = (theme: App.Theme) => {
+export const fixGlobalStyles = (theme: App.ITheme) => {
   normalize();
-  setupPage('body');
-  cssRule('body', {
+  setupPage('#root');
+  cssRule('body, #root', {
     backgroundColor: theme.background,
     fontFamily,
   });

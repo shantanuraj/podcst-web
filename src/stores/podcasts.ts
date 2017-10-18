@@ -10,7 +10,7 @@ import { IState } from '../stores/root';
 
 interface IGetEpisodesAction {
   type: 'GET_EPISODES';
-  feed: App.Podcast['feed'];
+  feed: App.IPodcast['feed'];
 }
 const GET_EPISODES: IGetEpisodesAction['type'] = 'GET_EPISODES';
 export const getEpisodes = (feed: string): IGetEpisodesAction => ({
@@ -20,13 +20,13 @@ export const getEpisodes = (feed: string): IGetEpisodesAction => ({
 
 interface IGetEpisodesSuccessAction {
   type: 'GET_EPISODES_SUCCESS';
-  episodes: App.PodcastEpisodesInfo | null;
-  feed: App.Podcast['feed'];
+  episodes: App.IPodcastEpisodesInfo | null;
+  feed: App.IPodcast['feed'];
 }
 const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
 export const getEpisodesSuccess = (
   feed: string,
-  episodes: App.PodcastEpisodesInfo | null,
+  episodes: App.IPodcastEpisodesInfo | null,
 ): IGetEpisodesSuccessAction => ({
   type: GET_EPISODES_SUCCESS,
   episodes,
@@ -37,7 +37,7 @@ export type PodcastsAction = IGetEpisodesAction | IGetEpisodesSuccessAction;
 
 export interface IPodcastsState {
   [feed: string]: {
-    episodes: App.PodcastEpisodesInfo | null;
+    episodes: App.IPodcastEpisodesInfo | null;
     loading: boolean;
   };
 }

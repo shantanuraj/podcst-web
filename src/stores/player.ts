@@ -15,10 +15,10 @@ import Audio from '../utils/audio';
  */
 export interface IPlayEpisodeAction {
   type: 'PLAY_EPISODE';
-  episode: App.EpisodeInfo;
+  episode: App.IEpisodeInfo;
 }
 export const PLAY_EPISODE: IPlayEpisodeAction['type'] = 'PLAY_EPISODE';
-export const playEpisode = (episode: App.EpisodeInfo): IPlayEpisodeAction => ({
+export const playEpisode = (episode: App.IEpisodeInfo): IPlayEpisodeAction => ({
   type: PLAY_EPISODE,
   episode,
 });
@@ -186,7 +186,7 @@ export interface IPlayerState {
   buffering: boolean;
   currentEpisode: number;
   duration: number;
-  queue: App.EpisodeInfo[];
+  queue: App.IEpisodeInfo[];
   seekPosition: number;
   state: EpisodePlayerState;
 }
