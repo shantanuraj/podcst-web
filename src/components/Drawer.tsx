@@ -69,6 +69,7 @@ const drawerHeader = (theme: App.ITheme) =>
 
 interface IDrawerMenuProps extends IDrawerState {
   theme: App.ITheme;
+  toggleDrawer: () => void;
 }
 
 const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
