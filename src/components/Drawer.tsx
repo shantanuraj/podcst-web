@@ -61,24 +61,20 @@ const drawerHeader = (theme: App.ITheme) =>
     justifyContent: 'flex-start',
     width: '100%',
     cursor: 'pointer',
-    $nest: {
-      '& span': {
-        marginLeft: 16,
-      },
-    },
   });
 
 interface IDrawerMenuProps extends IDrawerState {
   theme: App.ITheme;
-  toggleDrawer: () => void;
+  toggleDrawer();
 }
 
 const DrawerMenu = ({ isVisible, theme, toggleDrawer }: IDrawerMenuProps) => (
   <aside data-is-drawer-visible={isVisible} class={drawer(theme)}>
     <nav>
       <header onClick={toggleDrawer} class={drawerHeader(theme)}>
-        <Icons color={theme.text} icon="back" size={24} />
-        <span>Back</span>
+        <span role="img" aria-label="Close drawer">
+          <Icons color={theme.text} icon="back" />
+        </span>
       </header>
       <NavLinks links={linkMap} theme={theme} />
     </nav>

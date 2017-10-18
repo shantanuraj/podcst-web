@@ -4,47 +4,34 @@
 
 import { h } from 'preact';
 
-import { media, style } from 'typestyle';
-
-import { Link } from 'preact-router';
+import { style } from 'typestyle';
 
 import ConnectedSearch from '../containers/ConnectedSearch';
-import Icon from '../svg/Icon';
-import NavLinks, { ILinkMap } from './NavLinks';
+
+import Icons from '../svg/Icon';
 
 const toolbar = (theme: App.ITheme) =>
-  style(
-    {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      backgroundColor: theme.background,
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      height: '64px',
-      width: '100%',
-      zIndex: 501,
-      fontSize: 20,
-      color: theme.text,
-      boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
-      $nest: {
-        '& nav': {
-          padding: 16,
-        },
+  style({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    backgroundColor: theme.background,
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    height: '64px',
+    width: '100%',
+    zIndex: 501,
+    fontSize: 20,
+    color: theme.text,
+    boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
+    $nest: {
+      '& nav': {
+        padding: 16,
+        flex: 1,
       },
     },
-    media(
-      { maxWidth: 600 },
-      {
-        $nest: {
-          '& nav': {
-            padding: 0,
-          },
-        },
-      },
-    ),
-  );
+  });
 
 const secondaryItems = style({
   display: 'flex',
@@ -52,47 +39,24 @@ const secondaryItems = style({
   height: '100%',
 });
 
-const link = style(
-  {
-    paddingLeft: 16,
-    paddingRight: 16,
-  },
-  media(
-    { maxWidth: 600 },
-    {
-      $nest: { '& span': { display: 'none' } },
-    },
-  ),
-  media(
-    { minWidth: 601 },
-    {
-      $nest: { '& div': { display: 'none' } },
-    },
-  ),
-);
-
 const search = style({
   height: 'inherit',
   paddingLeft: 16,
 });
 
-const linkMap: ILinkMap = {
-  '/subs': 'Podcasts',
-  '/feed/top': 'Top',
-};
-
 interface IToolbarProps {
   theme: App.ITheme;
+  toggleDrawer();
 }
 
-const Toolbar = ({ theme }: IToolbarProps) => (
+const Toolbar = ({ theme, toggleDrawer }: IToolbarProps) => (
   <header class={toolbar(theme)}>
-    <NavLinks theme={theme} links={linkMap} />
+    <nav>
+      <span onClick={toggleDrawer}>
+        <Icons color={theme.text} icon="menu" />
+      </span>
+    </nav>
     <div class={secondaryItems}>
-      <Link class={link} href="/settings">
-        <Icon icon="settings" color={theme.text} />
-        <span>Settings</span>
-      </Link>
       <ConnectedSearch theme={theme} className={search} />
     </div>
   </header>

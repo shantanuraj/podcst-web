@@ -51,6 +51,7 @@ interface IAppProps extends IAppState {
   skipToNextEpisode();
   skipToPrevEpisode();
   stopEpisode();
+  toggleDrawer();
 }
 
 class App extends Component<IAppProps, never> {
@@ -80,10 +81,10 @@ class App extends Component<IAppProps, never> {
   }
 
   public render() {
-    const { theme, version, routerNavigate } = this.props;
+    const { theme, version, routerNavigate, toggleDrawer } = this.props;
     return (
       <div class={classes(normalizeEl, mainContainer)}>
-        <Toolbar theme={theme} />
+        <Toolbar theme={theme} toggleDrawer={toggleDrawer} />
         <ConnectedLoader theme={theme} />
         <ConnectedDrawer />
         <main class={classes(normalizeEl, container)}>

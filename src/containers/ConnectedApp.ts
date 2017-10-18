@@ -10,6 +10,8 @@ import { IState } from '../stores/root';
 
 import { appInit, changeTheme } from '../stores/app';
 
+import { toggleDrawer } from '../stores/drawer';
+
 import {
   pauseEpisode,
   resumeEpisode,
@@ -38,6 +40,7 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
       skipToNextEpisode,
       skipToPrevEpisode,
       stopEpisode,
+      toggleDrawer,
       routerNavigate: ({ url }: IMatchProps) => routerNavigate(url),
     },
     dispatch,
