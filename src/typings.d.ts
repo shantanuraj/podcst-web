@@ -225,6 +225,16 @@ interface IChromeNavigator extends Navigator {
   mediaSession: IChromeMediaSession;
 }
 
+interface INavigatorShareProps {
+  text: string;
+  title: string;
+  url: string;
+}
+
+interface IShareEnabledNavigator extends Navigator {
+  share(info: INavigatorShareProps): Promise<undefined>;
+}
+
 interface IReduxDevToolsEnabledWindow extends Window {
   __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any;
 }

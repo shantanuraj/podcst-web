@@ -9,6 +9,7 @@ import { normalizeEl } from '../utils/styles';
 
 import EpisodeRow from './EpisodeRow';
 import Loading from './Loading';
+import ShareButton from './ShareButton';
 
 const episodesContainer = (theme: App.ITheme) =>
   style({
@@ -76,6 +77,31 @@ const podcastTitle = style(margins, {
   fontSize: '40px',
   fontWeight: 'bold',
 });
+
+const buttonsContainer = style(
+  margins,
+  {
+    display: 'flex',
+    $nest: {
+      '& button': {
+        marginRight: 16,
+      },
+    },
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      width: '100%',
+      flexDirection: 'column',
+      $nest: {
+        '& button': {
+          margin: 0,
+          marginBottom: 16,
+        },
+      },
+    },
+  ),
+);
 
 const subscribeButton = (theme: App.ITheme) =>
   style({
@@ -202,10 +228,11 @@ class Episodes extends Component<IEpisodesProps, any> {
             <h2 class={infoMargins}>
               {author} - <a href={link}>{stripHost(link)}</a>
             </h2>
-            <div class={infoMargins}>
+            <div class={buttonsContainer}>
               <button class={subscribeButton(theme)} data-is-subscribed={isSubscribed} onClick={handler}>
                 {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
               </button>
+              <ShareButton title={title} text={`${title} - ${description}`} url={location.href} theme={theme} />
             </div>
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
