@@ -6,6 +6,8 @@ import { h } from 'preact';
 
 import { style, types } from 'typestyle';
 
+import { IDrawerState } from '../stores/drawer';
+
 import NavLinks, { ILinkMap } from './NavLinks';
 
 const linkMap: ILinkMap = {
@@ -26,13 +28,18 @@ const drawer = (theme: App.ITheme) =>
     display: 'block',
     position: 'fixed',
     height: '100%',
-    width: 240,
+    width: 0,
     zIndex: 502,
     background: theme.background,
     boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
     fontSize: 20,
     color: theme.text,
+    transition: 'all 0.3s ease',
     $nest: {
+      '&[data-is-drawer-visible]': {
+        width: 240,
+        minWidth: 240,
+      },
       '& nav nav': {
         display: 'flex',
         flexDirection: 'column',
@@ -42,12 +49,12 @@ const drawer = (theme: App.ITheme) =>
     },
   });
 
-interface IDrawerMenuProps {
+interface IDrawerMenuProps extends IDrawerState {
   theme: App.ITheme;
 }
 
-const DrawerMenu = ({ theme }: IDrawerMenuProps) => (
-  <aside class={drawer(theme)}>
+const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
+  <aside data-is-drawer-visible={isVisible} class={drawer(theme)}>
     <nav>
       <header>
         <div>Podcst.io</div>

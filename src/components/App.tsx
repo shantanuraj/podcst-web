@@ -17,6 +17,7 @@ import { IAppState } from '../stores/app';
 
 import { IMatchProps } from '../stores/router';
 
+import ConnectedDrawer from '../containers/ConnectedDrawer';
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
@@ -32,6 +33,11 @@ import Toolbar from './Toolbar';
 const container = style({
   paddingTop: 64,
   marginBottom: 64,
+});
+
+const mainContainer = style({
+  display: 'flex',
+  flexDirection: 'row',
 });
 
 interface IAppProps extends IAppState {
@@ -76,9 +82,10 @@ class App extends Component<IAppProps, never> {
   public render() {
     const { theme, version, routerNavigate } = this.props;
     return (
-      <div class={normalizeEl}>
+      <div class={classes(normalizeEl, mainContainer)}>
         <Toolbar theme={theme} />
         <ConnectedLoader theme={theme} />
+        <ConnectedDrawer />
         <main class={classes(normalizeEl, container)}>
           <Router>
             <ConnectedIndexRedirect path="/" />
