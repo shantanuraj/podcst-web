@@ -6,6 +6,7 @@ import { h } from 'preact';
 
 import { style } from 'typestyle';
 
+import BackIcon from './BackIcon';
 import DayIcon from './DayIcon';
 import MenuIcon from './MenuIcon';
 import NightIcon from './NightIcon';
@@ -13,7 +14,7 @@ import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
 import SettingsIcon from './SettingsIcon';
 
-export type IconType = 'play' | 'pause' | 'settings' | 'night' | 'day' | 'menu';
+export type IconType = 'play' | 'pause' | 'settings' | 'night' | 'day' | 'menu' | 'back';
 
 interface IconProps {
   icon: IconType;
@@ -33,6 +34,8 @@ const getIcon = (icon: IconProps['icon']): JSX.Element => {
     return <DayIcon />;
   } else if (icon === 'menu') {
     return <MenuIcon />;
+  } else if (icon === 'back') {
+    return <BackIcon />;
   }
 
   return <PlayIcon />;

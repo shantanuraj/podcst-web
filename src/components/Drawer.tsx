@@ -10,15 +10,17 @@ import { IDrawerState } from '../stores/drawer';
 
 import NavLinks, { ILinkMap } from './NavLinks';
 
+import Icons from '../svg/Icon';
+
 const linkMap: ILinkMap = {
   '/subs': 'Podcasts',
   '/feed/top': 'Top',
 };
 
 const drawerItem = (theme: App.ITheme): types.NestedCSSProperties => ({
-  height: 64,
   display: 'flex',
   alignItems: 'center',
+  height: 64,
   padding: 16,
   borderBottom: `solid 1px ${theme.backgroundLight}`,
 });
@@ -34,18 +36,34 @@ const drawer = (theme: App.ITheme) =>
     boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
     fontSize: 20,
     color: theme.text,
+    transform: `translateX(-240px)`,
     transition: 'all 0.3s ease',
     $nest: {
       '&[data-is-drawer-visible]': {
         width: 240,
         minWidth: 240,
+        transform: `translateX(0px)`,
       },
       '& nav nav': {
         display: 'flex',
         flexDirection: 'column',
       },
       '& nav nav a': drawerItem(theme),
-      '& nav header': drawerItem(theme),
+    },
+  });
+
+const drawerHeader = (theme: App.ITheme) =>
+  style({
+    ...drawerItem(theme),
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: '100%',
+    cursor: 'pointer',
+    $nest: {
+      '& span': {
+        marginLeft: 16,
+      },
     },
   });
 
@@ -54,10 +72,11 @@ interface IDrawerMenuProps extends IDrawerState {
 }
 
 const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
-  <aside data-is-drawer-visible={isVisible} class={drawer(theme)}>
+  <aside data-is-drawer-visible={!isVisible} class={drawer(theme)}>
     <nav>
-      <header>
-        <div>Podcst.io</div>
+      <header class={drawerHeader(theme)}>
+        <Icons color={theme.text} icon="back" />
+        <span>Back</span>
       </header>
       <NavLinks links={linkMap} theme={theme} />
     </nav>
