@@ -32,7 +32,7 @@ import { app, AppActions, chromeMediaMetadaUpdateEpic, IAppState, onThemeChangeE
 
 import { dismissToastEpic, IToastState, toast, ToastActions } from './toast';
 
-import { changeThemeEpic, playerControlsEpic, seekbarJumpsEpic, settingsShortcutEpic } from './keyboard';
+import { changeThemeEpic, openViewEpic, playerControlsEpic, seekbarJumpsEpic } from './keyboard';
 
 /**
  * Combined application actions interface
@@ -79,7 +79,7 @@ const epics = [
   'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
   seekbarJumpsEpic,
-  settingsShortcutEpic,
+  openViewEpic,
   dismissToastEpic,
   drawerCloseEpic,
 ].filter(epic => epic !== null);

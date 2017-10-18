@@ -26,6 +26,8 @@ import {
 
 import { navigate } from './router';
 
+import { toggleDrawer } from './drawer';
+
 /**
  * Seek delta in seconds
  */
@@ -125,16 +127,26 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
 /**
  * Keyboard shortcut map for opening settings
  */
-const OpenSettingsKeys: IKeyboardShortcutsMap = {
+const OpenViewKeys: IKeyboardShortcutsMap = {
   188: 'settings',
+  68: 'toggle-drawer',
 };
 
 /**
  * Open settings epic
  */
-export const settingsShortcutEpic: Epic<Actions, IState> = action$ =>
+export const openViewEpic: Epic<Actions, IState> = action$ =>
   action$.ofType(APP_INIT).switchMap(() =>
     Observable.fromEvent<KeyboardEvent>(document, 'keydown')
-      .filter(({ keyCode, target }) => !!OpenSettingsKeys[keyCode] && isNotIgnoreElement(target))
-      .map(() => navigate('/settings')),
+      .filter(({ keyCode, target }) => !!OpenViewKeys[keyCode] && isNotIgnoreElement(target))
+      .map(({ keyCode }) => {
+        switch (OpenViewKeys[keyCode]) {
+          case 'settings':
+            return navigate('/settings');
+          case 'toggle-drawer':
+            return toggleDrawer();
+          default:
+            return noop();
+        }
+      }),
   );

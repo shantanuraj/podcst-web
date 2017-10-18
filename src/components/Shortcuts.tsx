@@ -49,6 +49,10 @@ const appShortcuts: IShortcutInfo[] = [
     value: 's',
   },
   {
+    title: 'Toggle drawer',
+    value: 'd',
+  },
+  {
     title: 'Show episode info',
     value: 'e',
   },
