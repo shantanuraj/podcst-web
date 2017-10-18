@@ -203,8 +203,12 @@ interface IChromeMediaMetadataProps {
   title: string;
 }
 
+interface IChromeMediaMetadataClass {
+  new (props: IChromeMediaMetadataProps): IChromeMediaMetadata;
+}
+
 interface IChromeMediaMetadata {
-  new (props: IChromeMediaMetadataProps): {};
+  __data: string;
 }
 
 type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';
@@ -226,4 +230,4 @@ interface IReduxDevToolsEnabledWindow extends Window {
 
 declare let process: IProcess;
 
-declare let MediaMetadata: IChromeMediaMetadata;
+declare let MediaMetadata: IChromeMediaMetadataClass;
