@@ -232,7 +232,7 @@ class Episodes extends Component<IEpisodesProps, any> {
               <button class={subscribeButton(theme)} data-is-subscribed={isSubscribed} onClick={handler}>
                 {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
               </button>
-              <ShareButton title={title} text={description} url={location.href} theme={theme} />
+              <ShareButton title={title} text={`${title} - ${description}`} url={location.href} theme={theme} />
             </div>
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
