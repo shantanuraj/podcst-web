@@ -8,7 +8,7 @@ import { bindActionCreators, Dispatch } from 'redux';
 
 import { IState } from '../stores/root';
 
-import { toggleDrawer } from '../stores/drawer';
+import { closeDrawer } from '../stores/drawer';
 
 import Drawer from '../components/Drawer';
 
@@ -20,7 +20,7 @@ const mapState = (state: IState) => ({
 const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(
     {
-      toggleDrawer,
+      closeDrawer,
     },
     dispatch,
   );

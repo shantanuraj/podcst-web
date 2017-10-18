@@ -20,9 +20,20 @@ export const toggleDrawer = (): IToggleDrawerAction => ({
 });
 
 /**
+ * Action creator for drawer close
+ */
+interface ICloseDrawerAction {
+  type: 'CLOSE_DRAWER';
+}
+const CLOSE_DRAWER: ICloseDrawerAction['type'] = 'CLOSE_DRAWER';
+export const closeDrawer = (): ICloseDrawerAction => ({
+  type: CLOSE_DRAWER,
+});
+
+/**
  * Drawer actions
  */
-export type DrawerActions = IToggleDrawerAction;
+export type DrawerActions = IToggleDrawerAction | ICloseDrawerAction;
 
 /**
  * Drawer specific state
@@ -38,7 +49,7 @@ export const drawerCloseEpic: Epic<DrawerActions, IState> = (action$, store) =>
   action$.ofType(TOGGLE_DRAWER).switchMap(() =>
     Observable.fromEvent<MouseEvent>(document, 'mouseup')
       .filter(() => store.getState().drawer.isVisible)
-      .map(toggleDrawer),
+      .map(closeDrawer),
   );
 
 /**
@@ -51,6 +62,8 @@ export const drawer = (
   action: DrawerActions,
 ): IDrawerState => {
   switch (action.type) {
+    case CLOSE_DRAWER:
+      return { ...state, isVisible: false };
     case TOGGLE_DRAWER:
       return { ...state, isVisible: !state.isVisible };
     default:

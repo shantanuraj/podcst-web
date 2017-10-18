@@ -65,13 +65,13 @@ const drawerHeader = (theme: App.ITheme) =>
 
 interface IDrawerMenuProps extends IDrawerState {
   theme: App.ITheme;
-  toggleDrawer();
+  closeDrawer();
 }
 
-const DrawerMenu = ({ isVisible, theme, toggleDrawer }: IDrawerMenuProps) => (
+const DrawerMenu = ({ closeDrawer, isVisible, theme }: IDrawerMenuProps) => (
   <aside data-is-drawer-visible={isVisible} class={drawer(theme)}>
     <nav>
-      <header onClick={toggleDrawer} class={drawerHeader(theme)}>
+      <header onClick={closeDrawer} class={drawerHeader(theme)}>
         <span role="img" aria-label="Close drawer">
           <Icons color={theme.text} icon="back" />
         </span>
