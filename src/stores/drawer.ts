@@ -6,6 +6,8 @@ import { Observable } from 'rxjs/Observable';
 
 import { Epic } from 'redux-observable';
 
+import { Keys } from '../utils/constants';
+
 import { IState } from './root';
 
 /**
@@ -47,7 +49,10 @@ export interface IDrawerState {
  */
 export const drawerCloseEpic: Epic<DrawerActions, IState> = (action$, store) =>
   action$.ofType(TOGGLE_DRAWER).switchMap(() =>
-    Observable.fromEvent<MouseEvent>(document, 'mouseup')
+    Observable.merge(
+      Observable.fromEvent<MouseEvent>(document, 'mouseup'),
+      Observable.fromEvent<KeyboardEvent>(document, 'keyup').filter(e => e.keyCode === Keys.escape),
+    )
       .filter(() => store.getState().drawer.isVisible)
       .map(closeDrawer),
   );
