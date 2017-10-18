@@ -12,6 +12,8 @@ import { Actions, IState } from './root';
 
 import { noop } from './utils';
 
+import { Keys } from '../utils/constants';
+
 import { APP_INIT, changeTheme } from './app';
 
 import {
@@ -37,7 +39,7 @@ const SEEK_DELTA = 10;
  * Keyboard shortcut map for changing theme
  */
 const ChangeThemeKeys: IKeyboardShortcutsMap = {
-  84: 'change-theme',
+  [Keys.t]: 'change-theme',
 };
 
 /**
@@ -54,12 +56,12 @@ export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
  * Keyboard shortcut map for controlling map
  */
 const PlayerControlKeys: IKeyboardShortcutsMap = {
-  32: 'play',
-  80: 'prev',
-  78: 'next',
-  37: 'seek-back',
-  39: 'seek-forward',
-  69: 'episode-info',
+  [Keys.space]: 'play',
+  [Keys.p]: 'prev',
+  [Keys.n]: 'next',
+  [Keys.left]: 'seek-back',
+  [Keys.right]: 'seek-forward',
+  [Keys.e]: 'episode-info',
 };
 
 /**
@@ -128,8 +130,8 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
  * Keyboard shortcut map for opening settings
  */
 const OpenViewKeys: IKeyboardShortcutsMap = {
-  188: 'settings',
-  68: 'toggle-drawer',
+  [Keys.comma]: 'settings',
+  [Keys.d]: 'toggle-drawer',
 };
 
 /**

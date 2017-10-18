@@ -12,6 +12,8 @@ import { Subscription } from 'rxjs/Subscription';
 
 import { onEvent } from '../utils';
 
+import { Keys } from '../utils/constants';
+
 import { ISearchState } from '../stores/search';
 
 import SearchResults from './SearchResults';
@@ -28,8 +30,8 @@ const search = (theme: App.ITheme) =>
   });
 
 const Key: IKeyboardShortcutsMap = {
-  83: 'focus',
-  27: 'dismiss',
+  [Keys.s]: 'focus',
+  [Keys.escape]: 'dismiss',
 };
 
 interface ISearchProps extends ISearchState {
