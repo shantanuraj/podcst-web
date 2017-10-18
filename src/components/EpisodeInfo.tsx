@@ -81,6 +81,20 @@ const podcastTitle = style(margins, {
   fontWeight: 'bold',
 });
 
+const buttonsContainer = style(
+  margins,
+  {
+    display: 'flex',
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      width: '100%',
+      flexDirection: 'column',
+    },
+  ),
+);
+
 const showNotesContainer = style(
   {
     marginTop: 48,
@@ -88,7 +102,7 @@ const showNotesContainer = style(
   media(
     { maxWidth: 600 },
     {
-      marginTop: 24,
+      marginTop: 8,
     },
   ),
 );
@@ -152,7 +166,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
               from <a href={podcast.link}>{podcast.title}</a>
             </h2>
             <h2 class={infoMargins}>by {author}</h2>
-            <div class={infoMargins}>
+            <div class={buttonsContainer}>
               <ShareButton
                 text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
                 theme={theme}
