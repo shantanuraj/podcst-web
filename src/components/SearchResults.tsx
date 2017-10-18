@@ -105,16 +105,15 @@ class SearchResults extends Component<ISearchResultsProps, any> {
           .filter(({ keyCode }: KeyboardEvent) => SearchNavKeys[keyCode] !== undefined)
           .subscribe((e: KeyboardEvent) => {
             e.preventDefault();
-            switch (SearchNavKeys[e.keyCode]) {
+            const clicked = SearchNavKeys[e.keyCode];
+            switch (clicked) {
               case 'up':
-              case 'down': {
-                return this.props.navigateResult(SearchNavKeys[e.keyCode] as 'up' | 'down');
-              }
-              case 'select': {
+              case 'down':
+                return this.props.navigateResult(clicked);
+              case 'select':
                 const { podcasts, focusedResult, onResultSelect, dismissSearch } = this.props;
                 const selectedPodcast = podcasts[focusedResult];
                 return onResultSelect(selectedPodcast.feed), dismissSearch();
-              }
             }
           });
       }
