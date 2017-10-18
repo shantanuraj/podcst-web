@@ -57,4 +57,7 @@ export const getDefaultState = (): IState => ({
     message: null,
     persistent: false,
   },
+  drawer: {
+    isVisible: false,
+  },
 });

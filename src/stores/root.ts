@@ -18,6 +18,8 @@ import { feed, FeedActions, getFeedEpic, IFeedState } from './feed';
 
 import { ISearchState, search, SearchActions, searchPodcastsEpic } from './search';
 
+import { drawer, DrawerActions, IDrawerState } from './drawer';
+
 import {
   ISubscriptionsState,
   parseOPMLEpic,
@@ -44,6 +46,7 @@ export type Actions =
   | SubscriptionsActions
   | AppActions
   | ToastActions
+  | DrawerActions
   | INoopAction;
 
 /**
@@ -58,6 +61,7 @@ export interface IState {
   player: IPlayerState;
   subscriptions: ISubscriptionsState;
   toast: IToastState;
+  drawer: IDrawerState;
 }
 
 const epics = [
@@ -90,4 +94,5 @@ export const rootReducer = combineReducers<IState>({
   search,
   subscriptions,
   toast,
+  drawer,
 });
