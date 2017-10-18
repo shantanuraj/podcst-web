@@ -13,8 +13,9 @@ import NavLinks, { ILinkMap } from './NavLinks';
 import Icons from '../svg/Icon';
 
 const linkMap: ILinkMap = {
-  '/subs': 'Podcasts',
+  '/subs': 'Subscriptions',
   '/feed/top': 'Top',
+  '/settings': 'Settings',
 };
 
 const drawerItem = (theme: App.ITheme): types.NestedCSSProperties => ({
@@ -73,7 +74,7 @@ interface IDrawerMenuProps extends IDrawerState {
 }
 
 const DrawerMenu = ({ isVisible, theme, toggleDrawer }: IDrawerMenuProps) => (
-  <aside data-is-drawer-visible={!isVisible} class={drawer(theme)}>
+  <aside data-is-drawer-visible={isVisible} class={drawer(theme)}>
     <nav>
       <header onClick={toggleDrawer} class={drawerHeader(theme)}>
         <Icons color={theme.text} icon="back" />
