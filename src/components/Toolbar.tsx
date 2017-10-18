@@ -4,7 +4,7 @@
 
 import { h } from 'preact';
 
-import { style } from 'typestyle';
+import { media, style } from 'typestyle';
 
 import ConnectedSearch from '../containers/ConnectedSearch';
 
@@ -33,6 +33,28 @@ const toolbar = (theme: App.ITheme) =>
     },
   });
 
+const menuContainer = style(
+  {
+    display: 'flex',
+    alignItems: 'center',
+    $nest: {
+      '& span': {
+        marginLeft: 32,
+      },
+    },
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      $nest: {
+        '& span': {
+          marginLeft: 16,
+        },
+      },
+    },
+  ),
+);
+
 const secondaryItems = style({
   display: 'flex',
   alignItems: 'center',
@@ -52,9 +74,10 @@ interface IToolbarProps {
 const Toolbar = ({ theme, toggleDrawer }: IToolbarProps) => (
   <header class={toolbar(theme)}>
     <nav>
-      <span onClick={toggleDrawer}>
+      <div class={menuContainer} onClick={toggleDrawer}>
         <Icons color={theme.text} icon="menu" />
-      </span>
+        <span>Podcasts</span>
+      </div>
     </nav>
     <div class={secondaryItems}>
       <ConnectedSearch theme={theme} className={search} />
