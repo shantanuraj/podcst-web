@@ -2,6 +2,12 @@
  * Drawer actions / state
  */
 
+import { Observable } from 'rxjs/Observable';
+
+import { Epic } from 'redux-observable';
+
+import { IState } from './root';
+
 /**
  * Action creator for drawer toggle
  */
@@ -24,6 +30,16 @@ export type DrawerActions = IToggleDrawerAction;
 export interface IDrawerState {
   isVisible: boolean;
 }
+
+/**
+ * Drawer close epic
+ */
+export const drawerCloseEpic: Epic<DrawerActions, IState> = (action$, store) =>
+  action$.ofType(TOGGLE_DRAWER).switchMap(() =>
+    Observable.fromEvent<MouseEvent>(document, 'mouseup')
+      .filter(() => store.getState().drawer.isVisible)
+      .map(toggleDrawer),
+  );
 
 /**
  * Drawer reducer

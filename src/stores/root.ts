@@ -18,7 +18,7 @@ import { feed, FeedActions, getFeedEpic, IFeedState } from './feed';
 
 import { ISearchState, search, SearchActions, searchPodcastsEpic } from './search';
 
-import { drawer, DrawerActions, IDrawerState } from './drawer';
+import { drawer, DrawerActions, drawerCloseEpic, IDrawerState } from './drawer';
 
 import {
   ISubscriptionsState,
@@ -81,6 +81,7 @@ const epics = [
   seekbarJumpsEpic,
   settingsShortcutEpic,
   dismissToastEpic,
+  drawerCloseEpic,
 ].filter(epic => epic !== null);
 
 export const rootEpic = combineEpics<Actions, IState>(...(epics as Array<Epic<Actions, IState, any>>));
