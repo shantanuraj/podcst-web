@@ -11,6 +11,7 @@ import { IPodcastsState } from '../stores/podcasts';
 import { scrollToTop } from '../utils';
 
 import Loading from './Loading';
+import ShareButton from './ShareButton';
 import ShowNotes from './ShowNotes';
 
 const container = (theme: App.ITheme) =>
@@ -134,10 +135,12 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
     }
 
     const { state, theme } = this.props;
-    const { author, cover, episodeArt, showNotes, title } = episode;
+    const { author, cover, episodeArt, showNotes, summary, title } = episode;
 
     const showArt = episodeArt || cover;
     const isPlayerVisible = state !== 'stopped';
+
+    const shareTitle = `${podcast.title} - ${title}`;
 
     return (
       <div class={container(theme)}>
@@ -149,6 +152,14 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
               from <a href={podcast.link}>{podcast.title}</a>
             </h2>
             <h2 class={infoMargins}>by {author}</h2>
+            <div class={infoMargins}>
+              <ShareButton
+                text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
+                theme={theme}
+                title={shareTitle}
+                url={location.href}
+              />
+            </div>
             <ShowNotes className={showNotesContainer} isPlayerVisible={isPlayerVisible} showNotes={showNotes} />
           </div>
         </div>
