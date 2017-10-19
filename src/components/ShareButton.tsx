@@ -55,7 +55,7 @@ const share = ({ text, title, url }: IShareButtonProps) => () => {
 
 /* tslint:disable:no-console */
 const ShareButton = (props: IShareButtonProps) =>
-  !('share' in navigator) ? (
+  'share' in navigator ? (
     <button class={shareButton(props.theme)} onClick={share(props)}>
       Share
     </button>
