@@ -4,7 +4,14 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 
-export const updateMetadata = (episode: App.IEpisodeInfo, info: App.IPodcastEpisodesInfo | null) => {
+export const updateMetadata = (
+  episode: App.IEpisodeInfo,
+  info: App.IPodcastEpisodesInfo | null,
+  pause: () => void,
+  resume: () => void,
+  seekBack: () => void,
+  seekForward: () => void,
+) => {
   const { mediaSession } = navigator as IChromeNavigator;
 
   const { title, author, episodeArt, cover } = episode;
@@ -24,4 +31,9 @@ export const updateMetadata = (episode: App.IEpisodeInfo, info: App.IPodcastEpis
     ],
     title,
   });
+
+  mediaSession.setActionHandler('play', resume);
+  mediaSession.setActionHandler('pause', pause);
+  mediaSession.setActionHandler('seekbackward', seekBack);
+  mediaSession.setActionHandler('seekforward', seekForward);
 };
