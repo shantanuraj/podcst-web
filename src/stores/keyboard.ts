@@ -17,6 +17,7 @@ import { Keys } from '../utils/constants';
 import { APP_INIT, changeTheme } from './app';
 
 import {
+  jumpSeek,
   manualSeekUpdate,
   pauseEpisode,
   PLAY_EPISODE,
@@ -29,11 +30,6 @@ import {
 import { navigate } from './router';
 
 import { toggleDrawer } from './drawer';
-
-/**
- * Seek delta in seconds
- */
-const SEEK_DELTA = 10;
 
 /**
  * Keyboard shortcut map for changing theme
@@ -110,8 +106,7 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
             return skipToPrevEpisode();
           case 'seek-back':
           case 'seek-forward':
-            const seekTo = seekPosition + SEEK_DELTA * (shortcut === 'seek-forward' ? 1 : -1);
-            return manualSeekUpdate(seekTo, duration);
+            return jumpSeek(shortcut, seekPosition, duration);
           case 'episode-info':
             if (state !== 'stopped' && !!episode) {
               const { feed, title } = episode;

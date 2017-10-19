@@ -141,6 +141,19 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
 });
 
 /**
+ * Seek jump delta in seconds
+ */
+const SEEK_DELTA = 10;
+export const jumpSeek = (
+  seekDirection: 'seek-forward' | 'seek-back',
+  seekPosition: number,
+  duration: number,
+): IManualSeekUpdateAction => {
+  const seekTo = seekPosition + SEEK_DELTA * (seekDirection === 'seek-forward' ? 1 : -1);
+  return manualSeekUpdate(seekTo, duration);
+};
+
+/**
  * Seek update success action
  */
 interface ISeekUpdateSuccessAction {
