@@ -87,6 +87,11 @@ const buttonsContainer = style(
   {
     display: 'flex',
     marginTop: 16,
+    $nest: {
+      '& button': {
+        marginRight: 16,
+      },
+    },
   },
   media(
     { maxWidth: 600 },
@@ -94,6 +99,12 @@ const buttonsContainer = style(
       width: '100%',
       flexDirection: 'column',
       marginTop: 8,
+      $nest: {
+        '& button': {
+          margin: 0,
+          marginBottom: 16,
+        },
+      },
     },
   ),
 );
