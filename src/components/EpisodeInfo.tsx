@@ -11,6 +11,7 @@ import { IPodcastsState } from '../stores/podcasts';
 import { scrollToTop } from '../utils';
 
 import Loading from './Loading';
+import PlayButton from './PlayButton';
 import ShareButton from './ShareButton';
 import ShowNotes from './ShowNotes';
 
@@ -85,12 +86,26 @@ const buttonsContainer = style(
   margins,
   {
     display: 'flex',
+    marginTop: 16,
+    $nest: {
+      '& button': {
+        marginRight: 16,
+        minWidth: 120,
+      },
+    },
   },
   media(
     { maxWidth: 600 },
     {
       width: '100%',
       flexDirection: 'column',
+      marginTop: 8,
+      $nest: {
+        '& button': {
+          margin: 0,
+          marginBottom: 16,
+        },
+      },
     },
   ),
 );
@@ -108,6 +123,7 @@ const showNotesContainer = style(
 );
 
 interface IEpisodeInfoProps {
+  currentEpisode: App.IEpisodeInfo | null;
   feed: string;
   info: IPodcastsState;
   theme: App.ITheme;
@@ -143,18 +159,20 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
     return <Loading />;
   }
 
-  public renderLoaded(podcast: App.IPodcastEpisodesInfo, episode: App.IEpisode | undefined) {
+  public renderLoaded(podcast: App.IPodcastEpisodesInfo, episode: App.IEpisodeInfo | undefined) {
     if (!episode) {
       return <div>Couldn't get Podcasts episode</div>;
     }
 
-    const { state, theme } = this.props;
+    const { currentEpisode, state, playEpisode, pauseEpisode, resumeEpisode, theme } = this.props;
     const { author, cover, episodeArt, showNotes, summary, title } = episode;
 
     const showArt = episodeArt || cover;
     const isPlayerVisible = state !== 'stopped';
 
     const shareTitle = `${podcast.title} - ${title}`;
+
+    const play = () => playEpisode(episode);
 
     return (
       <div class={container(theme)}>
@@ -167,6 +185,15 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
             </h2>
             <h2 class={infoMargins}>by {author}</h2>
             <div class={buttonsContainer}>
+              <PlayButton
+                currentEpisode={currentEpisode}
+                episode={episode}
+                state={state}
+                theme={theme}
+                pause={pauseEpisode}
+                play={play}
+                resume={resumeEpisode}
+              />
               <ShareButton
                 text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
                 theme={theme}

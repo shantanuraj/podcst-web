@@ -124,3 +124,16 @@ export const patchEpisodesResponse = (feed: string) => (
     return null;
   }
 };
+
+/**
+ * Normalie seek value to handle edge-cases
+ */
+export const normalizeSeek = (seekTo: number, duration: number) => {
+  if (seekTo < 0) {
+    return 0;
+  } else if (seekTo > duration) {
+    return duration;
+  }
+
+  return seekTo;
+};

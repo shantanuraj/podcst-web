@@ -7,6 +7,7 @@ import { Component, h } from 'preact';
 import { classes, style } from 'typestyle';
 
 import { Router } from 'preact-router';
+
 import Match from 'preact-router/match';
 
 import { fixGlobalStyles, normalizeEl } from '../utils/styles';
@@ -57,7 +58,6 @@ interface IAppProps extends IAppState {
 class App extends Component<IAppProps, never> {
   public componentWillMount() {
     fixGlobalStyles(this.props.theme);
-    this.setupMediaSession();
     Audio.init(this.props);
   }
 
@@ -65,19 +65,6 @@ class App extends Component<IAppProps, never> {
     this.props.appInit();
     // tslint:disable:no-console
     console.log(`Initalized Podcst.io version: ${this.props.version}`);
-  }
-
-  public setupMediaSession() {
-    if ('mediaSession' in navigator) {
-      const { mediaSession } = navigator as IChromeNavigator;
-
-      const { pauseEpisode, resumeEpisode, skipToNextEpisode, skipToPrevEpisode } = this.props;
-
-      mediaSession.setActionHandler('play', resumeEpisode);
-      mediaSession.setActionHandler('pause', pauseEpisode);
-      mediaSession.setActionHandler('previoustrack', skipToPrevEpisode);
-      mediaSession.setActionHandler('nexttrack', skipToNextEpisode);
-    }
   }
 
   public render() {

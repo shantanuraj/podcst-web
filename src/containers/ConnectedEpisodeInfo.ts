@@ -18,6 +18,7 @@ const mapState = (state: IState) => ({
   info: state.podcasts,
   theme: state.app.theme,
   state: state.player.state,
+  currentEpisode: state.player.queue[state.player.currentEpisode] || null,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

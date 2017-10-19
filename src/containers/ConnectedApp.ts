@@ -8,7 +8,7 @@ import { bindActionCreators, Dispatch } from 'redux';
 
 import { IState } from '../stores/root';
 
-import { appInit, changeTheme } from '../stores/app';
+import { appInit } from '../stores/app';
 
 import { toggleDrawer } from '../stores/drawer';
 
@@ -32,7 +32,6 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(
     {
       appInit,
-      changeTheme,
       pauseEpisode,
       resumeEpisode,
       seekUpdate,

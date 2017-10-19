@@ -10,6 +10,8 @@ import { INoopAction, noop } from './utils';
 
 import Audio from '../utils/audio';
 
+import { normalizeSeek } from '../utils';
+
 /**
  * Play related actions
  */
@@ -139,6 +141,19 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
   duration,
   seekPosition,
 });
+
+/**
+ * Seek jump delta in seconds
+ */
+const SEEK_DELTA = 10;
+export const jumpSeek = (
+  seekDirection: 'seek-forward' | 'seek-back',
+  seekPosition: number,
+  duration: number,
+): IManualSeekUpdateAction => {
+  const seekTo = seekPosition + SEEK_DELTA * (seekDirection === 'seek-forward' ? 1 : -1);
+  return manualSeekUpdate(normalizeSeek(seekTo, duration), duration);
+};
 
 /**
  * Seek update success action

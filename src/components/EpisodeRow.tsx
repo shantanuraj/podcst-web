@@ -10,6 +10,8 @@ import { media, style } from 'typestyle';
 
 import { getEpisodeRoute, monthName } from '../utils';
 
+import PlayButton from './PlayButton';
+
 const episodeContainer = (theme: App.ITheme) =>
   style(
     {
@@ -57,24 +59,6 @@ const subContainer = (theme: App.ITheme) =>
     },
   });
 
-const playButton = (theme: App.ITheme) =>
-  style({
-    display: 'inline-block',
-    minWidth: '80px',
-    borderRadius: '3px',
-    padding: '8px',
-    background: 'transparent',
-    color: theme.text,
-    border: `2px solid ${theme.accent}`,
-    $nest: {
-      '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {
-        outline: 0,
-        backgroundColor: theme.accent,
-        color: theme.background,
-      },
-    },
-  });
-
 interface IEpisodeRowProps {
   episode: App.IEpisodeInfo;
   currentEpisode: App.IEpisodeInfo | null;
@@ -85,21 +69,6 @@ interface IEpisodeRowProps {
   resume: () => void;
   pause: () => void;
 }
-
-const renderButton = ({ currentEpisode, episode, play, pause, resume, state, theme }: IEpisodeRowProps) => {
-  const isCurrent = currentEpisode === episode;
-  const isPlaying = isCurrent && state === 'playing';
-  const isPaused = isCurrent && state === 'paused';
-
-  const handler = isPlaying ? pause : isPaused ? resume : play;
-  const text = isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play';
-
-  return (
-    <button class={playButton(theme)} data-is-playing={isPlaying} data-is-paused={isPaused} onClick={handler}>
-      {text}
-    </button>
-  );
-};
 
 const EpisodeRow = (props: IEpisodeRowProps) => {
   const { episode, feed, theme } = props;
@@ -129,7 +98,9 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
           <p>{minutes || ''}</p>
           <p>{minutes ? minutesSuffix : ''}</p>
         </div>
-        <div class={container}>{renderButton(props)}</div>
+        <div class={container}>
+          <PlayButton {...props} />
+        </div>
       </div>
     </div>
   );

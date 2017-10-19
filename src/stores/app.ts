@@ -6,6 +6,8 @@
 
 import { Epic } from 'redux-observable';
 
+import { bindActionCreators } from 'redux';
+
 import { updateMetadata } from '../utils/chrome-media-utils';
 
 import { fixGlobalStyles } from '../utils/styles';
@@ -16,7 +18,7 @@ import { ThemeProvider } from '../styles';
 
 import { Actions, IState } from './root';
 
-import { IPlayEpisodeAction, PLAY_EPISODE } from './player';
+import { IPlayEpisodeAction, jumpSeek, pauseEpisode, PLAY_EPISODE, resumeEpisode } from './player';
 
 import { noop } from './utils';
 
@@ -64,13 +66,28 @@ export interface IAppState {
 export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$, store) =>
   action$
     .ofType(PLAY_EPISODE)
-    .do((action: IPlayEpisodeAction) =>
-      updateMetadata(
-        action.episode,
-        (store.getState().podcasts[action.episode.feed] && store.getState().podcasts[action.episode.feed].episodes) ||
-          null,
-      ),
-    )
+    .do((action: IPlayEpisodeAction) => {
+      const { podcasts } = store.getState();
+
+      const info = (podcasts[action.episode.feed] && podcasts[action.episode.feed].episodes) || null;
+
+      const jump = (seekDirection: 'seek-back' | 'seek-forward') => () => {
+        const { duration, seekPosition } = store.getState().player;
+        return jumpSeek(seekDirection, seekPosition, duration);
+      };
+
+      const actions = bindActionCreators(
+        {
+          pause: pauseEpisode,
+          resume: resumeEpisode,
+          seekBack: jump('seek-back'),
+          seekForward: jump('seek-forward'),
+        },
+        store.dispatch,
+      );
+
+      updateMetadata(action.episode, info, actions.pause, actions.resume, actions.seekBack, actions.seekForward);
+    })
     .map(updateChromeMetadatAction);
 
 /**

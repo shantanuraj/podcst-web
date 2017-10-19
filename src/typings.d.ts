@@ -218,7 +218,7 @@ type ChromeEventHandler = () => void;
 
 interface IChromeMediaSession {
   metadata: IChromeMediaMetadata;
-  setActionHandler(ChromeMediaSessionEvents, ChromeEventHandler);
+  setActionHandler(event: ChromeMediaSessionEvents, handleR: ChromeEventHandler);
 }
 
 interface IChromeNavigator extends Navigator {
