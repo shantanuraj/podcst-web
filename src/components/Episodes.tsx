@@ -85,6 +85,7 @@ const buttonsContainer = style(
     $nest: {
       '& button': {
         marginRight: 16,
+        minWidth: 120,
       },
     },
   },

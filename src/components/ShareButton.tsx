@@ -10,7 +10,6 @@ const shareButton = (theme: App.ITheme) =>
   style(
     {
       display: 'inline-block',
-      minWidth: '120px',
       borderRadius: '3px',
       padding: '8px',
       background: 'transparent',
