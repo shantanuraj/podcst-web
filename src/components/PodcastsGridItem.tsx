@@ -8,7 +8,15 @@ import { Link } from 'preact-router';
 
 import { style } from 'typestyle';
 
-const gridItem = cover =>
+const gridContainer = (mode: App.ThemeMode) =>
+  style({
+    backgroundImage: `url(/icons/launcher-${mode}.svg)`,
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'contain',
+  });
+
+const gridItem = (cover: string) =>
   style({
     height: '200px',
     padding: '8px',
@@ -49,12 +57,13 @@ const podcastAuthor = style({
 
 interface IPodcastsGridItemProps {
   podcast: App.RenderablePodcast;
+  mode: App.ThemeMode;
 }
 
-const PodcastsGridItem = ({ podcast }: IPodcastsGridItemProps) => {
+const PodcastsGridItem = ({ podcast, mode }: IPodcastsGridItemProps) => {
   const { author, feed, title } = podcast;
   return (
-    <Link href={`/episodes?feed=${feed}`}>
+    <Link class={gridContainer(mode)} href={`/episodes?feed=${feed}`}>
       <div role="img" aria-label={`${title} by ${author}`} class={gridItem(podcast.cover)}>
         <div>
           <div class={podcastTitle}>{title}</div>

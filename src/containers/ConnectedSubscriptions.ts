@@ -15,6 +15,7 @@ import Subscriptions from '../components/Subscriptions';
 const mapState = (state: IState) => ({
   ...state.subscriptions,
   theme: state.app.theme,
+  themeMode: state.app.mode,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
