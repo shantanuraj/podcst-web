@@ -68,7 +68,7 @@ const Toolbar = ({ theme, toggleDrawer }: IToolbarProps) => (
       </div>
     </nav>
     <div class={secondaryItems}>
-      <ConnectedSearch theme={theme} className={search} />
+      <ConnectedSearch className={search} />
     </div>
   </header>
 );
