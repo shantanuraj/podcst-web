@@ -8,7 +8,7 @@ import { media, style, types } from 'typestyle';
 
 import { IPodcastsState } from '../stores/podcasts';
 
-import { scrollToTop } from '../utils';
+import { imageWithPlaceholder, scrollToTop } from '../utils';
 
 import Loading from './Loading';
 import PlayButton from './PlayButton';
@@ -50,16 +50,16 @@ const podcastInfoTitles = style({
   paddingTop: 0,
 });
 
-const infoCover = (cover: string) =>
+const infoCover = (mode: App.ThemeMode, cover: string) =>
   style(
     {
-      backgroundImage: `url(${cover})`,
+      backgroundImage: imageWithPlaceholder(mode, cover),
       backgroundPosition: 'center center',
       backgroundRepeat: 'no-repeat',
       backgroundSize: 'cover',
-      width: '300px',
-      height: '300px',
-      minWidth: '300px',
+      width: 300,
+      height: 300,
+      minWidth: 300,
     },
     media(
       { maxWidth: 600 },
@@ -126,6 +126,7 @@ interface IEpisodeInfoProps {
   currentEpisode: App.IEpisodeInfo | null;
   feed: string;
   info: IPodcastsState;
+  mode: App.ThemeMode;
   theme: App.ITheme;
   state: EpisodePlayerState;
   title: string;
@@ -164,7 +165,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
       return <div>Couldn't get Podcasts episode</div>;
     }
 
-    const { currentEpisode, state, playEpisode, pauseEpisode, resumeEpisode, theme } = this.props;
+    const { currentEpisode, mode, state, playEpisode, pauseEpisode, resumeEpisode, theme } = this.props;
     const { author, cover, episodeArt, showNotes, summary, title } = episode;
 
     const showArt = episodeArt || cover;
@@ -177,7 +178,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
     return (
       <div class={container(theme)}>
         <div class={podcastInfo}>
-          <div class={infoCover(showArt)} role="img" aria-label={`${title} episode art`} />
+          <div class={infoCover(mode, showArt)} role="img" aria-label={`${title} episode art`} />
           <div class={podcastInfoTitles}>
             <h1 class={podcastTitle}>{episode.link ? <a href={episode.link}>{title}</a> : title}</h1>
             <h2 class={infoMargins}>

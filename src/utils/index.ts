@@ -126,7 +126,7 @@ export const patchEpisodesResponse = (feed: string) => (
 };
 
 /**
- * Normalie seek value to handle edge-cases
+ * Normalize seek value to handle edge-cases
  */
 export const normalizeSeek = (seekTo: number, duration: number) => {
   if (seekTo < 0) {
@@ -137,3 +137,13 @@ export const normalizeSeek = (seekTo: number, duration: number) => {
 
   return seekTo;
 };
+
+/**
+ * Get placeholder image link based on theme mode
+ */
+export const placeholderURL = (mode: App.ThemeMode) => `url(/icons/launcher-${mode}.svg)`;
+
+/**
+ * Get css rule for image with placeholder
+ */
+export const imageWithPlaceholder = (mode: App.ThemeMode, image: string) => `url(${image}), ${placeholderURL(mode)}`;

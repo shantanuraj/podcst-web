@@ -12,6 +12,8 @@ import { Link } from 'preact-router';
 
 import { media, style } from 'typestyle';
 
+import { placeholderURL } from '../utils';
+
 import { Keys } from '../utils/constants';
 
 const results = (theme: App.ITheme) =>
@@ -43,12 +45,16 @@ const result = (theme: App.ITheme) =>
     },
   });
 
-const resultImage = style({
-  height: 50,
-  width: 50,
-  minHeight: 50,
-  minWidth: 50,
-});
+const resultImage = (mode: App.ThemeMode) =>
+  style({
+    height: 50,
+    width: 50,
+    minHeight: 50,
+    minWidth: 50,
+    backgroundImage: placeholderURL(mode),
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
+  });
 
 const resultText = style({
   display: 'flex',
@@ -75,6 +81,7 @@ interface ISearchResultsProps {
   podcasts: App.IPodcastSearchResult[];
   focusedResult: number;
   theme: App.ITheme;
+  mode: App.ThemeMode;
   dismissSearch();
   navigateResult(direction: 'up' | 'down');
   focusResult(focusedResult: number);
@@ -127,11 +134,12 @@ class SearchResults extends Component<ISearchResultsProps, any> {
     isFocussed: boolean,
     focusResult: () => void,
     dismissSearch: ISearchResultsProps['dismissSearch'],
+    mode: ISearchResultsProps['mode'],
     theme: ISearchResultsProps['theme'],
   ) => (
     <Link onClick={dismissSearch} href={`/episodes?feed=${podcast.feed}`}>
       <div class={result(theme)} data-focus={isFocussed} onMouseEnter={focusResult}>
-        <img class={resultImage} src={podcast.thumbnail} />
+        <img class={resultImage(mode)} src={podcast.thumbnail} />
         <div class={resultText}>
           <p class={resultPodcastTitle} title={podcast.title}>
             {podcast.title}
@@ -149,16 +157,17 @@ class SearchResults extends Component<ISearchResultsProps, any> {
     focusedResult: number,
     focusResult: ISearchResultsProps['focusResult'],
     dismissSearch: ISearchResultsProps['dismissSearch'],
+    mode: ISearchResultsProps['mode'],
     theme: ISearchResultsProps['theme'],
   ) =>
     podcasts.map((podcast, i) =>
-      this.renderPodcast(podcast, focusedResult === i, () => focusResult(i), dismissSearch, theme),
+      this.renderPodcast(podcast, focusedResult === i, () => focusResult(i), dismissSearch, mode, theme),
     );
 
-  public render({ dismissSearch, focusResult, focusedResult, podcasts, theme }: ISearchResultsProps) {
+  public render({ dismissSearch, focusResult, focusedResult, mode, podcasts, theme }: ISearchResultsProps) {
     return (
       <div class={results(theme)} onClick={dismissSearch} ref={el => (this.el = el as HTMLDivElement)}>
-        {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch, theme)}
+        {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch, mode, theme)}
       </div>
     );
   }

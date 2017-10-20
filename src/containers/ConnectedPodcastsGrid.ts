@@ -12,7 +12,10 @@ import { getFeed } from '../stores/feed';
 
 import PodcastsGrid from '../components/PodcastsGrid';
 
-const mapState = (state: IState) => state.feed;
+const mapState = (state: IState) => ({
+  ...state.feed,
+  themeMode: state.app.mode,
+});
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(

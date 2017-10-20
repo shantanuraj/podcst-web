@@ -72,7 +72,7 @@ class App extends Component<IAppProps, never> {
     return (
       <div class={classes(normalizeEl, mainContainer)}>
         <Toolbar theme={theme} toggleDrawer={toggleDrawer} />
-        <ConnectedLoader theme={theme} />
+        <ConnectedLoader />
         <ConnectedDrawer />
         <main class={classes(normalizeEl, container)}>
           <Router>
@@ -84,7 +84,7 @@ class App extends Component<IAppProps, never> {
             <ConnectedSettings version={version} path="/settings" />
           </Router>
         </main>
-        <ConnectedPlayer theme={theme} />
+        <ConnectedPlayer />
         <ConnectedToast />
         <Match>{routerNavigate}</Match>
       </div>

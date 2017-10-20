@@ -17,6 +17,7 @@ import { pauseEpisode, playEpisode, resumeEpisode } from '../stores/player';
 import Episodes from '../components/Episodes';
 
 const mapState = (state: IState) => ({
+  mode: state.app.mode,
   theme: state.app.theme,
   info: state.podcasts,
   state: state.player.state,

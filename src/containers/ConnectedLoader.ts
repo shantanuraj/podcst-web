@@ -11,27 +11,30 @@ import { IFeedData } from '../stores/feed';
 import Loader from '../components/Loader';
 
 const mapState = (state: IState) => {
-  const { feed, podcasts, search } = state;
+  const { app, feed, podcasts, search } = state;
+  const { theme } = app;
 
-  const stateLoading = {
+  const defaultState = {
     loading: true,
+    theme,
   };
 
   const loadingFeed = Object.keys(feed).find(key => (feed[key] as IFeedData).loading);
   if (loadingFeed) {
-    return stateLoading;
+    return defaultState;
   }
 
   const loadingPodcast = Object.keys(podcasts).find(key => podcasts[key].loading);
   if (loadingPodcast) {
-    return stateLoading;
+    return defaultState;
   }
 
   if (search.searching) {
-    return stateLoading;
+    return defaultState;
   }
 
   return {
+    ...defaultState,
     loading: false,
   };
 };
