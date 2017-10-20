@@ -12,6 +12,8 @@ import { Link } from 'preact-router';
 
 import { media, style } from 'typestyle';
 
+import { placeholderURL } from '../utils';
+
 import { Keys } from '../utils/constants';
 
 const results = (theme: App.ITheme) =>
@@ -49,7 +51,7 @@ const resultImage = (mode: App.ThemeMode) =>
     width: 50,
     minHeight: 50,
     minWidth: 50,
-    backgroundImage: `url(/icons/launcher-${mode}.svg)`,
+    backgroundImage: placeholderURL(mode),
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
   });

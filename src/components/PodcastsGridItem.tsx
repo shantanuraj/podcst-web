@@ -8,9 +8,11 @@ import { Link } from 'preact-router';
 
 import { style } from 'typestyle';
 
+import { placeholderURL } from '../utils';
+
 const gridContainer = (mode: App.ThemeMode) =>
   style({
-    backgroundImage: `url(/icons/launcher-${mode}.svg)`,
+    backgroundImage: placeholderURL(mode),
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
     backgroundSize: 'contain',

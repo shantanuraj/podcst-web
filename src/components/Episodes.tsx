@@ -3,7 +3,7 @@ import { classes, media, style, types } from 'typestyle';
 
 import { IPodcastsState } from '../stores/podcasts';
 
-import { scrollToTop, stripHost } from '../utils';
+import { imageWithPlaceholder, scrollToTop, stripHost } from '../utils';
 
 import { normalizeEl } from '../utils/styles';
 
@@ -20,7 +20,7 @@ const episodesContainer = (theme: App.ITheme) =>
 const infoCover = (mode: App.ThemeMode, cover: string) =>
   style(
     {
-      backgroundImage: `url(${cover}), url(/icons/launcher-${mode}.svg)`,
+      backgroundImage: imageWithPlaceholder(mode, cover),
       backgroundRepeat: 'no-repeat',
       backgroundSize: 'cover',
       width: '300px',
