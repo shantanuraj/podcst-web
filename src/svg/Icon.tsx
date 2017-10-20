@@ -47,6 +47,8 @@ const iconStyle = (fill: string, size: number = 36) =>
     fill,
     height: size,
     width: size,
+    minHeight: size,
+    minWidth: size,
   });
 
 const Icon = ({ icon, color, size }: IconProps) => <div class={iconStyle(color, size)}>{getIcon(icon)}</div>;
