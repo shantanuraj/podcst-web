@@ -51,9 +51,9 @@ interface IShowNotesProps {
 }
 
 const ShowNotes = ({ className, isPlayerVisible, showNotes }: IShowNotesProps) => (
-  <div class={classes(className, showNotesContainer)}>
+  <div data-is-player-visible={isPlayerVisible} class={classes(className, showNotesContainer)}>
     <h3>Show Notes</h3>
-    <div data-is-player-visible={isPlayerVisible} dangerouslySetInnerHTML={{ __html: showNotes }} />
+    <div dangerouslySetInnerHTML={{ __html: showNotes }} />
   </div>
 );
 
