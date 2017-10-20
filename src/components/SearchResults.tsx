@@ -44,8 +44,10 @@ const result = (theme: App.ITheme) =>
   });
 
 const resultImage = style({
-  height: '50px',
-  width: '50px',
+  height: 50,
+  width: 50,
+  minHeight: 50,
+  minWidth: 50,
 });
 
 const resultText = style({
