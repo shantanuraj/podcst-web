@@ -15,7 +15,7 @@ const gridContainer = (mode: App.ThemeMode) =>
     backgroundImage: placeholderURL(mode),
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
-    backgroundSize: 'contain',
+    backgroundSize: 100,
   });
 
 const gridItem = (cover: string) =>
