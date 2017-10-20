@@ -47,9 +47,8 @@ const episodeInfo = style({
   display: 'flex',
   height: '100%',
   flexDirection: 'column',
-  justifyContent: 'space-evenly' as any,
-  paddingLeft: 16,
-  paddingRight: 16,
+  justifyContent: 'space-around',
+  padding: '8px 16px',
   $nest: {
     '&>*': {
       fontSize: '14px',
