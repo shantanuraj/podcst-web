@@ -12,7 +12,11 @@ import { manualSeekUpdate, pauseEpisode, resumeEpisode, skipToNextEpisode, skipT
 
 import Player from '../components/Player';
 
-const mapState = (state: IState) => state.player;
+const mapState = (state: IState) => ({
+  ...state.player,
+  mode: state.app.mode,
+  theme: state.app.theme,
+});
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(

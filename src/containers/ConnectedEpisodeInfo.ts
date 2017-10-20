@@ -16,6 +16,7 @@ import EpisodeInfo from '../components/EpisodeInfo';
 
 const mapState = (state: IState) => ({
   info: state.podcasts,
+  mode: state.app.mode,
   theme: state.app.theme,
   state: state.player.state,
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,
