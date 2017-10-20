@@ -11,9 +11,15 @@ import PodcastsGrid from './PodcastsGrid';
 
 interface ISubscriptionsProps extends ISubscriptionsState {
   theme: App.ITheme;
+  themeMode: App.ThemeMode;
 }
 
-const Subscriptions = ({ subs, theme }: ISubscriptionsProps) =>
-  Object.keys(subs).length === 0 ? <ImportPodcastsView theme={theme} /> : <PodcastsGrid mode="subs" subs={subs} />;
+const Subscriptions = ({ subs, theme, themeMode }: ISubscriptionsProps) => {
+  return Object.keys(subs).length === 0 ? (
+    <ImportPodcastsView theme={theme} />
+  ) : (
+    <PodcastsGrid mode="subs" subs={subs} themeMode={themeMode} />
+  );
+};
 
 export default Subscriptions;

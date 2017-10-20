@@ -36,6 +36,7 @@ const Key: IKeyboardShortcutsMap = {
 
 interface ISearchProps extends ISearchState {
   className: string;
+  mode: App.ThemeMode;
   theme: App.ITheme;
   searchPodcasts(query: string);
   dismissSearch();
@@ -111,6 +112,7 @@ class Search extends Component<ISearchProps, any> {
   public render({
     className,
     dismissSearch,
+    mode,
     podcasts,
     query,
     searchPodcasts,
@@ -136,6 +138,7 @@ class Search extends Component<ISearchProps, any> {
             focusedResult={focusedResult}
             navigateResult={navigateResult}
             dismissSearch={dismissSearch}
+            mode={mode}
             podcasts={podcasts}
             onResultSelect={onResultSelect}
             theme={theme}

@@ -10,7 +10,7 @@ import { media, style } from 'typestyle';
 
 import Icon from '../svg/Icon';
 
-import { getEpisodeRoute } from '../utils';
+import { getEpisodeRoute, imageWithPlaceholder } from '../utils';
 
 const infoContainer = (theme: App.ITheme) =>
   style(
@@ -33,9 +33,9 @@ const linkContainer = style({
   display: 'flex',
 });
 
-const episodeImage = (image: string) =>
+const episodeImage = (mode: App.ThemeMode, image: string) =>
   style({
-    backgroundImage: `url(${image})`,
+    backgroundImage: imageWithPlaceholder(mode, image),
     backgroundRepeat: 'no-repeat',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
@@ -74,6 +74,7 @@ const playButton = style({
 
 interface IPlayerInfoProps {
   episode: App.IEpisodeInfo;
+  mode: App.ThemeMode;
   state: EpisodePlayerState;
   theme: App.ITheme;
   pause();
@@ -82,6 +83,7 @@ interface IPlayerInfoProps {
 
 const PlayerInfo = ({
   episode: { author, cover, feed, episodeArt, title },
+  mode,
   pause,
   resume,
   state,
@@ -96,7 +98,7 @@ const PlayerInfo = ({
       <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} />
     </button>
     <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
-      <div class={episodeImage(episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
+      <div class={episodeImage(mode, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
       <div class={episodeInfo}>
         <p>{title}</p>
         <p>{author}</p>

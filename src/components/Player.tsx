@@ -38,6 +38,7 @@ const player = (theme: App.ITheme) =>
   );
 
 interface IPlayerProps extends IPlayerState {
+  mode: App.ThemeMode;
   theme: App.ITheme;
   pause: () => void;
   resume: () => void;
@@ -49,6 +50,7 @@ interface IPlayerProps extends IPlayerState {
 const Player = ({
   duration,
   currentEpisode,
+  mode,
   pause,
   queue,
   resume,
@@ -68,7 +70,7 @@ const Player = ({
 
   return (
     <div class={player(theme)}>
-      <PlayerInfo episode={episode} pause={pause} resume={resume} state={state} theme={theme} />
+      <PlayerInfo episode={episode} mode={mode} pause={pause} resume={resume} state={state} theme={theme} />
       <Seekbar
         buffering={buffering}
         onSeek={onSeek}

@@ -19,12 +19,14 @@ const grid = style({
 
 interface IFeedStateProps extends IFeedState {
   mode: 'feed';
+  themeMode: App.ThemeMode;
   feed: FeedType;
   getFeed: (feed: FeedType) => void;
 }
 
 interface ISubsStateProps {
   mode: 'subs';
+  themeMode: App.ThemeMode;
   subs: ISubscriptionsMap;
 }
 
@@ -48,15 +50,15 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
     return <Loading />;
   }
 
-  public renderPodcast(podcast: App.RenderablePodcast) {
-    return <PodcastsGridItem podcast={podcast} />;
+  public renderPodcast = (mode: App.ThemeMode) => (podcast: App.RenderablePodcast) => {
+    return <PodcastsGridItem mode={mode} podcast={podcast} />;
+  };
+
+  public renderLoaded(mode: App.ThemeMode, podcasts: App.RenderablePodcast[]) {
+    return <div class={grid}>{podcasts.map(this.renderPodcast(mode))}</div>;
   }
 
-  public renderLoaded(podcasts: App.RenderablePodcast[]) {
-    return <div class={grid}>{podcasts.map(this.renderPodcast)}</div>;
-  }
-
-  public render({ mode }: PodcastsGridProps) {
+  public render({ mode, themeMode }: PodcastsGridProps) {
     if (mode === 'feed') {
       const { feed } = this.props as IFeedStateProps;
       const { loading, podcasts } = this.props[feed] as IFeedData;
@@ -65,7 +67,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
         return this.renderLoading();
       }
 
-      return this.renderLoaded(podcasts);
+      return this.renderLoaded(themeMode, podcasts);
     }
 
     const { subs } = this.props as ISubsStateProps;
@@ -75,7 +77,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
       feed,
     }));
 
-    return this.renderLoaded(renderablePodcasts);
+    return this.renderLoaded(themeMode, renderablePodcasts);
   }
 }
 
