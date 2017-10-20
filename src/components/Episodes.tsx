@@ -17,10 +17,10 @@ const episodesContainer = (theme: App.ITheme) =>
     color: theme.text,
   });
 
-const infoCover = (cover: string) =>
+const infoCover = (mode: App.ThemeMode, cover: string) =>
   style(
     {
-      backgroundImage: `url(${cover})`,
+      backgroundImage: `url(${cover}), url(/icons/launcher-${mode}.svg)`,
       backgroundRepeat: 'no-repeat',
       backgroundSize: 'cover',
       width: '300px',
@@ -147,6 +147,7 @@ const episodesView = style(
 );
 
 interface IEpisodesProps {
+  mode: App.ThemeMode;
   theme: App.ITheme;
   feed: string;
   info: IPodcastsState;
@@ -209,7 +210,7 @@ class Episodes extends Component<IEpisodesProps, any> {
       return <div>Couldn't get Podcasts episodes</div>;
     }
 
-    const { addSubscription, removeSubscription, subscriptions, state, theme } = this.props;
+    const { addSubscription, mode, removeSubscription, subscriptions, state, theme } = this.props;
 
     const isSubscribed = !!subscriptions[feed];
     const isPlayerVisible = state !== 'stopped';
@@ -223,7 +224,7 @@ class Episodes extends Component<IEpisodesProps, any> {
     return (
       <div class={classes(normalizeEl, episodesContainer(theme))}>
         <div class={podcastInfo}>
-          <div class={infoCover(cover)} role="img" aria-label={`${title} by ${author}`} />
+          <div class={infoCover(mode, cover)} role="img" aria-label={`${title} by ${author}`} />
           <div class={podcastInfoTitles(theme)}>
             <h1 class={podcastTitle}>{title}</h1>
             <h2 class={infoMargins}>
