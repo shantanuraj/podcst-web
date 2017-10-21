@@ -6,6 +6,8 @@ import { connect } from 'preact-redux';
 
 import { bindActionCreators, Dispatch } from 'redux';
 
+import { RouterOnChangeArgs } from 'preact-router';
+
 import { IState } from '../stores/root';
 
 import { appInit } from '../stores/app';
@@ -22,7 +24,7 @@ import {
   stopEpisode,
 } from '../stores/player';
 
-import { IMatchProps, routerNavigate } from '../stores/router';
+import { routerNavigate } from '../stores/router';
 
 import App from '../components/App';
 
@@ -40,7 +42,7 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
       skipToPrevEpisode,
       stopEpisode,
       toggleDrawer,
-      routerNavigate: ({ url }: IMatchProps) => routerNavigate(url),
+      routerNavigate: ({ url }: RouterOnChangeArgs) => routerNavigate(url),
     },
     dispatch,
   );
