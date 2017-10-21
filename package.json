@@ -10,7 +10,11 @@
     "trailingComma": "all"
   },
   "lint-staged": {
-    "src/**/{*.ts,*.tsx}": ["prettier --write", "tslint --project tsconfig.json --fix", "git add"]
+    "src/**/{*.ts,*.tsx}": [
+      "prettier --write",
+      "tslint --project tsconfig.json --fix",
+      "git add"
+    ]
   },
   "scripts": {
     "precommit": "lint-staged",
@@ -29,7 +33,7 @@
   },
   "dependencies": {
     "csstips": "^0.2.2",
-    "howler": "^2.0.4",
+    "howler": "^2.0.5",
     "preact": "^8.2.1",
     "preact-redux": "^2.0.2",
     "preact-router": "^2.5.5",
