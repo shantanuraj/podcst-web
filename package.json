@@ -1,6 +1,6 @@
 {
   "name": "podcst-web",
-  "version": "0.15.7",
+  "version": "0.15.8",
   "main": "dist/index.js",
   "license": "MIT",
   "private": true,
@@ -10,7 +10,11 @@
     "trailingComma": "all"
   },
   "lint-staged": {
-    "src/**/{*.ts,*.tsx}": ["prettier --write", "tslint --project tsconfig.json --fix", "git add"]
+    "src/**/{*.ts,*.tsx}": [
+      "prettier --write",
+      "tslint --project tsconfig.json --fix",
+      "git add"
+    ]
   },
   "scripts": {
     "precommit": "lint-staged",
@@ -29,14 +33,14 @@
   },
   "dependencies": {
     "csstips": "^0.2.2",
-    "howler": "^2.0.4",
-    "preact": "^8.2.1",
+    "howler": "^2.0.5",
+    "preact": "^8.2.5",
     "preact-redux": "^2.0.2",
-    "preact-router": "^2.5.5",
+    "preact-router": "^2.5.7",
     "redux": "^3.7.2",
-    "redux-observable": "^0.15.0",
-    "rxjs": "^5.4.3",
-    "typestyle": "^1.3.8"
+    "redux-observable": "^0.16.0",
+    "rxjs": "^5.5.0",
+    "typestyle": "^1.4.3"
   },
   "devDependencies": {
     "@types/howler": "^2.0.3",

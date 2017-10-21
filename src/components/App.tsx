@@ -6,17 +6,13 @@ import { Component, h } from 'preact';
 
 import { classes, style } from 'typestyle';
 
-import { Router } from 'preact-router';
-
-import Match from 'preact-router/match';
+import { Router, RouterOnChangeArgs } from 'preact-router';
 
 import { fixGlobalStyles, normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
 import { IAppState } from '../stores/app';
-
-import { IMatchProps } from '../stores/router';
 
 import ConnectedDrawer from '../containers/ConnectedDrawer';
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
@@ -46,7 +42,7 @@ interface IAppProps extends IAppState {
   appInit();
   pauseEpisode();
   resumeEpisode();
-  routerNavigate(props: IMatchProps);
+  routerNavigate(props: RouterOnChangeArgs);
   seekUpdate(seekPosition: number, duration: number);
   setBuffer(buffering: boolean);
   skipToNextEpisode();
@@ -75,7 +71,7 @@ class App extends Component<IAppProps, never> {
         <ConnectedLoader />
         <ConnectedDrawer />
         <main class={classes(normalizeEl, container)}>
-          <Router>
+          <Router onChange={routerNavigate}>
             <ConnectedIndexRedirect path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
             <ConnectedSubscriptions path="/subs" />
@@ -86,7 +82,6 @@ class App extends Component<IAppProps, never> {
         </main>
         <ConnectedPlayer />
         <ConnectedToast />
-        <Match>{routerNavigate}</Match>
       </div>
     );
   }

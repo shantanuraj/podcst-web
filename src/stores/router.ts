@@ -22,15 +22,6 @@ export const navigate = (route: string): INavigateAction => ({
 });
 
 /**
- * Props from Match component of preact-router
- */
-export interface IMatchProps {
-  url: string;
-  path: string;
-  matches: boolean;
-}
-
-/**
  * Router Navigate action to keep router state in sync
  */
 interface IRouterNavigateAction {
