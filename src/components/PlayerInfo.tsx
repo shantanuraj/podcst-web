@@ -18,6 +18,7 @@ const infoContainer = (theme: App.ITheme) =>
   style(
     {
       height: '100%',
+      width: '100%',
       display: 'flex',
       alignItems: 'center',
       backgroundColor: theme.background,
@@ -67,7 +68,7 @@ const buttonsContainer = style(
   {
     height: '100%',
     display: 'flex',
-    padding: '0 32px',
+    padding: '0 16px',
   },
   media(
     { maxWidth: 600 },

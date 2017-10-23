@@ -4,39 +4,30 @@
 
 import { Component, h } from 'preact';
 
-import { media, style } from 'typestyle';
+import { style } from 'typestyle';
 
-import { formatTime } from '../utils';
+// import { formatTime } from '../utils';
 
 const seekbarContainer = (theme: App.ITheme) =>
-  style(
-    {
-      position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      flexGrow: 1,
-      height: '100%',
-      backgroundColor: theme.background,
-    },
-    media(
-      { maxWidth: 600 },
-      {
-        opacity: 0.8,
-        backgroundColor: theme.background + 'cc',
-      },
-    ),
-  );
+  style({
+    position: 'absolute',
+    left: 96,
+    top: 0,
+    right: 0,
+    height: 4,
+    cursor: 'pointer',
+    backgroundColor: theme.backgroundLight,
+  });
 
-const seekbar = style({
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  height: '100%',
-  backgroundColor: `rgba(0, 0, 0, 0.5)`,
-  transition: 'width 1s',
-});
+const seekbar = (theme: App.ITheme) =>
+  style({
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: '100%',
+    backgroundColor: theme.accent,
+    transition: 'width 1s',
+  });
 
 interface ISeekbarProps {
   duration: number;
@@ -77,19 +68,15 @@ class Seekbar extends Component<ISeekbarProps, any> {
     }
   }
 
-  public render({ buffering, duration, seekPosition, theme }: ISeekbarProps) {
+  public render({ duration, seekPosition, theme }: ISeekbarProps) {
     return (
       <div ref={this.saveRef} class={seekbarContainer(theme)}>
-        {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
-        <div
-          class={seekbar}
-          style={{
-            width: `${seekPosition / duration * 100}%`,
-          }}
-        />
+        <div class={seekbar(theme)} style={{ width: `${seekPosition / duration * 100}%` }} />
       </div>
     );
   }
 }
 
 export default Seekbar;
+
+// {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
