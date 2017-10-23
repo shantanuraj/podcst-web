@@ -32,7 +32,7 @@ const player = (theme: App.ITheme) =>
     media(
       { maxWidth: 600 },
       {
-        height: 128,
+        height: DESKTOP_PLAYER_HEIGHT * 2,
         flexDirection: 'column-reverse',
         alignItems: 'stretch',
       },
