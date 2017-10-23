@@ -49,6 +49,22 @@ interface ISeekbarProps {
 class Seekbar extends Component<ISeekbarProps, any> {
   private el: HTMLDivElement | null = null;
 
+  private seekHandler = (e: MouseEvent) => {
+    const { duration, onSeek } = this.props;
+
+    if (this.el) {
+      const seekFraction = e.offsetX / this.el.offsetWidth;
+      const newSeekPosition = Math.floor(seekFraction * duration);
+      onSeek(newSeekPosition, duration);
+    }
+  };
+
+  private saveRef = (el: HTMLElement | undefined) => {
+    if (el) {
+      this.el = el as HTMLDivElement;
+    }
+  };
+
   public componentDidMount() {
     if (this.el) {
       this.el.addEventListener('click', this.seekHandler);
@@ -74,22 +90,6 @@ class Seekbar extends Component<ISeekbarProps, any> {
       </div>
     );
   }
-
-  private seekHandler = (e: MouseEvent) => {
-    const { duration, onSeek } = this.props;
-
-    if (this.el) {
-      const seekFraction = e.offsetX / this.el.offsetWidth;
-      const newSeekPosition = Math.floor(seekFraction * duration);
-      onSeek(newSeekPosition, duration);
-    }
-  };
-
-  private saveRef = (el: HTMLElement | undefined) => {
-    if (el) {
-      this.el = el as HTMLDivElement;
-    }
-  };
 }
 
 export default Seekbar;

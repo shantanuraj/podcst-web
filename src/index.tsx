@@ -31,4 +31,6 @@ const PodcastApp = ({ version }: IPodcastAppProps) => (
   </Provider>
 );
 
-render(<PodcastApp version={appVersion} />, document.getElementById('root') as HTMLElement);
+const mount = document.getElementById('root') as HTMLElement;
+
+render(<PodcastApp version={appVersion} />, mount, mount.lastElementChild as Element);
