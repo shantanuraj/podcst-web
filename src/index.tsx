@@ -2,12 +2,6 @@
  * Root app file
  */
 
-if (module.hot) {
-  // tslint:disable:no-var-requires
-  require('preact/devtools');
-  module.hot.accept();
-}
-
 import { h, render } from 'preact';
 
 import { Provider } from 'preact-redux';
@@ -17,20 +11,28 @@ import ConnectedApp from './containers/ConnectedApp';
 import configureStore from './stores';
 import './utils/patch_operators';
 
-const store = configureStore();
-
-const appVersion = process.env.APP_VERSION;
-
 interface IPodcastAppProps {
   version: string;
 }
 
-const PodcastApp = ({ version }: IPodcastAppProps) => (
-  <Provider store={store}>
-    <ConnectedApp version={version} />
-  </Provider>
-);
+const init = () => {
+  const store = configureStore();
+  const appVersion = process.env.APP_VERSION;
 
-const mount = document.getElementById('root') as HTMLElement;
+  const PodcastApp = ({ version }: IPodcastAppProps) => (
+    <Provider store={store}>
+      <ConnectedApp version={version} />
+    </Provider>
+  );
 
-render(<PodcastApp version={appVersion} />, mount, mount.lastElementChild as Element);
+  const mount = document.getElementById('root') as HTMLElement;
+  render(<PodcastApp version={appVersion} />, mount, mount.lastElementChild as Element);
+};
+
+if (module.hot) {
+  // tslint:disable:no-var-requires
+  require('preact/devtools');
+  module.hot.accept();
+}
+
+init();

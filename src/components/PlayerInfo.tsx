@@ -50,7 +50,7 @@ const episodeInfo = style({
   height: '100%',
   flexDirection: 'column',
   justifyContent: 'space-around',
-  padding: '8px 0',
+  padding: 8,
   $nest: {
     '&>*': {
       fontSize: '14px',
