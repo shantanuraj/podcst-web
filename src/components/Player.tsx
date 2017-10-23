@@ -8,7 +8,7 @@ import { media, style } from 'typestyle';
 
 import { IPlayerState } from '../stores/player';
 
-import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
+import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
 import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
@@ -32,9 +32,7 @@ const player = (theme: App.ITheme) =>
     media(
       { maxWidth: 600 },
       {
-        height: DESKTOP_PLAYER_HEIGHT * 2,
-        flexDirection: 'column-reverse',
-        alignItems: 'stretch',
+        height: MOBILE_PLAYER_HEIGHT,
       },
     ),
   );

@@ -14,7 +14,7 @@ import SeekButton from './SeekButton';
 
 import { getEpisodeRoute, getEpisodesRoute, imageWithPlaceholder } from '../utils';
 
-import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
+import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
 const infoContainer = (theme: App.ITheme) =>
   style(
@@ -39,14 +39,22 @@ const linkContainer = style({
 });
 
 const episodeImage = (mode: App.ThemeMode, image: string) =>
-  style({
-    backgroundImage: imageWithPlaceholder(mode, image),
-    backgroundRepeat: 'no-repeat',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    height: 'inherit',
-    width: DESKTOP_PLAYER_HEIGHT,
-  });
+  style(
+    {
+      backgroundImage: imageWithPlaceholder(mode, image),
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      height: 'inherit',
+      width: DESKTOP_PLAYER_HEIGHT,
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        width: MOBILE_PLAYER_HEIGHT,
+      },
+    ),
+  );
 
 const episodeInfoContainer = style({
   height: '100%',
@@ -86,11 +94,11 @@ const buttonsContainer = style(
   ),
 );
 
-export const playerButton = (width: number) =>
+export const playerButton = (sizeRatio: number) =>
   style(
     {
       height: '100%',
-      width,
+      width: Math.round(DESKTOP_PLAYER_HEIGHT * sizeRatio),
       background: 'inherit',
       border: 'none',
       display: 'flex',
@@ -102,6 +110,7 @@ export const playerButton = (width: number) =>
     media(
       { maxWidth: 600 },
       {
+        width: Math.round(MOBILE_PLAYER_HEIGHT * sizeRatio),
         $nest: {
           '&[data-hide-on-mobile]': {
             display: 'none',
@@ -123,8 +132,8 @@ interface IPlayerInfoProps {
   resume();
 }
 
-const MAIN_ICON_SIZE = Math.round(DESKTOP_PLAYER_HEIGHT * 2 / 3);
-const SUB_ICON_SIZE = Math.round(MAIN_ICON_SIZE * 2 / 3);
+const MAIN_ICON_RATIO = 2 / 3;
+const SUB_ICON_RATIO = MAIN_ICON_RATIO * MAIN_ICON_RATIO;
 
 const PlayerInfo = ({
   duration,
@@ -146,22 +155,22 @@ const PlayerInfo = ({
         direction="seek-back"
         label="Seek Back 10 seconds"
         onClick={() => jumpSeek('seek-back', seekPosition, duration)}
-        size={SUB_ICON_SIZE}
+        sizeRatio={SUB_ICON_RATIO}
         theme={theme}
       />
       <button
         role="button"
         aria-label={state === 'playing' ? 'Pause' : 'Play'}
-        class={playerButton(MAIN_ICON_SIZE)}
+        class={playerButton(MAIN_ICON_RATIO)}
         onClick={state === 'playing' ? pause : resume}
       >
-        <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} size={MAIN_ICON_SIZE} />
+        <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} size="100%" />
       </button>
       <SeekButton
         direction="seek-forward"
         label="Seek Forward 10 seconds"
         onClick={() => jumpSeek('seek-forward', seekPosition, duration)}
-        size={SUB_ICON_SIZE}
+        sizeRatio={SUB_ICON_RATIO}
         theme={theme}
       />
     </div>

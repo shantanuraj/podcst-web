@@ -12,13 +12,13 @@ interface ISeekButtonProps {
   direction: 'seek-back' | 'seek-forward';
   label: string;
   theme: App.ITheme;
-  size: number;
+  sizeRatio: number;
   onClick: () => void;
 }
 
-const SeekButton = ({ direction, label, onClick, size, theme }: ISeekButtonProps) => (
-  <button data-hide-on-mobile="true" role="button" aria-label={label} class={playerButton(size)} onClick={onClick}>
-    <Icon color={theme.accent} icon={direction} size={size} />
+const SeekButton = ({ direction, label, onClick, sizeRatio, theme }: ISeekButtonProps) => (
+  <button data-hide-on-mobile="true" role="button" aria-label={label} class={playerButton(sizeRatio)} onClick={onClick}>
+    <Icon color={theme.accent} icon={direction} size="100%" />
   </button>
 );
 

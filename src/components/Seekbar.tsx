@@ -4,20 +4,30 @@
 
 import { Component, h } from 'preact';
 
-import { style } from 'typestyle';
+import { media, style } from 'typestyle';
+
+import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
 // import { formatTime } from '../utils';
 
 const seekbarContainer = (theme: App.ITheme) =>
-  style({
-    position: 'absolute',
-    left: 96,
-    top: 0,
-    right: 0,
-    height: 4,
-    cursor: 'pointer',
-    backgroundColor: theme.backgroundLight,
-  });
+  style(
+    {
+      position: 'absolute',
+      left: DESKTOP_PLAYER_HEIGHT,
+      top: 0,
+      right: 0,
+      height: 4,
+      cursor: 'pointer',
+      backgroundColor: theme.backgroundLight,
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        left: MOBILE_PLAYER_HEIGHT,
+      },
+    ),
+  );
 
 const seekbar = (theme: App.ITheme) =>
   style({

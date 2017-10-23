@@ -21,7 +21,7 @@ export type IconType = 'play' | 'pause' | 'settings' | 'night' | 'day' | 'menu' 
 interface IconProps {
   icon: IconType;
   color: string;
-  size?: number;
+  size?: string | number;
 }
 
 const getIcon = (icon: IconProps['icon']): JSX.Element => {
@@ -48,7 +48,7 @@ const getIcon = (icon: IconProps['icon']): JSX.Element => {
   return <PlayIcon />;
 };
 
-const iconStyle = (fill: string, size: number = 36) =>
+const iconStyle = (fill: string, size: number | string = 36) =>
   style({
     fill,
     height: size,
