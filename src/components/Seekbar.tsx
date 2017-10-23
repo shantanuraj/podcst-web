@@ -27,6 +27,12 @@ const seekbar = (theme: App.ITheme) =>
     height: '100%',
     backgroundColor: theme.accent,
     transition: 'width 1s',
+    $nest: {
+      '&[data-is-buffering]': {
+        animation: `${theme.loaderAnimation} 2s infinite`,
+        width: '100%',
+      },
+    },
   });
 
 interface ISeekbarProps {
@@ -56,6 +62,10 @@ class Seekbar extends Component<ISeekbarProps, any> {
     }
   };
 
+  private getSeekWidth(seekPosition: number, duration: number, buffering: boolean): string {
+    return buffering ? '100%' : `${seekPosition / duration * 100}%`;
+  }
+
   public componentDidMount() {
     if (this.el) {
       this.el.addEventListener('click', this.seekHandler);
@@ -68,15 +78,17 @@ class Seekbar extends Component<ISeekbarProps, any> {
     }
   }
 
-  public render({ duration, seekPosition, theme }: ISeekbarProps) {
+  public render({ buffering, duration, seekPosition, theme }: ISeekbarProps) {
     return (
       <div ref={this.saveRef} class={seekbarContainer(theme)}>
-        <div class={seekbar(theme)} style={{ width: `${seekPosition / duration * 100}%` }} />
+        <div
+          data-is-buffering={buffering}
+          class={seekbar(theme)}
+          style={{ width: this.getSeekWidth(seekPosition, duration, buffering) }}
+        />
       </div>
     );
   }
 }
 
 export default Seekbar;
-
-// {buffering ? 'Buffering...' : formatTime(duration, seekPosition)}
