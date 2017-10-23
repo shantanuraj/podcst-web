@@ -45,31 +45,23 @@ const episodeImage = (mode: App.ThemeMode, image: string) =>
     width: DESKTOP_PLAYER_HEIGHT,
   });
 
-const episodeInfo = style(
-  {
-    display: 'flex',
-    height: '100%',
-    flexDirection: 'column',
-    justifyContent: 'space-around',
-    marginRight: 16,
-    $nest: {
-      '&>*': {
-        fontSize: '14px',
-        fontWeight: 'bold',
-      },
-      '&>*:last-child': {
-        fontSize: '10px',
-        fontWeight: 'lighter',
-      },
+const episodeInfo = style({
+  display: 'flex',
+  height: '100%',
+  flexDirection: 'column',
+  justifyContent: 'space-around',
+  paddingRight: 16,
+  $nest: {
+    '&>*': {
+      fontSize: '14px',
+      fontWeight: 'bold',
+    },
+    '&>*:last-child': {
+      fontSize: '10px',
+      fontWeight: 'lighter',
     },
   },
-  media(
-    { maxWidth: 600 },
-    {
-      marginRight: 0,
-    },
-  ),
-);
+});
 
 const buttonsContainer = style(
   {
