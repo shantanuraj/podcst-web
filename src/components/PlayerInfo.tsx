@@ -71,24 +71,44 @@ const episodeInfo = style(
   ),
 );
 
-const buttonsContainer = style({
-  height: '100%',
-  display: 'flex',
-  padding: '0 32px',
-});
+const buttonsContainer = style(
+  {
+    height: '100%',
+    display: 'flex',
+    padding: '0 32px',
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      padding: '0 16px',
+    },
+  ),
+);
 
 const playerButton = (width: number) =>
-  style({
-    height: '100%', // width,
-    width,
-    background: 'inherit',
-    border: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    outline: 0,
-    padding: 0,
-  });
+  style(
+    {
+      height: '100%', // width,
+      width,
+      background: 'inherit',
+      border: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      outline: 0,
+      padding: 0,
+    },
+    media(
+      { maxWidth: 600 },
+      {
+        $nest: {
+          '&[data-hide-on-mobile]': {
+            display: 'none',
+          },
+        },
+      },
+    ),
+  );
 
 interface IPlayerInfoProps {
   episode: App.IEpisodeInfo;
@@ -115,7 +135,12 @@ const PlayerInfo = ({
       <div class={episodeImage(mode, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
     </Link>
     <div class={buttonsContainer}>
-      <button role="button" aria-label="Seek Back 10 seconds" class={playerButton(SUB_ICON_SIZE)}>
+      <button
+        data-hide-on-mobile="true"
+        role="button"
+        aria-label="Seek Back 10 seconds"
+        class={playerButton(SUB_ICON_SIZE)}
+      >
         <Icon color={theme.accent} icon="seek-back-10" size={SUB_ICON_SIZE} />
       </button>
       <button
@@ -126,7 +151,12 @@ const PlayerInfo = ({
       >
         <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} size={MAIN_ICON_SIZE} />
       </button>
-      <button role="button" aria-label="Seek forward 10 seconds" class={playerButton(SUB_ICON_SIZE)}>
+      <button
+        data-hide-on-mobile="true"
+        role="button"
+        aria-label="Seek forward 10 seconds"
+        class={playerButton(SUB_ICON_SIZE)}
+      >
         <Icon color={theme.accent} icon="seek-forward-10" size={SUB_ICON_SIZE} />
       </button>
     </div>
