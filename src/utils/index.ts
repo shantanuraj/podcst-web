@@ -100,9 +100,16 @@ export const opmltoJSON = (file: string): IOPMLJson => {
 };
 
 /**
+ * Get episodes route for podcast episode listing
+ */
+export const getEpisodesRoute = (feed: string): string => {
+  return `/episodes?feed=${encodeURIComponent(feed)}`;
+};
+
+/**
  * Get episode route for info
  */
-export const getEpisodeRoute = (feed: string, title: string) => {
+export const getEpisodeRoute = (feed: string, title: string): string => {
   return `/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`;
 };
 

@@ -10,7 +10,7 @@ import { media, style } from 'typestyle';
 
 import Icon from '../svg/Icon';
 
-import { getEpisodeRoute, imageWithPlaceholder } from '../utils';
+import { getEpisodeRoute, getEpisodesRoute, imageWithPlaceholder } from '../utils';
 
 import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
 
@@ -124,7 +124,7 @@ const PlayerInfo = ({
   theme,
 }: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
-    <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
+    <Link class={linkContainer} href={getEpisodesRoute(feed)}>
       <div class={episodeImage(mode, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
     </Link>
     <div class={buttonsContainer}>
@@ -153,12 +153,12 @@ const PlayerInfo = ({
         <Icon color={theme.accent} icon="seek-forward-10" size={SUB_ICON_SIZE} />
       </button>
     </div>
-    <div class={linkContainer}>
+    <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
       <div class={episodeInfo}>
         <p>{title}</p>
         <p>{author}</p>
       </div>
-    </div>
+    </Link>
   </div>
 );
 
