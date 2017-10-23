@@ -19,7 +19,7 @@ const toolbar = (theme: App.ITheme) =>
     position: 'fixed',
     top: 0,
     left: 0,
-    height: '64px',
+    height: 64,
     width: '100%',
     zIndex: 501,
     fontSize: 20,

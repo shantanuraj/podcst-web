@@ -20,7 +20,7 @@ const player = (theme: App.ITheme) =>
       position: 'fixed',
       bottom: 0,
       left: 0,
-      height: '64px',
+      height: 64,
       width: '100%',
       zIndex: 500,
       fontSize: 20,
@@ -30,7 +30,7 @@ const player = (theme: App.ITheme) =>
     media(
       { maxWidth: 600 },
       {
-        height: '128px',
+        height: 128,
         flexDirection: 'column-reverse',
         alignItems: 'stretch',
       },

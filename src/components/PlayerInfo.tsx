@@ -40,7 +40,7 @@ const episodeImage = (mode: App.ThemeMode, image: string) =>
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     height: 'inherit',
-    width: '64px',
+    width: 64,
   });
 
 const episodeInfo = style({
@@ -63,7 +63,7 @@ const episodeInfo = style({
 
 const playButton = style({
   height: '100%',
-  width: '64px',
+  width: 64,
   background: 'inherit',
   border: 'none',
   display: 'flex',
