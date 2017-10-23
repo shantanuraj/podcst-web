@@ -64,35 +64,39 @@ const episodeInfoContainer = style({
 });
 
 const episodeInfo = (theme: App.ITheme) =>
-  style({
-    textOverflow: 'ellipsis',
-    overflow: 'hidden',
-    $nest: {
-      '& [data-title]': {
-        fontSize: 16,
-      },
-      '& [data-author]': {
-        color: theme.subTitle,
-        marginTop: 16,
-        fontSize: 15,
-        fontWeight: 'lighter',
-      },
-    },
-  });
-
-const buttonsContainer = style(
-  {
-    height: '100%',
-    display: 'flex',
-    padding: '0 16px',
-  },
-  media(
-    { maxWidth: 600 },
+  style(
     {
-      padding: '0 16px',
+      textOverflow: 'ellipsis',
+      overflow: 'hidden',
+      $nest: {
+        '& [data-title]': {
+          fontSize: 16,
+        },
+        '& [data-author]': {
+          color: theme.subTitle,
+          marginTop: 16,
+          fontSize: 15,
+          fontWeight: 'lighter',
+        },
+      },
     },
-  ),
-);
+    media(
+      { maxWidth: 600 },
+      {
+        $nest: {
+          '& [data-author]': {
+            marginTop: 8,
+          },
+        },
+      },
+    ),
+  );
+
+const buttonsContainer = style({
+  height: '100%',
+  display: 'flex',
+  padding: '0 16px',
+});
 
 export const playerButton = (sizeRatio: number) =>
   style(
