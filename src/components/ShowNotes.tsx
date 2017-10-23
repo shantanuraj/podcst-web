@@ -6,12 +6,14 @@ import { h } from 'preact';
 
 import { classes, media, style } from 'typestyle';
 
+import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
+
 const showNotesContainer = style(
   {
     fontSize: 'large',
     $nest: {
       '&[data-is-player-visible]': {
-        paddingBottom: 64,
+        paddingBottom: DESKTOP_PLAYER_HEIGHT,
       },
       '& h3': {
         marginTop: 0,
@@ -37,7 +39,7 @@ const showNotesContainer = style(
     {
       $nest: {
         '&[data-is-player-visible]': {
-          paddingBottom: 128,
+          paddingBottom: DESKTOP_PLAYER_HEIGHT * 2,
         },
       },
     },

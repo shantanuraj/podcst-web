@@ -14,7 +14,6 @@ import PodcastsGridItem from './PodcastsGridItem';
 const grid = style({
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))',
-  marginBottom: 64,
 });
 
 interface IFeedStateProps extends IFeedState {

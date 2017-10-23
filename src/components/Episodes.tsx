@@ -4,7 +4,7 @@ import { classes, media, style, types } from 'typestyle';
 import { IPodcastsState } from '../stores/podcasts';
 
 import { imageWithPlaceholder, scrollToTop, stripHost } from '../utils';
-
+import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
 import { normalizeEl } from '../utils/styles';
 
 import EpisodeRow from './EpisodeRow';
@@ -130,7 +130,7 @@ const episodesView = style(
   {
     $nest: {
       '&[data-is-player-visible]': {
-        paddingBottom: 64,
+        paddingBottom: DESKTOP_PLAYER_HEIGHT,
       },
     },
   },
@@ -139,7 +139,7 @@ const episodesView = style(
     {
       $nest: {
         '&[data-is-player-visible]': {
-          paddingBottom: 128,
+          paddingBottom: DESKTOP_PLAYER_HEIGHT * 2,
         },
       },
     },

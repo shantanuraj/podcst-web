@@ -8,6 +8,8 @@ import { media, style } from 'typestyle';
 
 import { IPlayerState } from '../stores/player';
 
+import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
+
 import PlayerInfo from './PlayerInfo';
 import Seekbar from './Seekbar';
 
@@ -20,7 +22,7 @@ const player = (theme: App.ITheme) =>
       position: 'fixed',
       bottom: 0,
       left: 0,
-      height: 64,
+      height: DESKTOP_PLAYER_HEIGHT,
       width: '100%',
       zIndex: 500,
       fontSize: 20,

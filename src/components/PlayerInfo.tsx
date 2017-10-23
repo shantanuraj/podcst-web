@@ -12,6 +12,8 @@ import Icon from '../svg/Icon';
 
 import { getEpisodeRoute, imageWithPlaceholder } from '../utils';
 
+import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
+
 const infoContainer = (theme: App.ITheme) =>
   style(
     {
@@ -40,7 +42,7 @@ const episodeImage = (mode: App.ThemeMode, image: string) =>
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     height: 'inherit',
-    width: 64,
+    width: DESKTOP_PLAYER_HEIGHT,
   });
 
 const episodeInfo = style({
@@ -63,7 +65,7 @@ const episodeInfo = style({
 
 const playButton = style({
   height: '100%',
-  width: 64,
+  width: DESKTOP_PLAYER_HEIGHT,
   background: 'inherit',
   border: 'none',
   display: 'flex',

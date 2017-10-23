@@ -21,3 +21,18 @@ export const Keys = {
   t: 84,
   up: 38,
 };
+
+/**
+ * Desktop player height
+ */
+export const DESKTOP_PLAYER_HEIGHT = 64;
+
+/**
+ * Mobile player height
+ */
+export const MOBILE_PLAYER_HEIGHT = 64;
+
+/**
+ * Toolbar height
+ */
+export const TOOLBAR_HEIGHT = 64;
