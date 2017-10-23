@@ -48,23 +48,29 @@ const episodeImage = (mode: App.ThemeMode, image: string) =>
     width: DESKTOP_PLAYER_HEIGHT,
   });
 
-const episodeInfo = style({
-  display: 'flex',
+const episodeInfoContainer = style({
   height: '100%',
-  flexDirection: 'column',
-  justifyContent: 'space-around',
+  display: 'flex',
+  alignItems: 'center',
   paddingRight: 16,
-  $nest: {
-    '&>*': {
-      fontSize: '14px',
-      fontWeight: 'bold',
-    },
-    '&>*:last-child': {
-      fontSize: '10px',
-      fontWeight: 'lighter',
-    },
-  },
 });
+
+const episodeInfo = (theme: App.ITheme) =>
+  style({
+    textOverflow: 'ellipsis',
+    overflow: 'hidden',
+    $nest: {
+      '& [data-title]': {
+        fontSize: 16,
+      },
+      '& [data-author]': {
+        color: theme.subTitle,
+        marginTop: 16,
+        fontSize: 15,
+        fontWeight: 'lighter',
+      },
+    },
+  });
 
 const buttonsContainer = style(
   {
@@ -160,9 +166,11 @@ const PlayerInfo = ({
       />
     </div>
     <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
-      <div class={episodeInfo}>
-        <p>{title}</p>
-        <p>{author}</p>
+      <div class={episodeInfoContainer}>
+        <div class={episodeInfo(theme)}>
+          <p data-title="true">{title}</p>
+          <p data-author="true">{author}</p>
+        </div>
       </div>
     </Link>
   </div>
