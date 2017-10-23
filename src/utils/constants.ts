@@ -25,7 +25,7 @@ export const Keys = {
 /**
  * Desktop player height
  */
-export const DESKTOP_PLAYER_HEIGHT = 64;
+export const DESKTOP_PLAYER_HEIGHT = 96;
 
 /**
  * Mobile player height

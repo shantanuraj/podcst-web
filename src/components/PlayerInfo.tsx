@@ -50,7 +50,7 @@ const episodeInfo = style({
   height: '100%',
   flexDirection: 'column',
   justifyContent: 'space-around',
-  padding: '8px 16px',
+  padding: '8px 0',
   $nest: {
     '&>*': {
       fontSize: '14px',
@@ -63,16 +63,24 @@ const episodeInfo = style({
   },
 });
 
-const playButton = style({
+const buttonsContainer = style({
   height: '100%',
-  width: DESKTOP_PLAYER_HEIGHT,
-  background: 'inherit',
-  border: 'none',
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  outline: 0,
+  padding: '0 32px',
 });
+
+const playerButton = (width: number) =>
+  style({
+    height: '100%', // width,
+    width,
+    background: 'inherit',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    outline: 0,
+    padding: 0,
+  });
 
 interface IPlayerInfoProps {
   episode: App.IEpisodeInfo;
@@ -83,6 +91,9 @@ interface IPlayerInfoProps {
   resume();
 }
 
+const MAIN_ICON_SIZE = Math.round(DESKTOP_PLAYER_HEIGHT * 2 / 3);
+const SUB_ICON_SIZE = Math.round(MAIN_ICON_SIZE * 2 / 3);
+
 const PlayerInfo = ({
   episode: { author, cover, feed, episodeArt, title },
   mode,
@@ -92,20 +103,31 @@ const PlayerInfo = ({
   theme,
 }: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
-    <button
-      aria-label={state === 'playing' ? 'Pause' : 'Play'}
-      class={playButton}
-      onClick={state === 'playing' ? pause : resume}
-    >
-      <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} />
-    </button>
     <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
       <div class={episodeImage(mode, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
+    </Link>
+    <div class={buttonsContainer}>
+      <button role="button" aria-label="Seek Back 10 seconds" class={playerButton(SUB_ICON_SIZE)}>
+        <Icon color={theme.accent} icon="seek-back-10" size={SUB_ICON_SIZE} />
+      </button>
+      <button
+        role="button"
+        aria-label={state === 'playing' ? 'Pause' : 'Play'}
+        class={playerButton(MAIN_ICON_SIZE)}
+        onClick={state === 'playing' ? pause : resume}
+      >
+        <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} size={MAIN_ICON_SIZE} />
+      </button>
+      <button role="button" aria-label="Seek forward 10 seconds" class={playerButton(SUB_ICON_SIZE)}>
+        <Icon color={theme.accent} icon="seek-forward-10" size={SUB_ICON_SIZE} />
+      </button>
+    </div>
+    <div class={linkContainer}>
       <div class={episodeInfo}>
         <p>{title}</p>
         <p>{author}</p>
       </div>
-    </Link>
+    </div>
   </div>
 );
 
