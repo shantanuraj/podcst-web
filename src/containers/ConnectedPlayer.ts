@@ -8,7 +8,14 @@ import { bindActionCreators, Dispatch } from 'redux';
 
 import { IState } from '../stores/root';
 
-import { manualSeekUpdate, pauseEpisode, resumeEpisode, skipToNextEpisode, skipToPrevEpisode } from '../stores/player';
+import {
+  jumpSeek,
+  manualSeekUpdate,
+  pauseEpisode,
+  resumeEpisode,
+  skipToNextEpisode,
+  skipToPrevEpisode,
+} from '../stores/player';
 
 import Player from '../components/Player';
 
@@ -26,6 +33,7 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
       resume: resumeEpisode,
       skipToPrev: skipToPrevEpisode,
       skipToNext: skipToNextEpisode,
+      jumpSeek,
     },
     dispatch,
   );

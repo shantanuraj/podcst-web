@@ -47,11 +47,13 @@ interface IPlayerProps extends IPlayerState {
   skipToNext: () => void;
   skipToPrev: () => void;
   onSeek: (seekPosition: number, duration: number) => void;
+  jumpSeek: (seekDirection: 'seek-forward' | 'seek-back', seekPosition: number, duration: number) => void;
 }
 
 const Player = ({
   duration,
   currentEpisode,
+  jumpSeek,
   mode,
   pause,
   queue,
@@ -72,7 +74,17 @@ const Player = ({
 
   return (
     <div class={player(theme)}>
-      <PlayerInfo episode={episode} mode={mode} pause={pause} resume={resume} state={state} theme={theme} />
+      <PlayerInfo
+        duration={episodeDuration}
+        episode={episode}
+        jumpSeek={jumpSeek}
+        mode={mode}
+        pause={pause}
+        resume={resume}
+        seekPosition={seekPosition}
+        state={state}
+        theme={theme}
+      />
       <Seekbar
         buffering={buffering}
         onSeek={onSeek}
