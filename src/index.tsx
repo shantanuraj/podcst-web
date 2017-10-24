@@ -6,10 +6,14 @@ import { h, render } from 'preact';
 
 import { Provider } from 'preact-redux';
 
+import { forceRenderStyles } from 'typestyle';
+
 // Patch Rx operators
-import ConnectedApp from './containers/ConnectedApp';
-import configureStore from './stores';
 import './utils/patch_operators';
+
+import ConnectedApp from './containers/ConnectedApp';
+
+import configureStore from './stores';
 
 interface IPodcastAppProps {
   version: string;
@@ -27,6 +31,7 @@ const init = () => {
 
   const mount = document.getElementById('root') as HTMLElement;
   render(<PodcastApp version={appVersion} />, mount, mount.lastElementChild as Element);
+  forceRenderStyles();
 };
 
 if (module.hot) {
