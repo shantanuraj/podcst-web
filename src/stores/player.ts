@@ -115,14 +115,14 @@ const skipAudio = (): ISkipAudioAction => ({
 /**
  * Seek update action
  */
-interface ISeekUpdateAction {
-  type: 'SEEK_UPDATE';
+interface ISeekUpdateRequestAction {
+  type: 'SEEK_UPDATE_REQUEST';
   duration: number;
   seekPosition: number;
 }
-const SEEK_UPDATE: ISeekUpdateAction['type'] = 'SEEK_UPDATE';
-export const seekUpdate = (seekPosition: number, duration: number): ISeekUpdateAction => ({
-  type: SEEK_UPDATE,
+const SEEK_UPDATE_REQUEST: ISeekUpdateRequestAction['type'] = 'SEEK_UPDATE_REQUEST';
+export const seekUpdateRequest = (seekPosition: number, duration: number): ISeekUpdateRequestAction => ({
+  type: SEEK_UPDATE_REQUEST,
   duration,
   seekPosition,
 });
@@ -191,7 +191,7 @@ export type PlayerActions =
   | ISkipToNextAction
   | ISkipToPrevAction
   | ISkipAudioAction
-  | ISeekUpdateAction
+  | ISeekUpdateRequestAction
   | ISeekUpdateSuccessAction
   | IManualSeekUpdateAction
   | ISetBufferAction
@@ -208,9 +208,9 @@ export interface IPlayerState {
 
 export const seekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
-    .ofType(SEEK_UPDATE)
+    .ofType(SEEK_UPDATE_REQUEST)
     .throttleTime(1000)
-    .map((action: ISeekUpdateAction) => seekUpdateSuccess(action.seekPosition, action.duration));
+    .map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration));
 
 export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
