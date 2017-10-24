@@ -194,13 +194,13 @@ class Episodes extends Component<IEpisodesProps, any> {
     return (
       <EpisodeRow
         feed={feed}
+        isCurrentEpisode={currentEpisode === episode}
         episode={episode}
         pause={pauseEpisode}
         play={play}
         resume={resumeEpisode}
         state={state}
         theme={theme}
-        currentEpisode={currentEpisode}
       />
     );
   };

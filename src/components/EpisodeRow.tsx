@@ -61,7 +61,7 @@ const subContainer = (theme: App.ITheme) =>
 
 interface IEpisodeRowProps {
   episode: App.IEpisodeInfo;
-  currentEpisode: App.IEpisodeInfo | null;
+  isCurrentEpisode: boolean;
   feed: string;
   state: EpisodePlayerState;
   theme: App.ITheme;
@@ -71,7 +71,7 @@ interface IEpisodeRowProps {
 }
 
 const EpisodeRow = (props: IEpisodeRowProps) => {
-  const { episode, feed, theme } = props;
+  const { isCurrentEpisode, episode, feed, play, pause, resume, state, theme } = props;
 
   const { title, published, duration } = episode;
 
@@ -99,7 +99,14 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
           <p>{minutes ? minutesSuffix : ''}</p>
         </div>
         <div class={container}>
-          <PlayButton {...props} />
+          <PlayButton
+            isCurrentEpisode={isCurrentEpisode}
+            pause={pause}
+            play={play}
+            resume={resume}
+            state={state}
+            theme={theme}
+          />
         </div>
       </div>
     </div>

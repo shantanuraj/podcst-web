@@ -187,8 +187,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
             <h2 class={infoMargins}>by {author}</h2>
             <div class={buttonsContainer}>
               <PlayButton
-                currentEpisode={currentEpisode}
-                episode={episode}
+                isCurrentEpisode={currentEpisode === episode}
                 state={state}
                 theme={theme}
                 pause={pauseEpisode}
