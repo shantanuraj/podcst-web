@@ -36,3 +36,8 @@ export const MOBILE_PLAYER_HEIGHT = 64;
  * Toolbar height
  */
 export const TOOLBAR_HEIGHT = 64;
+
+/**
+ * Default Seek jump delta
+ */
+export const SEEK_DELTA = 10;

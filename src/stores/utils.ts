@@ -6,6 +6,8 @@ import { IState } from './root';
 
 import { Storage } from '../utils/storage';
 
+import { SEEK_DELTA } from '../utils/constants';
+
 import { ThemeProvider } from '../styles';
 
 /**
@@ -46,6 +48,7 @@ export const getDefaultState = (): IState => ({
     currentEpisode: 0,
     duration: 0,
     queue: [],
+    seekDelta: SEEK_DELTA,
     seekPosition: 0,
     state: 'stopped',
   },

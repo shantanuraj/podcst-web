@@ -12,6 +12,8 @@ import Audio from '../utils/audio';
 
 import { normalizeSeek } from '../utils';
 
+import { SEEK_DELTA } from '../utils/constants';
+
 /**
  * Play related actions
  */
@@ -145,7 +147,6 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
 /**
  * Seek jump delta in seconds
  */
-export const SEEK_DELTA = 10;
 export const jumpSeek = (
   seekDirection: 'seek-forward' | 'seek-back',
   seekPosition: number,
@@ -202,6 +203,7 @@ export interface IPlayerState {
   currentEpisode: number;
   duration: number;
   queue: App.IEpisodeInfo[];
+  seekDelta: number;
   seekPosition: number;
   state: EpisodePlayerState;
 }
@@ -269,6 +271,7 @@ export const player = (
     currentEpisode: 0,
     duration: 0,
     queue: [],
+    seekDelta: SEEK_DELTA,
     seekPosition: 0,
     state: 'stopped',
   },
