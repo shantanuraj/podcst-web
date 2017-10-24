@@ -11,8 +11,11 @@ import { IPodcastsState } from '../stores/podcasts';
 import { imageWithPlaceholder, scrollToTop } from '../utils';
 
 import Loading from './Loading';
-import PlayButton from './PlayButton';
+
+import PlayButton from '../containers/ConnectedPlayButton';
+
 import ShareButton from './ShareButton';
+
 import ShowNotes from './ShowNotes';
 
 const container = (theme: App.ITheme) =>
@@ -126,14 +129,12 @@ interface IEpisodeInfoProps {
   currentEpisode: App.IEpisodeInfo | null;
   feed: string;
   info: IPodcastsState;
+  isPlayerVisible: boolean;
   mode: App.ThemeMode;
   theme: App.ITheme;
-  state: EpisodePlayerState;
   title: string;
   getEpisodes: (feed: string) => void;
-  pauseEpisode: () => void;
   playEpisode: (episode: App.IEpisode) => void;
-  resumeEpisode: () => void;
 }
 
 class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
@@ -165,11 +166,10 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
       return <div>Couldn't get Podcasts episode</div>;
     }
 
-    const { currentEpisode, mode, state, playEpisode, pauseEpisode, resumeEpisode, theme } = this.props;
+    const { currentEpisode, isPlayerVisible, mode, playEpisode, theme } = this.props;
     const { author, cover, episodeArt, showNotes, summary, title } = episode;
 
     const showArt = episodeArt || cover;
-    const isPlayerVisible = state !== 'stopped';
 
     const shareTitle = `${podcast.title} - ${title}`;
 
@@ -186,14 +186,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
             </h2>
             <h2 class={infoMargins}>by {author}</h2>
             <div class={buttonsContainer}>
-              <PlayButton
-                isCurrentEpisode={currentEpisode === episode}
-                state={state}
-                theme={theme}
-                pause={pauseEpisode}
-                play={play}
-                resume={resumeEpisode}
-              />
+              <PlayButton isCurrentEpisode={currentEpisode === episode} play={play} />
               <ShareButton
                 text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
                 theme={theme}
