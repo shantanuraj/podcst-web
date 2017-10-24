@@ -30,6 +30,22 @@ const updateChromeMetadatAction = (): IUpdateChromeMetadataAction => ({
   type: UPDATE_CHROME_METADATA,
 });
 
+interface IShowInfoModalAction {
+  type: 'SHOW_INFO_MODAL';
+}
+const SHOW_INFO_MODAL: IShowInfoModalAction['type'] = 'SHOW_INFO_MODAL';
+export const showModal = (): IShowInfoModalAction => ({
+  type: SHOW_INFO_MODAL,
+});
+
+interface ICloseInfoModalAction {
+  type: 'CLOSE_INFO_MODAL';
+}
+const CLOSE_INFO_MODAL: ICloseInfoModalAction['type'] = 'CLOSE_INFO_MODAL';
+export const closeModal = (): ICloseInfoModalAction => ({
+  type: CLOSE_INFO_MODAL,
+});
+
 type ChangeTheme = 'CHANGE_THEME';
 interface IChangeThemeAction {
   type: ChangeTheme;
@@ -50,12 +66,18 @@ export const appInit = (): IAppInitAction => ({
   type: APP_INIT,
 });
 
-export type AppActions = IAppInitAction | IUpdateChromeMetadataAction | IChangeThemeAction;
+export type AppActions =
+  | IAppInitAction
+  | IShowInfoModalAction
+  | ICloseInfoModalAction
+  | IUpdateChromeMetadataAction
+  | IChangeThemeAction;
 
 /**
  * App specific state
  */
 export interface IAppState {
+  isModalVisible: boolean;
   mode: App.ThemeMode;
   theme: App.ITheme;
 }
@@ -100,6 +122,7 @@ export const onThemeChangeEpic: Epic<Actions, IState> = (action$, store) =>
  */
 export const app = (
   state: IAppState = {
+    isModalVisible: false,
     mode: 'dark',
     theme: ThemeProvider('dark'),
   },
@@ -108,6 +131,10 @@ export const app = (
   switch (action.type) {
     case CHANGE_THEME:
       return { ...state, mode: action.mode, theme: ThemeProvider(action.mode) };
+    case SHOW_INFO_MODAL:
+      return { ...state, isModalVisible: true };
+    case CLOSE_INFO_MODAL:
+      return { ...state, isModalVisible: false };
     default:
       return state;
   }

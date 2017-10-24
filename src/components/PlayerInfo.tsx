@@ -142,6 +142,7 @@ interface IPlayerInfoProps {
   jumpSeek: (direction: SeekDirection) => void;
   pause();
   resume();
+  showModal();
 }
 
 const MAIN_ICON_RATIO = 2 / 3;
@@ -153,6 +154,7 @@ const PlayerInfo = ({
   jumpSeek,
   pause,
   resume,
+  showModal,
   state,
   theme,
 }: IPlayerInfoProps) => (
@@ -192,7 +194,7 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
-    <Link data-hide-on-desktop class={classes(linkContainer, showLink)} href="#" onClick={() => console.log('WOW')}>
+    <Link data-hide-on-desktop class={classes(linkContainer, showLink)} href="#" onClick={showModal}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>

@@ -8,6 +8,8 @@ import { bindActionCreators, Dispatch } from 'redux';
 
 import { IState } from '../stores/root';
 
+import { closeModal } from '../stores/app';
+
 import { getEpisodes } from '../stores/podcasts';
 
 import { playEpisode } from '../stores/player';
@@ -16,7 +18,7 @@ import EpisodeInfoModal from '../components/EpisodeInfoModal';
 
 const mapState = (state: IState) => ({
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,
-  isVisible: true,
+  isVisible: state.app.isModalVisible,
   info: state.podcasts,
   isPlayerVisible: state.player.state !== 'stopped',
   mode: state.app.mode,
@@ -26,6 +28,7 @@ const mapState = (state: IState) => ({
 const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(
     {
+      closeModal,
       getEpisodes,
       playEpisode,
     },

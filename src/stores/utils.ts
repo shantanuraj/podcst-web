@@ -9,6 +9,7 @@ import { Storage } from '../utils/storage';
 import { SEEK_DELTA } from '../utils/constants';
 
 import { ThemeProvider } from '../styles';
+import { IAppState } from './app';
 
 /**
  * Noop action
@@ -19,14 +20,17 @@ export interface INoopAction {
 const NOOP: INoopAction['type'] = 'NOOP';
 export const noop = (): INoopAction => ({ type: NOOP });
 
+const defaultAppState: IAppState = {
+  isModalVisible: false,
+  mode: 'dark',
+  theme: ThemeProvider('dark'),
+};
+
 /**
  * App default state
  */
 export const getDefaultState = (): IState => ({
-  app: Storage.getAppState() || {
-    mode: 'dark',
-    theme: ThemeProvider('dark'),
-  },
+  app: { ...defaultAppState, ...Storage.getAppState() },
   router: {
     path: '/',
   },

@@ -153,7 +153,7 @@ interface IJumpSeekAction {
   direction: SeekDirection;
 }
 const JUMP_SEEK: IJumpSeekAction['type'] = 'JUMP_SEEK';
-export const jumpSeek = (direction: SeekDirection) => ({
+export const jumpSeek = (direction: SeekDirection): IJumpSeekAction => ({
   type: JUMP_SEEK,
   direction,
 });

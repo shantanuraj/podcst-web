@@ -51,15 +51,16 @@ interface IPlayerProps extends IPlayerState {
   theme: App.ITheme;
   duration: never;
   seekPosition: never;
+  jumpSeek: (seekDirection: SeekDirection) => void;
+  onSeek: (seekPosition: number, duration: number) => void;
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;
   skipToPrev: () => void;
-  onSeek: (seekPosition: number, duration: number) => void;
-  jumpSeek: (seekDirection: SeekDirection) => void;
+  showModal: () => void;
 }
 
-const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, theme }: IPlayerProps) => {
+const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, showModal, state, theme }: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
   if (state === 'stopped' || !episode) {
@@ -74,6 +75,7 @@ const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, t
         mode={mode}
         pause={pause}
         resume={resume}
+        showModal={showModal}
         state={state}
         theme={theme}
       />

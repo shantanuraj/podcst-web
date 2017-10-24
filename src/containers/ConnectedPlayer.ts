@@ -8,6 +8,8 @@ import { bindActionCreators, Dispatch } from 'redux';
 
 import { IState } from '../stores/root';
 
+import { showModal } from '../stores/app';
+
 import {
   jumpSeek,
   manualSeekUpdate,
@@ -37,6 +39,7 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
       skipToPrev: skipToPrevEpisode,
       skipToNext: skipToNextEpisode,
       jumpSeek,
+      showModal,
     },
     dispatch,
   );
