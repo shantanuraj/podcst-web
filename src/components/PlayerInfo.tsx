@@ -2,6 +2,8 @@
  * Player Info bar
  */
 
+/* tslint:disable:no-console */
+
 import { h } from 'preact';
 
 import { Link } from 'preact-router';
@@ -190,12 +192,14 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
-    <div data-hide-on-desktop="true" class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+    <Link data-hide-on-desktop class={classes(linkContainer, showLink)} href="#" onClick={() => console.log('WOW')}>
       <div class={episodeInfoContainer}>
-        <p data-title="true">{title}</p>
-        <p data-author="true">{author}</p>
+        <div class={episodeInfo(theme)}>
+          <p data-title="true">{title}</p>
+          <p data-author="true">{author}</p>
+        </div>
       </div>
-    </div>
+    </Link>
   </div>
 );
 
