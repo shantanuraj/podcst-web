@@ -59,6 +59,8 @@ const seekInfo = style({
   alignItems: 'center',
   justifyContent: 'flex-end',
   marginRight: 32,
+  // Thanks Google Play Music!
+  transition: `opacity .218s ease`,
 });
 
 interface IPlayerProps extends IPlayerState {
@@ -107,7 +109,7 @@ const Player = ({
         state={state}
         theme={theme}
       />
-      <div class={seekInfo}>
+      <div data-display-on-hover="true" class={seekInfo}>
         <SeekInfo duration={duration} seekPosition={seekPosition} theme={theme} />
       </div>
       <Seekbar

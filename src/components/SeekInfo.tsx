@@ -13,8 +13,6 @@ const seekInfoContainer = (theme: App.ITheme) =>
     color: theme.subTitle,
     height: 12,
     fontSize: 12,
-    // Thanks Google Play Music!
-    transition: `opacity .218s ease`,
   });
 
 interface ISeekInfoProps {
@@ -27,7 +25,7 @@ const SeekInfo = ({ duration, seekPosition, theme }: ISeekInfoProps) => {
   const currentTime = formatTime(seekPosition);
   const totalTime = formatTime(duration);
   return (
-    <div data-display-on-hover="true" class={seekInfoContainer(theme)}>
+    <div class={seekInfoContainer(theme)}>
       <span aria-label={`Current episode time: ${currentTime}`}>{currentTime}</span> /{' '}
       <span aria-label={`Total time: ${totalTime}`}>{totalTime}</span>
     </div>
