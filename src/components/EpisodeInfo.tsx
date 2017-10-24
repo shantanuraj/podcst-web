@@ -125,14 +125,17 @@ const showNotesContainer = style(
   ),
 );
 
-interface IEpisodeInfoProps {
-  currentEpisode: App.IEpisodeInfo | null;
+export interface IEpisodeInfoProps {
+  // Passed props
   feed: string;
+  title: string;
+
+  // Connected props
+  currentEpisode: App.IEpisodeInfo | null;
   info: IPodcastsState;
   isPlayerVisible: boolean;
   mode: App.ThemeMode;
   theme: App.ITheme;
-  title: string;
   getEpisodes: (feed: string) => void;
   playEpisode: (episode: App.IEpisode) => void;
 }

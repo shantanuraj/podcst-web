@@ -18,6 +18,7 @@ import { IAppState } from '../stores/app';
 
 import ConnectedDrawer from '../containers/ConnectedDrawer';
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
+import ConnectedEpisodeInfoModal from '../containers/ConnectedEpisodeInfoModal';
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
 import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
 import ConnectedLoader from '../containers/ConnectedLoader';
@@ -84,6 +85,7 @@ class App extends Component<IAppProps, never> {
         </main>
         <ConnectedPlayer />
         <ConnectedToast />
+        <ConnectedEpisodeInfoModal />
       </div>
     );
   }
