@@ -182,7 +182,7 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+    <Link data-hide-on-mobile class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
@@ -190,6 +190,12 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
+    <div data-hide-on-desktop="true" class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+      <div class={episodeInfoContainer}>
+        <p data-title="true">{title}</p>
+        <p data-author="true">{author}</p>
+      </div>
+    </div>
   </div>
 );
 

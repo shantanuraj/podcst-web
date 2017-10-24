@@ -44,6 +44,15 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
       },
     ),
   );
+  cssRule(
+    '[data-hide-on-desktop]',
+    media(
+      { minWidth: 600 },
+      {
+        display: 'none',
+      },
+    ),
+  );
 };
 
 /**
