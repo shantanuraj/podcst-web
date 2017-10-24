@@ -49,6 +49,7 @@ const player = (theme: App.ITheme) =>
 interface IPlayerProps extends IPlayerState {
   mode: App.ThemeMode;
   theme: App.ITheme;
+  duration: never;
   seekPosition: never;
   pause: () => void;
   resume: () => void;
@@ -58,17 +59,12 @@ interface IPlayerProps extends IPlayerState {
   jumpSeek: (seekDirection: SeekDirection) => void;
 }
 
-const Player = ({ duration, currentEpisode, jumpSeek, mode, pause, queue, resume, state, theme }: IPlayerProps) => {
+const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, theme }: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
   if (state === 'stopped' || !episode) {
     return null;
   }
-
-  const episodeDuration = duration || episode.duration || 0;
-
-  /* tslint:disable:no-console */
-  console.log(episodeDuration, duration, episode.duration);
 
   return (
     <div class={player(theme)}>

@@ -23,7 +23,8 @@ const mapState = (state: IState) => ({
   ...state.player,
   mode: state.app.mode,
   theme: state.app.theme,
-  // Don't pass seekPosition to player
+  // Don't pass seekPosition & duration to player
+  duration: undefined,
   seekPosition: undefined,
 });
 
