@@ -30,9 +30,8 @@ const modal = (theme: App.ITheme) =>
   style({
     position: 'relative',
     backgroundColor: theme.background,
-    height: '80%',
+    height: '100%',
     width: '100%',
-    maxWidth: 600,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     overflowY: 'scroll',
