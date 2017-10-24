@@ -284,6 +284,7 @@ export const player = (
         currentEpisode,
         duration: duration || 0,
         queue,
+        seekPosition: 0,
         state: 'playing',
       };
     }
