@@ -12,9 +12,7 @@ import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants'
 
 import PlayerInfo from './PlayerInfo';
 
-import SeekInfo from './SeekInfo';
-
-import Seekbar from './Seekbar';
+import ConnectedSeekView from '../containers/ConnectedSeekView';
 
 const player = (theme: App.ITheme) =>
   style(
@@ -48,21 +46,6 @@ const player = (theme: App.ITheme) =>
     ),
   );
 
-const seekInfo = style({
-  position: 'absolute',
-  top: 4,
-  right: 0,
-  maxWidth: '100%',
-  overflow: 'hidden',
-  height: 32,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  marginRight: 32,
-  // Thanks Google Play Music!
-  transition: `opacity .218s ease`,
-});
-
 interface IPlayerProps extends IPlayerState {
   mode: App.ThemeMode;
   theme: App.ITheme;
@@ -84,8 +67,6 @@ const Player = ({
   resume,
   seekPosition,
   state,
-  onSeek,
-  buffering,
   theme,
 }: IPlayerProps) => {
   const episode = queue[currentEpisode];
@@ -95,6 +76,9 @@ const Player = ({
   }
 
   const episodeDuration = duration || episode.duration || 0;
+
+  /* tslint:disable:no-console */
+  console.log(episodeDuration, duration, episode.duration);
 
   return (
     <div class={player(theme)}>
@@ -109,16 +93,7 @@ const Player = ({
         state={state}
         theme={theme}
       />
-      <div data-display-on-hover="true" class={seekInfo}>
-        <SeekInfo duration={duration} seekPosition={seekPosition} theme={theme} />
-      </div>
-      <Seekbar
-        buffering={buffering}
-        onSeek={onSeek}
-        duration={episodeDuration}
-        seekPosition={seekPosition}
-        theme={theme}
-      />
+      <ConnectedSeekView />
     </div>
   );
 };

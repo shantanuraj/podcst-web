@@ -145,7 +145,7 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
 /**
  * Seek jump delta in seconds
  */
-const SEEK_DELTA = 10;
+export const SEEK_DELTA = 10;
 export const jumpSeek = (
   seekDirection: 'seek-forward' | 'seek-back',
   seekPosition: number,
