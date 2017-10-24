@@ -4,27 +4,35 @@
 
 import { h } from 'preact';
 
-import { style } from 'typestyle';
+import { media, style } from 'typestyle';
 
 import EpisodeInfo, { IEpisodeInfoProps } from './EpisodeInfo';
 
-const modalContainer = style({
-  position: 'fixed',
-  height: '100%',
-  width: '100%',
-  zIndex: 503,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  transform: `translateY(100%)`,
-  transition: 'all 0.5s ease',
-  $nest: {
-    '&[data-is-modal-visible]': {
-      transform: `translateY(0px)`,
+const modalContainer = style(
+  {
+    position: 'fixed',
+    height: '100%',
+    width: '100%',
+    zIndex: 503,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    transform: `translateY(100%)`,
+    transition: 'all 0.5s ease',
+    $nest: {
+      '&[data-is-modal-visible]': {
+        transform: `translateY(0px)`,
+      },
     },
   },
-});
+  media(
+    { minWidth: 600 },
+    {
+      display: 'none',
+    },
+  ),
+);
 
 const modal = (theme: App.ITheme) =>
   style({
