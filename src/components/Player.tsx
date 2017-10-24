@@ -6,7 +6,7 @@ import { h } from 'preact';
 
 import { media, style } from 'typestyle';
 
-import { IPlayerState } from '../stores/player';
+import { IPlayerState, SeekDirection } from '../stores/player';
 
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
@@ -49,26 +49,16 @@ const player = (theme: App.ITheme) =>
 interface IPlayerProps extends IPlayerState {
   mode: App.ThemeMode;
   theme: App.ITheme;
+  seekPosition: never;
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;
   skipToPrev: () => void;
   onSeek: (seekPosition: number, duration: number) => void;
-  jumpSeek: (seekDirection: 'seek-forward' | 'seek-back', seekPosition: number, duration: number) => void;
+  jumpSeek: (seekDirection: SeekDirection) => void;
 }
 
-const Player = ({
-  duration,
-  currentEpisode,
-  jumpSeek,
-  mode,
-  pause,
-  queue,
-  resume,
-  seekPosition,
-  state,
-  theme,
-}: IPlayerProps) => {
+const Player = ({ duration, currentEpisode, jumpSeek, mode, pause, queue, resume, state, theme }: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
   if (state === 'stopped' || !episode) {
@@ -83,13 +73,11 @@ const Player = ({
   return (
     <div class={player(theme)}>
       <PlayerInfo
-        duration={episodeDuration}
         episode={episode}
         jumpSeek={jumpSeek}
         mode={mode}
         pause={pause}
         resume={resume}
-        seekPosition={seekPosition}
         state={state}
         theme={theme}
       />

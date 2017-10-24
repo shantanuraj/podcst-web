@@ -12,6 +12,8 @@ import Icon from '../svg/Icon';
 
 import SeekButton from './SeekButton';
 
+import { SeekDirection } from '../stores/player';
+
 import { getEpisodeRoute, getEpisodesRoute, imageWithPlaceholder } from '../utils';
 
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
@@ -120,13 +122,11 @@ export const playerButton = (sizeRatio: number) =>
   );
 
 interface IPlayerInfoProps {
-  duration: number;
   episode: App.IEpisodeInfo;
   mode: App.ThemeMode;
-  seekPosition: number;
   state: EpisodePlayerState;
   theme: App.ITheme;
-  jumpSeek: (seekDirection: 'seek-forward' | 'seek-back', seekPosition: number, duration: number) => void;
+  jumpSeek: (direction: SeekDirection) => void;
   pause();
   resume();
 }
@@ -135,13 +135,11 @@ const MAIN_ICON_RATIO = 2 / 3;
 const SUB_ICON_RATIO = MAIN_ICON_RATIO * MAIN_ICON_RATIO;
 
 const PlayerInfo = ({
-  duration,
   episode: { author, cover, feed, episodeArt, title },
   mode,
   jumpSeek,
   pause,
   resume,
-  seekPosition,
   state,
   theme,
 }: IPlayerInfoProps) => (
@@ -153,7 +151,7 @@ const PlayerInfo = ({
       <SeekButton
         direction="seek-back"
         label="Seek Back 10 seconds"
-        onClick={() => jumpSeek('seek-back', seekPosition, duration)}
+        onClick={() => jumpSeek('seek-back')}
         sizeRatio={SUB_ICON_RATIO}
         theme={theme}
       />
@@ -168,7 +166,7 @@ const PlayerInfo = ({
       <SeekButton
         direction="seek-forward"
         label="Seek Forward 10 seconds"
-        onClick={() => jumpSeek('seek-forward', seekPosition, duration)}
+        onClick={() => jumpSeek('seek-forward')}
         sizeRatio={SUB_ICON_RATIO}
         theme={theme}
       />

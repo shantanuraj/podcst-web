@@ -23,6 +23,8 @@ const mapState = (state: IState) => ({
   ...state.player,
   mode: state.app.mode,
   theme: state.app.theme,
+  // Don't pass seekPosition to player
+  seekPosition: undefined,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

@@ -145,16 +145,18 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
 });
 
 /**
- * Seek jump delta in seconds
+ * Jump Seek action creator
  */
-export const jumpSeek = (
-  seekDirection: 'seek-forward' | 'seek-back',
-  seekPosition: number,
-  duration: number,
-): IManualSeekUpdateAction => {
-  const seekTo = seekPosition + SEEK_DELTA * (seekDirection === 'seek-forward' ? 1 : -1);
-  return manualSeekUpdate(normalizeSeek(seekTo, duration), duration);
-};
+export type SeekDirection = 'seek-forward' | 'seek-back';
+interface IJumpSeekAction {
+  type: 'JUMP_SEEK';
+  direction: SeekDirection;
+}
+const JUMP_SEEK: IJumpSeekAction['type'] = 'JUMP_SEEK';
+export const jumpSeek = (direction: SeekDirection) => ({
+  type: JUMP_SEEK,
+  direction,
+});
 
 /**
  * Seek update success action
@@ -194,6 +196,7 @@ export type PlayerActions =
   | ISkipAudioAction
   | ISeekUpdateRequestAction
   | ISeekUpdateSuccessAction
+  | IJumpSeekAction
   | IManualSeekUpdateAction
   | ISetBufferAction
   | INoopAction;
@@ -342,6 +345,17 @@ export const player = (
             ...state,
             duration: action.duration || episode.duration || 0,
             seekPosition: action.seekPosition,
+          };
+    }
+    case JUMP_SEEK: {
+      const { direction } = action;
+      const { duration, seekDelta, seekPosition } = state;
+      const seekTo = seekPosition + seekDelta * (direction === 'seek-forward' ? 1 : -1);
+      return state.buffering || state.state === 'stopped'
+        ? state
+        : {
+            ...state,
+            seekPosition: normalizeSeek(seekTo, duration),
           };
     }
     case SET_BUFFER:

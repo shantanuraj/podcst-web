@@ -71,17 +71,12 @@ export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$, stor
 
       const info = (podcasts[action.episode.feed] && podcasts[action.episode.feed].episodes) || null;
 
-      const jump = (seekDirection: 'seek-back' | 'seek-forward') => () => {
-        const { duration, seekPosition } = store.getState().player;
-        return jumpSeek(seekDirection, seekPosition, duration);
-      };
-
       const actions = bindActionCreators(
         {
           pause: pauseEpisode,
           resume: resumeEpisode,
-          seekBack: jump('seek-back'),
-          seekForward: jump('seek-forward'),
+          seekBack: () => jumpSeek('seek-back'),
+          seekForward: () => jumpSeek('seek-forward'),
         },
         store.dispatch,
       );

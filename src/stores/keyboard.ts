@@ -88,7 +88,7 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
     Observable.fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) => !!PlayerControlKeys[keyCode] && isNotIgnoreElement(target))
       .map(e => {
-        const { state, seekPosition, duration, currentEpisode, queue } = store.getState().player;
+        const { state, currentEpisode, queue } = store.getState().player;
 
         // Space for scroll check
         if (!(e.keyCode === 32 && state === 'stopped')) {
@@ -106,7 +106,7 @@ export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
             return skipToPrevEpisode();
           case 'seek-back':
           case 'seek-forward':
-            return jumpSeek(shortcut, seekPosition, duration);
+            return jumpSeek(shortcut);
           case 'episode-info':
             if (state !== 'stopped' && !!episode) {
               const { feed, title } = episode;
