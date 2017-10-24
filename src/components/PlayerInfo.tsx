@@ -115,11 +115,6 @@ export const playerButton = (sizeRatio: number) =>
       { maxWidth: 600 },
       {
         width: Math.round(MOBILE_PLAYER_HEIGHT * sizeRatio),
-        $nest: {
-          '&[data-hide-on-mobile]': {
-            display: 'none',
-          },
-        },
       },
     ),
   );

@@ -56,9 +56,7 @@ export const monthName = (monthNumber: number) => months[monthNumber];
 /**
  * Format remaining time
  */
-export const formatTime = (total: number, currentTime: number) => {
-  const time = Math.round(total - currentTime);
-
+export const formatTime = (time: number) => {
   const date = new Date(0);
   date.setSeconds(time);
 

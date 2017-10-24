@@ -8,8 +8,6 @@ import { media, style } from 'typestyle';
 
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
-// import { formatTime } from '../utils';
-
 const seekbarContainer = (theme: App.ITheme) =>
   style(
     {

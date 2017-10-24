@@ -1,6 +1,6 @@
 import { normalize, setupPage } from 'csstips';
 
-import { cssRule, style } from 'typestyle';
+import { cssRule, media, style } from 'typestyle';
 
 /**
  * Font family for application
@@ -35,6 +35,15 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
     textDecoration: 'none',
   });
   cssRule('input, button', { fontFamily });
+  cssRule(
+    '[data-hide-on-mobile]',
+    media(
+      { maxWidth: 600 },
+      {
+        display: 'none',
+      },
+    ),
+  );
 };
 
 /**
