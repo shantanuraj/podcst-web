@@ -18,7 +18,7 @@ import EpisodeInfoModal from '../components/EpisodeInfoModal';
 
 const mapState = (state: IState) => ({
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,
-  isVisible: state.app.isModalVisible,
+  isModalVisible: state.app.isModalVisible,
   info: state.podcasts,
   isPlayerVisible: state.player.state !== 'stopped',
   mode: state.app.mode,

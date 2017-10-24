@@ -68,24 +68,25 @@ const closeBar = (theme: App.ITheme) =>
   });
 
 interface IEpisodeInfoModalProps extends IEpisodeInfoProps {
-  isVisible: boolean;
+  isModalVisible: boolean;
   feed: never;
   title: never;
   closeModal: () => void;
 }
 
 const EpisodeInfoModal = (props: IEpisodeInfoModalProps) => {
-  const { closeModal, currentEpisode, isVisible, theme } = props;
+  const { closeModal, currentEpisode, isModalVisible, theme } = props;
+  const isVisible = !!currentEpisode && isModalVisible;
   return (
-    <div data-is-modal-visible={isVisible && !!currentEpisode} class={modalContainer}>
+    <div data-is-modal-visible={isVisible} class={modalContainer}>
       <div class={modal(theme)}>
         <button aria-label="Close episode modal" role="button" class={closeBarContainer(theme)} onClick={closeModal}>
           <div class={closeBar(theme)} />
         </button>
-        {currentEpisode === null ? (
-          <div />
-        ) : (
+        {isModalVisible && !!currentEpisode ? (
           <EpisodeInfo feed={currentEpisode.feed} title={currentEpisode.title} {...props} />
+        ) : (
+          <div />
         )}
       </div>
     </div>
