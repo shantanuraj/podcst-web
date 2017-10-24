@@ -332,11 +332,13 @@ export const player = (
     case MANUAL_SEEK_UPDATE:
     case SEEK_UPDATE_SUCCESS: {
       const episode = state.queue[state.currentEpisode];
-      return {
-        ...state,
-        duration: action.duration || episode.duration || 0,
-        seekPosition: action.seekPosition,
-      };
+      return state.buffering || state.state === 'stopped'
+        ? state
+        : {
+            ...state,
+            duration: action.duration || episode.duration || 0,
+            seekPosition: action.seekPosition,
+          };
     }
     case SET_BUFFER:
       const { buffering } = action;
