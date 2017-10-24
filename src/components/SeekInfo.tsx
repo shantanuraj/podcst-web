@@ -13,6 +13,7 @@ const seekInfoContainer = (theme: App.ITheme) =>
     color: theme.subTitle,
     height: 12,
     fontSize: 12,
+    zIndex: 2,
   });
 
 interface ISeekInfoProps {

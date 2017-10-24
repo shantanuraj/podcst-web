@@ -6,7 +6,7 @@ import { h } from 'preact';
 
 import { Link } from 'preact-router';
 
-import { media, style } from 'typestyle';
+import { classes, media, style } from 'typestyle';
 
 import Icon from '../svg/Icon';
 
@@ -40,6 +40,15 @@ const linkContainer = style({
   display: 'flex',
 });
 
+const showLink = style({
+  flex: 1,
+  $nest: {
+    '& > div': {
+      flex: 1,
+    },
+  },
+});
+
 const episodeImage = (mode: App.ThemeMode, image: string) =>
   style(
     {
@@ -68,9 +77,11 @@ const episodeInfoContainer = style({
 const episodeInfo = (theme: App.ITheme) =>
   style(
     {
-      textOverflow: 'ellipsis',
-      overflow: 'hidden',
       $nest: {
+        '& p': {
+          textOverflow: 'ellipsis',
+          overflow: 'hidden',
+        },
         '& [data-title]': {
           fontSize: 16,
         },
@@ -171,7 +182,7 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link class={linkContainer} href={getEpisodeRoute(feed, title)}>
+    <Link class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
