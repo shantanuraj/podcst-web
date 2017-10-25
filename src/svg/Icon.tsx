@@ -8,6 +8,7 @@ import { style } from 'typestyle';
 
 import BackIcon from './BackIcon';
 import DayIcon from './DayIcon';
+import InfoIcon from './InfoIcon';
 import MenuIcon from './MenuIcon';
 import NightIcon from './NightIcon';
 import PauseIcon from './PauseIcon';
@@ -16,7 +17,17 @@ import SeekBack from './SeekBack';
 import SeekForward from './SeekForward';
 import SettingsIcon from './SettingsIcon';
 
-export type IconType = 'play' | 'pause' | 'settings' | 'night' | 'day' | 'menu' | 'back' | 'seek-back' | 'seek-forward';
+export type IconType =
+  | 'play'
+  | 'pause'
+  | 'settings'
+  | 'night'
+  | 'day'
+  | 'menu'
+  | 'back'
+  | 'seek-back'
+  | 'seek-forward'
+  | 'info';
 
 interface IconProps {
   icon: IconType;
@@ -43,6 +54,8 @@ const getIcon = (icon: IconProps['icon']): JSX.Element => {
     return <SeekBack />;
   } else if (icon === 'seek-forward') {
     return <SeekForward />;
+  } else if (icon === 'info') {
+    return <InfoIcon />;
   }
 
   return <PlayIcon />;
