@@ -127,7 +127,7 @@ const Player = ({
       <ConnectedLargeSeekbar mode="inline" />
     </div>
   ) : (
-    <div player-visible={isVisible} class={player(theme)} />
+    <div data-is-player-visible={isVisible} class={player(theme)} />
   );
 };
 
