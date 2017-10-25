@@ -6,13 +6,15 @@ import { h } from 'preact';
 
 import { media, style } from 'typestyle';
 
+import { SeekDirection } from '../stores/player';
+
+import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
+
 import Seekbar, { ISeekbarProps } from './Seekbar';
 
 import SeekInfo from './SeekInfo';
 
 import SeekButton from './SeekButton';
-
-import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
 const MAIN_ICON_RATIO = 2 / 3;
 
@@ -50,16 +52,18 @@ const playerControls = style({
   },
 });
 
-/* tslint:disable:no-console */
+interface ILargeSeekbarProps extends ISeekbarProps {
+  jumpSeek(direction: SeekDirection);
+}
 
-const LargeSeekbar = (props: ISeekbarProps) => (
+const LargeSeekbar = (props: ILargeSeekbarProps) => (
   <div id="large-seekbar" class={seekbar(props.theme)}>
     <div class={playerControls}>
       <SeekButton
         direction="seek-back"
         hideOnMobile={false}
         label="Seek Back 10 seconds"
-        onClick={() => console.log('seek-back')}
+        onClick={() => props.jumpSeek('seek-back')}
         sizeRatio={MAIN_ICON_RATIO}
         theme={props.theme}
       />
@@ -68,7 +72,7 @@ const LargeSeekbar = (props: ISeekbarProps) => (
         direction="seek-forward"
         hideOnMobile={false}
         label="Seek Forward 10 seconds"
-        onClick={() => console.log('seek-forward')}
+        onClick={() => props.jumpSeek('seek-forward')}
         sizeRatio={MAIN_ICON_RATIO}
         theme={props.theme}
       />

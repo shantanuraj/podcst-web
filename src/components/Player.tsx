@@ -12,7 +12,7 @@ import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants'
 
 import PlayerInfo from './PlayerInfo';
 
-import LargeSeekbar from './LargeSeekbar';
+import ConnectedLargeSeekbar from '../containers/ConnectedLargeSeekbar';
 
 import ConnectedSeekView from '../containers/ConnectedSeekView';
 
@@ -111,14 +111,7 @@ const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, t
         />
         <ConnectedSeekView />
       </div>
-      <LargeSeekbar
-        mode="inline"
-        buffering={true}
-        duration={180}
-        seekPosition={90}
-        onSeek={(_x, _y) => ({})}
-        theme={theme}
-      />
+      <ConnectedLargeSeekbar mode="inline" />
     </div>
   ) : (
     <div player-visible={isVisible} class={player(theme)} />
