@@ -40,6 +40,8 @@ const infoContainer = (theme: App.ITheme) =>
 const linkContainer = style({
   height: '100%',
   display: 'flex',
+  border: 0,
+  padding: 0,
 });
 
 const showLink = style({
@@ -81,10 +83,12 @@ const episodeInfo = (theme: App.ITheme) =>
     {
       $nest: {
         '& p': {
+          textAlign: 'left',
           textOverflow: 'ellipsis',
           overflow: 'hidden',
         },
         '& [data-title]': {
+          color: theme.text,
           fontSize: 16,
         },
         '& [data-author]': {
@@ -185,7 +189,7 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link data-hide-on-mobile="true" class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+    <Link data-hide-on-mobile="true" class={classes(linkContainer, showLink)}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
@@ -193,7 +197,7 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
-    <Link
+    <button
       data-hide-on-desktop="true"
       class={classes(linkContainer, showLink)}
       href={getEpisodeRoute(feed, title)}
@@ -205,7 +209,7 @@ const PlayerInfo = ({
           <p data-author="true">{author}</p>
         </div>
       </div>
-    </Link>
+    </button>
   </div>
 );
 

@@ -34,6 +34,9 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
     color: 'inherit',
     textDecoration: 'none',
   });
+  cssRule('button', {
+    backgroundColor: 'inherit',
+  });
   cssRule('input, button', { fontFamily });
   cssRule(
     '[data-hide-on-mobile]',
