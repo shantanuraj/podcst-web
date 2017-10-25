@@ -189,7 +189,7 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link data-hide-on-mobile="true" class={classes(linkContainer, showLink)}>
+    <Link data-hide-on-mobile="true" class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
