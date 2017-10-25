@@ -34,7 +34,7 @@ interface ISeekViewProps {
 }
 
 const SeekView = ({ buffering, duration, seekPosition, theme, onSeek }: ISeekViewProps) => (
-  <div>
+  <div data-hide-on-mobile="true">
     <div data-display-on-hover="true" class={seekInfo}>
       <SeekInfo duration={duration} seekPosition={seekPosition} theme={theme} />
     </div>
