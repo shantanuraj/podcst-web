@@ -42,6 +42,7 @@ const linkContainer = style({
   display: 'flex',
   border: 0,
   padding: 0,
+  outline: 0,
 });
 
 const showLink = style({

@@ -6,9 +6,15 @@ import { h } from 'preact';
 
 import { media, style } from 'typestyle';
 
+import { Link } from 'preact-router';
+
 import { IPlayerState, SeekDirection } from '../stores/player';
 
+import { getEpisodeRoute } from '../utils';
+
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
+
+import Icon from '../svg/Icon';
 
 import PlayerInfo from './PlayerInfo';
 
@@ -30,6 +36,12 @@ const playerContainer = style(
     transform: `translateY(${DESKTOP_PLAYER_HEIGHT * 2}px)`,
     transition: 'all 0.3s ease',
     $nest: {
+      '& a': {
+        opacity: 0,
+      },
+      '&[data-is-player-visible] a': {
+        opacity: 1,
+      },
       '&[data-is-player-visible]': {
         transform: `translateY(${DESKTOP_PLAYER_HEIGHT}px)`,
       },
@@ -79,6 +91,13 @@ const player = (theme: App.ITheme) =>
     ),
   );
 
+const infoIcon = style({
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  zIndex: 1,
+});
+
 interface IPlayerProps extends IPlayerState {
   mode: App.ThemeMode;
   theme: App.ITheme;
@@ -123,6 +142,9 @@ const Player = ({
           toggleLargeSeek={toggleLargeSeek}
         />
         <ConnectedSeekView />
+        <Link class={infoIcon} href={getEpisodeRoute(episode.feed, episode.title)}>
+          <Icon color={theme.accent} icon="info" size={24} />
+        </Link>
       </div>
       <ConnectedLargeSeekbar mode="inline" />
     </div>
