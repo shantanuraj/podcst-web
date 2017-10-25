@@ -90,10 +90,9 @@ interface IPlayerProps extends IPlayerState {
   resume: () => void;
   skipToNext: () => void;
   skipToPrev: () => void;
-  showModal: () => void;
 }
 
-const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, showModal, state, theme }: IPlayerProps) => {
+const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, theme }: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
   const isVisible = state !== 'stopped' && !!episode;
@@ -107,7 +106,6 @@ const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, showModa
           mode={mode}
           pause={pause}
           resume={resume}
-          showModal={showModal}
           state={state}
           theme={theme}
         />

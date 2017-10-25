@@ -21,7 +21,6 @@ const NOOP: INoopAction['type'] = 'NOOP';
 export const noop = (): INoopAction => ({ type: NOOP });
 
 const defaultAppState: IAppState = {
-  isModalVisible: false,
   mode: 'dark',
   theme: ThemeProvider('dark'),
 };
