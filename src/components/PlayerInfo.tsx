@@ -142,6 +142,7 @@ interface IPlayerInfoProps {
   jumpSeek: (direction: SeekDirection) => void;
   pause();
   resume();
+  toggleLargeSeek();
 }
 
 const PlayerInfo = ({
@@ -152,6 +153,7 @@ const PlayerInfo = ({
   resume,
   state,
   theme,
+  toggleLargeSeek,
 }: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
     <Link class={linkContainer} href={getEpisodesRoute(feed)}>
@@ -183,7 +185,7 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link data-hide-on-mobile class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+    <Link data-hide-on-mobile="true" class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
@@ -191,7 +193,12 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
-    <Link data-hide-on-desktop class={classes(linkContainer, showLink)} href="#modal">
+    <Link
+      data-hide-on-desktop="true"
+      class={classes(linkContainer, showLink)}
+      href={getEpisodeRoute(feed, title)}
+      onClick={toggleLargeSeek}
+    >
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>

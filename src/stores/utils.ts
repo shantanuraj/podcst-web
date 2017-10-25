@@ -50,6 +50,7 @@ export const getDefaultState = (): IState => ({
     buffering: false,
     currentEpisode: 0,
     duration: 0,
+    isLargeSeekVisible: false,
     queue: [],
     seekDelta: SEEK_DELTA,
     seekPosition: 0,

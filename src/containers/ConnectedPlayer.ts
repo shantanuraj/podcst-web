@@ -15,6 +15,7 @@ import {
   resumeEpisode,
   skipToNextEpisode,
   skipToPrevEpisode,
+  toggleLargeSeek,
 } from '../stores/player';
 
 import Player from '../components/Player';
@@ -36,6 +37,7 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
       resume: resumeEpisode,
       skipToPrev: skipToPrevEpisode,
       skipToNext: skipToNextEpisode,
+      toggleLargeSeek,
       jumpSeek,
     },
     dispatch,

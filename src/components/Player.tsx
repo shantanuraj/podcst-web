@@ -90,15 +90,27 @@ interface IPlayerProps extends IPlayerState {
   resume: () => void;
   skipToNext: () => void;
   skipToPrev: () => void;
+  toggleLargeSeek: () => void;
 }
 
-const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, theme }: IPlayerProps) => {
+const Player = ({
+  currentEpisode,
+  isLargeSeekVisible,
+  jumpSeek,
+  mode,
+  pause,
+  queue,
+  resume,
+  state,
+  theme,
+  toggleLargeSeek,
+}: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
   const isVisible = state !== 'stopped' && !!episode;
 
   return isVisible ? (
-    <div data-is-seek-visible={isVisible} data-is-player-visible={isVisible} class={playerContainer}>
+    <div data-is-seek-visible={isLargeSeekVisible} data-is-player-visible={isVisible} class={playerContainer}>
       <div class={player(theme)}>
         <PlayerInfo
           episode={episode}
@@ -108,6 +120,7 @@ const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, state, t
           resume={resume}
           state={state}
           theme={theme}
+          toggleLargeSeek={toggleLargeSeek}
         />
         <ConnectedSeekView />
       </div>

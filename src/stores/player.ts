@@ -183,6 +183,17 @@ export const setBuffer = (buffering: boolean): ISetBufferAction => ({
   buffering,
 });
 
+/**
+ * Toggle large seek action creator
+ */
+interface IToggleLargeSeekAction {
+  type: 'TOGGLE_LARGE_SEEK';
+}
+const TOGGLE_LARGE_SEEK: IToggleLargeSeekAction['type'] = 'TOGGLE_LARGE_SEEK';
+export const toggleLargeSeek = (): IToggleLargeSeekAction => ({
+  type: TOGGLE_LARGE_SEEK,
+});
+
 export type PlayerActions =
   | IPlayEpisodeAction
   | IPauseAction
@@ -199,12 +210,14 @@ export type PlayerActions =
   | IJumpSeekAction
   | IManualSeekUpdateAction
   | ISetBufferAction
+  | IToggleLargeSeekAction
   | INoopAction;
 
 export interface IPlayerState {
   buffering: boolean;
   currentEpisode: number;
   duration: number;
+  isLargeSeekVisible: boolean;
   queue: App.IEpisodeInfo[];
   seekDelta: number;
   seekPosition: number;
@@ -277,6 +290,7 @@ export const player = (
     buffering: false,
     currentEpisode: 0,
     duration: 0,
+    isLargeSeekVisible: false,
     queue: [],
     seekDelta: SEEK_DELTA,
     seekPosition: 0,
@@ -367,6 +381,11 @@ export const player = (
       return {
         ...state,
         buffering,
+      };
+    case TOGGLE_LARGE_SEEK:
+      return {
+        ...state,
+        isLargeSeekVisible: !state.isLargeSeekVisible,
       };
     default:
       return state;
