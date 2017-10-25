@@ -1,6 +1,6 @@
 import { normalize, setupPage } from 'csstips';
 
-import { cssRule, style } from 'typestyle';
+import { cssRule, media, style } from 'typestyle';
 
 /**
  * Font family for application
@@ -34,7 +34,28 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
     color: 'inherit',
     textDecoration: 'none',
   });
+  cssRule('button', {
+    backgroundColor: 'inherit',
+  });
   cssRule('input, button', { fontFamily });
+  cssRule(
+    '[data-hide-on-mobile]',
+    media(
+      { maxWidth: 600 },
+      {
+        display: 'none',
+      },
+    ),
+  );
+  cssRule(
+    '[data-hide-on-desktop]',
+    media(
+      { minWidth: 600 },
+      {
+        display: 'none',
+      },
+    ),
+  );
 };
 
 /**

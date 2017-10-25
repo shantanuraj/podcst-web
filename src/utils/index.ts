@@ -56,9 +56,7 @@ export const monthName = (monthNumber: number) => months[monthNumber];
 /**
  * Format remaining time
  */
-export const formatTime = (total: number, currentTime: number) => {
-  const time = Math.round(total - currentTime);
-
+export const formatTime = (time: number) => {
   const date = new Date(0);
   date.setSeconds(time);
 
@@ -100,9 +98,16 @@ export const opmltoJSON = (file: string): IOPMLJson => {
 };
 
 /**
+ * Get episodes route for podcast episode listing
+ */
+export const getEpisodesRoute = (feed: string): string => {
+  return `/episodes?feed=${encodeURIComponent(feed)}`;
+};
+
+/**
  * Get episode route for info
  */
-export const getEpisodeRoute = (feed: string, title: string) => {
+export const getEpisodeRoute = (feed: string, title: string): string => {
   return `/episode?feed=${encodeURIComponent(feed)}&title=${encodeURIComponent(title)}`;
 };
 

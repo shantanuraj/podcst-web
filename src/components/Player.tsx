@@ -6,12 +6,57 @@ import { h } from 'preact';
 
 import { media, style } from 'typestyle';
 
-import { IPlayerState } from '../stores/player';
+import { Link } from 'preact-router';
 
-import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
+import { IPlayerState, SeekDirection } from '../stores/player';
+
+import { getEpisodeRoute } from '../utils';
+
+import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
+
+import Icon from '../svg/Icon';
 
 import PlayerInfo from './PlayerInfo';
-import Seekbar from './Seekbar';
+
+import ConnectedLargeSeekbar from '../containers/ConnectedLargeSeekbar';
+
+import ConnectedSeekView from '../containers/ConnectedSeekView';
+
+const playerContainer = style(
+  {
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    height: DESKTOP_PLAYER_HEIGHT * 2,
+    width: '100%',
+    zIndex: 500,
+    boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
+    transform: `translateY(${DESKTOP_PLAYER_HEIGHT * 2}px)`,
+    transition: 'all 0.3s ease',
+    $nest: {
+      '&[data-is-player-visible]': {
+        transform: `translateY(${DESKTOP_PLAYER_HEIGHT}px)`,
+      },
+    },
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      height: MOBILE_PLAYER_HEIGHT * 2,
+      transform: `translateY(${MOBILE_PLAYER_HEIGHT * 2}px)`,
+      $nest: {
+        '&[data-is-player-visible]': {
+          transform: `translateY(${MOBILE_PLAYER_HEIGHT}px)`,
+        },
+        '&[data-is-seek-visible]': {
+          transform: `translateY(0px)`,
+        },
+      },
+    },
+  ),
+);
 
 const player = (theme: App.ITheme) =>
   style(
@@ -19,68 +64,97 @@ const player = (theme: App.ITheme) =>
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'flex-start',
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
       height: DESKTOP_PLAYER_HEIGHT,
       width: '100%',
-      zIndex: 500,
       fontSize: 20,
       color: theme.text,
-      boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
+      $nest: {
+        '& [data-display-on-hover]': {
+          opacity: 0,
+        },
+        '&:hover [data-display-on-hover]': {
+          opacity: 1,
+        },
+      },
     },
     media(
       { maxWidth: 600 },
       {
-        height: 128,
-        flexDirection: 'column-reverse',
-        alignItems: 'stretch',
+        height: MOBILE_PLAYER_HEIGHT,
       },
     ),
   );
 
+const infoIcon = style({
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  opacity: 0,
+  zIndex: 1,
+  transition: 'all 0.3s ease',
+  $nest: {
+    '&[data-is-seek-visible]': {
+      opacity: 1,
+    },
+  },
+});
+
 interface IPlayerProps extends IPlayerState {
   mode: App.ThemeMode;
   theme: App.ITheme;
+  duration: never;
+  seekPosition: never;
+  jumpSeek: (seekDirection: SeekDirection) => void;
+  onSeek: (seekPosition: number, duration: number) => void;
   pause: () => void;
   resume: () => void;
   skipToNext: () => void;
   skipToPrev: () => void;
-  onSeek: (seekPosition: number, duration: number) => void;
+  toggleLargeSeek: () => void;
 }
 
 const Player = ({
-  duration,
   currentEpisode,
+  isLargeSeekVisible,
+  jumpSeek,
   mode,
   pause,
   queue,
   resume,
-  seekPosition,
   state,
-  onSeek,
-  buffering,
   theme,
+  toggleLargeSeek,
 }: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
-  if (state === 'stopped' || !episode) {
-    return null;
-  }
+  const isVisible = state !== 'stopped' && !!episode;
 
-  const episodeDuration = duration || episode.duration || 0;
-
-  return (
-    <div class={player(theme)}>
-      <PlayerInfo episode={episode} mode={mode} pause={pause} resume={resume} state={state} theme={theme} />
-      <Seekbar
-        buffering={buffering}
-        onSeek={onSeek}
-        duration={episodeDuration}
-        seekPosition={seekPosition}
-        theme={theme}
-      />
+  return isVisible ? (
+    <div data-is-seek-visible={isLargeSeekVisible} data-is-player-visible={isVisible} class={playerContainer}>
+      <div class={player(theme)}>
+        <PlayerInfo
+          episode={episode}
+          jumpSeek={jumpSeek}
+          mode={mode}
+          pause={pause}
+          resume={resume}
+          state={state}
+          theme={theme}
+          toggleLargeSeek={toggleLargeSeek}
+        />
+        <ConnectedSeekView />
+        <Link
+          data-is-seek-visible={isLargeSeekVisible}
+          class={infoIcon}
+          href={getEpisodeRoute(episode.feed, episode.title)}
+        >
+          <Icon color={theme.accent} icon="info" size={24} />
+        </Link>
+      </div>
+      <ConnectedLargeSeekbar mode="inline" />
     </div>
+  ) : (
+    <div data-is-player-visible={isVisible} class={playerContainer} />
   );
 };
 

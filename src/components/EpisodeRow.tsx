@@ -10,7 +10,7 @@ import { media, style } from 'typestyle';
 
 import { getEpisodeRoute, monthName } from '../utils';
 
-import PlayButton from './PlayButton';
+import ConnectedPlayButton from '../containers/ConnectedPlayButton';
 
 const episodeContainer = (theme: App.ITheme) =>
   style(
@@ -61,17 +61,14 @@ const subContainer = (theme: App.ITheme) =>
 
 interface IEpisodeRowProps {
   episode: App.IEpisodeInfo;
-  currentEpisode: App.IEpisodeInfo | null;
+  isCurrentEpisode: boolean;
   feed: string;
-  state: EpisodePlayerState;
   theme: App.ITheme;
   play: () => void;
-  resume: () => void;
-  pause: () => void;
 }
 
 const EpisodeRow = (props: IEpisodeRowProps) => {
-  const { episode, feed, theme } = props;
+  const { isCurrentEpisode, episode, feed, play, theme } = props;
 
   const { title, published, duration } = episode;
 
@@ -99,7 +96,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
           <p>{minutes ? minutesSuffix : ''}</p>
         </div>
         <div class={container}>
-          <PlayButton {...props} />
+          <ConnectedPlayButton isCurrentEpisode={isCurrentEpisode} play={play} />
         </div>
       </div>
     </div>
