@@ -10,6 +10,8 @@ import ConnectedSearch from '../containers/ConnectedSearch';
 
 import Icons from '../svg/Icon';
 
+import { TOOLBAR_HEIGHT } from '../utils/constants';
+
 const toolbar = (theme: App.ITheme) =>
   style({
     display: 'flex',
@@ -19,7 +21,7 @@ const toolbar = (theme: App.ITheme) =>
     position: 'fixed',
     top: 0,
     left: 0,
-    height: '64px',
+    height: TOOLBAR_HEIGHT,
     width: '100%',
     zIndex: 501,
     fontSize: 20,

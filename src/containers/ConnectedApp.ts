@@ -17,7 +17,7 @@ import { toggleDrawer } from '../stores/drawer';
 import {
   pauseEpisode,
   resumeEpisode,
-  seekUpdate,
+  seekUpdateRequest as seekUpdate,
   setBuffer,
   skipToNextEpisode,
   skipToPrevEpisode,

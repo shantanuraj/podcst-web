@@ -4,7 +4,7 @@ import { classes, media, style, types } from 'typestyle';
 import { IPodcastsState } from '../stores/podcasts';
 
 import { imageWithPlaceholder, scrollToTop, stripHost } from '../utils';
-
+import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
 import { normalizeEl } from '../utils/styles';
 
 import EpisodeRow from './EpisodeRow';
@@ -130,7 +130,7 @@ const episodesView = style(
   {
     $nest: {
       '&[data-is-player-visible]': {
-        paddingBottom: 64,
+        paddingBottom: DESKTOP_PLAYER_HEIGHT,
       },
     },
   },
@@ -139,7 +139,7 @@ const episodesView = style(
     {
       $nest: {
         '&[data-is-player-visible]': {
-          paddingBottom: 128,
+          paddingBottom: DESKTOP_PLAYER_HEIGHT * 2,
         },
       },
     },
@@ -147,17 +147,15 @@ const episodesView = style(
 );
 
 interface IEpisodesProps {
+  isPlayerVisible: boolean;
   mode: App.ThemeMode;
   theme: App.ITheme;
   feed: string;
   info: IPodcastsState;
-  state: EpisodePlayerState;
   currentEpisode: App.IEpisodeInfo | null;
   subscriptions: ISubscriptionsMap;
   getEpisodes: (feed: string) => void;
   playEpisode: (episode: App.IEpisodeInfo) => void;
-  resumeEpisode: () => void;
-  pauseEpisode: () => void;
   addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
   removeSubscription: (feed: string) => void;
 }
@@ -187,20 +185,17 @@ class Episodes extends Component<IEpisodesProps, any> {
   }
 
   public renderEpisode = (episode: App.IEpisodeInfo) => {
-    const { currentEpisode, playEpisode, pauseEpisode, resumeEpisode, state, theme, feed } = this.props;
+    const { currentEpisode, playEpisode, theme, feed } = this.props;
 
     const play = () => playEpisode(episode);
 
     return (
       <EpisodeRow
         feed={feed}
+        isCurrentEpisode={currentEpisode === episode}
         episode={episode}
-        pause={pauseEpisode}
         play={play}
-        resume={resumeEpisode}
-        state={state}
         theme={theme}
-        currentEpisode={currentEpisode}
       />
     );
   };
@@ -210,10 +205,9 @@ class Episodes extends Component<IEpisodesProps, any> {
       return <div>Couldn't get Podcasts episodes</div>;
     }
 
-    const { addSubscription, mode, removeSubscription, subscriptions, state, theme } = this.props;
+    const { addSubscription, isPlayerVisible, mode, removeSubscription, subscriptions, theme } = this.props;
 
     const isSubscribed = !!subscriptions[feed];
-    const isPlayerVisible = state !== 'stopped';
 
     const { author, cover, description, episodes, link, title } = info;
 

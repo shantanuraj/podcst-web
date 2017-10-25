@@ -12,6 +12,8 @@ import Audio from '../utils/audio';
 
 import { normalizeSeek } from '../utils';
 
+import { SEEK_DELTA } from '../utils/constants';
+
 /**
  * Play related actions
  */
@@ -115,14 +117,14 @@ const skipAudio = (): ISkipAudioAction => ({
 /**
  * Seek update action
  */
-interface ISeekUpdateAction {
-  type: 'SEEK_UPDATE';
+interface ISeekUpdateRequestAction {
+  type: 'SEEK_UPDATE_REQUEST';
   duration: number;
   seekPosition: number;
 }
-const SEEK_UPDATE: ISeekUpdateAction['type'] = 'SEEK_UPDATE';
-export const seekUpdate = (seekPosition: number, duration: number): ISeekUpdateAction => ({
-  type: SEEK_UPDATE,
+const SEEK_UPDATE_REQUEST: ISeekUpdateRequestAction['type'] = 'SEEK_UPDATE_REQUEST';
+export const seekUpdateRequest = (seekPosition: number, duration: number): ISeekUpdateRequestAction => ({
+  type: SEEK_UPDATE_REQUEST,
   duration,
   seekPosition,
 });
@@ -143,17 +145,18 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
 });
 
 /**
- * Seek jump delta in seconds
+ * Jump Seek action creator
  */
-const SEEK_DELTA = 10;
-export const jumpSeek = (
-  seekDirection: 'seek-forward' | 'seek-back',
-  seekPosition: number,
-  duration: number,
-): IManualSeekUpdateAction => {
-  const seekTo = seekPosition + SEEK_DELTA * (seekDirection === 'seek-forward' ? 1 : -1);
-  return manualSeekUpdate(normalizeSeek(seekTo, duration), duration);
-};
+export type SeekDirection = 'seek-forward' | 'seek-back';
+interface IJumpSeekAction {
+  type: 'JUMP_SEEK';
+  direction: SeekDirection;
+}
+const JUMP_SEEK: IJumpSeekAction['type'] = 'JUMP_SEEK';
+export const jumpSeek = (direction: SeekDirection): IJumpSeekAction => ({
+  type: JUMP_SEEK,
+  direction,
+});
 
 /**
  * Seek update success action
@@ -180,6 +183,17 @@ export const setBuffer = (buffering: boolean): ISetBufferAction => ({
   buffering,
 });
 
+/**
+ * Toggle large seek action creator
+ */
+interface IToggleLargeSeekAction {
+  type: 'TOGGLE_LARGE_SEEK';
+}
+const TOGGLE_LARGE_SEEK: IToggleLargeSeekAction['type'] = 'TOGGLE_LARGE_SEEK';
+export const toggleLargeSeek = (): IToggleLargeSeekAction => ({
+  type: TOGGLE_LARGE_SEEK,
+});
+
 export type PlayerActions =
   | IPlayEpisodeAction
   | IPauseAction
@@ -191,31 +205,39 @@ export type PlayerActions =
   | ISkipToNextAction
   | ISkipToPrevAction
   | ISkipAudioAction
-  | ISeekUpdateAction
+  | ISeekUpdateRequestAction
   | ISeekUpdateSuccessAction
+  | IJumpSeekAction
   | IManualSeekUpdateAction
   | ISetBufferAction
+  | IToggleLargeSeekAction
   | INoopAction;
 
 export interface IPlayerState {
   buffering: boolean;
   currentEpisode: number;
   duration: number;
+  isLargeSeekVisible: boolean;
   queue: App.IEpisodeInfo[];
+  seekDelta: number;
   seekPosition: number;
   state: EpisodePlayerState;
 }
 
-export const seekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
+export const uiSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
-    .ofType(SEEK_UPDATE)
+    .ofType(SEEK_UPDATE_REQUEST)
     .throttleTime(1000)
-    .map((action: ISeekUpdateAction) => seekUpdateSuccess(action.seekPosition, action.duration));
+    .map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration));
 
-export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
+export const audioSeekUpdateEpic: Epic<PlayerActions, IState> = (action$, store) =>
   action$
-    .ofType(MANUAL_SEEK_UPDATE)
-    .do((action: IManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
+    .ofType(MANUAL_SEEK_UPDATE, JUMP_SEEK)
+    .do((action: IManualSeekUpdateAction | IJumpSeekAction) => {
+      const { seekPosition } = store.getState().player;
+      const newSeekPosition = action.type === MANUAL_SEEK_UPDATE ? action.seekPosition : seekPosition;
+      Audio.seekTo(newSeekPosition);
+    })
     .map(noop);
 
 export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
@@ -268,7 +290,9 @@ export const player = (
     buffering: false,
     currentEpisode: 0,
     duration: 0,
+    isLargeSeekVisible: false,
     queue: [],
+    seekDelta: SEEK_DELTA,
     seekPosition: 0,
     state: 'stopped',
   },
@@ -284,6 +308,7 @@ export const player = (
         currentEpisode,
         duration: duration || 0,
         queue,
+        seekPosition: 0,
         state: 'playing',
       };
     }
@@ -332,17 +357,35 @@ export const player = (
     case MANUAL_SEEK_UPDATE:
     case SEEK_UPDATE_SUCCESS: {
       const episode = state.queue[state.currentEpisode];
-      return {
-        ...state,
-        duration: action.duration || episode.duration || 0,
-        seekPosition: action.seekPosition,
-      };
+      return state.buffering || state.state === 'stopped'
+        ? state
+        : {
+            ...state,
+            duration: action.duration || episode.duration || 0,
+            seekPosition: action.seekPosition,
+          };
+    }
+    case JUMP_SEEK: {
+      const { direction } = action;
+      const { duration, seekDelta, seekPosition } = state;
+      const seekTo = seekPosition + seekDelta * (direction === 'seek-forward' ? 1 : -1);
+      return state.buffering || state.state === 'stopped'
+        ? state
+        : {
+            ...state,
+            seekPosition: normalizeSeek(seekTo, duration),
+          };
     }
     case SET_BUFFER:
       const { buffering } = action;
       return {
         ...state,
         buffering,
+      };
+    case TOGGLE_LARGE_SEEK:
+      return {
+        ...state,
+        isLargeSeekVisible: !state.isLargeSeekVisible,
       };
     default:
       return state;

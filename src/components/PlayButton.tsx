@@ -25,8 +25,7 @@ const playButton = (theme: App.ITheme) =>
   });
 
 interface IPlayButtonProps {
-  currentEpisode: App.IEpisodeInfo | null;
-  episode: App.IEpisodeInfo;
+  isCurrentEpisode: boolean;
   state: EpisodePlayerState;
   theme: App.ITheme;
   play();
@@ -34,10 +33,9 @@ interface IPlayButtonProps {
   resume();
 }
 
-const PlayButton = ({ currentEpisode, episode, play, pause, resume, state, theme }: IPlayButtonProps) => {
-  const isCurrent = currentEpisode === episode;
-  const isPlaying = isCurrent && state === 'playing';
-  const isPaused = isCurrent && state === 'paused';
+const PlayButton = ({ isCurrentEpisode, play, pause, resume, state, theme }: IPlayButtonProps) => {
+  const isPlaying = isCurrentEpisode && state === 'playing';
+  const isPaused = isCurrentEpisode && state === 'paused';
 
   const handler = isPlaying ? pause : isPaused ? resume : play;
   const text = isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play';

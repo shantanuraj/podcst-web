@@ -173,7 +173,7 @@ interface IKeyboardShortcutsMap {
 
 interface IPodcastWebpackModule {
   hot?: {
-    accept: () => void;
+    accept: (val?: string, cb?: () => void) => void;
   };
 }
 

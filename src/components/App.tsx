@@ -12,6 +12,8 @@ import { fixGlobalStyles, normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
+import { DESKTOP_PLAYER_HEIGHT, TOOLBAR_HEIGHT } from '../utils/constants';
+
 import { IAppState } from '../stores/app';
 
 import ConnectedDrawer from '../containers/ConnectedDrawer';
@@ -28,8 +30,8 @@ import ConnectedToast from '../containers/ConnectedToast';
 import Toolbar from './Toolbar';
 
 const container = style({
-  paddingTop: 64,
-  marginBottom: 64,
+  paddingTop: TOOLBAR_HEIGHT,
+  marginBottom: DESKTOP_PLAYER_HEIGHT,
 });
 
 const mainContainer = style({

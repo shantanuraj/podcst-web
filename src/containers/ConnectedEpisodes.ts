@@ -12,15 +12,15 @@ import { getEpisodes } from '../stores/podcasts';
 
 import { addSubscription, removeSubscription } from '../stores/subscriptions';
 
-import { pauseEpisode, playEpisode, resumeEpisode } from '../stores/player';
+import { playEpisode } from '../stores/player';
 
 import Episodes from '../components/Episodes';
 
 const mapState = (state: IState) => ({
+  isPlayerVisible: state.player.state !== 'stopped',
   mode: state.app.mode,
   theme: state.app.theme,
   info: state.podcasts,
-  state: state.player.state,
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,
   subscriptions: state.subscriptions.subs,
 });
@@ -30,8 +30,6 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
     {
       getEpisodes,
       playEpisode,
-      pauseEpisode,
-      resumeEpisode,
       addSubscription,
       removeSubscription,
     },
