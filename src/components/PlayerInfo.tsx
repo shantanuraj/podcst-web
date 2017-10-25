@@ -194,7 +194,7 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
-    <Link data-hide-on-desktop class={classes(linkContainer, showLink)} href="#" onClick={showModal}>
+    <Link data-hide-on-desktop class={classes(linkContainer, showLink)} href="#modal" onClick={showModal}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>

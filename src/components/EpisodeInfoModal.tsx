@@ -85,7 +85,7 @@ const EpisodeInfoModal = (props: IEpisodeInfoModalProps) => {
   const { closeModal, currentEpisode, isModalVisible, theme } = props;
   const isVisible = !!currentEpisode && isModalVisible;
   return (
-    <div data-is-modal-visible={isVisible} class={modalContainer}>
+    <div id="modal" data-is-modal-visible={isVisible} class={modalContainer}>
       <div class={modal(theme)}>
         <button aria-label="Close episode modal" role="button" class={closeBarContainer(theme)} onClick={closeModal}>
           <div class={closeBar(theme)} />
