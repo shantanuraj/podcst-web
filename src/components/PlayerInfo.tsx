@@ -197,12 +197,7 @@ const PlayerInfo = ({
         </div>
       </div>
     </Link>
-    <button
-      data-hide-on-desktop="true"
-      class={classes(linkContainer, showLink)}
-      href={getEpisodeRoute(feed, title)}
-      onClick={toggleLargeSeek}
-    >
+    <button data-hide-on-desktop="true" class={classes(linkContainer, showLink)} onClick={toggleLargeSeek}>
       <div class={episodeInfoContainer}>
         <div class={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
