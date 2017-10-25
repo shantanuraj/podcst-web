@@ -29,6 +29,8 @@ const player = (theme: App.ITheme) =>
       fontSize: 20,
       color: theme.text,
       boxShadow: `0px 4px 32px 4px rgba(0,0,0,0.75)`,
+      transform: `translateY(${DESKTOP_PLAYER_HEIGHT}px)`,
+      transition: 'all 0.3s ease',
       $nest: {
         '& [data-display-on-hover]': {
           opacity: 0,
@@ -36,12 +38,16 @@ const player = (theme: App.ITheme) =>
         '&:hover [data-display-on-hover]': {
           opacity: 1,
         },
+        '&[data-is-player-visible]': {
+          transform: `translateY(0px)`,
+        },
       },
     },
     media(
       { maxWidth: 600 },
       {
         height: MOBILE_PLAYER_HEIGHT,
+        transform: `translateY(${MOBILE_PLAYER_HEIGHT}px)`,
       },
     ),
   );
@@ -63,12 +69,10 @@ interface IPlayerProps extends IPlayerState {
 const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, showModal, state, theme }: IPlayerProps) => {
   const episode = queue[currentEpisode];
 
-  if (state === 'stopped' || !episode) {
-    return null;
-  }
+  const isVisible = state !== 'stopped' && !!episode;
 
-  return (
-    <div class={player(theme)}>
+  return isVisible ? (
+    <div data-is-player-visible={isVisible} class={player(theme)}>
       <PlayerInfo
         episode={episode}
         jumpSeek={jumpSeek}
@@ -81,6 +85,8 @@ const Player = ({ currentEpisode, jumpSeek, mode, pause, queue, resume, showModa
       />
       <ConnectedSeekView />
     </div>
+  ) : (
+    <div player-visible={isVisible} class={player(theme)} />
   );
 };
 

@@ -12,7 +12,7 @@ import { IRouterState, router, RouterActions, routerEpic } from './router';
 
 import { getEpisodesEpic, IPodcastsState, podcasts, PodcastsAction } from './podcasts';
 
-import { IPlayerState, manualSeekUpdateEpic, player, PlayerActions, playerAudioEpic, seekUpdateEpic } from './player';
+import { audioSeekUpdateEpic, IPlayerState, player, PlayerActions, playerAudioEpic, uiSeekUpdateEpic } from './player';
 
 import { feed, FeedActions, getFeedEpic, IFeedState } from './feed';
 
@@ -70,8 +70,8 @@ const epics = [
   searchPodcastsEpic,
   getEpisodesEpic,
   playerAudioEpic,
-  seekUpdateEpic,
-  manualSeekUpdateEpic,
+  uiSeekUpdateEpic,
+  audioSeekUpdateEpic,
   parseOPMLEpic,
   subscriptionStateChangeEpic,
   changeThemeEpic,

@@ -211,16 +211,20 @@ export interface IPlayerState {
   state: EpisodePlayerState;
 }
 
-export const seekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
+export const uiSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
     .ofType(SEEK_UPDATE_REQUEST)
     .throttleTime(1000)
     .map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration));
 
-export const manualSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
+export const audioSeekUpdateEpic: Epic<PlayerActions, IState> = (action$, store) =>
   action$
-    .ofType(MANUAL_SEEK_UPDATE)
-    .do((action: IManualSeekUpdateAction) => Audio.seekTo(action.seekPosition))
+    .ofType(MANUAL_SEEK_UPDATE, JUMP_SEEK)
+    .do((action: IManualSeekUpdateAction | IJumpSeekAction) => {
+      const { seekPosition } = store.getState().player;
+      const newSeekPosition = action.type === MANUAL_SEEK_UPDATE ? action.seekPosition : seekPosition;
+      Audio.seekTo(newSeekPosition);
+    })
     .map(noop);
 
 export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
