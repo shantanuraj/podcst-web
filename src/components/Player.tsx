@@ -36,12 +36,6 @@ const playerContainer = style(
     transform: `translateY(${DESKTOP_PLAYER_HEIGHT * 2}px)`,
     transition: 'all 0.3s ease',
     $nest: {
-      '& a': {
-        opacity: 0,
-      },
-      '&[data-is-player-visible] a': {
-        opacity: 1,
-      },
       '&[data-is-player-visible]': {
         transform: `translateY(${DESKTOP_PLAYER_HEIGHT}px)`,
       },
@@ -95,7 +89,14 @@ const infoIcon = style({
   position: 'absolute',
   top: 8,
   right: 8,
+  opacity: 0,
   zIndex: 1,
+  transition: 'all 0.3s ease',
+  $nest: {
+    '&[data-is-seek-visible]': {
+      opacity: 1,
+    },
+  },
 });
 
 interface IPlayerProps extends IPlayerState {
@@ -142,7 +143,11 @@ const Player = ({
           toggleLargeSeek={toggleLargeSeek}
         />
         <ConnectedSeekView />
-        <Link class={infoIcon} href={getEpisodeRoute(episode.feed, episode.title)}>
+        <Link
+          data-is-seek-visible={isLargeSeekVisible}
+          class={infoIcon}
+          href={getEpisodeRoute(episode.feed, episode.title)}
+        >
           <Icon color={theme.accent} icon="info" size={24} />
         </Link>
       </div>
