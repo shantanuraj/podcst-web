@@ -41,3 +41,13 @@ export const TOOLBAR_HEIGHT = 64;
  * Default Seek jump delta
  */
 export const SEEK_DELTA = 10;
+
+/**
+ * Primary icon size ratio
+ */
+export const MAIN_ICON_RATIO = 2 / 3;
+
+/**
+ * Secondary icon size ratio
+ */
+export const SUB_ICON_RATIO = MAIN_ICON_RATIO * MAIN_ICON_RATIO;

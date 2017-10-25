@@ -8,15 +8,13 @@ import { media, style } from 'typestyle';
 
 import { SeekDirection } from '../stores/player';
 
-import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
+import { DESKTOP_PLAYER_HEIGHT, MAIN_ICON_RATIO, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
 import Seekbar, { ISeekbarProps } from './Seekbar';
 
 import SeekInfo from './SeekInfo';
 
 import SeekButton from './SeekButton';
-
-const MAIN_ICON_RATIO = 2 / 3;
 
 const seekbar = (theme: App.ITheme) =>
   style(

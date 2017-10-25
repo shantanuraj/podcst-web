@@ -18,7 +18,7 @@ import { SeekDirection } from '../stores/player';
 
 import { getEpisodeRoute, getEpisodesRoute, imageWithPlaceholder } from '../utils';
 
-import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
+import { DESKTOP_PLAYER_HEIGHT, MAIN_ICON_RATIO, MOBILE_PLAYER_HEIGHT, SUB_ICON_RATIO } from '../utils/constants';
 
 const infoContainer = (theme: App.ITheme) =>
   style(
@@ -143,9 +143,6 @@ interface IPlayerInfoProps {
   pause();
   resume();
 }
-
-const MAIN_ICON_RATIO = 2 / 3;
-const SUB_ICON_RATIO = MAIN_ICON_RATIO * MAIN_ICON_RATIO;
 
 const PlayerInfo = ({
   episode: { author, cover, feed, episodeArt, title },
