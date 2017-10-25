@@ -165,6 +165,7 @@ const PlayerInfo = ({
     <div class={buttonsContainer}>
       <SeekButton
         direction="seek-back"
+        hideOnMobile={true}
         label="Seek Back 10 seconds"
         onClick={() => jumpSeek('seek-back')}
         sizeRatio={SUB_ICON_RATIO}
@@ -180,6 +181,7 @@ const PlayerInfo = ({
       </button>
       <SeekButton
         direction="seek-forward"
+        hideOnMobile={true}
         label="Seek Forward 10 seconds"
         onClick={() => jumpSeek('seek-forward')}
         sizeRatio={SUB_ICON_RATIO}

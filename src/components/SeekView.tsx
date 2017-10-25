@@ -38,7 +38,14 @@ const SeekView = ({ buffering, duration, seekPosition, theme, onSeek }: ISeekVie
     <div data-display-on-hover="true" class={seekInfo}>
       <SeekInfo duration={duration} seekPosition={seekPosition} theme={theme} />
     </div>
-    <Seekbar buffering={buffering} onSeek={onSeek} duration={duration} seekPosition={seekPosition} theme={theme} />
+    <Seekbar
+      mode="absolute"
+      buffering={buffering}
+      onSeek={onSeek}
+      duration={duration}
+      seekPosition={seekPosition}
+      theme={theme}
+    />
   </div>
 );
 

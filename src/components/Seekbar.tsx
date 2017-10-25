@@ -8,42 +8,64 @@ import { media, style } from 'typestyle';
 
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
-const seekbarContainer = (theme: App.ITheme) =>
+const seekbarContainer = (theme: App.ITheme, mode: 'inline' | 'absolute') =>
   style(
     {
-      position: 'absolute',
-      left: DESKTOP_PLAYER_HEIGHT,
-      top: 0,
-      right: 0,
-      height: 4,
       cursor: 'pointer',
       backgroundColor: theme.backgroundLight,
     },
+    mode === 'absolute'
+      ? {
+          position: 'absolute',
+          left: DESKTOP_PLAYER_HEIGHT,
+          top: 0,
+          right: 0,
+          height: 4,
+        }
+      : {
+          height: 8,
+          width: '100%',
+        },
     media(
       { maxWidth: 600 },
-      {
-        left: MOBILE_PLAYER_HEIGHT,
-      },
+      mode === 'absolute'
+        ? {
+            left: MOBILE_PLAYER_HEIGHT,
+          }
+        : {},
     ),
   );
 
-const seekbar = (theme: App.ITheme) =>
-  style({
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: '100%',
-    backgroundColor: theme.accent,
-    transition: 'width 1s',
-    $nest: {
-      '&[data-is-buffering]': {
-        animation: `${theme.loaderAnimation} 2s infinite`,
-        width: '100%',
+const seekbar = (theme: App.ITheme, mode: 'inline' | 'absolute') =>
+  style(
+    {
+      backgroundColor: theme.accent,
+      transition: 'width 1s',
+      $nest: {
+        '&[data-is-buffering]': {
+          animation: `${theme.loaderAnimation} 2s infinite`,
+          width: '100%',
+        },
       },
     },
-  });
+    mode === 'absolute'
+      ? {
+          height: 4,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+        }
+      : {
+          height: 8,
+          borderRadius: 8,
+        },
+  );
 
-interface ISeekbarProps {
+export interface ISeekbarProps {
+  // Passed props
+  mode: 'inline' | 'absolute';
+
+  // Connected props
   duration: number;
   seekPosition: number;
   buffering: boolean;
@@ -86,12 +108,12 @@ class Seekbar extends Component<ISeekbarProps, any> {
     }
   }
 
-  public render({ buffering, duration, seekPosition, theme }: ISeekbarProps) {
+  public render({ buffering, duration, mode, seekPosition, theme }: ISeekbarProps) {
     return (
-      <div ref={this.saveRef} class={seekbarContainer(theme)}>
+      <div ref={this.saveRef} class={seekbarContainer(theme, mode)}>
         <div
           data-is-buffering={buffering}
-          class={seekbar(theme)}
+          class={seekbar(theme, mode)}
           style={{ width: this.getSeekWidth(seekPosition, duration, buffering) }}
         />
       </div>
