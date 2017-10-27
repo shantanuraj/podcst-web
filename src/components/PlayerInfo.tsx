@@ -141,7 +141,6 @@ export const playerButton = (sizeRatio: number) =>
 
 interface IPlayerInfoProps {
   episode: App.IEpisodeInfo;
-  mode: App.ThemeMode;
   state: EpisodePlayerState;
   theme: App.ITheme;
   jumpSeek: (direction: SeekDirection) => void;
@@ -152,7 +151,6 @@ interface IPlayerInfoProps {
 
 const PlayerInfo = ({
   episode: { author, cover, feed, episodeArt, title },
-  mode,
   jumpSeek,
   pause,
   resume,
