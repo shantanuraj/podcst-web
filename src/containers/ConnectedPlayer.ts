@@ -21,6 +21,7 @@ import {
 import Player from '../components/Player';
 
 const mapState = (state: IState) => ({
+  // Custom props
   ...state.player,
   mode: state.app.mode,
   theme: state.app.theme,

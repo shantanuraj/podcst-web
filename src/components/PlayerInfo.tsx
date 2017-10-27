@@ -54,10 +54,10 @@ const showLink = style({
   },
 });
 
-const episodeImage = (mode: App.ThemeMode, image: string) =>
+const episodeImage = (mode: App.ThemeMode, fallbackImage: string, image: string) =>
   style(
     {
-      backgroundImage: imageWithPlaceholder(mode, image),
+      backgroundImage: imageWithPlaceholder(mode, fallbackImage, image),
       backgroundRepeat: 'no-repeat',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
@@ -162,7 +162,7 @@ const PlayerInfo = ({
 }: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
     <Link class={linkContainer} href={getEpisodesRoute(feed)}>
-      <div class={episodeImage(mode, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
+      <div class={episodeImage(mode, cover, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
     </Link>
     <div class={buttonsContainer}>
       <SeekButton
