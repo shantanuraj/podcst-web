@@ -50,7 +50,7 @@ const drawer = (theme: App.ITheme) =>
         flexDirection: 'column',
       },
       '& nav nav a': drawerItem(theme),
-      '& a:hover, & a:focus': {
+      '& header:hover, & header:focus, & a:hover, & a:focus': {
         color: theme.background,
         backgroundColor: theme.accent,
         outline: 0,
