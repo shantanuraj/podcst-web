@@ -124,6 +124,19 @@ module.exports = env => {
           globDirectory: distDir,
           globPatterns: ['**/*.{html,js,css,svg}'],
           swDest: resolve(distDir, 'sw.js'),
+          runtimeCaching: [
+            {
+              urlPattern: /.mp3$/,
+              handler: 'staleWhileRevalidate',
+              options: {
+                cacheName: 'podcasts',
+                cacheExpiration: {
+                  maxEntries: 20,
+                },
+                cacheableResponse: { statuses: [0, 299] },
+              },
+            },
+          ],
         }),
       ),
     ]),
