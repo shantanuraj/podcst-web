@@ -16,7 +16,7 @@ import SeekButton from './SeekButton';
 
 import { SeekDirection } from '../stores/player';
 
-import { getEpisodeRoute, getEpisodesRoute, imageWithPlaceholder } from '../utils';
+import { getEpisodeRoute, getEpisodesRoute } from '../utils';
 
 import { DESKTOP_PLAYER_HEIGHT, MAIN_ICON_RATIO, MOBILE_PLAYER_HEIGHT, SUB_ICON_RATIO } from '../utils/constants';
 
