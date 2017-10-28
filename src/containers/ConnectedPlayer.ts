@@ -21,8 +21,8 @@ import {
 import Player from '../components/Player';
 
 const mapState = (state: IState) => ({
+  // Custom props
   ...state.player,
-  mode: state.app.mode,
   theme: state.app.theme,
   // Don't pass seekPosition & duration to player
   duration: undefined,

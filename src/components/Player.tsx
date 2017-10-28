@@ -100,7 +100,6 @@ const infoIcon = style({
 });
 
 interface IPlayerProps extends IPlayerState {
-  mode: App.ThemeMode;
   theme: App.ITheme;
   duration: never;
   seekPosition: never;
@@ -117,7 +116,6 @@ const Player = ({
   currentEpisode,
   isLargeSeekVisible,
   jumpSeek,
-  mode,
   pause,
   queue,
   resume,
@@ -135,7 +133,6 @@ const Player = ({
         <PlayerInfo
           episode={episode}
           jumpSeek={jumpSeek}
-          mode={mode}
           pause={pause}
           resume={resume}
           state={state}

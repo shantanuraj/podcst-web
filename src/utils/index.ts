@@ -151,4 +151,9 @@ export const placeholderURL = (mode: App.ThemeMode) => `url(/icons/launcher-${mo
 /**
  * Get css rule for image with placeholder
  */
-export const imageWithPlaceholder = (mode: App.ThemeMode, image: string) => `url(${image}), ${placeholderURL(mode)}`;
+export const imageWithPlaceholder = (mode: App.ThemeMode, ...images: string[]) =>
+  images
+    .filter(notNull)
+    .map(i => `url(${i})`)
+    .concat(placeholderURL(mode))
+    .join(', ');

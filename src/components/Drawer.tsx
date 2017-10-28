@@ -50,6 +50,11 @@ const drawer = (theme: App.ITheme) =>
         flexDirection: 'column',
       },
       '& nav nav a': drawerItem(theme),
+      '& a:hover, & a:focus': {
+        color: theme.background,
+        backgroundColor: theme.accent,
+        outline: 0,
+      },
     },
   });
 
@@ -61,6 +66,13 @@ const drawerHeader = (theme: App.ITheme) =>
     justifyContent: 'flex-start',
     width: '100%',
     cursor: 'pointer',
+    $nest: {
+      '&:hover, &:hover > span > div > svg': {
+        color: theme.background,
+        backgroundColor: theme.accent,
+        fill: theme.background,
+      },
+    },
   });
 
 interface IDrawerMenuProps extends IDrawerState {

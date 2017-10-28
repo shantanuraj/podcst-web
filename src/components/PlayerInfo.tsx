@@ -54,10 +54,10 @@ const showLink = style({
   },
 });
 
-const episodeImage = (mode: App.ThemeMode, image: string) =>
+const episodeImage = (image: string) =>
   style(
     {
-      backgroundImage: imageWithPlaceholder(mode, image),
+      backgroundImage: `url(${image})`,
       backgroundRepeat: 'no-repeat',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
@@ -141,7 +141,6 @@ export const playerButton = (sizeRatio: number) =>
 
 interface IPlayerInfoProps {
   episode: App.IEpisodeInfo;
-  mode: App.ThemeMode;
   state: EpisodePlayerState;
   theme: App.ITheme;
   jumpSeek: (direction: SeekDirection) => void;
@@ -152,7 +151,6 @@ interface IPlayerInfoProps {
 
 const PlayerInfo = ({
   episode: { author, cover, feed, episodeArt, title },
-  mode,
   jumpSeek,
   pause,
   resume,
@@ -162,7 +160,7 @@ const PlayerInfo = ({
 }: IPlayerInfoProps) => (
   <div class={infoContainer(theme)}>
     <Link class={linkContainer} href={getEpisodesRoute(feed)}>
-      <div class={episodeImage(mode, episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
+      <div class={episodeImage(episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
     </Link>
     <div class={buttonsContainer}>
       <SeekButton
