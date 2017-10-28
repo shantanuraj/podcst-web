@@ -122,7 +122,7 @@ module.exports = env => {
       ifProd(
         new WorkboxPlugin({
           globDirectory: distDir,
-          globPatterns: ['**/*.{html,js,css}'],
+          globPatterns: ['**/*.{html,js,css,svg}'],
           swDest: resolve(distDir, 'sw.js'),
         }),
       ),
