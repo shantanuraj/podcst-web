@@ -126,7 +126,7 @@ module.exports = env => {
           swDest: resolve(distDir, 'sw.js'),
           runtimeCaching: [
             {
-              urlPattern: /.mp3$/,
+              urlPattern: /.mp3(\?.*)?$/,
               handler: 'cacheFirst',
               options: {
                 cacheName: 'podcasts',
