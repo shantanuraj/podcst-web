@@ -4,7 +4,6 @@ import { classes, media, style, types } from 'typestyle';
 import { IPodcastsState } from '../stores/podcasts';
 
 import { imageWithPlaceholder, scrollToTop, stripHost } from '../utils';
-import { DESKTOP_PLAYER_HEIGHT } from '../utils/constants';
 import { normalizeEl } from '../utils/styles';
 
 import EpisodeRow from './EpisodeRow';
@@ -126,26 +125,6 @@ const subscribeButton = (theme: App.ITheme) =>
     },
   });
 
-const episodesView = style(
-  {
-    $nest: {
-      '&[data-is-player-visible]': {
-        paddingBottom: DESKTOP_PLAYER_HEIGHT,
-      },
-    },
-  },
-  media(
-    { maxWidth: 600 },
-    {
-      $nest: {
-        '&[data-is-player-visible]': {
-          paddingBottom: DESKTOP_PLAYER_HEIGHT * 2,
-        },
-      },
-    },
-  ),
-);
-
 interface IEpisodesProps {
   isPlayerVisible: boolean;
   mode: App.ThemeMode;
@@ -233,9 +212,7 @@ class Episodes extends Component<IEpisodesProps, any> {
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
-        <div data-is-player-visible={isPlayerVisible} class={episodesView}>
-          {episodes.map(this.renderEpisode)}
-        </div>
+        <div data-is-player-visible={isPlayerVisible}>{episodes.map(this.renderEpisode)}</div>
       </div>
     );
   }

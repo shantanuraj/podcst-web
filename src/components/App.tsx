@@ -4,7 +4,7 @@
 
 import { Component, h } from 'preact';
 
-import { classes, style } from 'typestyle';
+import { classes, media, style } from 'typestyle';
 
 import { Router, RouterOnChangeArgs } from 'preact-router';
 
@@ -12,7 +12,7 @@ import { fixGlobalStyles, normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
-import { DESKTOP_PLAYER_HEIGHT, TOOLBAR_HEIGHT } from '../utils/constants';
+import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT, TOOLBAR_HEIGHT } from '../utils/constants';
 
 import { IAppState } from '../stores/app';
 
@@ -29,10 +29,26 @@ import ConnectedToast from '../containers/ConnectedToast';
 
 import Toolbar from './Toolbar';
 
-const container = style({
-  paddingTop: TOOLBAR_HEIGHT,
-  marginBottom: DESKTOP_PLAYER_HEIGHT,
-});
+const container = style(
+  {
+    paddingTop: TOOLBAR_HEIGHT,
+    $nest: {
+      '&[data-is-player-visible]': {
+        marginBottom: DESKTOP_PLAYER_HEIGHT,
+      },
+    },
+  },
+  media(
+    { maxWidth: 600 },
+    {
+      $nest: {
+        '&[data-is-player-visible]': {
+          marginBottom: MOBILE_PLAYER_HEIGHT,
+        },
+      },
+    },
+  ),
+);
 
 const mainContainer = style({
   display: 'flex',
@@ -41,6 +57,7 @@ const mainContainer = style({
 
 interface IAppProps extends IAppState {
   version: string;
+  isPlayerVisible: boolean;
   appInit();
   pauseEpisode();
   resumeEpisode();
@@ -66,13 +83,13 @@ class App extends Component<IAppProps, never> {
   }
 
   public render() {
-    const { theme, version, routerNavigate, toggleDrawer } = this.props;
+    const { isPlayerVisible, routerNavigate, theme, toggleDrawer, version } = this.props;
     return (
       <div class={classes(normalizeEl, mainContainer)}>
         <Toolbar theme={theme} toggleDrawer={toggleDrawer} />
         <ConnectedLoader />
         <ConnectedDrawer />
-        <main class={classes(normalizeEl, container)}>
+        <main data-is-player-visible={isPlayerVisible} class={classes(normalizeEl, container)}>
           <Router onChange={routerNavigate}>
             <ConnectedIndexRedirect path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
