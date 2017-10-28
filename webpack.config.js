@@ -127,13 +127,20 @@ module.exports = env => {
           runtimeCaching: [
             {
               urlPattern: /.mp3$/,
-              handler: 'staleWhileRevalidate',
+              handler: 'cacheFirst',
               options: {
                 cacheName: 'podcasts',
                 cacheExpiration: {
                   maxEntries: 20,
                 },
                 cacheableResponse: { statuses: [0, 299] },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/data.podcst.io\/.*/,
+              handler: 'staleWhileRevalidate',
+              options: {
+                cacheName: 'data-api',
               },
             },
           ],
