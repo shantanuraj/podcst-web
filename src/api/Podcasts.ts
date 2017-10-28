@@ -4,6 +4,7 @@
 
 import { Observable } from 'rxjs/Observable';
 import { ajax } from 'rxjs/observable/dom/ajax';
+import { of } from 'rxjs/observable/of';
 
 import { patchEpisodesResponse } from '../utils';
 
@@ -21,13 +22,13 @@ export default class Podcasts {
   public static feed(type: FeedType): Observable<App.IPodcast[]> {
     return ajax(Podcasts.api(`/${type}?limit=100`))
       .map(res => res.response as App.IPodcast[])
-      .catch(() => Observable.of([]));
+      .catch(() => of([]));
   }
 
   public static search(term: string): Observable<App.IPodcastSearchResult[]> {
     return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`))
       .map(res => res.response as App.IPodcastSearchResult[])
-      .catch(() => Observable.of([]));
+      .catch(() => of([]));
   }
 
   public static episodes(url: string): Observable<App.IPodcastEpisodesInfo | null> {
@@ -35,6 +36,6 @@ export default class Podcasts {
     return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
       .map(res => res.response as App.IEpisodeListing | null)
       .map(patchRes)
-      .catch(() => Observable.of(null));
+      .catch(() => of(null));
   }
 }

@@ -2,7 +2,7 @@
  * Keyboard shortcuts epic root
  */
 
-import { Observable } from 'rxjs/Observable';
+import { fromEvent } from 'rxjs/observable/fromEvent';
 
 import { Epic } from 'redux-observable';
 
@@ -43,7 +43,7 @@ const ChangeThemeKeys: IKeyboardShortcutsMap = {
  */
 export const changeThemeEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(APP_INIT).switchMap(() =>
-    Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+    fromEvent<KeyboardEvent>(document, 'keyup')
       .filter(event => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target))
       .map(() => changeTheme(store.getState().app.mode === 'dark' ? 'light' : 'dark')),
   );
@@ -70,7 +70,7 @@ const isSeekKey = (keyCode: number) => keyCode >= 48 && keyCode <= 57;
  */
 export const seekbarJumpsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE).switchMap(() =>
-    Observable.fromEvent<KeyboardEvent>(document, 'keyup')
+    fromEvent<KeyboardEvent>(document, 'keyup')
       .filter(({ keyCode, target }) => isSeekKey(keyCode) && isNotIgnoreElement(target))
       .map(e => {
         const { duration } = store.getState().player;
@@ -85,7 +85,7 @@ export const seekbarJumpsEpic: Epic<Actions, IState> = (action$, store) =>
  */
 export const playerControlsEpic: Epic<Actions, IState> = (action$, store) =>
   action$.ofType(PLAY_EPISODE).switchMap(() =>
-    Observable.fromEvent<KeyboardEvent>(document, 'keydown')
+    fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) => !!PlayerControlKeys[keyCode] && isNotIgnoreElement(target))
       .map(e => {
         const { state, currentEpisode, queue } = store.getState().player;
@@ -134,7 +134,7 @@ const OpenViewKeys: IKeyboardShortcutsMap = {
  */
 export const openViewEpic: Epic<Actions, IState> = action$ =>
   action$.ofType(APP_INIT).switchMap(() =>
-    Observable.fromEvent<KeyboardEvent>(document, 'keydown')
+    fromEvent<KeyboardEvent>(document, 'keydown')
       .filter(({ keyCode, target }) => !!OpenViewKeys[keyCode] && isNotIgnoreElement(target))
       .map(({ keyCode }) => {
         switch (OpenViewKeys[keyCode]) {

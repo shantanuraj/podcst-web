@@ -6,7 +6,7 @@ import { Component, h } from 'preact';
 
 import { style } from 'typestyle';
 
-import { Observable } from 'rxjs/Observable';
+import { fromEvent } from 'rxjs/observable/fromEvent';
 
 import { Subscription } from 'rxjs/Subscription';
 
@@ -69,13 +69,13 @@ class Search extends Component<ISearchProps, any> {
   }
 
   public watchClicks = () => {
-    this.clicksSub = Observable.fromEvent<MouseEvent>(document, 'click')
+    this.clicksSub = fromEvent<MouseEvent>(document, 'click')
       .filter(e => this.canDissmissSearch(e.target))
       .subscribe(this.props.dismissSearch);
   };
 
   public watchKeyboard = () => {
-    this.keyboardSub = Observable.fromEvent(document, 'keydown')
+    this.keyboardSub = fromEvent(document, 'keydown')
       .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
       .map((event: KeyboardEvent) => ({
         input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement,
