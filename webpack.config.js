@@ -58,7 +58,15 @@ module.exports = env => {
         'preact-router',
         'redux',
         'redux-observable',
+
+        // Directly referenced Rx paackages
         'rxjs/observable/dom/ajax',
+        'rxjs/observable/of',
+        'rxjs/observable/fromEvent',
+        'rxjs/observable/merge',
+        'rxjs/observable/concat',
+
+        // Rx Packages referenced by patch files
         'rxjs/add/operator/catch',
         'rxjs/add/operator/debounceTime',
         'rxjs/add/operator/do',
