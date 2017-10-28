@@ -126,7 +126,6 @@ const subscribeButton = (theme: App.ITheme) =>
   });
 
 interface IEpisodesProps {
-  isPlayerVisible: boolean;
   mode: App.ThemeMode;
   theme: App.ITheme;
   feed: string;
@@ -184,7 +183,7 @@ class Episodes extends Component<IEpisodesProps, any> {
       return <div>Couldn't get Podcasts episodes</div>;
     }
 
-    const { addSubscription, isPlayerVisible, mode, removeSubscription, subscriptions, theme } = this.props;
+    const { addSubscription, mode, removeSubscription, subscriptions, theme } = this.props;
 
     const isSubscribed = !!subscriptions[feed];
 
@@ -212,7 +211,7 @@ class Episodes extends Component<IEpisodesProps, any> {
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
-        <div data-is-player-visible={isPlayerVisible}>{episodes.map(this.renderEpisode)}</div>
+        <div>{episodes.map(this.renderEpisode)}</div>
       </div>
     );
   }
