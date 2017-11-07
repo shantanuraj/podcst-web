@@ -11,6 +11,7 @@ const CleanWebpackPlugin = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const WorkboxPlugin = require('workbox-webpack-plugin');
 const WebpackChunkHash = require('webpack-chunk-hash');
+const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const { version } = require('./package.json');
 
 const getPath = env => {
@@ -150,6 +151,7 @@ module.exports = env => {
           ],
         }),
       ),
+      ifProd(new BundleAnalyzerPlugin()),
     ]),
     module: {
       rules: [
