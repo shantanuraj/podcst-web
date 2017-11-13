@@ -151,7 +151,12 @@ module.exports = env => {
           ],
         }),
       ),
-      ifProd(new BundleAnalyzerPlugin()),
+      ifProd(
+        new BundleAnalyzerPlugin({
+          analyzerMode: 'static',
+          openAnalyzer: true,
+        }),
+      ),
     ]),
     module: {
       rules: [
