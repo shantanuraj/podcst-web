@@ -114,14 +114,14 @@ const episodeInfo = (theme: App.ITheme) =>
 
 const buttonsContainer = style({
   height: '100%',
-  display: 'flex',
   padding: '0 16px',
+  display: 'flex',
+  alignItems: 'center',
 });
 
 export const playerButton = (sizeRatio: number) =>
   style(
     {
-      height: '100%',
       width: Math.round(DESKTOP_PLAYER_HEIGHT * sizeRatio),
       background: 'inherit',
       border: 'none',
