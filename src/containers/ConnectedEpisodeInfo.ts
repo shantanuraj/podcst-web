@@ -16,7 +16,6 @@ import EpisodeInfo from '../components/EpisodeInfo';
 
 const mapState = (state: IState) => ({
   info: state.podcasts,
-  isPlayerVisible: state.player.state !== 'stopped',
   mode: state.app.mode,
   theme: state.app.theme,
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,

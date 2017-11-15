@@ -2,7 +2,9 @@
  * Actions / Reducer for subscriptions
  */
 
-import { Observable } from 'rxjs/Observable';
+import { of } from 'rxjs/observable/of';
+
+import { concat } from 'rxjs/observable/concat';
 
 import { Epic } from 'redux-observable';
 
@@ -67,12 +69,11 @@ export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
     );
 
     const actions = [
-      Observable.of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
+      of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
       ...addSubscriptions,
-      Observable.of(showToast('Import successful!')),
+      of(showToast('Import successful!')),
     ];
-
-    return Observable.concat(...actions);
+    return concat(...actions);
   });
 
 export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, state) =>

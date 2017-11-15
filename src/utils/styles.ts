@@ -62,6 +62,6 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
  * Normalize element to take entire viewport
  */
 export const normalizeEl = style({
-  height: '100%',
+  minHeight: '100%',
   width: '100%',
 });

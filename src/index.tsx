@@ -29,7 +29,7 @@ const init = () => {
     </Provider>
   );
 
-  const mount = document.getElementById('root') as HTMLElement;
+  const mount = document.getElementById('root')!;
   render(<PodcastApp version={appVersion} />, mount, mount.lastElementChild as Element);
   forceRenderStyles();
 };

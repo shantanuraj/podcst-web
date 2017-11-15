@@ -2,7 +2,7 @@
  * Search results component
  */
 
-import { Observable } from 'rxjs/Observable';
+import { fromEvent } from 'rxjs/observable/fromEvent';
 
 import { Subscription } from 'rxjs/Subscription';
 
@@ -110,7 +110,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
     if (this.el) {
       const parent = this.el.parentElement;
       if (parent) {
-        this.navigationSub = Observable.fromEvent(parent, 'keydown')
+        this.navigationSub = fromEvent(parent, 'keydown')
           .filter(({ keyCode }: KeyboardEvent) => SearchNavKeys[keyCode] !== undefined)
           .subscribe((e: KeyboardEvent) => {
             e.preventDefault();

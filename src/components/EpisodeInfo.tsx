@@ -133,7 +133,6 @@ export interface IEpisodeInfoProps {
   // Connected props
   currentEpisode: App.IEpisodeInfo | null;
   info: IPodcastsState;
-  isPlayerVisible: boolean;
   mode: App.ThemeMode;
   theme: App.ITheme;
   getEpisodes: (feed: string) => void;
@@ -169,7 +168,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
       return <div>Couldn't get Podcasts episode</div>;
     }
 
-    const { currentEpisode, isPlayerVisible, mode, playEpisode, theme } = this.props;
+    const { currentEpisode, mode, playEpisode, theme } = this.props;
     const { author, cover, episodeArt, showNotes, summary, title } = episode;
 
     const showArt = episodeArt || cover;
@@ -197,7 +196,7 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
                 url={location.href}
               />
             </div>
-            <ShowNotes className={showNotesContainer} isPlayerVisible={isPlayerVisible} showNotes={showNotes} />
+            <ShowNotes className={showNotesContainer} showNotes={showNotes} />
           </div>
         </div>
       </div>

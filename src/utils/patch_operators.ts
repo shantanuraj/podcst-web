@@ -2,11 +2,6 @@
  * Patch RxOperators
  */
 
-import 'rxjs/add/observable/concat';
-import 'rxjs/add/observable/fromEvent';
-import 'rxjs/add/observable/merge';
-import 'rxjs/add/observable/of';
-
 import 'rxjs/add/operator/catch';
 import 'rxjs/add/operator/debounceTime';
 import 'rxjs/add/operator/do';

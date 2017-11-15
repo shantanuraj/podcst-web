@@ -11,6 +11,7 @@ const CleanWebpackPlugin = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const WorkboxPlugin = require('workbox-webpack-plugin');
 const WebpackChunkHash = require('webpack-chunk-hash');
+const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const { version } = require('./package.json');
 
 const getPath = env => {
@@ -58,11 +59,15 @@ module.exports = env => {
         'preact-router',
         'redux',
         'redux-observable',
+
+        // Directly referenced Rx paackages
         'rxjs/observable/dom/ajax',
-        'rxjs/add/observable/concat',
-        'rxjs/add/observable/fromEvent',
-        'rxjs/add/observable/merge',
-        'rxjs/add/observable/of',
+        'rxjs/observable/of',
+        'rxjs/observable/fromEvent',
+        'rxjs/observable/merge',
+        'rxjs/observable/concat',
+
+        // Rx Packages referenced by patch files
         'rxjs/add/operator/catch',
         'rxjs/add/operator/debounceTime',
         'rxjs/add/operator/do',
@@ -144,6 +149,12 @@ module.exports = env => {
               },
             },
           ],
+        }),
+      ),
+      ifProd(
+        new BundleAnalyzerPlugin({
+          analyzerMode: 'static',
+          openAnalyzer: true,
         }),
       ),
     ]),

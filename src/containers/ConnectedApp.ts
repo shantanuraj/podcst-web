@@ -28,7 +28,10 @@ import { routerNavigate } from '../stores/router';
 
 import App from '../components/App';
 
-const mapState = (state: IState) => state.app;
+const mapState = (state: IState) => ({
+  ...state.app,
+  isPlayerVisible: state.player.state !== 'stopped',
+});
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(

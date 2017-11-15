@@ -17,7 +17,6 @@ import { playEpisode } from '../stores/player';
 import Episodes from '../components/Episodes';
 
 const mapState = (state: IState) => ({
-  isPlayerVisible: state.player.state !== 'stopped',
   mode: state.app.mode,
   theme: state.app.theme,
   info: state.podcasts,
