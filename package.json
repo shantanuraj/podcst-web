@@ -1,6 +1,6 @@
 {
   "name": "podcst-web",
-  "version": "0.16.6",
+  "version": "0.16.7",
   "main": "dist/index.js",
   "license": "MIT",
   "private": true,
@@ -10,11 +10,7 @@
     "trailingComma": "all"
   },
   "lint-staged": {
-    "src/**/{*.ts,*.tsx}": [
-      "prettier --write",
-      "tslint --project tsconfig.json --fix",
-      "git add"
-    ]
+    "src/**/{*.ts,*.tsx}": ["prettier --write", "tslint --project tsconfig.json --fix", "git add"]
   },
   "scripts": {
     "precommit": "lint-staged",
