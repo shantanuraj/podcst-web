@@ -124,7 +124,7 @@ export const patchEpisodesResponse = (feed: string) => (
 ): App.IPodcastEpisodesInfo | null => {
   if (res) {
     const episodes: App.IEpisodeInfo[] = res.episodes.map(episode => ({ ...episode, feed }));
-    return { ...res, episodes };
+    return { ...res, episodes, feed };
   } else {
     return null;
   }
