@@ -26,6 +26,7 @@ import {
   subscriptions,
   SubscriptionsActions,
   subscriptionStateChangeEpic,
+  syncSubscriptionEpic,
 } from './subscriptions';
 
 import { app, AppActions, chromeMediaMetadaUpdateEpic, IAppState, onThemeChangeEpic } from './app';
@@ -74,6 +75,7 @@ const epics: Array<Epic<Actions, IState, any>> = [
   audioSeekUpdateEpic,
   parseOPMLEpic,
   subscriptionStateChangeEpic,
+  syncSubscriptionEpic,
   changeThemeEpic,
   onThemeChangeEpic,
   'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,

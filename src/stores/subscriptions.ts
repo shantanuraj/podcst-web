@@ -12,6 +12,8 @@ import { Actions, IState } from './root';
 
 import { showToast } from './toast';
 
+import { GET_EPISODES_SUCCESS, IGetEpisodesSuccessAction } from './podcasts';
+
 import { INoopAction, noop } from './utils';
 
 import { notNull, opmltoJSON } from '../utils';
@@ -81,6 +83,16 @@ export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
     .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))
     .map(noop);
+
+export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, state) =>
+  action$
+    .ofType(GET_EPISODES_SUCCESS)
+    .filter(
+      (action: IGetEpisodesSuccessAction) => !!action.episodes && !!state.getState().subscriptions.subs[action.feed],
+    )
+    .map((action: IGetEpisodesSuccessAction) =>
+      addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
+    );
 
 export const subscriptions = (
   state: ISubscriptionsState = {
