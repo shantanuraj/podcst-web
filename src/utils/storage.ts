@@ -3,12 +3,14 @@
  */
 
 import { IAppState } from '../stores/app';
+import { ISubscriptionsState } from '../stores/subscriptions';
 
-const STORE_KEY = 'store@PLAY_PODCST_IO/2';
-const DEPRECATED_KEYS = ['store@PLAY_PODCST_IO'];
+const STORE_KEY = 'store@3';
+const DEPRECATED_BASE_KEY = 'store@PLAY_PODCST_IO';
+const DEPRECATED_KEYS = [DEPRECATED_BASE_KEY, DEPRECATED_BASE_KEY + '/2'];
 
 interface IStoreable {
-  subscriptions: ISubscriptionsMap;
+  subscriptions: ISubscriptionsState;
   app: IAppState;
 }
 
@@ -48,7 +50,7 @@ export const Storage = {
     setValue('subscriptions', subs);
   },
   getSubscriptions() {
-    return getValue('subscriptions') || {};
+    return getValue('subscriptions');
   },
   saveAppState(appState: IAppState) {
     setValue('app', appState);

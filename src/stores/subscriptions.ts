@@ -81,7 +81,7 @@ export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
 export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, state) =>
   action$
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
-    .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))
+    .do(() => Storage.saveSubscriptions(state.getState().subscriptions))
     .map(noop);
 
 export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, state) =>

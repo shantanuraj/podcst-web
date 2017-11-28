@@ -56,8 +56,8 @@ export const getDefaultState = (): IState => ({
     seekPosition: 0,
     state: 'stopped',
   },
-  subscriptions: {
-    subs: Storage.getSubscriptions(),
+  subscriptions: Storage.getSubscriptions() || {
+    subs: {},
   },
   toast: {
     isVisible: false,
