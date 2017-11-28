@@ -23,6 +23,7 @@ import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
 import ConnectedLoader from '../containers/ConnectedLoader';
 import ConnectedPlayer from '../containers/ConnectedPlayer';
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
+import ConnectedRecents from '../containers/ConnectedRecents';
 import ConnectedSettings from '../containers/ConnectedSettings';
 import ConnectedSubscriptions from '../containers/ConnectedSubscriptions';
 import ConnectedToast from '../containers/ConnectedToast';
@@ -96,6 +97,7 @@ class App extends Component<IAppProps, never> {
             <ConnectedSubscriptions path="/subs" />
             <ConnectedEpisodes path="/episodes" />
             <ConnectedEpisodeInfo path="/episode" />
+            <ConnectedRecents path="/recents" />
             <ConnectedSettings version={version} path="/settings" />
           </Router>
         </main>
