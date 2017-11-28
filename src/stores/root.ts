@@ -64,7 +64,7 @@ export interface IState {
   drawer: IDrawerState;
 }
 
-const epics = [
+const epics: Array<Epic<Actions, IState, any>> = [
   routerEpic,
   getFeedEpic,
   searchPodcastsEpic,
@@ -82,9 +82,9 @@ const epics = [
   openViewEpic,
   dismissToastEpic,
   drawerCloseEpic,
-].filter(epic => epic !== null);
+].filter(epic => epic !== null) as Array<Epic<Actions, IState, any>>;
 
-export const rootEpic = combineEpics<Actions, IState>(...(epics as Array<Epic<Actions, IState, any>>));
+export const rootEpic = combineEpics<Actions, IState>(...epics);
 
 export const rootReducer = combineReducers<IState>({
   app,
