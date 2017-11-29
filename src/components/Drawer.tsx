@@ -14,6 +14,7 @@ import Icons from '../svg/Icon';
 
 const linkMap: ILinkMap = {
   '/subs': 'Subscriptions',
+  '/recents': 'Recents',
   '/feed/top': 'Top',
   '/settings': 'Settings',
 };

@@ -12,22 +12,33 @@ import { fixGlobalStyles, normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
+import { getTitle } from '../utils/route-titles';
+
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT, TOOLBAR_HEIGHT } from '../utils/constants';
 
-import { IAppState } from '../stores/app';
-
 import ConnectedDrawer from '../containers/ConnectedDrawer';
+
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
+
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
+
 import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
+
 import ConnectedLoader from '../containers/ConnectedLoader';
+
 import ConnectedPlayer from '../containers/ConnectedPlayer';
+
 import ConnectedPodcastsGrid from '../containers/ConnectedPodcastsGrid';
+
+import ConnectedRecents from '../containers/ConnectedRecents';
+
 import ConnectedSettings from '../containers/ConnectedSettings';
+
 import ConnectedSubscriptions from '../containers/ConnectedSubscriptions';
+
 import ConnectedToast from '../containers/ConnectedToast';
 
-import Toolbar from './Toolbar';
+import ConnectedToolbar from '../containers/ConnectedToolbar';
 
 const container = style(
   {
@@ -55,7 +66,8 @@ const mainContainer = style({
   flexDirection: 'row',
 });
 
-interface IAppProps extends IAppState {
+interface IAppProps {
+  theme: App.ITheme;
   version: string;
   isPlayerVisible: boolean;
   appInit();
@@ -64,14 +76,15 @@ interface IAppProps extends IAppState {
   routerNavigate(props: RouterOnChangeArgs);
   seekUpdate(seekPosition: number, duration: number);
   setBuffer(buffering: boolean);
+  setTitle(route: string);
   skipToNextEpisode();
   skipToPrevEpisode();
   stopEpisode();
-  toggleDrawer();
 }
 
 class App extends Component<IAppProps, never> {
   public componentWillMount() {
+    this.props.setTitle(getTitle(location.href));
     fixGlobalStyles(this.props.theme);
     Audio.init(this.props);
   }
@@ -83,10 +96,10 @@ class App extends Component<IAppProps, never> {
   }
 
   public render() {
-    const { isPlayerVisible, routerNavigate, theme, toggleDrawer, version } = this.props;
+    const { isPlayerVisible, routerNavigate, version } = this.props;
     return (
       <div class={classes(normalizeEl, mainContainer)}>
-        <Toolbar theme={theme} toggleDrawer={toggleDrawer} />
+        <ConnectedToolbar />
         <ConnectedLoader />
         <ConnectedDrawer />
         <main data-is-player-visible={isPlayerVisible} class={classes(normalizeEl, container)}>
@@ -96,6 +109,7 @@ class App extends Component<IAppProps, never> {
             <ConnectedSubscriptions path="/subs" />
             <ConnectedEpisodes path="/episodes" />
             <ConnectedEpisodeInfo path="/episode" />
+            <ConnectedRecents path="/recents" />
             <ConnectedSettings version={version} path="/settings" />
           </Router>
         </main>

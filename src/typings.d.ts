@@ -97,13 +97,10 @@ declare namespace App {
    */
   interface IPodcastEpisodesInfo extends IEpisodeListing {
     episodes: IEpisodeInfo[];
+    feed: string;
   }
 
-  type RenderablePodcast =
-    | IPodcast
-    | (IPodcastEpisodesInfo & {
-        feed: string;
-      });
+  type RenderablePodcast = IPodcast | IPodcastEpisodesInfo;
 
   /**
    * Podcasts Search result interface
@@ -131,7 +128,7 @@ declare namespace App {
 }
 
 interface ISubscriptionsMap {
-  [feed: string]: App.RenderablePodcast;
+  [feed: string]: App.IPodcastEpisodesInfo;
 }
 
 interface IFileInfo {

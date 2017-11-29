@@ -10,9 +10,7 @@ import { RouterOnChangeArgs } from 'preact-router';
 
 import { IState } from '../stores/root';
 
-import { appInit } from '../stores/app';
-
-import { toggleDrawer } from '../stores/drawer';
+import { appInit, setTitle } from '../stores/app';
 
 import {
   pauseEpisode,
@@ -29,7 +27,7 @@ import { routerNavigate } from '../stores/router';
 import App from '../components/App';
 
 const mapState = (state: IState) => ({
-  ...state.app,
+  theme: state.app.theme,
   isPlayerVisible: state.player.state !== 'stopped',
 });
 
@@ -41,10 +39,10 @@ const mapDispatch = (dispatch: Dispatch<IState>) =>
       resumeEpisode,
       seekUpdate,
       setBuffer,
+      setTitle,
       skipToNextEpisode,
       skipToPrevEpisode,
       stopEpisode,
-      toggleDrawer,
       routerNavigate: ({ url }: RouterOnChangeArgs) => routerNavigate(url),
     },
     dispatch,

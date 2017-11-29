@@ -22,6 +22,9 @@ import { IPlayEpisodeAction, jumpSeek, pauseEpisode, PLAY_EPISODE, resumeEpisode
 
 import { noop } from './utils';
 
+/**
+ * Update chrome metadata action creator
+ */
 interface IUpdateChromeMetadataAction {
   type: 'UPDATE_CHROME_METADATA';
 }
@@ -30,6 +33,9 @@ const updateChromeMetadatAction = (): IUpdateChromeMetadataAction => ({
   type: UPDATE_CHROME_METADATA,
 });
 
+/**
+ * Change theme action creator
+ */
 type ChangeTheme = 'CHANGE_THEME';
 interface IChangeThemeAction {
   type: ChangeTheme;
@@ -41,6 +47,23 @@ export const changeTheme = (mode: App.ThemeMode): IChangeThemeAction => ({
   mode,
 });
 
+/**
+ * Set title action creator
+ */
+type SetTitle = 'SET_TITLE';
+interface ISetTitleAction {
+  type: SetTitle;
+  title: string;
+}
+const SET_TITLE: ISetTitleAction['type'] = 'SET_TITLE';
+export const setTitle = (title: string): ISetTitleAction => ({
+  type: SET_TITLE,
+  title,
+});
+
+/**
+ * App init action creator
+ */
 type AppInit = 'APP_INIT';
 interface IAppInitAction {
   type: AppInit;
@@ -50,7 +73,7 @@ export const appInit = (): IAppInitAction => ({
   type: APP_INIT,
 });
 
-export type AppActions = IAppInitAction | IUpdateChromeMetadataAction | IChangeThemeAction;
+export type AppActions = IAppInitAction | IUpdateChromeMetadataAction | IChangeThemeAction | ISetTitleAction;
 
 /**
  * App specific state
@@ -58,6 +81,7 @@ export type AppActions = IAppInitAction | IUpdateChromeMetadataAction | IChangeT
 export interface IAppState {
   mode: App.ThemeMode;
   theme: App.ITheme;
+  title: string;
 }
 
 /**
@@ -86,12 +110,29 @@ export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$, stor
     .map(updateChromeMetadatAction);
 
 /**
+ * Update title side-effects epic
+ */
+export const updateTitleEpic: Epic<Actions, IState> = action$ =>
+  action$
+    .ofType(SET_TITLE)
+    .do((action: ISetTitleAction) => (document.title = action.title))
+    .map(noop);
+
+/**
  * On Theme change epic
  */
-export const onThemeChangeEpic: Epic<Actions, IState> = (action$, store) =>
+export const fixGlobalThemeEpic: Epic<Actions, IState> = (action$, store) =>
   action$
     .ofType(CHANGE_THEME)
     .do(() => fixGlobalStyles(store.getState().app.theme))
+    .map(noop);
+
+/**
+ * App state storage epic
+ */
+export const saveAppStateEpic: Epic<Actions, IState> = (action$, store) =>
+  action$
+    .filter(action => action.type === CHANGE_THEME || action.type === SET_TITLE)
     .do(() => Storage.saveAppState(store.getState().app))
     .map(noop);
 
@@ -102,12 +143,15 @@ export const app = (
   state: IAppState = {
     mode: 'dark',
     theme: ThemeProvider('dark'),
+    title: 'Podcst',
   },
   action: AppActions,
 ): IAppState => {
   switch (action.type) {
     case CHANGE_THEME:
       return { ...state, mode: action.mode, theme: ThemeProvider(action.mode) };
+    case SET_TITLE:
+      return { ...state, title: action.title };
     default:
       return state;
   }

@@ -72,6 +72,16 @@ const margins: types.NestedCSSProperties = {
 
 const infoMargins = style(margins);
 
+const episodesListContainer = (theme: App.ITheme) =>
+  style(
+    {
+      margin: '32px 0 0',
+      borderTop: `1px solid ${theme.backgroundLight}`,
+      padding: 0,
+    },
+    media({ maxWidth: 600 }, { margin: 0 }),
+  );
+
 const podcastTitle = style(margins, {
   fontSize: '40px',
   fontWeight: 'bold',
@@ -134,7 +144,7 @@ interface IEpisodesProps {
   subscriptions: ISubscriptionsMap;
   getEpisodes: (feed: string) => void;
   playEpisode: (episode: App.IEpisodeInfo) => void;
-  addSubscription: (feed: string, podcasts: App.RenderablePodcast) => void;
+  addSubscription: (feed: string, podcasts: App.IPodcastEpisodesInfo) => void;
   removeSubscription: (feed: string) => void;
 }
 
@@ -163,19 +173,11 @@ class Episodes extends Component<IEpisodesProps, any> {
   }
 
   public renderEpisode = (episode: App.IEpisodeInfo) => {
-    const { currentEpisode, playEpisode, theme, feed } = this.props;
+    const { currentEpisode, playEpisode, theme } = this.props;
 
     const play = () => playEpisode(episode);
 
-    return (
-      <EpisodeRow
-        feed={feed}
-        isCurrentEpisode={currentEpisode === episode}
-        episode={episode}
-        play={play}
-        theme={theme}
-      />
-    );
+    return <EpisodeRow isCurrentEpisode={currentEpisode === episode} episode={episode} play={play} theme={theme} />;
   };
 
   public renderLoaded(feed: string, info: App.IPodcastEpisodesInfo | null) {
@@ -189,9 +191,7 @@ class Episodes extends Component<IEpisodesProps, any> {
 
     const { author, cover, description, episodes, link, title } = info;
 
-    const handler = () => {
-      isSubscribed ? removeSubscription(feed) : addSubscription(feed, { ...info, feed });
-    };
+    const handler = () => (isSubscribed ? removeSubscription(feed) : addSubscription(feed, info));
 
     return (
       <div class={classes(normalizeEl, episodesContainer(theme))}>
@@ -211,7 +211,7 @@ class Episodes extends Component<IEpisodesProps, any> {
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
-        <div>{episodes.map(this.renderEpisode)}</div>
+        <ul class={episodesListContainer(theme)}>{episodes.map(this.renderEpisode)}</ul>
       </div>
     );
   }

@@ -12,11 +12,11 @@ import { getEpisodeRoute, monthName } from '../utils';
 
 import ConnectedPlayButton from '../containers/ConnectedPlayButton';
 
-const episodeContainer = (theme: App.ITheme) =>
+const listItem = (theme: App.ITheme) =>
   style(
     {
-      paddingTop: 16,
-      paddingBottom: 16,
+      display: 'flex',
+      alignItems: 'center',
       paddingLeft: 32,
       paddingRight: 32,
       $nest: {
@@ -25,8 +25,14 @@ const episodeContainer = (theme: App.ITheme) =>
         },
       },
     },
-    media({ maxWidth: 600 }, { padding: 16 }),
+    media({ maxWidth: 600 }, { paddingLeft: 0, paddingRight: 16 }),
   );
+
+const episodeContainer = (theme: App.ITheme) =>
+  style({
+    flex: 1,
+    color: theme.text,
+  });
 
 const episodeRow = style({
   display: 'flex',
@@ -38,6 +44,13 @@ const container = style({
   alignItems: 'center',
 });
 
+const episodeImage = style({
+  height: 84,
+  width: 84,
+  objectFit: 'cover',
+  objectPosition: 'center',
+});
+
 const episodeTitle = style({
   flex: 1,
   display: 'flex',
@@ -46,6 +59,7 @@ const episodeTitle = style({
 
 const subContainer = (theme: App.ITheme) =>
   style({
+    marginLeft: 16,
     marginRight: 16,
     color: theme.subTitle,
     display: 'flex',
@@ -62,15 +76,14 @@ const subContainer = (theme: App.ITheme) =>
 interface IEpisodeRowProps {
   episode: App.IEpisodeInfo;
   isCurrentEpisode: boolean;
-  feed: string;
   theme: App.ITheme;
   play: () => void;
 }
 
 const EpisodeRow = (props: IEpisodeRowProps) => {
-  const { isCurrentEpisode, episode, feed, play, theme } = props;
+  const { isCurrentEpisode, episode, play, theme } = props;
 
-  const { title, published, duration } = episode;
+  const { cover, episodeArt, feed, title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
@@ -80,26 +93,29 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
   const subContainerTheme = subContainer(theme);
 
   return (
-    <div class={episodeContainer(theme)}>
-      <div class={episodeRow}>
-        <div class={container}>
+    <li class={listItem(theme)}>
+      <img class={episodeImage} src={episodeArt || cover} alt={title} />
+      <div class={episodeContainer(theme)}>
+        <div class={episodeRow}>
+          <div class={container}>
+            <div class={subContainerTheme}>
+              <p>{month}</p>
+              <p>{day}</p>
+            </div>
+          </div>
+          <Link class={episodeTitle} href={getEpisodeRoute(feed, title)}>
+            {title}
+          </Link>
           <div class={subContainerTheme}>
-            <p>{month}</p>
-            <p>{day}</p>
+            <p>{minutes || ''}</p>
+            <p>{minutes ? minutesSuffix : ''}</p>
+          </div>
+          <div class={container}>
+            <ConnectedPlayButton isCurrentEpisode={isCurrentEpisode} play={play} />
           </div>
         </div>
-        <Link class={episodeTitle} href={getEpisodeRoute(feed, title)}>
-          {title}
-        </Link>
-        <div class={subContainerTheme}>
-          <p>{minutes || ''}</p>
-          <p>{minutes ? minutesSuffix : ''}</p>
-        </div>
-        <div class={container}>
-          <ConnectedPlayButton isCurrentEpisode={isCurrentEpisode} play={play} />
-        </div>
       </div>
-    </div>
+    </li>
   );
 };
 

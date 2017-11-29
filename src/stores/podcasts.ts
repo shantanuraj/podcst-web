@@ -18,12 +18,12 @@ export const getEpisodes = (feed: string): IGetEpisodesAction => ({
   feed,
 });
 
-interface IGetEpisodesSuccessAction {
+export interface IGetEpisodesSuccessAction {
   type: 'GET_EPISODES_SUCCESS';
   episodes: App.IPodcastEpisodesInfo | null;
   feed: App.IPodcast['feed'];
 }
-const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
+export const GET_EPISODES_SUCCESS: IGetEpisodesSuccessAction['type'] = 'GET_EPISODES_SUCCESS';
 export const getEpisodesSuccess = (
   feed: string,
   episodes: App.IPodcastEpisodesInfo | null,
@@ -52,6 +52,9 @@ export const getEpisodesEpic: Epic<PodcastsAction, IState> = action$ =>
       Podcasts.episodes(action.feed).map(episodes => getEpisodesSuccess(action.feed, episodes)),
     );
 
+/**
+ * Podcasts reducer
+ */
 export const podcasts = (state: IPodcastsState = {}, action: PodcastsAction): IPodcastsState => {
   switch (action.type) {
     case GET_EPISODES:
