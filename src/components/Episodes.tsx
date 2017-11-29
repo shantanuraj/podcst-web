@@ -72,10 +72,12 @@ const margins: types.NestedCSSProperties = {
 
 const infoMargins = style(margins);
 
-const episodesListContainer = style({
-  margin: 0,
-  padding: 0,
-});
+const episodesListContainer = (theme: App.ITheme) =>
+  style({
+    margin: '32px 0 0',
+    borderTop: `1px solid ${theme.backgroundLight}`,
+    padding: 0,
+  });
 
 const podcastTitle = style(margins, {
   fontSize: '40px',
@@ -206,7 +208,7 @@ class Episodes extends Component<IEpisodesProps, any> {
             <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
           </div>
         </div>
-        <ul class={episodesListContainer}>{episodes.map(this.renderEpisode)}</ul>
+        <ul class={episodesListContainer(theme)}>{episodes.map(this.renderEpisode)}</ul>
       </div>
     );
   }
