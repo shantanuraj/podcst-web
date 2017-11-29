@@ -15,6 +15,7 @@ import ConnectedPlayButton from '../containers/ConnectedPlayButton';
 export const episodeContainer = (theme: App.ITheme) =>
   style(
     {
+      display: 'block',
       color: theme.text,
       paddingTop: 16,
       paddingBottom: 16,
@@ -80,7 +81,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
   const subContainerTheme = subContainer(theme);
 
   return (
-    <div class={episodeContainer(theme)}>
+    <li class={episodeContainer(theme)}>
       <div class={episodeRow}>
         <div class={container}>
           <div class={subContainerTheme}>
@@ -99,7 +100,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
           <ConnectedPlayButton isCurrentEpisode={isCurrentEpisode} play={play} />
         </div>
       </div>
-    </div>
+    </li>
   );
 };
 
