@@ -18,8 +18,7 @@ const RecentRow = ({ author, title }: App.IEpisodeInfo) => (
 
 const Recents = ({ episodes }: IRecentsProps) => (
   <div class={style({ color: 'white' })}>
-    <h1>Recents</h1>
-    <div>{episodes.map(RecentRow)}</div>
+    <ul>{episodes.map(RecentRow)}</ul>
   </div>
 );
 
