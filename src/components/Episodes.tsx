@@ -73,11 +73,14 @@ const margins: types.NestedCSSProperties = {
 const infoMargins = style(margins);
 
 const episodesListContainer = (theme: App.ITheme) =>
-  style({
-    margin: '32px 0 0',
-    borderTop: `1px solid ${theme.backgroundLight}`,
-    padding: 0,
-  });
+  style(
+    {
+      margin: '32px 0 0',
+      borderTop: `1px solid ${theme.backgroundLight}`,
+      padding: 0,
+    },
+    media({ maxWidth: 600 }, { margin: 0 }),
+  );
 
 const podcastTitle = style(margins, {
   fontSize: '40px',
