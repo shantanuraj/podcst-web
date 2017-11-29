@@ -25,7 +25,7 @@ const listItem = (theme: App.ITheme) =>
         },
       },
     },
-    media({ maxWidth: 600 }, { padding: 16 }),
+    media({ maxWidth: 600 }, { paddingLeft: 0, paddingRight: 16 }),
   );
 
 const episodeContainer = (theme: App.ITheme) =>
