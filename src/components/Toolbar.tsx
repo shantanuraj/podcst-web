@@ -57,16 +57,17 @@ const search = style({
 });
 
 interface IToolbarProps {
+  title: string;
   theme: App.ITheme;
   toggleDrawer();
 }
 
-const Toolbar = ({ theme, toggleDrawer }: IToolbarProps) => (
+const Toolbar = ({ title, theme, toggleDrawer }: IToolbarProps) => (
   <header class={toolbar(theme)}>
     <nav>
       <div class={menuContainer} onClick={toggleDrawer}>
         <Icons color={theme.text} icon="menu" size={24} />
-        <span>Podcasts</span>
+        <span>{title}</span>
       </div>
     </nav>
     <div class={secondaryItems}>

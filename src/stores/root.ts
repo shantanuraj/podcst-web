@@ -8,7 +8,7 @@ import { combineReducers } from 'redux';
 
 import { INoopAction } from './utils';
 
-import { IRouterState, router, RouterActions, routerEpic } from './router';
+import { IRouterState, router, RouterActions, routerEpic, routeTitleSyncEpic } from './router';
 
 import { getEpisodesEpic, IPodcastsState, podcasts, PodcastsAction } from './podcasts';
 
@@ -29,7 +29,15 @@ import {
   syncSubscriptionEpic,
 } from './subscriptions';
 
-import { app, AppActions, chromeMediaMetadaUpdateEpic, IAppState, onThemeChangeEpic } from './app';
+import {
+  app,
+  AppActions,
+  chromeMediaMetadaUpdateEpic,
+  fixGlobalThemeEpic,
+  IAppState,
+  saveAppStateEpic,
+  updateTitleEpic,
+} from './app';
 
 import { dismissToastEpic, IToastState, toast, ToastActions } from './toast';
 
@@ -66,7 +74,10 @@ export interface IState {
 }
 
 const epics: Array<Epic<Actions, IState, any>> = [
+  // router epics
   routerEpic,
+  routeTitleSyncEpic,
+
   getFeedEpic,
   searchPodcastsEpic,
   getEpisodesEpic,
@@ -77,7 +88,12 @@ const epics: Array<Epic<Actions, IState, any>> = [
   subscriptionStateChangeEpic,
   syncSubscriptionEpic,
   changeThemeEpic,
-  onThemeChangeEpic,
+
+  // app state epics
+  fixGlobalThemeEpic,
+  updateTitleEpic,
+  saveAppStateEpic,
+
   'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
   seekbarJumpsEpic,

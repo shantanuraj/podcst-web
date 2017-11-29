@@ -6,8 +6,6 @@ import { h } from 'preact';
 
 import { media, style, types } from 'typestyle';
 
-import { IAppState } from '../stores/app';
-
 import ImportPodcastsView from './ImportPodcastsView';
 import NavLinks, { ILinkMap } from './NavLinks';
 import Shortcuts from './Shortcuts';
@@ -26,7 +24,9 @@ const componentsMap = ({ mode, theme, changeTheme }: ISettingsProps) => ({
   import: <ImportPodcastsView theme={theme} />,
 });
 
-interface ISettingsProps extends IAppState {
+interface ISettingsProps {
+  mode: App.ThemeMode;
+  theme: App.ITheme;
   section: 'theme' | 'shortcuts';
   version: string;
   changeTheme(mode: App.ThemeMode);

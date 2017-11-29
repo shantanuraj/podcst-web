@@ -6,7 +6,10 @@ import { Epic } from 'redux-observable';
 
 import { route as routeTo } from 'preact-router';
 
-import { IState } from '../stores/root';
+import { Actions, IState } from './root';
+
+import { getTitle } from '../utils/route-titles';
+import { setTitle } from './app';
 
 /**
  * Action creator for navigating between routes
@@ -65,6 +68,14 @@ export const routerEpic: Epic<RouterActions, IState> = action$ =>
     .map(action => action.route)
     .do(routeTo)
     .map(navigationComplete);
+
+/**
+ * Route title sync epic
+ */
+export const routeTitleSyncEpic: Epic<Actions, IState> = action$ =>
+  action$
+    .filter(action => action.type === NAVIGATE || action.type === ROUTER_NAVIGATE)
+    .map(({ route }: INavigateAction | IRouterNavigateAction) => setTitle(getTitle(route)));
 
 /**
  * Router reducer

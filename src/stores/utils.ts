@@ -23,6 +23,7 @@ export const noop = (): INoopAction => ({ type: NOOP });
 const defaultAppState: IAppState = {
   mode: 'dark',
   theme: ThemeProvider('dark'),
+  title: 'Podcst',
 };
 
 /**
