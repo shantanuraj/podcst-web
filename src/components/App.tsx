@@ -12,6 +12,8 @@ import { fixGlobalStyles, normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
+import { getTitle } from '../utils/route-titles';
+
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT, TOOLBAR_HEIGHT } from '../utils/constants';
 
 import ConnectedDrawer from '../containers/ConnectedDrawer';
@@ -82,7 +84,7 @@ interface IAppProps {
 
 class App extends Component<IAppProps, never> {
   public componentWillMount() {
-    this.props.setTitle(location.href);
+    this.props.setTitle(getTitle(location.href));
     fixGlobalStyles(this.props.theme);
     Audio.init(this.props);
   }

@@ -12,9 +12,10 @@ import { getEpisodeRoute, monthName } from '../utils';
 
 import ConnectedPlayButton from '../containers/ConnectedPlayButton';
 
-const episodeContainer = (theme: App.ITheme) =>
+export const episodeContainer = (theme: App.ITheme) =>
   style(
     {
+      color: theme.text,
       paddingTop: 16,
       paddingBottom: 16,
       paddingLeft: 32,
@@ -44,7 +45,7 @@ const episodeTitle = style({
   alignItems: 'center',
 });
 
-const subContainer = (theme: App.ITheme) =>
+export const subContainer = (theme: App.ITheme) =>
   style({
     marginRight: 16,
     color: theme.subTitle,
@@ -62,15 +63,14 @@ const subContainer = (theme: App.ITheme) =>
 interface IEpisodeRowProps {
   episode: App.IEpisodeInfo;
   isCurrentEpisode: boolean;
-  feed: string;
   theme: App.ITheme;
   play: () => void;
 }
 
 const EpisodeRow = (props: IEpisodeRowProps) => {
-  const { isCurrentEpisode, episode, feed, play, theme } = props;
+  const { isCurrentEpisode, episode, play, theme } = props;
 
-  const { title, published, duration } = episode;
+  const { feed, title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
