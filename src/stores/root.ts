@@ -8,7 +8,7 @@ import { combineReducers } from 'redux';
 
 import { INoopAction } from './utils';
 
-import { IRouterState, router, RouterActions, routerEpic } from './router';
+import { IRouterState, router, RouterActions, routerEpic, routeTitleSyncEpic } from './router';
 
 import { getEpisodesEpic, IPodcastsState, podcasts, PodcastsAction } from './podcasts';
 
@@ -26,9 +26,18 @@ import {
   subscriptions,
   SubscriptionsActions,
   subscriptionStateChangeEpic,
+  syncSubscriptionEpic,
 } from './subscriptions';
 
-import { app, AppActions, chromeMediaMetadaUpdateEpic, IAppState, onThemeChangeEpic } from './app';
+import {
+  app,
+  AppActions,
+  chromeMediaMetadaUpdateEpic,
+  fixGlobalThemeEpic,
+  IAppState,
+  saveAppStateEpic,
+  updateTitleEpic,
+} from './app';
 
 import { dismissToastEpic, IToastState, toast, ToastActions } from './toast';
 
@@ -64,8 +73,11 @@ export interface IState {
   drawer: IDrawerState;
 }
 
-const epics = [
+const epics: Array<Epic<Actions, IState, any>> = [
+  // router epics
   routerEpic,
+  routeTitleSyncEpic,
+
   getFeedEpic,
   searchPodcastsEpic,
   getEpisodesEpic,
@@ -74,17 +86,23 @@ const epics = [
   audioSeekUpdateEpic,
   parseOPMLEpic,
   subscriptionStateChangeEpic,
+  syncSubscriptionEpic,
   changeThemeEpic,
-  onThemeChangeEpic,
+
+  // app state epics
+  fixGlobalThemeEpic,
+  updateTitleEpic,
+  saveAppStateEpic,
+
   'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
   seekbarJumpsEpic,
   openViewEpic,
   dismissToastEpic,
   drawerCloseEpic,
-].filter(epic => epic !== null);
+].filter(epic => epic !== null) as Array<Epic<Actions, IState, any>>;
 
-export const rootEpic = combineEpics<Actions, IState>(...(epics as Array<Epic<Actions, IState, any>>));
+export const rootEpic = combineEpics<Actions, IState>(...epics);
 
 export const rootReducer = combineReducers<IState>({
   app,

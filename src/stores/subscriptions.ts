@@ -12,6 +12,8 @@ import { Actions, IState } from './root';
 
 import { showToast } from './toast';
 
+import { GET_EPISODES_SUCCESS, IGetEpisodesSuccessAction } from './podcasts';
+
 import { INoopAction, noop } from './utils';
 
 import { notNull, opmltoJSON } from '../utils';
@@ -23,10 +25,10 @@ import Podcasts from '../api/Podcasts';
 interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
   feed: string;
-  podcasts: App.RenderablePodcast;
+  podcasts: App.IPodcastEpisodesInfo;
 }
 const ADD_SUBSCRIPTION: IAddSubscriptionAction['type'] = 'ADD_SUBSCRIPTION';
-export const addSubscription = (feed: string, podcasts: App.RenderablePodcast): IAddSubscriptionAction => ({
+export const addSubscription = (feed: string, podcasts: App.IPodcastEpisodesInfo): IAddSubscriptionAction => ({
   type: ADD_SUBSCRIPTION,
   feed,
   podcasts,
@@ -65,7 +67,7 @@ export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
     const addSubscriptions = feeds.map(({ feed }) =>
       Podcasts.episodes(feed)
         .filter(notNull)
-        .map((podcasts: App.IPodcastEpisodesInfo) => addSubscription(feed, { ...podcasts, feed })),
+        .map((podcasts: App.IPodcastEpisodesInfo) => addSubscription(feed, podcasts)),
     );
 
     const actions = [
@@ -79,8 +81,18 @@ export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
 export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, state) =>
   action$
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
-    .do(() => Storage.saveSubscriptions(state.getState().subscriptions.subs))
+    .do(() => Storage.saveSubscriptions(state.getState().subscriptions))
     .map(noop);
+
+export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, state) =>
+  action$
+    .ofType(GET_EPISODES_SUCCESS)
+    .filter(
+      (action: IGetEpisodesSuccessAction) => !!action.episodes && !!state.getState().subscriptions.subs[action.feed],
+    )
+    .map((action: IGetEpisodesSuccessAction) =>
+      addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
+    );
 
 export const subscriptions = (
   state: ISubscriptionsState = {
