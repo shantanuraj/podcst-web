@@ -44,6 +44,13 @@ const container = style({
   alignItems: 'center',
 });
 
+const episodeImage = style({
+  height: 84,
+  width: 84,
+  objectFit: 'cover',
+  objectPosition: 'center',
+});
+
 const episodeTitle = style({
   flex: 1,
   display: 'flex',
@@ -87,7 +94,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
 
   return (
     <li class={listItem(theme)}>
-      <img src={episodeArt || cover} alt={title} height={84} width={84} />
+      <img class={episodeImage} src={episodeArt || cover} alt={title} />
       <div class={episodeContainer(theme)}>
         <div class={episodeRow}>
           <div class={container}>
