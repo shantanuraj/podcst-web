@@ -16,12 +16,17 @@ import { playEpisode } from '../stores/player';
 
 import Episodes from '../components/Episodes';
 
-const mapState = (state: IState) => ({
-  mode: state.app.mode,
-  theme: state.app.theme,
-  info: state.podcasts,
-  currentEpisode: state.player.queue[state.player.currentEpisode] || null,
-  subscriptions: state.subscriptions.subs,
+const mapState = ({
+  app: { mode, theme },
+  podcasts,
+  player: { currentEpisode, queue },
+  subscriptions: { subs },
+}: IState) => ({
+  mode,
+  theme,
+  info: podcasts,
+  currentEpisode: queue[currentEpisode] || null,
+  subscriptions: subs,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

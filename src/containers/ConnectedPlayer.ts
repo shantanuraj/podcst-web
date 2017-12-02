@@ -20,13 +20,17 @@ import {
 
 import Player from '../components/Player';
 
-const mapState = (state: IState) => ({
-  // Custom props
-  ...state.player,
-  theme: state.app.theme,
-  // Don't pass seekPosition & duration to player
-  duration: undefined,
-  seekPosition: undefined,
+const mapState = ({
+  app: { theme },
+  player: { buffering, currentEpisode, isLargeSeekVisible, queue, seekDelta, state },
+}: IState) => ({
+  buffering,
+  currentEpisode,
+  isLargeSeekVisible,
+  queue,
+  seekDelta,
+  state,
+  theme,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

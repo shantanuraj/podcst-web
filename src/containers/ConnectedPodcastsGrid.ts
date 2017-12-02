@@ -12,9 +12,9 @@ import { getFeed } from '../stores/feed';
 
 import PodcastsGrid from '../components/PodcastsGrid';
 
-const mapState = (state: IState) => ({
-  ...state.feed,
-  themeMode: state.app.mode,
+const mapState = ({ app: { mode }, feed }: IState) => ({
+  ...feed,
+  themeMode: mode,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

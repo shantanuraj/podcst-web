@@ -8,9 +8,9 @@ import { IState } from '../stores/root';
 
 import Toast from '../components/Toast';
 
-const mapState = (state: IState) => ({
-  ...state.toast,
-  theme: state.app.theme,
+const mapState = ({ app: { theme }, toast }: IState) => ({
+  ...toast,
+  theme,
 });
 
 const ConnectedToast = connect(mapState)(Toast);

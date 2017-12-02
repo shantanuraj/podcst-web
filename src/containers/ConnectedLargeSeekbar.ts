@@ -12,11 +12,11 @@ import { jumpSeek, manualSeekUpdate } from '../stores/player';
 
 import LargeSeekbar from '../components/LargeSeekbar';
 
-const mapState = (state: IState) => ({
-  buffering: state.player.buffering,
-  duration: state.player.duration,
-  seekPosition: state.player.seekPosition,
-  theme: state.app.theme,
+const mapState = ({ player: { buffering, duration, seekPosition }, app: { theme } }: IState) => ({
+  buffering,
+  duration,
+  seekPosition,
+  theme,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

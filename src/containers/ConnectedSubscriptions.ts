@@ -12,10 +12,10 @@ import { parseOPML } from '../stores/subscriptions';
 
 import Subscriptions from '../components/Subscriptions';
 
-const mapState = (state: IState) => ({
-  ...state.subscriptions,
-  theme: state.app.theme,
-  themeMode: state.app.mode,
+const mapState = ({ app: { theme, mode }, subscriptions }: IState) => ({
+  ...subscriptions,
+  theme,
+  themeMode: mode,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
