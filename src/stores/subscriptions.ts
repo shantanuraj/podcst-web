@@ -21,6 +21,7 @@ import { notNull, opmltoJSON } from '../utils';
 import { Storage } from '../utils/storage';
 
 import Podcasts from '../api/Podcasts';
+import { recents } from '../utils/recents';
 
 interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
@@ -103,24 +104,27 @@ export const subscriptions = (
   action: SubscriptionsActions,
 ): ISubscriptionsState => {
   switch (action.type) {
-    case ADD_SUBSCRIPTION:
+    case ADD_SUBSCRIPTION: {
+      const subs = {
+        ...state.subs,
+        [action.feed]: action.podcasts,
+      };
       return {
         ...state,
-        subs: {
-          ...state.subs,
-          [action.feed]: action.podcasts,
-        },
+        subs,
+        recents: recents(subs),
       };
-    case REMOVE_SUBSCRIPTION:
+    }
+    case REMOVE_SUBSCRIPTION: {
+      const subs = Object.keys(state.subs)
+        .filter(feed => feed !== action.feed)
+        .reduce((acc, feed) => ({ ...acc, [feed]: state.subs[feed] }), {} as ISubscriptionsMap);
       return {
         ...state,
-        subs: Object.keys(state.subs).reduce((subs, feed) => {
-          if (feed !== action.feed) {
-            subs[feed] = state.subs[feed];
-          }
-          return subs;
-        }, {}),
+        subs,
+        recents: recents(subs),
       };
+    }
     default:
       return state;
   }
