@@ -18,10 +18,11 @@ import { INoopAction, noop } from './utils';
 
 import { notNull, opmltoJSON } from '../utils';
 
+import { recents } from '../utils/recents';
+
 import { Storage } from '../utils/storage';
 
 import Podcasts from '../api/Podcasts';
-import { recents } from '../utils/recents';
 
 interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
