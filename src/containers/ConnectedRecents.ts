@@ -8,15 +8,15 @@ import { bindActionCreators, Dispatch } from 'redux';
 
 import { IState } from '../stores/root';
 
-import { recents } from '../utils/recents';
-
 import { playEpisode } from '../stores/player';
+
+import { recents } from '../utils/recents';
 
 import Recents from '../components/recents';
 
 const mapState = (state: IState) => ({
   currentEpisode: state.player.queue[state.player.currentEpisode] || null,
-  episodes: recents(state.subscriptions.subs),
+  episodes: state.subscriptions.recents.length > 0 ? state.subscriptions.recents : recents(state.subscriptions.subs),
   theme: state.app.theme,
 });
 
