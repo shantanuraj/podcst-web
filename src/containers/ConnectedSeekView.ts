@@ -12,11 +12,11 @@ import { manualSeekUpdate } from '../stores/player';
 
 import SeekView from '../components/SeekView';
 
-const mapState = (state: IState) => ({
-  buffering: state.player.buffering,
-  duration: state.player.duration,
-  seekPosition: state.player.seekPosition,
-  theme: state.app.theme,
+const mapState = ({ app: { theme }, player: { buffering, duration, seekPosition } }: IState) => ({
+  buffering,
+  duration,
+  seekPosition,
+  theme,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

@@ -10,10 +10,7 @@ import { IFeedData } from '../stores/feed';
 
 import Loader from '../components/Loader';
 
-const mapState = (state: IState) => {
-  const { app, feed, podcasts, search } = state;
-  const { theme } = app;
-
+const mapState = ({ app: { theme }, feed, podcasts, search: { searching } }: IState) => {
   const defaultState = {
     loading: true,
     theme,
@@ -29,7 +26,7 @@ const mapState = (state: IState) => {
     return defaultState;
   }
 
-  if (search.searching) {
+  if (searching) {
     return defaultState;
   }
 

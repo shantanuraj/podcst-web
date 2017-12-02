@@ -12,7 +12,7 @@ import { navigate } from '../stores/router';
 
 import IndexRedirect from '../components/IndexRedirect';
 
-const mapState = (_state: IState) => ({});
+const mapState = () => ({});
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
   bindActionCreators(

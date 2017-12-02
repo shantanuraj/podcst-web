@@ -12,9 +12,9 @@ import { pauseEpisode, resumeEpisode } from '../stores/player';
 
 import PlayButton from '../components/PlayButton';
 
-const mapState = (state: IState) => ({
-  state: state.player.state,
-  theme: state.app.theme,
+const mapState = ({ app: { theme }, player: { state } }: IState) => ({
+  state,
+  theme,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

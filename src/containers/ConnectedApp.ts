@@ -26,9 +26,9 @@ import { routerNavigate } from '../stores/router';
 
 import App from '../components/App';
 
-const mapState = (state: IState) => ({
-  theme: state.app.theme,
-  isPlayerVisible: state.player.state !== 'stopped',
+const mapState = ({ app: { theme }, player: { state } }: IState) => ({
+  theme,
+  isPlayerVisible: state !== 'stopped',
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

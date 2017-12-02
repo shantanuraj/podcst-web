@@ -12,9 +12,9 @@ import { toggleDrawer } from '../stores/drawer';
 
 import Toolbar from '../components/Toolbar';
 
-const mapState = (state: IState) => ({
-  title: state.app.title,
-  theme: state.app.theme,
+const mapState = ({ app: { theme, title } }: IState) => ({
+  title,
+  theme,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>

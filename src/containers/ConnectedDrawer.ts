@@ -8,9 +8,9 @@ import { IState } from '../stores/root';
 
 import Drawer from '../components/Drawer';
 
-const mapState = (state: IState) => ({
-  ...state.drawer,
-  theme: state.app.theme,
+const mapState = ({ app: { theme }, drawer }: IState) => ({
+  ...drawer,
+  theme,
 });
 
 const ConnectedDrawer = connect(mapState)(Drawer);

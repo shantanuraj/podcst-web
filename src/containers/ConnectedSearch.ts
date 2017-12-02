@@ -14,10 +14,10 @@ import { navigate } from '../stores/router';
 
 import Search from '../components/Search';
 
-const mapState = (state: IState) => ({
-  ...state.search,
-  mode: state.app.mode,
-  theme: state.app.theme,
+const mapState = ({ app: { mode, theme }, search }: IState) => ({
+  ...search,
+  mode,
+  theme,
 });
 
 const mapDispatch = (dispatch: Dispatch<IState>) =>
