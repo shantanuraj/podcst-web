@@ -58,6 +58,7 @@ export type SubscriptionsActions = IAddSubscriptionAction | IRemoveSubscriptionA
 
 export interface ISubscriptionsState {
   subs: ISubscriptionsMap;
+  recents: App.IEpisodeInfo[];
 }
 
 export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
@@ -78,17 +79,17 @@ export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
     return concat(...actions);
   });
 
-export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, state) =>
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, store) =>
   action$
     .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
-    .do(() => Storage.saveSubscriptions(state.getState().subscriptions))
+    .do(() => Storage.saveSubscriptions(store.getState().subscriptions))
     .map(noop);
 
-export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, state) =>
+export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, store) =>
   action$
     .ofType(GET_EPISODES_SUCCESS)
     .filter(
-      (action: IGetEpisodesSuccessAction) => !!action.episodes && !!state.getState().subscriptions.subs[action.feed],
+      ({ episodes, feed }: IGetEpisodesSuccessAction) => !!episodes && feed in store.getState().subscriptions.subs,
     )
     .map((action: IGetEpisodesSuccessAction) =>
       addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
@@ -97,6 +98,7 @@ export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, state) =>
 export const subscriptions = (
   state: ISubscriptionsState = {
     subs: {},
+    recents: [],
   },
   action: SubscriptionsActions,
 ): ISubscriptionsState => {

@@ -59,6 +59,7 @@ export const getDefaultState = (): IState => ({
   },
   subscriptions: Storage.getSubscriptions() || {
     subs: {},
+    recents: [],
   },
   toast: {
     isVisible: false,
