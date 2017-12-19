@@ -129,6 +129,8 @@ module.exports = env => {
           globDirectory: distDir,
           globPatterns: ['**/*.{html,js,css,svg}'],
           swDest: resolve(distDir, 'sw.js'),
+          clientsClaim: true,
+          skipWaiting: true,
           runtimeCaching: [
             {
               urlPattern: /.mp3(\?.*)?$/,
