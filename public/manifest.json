@@ -31,5 +31,5 @@
   "background_color": "#212121",
   "theme_color": "#212121",
   "display": "standalone",
-  "start_url": "/"
+  "start_url": "/feed/top"
 }
