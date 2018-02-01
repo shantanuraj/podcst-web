@@ -194,8 +194,36 @@ export const toggleLargeSeek = (): IToggleLargeSeekAction => ({
   type: TOGGLE_LARGE_SEEK,
 });
 
+/**
+ * Add to queue action
+ */
+interface IAddToQueue {
+  type: 'ADD_TO_QUEUE';
+  episode: App.IEpisodeInfo;
+}
+const ADD_TO_QUEUE: IAddToQueue['type'] = 'ADD_TO_QUEUE';
+export const addToQueue = (episode: App.IEpisodeInfo): IAddToQueue => ({
+  type: ADD_TO_QUEUE,
+  episode,
+});
+
+/**
+ * Remove ith from queue action
+ */
+interface IRemoveFromQueue {
+  type: 'REMOVE_FROM_QUEUE';
+  position: number;
+}
+const REMOVE_FROM_QUEUE: IRemoveFromQueue['type'] = 'REMOVE_FROM_QUEUE';
+export const removeFromQueue = (position: number): IRemoveFromQueue => ({
+  type: REMOVE_FROM_QUEUE,
+  position,
+});
+
 export type PlayerActions =
   | IPlayEpisodeAction
+  | IAddToQueue
+  | IRemoveFromQueue
   | IPauseAction
   | IPauseAudioAction
   | IResumeEpisodeAction
