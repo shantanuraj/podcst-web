@@ -14,6 +14,8 @@ import { normalizeSeek } from '../utils';
 
 import { SEEK_DELTA } from '../utils/constants';
 
+import { removeIth } from '../utils/array-util';
+
 /**
  * Play related actions
  */
@@ -338,6 +340,18 @@ export const player = (
         queue,
         seekPosition: 0,
         state: 'playing',
+      };
+    }
+    case ADD_TO_QUEUE: {
+      return {
+        ...state,
+        queue: state.queue.concat(action.episode),
+      };
+    }
+    case REMOVE_FROM_QUEUE: {
+      return {
+        ...state,
+        queue: removeIth(state.queue, action.position),
       };
     }
     case PAUSE_EPISODE: {
