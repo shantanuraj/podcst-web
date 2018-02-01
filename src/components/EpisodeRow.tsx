@@ -113,8 +113,6 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
           </div>
           <div class={container}>
             <ConnectedPlayButton isCurrentEpisode={isCurrentEpisode} play={play} />
-          </div>
-          <div>
             <ConnectedQueueButton episode={episode} />
           </div>
         </div>
