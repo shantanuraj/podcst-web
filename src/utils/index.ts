@@ -18,6 +18,21 @@ const URL_REGEX = /^https?\:\//;
 const HOST_REGEX = /^https?\:\/\/(www\.)?(.*)/;
 
 /**
+ * Returns normalized link
+ */
+const getLink = (token: string, maybeSpace: string): string => {
+  const trimmedToken = token.trim();
+  const lastChar = trimmedToken[trimmedToken.length - 1];
+  let normalizedToken = trimmedToken;
+  let seperator = maybeSpace;
+  if (lastChar === '.') {
+    normalizedToken = trimmedToken.slice(0, -1);
+    seperator = lastChar + maybeSpace;
+  }
+  return `<a target="_blank" href="${normalizedToken}">${normalizedToken}</a><span>${seperator}</span>`;
+};
+
+/**
  * Linkify text
  */
 export const linkifyText = (text: string): string => {
@@ -27,7 +42,7 @@ export const linkifyText = (text: string): string => {
     const maybeSpace = hasSpace ? ' ' : '';
 
     if (URL_REGEX.test(token)) {
-      return `<a target="_blank" href="${token}">${token}</a><span>${maybeSpace}</span>`;
+      return getLink(token, maybeSpace);
     } else {
       return token + maybeSpace;
     }
