@@ -8,7 +8,7 @@ import { classes, media, style } from 'typestyle';
 
 import { Router, RouterOnChangeArgs } from 'preact-router';
 
-import { fixGlobalStyles, normalizeEl } from '../utils/styles';
+import { normalizeEl } from '../utils/styles';
 
 import Audio from '../utils/audio';
 
