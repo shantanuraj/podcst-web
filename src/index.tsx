@@ -11,6 +11,8 @@ import { forceRenderStyles } from 'typestyle';
 // Patch Rx operators
 import './utils/patch_operators';
 
+import { fixGlobalStyles } from './utils/styles';
+
 import ConnectedApp from './containers/ConnectedApp';
 
 import configureStore from './stores';
@@ -22,6 +24,9 @@ interface IPodcastAppProps {
 const init = () => {
   const store = configureStore();
   const appVersion = process.env.APP_VERSION;
+
+  const { theme } = store.getState().app;
+  fixGlobalStyles(theme);
 
   const PodcastApp = ({ version }: IPodcastAppProps) => (
     <Provider store={store}>

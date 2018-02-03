@@ -83,13 +83,9 @@ interface IAppProps {
 }
 
 class App extends Component<IAppProps, never> {
-  public componentWillMount() {
-    this.props.setTitle(getTitle(location.href));
-    fixGlobalStyles(this.props.theme);
-    Audio.init(this.props);
-  }
-
   public componentDidMount() {
+    this.props.setTitle(getTitle(location.href));
+    Audio.init(this.props);
     this.props.appInit();
     // tslint:disable:no-console
     console.log(`Initalized Podcst.io version: ${this.props.version}`);

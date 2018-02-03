@@ -96,21 +96,9 @@ class Seekbar extends Component<ISeekbarProps, any> {
     return buffering ? '100%' : `${seekPosition / duration * 100}%`;
   }
 
-  public componentDidMount() {
-    if (this.el) {
-      this.el.addEventListener('click', this.seekHandler);
-    }
-  }
-
-  public componentWillMount() {
-    if (this.el) {
-      this.el.removeEventListener('click', this.seekHandler);
-    }
-  }
-
   public render({ buffering, duration, mode, seekPosition, theme }: ISeekbarProps) {
     return (
-      <div ref={this.saveRef} class={seekbarContainer(theme, mode)}>
+      <div ref={this.saveRef} class={seekbarContainer(theme, mode)} onClick={this.seekHandler}>
         <div
           data-is-buffering={buffering}
           class={seekbar(theme, mode)}
