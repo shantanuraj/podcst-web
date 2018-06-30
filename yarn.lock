@@ -6,16 +6,6 @@
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/@types/howler/-/howler-2.0.3.tgz#4adef7852a408b871e82d2a35822c889a00304be"
 
-"@types/lodash-es@^4.14.6":
-  version "4.14.6"
-  resolved "https://registry.yarnpkg.com/@types/lodash-es/-/lodash-es-4.14.6.tgz#c11d48d77f46b0aa9fae2a152b8259c23891efd1"
-  dependencies:
-    "@types/lodash" "*"
-
-"@types/lodash@*":
-  version "4.14.72"
-  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.72.tgz#f090cf6eb1fee1647a0efa1ebe18b0b78ed551c6"
-
 abbrev@1:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/abbrev/-/abbrev-1.1.0.tgz#d0554c2256636e2f56e7c2e5ad183f859428d81f"
