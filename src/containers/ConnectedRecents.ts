@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { IState } from '../stores/root';
 
 import { playEpisode } from '../stores/player';
@@ -20,13 +18,9 @@ const mapState = ({ app: { theme }, player: { currentEpisode, queue }, subscript
   theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      playEpisode,
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  playEpisode,
+};
 
 const ConnectedRecents = connect(mapState, mapDispatch)(Recents);
 

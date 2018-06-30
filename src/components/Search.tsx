@@ -6,9 +6,9 @@ import { Component, h } from 'preact';
 
 import { style } from 'typestyle';
 
-import { fromEvent } from 'rxjs/observable/fromEvent';
+import { fromEvent, Subscription } from 'rxjs';
 
-import { Subscription } from 'rxjs/Subscription';
+import { filter, map } from 'rxjs/operators';
 
 import { onEvent } from '../utils';
 
@@ -50,7 +50,7 @@ class Search extends Component<ISearchProps, any> {
   private clicksSub: Subscription | null = null;
   private keyboardSub: Subscription | null = null;
 
-  public canDissmissSearch = (target: EventTarget | HTMLElement, checkInside: boolean = false) => {
+  public canDissmissSearch = (target: EventTarget | HTMLElement | null, checkInside: boolean = false) => {
     const hasEl = !!this.el;
     const isSearching = this.props.searching || !!this.props.query;
     const targetPositionCheck = !!this.el && this.el.contains(target as HTMLElement) === checkInside;
@@ -70,19 +70,21 @@ class Search extends Component<ISearchProps, any> {
 
   public watchClicks = () => {
     this.clicksSub = fromEvent<MouseEvent>(document, 'click')
-      .filter(e => this.canDissmissSearch(e.target))
+      .pipe(filter(e => this.canDissmissSearch(e.target)))
       .subscribe(this.props.dismissSearch);
   };
 
   public watchKeyboard = () => {
     this.keyboardSub = fromEvent(document, 'keydown')
-      .filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined)
-      .map((event: KeyboardEvent) => ({
-        input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement,
-        keyCode: event.keyCode,
-        preventDefault: () => event.preventDefault(),
-        target: event.target as HTMLElement,
-      }))
+      .pipe(
+        filter(({ keyCode }: KeyboardEvent) => Key[keyCode] !== undefined),
+        map((event: KeyboardEvent) => ({
+          input: (this.el as HTMLDivElement).querySelector('input') as HTMLInputElement,
+          keyCode: event.keyCode,
+          preventDefault: () => event.preventDefault(),
+          target: event.target as HTMLElement,
+        })),
+      )
       .subscribe(({ input, keyCode, preventDefault, target }) => {
         switch (Key[keyCode]) {
           case 'focus': {

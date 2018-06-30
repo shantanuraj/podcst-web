@@ -4,6 +4,8 @@
 
 import { Epic } from 'redux-observable';
 
+import { map, mergeMap } from 'rxjs/operators';
+
 import { IState } from './root';
 
 import Podcasts from '../api/Podcasts';
@@ -46,11 +48,13 @@ export interface IFeedState {
 }
 
 // Get feed epic
-export const getFeedEpic: Epic<FeedActions, IState> = action$ =>
+export const getFeedEpic: Epic<FeedActions, IGetFeedSuccessAction, IState> = action$ =>
   action$
     .ofType(GET_FEED)
-    .mergeMap((action: IGetFeedAction) =>
-      Podcasts.feed(action.feedType).map(podcasts => getFeedSuccess(action.feedType, podcasts)),
+    .pipe(
+      mergeMap((action: IGetFeedAction) =>
+        Podcasts.feed(action.feedType).pipe(map(podcasts => getFeedSuccess(action.feedType, podcasts))),
+      ),
     );
 
 // Feed reducer

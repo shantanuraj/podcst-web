@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { IState } from '../stores/root';
 
 import { manualSeekUpdate } from '../stores/player';
@@ -19,13 +17,9 @@ const mapState = ({ app: { theme }, player: { buffering, duration, seekPosition 
   theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      onSeek: manualSeekUpdate,
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  onSeek: manualSeekUpdate,
+};
 
 const ConnectedSeekView = connect(mapState, mapDispatch)(SeekView);
 

@@ -95,7 +95,8 @@ const ignoreKeyboardSelector = 'header *';
 /**
  * Boolean check for ignore selector
  */
-export const isNotIgnoreElement = (target: EventTarget) => !(target as HTMLElement).matches(ignoreKeyboardSelector);
+export const isNotIgnoreElement = (target: EventTarget | null) =>
+  !!target && !(target as HTMLElement).matches(ignoreKeyboardSelector);
 
 /**
  * Parse OPML XML element to JSON

@@ -4,7 +4,7 @@
 
 import { combineEpics, Epic } from 'redux-observable';
 
-import { combineReducers } from 'redux';
+import { combineReducers, Dispatch } from 'redux';
 
 import { INoopAction } from './utils';
 
@@ -73,36 +73,37 @@ export interface IState {
   drawer: IDrawerState;
 }
 
-const epics: Array<Epic<Actions, IState, any>> = [
-  // router epics
-  routerEpic,
-  routeTitleSyncEpic,
+const epics = (dispatch: Dispatch<Actions>) =>
+  [
+    // router epics
+    routerEpic,
+    routeTitleSyncEpic,
 
-  getFeedEpic,
-  searchPodcastsEpic,
-  getEpisodesEpic,
-  playerAudioEpic,
-  uiSeekUpdateEpic,
-  audioSeekUpdateEpic,
-  parseOPMLEpic,
-  subscriptionStateChangeEpic,
-  syncSubscriptionEpic,
-  changeThemeEpic,
+    getFeedEpic,
+    searchPodcastsEpic,
+    getEpisodesEpic,
+    playerAudioEpic,
+    uiSeekUpdateEpic,
+    audioSeekUpdateEpic,
+    parseOPMLEpic,
+    subscriptionStateChangeEpic,
+    syncSubscriptionEpic,
+    changeThemeEpic,
 
-  // app state epics
-  fixGlobalThemeEpic,
-  updateTitleEpic,
-  saveAppStateEpic,
+    // app state epics
+    fixGlobalThemeEpic,
+    updateTitleEpic,
+    saveAppStateEpic,
 
-  'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
-  playerControlsEpic,
-  seekbarJumpsEpic,
-  openViewEpic,
-  dismissToastEpic,
-  drawerCloseEpic,
-].filter(epic => epic !== null) as Array<Epic<Actions, IState, any>>;
+    'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic(dispatch) : null,
+    playerControlsEpic,
+    seekbarJumpsEpic,
+    openViewEpic,
+    dismissToastEpic,
+    drawerCloseEpic,
+  ].filter(epic => epic !== null) as Array<Epic<Actions, Actions, IState>>;
 
-export const rootEpic = combineEpics<Actions, IState>(...epics);
+export const getRootEpic = (dispatch: Dispatch<Actions>) => combineEpics<Actions, Actions, IState>(...epics(dispatch));
 
 export const rootReducer = combineReducers<IState>({
   app,

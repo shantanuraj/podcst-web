@@ -4,18 +4,23 @@
 
 import { applyMiddleware, compose, createStore } from 'redux';
 
-import { createEpicMiddleware } from 'redux-observable';
+import { createEpicMiddleware, Epic } from 'redux-observable';
 
-import { IState, rootEpic, rootReducer } from './root';
+import { Actions, getRootEpic, IState, rootReducer } from './root';
 
 import { getDefaultState } from './utils';
 
-const epicMiddleware = createEpicMiddleware(rootEpic);
+const epicMiddleware = createEpicMiddleware();
 
 const composeEnhancers = (window as IReduxDevToolsEnabledWindow).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 
 export default function configureStore() {
-  const store = createStore<IState>(rootReducer, getDefaultState(), composeEnhancers(applyMiddleware(epicMiddleware)));
-
+  const store = createStore<IState, Actions, {}, {}>(
+    rootReducer,
+    getDefaultState(),
+    composeEnhancers(applyMiddleware(epicMiddleware)),
+  );
+  const rootEpic = getRootEpic(store.dispatch);
+  epicMiddleware.run(rootEpic as Epic<Actions, Actions, any>);
   return store;
 }

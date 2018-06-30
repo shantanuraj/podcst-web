@@ -2,9 +2,9 @@
  * TextShare API
  */
 
-import { Observable } from 'rxjs/Observable';
-import { ajax } from 'rxjs/observable/dom/ajax';
-import { of } from 'rxjs/observable/of';
+import { Observable, of } from 'rxjs';
+import { ajax } from 'rxjs/ajax';
+import { catchError, map } from 'rxjs/operators';
 
 import { patchEpisodesResponse } from '../utils';
 
@@ -20,22 +20,25 @@ export default class Podcasts {
   }
 
   public static feed(type: FeedType): Observable<App.IPodcast[]> {
-    return ajax(Podcasts.api(`/${type}?limit=100`))
-      .map(res => res.response as App.IPodcast[])
-      .catch(() => of([]));
+    return ajax(Podcasts.api(`/${type}?limit=100`)).pipe(
+      map(res => res.response as App.IPodcast[]),
+      catchError(() => of([])),
+    );
   }
 
   public static search(term: string): Observable<App.IPodcastSearchResult[]> {
-    return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`))
-      .map(res => res.response as App.IPodcastSearchResult[])
-      .catch(() => of([]));
+    return ajax(Podcasts.api(`/search?term=${encodeURIComponent(term)}`)).pipe(
+      map(res => res.response as App.IPodcastSearchResult[]),
+      catchError(() => of([])),
+    );
   }
 
   public static episodes(url: string): Observable<App.IPodcastEpisodesInfo | null> {
     const patchRes = patchEpisodesResponse(url);
-    return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`))
-      .map(res => res.response as App.IEpisodeListing | null)
-      .map(patchRes)
-      .catch(() => of(null));
+    return ajax(Podcasts.api(`/feed?url=${encodeURIComponent(url)}`)).pipe(
+      map(res => res.response as App.IEpisodeListing | null),
+      map(patchRes),
+      catchError(() => of(null)),
+    );
   }
 }

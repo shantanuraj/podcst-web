@@ -4,6 +4,8 @@
 
 import { Epic } from 'redux-observable';
 
+import { debounceTime, filter, map } from 'rxjs/operators';
+
 import { IState } from '../stores/root';
 
 /**
@@ -14,7 +16,7 @@ const DISMISS_TOAST_AFTER = 4000;
 /**
  * Action creator for showing toast
  */
-interface IShowToastAction {
+export interface IShowToastAction {
   type: 'SHOW_TOAST';
   message: string;
   persistent: boolean;
@@ -51,11 +53,12 @@ export interface IToastState {
 /**
  * Dismiss toast epic
  */
-export const dismissToastEpic: Epic<ToastActions, IState> = action$ =>
-  action$
-    .filter(action => action.type === SHOW_TOAST && !action.persistent)
-    .debounceTime(DISMISS_TOAST_AFTER)
-    .map(dismissToast);
+export const dismissToastEpic: Epic<ToastActions, IDismissToastAction, IState> = action$ =>
+  action$.pipe(
+    filter(action => action.type === SHOW_TOAST && !action.persistent),
+    debounceTime(DISMISS_TOAST_AFTER),
+    map(dismissToast),
+  );
 
 /**
  * Toast reducer

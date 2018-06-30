@@ -2,15 +2,15 @@
  * Actions / Reducer for subscriptions
  */
 
-import { of } from 'rxjs/observable/of';
+import { concat, of } from 'rxjs';
 
-import { concat } from 'rxjs/observable/concat';
+import { filter, map, mergeMap, tap } from 'rxjs/operators';
 
 import { Epic } from 'redux-observable';
 
 import { Actions, IState } from './root';
 
-import { showToast } from './toast';
+import { IShowToastAction, showToast } from './toast';
 
 import { GET_EPISODES_SUCCESS, IGetEpisodesSuccessAction } from './podcasts';
 
@@ -63,38 +63,42 @@ export interface ISubscriptionsState {
   recents: App.IEpisodeInfo[];
 }
 
-export const parseOPMLEpic: Epic<Actions, IState> = action$ =>
-  action$.ofType(PARSE_OPML).mergeMap((action: IParseOPMLAction) => {
-    const { feeds } = opmltoJSON(action.file);
+export const parseOPMLEpic: Epic<Actions, IShowToastAction | IAddSubscriptionAction, IState> = action$ =>
+  action$.ofType(PARSE_OPML).pipe(
+    mergeMap((action: IParseOPMLAction) => {
+      const { feeds } = opmltoJSON(action.file);
 
-    const addSubscriptions = feeds.map(({ feed }) =>
-      Podcasts.episodes(feed)
-        .filter(notNull)
-        .map((podcasts: App.IPodcastEpisodesInfo) => addSubscription(feed, podcasts)),
-    );
+      const addSubscriptions = feeds.map(({ feed }) =>
+        Podcasts.episodes(feed).pipe(
+          filter(notNull),
+          map((podcasts: App.IPodcastEpisodesInfo) => addSubscription(feed, podcasts)),
+        ),
+      );
 
-    const actions = [
-      of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
-      ...addSubscriptions,
-      of(showToast('Import successful!')),
-    ];
-    return concat(...actions);
-  });
+      const actions = [
+        of(showToast(`Importing ${feeds.length} feed${feeds.length > 1 ? 's' : ''}`, true)),
+        ...addSubscriptions,
+        of(showToast('Import successful!')),
+      ];
+      return concat(...actions);
+    }),
+  );
 
-export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IState> = (action$, store) =>
-  action$
-    .filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION)
-    .do(() => Storage.saveSubscriptions(store.getState().subscriptions))
-    .map(noop);
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, INoopAction, IState> = (action$, state$) =>
+  action$.pipe(
+    filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION),
+    tap(() => Storage.saveSubscriptions(state$.value.subscriptions)),
+    map(noop),
+  );
 
-export const syncSubscriptionEpic: Epic<Actions, IState> = (action$, store) =>
+export const syncSubscriptionEpic: Epic<Actions, IAddSubscriptionAction, IState> = (action$, state$) =>
   action$
     .ofType(GET_EPISODES_SUCCESS)
-    .filter(
-      ({ episodes, feed }: IGetEpisodesSuccessAction) => !!episodes && feed in store.getState().subscriptions.subs,
-    )
-    .map((action: IGetEpisodesSuccessAction) =>
-      addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
+    .pipe(
+      filter(({ episodes, feed }: IGetEpisodesSuccessAction) => !!episodes && feed in state$.value.subscriptions.subs),
+      map((action: IGetEpisodesSuccessAction) =>
+        addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
+      ),
     );
 
 export const subscriptions = (

@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { IState } from '../stores/root';
 
 import { dismissSearch, focusResult, navigateResult, searchPodcasts } from '../stores/search';
@@ -20,17 +18,13 @@ const mapState = ({ app: { mode, theme }, search }: IState) => ({
   theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      dismissSearch,
-      focusResult,
-      navigateResult,
-      searchPodcasts,
-      onResultSelect: (feed: string) => navigate(`/episodes?feed=${feed}`),
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  dismissSearch,
+  focusResult,
+  navigateResult,
+  searchPodcasts,
+  onResultSelect: (feed: string) => navigate(`/episodes?feed=${feed}`),
+};
 
 const ConnectedSearch = connect(mapState, mapDispatch)(Search);
 

@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { IState } from '../stores/root';
 
 import { toggleDrawer } from '../stores/drawer';
@@ -17,13 +15,9 @@ const mapState = ({ app: { theme, title } }: IState) => ({
   theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      toggleDrawer,
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  toggleDrawer,
+};
 
 const ConnectedToolbar = connect(mapState, mapDispatch)(Toolbar);
 

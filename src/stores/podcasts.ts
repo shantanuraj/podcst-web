@@ -4,6 +4,8 @@
 
 import { Epic } from 'redux-observable';
 
+import { map, mergeMap } from 'rxjs/operators';
+
 import Podcasts from '../api/Podcasts';
 
 import { IState } from '../stores/root';
@@ -45,11 +47,13 @@ export interface IPodcastsState {
 /**
  * Get episodes epic
  */
-export const getEpisodesEpic: Epic<PodcastsAction, IState> = action$ =>
+export const getEpisodesEpic: Epic<PodcastsAction, IGetEpisodesSuccessAction, IState> = action$ =>
   action$
     .ofType(GET_EPISODES)
-    .mergeMap((action: IGetEpisodesAction) =>
-      Podcasts.episodes(action.feed).map(episodes => getEpisodesSuccess(action.feed, episodes)),
+    .pipe(
+      mergeMap((action: IGetEpisodesAction) =>
+        Podcasts.episodes(action.feed).pipe(map(episodes => getEpisodesSuccess(action.feed, episodes))),
+      ),
     );
 
 /**

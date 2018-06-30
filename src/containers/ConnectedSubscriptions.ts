@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { IState } from '../stores/root';
 
 import { parseOPML } from '../stores/subscriptions';
@@ -18,13 +16,9 @@ const mapState = ({ app: { theme, mode }, subscriptions }: IState) => ({
   themeMode: mode,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      parseOPML,
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  parseOPML,
+};
 
 const ConnectedSubscriptions = connect(mapState, mapDispatch)(Subscriptions);
 

@@ -4,6 +4,8 @@
 
 import { Epic } from 'redux-observable';
 
+import { filter, map, tap, throttleTime } from 'rxjs/operators';
+
 import { IState } from './root';
 
 import { INoopAction, noop } from './utils';
@@ -132,7 +134,7 @@ export const seekUpdateRequest = (seekPosition: number, duration: number): ISeek
 /**
  * Manual seek update action
  */
-interface IManualSeekUpdateAction {
+export interface IManualSeekUpdateAction {
   type: 'MANUAL_SEEK_UPDATE';
   duration: number;
   seekPosition: number;
@@ -224,25 +226,27 @@ export interface IPlayerState {
   state: EpisodePlayerState;
 }
 
-export const uiSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
+export const uiSeekUpdateEpic: Epic<PlayerActions, ISeekUpdateSuccessAction, IState> = action$ =>
   action$
     .ofType(SEEK_UPDATE_REQUEST)
-    .throttleTime(1000)
-    .map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration));
+    .pipe(
+      throttleTime(1000),
+      map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration)),
+    );
 
-export const audioSeekUpdateEpic: Epic<PlayerActions, IState> = (action$, store) =>
-  action$
-    .ofType(MANUAL_SEEK_UPDATE, JUMP_SEEK)
-    .do((action: IManualSeekUpdateAction | IJumpSeekAction) => {
-      const { seekPosition } = store.getState().player;
+export const audioSeekUpdateEpic: Epic<PlayerActions, INoopAction, IState> = (action$, state$) =>
+  action$.ofType(MANUAL_SEEK_UPDATE, JUMP_SEEK).pipe(
+    tap((action: IManualSeekUpdateAction | IJumpSeekAction) => {
+      const { seekPosition } = state$.value.player;
       const newSeekPosition = action.type === MANUAL_SEEK_UPDATE ? action.seekPosition : seekPosition;
       Audio.seekTo(newSeekPosition);
-    })
-    .map(noop);
+    }),
+    map(noop),
+  );
 
-export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
-  action$
-    .filter(
+export const playerAudioEpic: Epic<PlayerActions, PlayerActions, IState> = (action$, store) =>
+  action$.pipe(
+    filter(
       action =>
         action.type === PLAY_EPISODE ||
         action.type === PAUSE_EPISODE ||
@@ -250,8 +254,8 @@ export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
         action.type === STOP_EPISODE ||
         action.type === SKIP_TO_NEXT_EPISODE ||
         action.type === SKIP_TO_PREV_EPISODE,
-    )
-    .do((action: PlayerActions) => {
+    ),
+    tap((action: PlayerActions) => {
       switch (action.type) {
         case PLAY_EPISODE:
           return Audio.play(action.episode);
@@ -263,11 +267,11 @@ export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
           return Audio.stop();
         case SKIP_TO_NEXT_EPISODE:
         case SKIP_TO_PREV_EPISODE:
-          const { currentEpisode, queue } = state.getState().player;
+          const { currentEpisode, queue } = store.value.player;
           return Audio.skipTo(queue[currentEpisode]);
       }
-    })
-    .map((action: PlayerActions) => {
+    }),
+    map((action: PlayerActions) => {
       switch (action.type) {
         case PLAY_EPISODE:
           return setBuffer(true);
@@ -283,7 +287,8 @@ export const playerAudioEpic: Epic<PlayerActions, IState> = (action$, state) =>
         default:
           return noop();
       }
-    });
+    }),
+  );
 
 export const player = (
   state: IPlayerState = {

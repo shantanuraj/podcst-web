@@ -6,7 +6,9 @@
 
 import { Epic } from 'redux-observable';
 
-import { bindActionCreators } from 'redux';
+import { filter, map, tap } from 'rxjs/operators';
+
+import { bindActionCreators, Dispatch } from 'redux';
 
 import { updateMetadata } from '../utils/chrome-media-utils';
 
@@ -18,9 +20,9 @@ import { ThemeProvider } from '../styles';
 
 import { Actions, IState } from './root';
 
-import { IPlayEpisodeAction, jumpSeek, pauseEpisode, PLAY_EPISODE, resumeEpisode } from './player';
+import { IPlayEpisodeAction, jumpSeek, pauseEpisode, PLAY_EPISODE, PlayerActions, resumeEpisode } from './player';
 
-import { noop } from './utils';
+import { INoopAction, noop } from './utils';
 
 /**
  * Update chrome metadata action creator
@@ -37,7 +39,7 @@ const updateChromeMetadatAction = (): IUpdateChromeMetadataAction => ({
  * Change theme action creator
  */
 type ChangeTheme = 'CHANGE_THEME';
-interface IChangeThemeAction {
+export interface IChangeThemeAction {
   type: ChangeTheme;
   mode: App.ThemeMode;
 }
@@ -51,7 +53,7 @@ export const changeTheme = (mode: App.ThemeMode): IChangeThemeAction => ({
  * Set title action creator
  */
 type SetTitle = 'SET_TITLE';
-interface ISetTitleAction {
+export interface ISetTitleAction {
   type: SetTitle;
   title: string;
 }
@@ -87,11 +89,12 @@ export interface IAppState {
 /**
  * Chrome MediaSession Metadata epic
  */
-export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$, store) =>
-  action$
-    .ofType(PLAY_EPISODE)
-    .do((action: IPlayEpisodeAction) => {
-      const { podcasts } = store.getState();
+export const chromeMediaMetadaUpdateEpic: (
+  dispatch: Dispatch<PlayerActions>,
+) => Epic<Actions, IUpdateChromeMetadataAction, IState> = dispatch => (action$, state$) =>
+  action$.ofType(PLAY_EPISODE).pipe(
+    tap((action: IPlayEpisodeAction) => {
+      const { podcasts } = state$.value;
 
       const info = (podcasts[action.episode.feed] && podcasts[action.episode.feed].episodes) || null;
 
@@ -102,39 +105,35 @@ export const chromeMediaMetadaUpdateEpic: Epic<Actions, IState> = (action$, stor
           seekBack: () => jumpSeek('seek-back'),
           seekForward: () => jumpSeek('seek-forward'),
         },
-        store.dispatch,
+        dispatch,
       );
 
       updateMetadata(action.episode, info, actions.pause, actions.resume, actions.seekBack, actions.seekForward);
-    })
-    .map(updateChromeMetadatAction);
+    }),
+    map(updateChromeMetadatAction),
+  );
 
 /**
  * Update title side-effects epic
  */
-export const updateTitleEpic: Epic<Actions, IState> = action$ =>
-  action$
-    .ofType(SET_TITLE)
-    .do((action: ISetTitleAction) => (document.title = action.title))
-    .map(noop);
+export const updateTitleEpic: Epic<Actions, INoopAction, IState> = action$ =>
+  action$.ofType(SET_TITLE).pipe(tap((action: ISetTitleAction) => (document.title = action.title)), map(noop));
 
 /**
  * On Theme change epic
  */
-export const fixGlobalThemeEpic: Epic<Actions, IState> = (action$, store) =>
-  action$
-    .ofType(CHANGE_THEME)
-    .do(() => fixGlobalStyles(store.getState().app.theme))
-    .map(noop);
+export const fixGlobalThemeEpic: Epic<Actions, INoopAction, IState> = (action$, state$) =>
+  action$.ofType(CHANGE_THEME).pipe(tap(() => fixGlobalStyles(state$.value.app.theme)), map(noop));
 
-/**
+/**qq
  * App state storage epic
  */
-export const saveAppStateEpic: Epic<Actions, IState> = (action$, store) =>
-  action$
-    .filter(action => action.type === CHANGE_THEME || action.type === SET_TITLE)
-    .do(() => Storage.saveAppState(store.getState().app))
-    .map(noop);
+export const saveAppStateEpic: Epic<Actions, INoopAction, IState> = (action$, state$) =>
+  action$.pipe(
+    filter(action => action.type === CHANGE_THEME || action.type === SET_TITLE),
+    tap(() => Storage.saveAppState(state$.value.app)),
+    map(noop),
+  );
 
 /**
  * App reducer

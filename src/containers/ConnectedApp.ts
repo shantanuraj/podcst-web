@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { RouterOnChangeArgs } from 'preact-router';
 
 import { IState } from '../stores/root';
@@ -31,22 +29,18 @@ const mapState = ({ app: { theme }, player: { state } }: IState) => ({
   isPlayerVisible: state !== 'stopped',
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      appInit,
-      pauseEpisode,
-      resumeEpisode,
-      seekUpdate,
-      setBuffer,
-      setTitle,
-      skipToNextEpisode,
-      skipToPrevEpisode,
-      stopEpisode,
-      routerNavigate: ({ url }: RouterOnChangeArgs) => routerNavigate(url),
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  appInit,
+  pauseEpisode,
+  resumeEpisode,
+  seekUpdate,
+  setBuffer,
+  setTitle,
+  skipToNextEpisode,
+  skipToPrevEpisode,
+  stopEpisode,
+  routerNavigate: ({ url }: RouterOnChangeArgs) => routerNavigate(url),
+};
 
 const ConnectedApp = connect(mapState, mapDispatch)(App);
 

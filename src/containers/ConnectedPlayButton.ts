@@ -4,8 +4,6 @@
 
 import { connect } from 'preact-redux';
 
-import { bindActionCreators, Dispatch } from 'redux';
-
 import { IState } from '../stores/root';
 
 import { pauseEpisode, resumeEpisode } from '../stores/player';
@@ -17,14 +15,10 @@ const mapState = ({ app: { theme }, player: { state } }: IState) => ({
   theme,
 });
 
-const mapDispatch = (dispatch: Dispatch<IState>) =>
-  bindActionCreators(
-    {
-      pause: pauseEpisode,
-      resume: resumeEpisode,
-    },
-    dispatch,
-  );
+const mapDispatch = {
+  pause: pauseEpisode,
+  resume: resumeEpisode,
+};
 
 const ConnectedPlayButton = connect(mapState, mapDispatch)(PlayButton);
 

@@ -4,7 +4,9 @@
 
 import { Epic } from 'redux-observable';
 
-import { of } from 'rxjs/observable/of';
+import { debounceTime, map, switchMap } from 'rxjs/operators';
+
+import { of } from 'rxjs';
 
 import Podcasts from '../api/Podcasts';
 
@@ -75,15 +77,15 @@ export type SearchActions =
   | INavigateResultAction
   | IFocusResultAction;
 
-export const searchPodcastsEpic: Epic<SearchActions, IState> = action$ =>
-  action$
-    .ofType(SEARCH_PODCASTS)
-    .debounceTime(200)
-    .switchMap((action: ISearchPodcastsAction) => {
+export const searchPodcastsEpic: Epic<SearchActions, ISearchPodcastsSuccessAction, IState> = action$ =>
+  action$.ofType(SEARCH_PODCASTS).pipe(
+    debounceTime(200),
+    switchMap((action: ISearchPodcastsAction) => {
       return action.query.length === 0
         ? of(searchPodcastsSuccess([]))
-        : Podcasts.search(action.query).map(searchPodcastsSuccess);
-    });
+        : Podcasts.search(action.query).pipe(map(searchPodcastsSuccess));
+    }),
+  );
 
 export const search = (
   state: ISearchState = {

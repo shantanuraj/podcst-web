@@ -2,9 +2,9 @@
  * Drawer actions / state
  */
 
-import { fromEvent } from 'rxjs/observable/fromEvent';
+import { fromEvent, merge } from 'rxjs';
 
-import { merge } from 'rxjs/observable/merge';
+import { filter, map, switchMap } from 'rxjs/operators';
 
 import { Epic } from 'redux-observable';
 
@@ -49,15 +49,17 @@ export interface IDrawerState {
 /**
  * Drawer close epic
  */
-export const drawerCloseEpic: Epic<DrawerActions, IState> = (action$, store) =>
-  action$.ofType(TOGGLE_DRAWER).switchMap(() =>
-    merge(
-      fromEvent<MouseEvent>(document, 'mouseup'),
-      fromEvent<KeyboardEvent>(document, 'keyup').filter(e => e.keyCode === Keys.escape),
-    )
-      .filter(() => store.getState().drawer.isVisible)
-      .map(closeDrawer),
-  );
+export const drawerCloseEpic: Epic<DrawerActions, ICloseDrawerAction, IState> = (action$, state$) =>
+  action$
+    .ofType(TOGGLE_DRAWER)
+    .pipe(
+      switchMap(() =>
+        merge(
+          fromEvent<MouseEvent>(document, 'mouseup'),
+          fromEvent<KeyboardEvent>(document, 'keyup').pipe(filter(e => e.keyCode === Keys.escape)),
+        ).pipe(filter(() => state$.value.drawer.isVisible), map(closeDrawer)),
+      ),
+    );
 
 /**
  * Drawer reducer
