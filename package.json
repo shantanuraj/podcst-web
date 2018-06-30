@@ -32,7 +32,7 @@
     "lint": "tslint --project tsconfig.json --fix"
   },
   "dependencies": {
-    "csstips": "^0.2.2",
+    "csstips": "^0.3.0",
     "howler": "^2.0.5",
     "preact": "^8.2.5",
     "preact-redux": "^2.0.2",
