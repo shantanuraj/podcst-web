@@ -61,22 +61,10 @@ module.exports = env => {
         'redux-observable',
 
         // Directly referenced Rx paackages
-        'rxjs/observable/dom/ajax',
-        'rxjs/observable/of',
-        'rxjs/observable/fromEvent',
-        'rxjs/observable/merge',
-        'rxjs/observable/concat',
+        'rxjs',
+        'rxjs/ajax',
+        'rxjs/operators',
 
-        // Rx Packages referenced by patch files
-        'rxjs/add/operator/catch',
-        'rxjs/add/operator/debounceTime',
-        'rxjs/add/operator/do',
-        'rxjs/add/operator/filter',
-        'rxjs/add/operator/map',
-        'rxjs/add/operator/mergeMap',
-        'rxjs/add/operator/switchMap',
-        'rxjs/add/operator/takeUntil',
-        'rxjs/add/operator/throttleTime',
         'typestyle',
       ],
       app: './index.tsx',

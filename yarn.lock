@@ -1383,6 +1383,10 @@ csstips@^0.3.0:
   version "0.3.0"
   resolved "https://registry.yarnpkg.com/csstips/-/csstips-0.3.0.tgz#e9a069363fbd53002ac4dd4221b5f4ad4e18f65c"
 
+csstype@^2.4.0:
+  version "2.5.5"
+  resolved "https://registry.yarnpkg.com/csstype/-/csstype-2.5.5.tgz#4125484a3d42189a863943f23b9e4b80fedfa106"
+
 currently-unhandled@^0.4.1:
   version "0.4.1"
   resolved "https://registry.yarnpkg.com/currently-unhandled/-/currently-unhandled-0.4.1.tgz#988df33feab191ef799a61369dd76c17adf957ea"
@@ -2008,9 +2012,9 @@ forwarded@~0.1.2:
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/forwarded/-/forwarded-0.1.2.tgz#98c23dab1175657b8c0573e8ceccd91b0ff18c84"
 
-free-style@2.4.1:
-  version "2.4.1"
-  resolved "https://registry.yarnpkg.com/free-style/-/free-style-2.4.1.tgz#4ef5a6d8a873f7b99beaf6410b428e0ba1b0f376"
+free-style@2.5.1:
+  version "2.5.1"
+  resolved "https://registry.yarnpkg.com/free-style/-/free-style-2.5.1.tgz#5e3f684c470d3bba7e4dbb43524e0a08917e873c"
 
 fresh@0.5.0:
   version "0.5.0"
@@ -4747,11 +4751,12 @@ typescript@^2.5.3:
   version "2.5.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-2.5.3.tgz#df3dcdc38f3beb800d4bc322646b04a3f6ca7f0d"
 
-typestyle@^1.4.3:
-  version "1.4.3"
-  resolved "https://registry.yarnpkg.com/typestyle/-/typestyle-1.4.3.tgz#5d7d4246a6b31ed4e04ddf6532025ec9e1424c26"
+typestyle@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/typestyle/-/typestyle-2.0.1.tgz#9593e6029ce5f23f1a5728ddd3ed6bf1ffa781f8"
   dependencies:
-    free-style "2.4.1"
+    csstype "^2.4.0"
+    free-style "2.5.1"
 
 uglify-js@3.0.x:
   version "3.0.27"
