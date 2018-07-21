@@ -254,6 +254,9 @@ export interface IPlayerState {
   state: EpisodePlayerState;
 }
 
+export const episodeEndEpic: Epic<PlayerActions, IState> = action$ =>
+  action$.ofType(STOP_EPISODE).map(skipToNextEpisode);
+
 export const uiSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
     .ofType(SEEK_UPDATE_REQUEST)
@@ -378,7 +381,7 @@ export const player = (
       };
     }
     case SKIP_TO_NEXT_EPISODE: {
-      const currentEpisode = (state.currentEpisode + 1) % state.queue.length;
+      const currentEpisode = Math.min(state.currentEpisode + 1, state.queue.length - 1);
       const { duration } = state.queue[currentEpisode];
       return {
         ...state,
@@ -387,8 +390,7 @@ export const player = (
       };
     }
     case SKIP_TO_PREV_EPISODE: {
-      const currentEpisode =
-        state.currentEpisode === 0 ? state.queue.length - 1 : (state.currentEpisode - 1) / state.queue.length;
+      const currentEpisode = Math.max(0, state.currentEpisode - 1);
       const { duration } = state.queue[currentEpisode];
       return {
         ...state,
