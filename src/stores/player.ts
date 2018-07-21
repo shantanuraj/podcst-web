@@ -388,6 +388,7 @@ export const player = (
         currentEpisode,
         seekPosition: 0,
         duration: duration || 0,
+        state: 'playing',
       };
     }
     case SKIP_TO_PREV_EPISODE: {
@@ -398,6 +399,7 @@ export const player = (
         currentEpisode,
         seekPosition: 0,
         duration: duration || 0,
+        state: 'playing',
       };
     }
     case MANUAL_SEEK_UPDATE:
