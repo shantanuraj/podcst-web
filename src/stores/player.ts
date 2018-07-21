@@ -386,6 +386,7 @@ export const player = (
       return {
         ...state,
         currentEpisode,
+        seekPosition: 0,
         duration: duration || 0,
       };
     }
@@ -395,6 +396,7 @@ export const player = (
       return {
         ...state,
         currentEpisode,
+        seekPosition: 0,
         duration: duration || 0,
       };
     }
