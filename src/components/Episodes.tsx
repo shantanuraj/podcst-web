@@ -3,7 +3,7 @@ import { classes, media, style, types } from 'typestyle';
 
 import { IPodcastsState } from '../stores/podcasts';
 
-import { imageWithPlaceholder, scrollToTop, stripHost } from '../utils';
+import { imageWithPlaceholder, linkifyText, scrollToTop, stripHost } from '../utils';
 import { normalizeEl } from '../utils/styles';
 
 import EpisodeRow from './EpisodeRow';
@@ -208,7 +208,7 @@ class Episodes extends Component<IEpisodesProps, any> {
               </button>
               <ShareButton title={title} text={`${title} - ${description}`} url={location.href} theme={theme} />
             </div>
-            <p class={infoMargins} dangerouslySetInnerHTML={{ __html: description.trim() }} />
+            <p class={infoMargins} dangerouslySetInnerHTML={{ __html: linkifyText(description).trim() }} />
           </div>
         </div>
         <ul class={episodesListContainer(theme)}>{episodes.map(this.renderEpisode)}</ul>

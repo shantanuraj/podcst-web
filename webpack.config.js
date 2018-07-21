@@ -10,7 +10,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const WorkboxPlugin = require('workbox-webpack-plugin');
-const WebpackChunkHash = require('webpack-chunk-hash');
+const WebpackHashOutput = require('webpack-plugin-hash-output');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const { version } = require('./package.json');
 
@@ -96,11 +96,13 @@ module.exports = env => {
       new CopyWebpackPlugin([{ from: '../public' }]),
       new webpack.optimize.ModuleConcatenationPlugin(),
       new webpack.optimize.CommonsChunkPlugin({
-        name: ['vendor', 'manifest'],
+        name: ['vendor', 'manifest', 'app'],
         minChunks: Infinity,
       }),
       new webpack.HashedModuleIdsPlugin(),
-      new WebpackChunkHash(),
+      new WebpackHashOutput({
+        manifestFiles: 'vendor',
+      }),
       new webpack.DefinePlugin({
         'process.env': {
           NODE_ENV: isProdOrStaging ? '"production"' : '"development"',
