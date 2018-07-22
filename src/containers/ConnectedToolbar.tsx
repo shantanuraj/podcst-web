@@ -2,7 +2,7 @@
  * Connected Toolbar component
  */
 
-import { connect } from 'preact-redux';
+import { connect } from 'react-redux';
 
 import { IState } from '../stores/root';
 

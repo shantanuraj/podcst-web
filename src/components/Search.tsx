@@ -2,7 +2,7 @@
  * Search component for toolbar
  */
 
-import { Component, h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -45,7 +45,7 @@ interface ISearchProps extends ISearchState {
   onResultSelect(feed: string);
 }
 
-class Search extends Component<ISearchProps, any> {
+class Search extends React.PureComponent<ISearchProps, any> {
   private el: HTMLElement | null = null;
   private clicksSub: Subscription | null = null;
   private keyboardSub: Subscription | null = null;
@@ -125,10 +125,10 @@ class Search extends Component<ISearchProps, any> {
     theme,
   }: ISearchProps) {
     return (
-      <div class={className} ref={this.saveRef}>
+      <div className={className} ref={this.saveRef}>
         <input
           aria-label="Search podcasts"
-          class={search(theme)}
+          className={search(theme)}
           type="text"
           onInput={onEvent(searchPodcasts)}
           placeholder={'Search'}

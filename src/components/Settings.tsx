@@ -2,7 +2,7 @@
  * Settings component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { media, style, types } from 'typestyle';
 
@@ -10,6 +10,8 @@ import ImportPodcastsView from './ImportPodcastsView';
 import NavLinks, { ILinkMap } from './NavLinks';
 import Shortcuts from './Shortcuts';
 import ThemePicker from './ThemePicker';
+
+import { App } from '../typings';
 
 const linkMap = (version: string): ILinkMap => ({
   '/settings?section=theme': 'Change Theme',
@@ -80,7 +82,7 @@ const Settings = (props: ISettingsProps) => {
   }
 
   return (
-    <div class={container(theme)}>
+    <div className={container(theme)}>
       <NavLinks links={linkMap(version)} theme={theme} />
     </div>
   );

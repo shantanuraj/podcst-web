@@ -5,7 +5,7 @@
 import { Epic } from 'redux-observable';
 import { filter, map, tap } from 'rxjs/operators';
 
-import { route as routeTo } from 'preact-router';
+import { route as routeTo } from 'react-router-dom';
 
 import { Actions, IState } from './root';
 

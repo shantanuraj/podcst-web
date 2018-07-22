@@ -54,9 +54,10 @@ module.exports = env => {
       vendor: [
         'csstips',
         'howler',
-        'preact',
-        'preact-redux',
-        'preact-router',
+        'react',
+        'react-dom',
+        'react-redux',
+        'react-router-dom',
         'redux',
         'redux-observable',
 

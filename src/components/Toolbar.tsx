@@ -2,7 +2,7 @@
  * Toolbar component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -63,14 +63,14 @@ interface IToolbarProps {
 }
 
 const Toolbar = ({ title, theme, toggleDrawer }: IToolbarProps) => (
-  <header class={toolbar(theme)}>
+  <header className={toolbar(theme)}>
     <nav>
-      <div class={menuContainer} onClick={toggleDrawer}>
+      <div className={menuContainer} onClick={toggleDrawer}>
         <Icons color={theme.text} icon="menu" size={24} />
         <span>{title}</span>
       </div>
     </nav>
-    <div class={secondaryItems}>
+    <div className={secondaryItems}>
       <ConnectedSearch className={search} />
     </div>
   </header>

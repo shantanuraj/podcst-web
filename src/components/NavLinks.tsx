@@ -2,11 +2,13 @@
  * Nav links
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
-import { Link } from 'preact-router';
+import { Link } from 'react-router-dom';
 
 import { style } from 'typestyle';
+
+import { App } from '../typings';
 
 const navLinks = style({
   flex: 1,
@@ -24,7 +26,7 @@ export interface ILinkMap {
 }
 
 const renderLink = (theme: App.ITheme, link: string, title: string) => (
-  <Link class={navLink(theme)} href={link}>
+  <Link className={navLink(theme)} href={link}>
     {title}
   </Link>
 );
@@ -37,6 +39,6 @@ interface INavLinksProps {
   theme: App.ITheme;
 }
 
-const NavLinks = ({ theme, links }: INavLinksProps) => <nav class={navLinks}>{renderLinks(theme, links)}</nav>;
+const NavLinks = ({ theme, links }: INavLinksProps) => <nav className={navLinks}>{renderLinks(theme, links)}</nav>;
 
 export default NavLinks;

@@ -19,7 +19,7 @@
     "suppressImplicitAnyIndexErrors": true,
     "outDir": "dist",
     "jsx": "react",
-    "jsxFactory": "h"
+    "jsxFactory": "React.createElement"
   },
   "compileOnSave": false,
   "buildOnSave": false,

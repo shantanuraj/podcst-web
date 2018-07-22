@@ -2,7 +2,7 @@
  * Toast component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
@@ -36,6 +36,6 @@ interface IToastProps extends IToastState {
 }
 
 const Toast = ({ isVisible, message, theme }: IToastProps) =>
-  isVisible ? <div class={toastContainer(theme)}>{message}</div> : null;
+  isVisible ? <div className={toastContainer(theme)}>{message}</div> : null;
 
 export default Toast;

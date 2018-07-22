@@ -2,7 +2,7 @@
  * Import Podcasts component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 const onChange = (cb: (file: string) => void) => {
   return (e: Event) => {

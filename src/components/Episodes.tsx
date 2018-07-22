@@ -1,4 +1,4 @@
-import { Component, h } from 'preact';
+import * as React from 'react';
 import { classes, media, style, types } from 'typestyle';
 
 import { IPodcastsState } from '../stores/podcasts';
@@ -148,7 +148,7 @@ interface IEpisodesProps {
   removeSubscription: (feed: string) => void;
 }
 
-class Episodes extends Component<IEpisodesProps, any> {
+class Episodes extends React.PureComponent<IEpisodesProps, any> {
   public loadIfNeeded = () => {
     const { feed, getEpisodes, info } = this.props;
 
@@ -194,24 +194,24 @@ class Episodes extends Component<IEpisodesProps, any> {
     const handler = () => (isSubscribed ? removeSubscription(feed) : addSubscription(feed, info));
 
     return (
-      <div class={classes(normalizeEl, episodesContainer(theme))}>
-        <div class={podcastInfo}>
-          <div class={infoCover(mode, cover)} role="img" aria-label={`${title} by ${author}`} />
-          <div class={podcastInfoTitles(theme)}>
-            <h1 class={podcastTitle}>{title}</h1>
-            <h2 class={infoMargins}>
+      <div className={classes(normalizeEl, episodesContainer(theme))}>
+        <div className={podcastInfo}>
+          <div className={infoCover(mode, cover)} role="img" aria-label={`${title} by ${author}`} />
+          <div className={podcastInfoTitles(theme)}>
+            <h1 className={podcastTitle}>{title}</h1>
+            <h2 className={infoMargins}>
               {author} - <a href={link}>{stripHost(link)}</a>
             </h2>
-            <div class={buttonsContainer}>
-              <button class={subscribeButton(theme)} data-is-subscribed={isSubscribed} onClick={handler}>
+            <div className={buttonsContainer}>
+              <button className={subscribeButton(theme)} data-is-subscribed={isSubscribed} onClick={handler}>
                 {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
               </button>
               <ShareButton title={title} text={`${title} - ${description}`} url={location.href} theme={theme} />
             </div>
-            <p class={infoMargins} dangerouslySetInnerHTML={{ __html: linkifyText(description).trim() }} />
+            <p className={infoMargins} dangerouslySetInnerHTML={{ __html: linkifyText(description).trim() }} />
           </div>
         </div>
-        <ul class={episodesListContainer(theme)}>{episodes.map(this.renderEpisode)}</ul>
+        <ul className={episodesListContainer(theme)}>{episodes.map(this.renderEpisode)}</ul>
       </div>
     );
   }

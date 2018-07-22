@@ -4,9 +4,9 @@
 
 /* tslint:disable:no-console */
 
-import { h } from 'preact';
+import * as React from 'react';
 
-import { Link } from 'preact-router';
+import { Link } from 'react-router-dom';
 
 import { classes, media, style } from 'typestyle';
 
@@ -158,11 +158,11 @@ const PlayerInfo = ({
   theme,
   toggleLargeSeek,
 }: IPlayerInfoProps) => (
-  <div class={infoContainer(theme)}>
-    <Link class={linkContainer} href={getEpisodesRoute(feed)}>
-      <div class={episodeImage(episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
+  <div className={infoContainer(theme)}>
+    <Link className={linkContainer} href={getEpisodesRoute(feed)}>
+      <div className={episodeImage(episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
     </Link>
-    <div class={buttonsContainer}>
+    <div className={buttonsContainer}>
       <SeekButton
         direction="seek-back"
         hideOnMobile={true}
@@ -174,7 +174,7 @@ const PlayerInfo = ({
       <button
         role="button"
         aria-label={state === 'playing' ? 'Pause' : 'Play'}
-        class={playerButton(MAIN_ICON_RATIO)}
+        className={playerButton(MAIN_ICON_RATIO)}
         onClick={state === 'playing' ? pause : resume}
       >
         <Icon color={theme.accent} icon={state === 'playing' ? 'pause' : 'play'} size="100%" />
@@ -188,17 +188,17 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link data-hide-on-mobile="true" class={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
-      <div class={episodeInfoContainer}>
-        <div class={episodeInfo(theme)}>
+    <Link data-hide-on-mobile="true" className={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+      <div className={episodeInfoContainer}>
+        <div className={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
           <p data-author="true">{author}</p>
         </div>
       </div>
     </Link>
-    <button data-hide-on-desktop="true" class={classes(linkContainer, showLink)} onClick={toggleLargeSeek}>
-      <div class={episodeInfoContainer}>
-        <div class={episodeInfo(theme)}>
+    <button data-hide-on-desktop="true" className={classes(linkContainer, showLink)} onClick={toggleLargeSeek}>
+      <div className={episodeInfoContainer}>
+        <div className={episodeInfo(theme)}>
           <p data-title="true">{title}</p>
           <p data-author="true">{author}</p>
         </div>

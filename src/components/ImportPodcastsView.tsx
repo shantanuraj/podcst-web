@@ -2,7 +2,7 @@
  * Import Podcasts component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -37,8 +37,8 @@ interface IImportPodcastsViewProps {
 }
 
 const ImportPodcastsView = ({ theme }: IImportPodcastsViewProps) => (
-  <div class={container}>
-    <button class={importButton(theme)}>
+  <div className={container}>
+    <button className={importButton(theme)}>
       <ConnectedImportPodcasts />
     </button>
   </div>

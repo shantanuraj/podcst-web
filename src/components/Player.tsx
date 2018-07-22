@@ -2,11 +2,11 @@
  * Player component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
-import { Link } from 'preact-router';
+import { Link } from 'react-router-dom';
 
 import { IPlayerState, SeekDirection } from '../stores/player';
 
@@ -128,8 +128,8 @@ const Player = ({
   const isVisible = state !== 'stopped' && !!episode;
 
   return isVisible ? (
-    <div data-is-seek-visible={isLargeSeekVisible} data-is-player-visible={isVisible} class={playerContainer}>
-      <div class={player(theme)}>
+    <div data-is-seek-visible={isLargeSeekVisible} data-is-player-visible={isVisible} className={playerContainer}>
+      <div className={player(theme)}>
         <PlayerInfo
           episode={episode}
           jumpSeek={jumpSeek}
@@ -142,7 +142,7 @@ const Player = ({
         <ConnectedSeekView />
         <Link
           data-is-seek-visible={isLargeSeekVisible}
-          class={infoIcon}
+          className={infoIcon}
           href={getEpisodeRoute(episode.feed, episode.title)}
         >
           <Icon color={theme.accent} icon="info" size={24} />
@@ -151,7 +151,7 @@ const Player = ({
       <ConnectedLargeSeekbar mode="inline" />
     </div>
   ) : (
-    <div data-is-player-visible={isVisible} class={playerContainer} />
+    <div data-is-player-visible={isVisible} className={playerContainer} />
   );
 };
 

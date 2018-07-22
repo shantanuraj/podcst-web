@@ -2,13 +2,13 @@
  * Index redirect
  */
 
-import { Component } from 'preact';
+import { PureComponent } from 'react';
 
 interface IndexRedirectProps {
   navigate: (route: string) => void;
 }
 
-class IndexRedirect extends Component<IndexRedirectProps, {}> {
+class IndexRedirect extends PureComponent<IndexRedirectProps, {}> {
   public componentDidMount() {
     this.props.navigate('/feed/top');
   }

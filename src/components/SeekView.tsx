@@ -2,7 +2,7 @@
  * Seek View component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -35,7 +35,7 @@ interface ISeekViewProps {
 
 const SeekView = ({ buffering, duration, seekPosition, theme, onSeek }: ISeekViewProps) => (
   <div data-hide-on-mobile="true">
-    <div data-display-on-hover="true" class={seekInfo}>
+    <div data-display-on-hover="true" className={seekInfo}>
       <SeekInfo duration={duration} seekPosition={seekPosition} theme={theme} />
     </div>
     <Seekbar

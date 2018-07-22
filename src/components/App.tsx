@@ -2,7 +2,7 @@
  * App component
  */
 
-import { Component, h } from 'preact';
+import * as React from 'react';
 
 import { classes, media, style } from 'typestyle';
 
@@ -40,6 +40,8 @@ import ConnectedToast from '../containers/ConnectedToast';
 
 import ConnectedToolbar from '../containers/ConnectedToolbar';
 
+import { App as AppTypes } from '../typings';
+
 const container = style(
   {
     paddingTop: TOOLBAR_HEIGHT,
@@ -67,7 +69,7 @@ const mainContainer = style({
 });
 
 interface IAppProps {
-  theme: App.ITheme;
+  theme: AppTypes.ITheme;
   version: string;
   isPlayerVisible: boolean;
   appInit();
@@ -82,7 +84,7 @@ interface IAppProps {
   stopEpisode();
 }
 
-class App extends Component<IAppProps, never> {
+class App extends React.PureComponent<IAppProps, never> {
   public componentDidMount() {
     this.props.setTitle(getTitle(location.href));
     Audio.init(this.props);
@@ -94,11 +96,11 @@ class App extends Component<IAppProps, never> {
   public render() {
     const { isPlayerVisible, routerNavigate, version } = this.props;
     return (
-      <div class={classes(normalizeEl, mainContainer)}>
+      <div className={classes(normalizeEl, mainContainer)}>
         <ConnectedToolbar />
         <ConnectedLoader />
         <ConnectedDrawer />
-        <main data-is-player-visible={isPlayerVisible} class={classes(normalizeEl, container)}>
+        <main data-is-player-visible={isPlayerVisible} className={classes(normalizeEl, container)}>
           <Router onChange={routerNavigate}>
             <ConnectedIndexRedirect path="/" />
             <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />

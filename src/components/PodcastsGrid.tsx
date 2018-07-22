@@ -2,7 +2,7 @@
  * Podcasts grid component
  */
 
-import { Component, h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -31,7 +31,7 @@ interface ISubsStateProps {
 
 type PodcastsGridProps = IFeedStateProps | ISubsStateProps;
 
-class PodcastsGrid extends Component<PodcastsGridProps, any> {
+class PodcastsGrid extends React.PureComponent<PodcastsGridProps, any> {
   public componentDidMount() {
     if (this.props.mode === 'subs') {
       return;
@@ -54,7 +54,7 @@ class PodcastsGrid extends Component<PodcastsGridProps, any> {
   };
 
   public renderLoaded(mode: App.ThemeMode, podcasts: App.RenderablePodcast[]) {
-    return <div class={grid}>{podcasts.map(this.renderPodcast(mode))}</div>;
+    return <div className={grid}>{podcasts.map(this.renderPodcast(mode))}</div>;
   }
 
   public render({ mode, themeMode }: PodcastsGridProps) {

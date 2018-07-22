@@ -2,7 +2,7 @@
  * SVG Icons
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -70,6 +70,6 @@ const iconStyle = (fill: string, size: number | string = 36) =>
     minWidth: size,
   });
 
-const Icon = ({ icon, color, size }: IconProps) => <div class={iconStyle(color, size)}>{getIcon(icon)}</div>;
+const Icon = ({ icon, color, size }: IconProps) => <div className={iconStyle(color, size)}>{getIcon(icon)}</div>;
 
 export default Icon;

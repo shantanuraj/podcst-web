@@ -2,7 +2,7 @@
  * Connected Import Podcasts component
  */
 
-import { connect } from 'preact-redux';
+import { connect } from 'react-redux';
 
 import { parseOPML } from '../stores/subscriptions';
 

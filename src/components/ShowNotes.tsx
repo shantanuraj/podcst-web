@@ -2,7 +2,7 @@
  * Show notes component for displaying episode notes
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { classes, style } from 'typestyle';
 
@@ -35,7 +35,7 @@ interface IShowNotesProps {
 }
 
 const ShowNotes = ({ className, showNotes }: IShowNotesProps) => (
-  <div class={classes(className, showNotesContainer)}>
+  <div className={classes(className, showNotesContainer)}>
     <h3>Show Notes</h3>
     <div dangerouslySetInnerHTML={{ __html: showNotes }} />
   </div>

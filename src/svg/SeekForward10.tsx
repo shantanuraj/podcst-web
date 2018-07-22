@@ -1,4 +1,4 @@
-import { h } from 'preact';
+import * as React from 'react';
 
 /* tslint:disable:max-line-length */
 const SeekForward = () => (

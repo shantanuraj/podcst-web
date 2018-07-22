@@ -2,7 +2,7 @@
  * SeekInfo component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -26,7 +26,7 @@ const SeekInfo = ({ duration, seekPosition, theme }: ISeekInfoProps) => {
   const currentTime = formatTime(seekPosition);
   const totalTime = formatTime(duration);
   return (
-    <div class={seekInfoContainer(theme)}>
+    <div className={seekInfoContainer(theme)}>
       <span aria-label={`Current episode time: ${currentTime}`}>{currentTime}</span> /{' '}
       <span aria-label={`Total time: ${totalTime}`}>{totalTime}</span>
     </div>

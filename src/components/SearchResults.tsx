@@ -6,9 +6,9 @@ import { fromEvent, Subscription } from 'rxjs';
 
 import { filter } from 'rxjs/operators';
 
-import { Component, h } from 'preact';
+import * as React from 'react';
 
-import { Link } from 'preact-router';
+import { Link } from 'react-router-dom';
 
 import { media, style } from 'typestyle';
 
@@ -94,7 +94,7 @@ const SearchNavKeys: IKeyboardShortcutsMap = {
   [Keys.enter]: 'select',
 };
 
-class SearchResults extends Component<ISearchResultsProps, any> {
+class SearchResults extends React.PureComponent<ISearchResultsProps, any> {
   public el: HTMLDivElement | null;
   public navigationSub: Subscription | null;
 
@@ -138,13 +138,13 @@ class SearchResults extends Component<ISearchResultsProps, any> {
     theme: ISearchResultsProps['theme'],
   ) => (
     <Link onClick={dismissSearch} href={`/episodes?feed=${podcast.feed}`}>
-      <div class={result(theme)} data-focus={isFocussed} onMouseEnter={focusResult}>
-        <img class={resultImage(mode)} src={podcast.thumbnail} />
-        <div class={resultText}>
-          <p class={resultPodcastTitle} title={podcast.title}>
+      <div className={result(theme)} data-focus={isFocussed} onMouseEnter={focusResult}>
+        <img className={resultImage(mode)} src={podcast.thumbnail} />
+        <div className={resultText}>
+          <p className={resultPodcastTitle} title={podcast.title}>
             {podcast.title}
           </p>
-          <p class={resultAuthorText} title={podcast.author}>
+          <p className={resultAuthorText} title={podcast.author}>
             {podcast.author}
           </p>
         </div>
@@ -166,7 +166,7 @@ class SearchResults extends Component<ISearchResultsProps, any> {
 
   public render({ dismissSearch, focusResult, focusedResult, mode, podcasts, theme }: ISearchResultsProps) {
     return (
-      <div class={results(theme)} onClick={dismissSearch} ref={el => (this.el = el as HTMLDivElement)}>
+      <div className={results(theme)} onClick={dismissSearch} ref={el => (this.el = el as HTMLDivElement)}>
         {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch, mode, theme)}
       </div>
     );

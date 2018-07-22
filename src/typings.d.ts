@@ -10,7 +10,7 @@ type FeedType = 'top';
 /**
  * Application type dependencies
  */
-declare namespace App {
+export declare namespace App {
   /**
    * Adapted Podcast interface
    */
@@ -168,19 +168,13 @@ interface IKeyboardShortcutsMap {
   [keyCode: number]: KeyboardShortcuts;
 }
 
-interface IPodcastWebpackModule {
+export interface IPodcastWebpackModule {
   hot?: {
     accept: (val?: string, cb?: () => void) => void;
   };
 }
 
-declare let module: IPodcastWebpackModule;
-
-type Require = (package: string) => void;
-
-declare let require: Require;
-
-interface IProcess {
+export interface IProcess {
   env: {
     APP_VERSION: string;
     IN_BROWSER: string;
@@ -235,7 +229,5 @@ interface IShareEnabledNavigator extends Navigator {
 interface IReduxDevToolsEnabledWindow extends Window {
   __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any;
 }
-
-declare let process: IProcess;
 
 declare let MediaMetadata: IChromeMediaMetadataClass;

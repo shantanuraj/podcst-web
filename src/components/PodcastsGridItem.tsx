@@ -2,9 +2,9 @@
  * Podcasts Grid Item
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
-import { Link } from 'preact-router';
+import { Link } from 'react-router-dom';
 
 import { style } from 'typestyle';
 
@@ -65,11 +65,11 @@ interface IPodcastsGridItemProps {
 const PodcastsGridItem = ({ podcast, mode }: IPodcastsGridItemProps) => {
   const { author, feed, title } = podcast;
   return (
-    <Link class={gridContainer(mode)} href={`/episodes?feed=${feed}`}>
-      <div role="img" aria-label={`${title} by ${author}`} class={gridItem(podcast.cover)}>
+    <Link className={gridContainer(mode)} href={`/episodes?feed=${feed}`}>
+      <div role="img" aria-label={`${title} by ${author}`} className={gridItem(podcast.cover)}>
         <div>
-          <div class={podcastTitle}>{title}</div>
-          <div class={podcastAuthor}>{author}</div>
+          <div className={podcastTitle}>{title}</div>
+          <div className={podcastAuthor}>{author}</div>
         </div>
       </div>
     </Link>

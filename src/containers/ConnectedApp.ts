@@ -2,7 +2,7 @@
  * Connected App component
  */
 
-import { connect } from 'preact-redux';
+import { connect } from 'react-redux';
 
 import { RouterOnChangeArgs } from 'preact-router';
 

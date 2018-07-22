@@ -2,7 +2,7 @@
  * Connect Index Redirect component
  */
 
-import { connect } from 'preact-redux';
+import { connect } from 'react-redux';
 
 import { navigate } from '../stores/router';
 

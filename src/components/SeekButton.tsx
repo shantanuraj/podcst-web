@@ -2,7 +2,7 @@
  * Seek Button component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import Icon from '../svg/Icon';
 
@@ -22,7 +22,7 @@ const SeekButton = ({ direction, hideOnMobile, label, onClick, sizeRatio, theme 
     data-hide-on-mobile={hideOnMobile}
     role="button"
     aria-label={label}
-    class={playerButton(sizeRatio)}
+    className={playerButton(sizeRatio)}
     onClick={onClick}
   >
     <Icon color={theme.accent} icon={direction} size="100%" />

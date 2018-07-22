@@ -2,7 +2,7 @@
  * Recents component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -37,7 +37,7 @@ const Recents = ({ currentEpisode, episodes, playEpisode, theme }: IRecentsProps
   const RecentRow = recentRow(currentEpisode, playEpisode, theme);
   return (
     <div>
-      <ul class={container}>{episodes.map(RecentRow)}</ul>
+      <ul className={container}>{episodes.map(RecentRow)}</ul>
     </div>
   );
 };

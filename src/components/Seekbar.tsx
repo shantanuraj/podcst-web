@@ -2,11 +2,13 @@
  * Seekbar component
  */
 
-import { Component, h } from 'preact';
+import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
+
+import { App } from '../typings';
 
 const seekbarContainer = (theme: App.ITheme, mode: 'inline' | 'absolute') =>
   style(
@@ -73,7 +75,7 @@ export interface ISeekbarProps {
   onSeek: (seekPosition: number, duration: number) => void;
 }
 
-class Seekbar extends Component<ISeekbarProps, any> {
+class Seekbar extends React.PureComponent<ISeekbarProps, any> {
   private el: HTMLDivElement | null = null;
 
   private seekHandler = (e: MouseEvent) => {
@@ -96,12 +98,13 @@ class Seekbar extends Component<ISeekbarProps, any> {
     return buffering ? '100%' : `${seekPosition / duration * 100}%`;
   }
 
-  public render({ buffering, duration, mode, seekPosition, theme }: ISeekbarProps) {
+  public render() {
+    const { buffering, duration, mode, seekPosition, theme } = this.props;
     return (
-      <div ref={this.saveRef} class={seekbarContainer(theme, mode)} onClick={this.seekHandler}>
+      <div ref={this.saveRef} className={seekbarContainer(theme, mode)} onClick={this.seekHandler}>
         <div
           data-is-buffering={buffering}
-          class={seekbar(theme, mode)}
+          className={seekbar(theme, mode)}
           style={{ width: this.getSeekWidth(seekPosition, duration, buffering) }}
         />
       </div>

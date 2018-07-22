@@ -2,7 +2,7 @@
  * Drawer menu component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style, types } from 'typestyle';
 
@@ -11,6 +11,8 @@ import { IDrawerState } from '../stores/drawer';
 import NavLinks, { ILinkMap } from './NavLinks';
 
 import Icons from '../svg/Icon';
+
+import { App } from '../typings';
 
 const linkMap: ILinkMap = {
   '/subs': 'Subscriptions',
@@ -81,9 +83,9 @@ interface IDrawerMenuProps extends IDrawerState {
 }
 
 const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
-  <aside data-is-drawer-visible={isVisible} class={drawer(theme)}>
+  <aside data-is-drawer-visible={isVisible} className={drawer(theme)}>
     <nav>
-      <header class={drawerHeader(theme)}>
+      <header className={drawerHeader(theme)}>
         <span role="img" aria-label="Close drawer">
           <Icons color={theme.text} icon="back" size={24} />
         </span>

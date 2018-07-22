@@ -2,9 +2,11 @@
  * Shortcuts component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { media, style } from 'typestyle';
+
+import { App } from '../typings';
 
 const container = style({
   display: 'flex',
@@ -83,7 +85,7 @@ const appShortcuts: IShortcutInfo[] = [
 ];
 
 const renderShortcut = (theme: App.ITheme) => ({ title, value }: IShortcutInfo) => (
-  <div class={item(theme)}>
+  <div className={item(theme)}>
     <span>{title}</span>
     <pre>{value}</pre>
   </div>
@@ -95,6 +97,6 @@ interface IShortcutsProps {
   theme: App.ITheme;
 }
 
-const Shortcuts = ({ theme }: IShortcutsProps) => <div class={container}>{renderShortcuts(theme, appShortcuts)}</div>;
+const Shortcuts = ({ theme }: IShortcutsProps) => <div className={container}>{renderShortcuts(theme, appShortcuts)}</div>;
 
 export default Shortcuts;

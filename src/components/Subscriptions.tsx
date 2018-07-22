@@ -2,7 +2,7 @@
  * Subscriptions component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { ISubscriptionsState } from '../stores/subscriptions';
 

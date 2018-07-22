@@ -2,9 +2,9 @@
  * Episode view
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
-import { Link } from 'preact-router';
+import { Link } from 'react-router-dom';
 
 import { media, style } from 'typestyle';
 
@@ -93,24 +93,24 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
   const subContainerTheme = subContainer(theme);
 
   return (
-    <li class={listItem(theme)}>
-      <img class={episodeImage} src={episodeArt || cover} alt={title} />
-      <div class={episodeContainer(theme)}>
-        <div class={episodeRow}>
-          <div class={container}>
-            <div class={subContainerTheme}>
+    <li className={listItem(theme)}>
+      <img className={episodeImage} src={episodeArt || cover} alt={title} />
+      <div className={episodeContainer(theme)}>
+        <div className={episodeRow}>
+          <div className={container}>
+            <div className={subContainerTheme}>
               <p>{month}</p>
               <p>{day}</p>
             </div>
           </div>
-          <Link class={episodeTitle} href={getEpisodeRoute(feed, title)}>
+          <Link className={episodeTitle} href={getEpisodeRoute(feed, title)}>
             {title}
           </Link>
-          <div class={subContainerTheme}>
+          <div className={subContainerTheme}>
             <p>{minutes || ''}</p>
             <p>{minutes ? minutesSuffix : ''}</p>
           </div>
-          <div class={container}>
+          <div className={container}>
             <ConnectedPlayButton isCurrentEpisode={isCurrentEpisode} play={play} />
           </div>
         </div>

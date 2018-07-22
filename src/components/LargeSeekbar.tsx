@@ -2,7 +2,7 @@
  * Large Seekbar component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
@@ -15,6 +15,8 @@ import Seekbar, { ISeekbarProps } from './Seekbar';
 import SeekInfo from './SeekInfo';
 
 import SeekButton from './SeekButton';
+
+import { App } from '../typings';
 
 const seekbar = (theme: App.ITheme) =>
   style(
@@ -55,8 +57,8 @@ interface ILargeSeekbarProps extends ISeekbarProps {
 }
 
 const LargeSeekbar = (props: ILargeSeekbarProps) => (
-  <div id="large-seekbar" class={seekbar(props.theme)}>
-    <div class={playerControls}>
+  <div id="large-seekbar" className={seekbar(props.theme)}>
+    <div className={playerControls}>
       <SeekButton
         direction="seek-back"
         hideOnMobile={false}

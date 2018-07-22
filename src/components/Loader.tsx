@@ -2,7 +2,7 @@
  * Loader component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -22,6 +22,6 @@ interface ILoaderProps {
   theme: App.ITheme;
 }
 
-const Loader = ({ loading, theme }: ILoaderProps) => (loading ? <div class={loadingStyle(theme)} /> : null);
+const Loader = ({ loading, theme }: ILoaderProps) => (loading ? <div className={loadingStyle(theme)} /> : null);
 
 export default Loader;

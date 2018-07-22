@@ -24,6 +24,8 @@ import { IPlayEpisodeAction, jumpSeek, pauseEpisode, PLAY_EPISODE, PlayerActions
 
 import { INoopAction, noop } from './utils';
 
+import { App } from '../typings';
+
 /**
  * Update chrome metadata action creator
  */

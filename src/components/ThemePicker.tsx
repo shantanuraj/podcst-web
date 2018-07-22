@@ -2,7 +2,7 @@
  * Theme Picker settings component
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
@@ -95,8 +95,8 @@ const renderThemes = (color: string, selected: App.ThemeMode, themes: IThemeInfo
   themes.map(theme => renderTheme(color, selected, theme));
 
 const ThemePicker = ({ mode, theme, onThemeChange }: IThemePickerProps) => (
-  <form onChange={onEvent(onThemeChange)} class={container(theme)}>
-    <div class={themesContainer(theme)}>{renderThemes(theme.text, mode, appThemes)}</div>
+  <form onChange={onEvent(onThemeChange)} className={container(theme)}>
+    <div className={themesContainer(theme)}>{renderThemes(theme.text, mode, appThemes)}</div>
   </form>
 );
 

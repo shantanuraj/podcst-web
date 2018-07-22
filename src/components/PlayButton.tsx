@@ -2,7 +2,7 @@
  * Episode play button
  */
 
-import { h } from 'preact';
+import * as React from 'react';
 
 import { style } from 'typestyle';
 
@@ -41,7 +41,7 @@ const PlayButton = ({ isCurrentEpisode, play, pause, resume, state, theme }: IPl
   const text = isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play';
 
   return (
-    <button class={playButton(theme)} data-is-playing={isPlaying} data-is-paused={isPaused} onClick={handler}>
+    <button className={playButton(theme)} data-is-playing={isPlaying} data-is-paused={isPaused} onClick={handler}>
       {text}
     </button>
   );

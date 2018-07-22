@@ -2,7 +2,7 @@
  * Episode info view
  */
 
-import { Component, h } from 'preact';
+import * as React from 'react';
 
 import { media, style, types } from 'typestyle';
 
@@ -139,7 +139,7 @@ export interface IEpisodeInfoProps {
   playEpisode: (episode: App.IEpisode) => void;
 }
 
-class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
+class EpisodeInfo extends React.PureComponent<IEpisodeInfoProps, never> {
   public loadIfNeeded = () => {
     const { feed, getEpisodes, info } = this.props;
 
@@ -178,16 +178,16 @@ class EpisodeInfo extends Component<IEpisodeInfoProps, never> {
     const play = () => playEpisode(episode);
 
     return (
-      <div class={container(theme)}>
-        <div class={podcastInfo}>
-          <div class={infoCover(mode, showArt)} role="img" aria-label={`${title} episode art`} />
-          <div class={podcastInfoTitles}>
-            <h1 class={podcastTitle}>{episode.link ? <a href={episode.link}>{title}</a> : title}</h1>
-            <h2 class={infoMargins}>
+      <div className={container(theme)}>
+        <div className={podcastInfo}>
+          <div className={infoCover(mode, showArt)} role="img" aria-label={`${title} episode art`} />
+          <div className={podcastInfoTitles}>
+            <h1 className={podcastTitle}>{episode.link ? <a href={episode.link}>{title}</a> : title}</h1>
+            <h2 className={infoMargins}>
               from <a href={podcast.link}>{podcast.title}</a>
             </h2>
-            <h2 class={infoMargins}>by {author}</h2>
-            <div class={buttonsContainer}>
+            <h2 className={infoMargins}>by {author}</h2>
+            <div className={buttonsContainer}>
               <PlayButton isCurrentEpisode={currentEpisode === episode} play={play} />
               <ShareButton
                 text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
