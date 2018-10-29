@@ -16,6 +16,8 @@ import { normalizeSeek } from '../utils';
 
 import { SEEK_DELTA } from '../utils/constants';
 
+import { App, EpisodePlayerState } from '../typings';
+
 /**
  * Play related actions
  */

@@ -4,6 +4,8 @@
 
 import { Howl } from 'howler';
 
+import { App } from '../typings';
+
 let globalHowl: Howl;
 
 interface IAudioCallbacks {

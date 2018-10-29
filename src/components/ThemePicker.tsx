@@ -10,6 +10,8 @@ import Icon, { IconType } from '../svg/Icon';
 
 import { onEvent } from '../utils';
 
+import { App } from '../typings';
+
 const container = (theme: App.ITheme) =>
   style({
     display: 'flex',
@@ -84,7 +86,7 @@ const appThemes: IThemeInfo[] = [
 const renderTheme = (color: string, selected: App.ThemeMode, { icon, name, theme }: IThemeInfo) => (
   <div>
     <input type="radio" id={theme} name="theme" checked={selected === theme} value={theme} />
-    <label for={theme}>
+    <label htmlFor={theme}>
       <Icon color={color} icon={icon} />
       {name}
     </label>

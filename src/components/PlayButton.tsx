@@ -6,6 +6,8 @@ import * as React from 'react';
 
 import { style } from 'typestyle';
 
+import { App, EpisodePlayerState } from '../typings';
+
 const playButton = (theme: App.ITheme) =>
   style({
     display: 'inline-block',

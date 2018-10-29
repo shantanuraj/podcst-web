@@ -3,9 +3,9 @@
 /**
  * Shared Explicit state type
  */
-type ExplicitState = 'explicit' | 'cleaned' | 'notExplicit';
+export type ExplicitState = 'explicit' | 'cleaned' | 'notExplicit';
 
-type FeedType = 'top';
+export type FeedType = 'top';
 
 /**
  * Application type dependencies
@@ -127,28 +127,28 @@ export declare namespace App {
   }
 }
 
-interface ISubscriptionsMap {
+export interface ISubscriptionsMap {
   [feed: string]: App.IPodcastEpisodesInfo;
 }
 
-interface IFileInfo {
+export interface IFileInfo {
   url: string;
   length: string;
   type: string;
 }
 
-interface IOPMLFeed {
+export interface IOPMLFeed {
   title: string;
   feed: string;
 }
 
-interface IOPMLJson {
+export interface IOPMLJson {
   feeds: IOPMLFeed[];
 }
 
-type EpisodePlayerState = 'playing' | 'paused' | 'stopped';
+export type EpisodePlayerState = 'playing' | 'paused' | 'stopped';
 
-type KeyboardShortcuts =
+export type KeyboardShortcuts =
   | 'play'
   | 'next'
   | 'prev'
@@ -164,7 +164,7 @@ type KeyboardShortcuts =
   | 'toggle-drawer'
   | 'select';
 
-interface IKeyboardShortcutsMap {
+export interface IKeyboardShortcutsMap {
   [keyCode: number]: KeyboardShortcuts;
 }
 
@@ -182,51 +182,51 @@ export interface IProcess {
   };
 }
 
-interface IArtwork {
+export interface IArtwork {
   src: string;
   sizes: '96x96' | '128x128' | '192x192' | '256x256' | '384x384' | '512x512';
   type: 'image/png' | 'image/jpeg';
 }
 
-interface IChromeMediaMetadataProps {
+export interface IChromeMediaMetadataProps {
   album: string;
   artist: string;
   artwork: IArtwork[];
   title: string;
 }
 
-interface IChromeMediaMetadataClass {
+export interface IChromeMediaMetadataClass {
   new (props: IChromeMediaMetadataProps): IChromeMediaMetadata;
 }
 
-interface IChromeMediaMetadata {
+export interface IChromeMediaMetadata {
   __data: string;
 }
 
-type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';
+export type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';
 
-type ChromeEventHandler = () => void;
+export type ChromeEventHandler = () => void;
 
-interface IChromeMediaSession {
+export interface IChromeMediaSession {
   metadata: IChromeMediaMetadata;
   setActionHandler(event: ChromeMediaSessionEvents, handleR: ChromeEventHandler);
 }
 
-interface IChromeNavigator extends Navigator {
+export interface IChromeNavigator extends Navigator {
   mediaSession: IChromeMediaSession;
 }
 
-interface INavigatorShareProps {
+export interface INavigatorShareProps {
   text: string;
   title: string;
   url: string;
 }
 
-interface IShareEnabledNavigator extends Navigator {
+export interface IShareEnabledNavigator extends Navigator {
   share(info: INavigatorShareProps): Promise<undefined>;
 }
 
-interface IReduxDevToolsEnabledWindow extends Window {
+export interface IReduxDevToolsEnabledWindow extends Window {
   __REDUX_DEVTOOLS_EXTENSION_COMPOSE__: any;
 }
 

@@ -6,6 +6,8 @@ import * as React from 'react';
 
 import { style } from 'typestyle';
 
+import { App } from '../typings';
+
 import ConnectedImportPodcasts from '../containers/ConnectedImportPodcasts';
 
 const container = style({

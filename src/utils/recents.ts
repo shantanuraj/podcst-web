@@ -1,3 +1,5 @@
+import { App, ISubscriptionsMap } from '../typings';
+
 /**
  * Recent episodes helper for subscriptions
  */

@@ -6,6 +6,8 @@ import * as React from 'react';
 
 import { style } from 'typestyle';
 
+import { App, FeedType, ISubscriptionsMap } from '../typings';
+
 import { IFeedData, IFeedState } from '../stores/feed';
 
 import Loading from './Loading';
@@ -57,7 +59,9 @@ class PodcastsGrid extends React.PureComponent<PodcastsGridProps, any> {
     return <div className={grid}>{podcasts.map(this.renderPodcast(mode))}</div>;
   }
 
-  public render({ mode, themeMode }: PodcastsGridProps) {
+  public render() {
+    const { mode, themeMode } = this.props;
+
     if (mode === 'feed') {
       const { feed } = this.props as IFeedStateProps;
       const { loading, podcasts } = this.props[feed] as IFeedData;

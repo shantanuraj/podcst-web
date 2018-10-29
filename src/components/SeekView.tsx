@@ -10,6 +10,8 @@ import SeekInfo from './SeekInfo';
 
 import Seekbar from './Seekbar';
 
+import { App } from '../typings';
+
 const seekInfo = style({
   position: 'absolute',
   top: 4,

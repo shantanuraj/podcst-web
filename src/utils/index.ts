@@ -2,6 +2,8 @@
  * Utility functions
  */
 
+import { App, IOPMLFeed, IOPMLJson } from '../typings';
+
 /**
  * Simple event value extractor callback
  * @param fn - Callback to execute with string value

@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom';
 
 import { classes, media, style } from 'typestyle';
 
+import { App, EpisodePlayerState } from '../typings';
+
 import Icon from '../svg/Icon';
 
 import SeekButton from './SeekButton';

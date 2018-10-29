@@ -6,6 +6,8 @@ import { Observable, of } from 'rxjs';
 import { ajax } from 'rxjs/ajax';
 import { catchError, map } from 'rxjs/operators';
 
+import { App, FeedType } from '../typings';
+
 import { patchEpisodesResponse } from '../utils';
 
 export default class Podcasts {

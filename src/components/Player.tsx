@@ -8,6 +8,8 @@ import { media, style } from 'typestyle';
 
 import { Link } from 'react-router-dom';
 
+import { App } from '../typings';
+
 import { IPlayerState, SeekDirection } from '../stores/player';
 
 import { getEpisodeRoute } from '../utils';

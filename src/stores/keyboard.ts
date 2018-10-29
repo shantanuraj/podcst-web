@@ -34,6 +34,8 @@ import { navigate } from './router';
 
 import { toggleDrawer } from './drawer';
 
+import { IKeyboardShortcutsMap } from '../typings';
+
 /**
  * Keyboard shortcut map for changing theme
  */

@@ -12,6 +12,8 @@ import Icons from '../svg/Icon';
 
 import { TOOLBAR_HEIGHT } from '../utils/constants';
 
+import { App } from '../typings';
+
 const toolbar = (theme: App.ITheme) =>
   style({
     display: 'flex',

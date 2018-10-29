@@ -12,6 +12,8 @@ import Podcasts from '../api/Podcasts';
 
 import { IState } from './root';
 
+import { App } from '../typings';
+
 interface ISearchPodcastsAction {
   type: 'SEARCH_PODCASTS';
   query: string;

@@ -4,6 +4,8 @@
 
 import { keyframes } from 'typestyle';
 
+import { App } from '../typings';
+
 const background = '#ffffff';
 const accent = '#8649b2';
 

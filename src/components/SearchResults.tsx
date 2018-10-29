@@ -16,6 +16,8 @@ import { placeholderURL } from '../utils';
 
 import { Keys } from '../utils/constants';
 
+import { App, IKeyboardShortcutsMap } from '../typings';
+
 const results = (theme: App.ITheme) =>
   style(
     {
@@ -164,7 +166,8 @@ class SearchResults extends React.PureComponent<ISearchResultsProps, any> {
       this.renderPodcast(podcast, focusedResult === i, () => focusResult(i), dismissSearch, mode, theme),
     );
 
-  public render({ dismissSearch, focusResult, focusedResult, mode, podcasts, theme }: ISearchResultsProps) {
+  public render() {
+    const { dismissSearch, focusResult, focusedResult, mode, podcasts, theme } = this.props;
     return (
       <div className={results(theme)} onClick={dismissSearch} ref={el => (this.el = el as HTMLDivElement)}>
         {this.renderPodcasts(podcasts, focusedResult, focusResult, dismissSearch, mode, theme)}

@@ -8,6 +8,8 @@ import { style } from 'typestyle';
 
 import EpisodeRow from './EpisodeRow';
 
+import { App } from '../typings';
+
 const container = style({
   padding: 0,
   margin: 0,

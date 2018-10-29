@@ -18,6 +18,8 @@ import { ISearchState } from '../stores/search';
 
 import SearchResults from './SearchResults';
 
+import { App, IKeyboardShortcutsMap } from '../typings';
+
 const search = (theme: App.ITheme) =>
   style({
     padding: 16,
@@ -111,19 +113,21 @@ class Search extends React.PureComponent<ISearchProps, any> {
     }
   };
 
-  public render({
-    className,
-    dismissSearch,
-    mode,
-    podcasts,
-    query,
-    searchPodcasts,
-    focusedResult,
-    focusResult,
-    navigateResult,
-    onResultSelect,
-    theme,
-  }: ISearchProps) {
+  public render() {
+    const {
+      className,
+      dismissSearch,
+      mode,
+      podcasts,
+      query,
+      searchPodcasts,
+      focusedResult,
+      focusResult,
+      navigateResult,
+      onResultSelect,
+      theme,
+    } = this.props;
+
     return (
       <div className={className} ref={this.saveRef}>
         <input

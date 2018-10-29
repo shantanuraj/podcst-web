@@ -1,3 +1,5 @@
+import { App, IChromeNavigator, MediaMetadata } from '../typings';
+
 /**
  * Hook into Chrome for Android's media session
  * https://developers.google.com/web/updates/2015/07/media-notifications

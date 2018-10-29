@@ -2,6 +2,8 @@ import { normalize, setupPage } from 'csstips';
 
 import { cssRule, media, style } from 'typestyle';
 
+import { App } from '../typings';
+
 /**
  * Font family for application
  */

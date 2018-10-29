@@ -2,6 +2,7 @@
  * Theme provider
  */
 
+import { App } from '../typings';
 import darkTheme from './theme-dark';
 import lightTheme from './theme-light';
 

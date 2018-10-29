@@ -24,6 +24,8 @@ import { Storage } from '../utils/storage';
 
 import Podcasts from '../api/Podcasts';
 
+import { App, ISubscriptionsMap } from '../typings';
+
 interface IAddSubscriptionAction {
   type: 'ADD_SUBSCRIPTION';
   feed: string;

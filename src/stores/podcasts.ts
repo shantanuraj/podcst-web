@@ -10,6 +10,8 @@ import Podcasts from '../api/Podcasts';
 
 import { IState } from '../stores/root';
 
+import { App } from '../typings';
+
 interface IGetEpisodesAction {
   type: 'GET_EPISODES';
   feed: App.IPodcast['feed'];

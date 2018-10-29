@@ -8,6 +8,8 @@ import Icon from '../svg/Icon';
 
 import { playerButton } from './PlayerInfo';
 
+import { App } from '../typings';
+
 interface ISeekButtonProps {
   direction: 'seek-back' | 'seek-forward';
   hideOnMobile: boolean;

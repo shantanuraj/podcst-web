@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { classes, media, style, types } from 'typestyle';
 
+import { App, ISubscriptionsMap } from '../typings';
+
 import { IPodcastsState } from '../stores/podcasts';
 
 import { imageWithPlaceholder, linkifyText, scrollToTop, stripHost } from '../utils';
@@ -216,7 +218,8 @@ class Episodes extends React.PureComponent<IEpisodesProps, any> {
     );
   }
 
-  public render({ feed, info }: IEpisodesProps) {
+  public render() {
+    const { feed, info } = this.props;
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading) {
       return this.renderLoading();

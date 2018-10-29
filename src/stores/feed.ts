@@ -10,6 +10,8 @@ import { IState } from './root';
 
 import Podcasts from '../api/Podcasts';
 
+import { App, FeedType } from '../typings';
+
 interface IGetFeedAction {
   type: 'GET_FEED';
   feedType: FeedType;

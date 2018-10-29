@@ -8,6 +8,8 @@ import { style } from 'typestyle';
 
 import { formatTime } from '../utils';
 
+import { App } from '../typings';
+
 const seekInfoContainer = (theme: App.ITheme) =>
   style({
     color: theme.subTitle,

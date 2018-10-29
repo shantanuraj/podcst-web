@@ -10,6 +10,8 @@ import { style } from 'typestyle';
 
 import { placeholderURL } from '../utils';
 
+import { App } from '../typings';
+
 const gridContainer = (mode: App.ThemeMode) =>
   style({
     backgroundImage: placeholderURL(mode),

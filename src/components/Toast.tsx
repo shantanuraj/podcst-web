@@ -8,6 +8,8 @@ import { media, style } from 'typestyle';
 
 import { IToastState } from '../stores/toast';
 
+import { App } from '../typings';
+
 const toastContainer = (theme: App.ITheme) =>
   style(
     {

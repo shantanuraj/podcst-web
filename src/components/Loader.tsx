@@ -6,6 +6,8 @@ import * as React from 'react';
 
 import { style } from 'typestyle';
 
+import { App } from '../typings';
+
 const loadingStyle = (theme: App.ITheme) =>
   style({
     position: 'fixed',

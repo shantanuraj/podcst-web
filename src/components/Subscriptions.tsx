@@ -9,6 +9,8 @@ import { ISubscriptionsState } from '../stores/subscriptions';
 import ImportPodcastsView from './ImportPodcastsView';
 import PodcastsGrid from './PodcastsGrid';
 
+import { App } from '../typings';
+
 interface ISubscriptionsProps extends ISubscriptionsState {
   theme: App.ITheme;
   themeMode: App.ThemeMode;

@@ -8,6 +8,8 @@ import { Link } from 'react-router-dom';
 
 import { media, style } from 'typestyle';
 
+import { App } from '../typings';
+
 import { getEpisodeRoute, monthName } from '../utils';
 
 import ConnectedPlayButton from '../containers/ConnectedPlayButton';

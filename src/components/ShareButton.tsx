@@ -6,6 +6,8 @@ import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
+import { App, IShareEnabledNavigator } from '../typings';
+
 const shareButton = (theme: App.ITheme) =>
   style(
     {
