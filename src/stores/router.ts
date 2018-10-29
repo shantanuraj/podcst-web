@@ -5,12 +5,15 @@
 import { Epic } from 'redux-observable';
 import { filter, map, tap } from 'rxjs/operators';
 
-import { route as routeTo } from 'react-router-dom';
+// import { route as routeTo } from 'react-router-dom';
 
 import { Actions, IState } from './root';
 
 import { getTitle } from '../utils/route-titles';
 import { ISetTitleAction, setTitle } from './app';
+
+// TODO Fix
+const routeTo = () => ({});
 
 /**
  * Action creator for navigating between routes

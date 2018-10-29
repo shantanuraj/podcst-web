@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { RouteComponentProps } from 'react-router';
 import { classes, media, style, types } from 'typestyle';
 
 import { App, ISubscriptionsMap } from '../typings';
@@ -140,7 +141,6 @@ const subscribeButton = (theme: App.ITheme) =>
 interface IEpisodesProps {
   mode: App.ThemeMode;
   theme: App.ITheme;
-  feed: string;
   info: IPodcastsState;
   currentEpisode: App.IEpisodeInfo | null;
   subscriptions: ISubscriptionsMap;
@@ -150,9 +150,13 @@ interface IEpisodesProps {
   removeSubscription: (feed: string) => void;
 }
 
-class Episodes extends React.PureComponent<IEpisodesProps, any> {
+class Episodes extends React.PureComponent<IEpisodesProps & RouteComponentProps<any>, any> {
   public loadIfNeeded = () => {
-    const { feed, getEpisodes, info } = this.props;
+    const { search } = this.props.location;
+    const params = new URLSearchParams(search);
+    const feed = params.get('feed') as 'top';
+
+    const { getEpisodes, info } = this.props;
 
     const feedInfo = info[feed];
 
@@ -219,7 +223,11 @@ class Episodes extends React.PureComponent<IEpisodesProps, any> {
   }
 
   public render() {
-    const { feed, info } = this.props;
+    const { search } = this.props.location;
+    const params = new URLSearchParams(search);
+    const feed = params.get('feed') as 'top';
+
+    const { info } = this.props;
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading) {
       return this.renderLoading();

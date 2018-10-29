@@ -10,6 +10,8 @@ import { Actions, getRootEpic, IState, rootReducer } from './root';
 
 import { getDefaultState } from './utils';
 
+import { IReduxDevToolsEnabledWindow } from '../typings';
+
 const epicMiddleware = createEpicMiddleware();
 
 const composeEnhancers = (window as IReduxDevToolsEnabledWindow).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;

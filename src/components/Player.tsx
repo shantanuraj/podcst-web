@@ -103,8 +103,6 @@ const infoIcon = style({
 
 interface IPlayerProps extends IPlayerState {
   theme: App.ITheme;
-  duration: never;
-  seekPosition: never;
   jumpSeek: (seekDirection: SeekDirection) => void;
   onSeek: (seekPosition: number, duration: number) => void;
   pause: () => void;
@@ -145,12 +143,12 @@ const Player = ({
         <Link
           data-is-seek-visible={isLargeSeekVisible}
           className={infoIcon}
-          href={getEpisodeRoute(episode.feed, episode.title)}
+          to={getEpisodeRoute(episode.feed, episode.title)}
         >
           <Icon color={theme.accent} icon="info" size={24} />
         </Link>
       </div>
-      <ConnectedLargeSeekbar mode="inline" />
+      <ConnectedLargeSeekbar />
     </div>
   ) : (
     <div data-is-player-visible={isVisible} className={playerContainer} />

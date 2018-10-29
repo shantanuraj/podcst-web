@@ -78,17 +78,17 @@ export interface ISeekbarProps {
 class Seekbar extends React.PureComponent<ISeekbarProps, any> {
   private el: HTMLDivElement | null = null;
 
-  private seekHandler = (e: MouseEvent) => {
+  private seekHandler = (e: React.MouseEvent<HTMLDivElement>) => {
     const { duration, onSeek } = this.props;
 
     if (this.el) {
-      const seekFraction = e.offsetX / this.el.offsetWidth;
+      const seekFraction = e.nativeEvent.offsetX / this.el.offsetWidth;
       const newSeekPosition = Math.floor(seekFraction * duration);
       onSeek(newSeekPosition, duration);
     }
   };
 
-  private saveRef = (el: HTMLElement | undefined) => {
+  private saveRef = (el: HTMLDivElement) => {
     if (el) {
       this.el = el as HTMLDivElement;
     }

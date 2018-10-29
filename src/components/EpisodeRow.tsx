@@ -105,7 +105,7 @@ const EpisodeRow = (props: IEpisodeRowProps) => {
               <p>{day}</p>
             </div>
           </div>
-          <Link className={episodeTitle} href={getEpisodeRoute(feed, title)}>
+          <Link className={episodeTitle} to={getEpisodeRoute(feed, title)}>
             {title}
           </Link>
           <div className={subContainerTheme}>

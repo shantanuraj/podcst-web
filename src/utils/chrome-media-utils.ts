@@ -1,4 +1,4 @@
-import { App, IChromeNavigator, MediaMetadata } from '../typings';
+import { App, IChromeMediaMetadataClass, IChromeNavigator } from '../typings';
 
 /**
  * Hook into Chrome for Android's media session
@@ -20,7 +20,9 @@ export const updateMetadata = (
 
   const artwork = episodeArt || cover || ((info && info.cover) as string);
 
-  mediaSession.metadata = new MediaMetadata({
+  const MM = (window as any).MediaMetadata as IChromeMediaMetadataClass;
+
+  mediaSession.metadata = new MM({
     album: (info && info.title) || title,
     artist: author || ((info && info.author) as string),
     artwork: [

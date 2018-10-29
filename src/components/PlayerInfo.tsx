@@ -161,7 +161,7 @@ const PlayerInfo = ({
   toggleLargeSeek,
 }: IPlayerInfoProps) => (
   <div className={infoContainer(theme)}>
-    <Link className={linkContainer} href={getEpisodesRoute(feed)}>
+    <Link className={linkContainer} to={getEpisodesRoute(feed)}>
       <div className={episodeImage(episodeArt || cover)} role="img" aria-label={`${title} episode art`} />
     </Link>
     <div className={buttonsContainer}>
@@ -190,7 +190,7 @@ const PlayerInfo = ({
         theme={theme}
       />
     </div>
-    <Link data-hide-on-mobile="true" className={classes(linkContainer, showLink)} href={getEpisodeRoute(feed, title)}>
+    <Link data-hide-on-mobile="true" className={classes(linkContainer, showLink)} to={getEpisodeRoute(feed, title)}>
       <div className={episodeInfoContainer}>
         <div className={episodeInfo(theme)}>
           <p data-title="true">{title}</p>

@@ -67,7 +67,7 @@ interface IPodcastsGridItemProps {
 const PodcastsGridItem = ({ podcast, mode }: IPodcastsGridItemProps) => {
   const { author, feed, title } = podcast;
   return (
-    <Link className={gridContainer(mode)} href={`/episodes?feed=${feed}`}>
+    <Link className={gridContainer(mode)} to={`/episodes?feed=${feed}`}>
       <div role="img" aria-label={`${title} by ${author}`} className={gridItem(podcast.cover)}>
         <div>
           <div className={podcastTitle}>{title}</div>

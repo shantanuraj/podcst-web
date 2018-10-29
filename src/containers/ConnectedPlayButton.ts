@@ -8,11 +8,15 @@ import { IState } from '../stores/root';
 
 import { pauseEpisode, resumeEpisode } from '../stores/player';
 
-import PlayButton from '../components/PlayButton';
+import PlayButton, { IPlayButtonProps } from '../components/PlayButton';
 
-const mapState = ({ app: { theme }, player: { state } }: IState) => ({
+const mapState = (
+  { app: { theme }, player: { state } }: IState,
+  ownProps: Partial<IPlayButtonProps>,
+  ) => ({
   state,
   theme,
+  ...ownProps
 });
 
 const mapDispatch = {

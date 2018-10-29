@@ -4,6 +4,8 @@
 
 import * as React from 'react';
 
+import { RouteComponentProps } from 'react-router';
+
 import { media, style, types } from 'typestyle';
 
 import { App } from '../typings';
@@ -128,10 +130,6 @@ const showNotesContainer = style(
 );
 
 export interface IEpisodeInfoProps {
-  // Passed props
-  feed: string;
-  title: string;
-
   // Connected props
   currentEpisode: App.IEpisodeInfo | null;
   info: IPodcastsState;
@@ -141,9 +139,13 @@ export interface IEpisodeInfoProps {
   playEpisode: (episode: App.IEpisode) => void;
 }
 
-class EpisodeInfo extends React.PureComponent<IEpisodeInfoProps, never> {
+class EpisodeInfo extends React.PureComponent<IEpisodeInfoProps & RouteComponentProps<any>, never> {
   public loadIfNeeded = () => {
-    const { feed, getEpisodes, info } = this.props;
+    const { search } = this.props.location;
+    const params = new URLSearchParams(search);
+    const feed = params.get('feed') as 'top';
+
+    const { getEpisodes, info } = this.props;
 
     const feedInfo = info[feed];
 
@@ -206,7 +208,12 @@ class EpisodeInfo extends React.PureComponent<IEpisodeInfoProps, never> {
   }
 
   public render() {
-    const { feed, info, title } = this.props;
+    const { search } = this.props.location;
+    const params = new URLSearchParams(search);
+    const feed = params.get('feed') as 'top';
+    const title = params.get('title');
+
+    const { info } = this.props;
     const feedInfo = info[feed];
     if (!feedInfo || feedInfo.loading || !feedInfo.episodes) {
       return this.renderLoading();

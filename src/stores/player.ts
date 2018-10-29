@@ -152,7 +152,7 @@ export const manualSeekUpdate = (seekPosition: number, duration: number): IManua
  * Jump Seek action creator
  */
 export type SeekDirection = 'seek-forward' | 'seek-back';
-interface IJumpSeekAction {
+export interface IJumpSeekAction {
   type: 'JUMP_SEEK';
   direction: SeekDirection;
 }
@@ -221,10 +221,10 @@ export interface IPlayerState {
   buffering: boolean;
   currentEpisode: number;
   duration: number;
+  seekPosition: number;
   isLargeSeekVisible: boolean;
   queue: App.IEpisodeInfo[];
   seekDelta: number;
-  seekPosition: number;
   state: EpisodePlayerState;
 }
 

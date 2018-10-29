@@ -18,6 +18,8 @@ import {
 
 import Player from '../components/Player';
 
+const UNUSED_NUMBER_VAR = -1;
+
 const mapState = ({
   app: { theme },
   player: { buffering, currentEpisode, isLargeSeekVisible, queue, seekDelta, state },
@@ -29,6 +31,8 @@ const mapState = ({
   seekDelta,
   state,
   theme,
+  duration: UNUSED_NUMBER_VAR,
+  seekPosition: UNUSED_NUMBER_VAR,
 });
 
 const mapDispatch = {

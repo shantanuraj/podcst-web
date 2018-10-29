@@ -6,7 +6,7 @@ import * as React from 'react';
 
 import { classes, media, style } from 'typestyle';
 
-import { Router, RouterOnChangeArgs } from 'preact-router';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 
 import { normalizeEl } from '../utils/styles';
 
@@ -16,13 +16,13 @@ import { getTitle } from '../utils/route-titles';
 
 import { DESKTOP_PLAYER_HEIGHT, MOBILE_PLAYER_HEIGHT, TOOLBAR_HEIGHT } from '../utils/constants';
 
+import IndexRedirect from '../components/IndexRedirect';
+
 import ConnectedDrawer from '../containers/ConnectedDrawer';
 
 import ConnectedEpisodeInfo from '../containers/ConnectedEpisodeInfo';
 
 import ConnectedEpisodes from '../containers/ConnectedEpisodes';
-
-import ConnectedIndexRedirect from '../containers/ConnectedIndexRedirect';
 
 import ConnectedLoader from '../containers/ConnectedLoader';
 
@@ -75,7 +75,6 @@ interface IAppProps {
   appInit();
   pauseEpisode();
   resumeEpisode();
-  routerNavigate(props: RouterOnChangeArgs);
   seekUpdate(seekPosition: number, duration: number);
   setBuffer(buffering: boolean);
   setTitle(route: string);
@@ -94,21 +93,23 @@ class App extends React.PureComponent<IAppProps, never> {
   }
 
   public render() {
-    const { isPlayerVisible, routerNavigate, version } = this.props;
+    const { isPlayerVisible, version } = this.props;
     return (
       <div className={classes(normalizeEl, mainContainer)}>
         <ConnectedToolbar />
         <ConnectedLoader />
         <ConnectedDrawer />
         <main data-is-player-visible={isPlayerVisible} className={classes(normalizeEl, container)}>
-          <Router onChange={routerNavigate}>
-            <ConnectedIndexRedirect path="/" />
-            <ConnectedPodcastsGrid mode="feed" path="/feed/:feed" />
-            <ConnectedSubscriptions path="/subs" />
-            <ConnectedEpisodes path="/episodes" />
-            <ConnectedEpisodeInfo path="/episode" />
-            <ConnectedRecents path="/recents" />
-            <ConnectedSettings version={version} path="/settings" />
+          <Router>
+            <Switch>
+              <Route path="/" component={IndexRedirect} />
+              <Route path="/feed/:feed" component={ConnectedPodcastsGrid} mode="feed" />
+              <Route path="/subs" component={ConnectedSubscriptions} />
+              <Route path="/episodes" component={ConnectedEpisodes} />
+              <Route path="/episode" component={ConnectedEpisodeInfo} />
+              <Route path="/recents" component={ConnectedRecents} />
+              <Route path="/settings" component={ConnectedSettings} version={version} />
+            </Switch>
           </Router>
         </main>
         <ConnectedPlayer />

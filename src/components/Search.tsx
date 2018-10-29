@@ -107,7 +107,7 @@ class Search extends React.PureComponent<ISearchProps, any> {
       });
   };
 
-  public saveRef = (el: HTMLElement | undefined) => {
+  public saveRef = (el: HTMLDivElement) => {
     if (el) {
       this.el = el;
     }

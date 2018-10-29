@@ -4,6 +4,8 @@
 
 import * as React from 'react';
 
+import { RouteComponentProps } from 'react-router';
+
 import { style } from 'typestyle';
 
 import { App, FeedType, ISubscriptionsMap } from '../typings';
@@ -33,17 +35,23 @@ interface ISubsStateProps {
 
 type PodcastsGridProps = IFeedStateProps | ISubsStateProps;
 
-class PodcastsGrid extends React.PureComponent<PodcastsGridProps, any> {
+class PodcastsGrid extends React.PureComponent<PodcastsGridProps & Partial<RouteComponentProps<{ feed: string }>>, any> {
   public componentDidMount() {
     if (this.props.mode === 'subs') {
       return;
     }
 
-    const { feed, getFeed } = this.props;
-    const { loading, podcasts } = this.props[feed];
+    if (this.props.location) {
+      const { search } = this.props.location;
+      const params = new URLSearchParams(search);
+      const feed = params.get('feed') as 'top';
 
-    if (!loading && podcasts.length === 0) {
-      getFeed(feed);
+      const { getFeed } = this.props;
+      const { loading, podcasts } = this.props[feed];
+
+      if (!loading && podcasts.length === 0) {
+        getFeed(feed as 'top');
+      }
     }
   }
 

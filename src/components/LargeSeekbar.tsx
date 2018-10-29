@@ -6,7 +6,7 @@ import * as React from 'react';
 
 import { media, style } from 'typestyle';
 
-import { SeekDirection } from '../stores/player';
+import { IJumpSeekAction, SeekDirection } from '../stores/player';
 
 import { DESKTOP_PLAYER_HEIGHT, MAIN_ICON_RATIO, MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
@@ -52,8 +52,8 @@ const playerControls = style({
   },
 });
 
-interface ILargeSeekbarProps extends ISeekbarProps {
-  jumpSeek(direction: SeekDirection);
+type ILargeSeekbarProps = ISeekbarProps & {
+  jumpSeek: (direction: SeekDirection) => IJumpSeekAction;
 }
 
 const LargeSeekbar = (props: ILargeSeekbarProps) => (

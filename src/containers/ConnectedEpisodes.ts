@@ -4,6 +4,8 @@
 
 import { connect } from 'react-redux';
 
+import { RouteComponentProps } from 'react-router';
+
 import { IState } from '../stores/root';
 
 import { getEpisodes } from '../stores/podcasts';
@@ -19,12 +21,15 @@ const mapState = ({
   podcasts,
   player: { currentEpisode, queue },
   subscriptions: { subs },
-}: IState) => ({
+}: IState,
+  ownProps: RouteComponentProps<any>,
+) => ({
   mode,
   theme,
   info: podcasts,
   currentEpisode: queue[currentEpisode] || null,
   subscriptions: subs,
+  ...ownProps,
 });
 
 const mapDispatch = {

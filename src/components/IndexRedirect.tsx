@@ -3,14 +3,11 @@
  */
 
 import { PureComponent } from 'react';
+import { RouteComponentProps } from 'react-router-dom';
 
-interface IndexRedirectProps {
-  navigate: (route: string) => void;
-}
-
-class IndexRedirect extends PureComponent<IndexRedirectProps, {}> {
+class IndexRedirect extends PureComponent<RouteComponentProps<null>, {}> {
   public componentDidMount() {
-    this.props.navigate('/feed/top');
+    this.props.history.push('/feed/top');
   }
 
   public render() {

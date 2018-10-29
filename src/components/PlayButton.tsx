@@ -26,7 +26,7 @@ const playButton = (theme: App.ITheme) =>
     },
   });
 
-interface IPlayButtonProps {
+export interface IPlayButtonProps {
   isCurrentEpisode: boolean;
   state: EpisodePlayerState;
   theme: App.ITheme;

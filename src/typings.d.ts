@@ -203,7 +203,13 @@ export interface IChromeMediaMetadata {
   __data: string;
 }
 
-export type ChromeMediaSessionEvents = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack';
+export type ChromeMediaSessionEvents =
+  | 'play'
+  | 'pause'
+  | 'seekbackward'
+  | 'seekforward'
+  | 'previoustrack'
+  | 'nexttrack';
 
 export type ChromeEventHandler = () => void;
 

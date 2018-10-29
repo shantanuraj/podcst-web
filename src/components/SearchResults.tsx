@@ -139,7 +139,7 @@ class SearchResults extends React.PureComponent<ISearchResultsProps, any> {
     mode: ISearchResultsProps['mode'],
     theme: ISearchResultsProps['theme'],
   ) => (
-    <Link onClick={dismissSearch} href={`/episodes?feed=${podcast.feed}`}>
+    <Link onClick={dismissSearch} to={`/episodes?feed=${podcast.feed}`}>
       <div className={result(theme)} data-focus={isFocussed} onMouseEnter={focusResult}>
         <img className={resultImage(mode)} src={podcast.thumbnail} />
         <div className={resultText}>

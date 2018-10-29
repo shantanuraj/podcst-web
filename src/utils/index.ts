@@ -4,12 +4,14 @@
 
 import { App, IOPMLFeed, IOPMLJson } from '../typings';
 
+import { FormEvent } from 'react';
+
 /**
  * Simple event value extractor callback
  * @param fn - Callback to execute with string value
  */
-export const onEvent = (fn: (val: string) => void) => {
-  return (event: Event) => {
+export const onEvent = <T extends FormEvent>(fn: (val: string) => void) => {
+  return (event: Event | T) => {
     const target = event.target as HTMLInputElement;
     fn(target.value);
   };

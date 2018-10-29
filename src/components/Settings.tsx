@@ -3,6 +3,7 @@
  */
 
 import * as React from 'react';
+import { RouteComponentProps } from 'react-router';
 
 import { media, style, types } from 'typestyle';
 
@@ -26,10 +27,9 @@ const componentsMap = ({ mode, theme, changeTheme }: ISettingsProps) => ({
   import: <ImportPodcastsView theme={theme} />,
 });
 
-interface ISettingsProps {
+interface ISettingsProps extends RouteComponentProps<any, any> {
   mode: App.ThemeMode;
   theme: App.ITheme;
-  section: 'theme' | 'shortcuts';
   version: string;
   changeTheme(mode: App.ThemeMode);
 }
@@ -75,10 +75,16 @@ const container = (theme: App.ITheme) =>
   );
 
 const Settings = (props: ISettingsProps) => {
-  const { theme, section, version } = props;
+  const { theme, location, version } = props;
 
-  if (section) {
-    return componentsMap(props)[section];
+  if (location) {
+    const { search } = location;
+    const params = new URLSearchParams(search);
+    const section = params.get('section') as 'import' | 'shortcuts' | 'theme' | null;
+
+    if (section) {
+      return componentsMap(props)[section];
+    }
   }
 
   return (
