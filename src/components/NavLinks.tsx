@@ -26,7 +26,7 @@ export interface ILinkMap {
 }
 
 const renderLink = (theme: App.ITheme, link: string, title: string) => (
-  <Link className={navLink(theme)} to={link}>
+  <Link key={title} className={navLink(theme)} to={link}>
     {title}
   </Link>
 );

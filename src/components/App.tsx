@@ -95,12 +95,12 @@ class App extends React.PureComponent<IAppProps, never> {
   public render() {
     const { isPlayerVisible, version } = this.props;
     return (
-      <div className={classes(normalizeEl, mainContainer)}>
-        <ConnectedToolbar />
-        <ConnectedLoader />
-        <ConnectedDrawer />
-        <main data-is-player-visible={isPlayerVisible} className={classes(normalizeEl, container)}>
-          <Router>
+      <Router>
+        <div className={classes(normalizeEl, mainContainer)}>
+          <ConnectedToolbar />
+          <ConnectedLoader />
+          <ConnectedDrawer />
+          <main data-is-player-visible={isPlayerVisible} className={classes(normalizeEl, container)}>
             <Switch>
               <Route path="/" component={IndexRedirect} />
               <Route path="/feed/:feed" component={ConnectedPodcastsGrid} mode="feed" />
@@ -110,11 +110,11 @@ class App extends React.PureComponent<IAppProps, never> {
               <Route path="/recents" component={ConnectedRecents} />
               <Route path="/settings" component={ConnectedSettings} version={version} />
             </Switch>
-          </Router>
-        </main>
-        <ConnectedPlayer />
-        <ConnectedToast />
-      </div>
+          </main>
+          <ConnectedPlayer />
+          <ConnectedToast />
+        </div>
+      </Router>
     );
   }
 }
