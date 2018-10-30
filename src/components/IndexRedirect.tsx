@@ -2,16 +2,16 @@
  * Index redirect
  */
 
-import { PureComponent } from 'react';
-import { RouteComponentProps } from 'react-router-dom';
+import * as React from 'react';
+import { Redirect, RouteComponentProps } from 'react-router-dom';
 
-class IndexRedirect extends PureComponent<RouteComponentProps<null>, {}> {
-  public componentDidMount() {
-    this.props.history.push('/feed/top');
-  }
-
+const REDIRECT_PATH = '/feed/top';
+class IndexRedirect extends React.PureComponent<RouteComponentProps<any>, {}> {
   public render() {
-    return null;
+    if (this.props.location.pathname === REDIRECT_PATH) {
+      return null;
+    }
+    return <Redirect to={{ pathname: '/feed/top' }} />;
   }
 }
 

@@ -20,7 +20,7 @@ const Subscriptions = ({ subs, theme, themeMode }: ISubscriptionsProps) => {
   return Object.keys(subs).length === 0 ? (
     <ImportPodcastsView theme={theme} />
   ) : (
-    <PodcastsGrid mode="subs" subs={subs} themeMode={themeMode} />
+    <PodcastsGrid feed="top" mode="subs" subs={subs} themeMode={themeMode} />
   );
 };
 

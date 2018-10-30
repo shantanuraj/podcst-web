@@ -43,7 +43,7 @@ const drawer = (theme: App.ITheme) =>
     transform: `translateX(-240px)`,
     transition: 'all 0.3s ease',
     $nest: {
-      '&[data-is-drawer-visible]': {
+      '&[data-is-drawer-visible="true"]': {
         width: 240,
         minWidth: 240,
         transform: `translateX(0px)`,

@@ -38,7 +38,7 @@ const playerContainer = style(
     transform: `translateY(${DESKTOP_PLAYER_HEIGHT * 2}px)`,
     transition: 'all 0.3s ease',
     $nest: {
-      '&[data-is-player-visible]': {
+      '&[data-is-player-visible="true"]': {
         transform: `translateY(${DESKTOP_PLAYER_HEIGHT}px)`,
       },
     },
@@ -49,10 +49,10 @@ const playerContainer = style(
       height: MOBILE_PLAYER_HEIGHT * 2,
       transform: `translateY(${MOBILE_PLAYER_HEIGHT * 2}px)`,
       $nest: {
-        '&[data-is-player-visible]': {
+        '&[data-is-player-visible="true"]': {
           transform: `translateY(${MOBILE_PLAYER_HEIGHT}px)`,
         },
-        '&[data-is-seek-visible]': {
+        '&[data-is-seek-visible="true"]': {
           transform: `translateY(0px)`,
         },
       },
@@ -95,7 +95,7 @@ const infoIcon = style({
   zIndex: 1,
   transition: 'all 0.3s ease',
   $nest: {
-    '&[data-is-seek-visible]': {
+    '&[data-is-seek-visible="true"]': {
       opacity: 1,
     },
   },

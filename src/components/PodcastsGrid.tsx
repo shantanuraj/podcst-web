@@ -30,22 +30,23 @@ interface IFeedStateProps extends IFeedState {
 interface ISubsStateProps {
   mode: 'subs';
   themeMode: App.ThemeMode;
+  feed: FeedType;
   subs: ISubscriptionsMap;
 }
 
 type PodcastsGridProps = IFeedStateProps | ISubsStateProps;
 
-class PodcastsGrid extends React.PureComponent<PodcastsGridProps & Partial<RouteComponentProps<{ feed: string }>>, any> {
+class PodcastsGrid extends React.PureComponent<
+  PodcastsGridProps & Partial<RouteComponentProps<{ feed: string }>>,
+  any
+> {
   public componentDidMount() {
     if (this.props.mode === 'subs') {
       return;
     }
 
-    if (this.props.location) {
-      const { search } = this.props.location;
-      const params = new URLSearchParams(search);
-      const feed = params.get('feed') as 'top';
-
+    if (this.props.match) {
+      const { params: { feed } } = this.props.match;
       const { getFeed } = this.props;
       const { loading, podcasts } = this.props[feed];
 
@@ -60,7 +61,7 @@ class PodcastsGrid extends React.PureComponent<PodcastsGridProps & Partial<Route
   }
 
   public renderPodcast = (mode: App.ThemeMode) => (podcast: App.RenderablePodcast) => {
-    return <PodcastsGridItem mode={mode} podcast={podcast} />;
+    return <PodcastsGridItem key={podcast.feed} mode={mode} podcast={podcast} />;
   };
 
   public renderLoaded(mode: App.ThemeMode, podcasts: App.RenderablePodcast[]) {

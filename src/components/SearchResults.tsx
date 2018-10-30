@@ -41,7 +41,7 @@ const result = (theme: App.ITheme) =>
   style({
     display: 'flex',
     $nest: {
-      '&[data-focus]': {
+      '&[data-focus="true"]': {
         backgroundColor: theme.backgroundLight,
       },
     },
@@ -139,7 +139,7 @@ class SearchResults extends React.PureComponent<ISearchResultsProps, any> {
     mode: ISearchResultsProps['mode'],
     theme: ISearchResultsProps['theme'],
   ) => (
-    <Link onClick={dismissSearch} to={`/episodes?feed=${podcast.feed}`}>
+    <Link key={podcast.feed} onClick={dismissSearch} to={`/episodes?feed=${podcast.feed}`}>
       <div className={result(theme)} data-focus={isFocussed} onMouseEnter={focusResult}>
         <img className={resultImage(mode)} src={podcast.thumbnail} />
         <div className={resultText}>

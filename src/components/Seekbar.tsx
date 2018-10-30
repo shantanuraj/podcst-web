@@ -44,7 +44,7 @@ const seekbar = (theme: App.ITheme, mode: 'inline' | 'absolute') =>
       backgroundColor: theme.accent,
       transition: 'width 1s',
       $nest: {
-        '&[data-is-buffering]': {
+        '&[data-is-buffering="true"]': {
           animation: `${theme.loaderAnimation} 2s infinite`,
           width: '100%',
         },

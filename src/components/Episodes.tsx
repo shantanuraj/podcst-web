@@ -127,11 +127,11 @@ const subscribeButton = (theme: App.ITheme) =>
     border: `2px solid ${theme.accent}`,
     outline: 0,
     $nest: {
-      '&:focus, &:hover, &[data-is-subscribed]': {
+      '&:focus, &:hover, &[data-is-subscribed="true"]': {
         backgroundColor: theme.accent,
         color: theme.background,
       },
-      '&[data-is-subscribed]:hover': {
+      '&[data-is-subscribed="true"]:hover': {
         background: 'transparent',
         color: theme.text,
       },
@@ -183,7 +183,15 @@ class Episodes extends React.PureComponent<IEpisodesProps & RouteComponentProps<
 
     const play = () => playEpisode(episode);
 
-    return <EpisodeRow isCurrentEpisode={currentEpisode === episode} episode={episode} play={play} theme={theme} />;
+    return (
+      <EpisodeRow
+        key={episode.title}
+        isCurrentEpisode={currentEpisode === episode}
+        episode={episode}
+        play={play}
+        theme={theme}
+      />
+    );
   };
 
   public renderLoaded(feed: string, info: App.IPodcastEpisodesInfo | null) {

@@ -18,7 +18,7 @@ const playButton = (theme: App.ITheme) =>
     color: theme.text,
     border: `2px solid ${theme.accent}`,
     $nest: {
-      '&:hover, &:focus, &:active, &[data-is-playing], &[data-is-paused]': {
+      '&:hover, &:focus, &:active, &[data-is-playing="true"], &[data-is-paused="true"]': {
         outline: 0,
         backgroundColor: theme.accent,
         color: theme.background,

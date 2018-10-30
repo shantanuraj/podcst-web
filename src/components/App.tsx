@@ -46,7 +46,7 @@ const container = style(
   {
     paddingTop: TOOLBAR_HEIGHT,
     $nest: {
-      '&[data-is-player-visible]': {
+      '&[data-is-player-visible="true"]': {
         marginBottom: DESKTOP_PLAYER_HEIGHT,
       },
     },
@@ -55,7 +55,7 @@ const container = style(
     { maxWidth: 600 },
     {
       $nest: {
-        '&[data-is-player-visible]': {
+        '&[data-is-player-visible="true"]': {
           marginBottom: MOBILE_PLAYER_HEIGHT,
         },
       },
@@ -102,13 +102,17 @@ class App extends React.PureComponent<IAppProps, never> {
           <ConnectedDrawer />
           <main data-is-player-visible={isPlayerVisible} className={classes(normalizeEl, container)}>
             <Switch>
-              <Route path="/" component={IndexRedirect} />
-              <Route path="/feed/:feed" component={ConnectedPodcastsGrid} mode="feed" />
-              <Route path="/subs" component={ConnectedSubscriptions} />
-              <Route path="/episodes" component={ConnectedEpisodes} />
-              <Route path="/episode" component={ConnectedEpisodeInfo} />
-              <Route path="/recents" component={ConnectedRecents} />
-              <Route path="/settings" component={ConnectedSettings} version={version} />
+              <Route exact path="/" component={IndexRedirect} />
+              <Route
+                path="/feed/:feed"
+                component={props => <ConnectedPodcastsGrid {...props} mode="feed" feed="top" />}
+              />
+              <Route exact path="/subs" component={ConnectedSubscriptions} />
+              <Route exact path="/episodes" component={ConnectedEpisodes} />
+              <Route exact path="/episode" component={ConnectedEpisodeInfo} />
+              <Route exact path="/recents" component={ConnectedRecents} />
+              <Route exact path="/settings" component={ConnectedSettings} version={version} />
+              }/>
             </Switch>
           </main>
           <ConnectedPlayer />
