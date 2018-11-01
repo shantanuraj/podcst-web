@@ -71,10 +71,10 @@ const player = (theme: App.ITheme) =>
       fontSize: 20,
       color: theme.text,
       $nest: {
-        '& [data-display-on-hover]': {
+        '& [data-display-on-hover="true"]': {
           opacity: 0,
         },
-        '&:hover [data-display-on-hover]': {
+        '&:hover [data-display-on-hover="true"]': {
           opacity: 1,
         },
       },

@@ -41,7 +41,7 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
   });
   cssRule('input, button', { fontFamily });
   cssRule(
-    '[data-hide-on-mobile]',
+    '[data-hide-on-mobile="true"]',
     media(
       { maxWidth: 600 },
       {
@@ -50,7 +50,7 @@ export const fixGlobalStyles = (theme: App.ITheme) => {
     ),
   );
   cssRule(
-    '[data-hide-on-desktop]',
+    '[data-hide-on-desktop="true"]',
     media(
       { minWidth: 600 },
       {
