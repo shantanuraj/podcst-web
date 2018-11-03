@@ -46,7 +46,9 @@ class PodcastsGrid extends React.PureComponent<
     }
 
     if (this.props.match) {
-      const { params: { feed } } = this.props.match;
+      const {
+        params: { feed },
+      } = this.props.match;
       const { getFeed } = this.props;
       const { loading, podcasts } = this.props[feed];
 

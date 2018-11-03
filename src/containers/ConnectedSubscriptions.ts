@@ -20,6 +20,9 @@ const mapDispatch = {
   parseOPML,
 };
 
-const ConnectedSubscriptions = connect(mapState, mapDispatch)(Subscriptions);
+const ConnectedSubscriptions = connect(
+  mapState,
+  mapDispatch,
+)(Subscriptions);
 
 export default ConnectedSubscriptions;

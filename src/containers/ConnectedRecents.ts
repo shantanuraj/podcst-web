@@ -22,6 +22,9 @@ const mapDispatch = {
   playEpisode,
 };
 
-const ConnectedRecents = connect(mapState, mapDispatch)(Recents);
+const ConnectedRecents = connect(
+  mapState,
+  mapDispatch,
+)(Recents);
 
 export default ConnectedRecents;

@@ -97,6 +97,8 @@ interface IShortcutsProps {
   theme: App.ITheme;
 }
 
-const Shortcuts = ({ theme }: IShortcutsProps) => <div className={container}>{renderShortcuts(theme, appShortcuts)}</div>;
+const Shortcuts = ({ theme }: IShortcutsProps) => (
+  <div className={container}>{renderShortcuts(theme, appShortcuts)}</div>
+);
 
 export default Shortcuts;

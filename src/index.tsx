@@ -40,8 +40,8 @@ const init = () => {
   forceRenderStyles();
 };
 
-if ((module as any as IPodcastWebpackModule).hot) {
-  (module as any as IPodcastWebpackModule).hot!.accept();
+if (((module as any) as IPodcastWebpackModule).hot) {
+  ((module as any) as IPodcastWebpackModule).hot!.accept();
 }
 
 init();

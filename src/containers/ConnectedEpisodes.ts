@@ -16,12 +16,8 @@ import { playEpisode } from '../stores/player';
 
 import Episodes from '../components/Episodes';
 
-const mapState = ({
-  app: { mode, theme },
-  podcasts,
-  player: { currentEpisode, queue },
-  subscriptions: { subs },
-}: IState,
+const mapState = (
+  { app: { mode, theme }, podcasts, player: { currentEpisode, queue }, subscriptions: { subs } }: IState,
   ownProps: RouteComponentProps<any>,
 ) => ({
   mode,
@@ -39,6 +35,9 @@ const mapDispatch = {
   removeSubscription,
 };
 
-const ConnectedEpisodes = connect(mapState, mapDispatch)(Episodes);
+const ConnectedEpisodes = connect(
+  mapState,
+  mapDispatch,
+)(Episodes);
 
 export default ConnectedEpisodes;

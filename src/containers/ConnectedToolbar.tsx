@@ -19,6 +19,9 @@ const mapDispatch = {
   toggleDrawer,
 };
 
-const ConnectedToolbar = connect(mapState, mapDispatch)(Toolbar);
+const ConnectedToolbar = connect(
+  mapState,
+  mapDispatch,
+)(Toolbar);
 
 export default ConnectedToolbar;

@@ -21,10 +21,10 @@ interface ISearchPodcastsAction {
 const SEARCH_PODCASTS: ISearchPodcastsAction['type'] = 'SEARCH_PODCASTS';
 export const searchPodcasts = (query: ISearchPodcastsAction['query']): ISearchPodcastsAction | IDismissSearchAction =>
   query
-    ? {
+    ? ({
         type: SEARCH_PODCASTS,
         query,
-      } as ISearchPodcastsAction
+      } as ISearchPodcastsAction)
     : dismissSearch();
 
 interface ISearchPodcastsSuccessAction {

@@ -21,6 +21,9 @@ const mapDispatch = {
   onSeek: manualSeekUpdate,
 };
 
-const ConnectedSeekView = connect(mapState, mapDispatch)(SeekView);
+const ConnectedSeekView = connect(
+  mapState,
+  mapDispatch,
+)(SeekView);
 
 export default ConnectedSeekView;

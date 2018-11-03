@@ -25,6 +25,9 @@ const mapDispatch = {
   onSeek: manualSeekUpdate,
 };
 
-const ConnectedLargeSeekbar = connect(mapState, mapDispatch)(LargeSeekbar);
+const ConnectedLargeSeekbar = connect(
+  mapState,
+  mapDispatch,
+)(LargeSeekbar);
 
 export default ConnectedLargeSeekbar;

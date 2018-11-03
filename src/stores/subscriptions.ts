@@ -94,14 +94,12 @@ export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, INoopAction
   );
 
 export const syncSubscriptionEpic: Epic<Actions, IAddSubscriptionAction, IState> = (action$, state$) =>
-  action$
-    .ofType(GET_EPISODES_SUCCESS)
-    .pipe(
-      filter(({ episodes, feed }: IGetEpisodesSuccessAction) => !!episodes && feed in state$.value.subscriptions.subs),
-      map((action: IGetEpisodesSuccessAction) =>
-        addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
-      ),
-    );
+  action$.ofType(GET_EPISODES_SUCCESS).pipe(
+    filter(({ episodes, feed }: IGetEpisodesSuccessAction) => !!episodes && feed in state$.value.subscriptions.subs),
+    map((action: IGetEpisodesSuccessAction) =>
+      addSubscription(action.feed, { ...action.episodes!, feed: action.feed }),
+    ),
+  );
 
 export const subscriptions = (
   state: ISubscriptionsState = {

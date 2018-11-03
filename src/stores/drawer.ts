@@ -50,16 +50,17 @@ export interface IDrawerState {
  * Drawer close epic
  */
 export const drawerCloseEpic: Epic<DrawerActions, ICloseDrawerAction, IState> = (action$, state$) =>
-  action$
-    .ofType(TOGGLE_DRAWER)
-    .pipe(
-      switchMap(() =>
-        merge(
-          fromEvent<MouseEvent>(document, 'mouseup'),
-          fromEvent<KeyboardEvent>(document, 'keyup').pipe(filter(e => e.keyCode === Keys.escape)),
-        ).pipe(filter(() => state$.value.drawer.isVisible), map(closeDrawer)),
+  action$.ofType(TOGGLE_DRAWER).pipe(
+    switchMap(() =>
+      merge(
+        fromEvent<MouseEvent>(document, 'mouseup'),
+        fromEvent<KeyboardEvent>(document, 'keyup').pipe(filter(e => e.keyCode === Keys.escape)),
+      ).pipe(
+        filter(() => state$.value.drawer.isVisible),
+        map(closeDrawer),
       ),
-    );
+    ),
+  );
 
 /**
  * Drawer reducer

@@ -10,13 +10,10 @@ import { pauseEpisode, resumeEpisode } from '../stores/player';
 
 import PlayButton, { IPlayButtonProps } from '../components/PlayButton';
 
-const mapState = (
-  { app: { theme }, player: { state } }: IState,
-  ownProps: Partial<IPlayButtonProps>,
-  ) => ({
+const mapState = ({ app: { theme }, player: { state } }: IState, ownProps: Partial<IPlayButtonProps>) => ({
   state,
   theme,
-  ...ownProps
+  ...ownProps,
 });
 
 const mapDispatch = {
@@ -24,6 +21,9 @@ const mapDispatch = {
   resume: resumeEpisode,
 };
 
-const ConnectedPlayButton = connect(mapState, mapDispatch)(PlayButton);
+const ConnectedPlayButton = connect(
+  mapState,
+  mapDispatch,
+)(PlayButton);
 
 export default ConnectedPlayButton;

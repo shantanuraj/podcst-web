@@ -47,16 +47,14 @@ const ChangeThemeKeys: IKeyboardShortcutsMap = {
  * Theme change shortcut epic
  */
 export const changeThemeEpic: Epic<Actions, IChangeThemeAction, IState> = (action$, state$) =>
-  action$
-    .ofType(APP_INIT)
-    .pipe(
-      switchMap(() =>
-        fromEvent<KeyboardEvent>(document, 'keyup').pipe(
-          filter(event => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target)),
-          map(() => changeTheme(state$.value.app.mode === 'dark' ? 'light' : 'dark')),
-        ),
+  action$.ofType(APP_INIT).pipe(
+    switchMap(() =>
+      fromEvent<KeyboardEvent>(document, 'keyup').pipe(
+        filter(event => !!ChangeThemeKeys[event.keyCode] && isNotIgnoreElement(event.target)),
+        map(() => changeTheme(state$.value.app.mode === 'dark' ? 'light' : 'dark')),
       ),
-    );
+    ),
+  );
 
 /**
  * Keyboard shortcut map for controlling map

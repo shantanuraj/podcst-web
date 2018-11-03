@@ -54,7 +54,7 @@ const playerControls = style({
 
 type ILargeSeekbarProps = ISeekbarProps & {
   jumpSeek: (direction: SeekDirection) => IJumpSeekAction;
-}
+};
 
 const LargeSeekbar = (props: ILargeSeekbarProps) => (
   <div id="large-seekbar" className={seekbar(props.theme)}>

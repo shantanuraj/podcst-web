@@ -16,6 +16,9 @@ const mapDispatch = {
   changeTheme,
 };
 
-const ConnectedSettings = connect(mapState, mapDispatch)(Settings);
+const ConnectedSettings = connect(
+  mapState,
+  mapDispatch,
+)(Settings);
 
 export default ConnectedSettings;

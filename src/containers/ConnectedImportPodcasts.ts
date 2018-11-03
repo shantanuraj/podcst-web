@@ -14,6 +14,9 @@ const mapDispatch = {
   parseOPML,
 };
 
-const ConnectedImportPodcasts = connect(mapState, mapDispatch)(ImportPodcasts);
+const ConnectedImportPodcasts = connect(
+  mapState,
+  mapDispatch,
+)(ImportPodcasts);
 
 export default ConnectedImportPodcasts;

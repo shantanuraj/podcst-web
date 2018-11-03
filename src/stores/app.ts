@@ -119,13 +119,19 @@ export const chromeMediaMetadaUpdateEpic: (
  * Update title side-effects epic
  */
 export const updateTitleEpic: Epic<Actions, INoopAction, IState> = action$ =>
-  action$.ofType(SET_TITLE).pipe(tap((action: ISetTitleAction) => (document.title = action.title)), map(noop));
+  action$.ofType(SET_TITLE).pipe(
+    tap((action: ISetTitleAction) => (document.title = action.title)),
+    map(noop),
+  );
 
 /**
  * On Theme change epic
  */
 export const fixGlobalThemeEpic: Epic<Actions, INoopAction, IState> = (action$, state$) =>
-  action$.ofType(CHANGE_THEME).pipe(tap(() => fixGlobalStyles(state$.value.app.theme)), map(noop));
+  action$.ofType(CHANGE_THEME).pipe(
+    tap(() => fixGlobalStyles(state$.value.app.theme)),
+    map(noop),
+  );
 
 /**qq
  * App state storage epic

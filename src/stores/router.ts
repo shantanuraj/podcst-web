@@ -64,7 +64,11 @@ export interface IRouterState {
  * Router navigation epic
  */
 export const routerEpic: Epic<RouterActions, INavigationCompleteAction, IState> = action$ =>
-  action$.ofType(NAVIGATE).pipe(map(action => action.route), tap(routeTo), map(navigationComplete));
+  action$.ofType(NAVIGATE).pipe(
+    map(action => action.route),
+    tap(routeTo),
+    map(navigationComplete),
+  );
 
 /**
  * Route title sync epic

@@ -95,7 +95,7 @@ class Seekbar extends React.PureComponent<ISeekbarProps, any> {
   };
 
   private getSeekWidth(seekPosition: number, duration: number, buffering: boolean): string {
-    return buffering ? '100%' : `${seekPosition / duration * 100}%`;
+    return buffering ? '100%' : `${(seekPosition / duration) * 100}%`;
   }
 
   public render() {

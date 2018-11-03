@@ -34,9 +34,12 @@ const mapDispatch = {
   setTitle,
   skipToNextEpisode,
   skipToPrevEpisode,
-  stopEpisode
+  stopEpisode,
 };
 
-const ConnectedApp = connect(mapState, mapDispatch)(App);
+const ConnectedApp = connect(
+  mapState,
+  mapDispatch,
+)(App);
 
 export default ConnectedApp;

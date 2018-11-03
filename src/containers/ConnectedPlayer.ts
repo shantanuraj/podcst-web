@@ -45,6 +45,9 @@ const mapDispatch = {
   jumpSeek,
 };
 
-const ConnectedPlayer = connect(mapState, mapDispatch)(Player);
+const ConnectedPlayer = connect(
+  mapState,
+  mapDispatch,
+)(Player);
 
 export default ConnectedPlayer;

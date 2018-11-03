@@ -19,6 +19,9 @@ const mapDispatch = {
   getFeed,
 };
 
-const ConnectedPodcastsGrid = connect(mapState, mapDispatch)(PodcastsGrid);
+const ConnectedPodcastsGrid = connect(
+  mapState,
+  mapDispatch,
+)(PodcastsGrid);
 
 export default ConnectedPodcastsGrid;

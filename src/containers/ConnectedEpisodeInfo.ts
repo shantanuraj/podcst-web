@@ -30,6 +30,9 @@ const mapDispatch = {
   playEpisode,
 };
 
-const ConnectedEpisodeInfo = connect(mapState, mapDispatch)(EpisodeInfo);
+const ConnectedEpisodeInfo = connect(
+  mapState,
+  mapDispatch,
+)(EpisodeInfo);
 
 export default ConnectedEpisodeInfo;

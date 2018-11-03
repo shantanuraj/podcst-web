@@ -26,6 +26,9 @@ const mapDispatch = {
   onResultSelect: (feed: string) => navigate(`/episodes?feed=${feed}`),
 };
 
-const ConnectedSearch = connect(mapState, mapDispatch)(Search);
+const ConnectedSearch = connect(
+  mapState,
+  mapDispatch,
+)(Search);
 
 export default ConnectedSearch;

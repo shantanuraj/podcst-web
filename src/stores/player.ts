@@ -229,12 +229,10 @@ export interface IPlayerState {
 }
 
 export const uiSeekUpdateEpic: Epic<PlayerActions, ISeekUpdateSuccessAction, IState> = action$ =>
-  action$
-    .ofType(SEEK_UPDATE_REQUEST)
-    .pipe(
-      throttleTime(1000),
-      map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration)),
-    );
+  action$.ofType(SEEK_UPDATE_REQUEST).pipe(
+    throttleTime(1000),
+    map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration)),
+  );
 
 export const audioSeekUpdateEpic: Epic<PlayerActions, INoopAction, IState> = (action$, state$) =>
   action$.ofType(MANUAL_SEEK_UPDATE, JUMP_SEEK).pipe(
