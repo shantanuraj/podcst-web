@@ -44,7 +44,7 @@
     "react-dom": "^16.4.1",
     "react-redux": "^5.0.7",
     "react-router-dom": "^4.3.1",
-    "redux": "^4.0.0",
+    "redux": "4.0.1",
     "redux-observable": "^1.0.0",
     "rxjs": "6.3.3",
     "typestyle": "^2.0.1"
