@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "csstips": "^0.3.0",
+    "history": "^4.7.2",
     "howler": "^2.0.13",
     "react": "^16.4.1",
     "react-dom": "^16.4.1",
@@ -44,6 +45,7 @@
     "typestyle": "^2.0.1"
   },
   "devDependencies": {
+    "@types/history": "^4.7.2",
     "@types/howler": "^2.0.5",
     "@types/react": "^16.4.6",
     "@types/react-dom": "^16.0.6",

@@ -6,7 +6,11 @@ import * as React from 'react';
 
 import { classes, media, style } from 'typestyle';
 
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import { Router } from 'react-router';
+
+import { Route, Switch } from 'react-router-dom';
+
+import { history } from '../utils/history';
 
 import { normalizeEl } from '../utils/styles';
 
@@ -95,7 +99,7 @@ class App extends React.PureComponent<IAppProps, never> {
   public render() {
     const { isPlayerVisible, version } = this.props;
     return (
-      <Router>
+      <Router history={history}>
         <div className={classes(normalizeEl, mainContainer)}>
           <ConnectedToolbar />
           <ConnectedLoader />
