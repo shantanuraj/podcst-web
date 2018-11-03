@@ -14,6 +14,8 @@ import { normalizeSeek } from '../utils';
 
 import { SEEK_DELTA } from '../utils/constants';
 
+import { removeIth } from '../utils/array-util';
+
 /**
  * Play related actions
  */
@@ -194,8 +196,36 @@ export const toggleLargeSeek = (): IToggleLargeSeekAction => ({
   type: TOGGLE_LARGE_SEEK,
 });
 
+/**
+ * Add to queue action
+ */
+interface IAddToQueue {
+  type: 'ADD_TO_QUEUE';
+  episode: App.IEpisodeInfo;
+}
+const ADD_TO_QUEUE: IAddToQueue['type'] = 'ADD_TO_QUEUE';
+export const addToQueue = (episode: App.IEpisodeInfo): IAddToQueue => ({
+  type: ADD_TO_QUEUE,
+  episode,
+});
+
+/**
+ * Remove ith from queue action
+ */
+interface IRemoveFromQueue {
+  type: 'REMOVE_FROM_QUEUE';
+  position: number;
+}
+const REMOVE_FROM_QUEUE: IRemoveFromQueue['type'] = 'REMOVE_FROM_QUEUE';
+export const removeFromQueue = (position: number): IRemoveFromQueue => ({
+  type: REMOVE_FROM_QUEUE,
+  position,
+});
+
 export type PlayerActions =
   | IPlayEpisodeAction
+  | IAddToQueue
+  | IRemoveFromQueue
   | IPauseAction
   | IPauseAudioAction
   | IResumeEpisodeAction
@@ -223,6 +253,9 @@ export interface IPlayerState {
   seekPosition: number;
   state: EpisodePlayerState;
 }
+
+export const episodeEndEpic: Epic<PlayerActions, IState> = action$ =>
+  action$.ofType(STOP_EPISODE).map(skipToNextEpisode);
 
 export const uiSeekUpdateEpic: Epic<PlayerActions, IState> = action$ =>
   action$
@@ -312,6 +345,18 @@ export const player = (
         state: 'playing',
       };
     }
+    case ADD_TO_QUEUE: {
+      return {
+        ...state,
+        queue: state.queue.concat(action.episode),
+      };
+    }
+    case REMOVE_FROM_QUEUE: {
+      return {
+        ...state,
+        queue: removeIth(state.queue, action.position),
+      };
+    }
     case PAUSE_EPISODE: {
       return state.queue.length === 0 || state.state === 'stopped'
         ? state
@@ -336,22 +381,25 @@ export const player = (
       };
     }
     case SKIP_TO_NEXT_EPISODE: {
-      const currentEpisode = (state.currentEpisode + 1) % state.queue.length;
+      const currentEpisode = Math.min(state.currentEpisode + 1, state.queue.length - 1);
       const { duration } = state.queue[currentEpisode];
       return {
         ...state,
         currentEpisode,
+        seekPosition: 0,
         duration: duration || 0,
+        state: 'playing',
       };
     }
     case SKIP_TO_PREV_EPISODE: {
-      const currentEpisode =
-        state.currentEpisode === 0 ? state.queue.length - 1 : (state.currentEpisode - 1) / state.queue.length;
+      const currentEpisode = Math.max(0, state.currentEpisode - 1);
       const { duration } = state.queue[currentEpisode];
       return {
         ...state,
         currentEpisode,
+        seekPosition: 0,
         duration: duration || 0,
+        state: 'playing',
       };
     }
     case MANUAL_SEEK_UPDATE:

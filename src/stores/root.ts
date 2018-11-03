@@ -12,7 +12,15 @@ import { IRouterState, router, RouterActions, routerEpic, routeTitleSyncEpic } f
 
 import { getEpisodesEpic, IPodcastsState, podcasts, PodcastsAction } from './podcasts';
 
-import { audioSeekUpdateEpic, IPlayerState, player, PlayerActions, playerAudioEpic, uiSeekUpdateEpic } from './player';
+import {
+  audioSeekUpdateEpic,
+  episodeEndEpic,
+  IPlayerState,
+  player,
+  PlayerActions,
+  playerAudioEpic,
+  uiSeekUpdateEpic,
+} from './player';
 
 import { feed, FeedActions, getFeedEpic, IFeedState } from './feed';
 
@@ -96,6 +104,7 @@ const epics: Array<Epic<Actions, IState, any>> = [
 
   'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic : null,
   playerControlsEpic,
+  episodeEndEpic,
   seekbarJumpsEpic,
   openViewEpic,
   dismissToastEpic,
