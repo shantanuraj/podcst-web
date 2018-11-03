@@ -148,8 +148,15 @@ module.exports = env => {
               loader: 'babel-loader',
               options: {
                 cacheDirectory: true,
-                plugins: ['transform-class-properties', 'transform-object-assign'],
-                presets: ['env'],
+                plugins: ['@babel/plugin-proposal-class-properties', '@babel/plugin-transform-object-assign'],
+                presets: [
+                  [
+                    '@babel/preset-env',
+                    {
+                      useBuiltIns: 'entry'
+                    }
+                  ]
+                ],
               },
             },
             'ts-loader',
