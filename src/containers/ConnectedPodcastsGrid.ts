@@ -22,6 +22,6 @@ const mapDispatch = {
 const ConnectedPodcastsGrid = connect(
   mapState,
   mapDispatch,
-)(PodcastsGrid);
+)(PodcastsGrid as any); // TODO fix hack
 
 export default ConnectedPodcastsGrid;

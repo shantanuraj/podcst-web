@@ -134,7 +134,7 @@ class Search extends React.PureComponent<ISearchProps, any> {
           aria-label="Search podcasts"
           className={search(theme)}
           type="text"
-          onInput={onEvent(searchPodcasts)}
+          onChange={onEvent(searchPodcasts)}
           placeholder={'Search'}
           value={query}
         />

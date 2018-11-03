@@ -106,6 +106,7 @@ export declare namespace App {
    * Podcasts Search result interface
    */
   interface IPodcastSearchResult {
+    id: number;
     author: string;
     feed: string;
     thumbnail: string;
