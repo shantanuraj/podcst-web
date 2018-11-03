@@ -9,7 +9,7 @@ const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const WorkboxPlugin = require('workbox-webpack-plugin');
+const { GenerateSW } = require('workbox-webpack-plugin');
 const WebpackHashOutput = require('webpack-plugin-hash-output');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const { version } = require('./package.json');
@@ -50,6 +50,7 @@ module.exports = env => {
   }
 
   return {
+    mode: isProdOrStaging ? 'production' : 'development',
     entry: {
       vendor: [
         'csstips',
@@ -83,18 +84,12 @@ module.exports = env => {
     plugins: removeEmpty([
       new CleanWebpackPlugin('./dist'),
       new CopyWebpackPlugin([{ from: '../public' }]),
-      new webpack.optimize.ModuleConcatenationPlugin(),
-      new webpack.optimize.CommonsChunkPlugin({
-        name: ['vendor', 'manifest', 'app'],
-        minChunks: Infinity,
-      }),
       new webpack.HashedModuleIdsPlugin(),
       new WebpackHashOutput({
         manifestFiles: 'vendor',
       }),
       new webpack.DefinePlugin({
         'process.env': {
-          NODE_ENV: isProdOrStaging ? '"production"' : '"development"',
           // Error logging
           APP_VERSION: `'${version}'`,
           IN_BROWSER: '"true"',
@@ -106,17 +101,9 @@ module.exports = env => {
           debug: false,
         }),
       ),
-      ifProd(
-        new webpack.optimize.UglifyJsPlugin({
-          compress: {
-            screw_ie8: true,
-            warnings: false,
-          },
-        }),
-      ),
       new HtmlWebpackPlugin({ template: '../public/index.html' }),
       ifProd(
-        new WorkboxPlugin({
+        new GenerateSW({
           globDirectory: distDir,
           globPatterns: ['**/*.{html,js,css,svg}'],
           swDest: resolve(distDir, 'sw.js'),
@@ -167,10 +154,6 @@ module.exports = env => {
             },
             'ts-loader',
           ],
-        },
-        {
-          test: /\.css$/,
-          use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
         },
         {
           test: /\.(png|woff|woff2|eot|ttf|svg)$/,
