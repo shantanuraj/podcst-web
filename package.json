@@ -5,6 +5,11 @@
   "license": "MIT",
   "private": true,
   "browserslist": "> 0.25%, not dead",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
   "prettier": {
     "printWidth": 120,
     "singleQuote": true,
@@ -18,7 +23,6 @@
     ]
   },
   "scripts": {
-    "precommit": "lint-staged",
     "build:dev": "webpack --env.dev",
     "build:staging": "webpack --env.staging",
     "build:prod": "webpack --env.prod",
@@ -61,8 +65,8 @@
     "copy-webpack-plugin": "4.6.0",
     "file-loader": "2.0.0",
     "html-webpack-plugin": "3.2.0",
-    "husky": "^0.14.3",
-    "lint-staged": "^4.2.3",
+    "husky": "1.1.3",
+    "lint-staged": "8.0.4",
     "prettier": "1.14.3",
     "ts-loader": "5.3.0",
     "tslint": "5.11.0",
