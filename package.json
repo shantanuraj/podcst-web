@@ -46,7 +46,7 @@
     "react-router-dom": "^4.3.1",
     "redux": "^4.0.0",
     "redux-observable": "^1.0.0",
-    "rxjs": "^6.2.1",
+    "rxjs": "6.3.3",
     "typestyle": "^2.0.1"
   },
   "devDependencies": {
