@@ -24,20 +24,8 @@ const getPath = env => {
   if (key === 'dev') {
     return '/';
   } else {
-    return appUrl + `/${key}/`;
+    return cdnUrl + `/${key}/`;
   }
-};
-
-const cdnTransform = (manifestEntries) => {
-  const manifest = manifestEntries.map(entry => {
-    console.log({ url: entry.url });
-    if (entry.url.startsWith('/assets/')) {
-      entry.url = cdnUrl + entry.url;
-    }
-    return entry;
-  });
-
-  return { manifest, warnings: [] };
 };
 
 module.exports = env => {
@@ -106,14 +94,9 @@ module.exports = env => {
       }),
       ifProd(
         new GenerateSW({
-          globDirectory: distDir,
-          globPatterns: ['**/*.{html,js,css,svg}'],
           swDest: resolve(distDir, 'sw.js'),
           clientsClaim: true,
           skipWaiting: true,
-          manifestTransforms: [
-            cdnTransform,
-          ],
           runtimeCaching: [
             {
               urlPattern: /.mp3(\?.*)?$/,
