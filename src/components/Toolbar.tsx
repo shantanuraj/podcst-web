@@ -53,6 +53,10 @@ const secondaryItems = style({
   height: '100%',
 });
 
+const spacer = style({
+  flex: 100,
+});
+
 const search = style({
   height: 'inherit',
   paddingLeft: 16,
@@ -66,12 +70,13 @@ interface IToolbarProps {
 
 const Toolbar = ({ title, theme, toggleDrawer }: IToolbarProps) => (
   <header className={toolbar(theme)}>
-    <nav>
-      <div className={menuContainer} onClick={toggleDrawer}>
+    <nav onClick={toggleDrawer}>
+      <div className={menuContainer}>
         <Icons color={theme.text} icon="menu" size={24} />
         <span>{title}</span>
       </div>
     </nav>
+    <span className={spacer} />
     <div className={secondaryItems}>
       <ConnectedSearch className={search} />
     </div>
