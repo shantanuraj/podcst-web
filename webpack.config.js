@@ -10,7 +10,6 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { GenerateSW } = require('workbox-webpack-plugin');
-const WebpackHashOutput = require('webpack-plugin-hash-output');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const { version } = require('./package.json');
 
@@ -66,24 +65,12 @@ module.exports = env => {
 
   return {
     mode: isProdOrStaging ? 'production' : 'development',
+    optimization: {
+      splitChunks: {
+        chunks: 'initial',
+      },
+    },
     entry: {
-      vendor: [
-        'csstips',
-        'howler',
-        'react',
-        'react-dom',
-        'react-redux',
-        'react-router-dom',
-        'redux',
-        'redux-observable',
-
-        // Directly referenced Rx paackages
-        'rxjs',
-        'rxjs/ajax',
-        'rxjs/operators',
-
-        'typestyle',
-      ],
       app: './index.tsx',
     },
     output,
@@ -100,9 +87,6 @@ module.exports = env => {
       new CleanWebpackPlugin('./dist'),
       new CopyWebpackPlugin([{ from: '../public' }]),
       new webpack.HashedModuleIdsPlugin(),
-      new WebpackHashOutput({
-        manifestFiles: 'vendor',
-      }),
       new webpack.DefinePlugin({
         'process.env': {
           // Error logging
@@ -136,7 +120,7 @@ module.exports = env => {
               handler: 'cacheFirst',
               options: {
                 cacheName: 'podcasts',
-                cacheExpiration: {
+                expiration: {
                   maxEntries: 20,
                 },
                 cacheableResponse: { statuses: [0, 299] },
