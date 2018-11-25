@@ -93,7 +93,7 @@ class App extends React.PureComponent<IAppProps, never> {
     Audio.init(this.props);
     this.props.appInit();
     // tslint:disable:no-console
-    console.log(`Initalized Podcst.io version: ${this.props.version}`);
+    console.log(`Initalized app version: ${this.props.version}`);
   }
 
   public render() {
