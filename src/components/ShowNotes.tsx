@@ -5,6 +5,7 @@
 import * as React from 'react';
 
 import { classes, style } from 'typestyle';
+import { linkifyText } from '../utils';
 
 const showNotesContainer = style({
   fontSize: 'large',
@@ -37,7 +38,7 @@ interface IShowNotesProps {
 const ShowNotes = ({ className, showNotes }: IShowNotesProps) => (
   <div className={classes(className, showNotesContainer)}>
     <h3>Show Notes</h3>
-    <div dangerouslySetInnerHTML={{ __html: showNotes }} />
+    <div dangerouslySetInnerHTML={{ __html: linkifyText(showNotes) }} />
   </div>
 );
 
