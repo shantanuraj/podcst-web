@@ -115,8 +115,7 @@ class App extends React.PureComponent<IAppProps, never> {
               <Route exact path="/episodes" component={ConnectedEpisodes} />
               <Route exact path="/episode" component={ConnectedEpisodeInfo} />
               <Route exact path="/recents" component={ConnectedRecents} />
-              <Route exact path="/settings" component={ConnectedSettings} version={version} />
-              }/>
+              <Route exact path="/settings" component={props => <ConnectedSettings {...props} version={version} />} />
             </Switch>
           </main>
           <ConnectedPlayer />
