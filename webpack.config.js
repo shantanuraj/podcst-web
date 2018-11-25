@@ -127,7 +127,9 @@ module.exports = env => {
           swDest: resolve(distDir, 'sw.js'),
           clientsClaim: true,
           skipWaiting: true,
-          manifestTransforms: cdnTransform,
+          manifestTransforms: [
+            cdnTransform,
+          ],
           runtimeCaching: [
             {
               urlPattern: /.mp3(\?.*)?$/,
