@@ -1,11 +1,12 @@
 const { join } = require('path');
-const { existsSync, mkdirSync, writeFileSync } = require('fs');
+
+const { ensureDir, saveFile } = require('./common');
 
 const outDir = join(process.cwd(), 'public');
 const outPath = join(outDir, 'manifest.json');
 
 const appName = process.env.PODCST_APP || 'Podcst';
-const baseUrl = process.env.PODCST_URL || 'play.podcst.io';
+const baseUrl = process.env.PODCST_URL || 'play.podcst.app';
 
 const templateManifest = {
   short_name: appName,
@@ -41,18 +42,6 @@ const templateManifest = {
   theme_color: '#212121',
   display: 'standalone',
   start_url: '/feed/top'
-};
-
-const prettify = data => JSON.stringify(data, undefined, 2) + '\n';
-
-const ensureDir = (dir) => {
-  if (!existsSync(dir)) {
-    mkdirSync(dir)
-  }
-};
-
-const saveFile = (path, data) => {
-  writeFileSync(path, prettify(data), 'utf-8');
 };
 
 module.exports = function generateManifest() {

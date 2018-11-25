@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "podcst-web",
+  "builds": [
+    {
+      "src": "dist/**",
+      "use": "@now/static"
+    }
+  ]
+}

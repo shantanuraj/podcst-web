@@ -18,7 +18,7 @@ const generateManifest = require('./shell/generate-manifest');
 const srcDir = resolve(__dirname, 'src');
 const distDir = resolve(__dirname, 'dist');
 
-const appUrl = 'https://' + (process.env.PODCST_URL || 'play.podcst.io');
+const appUrl = 'https://' + (process.env.PODCST_URL || 'play.podcst.app');
 const cdnUrl = appUrl.replace('play', 'static');
 
 const getPath = env => {
@@ -26,7 +26,7 @@ const getPath = env => {
   if (key === 'dev') {
     return '/';
   } else {
-    return cdnUrl + `/${key}/`;
+    return cdnUrl + '/';
   }
 };
 
@@ -126,7 +126,7 @@ module.exports = env => {
       ifProd(
         new BundleAnalyzerPlugin({
           analyzerMode: 'static',
-          openAnalyzer: true,
+          openAnalyzer: false,
         }),
       ),
     ]),
