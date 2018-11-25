@@ -11,7 +11,9 @@ const CleanWebpackPlugin = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { GenerateSW } = require('workbox-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+
 const { version } = require('./package.json');
+const generateManifest = require('./shell/generate-manifest');
 
 const srcDir = resolve(__dirname, 'src');
 const distDir = resolve(__dirname, 'dist');
@@ -27,6 +29,8 @@ const getPath = env => {
     return cdnUrl + `/${key}/`;
   }
 };
+
+generateManifest();
 
 module.exports = env => {
   const isProd = !!env.prod;

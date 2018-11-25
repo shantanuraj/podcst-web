@@ -59,3 +59,6 @@ typings/
 
 # Build folder
 dist
+
+# Static manifest
+public/manifest.json

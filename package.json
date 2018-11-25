@@ -26,8 +26,6 @@
     "build:dev": "webpack --env.dev",
     "build:staging": "webpack --env.staging",
     "build:prod": "webpack --env.prod",
-    "postbuild:staging": "./shell/post-process.sh staging",
-    "postbuild:prod": "./shell/post-process.sh prod",
     "predeploy:staging": "yarn build:staging",
     "predeploy:prod": "yarn build:prod",
     "deploy:staging": "./shell/sync.sh staging",
