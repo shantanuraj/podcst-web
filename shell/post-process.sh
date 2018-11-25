@@ -5,3 +5,6 @@ sed -i -- "s/https:\/\/static.podcst.io\/$1\/index.html/https:\/\/play.podcst.io
 
 # Echo success
 echo "Fixed dist/sw.js for $1"
+
+# Generate manifest.json
+node generate-manifest.js
