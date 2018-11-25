@@ -26,6 +26,8 @@ const getPath = env => {
 const srcDir = resolve(__dirname, 'src');
 const distDir = resolve(__dirname, 'dist');
 
+const appUrl = 'https://' + (process.env.PODCST_URL || 'play.podcst.io');
+
 module.exports = env => {
   const isProd = !!env.prod;
   const isStaging = !!env.staging;
@@ -101,7 +103,10 @@ module.exports = env => {
           debug: false,
         }),
       ),
-      new HtmlWebpackPlugin({ template: '../public/index.html' }),
+      new HtmlWebpackPlugin({
+        template: '../public/index.html',
+        appUrl,
+      }),
       ifProd(
         new GenerateSW({
           globDirectory: distDir,
