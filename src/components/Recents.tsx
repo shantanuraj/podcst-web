@@ -28,6 +28,7 @@ const recentRow = (
   theme: App.ITheme,
 ) => (episode: App.IEpisodeInfo) => (
   <EpisodeRow
+    key={episode.title}
     isCurrentEpisode={currentEpisode === episode}
     episode={episode}
     play={() => playEpisode(episode)}

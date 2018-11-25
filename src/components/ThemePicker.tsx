@@ -84,7 +84,7 @@ const appThemes: IThemeInfo[] = [
 ];
 
 const renderTheme = (color: string, selected: App.ThemeMode, { icon, name, theme }: IThemeInfo) => (
-  <div>
+  <div key={name}>
     <input type="radio" id={theme} name="theme" checked={selected === theme} value={theme} />
     <label htmlFor={theme}>
       <Icon color={color} icon={icon} />
