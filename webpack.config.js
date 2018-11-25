@@ -14,19 +14,32 @@ const WebpackHashOutput = require('webpack-plugin-hash-output');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const { version } = require('./package.json');
 
+const srcDir = resolve(__dirname, 'src');
+const distDir = resolve(__dirname, 'dist');
+
+const appUrl = 'https://' + (process.env.PODCST_URL || 'play.podcst.io');
+const cdnUrl = appUrl.replace('play', 'static');
+
 const getPath = env => {
   const key = Object.keys(env)[0];
   if (key === 'dev') {
     return '/';
   } else {
-    return `https://static.podcst.io/${key}/`;
+    return appUrl + `/${key}/`;
   }
 };
 
-const srcDir = resolve(__dirname, 'src');
-const distDir = resolve(__dirname, 'dist');
+const cdnTransform = (manifestEntries) => {
+  const manifest = manifestEntries.map(entry => {
+    console.log({ url: entry.url });
+    if (entry.url.startsWith('/assets/')) {
+      entry.url = cdnUrl + entry.url;
+    }
+    return entry;
+  });
 
-const appUrl = 'https://' + (process.env.PODCST_URL || 'play.podcst.io');
+  return { manifest, warnings: [] };
+};
 
 module.exports = env => {
   const isProd = !!env.prod;
@@ -114,6 +127,7 @@ module.exports = env => {
           swDest: resolve(distDir, 'sw.js'),
           clientsClaim: true,
           skipWaiting: true,
+          manifestTransforms: cdnTransform,
           runtimeCaching: [
             {
               urlPattern: /.mp3(\?.*)?$/,
