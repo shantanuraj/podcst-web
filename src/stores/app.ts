@@ -22,7 +22,7 @@ import { Actions, IState } from './root';
 
 import { IPlayEpisodeAction, jumpSeek, pauseEpisode, PLAY_EPISODE, PlayerActions, resumeEpisode } from './player';
 
-import { INoopAction, noop } from './utils';
+import { effect, IEffectAction } from './utils';
 
 import { App } from '../typings';
 
@@ -118,29 +118,29 @@ export const chromeMediaMetadaUpdateEpic: (
 /**
  * Update title side-effects epic
  */
-export const updateTitleEpic: Epic<Actions, INoopAction, IState> = action$ =>
+export const updateTitleEpic: Epic<Actions, IEffectAction, IState> = action$ =>
   action$.ofType(SET_TITLE).pipe(
     tap((action: ISetTitleAction) => (document.title = action.title)),
-    map(noop),
+    map(effect),
   );
 
 /**
  * On Theme change epic
  */
-export const fixGlobalThemeEpic: Epic<Actions, INoopAction, IState> = (action$, state$) =>
+export const fixGlobalThemeEpic: Epic<Actions, IEffectAction, IState> = (action$, state$) =>
   action$.ofType(CHANGE_THEME).pipe(
     tap(() => fixGlobalStyles(state$.value.app.theme)),
-    map(noop),
+    map(effect),
   );
 
 /**qq
  * App state storage epic
  */
-export const saveAppStateEpic: Epic<Actions, INoopAction, IState> = (action$, state$) =>
+export const saveAppStateEpic: Epic<Actions, IEffectAction, IState> = (action$, state$) =>
   action$.pipe(
     filter(action => action.type === CHANGE_THEME || action.type === SET_TITLE),
     tap(() => Storage.saveAppState(state$.value.app)),
-    map(noop),
+    map(effect),
   );
 
 /**

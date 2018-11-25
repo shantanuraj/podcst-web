@@ -6,7 +6,7 @@ import { combineEpics, Epic } from 'redux-observable';
 
 import { combineReducers, Dispatch } from 'redux';
 
-import { INoopAction } from './utils';
+import { IEffectAction } from './utils';
 
 import { IRouterState, router, RouterActions, routerEpic, routeTitleSyncEpic } from './router';
 
@@ -46,7 +46,7 @@ import { changeThemeEpic, openViewEpic, playerControlsEpic, seekbarJumpsEpic } f
 /**
  * Combined application actions interface
  */
-export type Actions =
+export type StoreActions =
   | RouterActions
   | FeedActions
   | SearchActions
@@ -56,7 +56,12 @@ export type Actions =
   | AppActions
   | ToastActions
   | DrawerActions
-  | INoopAction;
+  | IEffectAction;
+
+/**
+ * Combined application actions with effect action
+ */
+export type Actions = StoreActions | IEffectAction;
 
 /**
  * Combined application state interface

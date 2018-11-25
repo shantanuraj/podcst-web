@@ -8,7 +8,7 @@ import { filter, map, tap, throttleTime } from 'rxjs/operators';
 
 import { IState } from './root';
 
-import { INoopAction, noop } from './utils';
+import { effect, IEffectAction } from './utils';
 
 import Audio from '../utils/audio';
 
@@ -215,7 +215,7 @@ export type PlayerActions =
   | IManualSeekUpdateAction
   | ISetBufferAction
   | IToggleLargeSeekAction
-  | INoopAction;
+  | IEffectAction;
 
 export interface IPlayerState {
   buffering: boolean;
@@ -234,14 +234,14 @@ export const uiSeekUpdateEpic: Epic<PlayerActions, ISeekUpdateSuccessAction, ISt
     map((action: ISeekUpdateRequestAction) => seekUpdateSuccess(action.seekPosition, action.duration)),
   );
 
-export const audioSeekUpdateEpic: Epic<PlayerActions, INoopAction, IState> = (action$, state$) =>
+export const audioSeekUpdateEpic: Epic<PlayerActions, IEffectAction, IState> = (action$, state$) =>
   action$.ofType(MANUAL_SEEK_UPDATE, JUMP_SEEK).pipe(
     tap((action: IManualSeekUpdateAction | IJumpSeekAction) => {
       const { seekPosition } = state$.value.player;
       const newSeekPosition = action.type === MANUAL_SEEK_UPDATE ? action.seekPosition : seekPosition;
       Audio.seekTo(newSeekPosition);
     }),
-    map(noop),
+    map(effect),
   );
 
 export const playerAudioEpic: Epic<PlayerActions, PlayerActions, IState> = (action$, store) =>
@@ -285,7 +285,11 @@ export const playerAudioEpic: Epic<PlayerActions, PlayerActions, IState> = (acti
         case SKIP_TO_PREV_EPISODE:
           return skipAudio();
         default:
-          return noop();
+          return effect({
+            epic: 'playerAudioEpic',
+            error: true,
+            payload: action,
+          });
       }
     }),
   );

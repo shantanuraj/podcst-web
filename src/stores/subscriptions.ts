@@ -14,7 +14,7 @@ import { IShowToastAction, showToast } from './toast';
 
 import { GET_EPISODES_SUCCESS, IGetEpisodesSuccessAction } from './podcasts';
 
-import { INoopAction, noop } from './utils';
+import { effect, IEffectAction } from './utils';
 
 import { notNull, opmltoJSON } from '../utils';
 
@@ -58,7 +58,11 @@ export const parseOPML = (file: string): IParseOPMLAction => ({
   file,
 });
 
-export type SubscriptionsActions = IAddSubscriptionAction | IRemoveSubscriptionAction | IParseOPMLAction | INoopAction;
+export type SubscriptionsActions =
+  | IAddSubscriptionAction
+  | IRemoveSubscriptionAction
+  | IParseOPMLAction
+  | IEffectAction;
 
 export interface ISubscriptionsState {
   subs: ISubscriptionsMap;
@@ -86,11 +90,11 @@ export const parseOPMLEpic: Epic<Actions, IShowToastAction | IAddSubscriptionAct
     }),
   );
 
-export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, INoopAction, IState> = (action$, state$) =>
+export const subscriptionStateChangeEpic: Epic<SubscriptionsActions, IEffectAction, IState> = (action$, state$) =>
   action$.pipe(
     filter(({ type }) => type === ADD_SUBSCRIPTION || type === REMOVE_SUBSCRIPTION),
     tap(() => Storage.saveSubscriptions(state$.value.subscriptions)),
-    map(noop),
+    map(effect),
   );
 
 export const syncSubscriptionEpic: Epic<Actions, IAddSubscriptionAction, IState> = (action$, state$) =>

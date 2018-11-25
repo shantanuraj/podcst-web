@@ -12,7 +12,7 @@ import { getEpisodeRoute, isNotIgnoreElement } from '../utils';
 
 import { Actions, IState } from './root';
 
-import { noop } from './utils';
+import { effect } from './utils';
 
 import { Keys } from '../utils/constants';
 
@@ -124,10 +124,14 @@ export const playerControlsEpic: Epic<Actions, Actions, IState> = (action$, stat
                 const { feed, title } = episode;
                 return navigate(getEpisodeRoute(feed, title));
               } else {
-                return noop();
+                return effect({ epic: 'playerControlsEpic' });
               }
             default:
-              return noop();
+              return effect({
+                epic: 'playerControlsEpic',
+                error: true,
+                payload: shortcut,
+              });
           }
         }),
         takeUntil(action$.ofType(STOP_EPISODE)),
@@ -158,7 +162,11 @@ export const openViewEpic: Epic<Actions, Actions, IState> = action$ =>
             case 'toggle-drawer':
               return toggleDrawer();
             default:
-              return noop();
+              return effect({
+                epic: 'openViewEpic',
+                error: true,
+                payload: keyCode,
+              });
           }
         }),
       ),

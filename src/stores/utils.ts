@@ -2,7 +2,7 @@
  * Utils for store
  */
 
-import { IState } from './root';
+import { IState, StoreActions } from './root';
 
 import { Storage } from '../utils/storage';
 
@@ -12,13 +12,26 @@ import { ThemeProvider } from '../styles';
 import { IAppState } from './app';
 
 /**
- * Noop action
+ * Effect descriptior
  */
-export interface INoopAction {
-  type: 'NOOP';
+export interface IEffectDescriptor {
+  epic: string;
+  error?: boolean;
+  payload?: string | number | object;
 }
-const NOOP: INoopAction['type'] = 'NOOP';
-export const noop = (): INoopAction => ({ type: NOOP });
+
+/**
+ * Effect action
+ */
+export interface IEffectAction {
+  type: 'EFFECT';
+  action: StoreActions | IEffectDescriptor;
+}
+const EFFECT: IEffectAction['type'] = 'EFFECT';
+export const effect = (action: StoreActions | IEffectDescriptor): IEffectAction => ({
+  type: EFFECT,
+  action,
+});
 
 const defaultAppState: IAppState = {
   mode: 'dark',
