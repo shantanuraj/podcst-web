@@ -55,8 +55,7 @@ export type StoreActions =
   | SubscriptionsActions
   | AppActions
   | ToastActions
-  | DrawerActions
-  | IEffectAction;
+  | DrawerActions;
 
 /**
  * Combined application actions with effect action
