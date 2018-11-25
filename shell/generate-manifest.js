@@ -1,5 +1,5 @@
 const { join } = require('path');
-const { writeFileSync } = require('fs');
+const { existsSync, mkdirSync, writeFileSync } = require('fs');
 
 const outDir = join(process.cwd(), 'dist');
 const outPath = join(outDir, 'manifest.json');
@@ -43,6 +43,17 @@ const templateManifest = {
   start_url: '/feed/top'
 };
 
-const prettify = data => JSON.stringify(data, undefined, 2);
+const prettify = data => JSON.stringify(data, undefined, 2) + '\n';
 
-writeFileSync(outPath, prettify(templateManifest), 'utf-8');
+const ensureDir = (dir) => {
+  if (!existsSync(dir)) {
+    mkdirSync(dir)
+  }
+}
+
+const saveFile = (path, data) => {
+  writeFileSync(path, prettify(data), 'utf-8');
+};
+
+ensureDir(outDir)
+saveFile(outPath, templateManifest);

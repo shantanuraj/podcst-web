@@ -1,4 +1,4 @@
 #!/bin/bash
 
 # Generate manifest.json
-node generate-manifest.js
+node shell/generate-manifest.js
