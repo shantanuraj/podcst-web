@@ -120,6 +120,7 @@ export const chromeMediaMetadaUpdateEpic: (
  */
 export const updateTitleEpic: Epic<Actions, IEffectAction, IState> = action$ =>
   action$.ofType(SET_TITLE).pipe(
+    filter((action: ISetTitleAction) => action.title !== document.title),
     tap((action: ISetTitleAction) => (document.title = action.title)),
     map(effect),
   );
