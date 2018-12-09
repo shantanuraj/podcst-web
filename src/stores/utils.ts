@@ -9,6 +9,7 @@ import { IState, StoreActions } from './root';
 import { Storage } from '../utils/storage';
 
 import { SEEK_DELTA } from '../utils/constants';
+import { prefersLightTheme } from '../utils/system-theme';
 
 import { ThemeProvider } from '../styles';
 import { IAppState } from './app';
@@ -36,7 +37,6 @@ export const effect = (action: StoreActions | IEffectDescriptor): IEffectAction 
 });
 
 const preferredTheme = () => {
-  const prefersLightTheme = matchMedia('(prefers-color-scheme: light)');
   const mode: App.ThemeMode = prefersLightTheme.matches ? 'light' : 'dark';
   return { mode, theme: ThemeProvider(mode) };
 };

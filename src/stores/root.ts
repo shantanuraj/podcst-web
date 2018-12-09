@@ -36,6 +36,7 @@ import {
   fixGlobalThemeEpic,
   IAppState,
   saveAppStateEpic,
+  systemThemeChangeEpic,
   updateTitleEpic,
 } from './app';
 
@@ -98,6 +99,7 @@ const epics = (dispatch: Dispatch<Actions>) =>
     fixGlobalThemeEpic,
     updateTitleEpic,
     saveAppStateEpic,
+    systemThemeChangeEpic,
 
     'mediaSession' in navigator ? chromeMediaMetadaUpdateEpic(dispatch) : null,
     playerControlsEpic,

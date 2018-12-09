@@ -6,7 +6,7 @@
 
 import { Epic } from 'redux-observable';
 
-import { filter, map, tap } from 'rxjs/operators';
+import { filter, map, switchMap, tap } from 'rxjs/operators';
 
 import { bindActionCreators, Dispatch } from 'redux';
 
@@ -15,6 +15,8 @@ import { updateMetadata } from '../utils/chrome-media-utils';
 import { fixGlobalStyles } from '../utils/styles';
 
 import { Storage } from '../utils/storage';
+
+import { systemThemeMode$ } from '../utils/system-theme';
 
 import { ThemeProvider } from '../styles';
 
@@ -126,6 +128,12 @@ export const updateTitleEpic: Epic<Actions, IEffectAction, IState> = action$ =>
   );
 
 /**
+ * System theme change sync epic
+ */
+export const systemThemeChangeEpic: Epic<Actions, IChangeThemeAction, IState> = action$ =>
+  action$.ofType(APP_INIT).pipe(switchMap(() => systemThemeMode$.pipe(map(changeTheme))));
+
+/**
  * On Theme change epic
  */
 export const fixGlobalThemeEpic: Epic<Actions, IEffectAction, IState> = (action$, state$) =>
@@ -134,7 +142,7 @@ export const fixGlobalThemeEpic: Epic<Actions, IEffectAction, IState> = (action$
     map(effect),
   );
 
-/**qq
+/**
  * App state storage epic
  */
 export const saveAppStateEpic: Epic<Actions, IEffectAction, IState> = (action$, state$) =>
