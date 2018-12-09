@@ -2,6 +2,8 @@
  * Utils for store
  */
 
+import { App } from '../typings';
+
 import { IState, StoreActions } from './root';
 
 import { Storage } from '../utils/storage';
@@ -33,9 +35,14 @@ export const effect = (action: StoreActions | IEffectDescriptor): IEffectAction 
   action,
 });
 
+const preferredTheme = () => {
+  const prefersLightTheme = matchMedia('(prefers-color-scheme: light)');
+  const mode: App.ThemeMode = prefersLightTheme.matches ? 'light' : 'dark';
+  return { mode, theme: ThemeProvider(mode) };
+};
+
 const defaultAppState: IAppState = {
-  mode: 'dark',
-  theme: ThemeProvider('dark'),
+  ...preferredTheme(),
   title: 'Podcst',
 };
 
