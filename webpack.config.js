@@ -18,8 +18,8 @@ const generateManifest = require('./shell/generate-manifest');
 const srcDir = resolve(__dirname, 'src');
 const distDir = resolve(__dirname, 'dist');
 
-const appUrl = 'https://' + (process.env.PODCST_URL || 'play.podcst.app');
-const cdnUrl = appUrl.replace('play', 'static');
+const appUrl = 'https://' + (process.env.PODCST_URL || 'podcst.app');
+const cdnUrl = process.env.PODCST_URL ? appUrl.replace('play', 'static') : 'https://static.podcst.app';
 
 const getPath = env => {
   const key = Object.keys(env)[0];
@@ -95,6 +95,7 @@ module.exports = env => {
       new HtmlWebpackPlugin({
         template: '../public/index.html',
         appUrl,
+        cdnUrl,
       }),
       ifProd(
         new GenerateSW({
