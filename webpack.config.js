@@ -102,6 +102,7 @@ module.exports = env => {
           swDest: resolve(distDir, 'sw.js'),
           clientsClaim: true,
           skipWaiting: true,
+          globIgnores: [ '**/now.json' ],
           runtimeCaching: [
             {
               urlPattern: /.mp3(\?.*)?$/,
