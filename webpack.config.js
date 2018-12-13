@@ -103,6 +103,7 @@ module.exports = env => {
           clientsClaim: true,
           skipWaiting: true,
           globIgnores: [ '**/now.json' ],
+          navigateFallback: '/index.html',
           runtimeCaching: [
             {
               urlPattern: /.mp3(\?.*)?$/,
