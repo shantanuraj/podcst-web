@@ -19,7 +19,8 @@ const srcDir = resolve(__dirname, 'src');
 const distDir = resolve(__dirname, 'dist');
 
 const appUrl = 'https://' + (process.env.PODCST_URL || 'podcst.app');
-const cdnUrl = process.env.PODCST_URL ? appUrl.replace('play', 'static') : 'https://static.podcst.app';
+// TODO: temp hack const cdnUrl = process.env.PODCST_URL ? appUrl.replace('play', 'static') : 'https://static.podcst.app';
+const cdnUrl = 'https://podcst.app';
 
 const getPath = env => {
   const key = Object.keys(env)[0];

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "hapi": "^16.6.0",
+    "inert": "^4.2.1"
+  },
+  "main": "index.js",
+  "scripts": {
+    "start": "node ."
+  }
+}

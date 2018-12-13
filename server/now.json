@@ -1,0 +1,13 @@
+
+{
+  "version": 2,
+  "name": "podcst-web-server",
+  "alias": "podcst.app",
+  "builds": [
+    { "src": "dist/**", "use": "@now/static" },
+    { "src": "index.js", "use": "@now/node-server" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/index.js" }
+  ]
+}
