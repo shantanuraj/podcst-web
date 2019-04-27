@@ -22,6 +22,33 @@ const appUrl = 'https://' + (process.env.PODCST_URL || 'podcst.app');
 // TODO: temp hack const cdnUrl = process.env.PODCST_URL ? appUrl.replace('play', 'static') : 'https://static.podcst.app';
 const cdnUrl = 'https://podcst.app';
 
+const routes = [
+  {
+    page: '/',
+    title: 'Podcst',
+  },
+  {
+    page: '/feed/top',
+    title: 'Podcst - Top',
+  },
+  {
+    page: '/episodes',
+    title: 'Podcst - Feed',
+  },
+  {
+    page: '/subs',
+    title: 'Podcst - Subscriptions',
+  },
+  {
+    page: '/settings',
+    title: 'Podcst - Settings',
+  },
+  {
+    page: '/recents',
+    title: 'Podcst - Recents',
+  },
+];
+
 const getPath = env => {
   const key = Object.keys(env)[0];
   if (key === 'dev') {
@@ -32,6 +59,25 @@ const getPath = env => {
 };
 
 generateManifest();
+
+const generatePage = ({ page, title }) =>{
+  const opts = {
+    template: '../public/index.html',
+    appUrl,
+    cdnUrl,
+    title
+  };
+
+  let path = page.slice(1);
+
+  if (path) {
+    opts.filename = `${path}/index.html`
+  }
+
+  return new HtmlWebpackPlugin(opts);
+}
+
+const pages = routes.map(generatePage);
 
 module.exports = env => {
   const isProd = !!env.prod;
@@ -93,11 +139,7 @@ module.exports = env => {
           debug: false,
         }),
       ),
-      new HtmlWebpackPlugin({
-        template: '../public/index.html',
-        appUrl,
-        cdnUrl,
-      }),
+      ...pages,
       ifProd(
         new GenerateSW({
           swDest: resolve(distDir, 'sw.js'),

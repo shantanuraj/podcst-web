@@ -1,5 +1,8 @@
 {
   "version": 2,
   "name": "podcst-web-static",
-  "alias": "static.podcst.app"
+  "alias": [
+    "podcst.app",
+    "static.podcst.app"
+  ]
 }
