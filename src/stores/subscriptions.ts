@@ -37,7 +37,6 @@ export const addSubscription = (feed: string, podcasts: App.IPodcastEpisodesInfo
   feed,
   podcasts,
 });
-
 interface IRemoveSubscriptionAction {
   type: 'REMOVE_SUBSCRIPTION';
   feed: string;
@@ -137,4 +136,12 @@ export const subscriptions = (
     default:
       return state;
   }
+};
+
+export const toPodcastsList = (subs: ISubscriptionsMap): App.RenderablePodcast[] => {
+  const renderablePodcasts = Object.keys(subs).map(feed => ({
+    ...subs[feed],
+    feed,
+  }));
+  return renderablePodcasts;
 };

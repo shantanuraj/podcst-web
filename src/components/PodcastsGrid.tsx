@@ -4,15 +4,12 @@
 
 import * as React from 'react';
 
-import { RouteComponentProps } from 'react-router';
-
 import { style } from 'typestyle';
 
-import { App, FeedType, ISubscriptionsMap } from '../typings';
-
-import { IFeedData, IFeedState } from '../stores/feed';
+import { App, FeedType } from '../typings';
 
 import Loading from './Loading';
+
 import PodcastsGridItem from './PodcastsGridItem';
 
 const grid = style({
@@ -20,41 +17,19 @@ const grid = style({
   gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))',
 });
 
-interface IFeedStateProps extends IFeedState {
-  mode: 'feed';
+interface IPodcastsGridProps {
   themeMode: App.ThemeMode;
-  feed: FeedType;
-  getFeed: (feed: FeedType) => void;
+  podcasts: App.RenderablePodcast[];
+  loading: boolean;
+  feed?: FeedType;
+  getFeed?: (feed: FeedType) => void;
 }
 
-interface ISubsStateProps {
-  mode: 'subs';
-  themeMode: App.ThemeMode;
-  feed: FeedType;
-  subs: ISubscriptionsMap;
-}
-
-type PodcastsGridProps = IFeedStateProps | ISubsStateProps;
-
-class PodcastsGrid extends React.PureComponent<
-  PodcastsGridProps & Partial<RouteComponentProps<{ feed: string }>>,
-  any
-> {
+class PodcastsGrid extends React.PureComponent<IPodcastsGridProps, never> {
   public componentDidMount() {
-    if (this.props.mode === 'subs') {
-      return;
-    }
-
-    if (this.props.match) {
-      const {
-        params: { feed },
-      } = this.props.match;
-      const { getFeed } = this.props;
-      const { loading, podcasts } = this.props[feed];
-
-      if (!loading && podcasts.length === 0) {
-        getFeed(feed as 'top');
-      }
+    const { feed, getFeed, loading, podcasts } = this.props;
+    if (!loading && podcasts.length === 0 && feed && getFeed) {
+      getFeed(feed);
     }
   }
 
@@ -71,27 +46,9 @@ class PodcastsGrid extends React.PureComponent<
   }
 
   public render() {
-    const { mode, themeMode } = this.props;
+    const { loading, podcasts, themeMode } = this.props;
 
-    if (mode === 'feed') {
-      const { feed } = this.props as IFeedStateProps;
-      const { loading, podcasts } = this.props[feed] as IFeedData;
-
-      if (loading || podcasts.length === 0) {
-        return this.renderLoading();
-      }
-
-      return this.renderLoaded(themeMode, podcasts);
-    }
-
-    const { subs } = this.props as ISubsStateProps;
-
-    const renderablePodcasts = Object.keys(subs).map(feed => ({
-      ...subs[feed],
-      feed,
-    }));
-
-    return this.renderLoaded(themeMode, renderablePodcasts);
+    return loading || podcasts.length === 0 ? this.renderLoading() : this.renderLoaded(themeMode, podcasts);
   }
 }
 

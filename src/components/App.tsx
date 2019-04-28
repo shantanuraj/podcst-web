@@ -6,7 +6,7 @@ import * as React from 'react';
 
 import { classes, media, style } from 'typestyle';
 
-import { Router } from 'react-router';
+import { RouteComponentProps, Router } from 'react-router';
 
 import { Route, Switch } from 'react-router-dom';
 
@@ -44,7 +44,7 @@ import ConnectedToast from '../containers/ConnectedToast';
 
 import ConnectedToolbar from '../containers/ConnectedToolbar';
 
-import { App as AppTypes } from '../typings';
+import { App as AppTypes, FeedType } from '../typings';
 
 const container = style(
   {
@@ -71,6 +71,10 @@ const mainContainer = style({
   display: 'flex',
   flexDirection: 'row',
 });
+
+const PodcastGrid = ({ match }: RouteComponentProps<{ feed: FeedType }>) => (
+  <ConnectedPodcastsGrid feed={match.params.feed} />
+);
 
 interface IAppProps {
   theme: AppTypes.ITheme;
@@ -107,10 +111,7 @@ class App extends React.PureComponent<IAppProps, never> {
           <main data-is-player-visible={isPlayerVisible} className={classes(normalizeEl, container)}>
             <Switch>
               <Route exact path="/" component={IndexRedirect} />
-              <Route
-                path="/feed/:feed"
-                component={props => <ConnectedPodcastsGrid {...props} mode="feed" feed="top" />}
-              />
+              <Route path="/feed/:feed" component={PodcastGrid} />
               <Route exact path="/subs" component={ConnectedSubscriptions} />
               <Route exact path="/episodes" component={ConnectedEpisodes} />
               <Route exact path="/episode" component={ConnectedEpisodeInfo} />

@@ -10,8 +10,10 @@ import { getFeed } from '../stores/feed';
 
 import PodcastsGrid from '../components/PodcastsGrid';
 
-const mapState = ({ app: { mode }, feed }: IState) => ({
-  ...feed,
+import { FeedType } from '../typings';
+
+const mapState = ({ app: { mode }, feed: feedData }: IState, { feed }: { feed: FeedType }) => ({
+  ...feedData[feed],
   themeMode: mode,
 });
 
@@ -22,6 +24,6 @@ const mapDispatch = {
 const ConnectedPodcastsGrid = connect(
   mapState,
   mapDispatch,
-)(PodcastsGrid as any); // TODO fix hack
+)(PodcastsGrid);
 
 export default ConnectedPodcastsGrid;

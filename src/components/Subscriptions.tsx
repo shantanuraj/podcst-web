@@ -4,7 +4,7 @@
 
 import * as React from 'react';
 
-import { ISubscriptionsState } from '../stores/subscriptions';
+import { ISubscriptionsState, toPodcastsList } from '../stores/subscriptions';
 
 import ImportPodcastsView from './ImportPodcastsView';
 import PodcastsGrid from './PodcastsGrid';
@@ -20,7 +20,7 @@ const Subscriptions = ({ subs, theme, themeMode }: ISubscriptionsProps) => {
   return Object.keys(subs).length === 0 ? (
     <ImportPodcastsView theme={theme} />
   ) : (
-    <PodcastsGrid feed="top" mode="subs" subs={subs} themeMode={themeMode} />
+    <PodcastsGrid podcasts={toPodcastsList(subs)} loading={false} themeMode={themeMode} />
   );
 };
 
