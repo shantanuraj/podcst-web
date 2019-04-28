@@ -85,11 +85,11 @@ interface IDrawerMenuProps extends IDrawerState {
 const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
   <aside data-is-drawer-visible={isVisible} className={drawer(theme)}>
     <nav>
-      <header className={drawerHeader(theme)}>
+      <div className={drawerHeader(theme)}>
         <span role="img" aria-label="Close drawer">
           <Icons color={theme.text} icon="back" size={24} />
         </span>
-      </header>
+      </div>
       <NavLinks links={linkMap} theme={theme} />
     </nav>
   </aside>
