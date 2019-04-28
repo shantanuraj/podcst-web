@@ -139,7 +139,7 @@ module.exports = env => {
           debug: false,
         }),
       ),
-      ...pages,
+      ...(isProd ? pages : pages.slice(0, 1)),
       ifProd(
         new GenerateSW({
           swDest: resolve(distDir, 'sw.js'),
