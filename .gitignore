@@ -62,3 +62,6 @@ dist
 
 # Static manifest
 public/manifest.json
+
+# Vim swap
+*.swp
