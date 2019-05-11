@@ -36,6 +36,10 @@ const routes = [
     title: 'Podcst - Feed',
   },
   {
+    page: '/episode',
+    title: 'Podcst - Episode',
+  },
+  {
     page: '/subs',
     title: 'Podcst - Subscriptions',
   },
