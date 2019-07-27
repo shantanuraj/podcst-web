@@ -23,6 +23,7 @@
     ]
   },
   "scripts": {
+    "build": "yarn build:prod",
     "build:dev": "webpack --env.dev",
     "build:prod": "webpack --env.prod",
     "predeploy": "yarn build:prod",
