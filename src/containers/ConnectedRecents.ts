@@ -10,7 +10,7 @@ import { playEpisode } from '../stores/player';
 
 import { recents as recentEpisodes } from '../utils/recents';
 
-import Recents from '../components/recents';
+import Recents from '../components/Recents';
 
 const mapState = ({ app: { theme }, player: { currentEpisode, queue }, subscriptions: { recents, subs } }: IState) => ({
   currentEpisode: queue[currentEpisode] || null,
