@@ -23,11 +23,11 @@
     ]
   },
   "scripts": {
-    "build": "yarn build:prod",
+    "build": "npm run build:prod",
     "build:dev": "webpack --env.dev",
     "build:prod": "webpack --env.prod",
-    "predeploy": "yarn build:prod",
-    "deploy": "now dist",
+    "predeploy": "npm run build:prod",
+    "deploy": "now",
     "dev": "webpack-dev-server --config webpack.config.js --env.dev --hot --inline --host 0.0.0.0",
     "format": "prettier --write \"src/**/{*.ts,*.tsx}\"",
     "lint": "tslint --project tsconfig.json --fix"
