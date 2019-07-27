@@ -23,7 +23,7 @@
     ]
   },
   "scripts": {
-    "build": "npm run build:prod",
+    "now-build": "npm run build:prod",
     "build:dev": "webpack --env.dev",
     "build:prod": "webpack --env.prod",
     "predeploy": "npm run build:prod",
