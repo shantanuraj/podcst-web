@@ -38,17 +38,16 @@ yarn
 The following steps are for building and installing from the source code. First compile the code to the `build` folder in the project directory.
 
 ```bash
-# build:deb compiles to unoptimised dev friendly build
+# build:dev compiles to unoptimised dev friendly build
 yarn build:dev
 
 # build:prod and build:staging compile to optimised / minified production ready build
-# build:staging is useful for using a different deployment path
 yarn build:prod
 ```
 
 or to compile in watch mode (automatically compile on file change)
 
-```
+```bash
 yarn dev
 ```
 
@@ -70,10 +69,9 @@ Use the following process to cut a new release.
 
   1. run `git flow release start <semver>`
   1. bump the `package.json` version.
-  1. run `yarn compile`
+  1. commit the changes.
   1. run `git flow release finish <semver>`
   1. run `git push --follow-tags`
-  1. zip the `build` folder and add it as a download to the release.
 
 You'll find a great [tutorial on gitflow here](http://jeffkreeftmeijer.com/2010/why-arent-you-using-git-flow/) if you want to learn more about the details of how it works.
 
@@ -81,27 +79,21 @@ You'll find a great [tutorial on gitflow here](http://jeffkreeftmeijer.com/2010/
 
 None yet but when they (hopefully exist)
 
-```bash
+```shell
 yarn test
 ```
 
 ## Deployment
 
-The production releases of this website will be hosted on AWS
-
-The following steps, documented here for reference, they require authorized credentails for AWS.
-These can only be done by an AWS account administrator (such as [shantanuraj](https://github.com/shantanuraj)).
-
+Deployment is automated and managed via zeit.co's [now-cli](https://github.com/zeit/now-cli).
 
 ```shell
 # To deploy production builds
-# Use deploy:staging to deploy to staging bucket
-yarn deploy:prod
-```
+now --target production
 
-  1. Login to the a server running the `podcst-web-server` setup.
-  1. Restart the server `yarn start`.
-  1. Wait for the AWS sync to complete.
+# To deploy without aliasing
+now
+```
 
 ## Built With
 
