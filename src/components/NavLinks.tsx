@@ -9,7 +9,6 @@ import { Link } from 'react-router-dom';
 import { media, style } from 'typestyle';
 
 import { App } from '../typings';
-import { MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
 const navLinks = style(
   {

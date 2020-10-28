@@ -10,8 +10,6 @@ import { IDrawerState } from '../stores/drawer';
 
 import NavLinks, { ILinkMap } from './NavLinks';
 
-import Icons from '../svg/Icon';
-
 import { App } from '../typings';
 
 const linkMap: ILinkMap = {
@@ -21,7 +19,7 @@ const linkMap: ILinkMap = {
   '/settings': 'Settings',
 };
 
-const drawerItem = (theme: App.ITheme): types.NestedCSSProperties => ({
+const drawerItem: types.NestedCSSProperties = {
   display: 'flex',
   alignItems: 'center',
   padding: '2rem',
@@ -32,7 +30,7 @@ const drawerItem = (theme: App.ITheme): types.NestedCSSProperties => ({
       height: 64,
     },
   ),
-});
+};
 
 const drawer = (theme: App.ITheme) =>
   style(
@@ -44,7 +42,7 @@ const drawer = (theme: App.ITheme) =>
       bottom: '0',
       width: '100%',
       $nest: {
-        '& li a': drawerItem(theme),
+        '& li a': drawerItem,
         '& a:hover, & a:focus': {
           color: theme.background,
           backgroundColor: theme.accent,
@@ -66,7 +64,7 @@ interface IDrawerMenuProps extends IDrawerState {
   theme: App.ITheme;
 }
 
-const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
+const DrawerMenu = ({ theme }: IDrawerMenuProps) => (
   <nav className={drawer(theme)}>
     <NavLinks links={linkMap} theme={theme} />
   </nav>

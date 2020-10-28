@@ -4,11 +4,11 @@
 
 import * as React from 'react';
 
+import { Link } from 'react-router-dom';
+
 import { media, style } from 'typestyle';
 
 import ConnectedSearch from '../containers/ConnectedSearch';
-
-import Icons from '../svg/Icon';
 
 import { TOOLBAR_HEIGHT } from '../utils/constants';
 
@@ -36,33 +36,22 @@ const toolbar = (theme: App.ITheme) =>
     },
   });
 
-const menuContainer = style({
-  display: 'flex',
-  alignItems: 'center',
-  $nest: {
-    '& span': {
-      marginLeft: 16,
-    },
+const logo = style(
+  {
+    background: '#e3e3e3',
+    width: '8rem',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-});
-
-const logo = (theme: App.ITheme) =>
-  style(
+  media(
+    { minWidth: 600 },
     {
-      background: '#e3e3e3',
-      width: '8rem',
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      width: '20rem',
     },
-    media(
-      { minWidth: 600 },
-      {
-        width: '20rem',
-      },
-    ),
-  );
+  ),
+);
 
 const secondaryItems = style({
   display: 'flex',
@@ -98,17 +87,17 @@ interface IToolbarProps {
   theme: App.ITheme;
 }
 
-const Toolbar = ({ title, theme, toggleDrawer }: IToolbarProps) => (
+const Toolbar = ({ theme }: IToolbarProps) => (
   <header className={toolbar(theme)}>
-    <a href="/" className={logo(theme)}>
+    <Link to="/" className={logo}>
       PODCST
-    </a>
+    </Link>
     <div className={secondaryItems}>
       <ConnectedSearch className={search} />
     </div>
-    <a href="/" className={profile}>
+    <Link to="/" className={profile}>
       <img src="https://images.unsplash.com/photo-1511485977113-f34c92461ad9?ixlib=rb-1.2.1&q=80&fm=jpg" />
-    </a>
+    </Link>
   </header>
 );
 
