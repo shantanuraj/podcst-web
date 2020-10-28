@@ -6,29 +6,48 @@ import * as React from 'react';
 
 import { Link } from 'react-router-dom';
 
-import { style } from 'typestyle';
+import { media, style } from 'typestyle';
 
 import { App } from '../typings';
+import { MOBILE_PLAYER_HEIGHT } from '../utils/constants';
 
-const navLinks = style({
-  flex: 1,
-});
+const navLinks = style(
+  {
+    listStyle: 'none',
+    display: 'flex',
+    flexDirection: 'row',
+    margin: 0,
+    padding: 0,
+    justifyContent: 'space-between',
+  },
+  media(
+    { minWidth: 600 },
+    {
+      flexDirection: 'column',
+    },
+  ),
+);
 
 const navLink = (theme: App.ITheme) =>
-  style({
-    padding: '0 16px',
-    textDecoration: 'none',
-    color: theme.text,
-  });
+  style(
+    {
+      textDecoration: 'none',
+      color: theme.text,
+      flex: 1,
+    },
+    media({ minWidth: 600 }, {}),
+  );
 
 export interface ILinkMap {
   [link: string]: string;
 }
 
 const renderLink = (theme: App.ITheme, link: string, title: string) => (
-  <Link key={title} className={navLink(theme)} to={link}>
-    {title}
-  </Link>
+  <li>
+    <Link key={title} className={navLink(theme)} to={link}>
+      {title}
+    </Link>
+  </li>
 );
 
 const renderLinks = (theme: App.ITheme, linkMap: ILinkMap) =>
@@ -39,6 +58,6 @@ interface INavLinksProps {
   theme: App.ITheme;
 }
 
-const NavLinks = ({ theme, links }: INavLinksProps) => <nav className={navLinks}>{renderLinks(theme, links)}</nav>;
+const NavLinks = ({ theme, links }: INavLinksProps) => <ul className={navLinks}>{renderLinks(theme, links)}</ul>;
 
 export default NavLinks;

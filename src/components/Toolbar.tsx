@@ -4,7 +4,7 @@
 
 import * as React from 'react';
 
-import { style } from 'typestyle';
+import { media, style } from 'typestyle';
 
 import ConnectedSearch from '../containers/ConnectedSearch';
 
@@ -28,7 +28,6 @@ const toolbar = (theme: App.ITheme) =>
     zIndex: 501,
     fontSize: 20,
     color: theme.text,
-    boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
     $nest: {
       '& nav': {
         padding: 16,
@@ -47,39 +46,69 @@ const menuContainer = style({
   },
 });
 
+const logo = (theme: App.ITheme) =>
+  style(
+    {
+      background: '#e3e3e3',
+      width: '8rem',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    media(
+      { minWidth: 600 },
+      {
+        width: '20rem',
+      },
+    ),
+  );
+
 const secondaryItems = style({
   display: 'flex',
   alignItems: 'center',
   height: '100%',
+  flex: 1,
 });
 
-const spacer = style({
-  flex: 100,
+const profile = style({
+  marginLeft: 'auto',
+  paddingLeft: '0.25rem',
+  paddingRight: '0.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  $nest: {
+    img: {
+      borderRadius: '50%',
+      width: '3rem',
+      height: '3rem',
+      objectFit: 'cover',
+    },
+  },
 });
 
 const search = style({
   height: 'inherit',
-  paddingLeft: 16,
+  padding: '0.5rem',
+  width: '100%',
 });
 
 interface IToolbarProps {
   title: string;
   theme: App.ITheme;
-  toggleDrawer();
 }
 
 const Toolbar = ({ title, theme, toggleDrawer }: IToolbarProps) => (
   <header className={toolbar(theme)}>
-    <nav onClick={toggleDrawer}>
-      <div className={menuContainer}>
-        <Icons color={theme.text} icon="menu" size={24} />
-        <span>{title}</span>
-      </div>
-    </nav>
-    <span className={spacer} />
+    <a href="/" className={logo(theme)}>
+      PODCST
+    </a>
     <div className={secondaryItems}>
       <ConnectedSearch className={search} />
     </div>
+    <a href="/" className={profile}>
+      <img src="https://images.unsplash.com/photo-1511485977113-f34c92461ad9?ixlib=rb-1.2.1&q=80&fm=jpg" />
+    </a>
   </header>
 );
 

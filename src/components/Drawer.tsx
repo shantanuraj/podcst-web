@@ -4,7 +4,7 @@
 
 import * as React from 'react';
 
-import { style, types } from 'typestyle';
+import { media, style, types } from 'typestyle';
 
 import { IDrawerState } from '../stores/drawer';
 
@@ -24,75 +24,52 @@ const linkMap: ILinkMap = {
 const drawerItem = (theme: App.ITheme): types.NestedCSSProperties => ({
   display: 'flex',
   alignItems: 'center',
-  height: 64,
-  padding: 16,
-  borderBottom: `solid 1px ${theme.backgroundLight}`,
+  padding: '2rem',
+  ...media(
+    { minWidth: 600 },
+    {
+      padding: '1rem',
+      height: 64,
+    },
+  ),
 });
 
 const drawer = (theme: App.ITheme) =>
-  style({
-    display: 'block',
-    position: 'fixed',
-    height: '100%',
-    width: 0,
-    zIndex: 502,
-    background: theme.background,
-    boxShadow: `0px 4px 4px 0px rgba(0,0,0,0.75)`,
-    fontSize: 20,
-    color: theme.text,
-    transform: `translateX(-240px)`,
-    transition: 'all 0.3s ease',
-    $nest: {
-      '&[data-is-drawer-visible="true"]': {
-        width: 240,
-        minWidth: 240,
-        transform: `translateX(0px)`,
-      },
-      '& nav nav': {
-        display: 'flex',
-        flexDirection: 'column',
-      },
-      '& nav nav a': drawerItem(theme),
-      '& a:hover, & a:focus': {
-        color: theme.background,
-        backgroundColor: theme.accent,
-        outline: 0,
+  style(
+    {
+      background: theme.background,
+      fontSize: 20,
+      color: theme.text,
+      position: 'fixed',
+      bottom: '0',
+      width: '100%',
+      $nest: {
+        '& li a': drawerItem(theme),
+        '& a:hover, & a:focus': {
+          color: theme.background,
+          backgroundColor: theme.accent,
+          outline: 0,
+        },
       },
     },
-  });
-
-const drawerHeader = (theme: App.ITheme) =>
-  style({
-    ...drawerItem(theme),
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: '100%',
-    cursor: 'pointer',
-    $nest: {
-      '&:hover, &:hover > span > div > svg': {
-        color: theme.background,
-        backgroundColor: theme.accent,
-        fill: theme.background,
+    media(
+      { minWidth: 600 },
+      {
+        position: 'relative',
+        width: '20rem',
+        padding: '64px 0 0',
       },
-    },
-  });
+    ),
+  );
 
 interface IDrawerMenuProps extends IDrawerState {
   theme: App.ITheme;
 }
 
 const DrawerMenu = ({ isVisible, theme }: IDrawerMenuProps) => (
-  <aside data-is-drawer-visible={isVisible} className={drawer(theme)}>
-    <nav>
-      <div className={drawerHeader(theme)}>
-        <span role="img" aria-label="Close drawer">
-          <Icons color={theme.text} icon="back" size={24} />
-        </span>
-      </div>
-      <NavLinks links={linkMap} theme={theme} />
-    </nav>
-  </aside>
+  <nav className={drawer(theme)}>
+    <NavLinks links={linkMap} theme={theme} />
+  </nav>
 );
 
 export default DrawerMenu;
