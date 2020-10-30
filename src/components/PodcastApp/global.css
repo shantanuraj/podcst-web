@@ -1,5 +1,7 @@
-@import './theme.css';
 @import 'normalize.css';
+
+@import '../../styles/colors.css';
+@import './theme.css';
 
 html, body {
   color: var(--color-text);
