@@ -1,0 +1,32 @@
+.wrapper {
+  background-image: url(/icons/launcher-dark.svg);
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: 100px;
+}
+
+:root.light {
+  background-image: url(/icons/launcher-light.svg);
+}
+
+.tile {
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  height: 200px;
+  justify-content: flex-end;
+  padding: 8px;
+}
+
+.title {
+  font-size: var(--dimen-font-secondary);
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.author {
+  font-size: var(--dimen-font-smallest);
+  font-weight: lighter;
+}

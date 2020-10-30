@@ -1,0 +1,51 @@
+@import './theme.css';
+@import 'normalize.css';
+
+html, body {
+  color: var(--color-text);
+  background-color: var(--color-background);
+  font-family: var(--font-primary);
+  font-size: var(--dimen-font-primary);
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#__next {
+  height: 100%;
+  width: 100%;
+}
+
+*,*:before,*:after {
+  box-sizing: inherit;
+}
+
+p, pre {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  padding: 0;
+  background-color: inherit;
+}
+
+input, button {
+  font-family: var(--font-primary);
+  color: var(--color-text);
+  border: none;
+}
+
+button:enabled {
+  cursor: pointer;
+}
+
+main {
+  padding-top: var(--dimen-header-height);
+}
