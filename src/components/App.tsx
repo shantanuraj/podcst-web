@@ -48,6 +48,7 @@ import { App as AppTypes, FeedType } from '../typings';
 
 const container = style(
   {
+    flex: 1,
     paddingTop: TOOLBAR_HEIGHT,
     $nest: {
       '&[data-is-player-visible="true"]': {

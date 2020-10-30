@@ -29,6 +29,7 @@ export type IconType =
   | 'seek-forward'
   | 'info';
 
+// tslint:disable-next-line: interface-name
 interface IconProps {
   icon: IconType;
   color: string;

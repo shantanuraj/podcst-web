@@ -24,9 +24,10 @@ const search = (theme: App.ITheme) =>
   style({
     padding: 16,
     height: 'inherit',
-    boxShadow: 'inset 0 2px 5px rgba(0,0,0,.2)',
+    boxShadow: 'none',
+    width: '100%',
     backgroundColor: theme.backgroundSearch,
-    border: `1px solid ${theme.backgroundSearch}`,
+    border: 0,
     outline: 'none',
     color: theme.textLight,
   });
