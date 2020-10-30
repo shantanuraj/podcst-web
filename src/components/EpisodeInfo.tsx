@@ -186,9 +186,9 @@ class EpisodeInfo extends React.PureComponent<IEpisodeInfoProps & RouteComponent
         <div className={podcastInfo}>
           <div className={infoCover(mode, showArt)} role="img" aria-label={`${title} episode art`} />
           <div className={podcastInfoTitles}>
-            <h1 className={podcastTitle}>{episode.link ? <a href={episode.link}>{title}</a> : title}</h1>
+            <h1 className={podcastTitle}>{episode.link ? <a target="_blank" href={episode.link}>{title}</a> : title}</h1>
             <h2 className={infoMargins}>
-              from <a href={podcast.link}>{podcast.title}</a>
+              from <a target="_blank" href={podcast.link}>{podcast.title}</a>
             </h2>
             <h2 className={infoMargins}>by {author}</h2>
             <div className={buttonsContainer}>
