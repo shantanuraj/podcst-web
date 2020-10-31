@@ -32,7 +32,6 @@
   animation: loading-dark 2s infinite;
 }
 
-/* TODO: Ask Olivia */
-:root.light .loadBar {
+:global(:root.light) .loadBar {
   animation: loading-light 2s infinite;
 }
