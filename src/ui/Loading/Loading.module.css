@@ -1,0 +1,19 @@
+@keyframes pulse {
+  0% {
+    background-position: 0 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.loading {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(-45deg, #80CBC4, #A7FFEB, #F48FB1, #FFEE58);
+  background-size: 400% 400%;
+  animation: pulse 4s ease infinite;
+}

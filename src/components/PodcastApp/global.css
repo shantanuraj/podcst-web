@@ -15,7 +15,8 @@ html, body {
   box-sizing: border-box;
 }
 
-#__next {
+#__next,
+main {
   height: 100%;
   width: 100%;
 }

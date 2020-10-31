@@ -1,0 +1,38 @@
+@keyframes loading-dark {
+  0% {
+    background-color: #5cffa0;
+  }
+  50% {
+    background-color: #00B778;
+  }
+  100% {
+    background-color: #82ffb5;
+  }
+}
+
+@keyframes loading-light {
+  0% {
+    background-color: #c069ff;
+  }
+  50% {
+    background-color: #60347f;
+  }
+  100% {
+    background-color: #8649b2;
+  }
+}
+
+.loadBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: var(--dimen-load-bar-height);
+  width: 100%;
+  z-index: var(--dimen-header-z-index);
+  animation: loading-dark 2s infinite;
+}
+
+/* TODO: Ask Olivia */
+:root.light .loadBar {
+  animation: loading-light 2s infinite;
+}

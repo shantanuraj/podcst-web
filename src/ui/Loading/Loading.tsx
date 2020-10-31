@@ -1,5 +1,12 @@
 import * as React from 'react';
+import { LoadBar } from '../LoadBar';
+import styles from './Loading.module.css';
 
 export const Loading = React.memo(function Loading() {
-  return <div>Loading...</div>;
+  return (
+    <React.Fragment>
+      <LoadBar />
+      <div aria-label="Loading..." className={styles.loading} />
+    </React.Fragment>
+  );
 });
