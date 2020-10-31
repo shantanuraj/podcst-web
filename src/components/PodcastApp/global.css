@@ -52,3 +52,11 @@ button:enabled {
 main {
   padding-top: var(--dimen-header-height);
 }
+
+h1 {
+  font-size: var(--dimen-font-largest);
+}
+
+h2 {
+  font-size: var(--dimen-font-larger);
+}
