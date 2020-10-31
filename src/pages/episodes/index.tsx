@@ -2,6 +2,8 @@ import { useRouter } from 'next/router';
 import * as React from 'react';
 import { useEpisodesInfo } from '../../data/episodes';
 import { Loading } from '../../ui/Loading';
+import { EpisodesList } from '../../ui/EpisodesList';
+import { PodcastInfo } from '../../ui/PodcastInfo/PodcastInfo';
 
 export default function EpisodesPage() {
   const router = useRouter();
@@ -27,9 +29,8 @@ export function Episodes({ feed }: EpisodesProps) {
 
   return (
     <React.Fragment>
-      {episodes.map((ep, idx) => (
-        <div key={`${idx}-${ep.title}`}>{ep.title}</div>
-      ))}
+      <PodcastInfo info={info} />
+      <EpisodesList episodes={episodes} />
     </React.Fragment>
   );
 }

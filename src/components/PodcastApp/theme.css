@@ -19,12 +19,19 @@
   --dimen-drawer-z-index: 502;
   --dimen-drawer-width: 240px;
 
+  --dimen-font-largest: 40px;
+  --dimen-font-larger: 24px;
   --dimen-font-primary: 20px;
+  --dimen-font-regular: 16px;
   --dimen-font-secondary: 14px;
   --dimen-font-smallest: 12px;
 
   --dimen-icon-primary: 24px;
   --dimen-load-bar-height: 4px;
+
+  --dimen-podcast-info-padding: 32px 32px 0;
+  --dimen-podcast-info-cover: 300px;
+  --dimen-podcast-info-direction: row;
 }
 
 :root.light {
@@ -39,4 +46,13 @@
   --color-text: #000000;
   --color-sub-title: #555555;
   --color-text-light: #ffffff;
+}
+
+
+@media only screen and (max-width: 600px) {
+  :root {
+    --dimen-podcast-info-padding: 0;
+    --dimen-podcast-info-cover: 100vw;
+    --dimen-podcast-info-direction: column;
+  }
 }

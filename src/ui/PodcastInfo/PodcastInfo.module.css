@@ -1,0 +1,49 @@
+.info {
+  display: flex;
+  flex-direction: var(--dimen-podcast-info-direction);
+  padding: var(--dimen-podcast-info-padding);
+}
+
+.info img {
+  height: var(--dimen-podcast-info-cover);
+  width: var(--dimen-podcast-info-cover);
+}
+
+.info .text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0 16px 16px;
+}
+
+.info .text a {
+  color: var(--color-accent);
+}
+
+.info .text h1 {
+  font-weight: bold;
+}
+
+.info .text p {
+  font-size: var(--dimen-font-regular);
+}
+
+.buttons,
+.description,
+.info .text h1,
+.info .text h2 {
+  margin: 8px 0;
+}
+
+.buttons {
+  display: flex;
+}
+
+.buttons button {
+  min-width: 120px;
+}
+
+.buttons button:not(:first-child) {
+  margin-left: 16px;
+}
