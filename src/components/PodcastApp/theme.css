@@ -24,6 +24,7 @@
   --dimen-font-smallest: 12px;
 
   --dimen-icon-primary: 24px;
+  --dimen-load-bar-height: 4px;
 }
 
 :root.light {
@@ -38,28 +39,4 @@
   --color-text: #000000;
   --color-sub-title: #555555;
   --color-text-light: #ffffff;
-}
-
-@keyframes loading-dark {
-  0% {
-    background-color: #5cffa0;
-  }
-  50% {
-    background-color: #00B778;
-  }
-  100% {
-    background-color: #82ffb5;
-  }
-}
-
-@keyframes loading-light {
-  0% {
-    background-color: #c069ff;
-  }
-  50% {
-    background-color: #60347f;
-  }
-  100% {
-    background-color: #8649b2;
-  }
 }
