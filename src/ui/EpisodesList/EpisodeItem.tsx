@@ -16,7 +16,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const day = pub.getDate();
   const month = pub.toLocaleDateString('default', { month: 'short' });
   const minutes = Math.floor((duration || 0) / 60);
-  const minutesSuffix = `min${minutes > 0 ? 's' : ''}`;
+  const minutesSuffix = `min${minutes > 1 ? 's' : ''}`;
 
   return (
     <Link href={`/episode?feed=${feed}&title=${title}`}>
