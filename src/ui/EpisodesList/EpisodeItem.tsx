@@ -21,7 +21,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   return (
     <Link href={`/episode?feed=${feed}&title=${title}`}>
       <a className={styles.container}>
-        <img className={styles.image} src={episodeArt || cover} alt={title} />
+        <img loading="lazy" className={styles.image} src={episodeArt || cover} alt={title} />
         <div className={styles.info}>
           <span>{month}</span>
           <span>{day}</span>
