@@ -1,9 +1,11 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect } from 'react';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import { Header } from '../../ui/Header';
+import { removeDeprecatedStorage } from '../../shared/storage/storage';
 
 export default function App({ Component, pageProps }: AppProps) {
+  useEffect(removeDeprecatedStorage, []);
   return (
     <Fragment>
       <Head>
