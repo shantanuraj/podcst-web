@@ -1,4 +1,5 @@
 import { IEpisodeInfo } from '../../types';
+import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
 
@@ -11,7 +12,7 @@ export function EpisodesList({ episodes }: EpisodesListProps) {
     <ul className={styles.list}>
       {episodes.map((episode, idx) => (
         <li key={`${idx}-${episode.title}`}>
-          {episode.title} - {episode.author}
+          <EpisodeItem episode={episode} />
         </li>
       ))}
     </ul>

@@ -1,3 +1,15 @@
 .list {
+  margin: 32px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--color-background-light);
+}
 
+@media only screen and (max-width: 600px) {
+  .list {
+    margin: 0;
+  }
+}
+
+.list li:nth-child(even) {
+  background-color: var(--color-background-light);
 }
