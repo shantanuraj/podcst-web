@@ -22,6 +22,7 @@
 
 .info {
   display: flex;
+  color: var(--color-sub-title);
   flex-direction: column;
   align-items: center;
   margin: 0 16px;
