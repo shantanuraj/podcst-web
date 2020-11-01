@@ -41,9 +41,24 @@
 }
 
 .buttons button {
-  min-width: 120px;
+  width: 120px;
 }
 
 .buttons button:not(:first-child) {
   margin-left: 16px;
+}
+
+@media only screen and (max-width: 600px) {
+  .buttons {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .buttons button {
+    width: 100%;
+  }
+
+  .buttons button:not(:first-child) {
+    margin: 16px 0 0;
+  }
 }
