@@ -4,6 +4,7 @@ import { useEpisodesInfo } from '../../data/episodes';
 import { Loading } from '../../ui/Loading';
 import { EpisodesList } from '../../ui/EpisodesList';
 import { PodcastInfo } from '../../ui/PodcastInfo/PodcastInfo';
+import { SubscriptionsProvider } from '../../shared/subscriptions';
 
 export default function EpisodesPage() {
   const router = useRouter();
@@ -29,7 +30,9 @@ export function Episodes({ feed }: EpisodesProps) {
 
   return (
     <React.Fragment>
-      <PodcastInfo info={info} />
+      <SubscriptionsProvider>
+        <PodcastInfo info={info} />
+      </SubscriptionsProvider>
       <EpisodesList episodes={episodes} />
     </React.Fragment>
   );
