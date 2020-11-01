@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "name": "podcst-web-static",
   "alias": [
     "podcst.app",
     "static.podcst.app"
-  ],
-  "builds": [
-    { "src": "package.json", "use": "@now/static-build" }
   ]
 }
 

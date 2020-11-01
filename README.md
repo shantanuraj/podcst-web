@@ -21,7 +21,7 @@ See the [development](#development) section below for additional details.
 
 ### Prerequisites
 
-* [Node](https://nodejs.org/)   - node version 8+ for using latest ES2016+ featuers
+* [Node](https://nodejs.org/)   - node version 8+ for using latest ES2016+ features
 * [yarn](https://yarnpkg.com/)  - package manager
 
 ### Getting the Source Code
@@ -38,11 +38,11 @@ yarn
 The following steps are for building and installing from the source code. First compile the code to the `build` folder in the project directory.
 
 ```bash
-# build:dev compiles to unoptimised dev friendly build
-yarn build:dev
+# dev: compiles to unoptimised dev friendly build
+yarn dev
 
-# build:prod and build:staging compile to optimised / minified production ready build
-yarn build:prod
+# build: compiles to optimised / minified production ready build
+yarn build
 ```
 
 or to compile in watch mode (automatically compile on file change)
@@ -51,9 +51,7 @@ or to compile in watch mode (automatically compile on file change)
 yarn dev
 ```
 
-Once the url reported by the webpack-dev-server
-
-> **Note:** Code changes are hot-reloaded but *not* perfectly components render multiple times. You must click the `Reload (⌘R)` if you face any issues.
+Once the url reported by Next.js
 
 ## Building
 
@@ -85,7 +83,7 @@ yarn test
 
 ## Deployment
 
-Deployment is automated and managed via zeit.co's [now-cli](https://github.com/zeit/now-cli).
+Deployment is automated and managed using the [vercel cli](https://github.com/vercel/vercel).
 
 ```shell
 # To deploy production builds
@@ -95,14 +93,14 @@ now --target production
 now
 ```
 
+On every merge to master the production deployment is automatically updated.
+
 ## Built With
 
 * [TypeScript](https://www.typescriptlang.org/) - ***Much Nicer JavaScript***
-* [Webpack 3](https://webpack.js.org/) - Bundling and transpiling TS to JS
 * [Howler](https://howlerjs.com/) - Manage play audio
-* [Workbox](https://workboxjs.org/) - Automated PWA generation
-* [Redux Observables](https://redux-observable.js.org/) - Sane tooling / philosophy to manage async redux actions
-* [typestyle](https://typestyle.github.io/) - Type-checked CSS in JS
+* [SWR](https://swr.vercel.app/) - API data and caching
+* [Next.js](https://nextjs.org/docs) - React with sane defaults
 
 ## Contributing
 

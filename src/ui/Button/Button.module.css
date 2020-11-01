@@ -1,0 +1,20 @@
+.button {
+  border-radius: 3px;
+  font-size: var(--dimen-font-regular);
+  display: inline-block;
+  padding: 8px;
+  background: transparent;
+  color: var(--color-text);
+  border: 2px solid var(--color-accent);
+  outline: 0;
+}
+
+button.button:focus, button.button:hover, button.button[data-is-subscribed="true"] {
+  background-color: var(--color-accent);
+  color: var(--color-background);
+}
+
+button.button[data-is-subscribed="true"]:hover {
+  background-color: transparent;
+  color: var(--color-text);
+}
