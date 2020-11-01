@@ -4,7 +4,7 @@
   flex-direction: row;
   padding: 0 32px;
   font-size: var(--dimen-font-regular);
-  height: 86px;
+  height: 84px;
 }
 
 .image {
