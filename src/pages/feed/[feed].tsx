@@ -6,7 +6,7 @@ import { FeedType, IPodcast } from '../../types';
 import { Loading } from '../../ui/Loading';
 import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next';
 import { FEED_REVALIDATE_DURATION } from '../../data/constants';
-import { PodcastGrid } from '../../ui/PodcastGrid';
+import { PodcastsGrid } from '../../ui/PodcastsGrid';
 
 export const getStaticPaths: GetStaticPaths = async () => {
   return {
@@ -33,7 +33,7 @@ export default function Feed({ podcasts }: InferGetStaticPropsType<typeof getSta
       <Head>
         <title>Podcst | Top Podcasts</title>
       </Head>
-      <PodcastGrid podcasts={podcasts} />
+      <PodcastsGrid podcasts={podcasts} />
     </React.Fragment>
   );
 }
