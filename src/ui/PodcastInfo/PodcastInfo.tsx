@@ -4,6 +4,7 @@ import { toggleSubscription } from '../../shared/subscriptions';
 import { useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { IPodcastEpisodesInfo } from '../../types';
 import { Button } from '../Button';
+import { ShareButton } from '../Button/ShareButton';
 import { ExternalLink } from '../ExternalLink';
 
 import styles from './PodcastInfo.module.css';
@@ -32,7 +33,13 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
           <Button data-is-subscribed={isSubscribed} onClick={onSubscribeClick}>
             {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
           </Button>
-          <Button>Share</Button>
+          <ShareButton
+            title={title}
+            text={`Listen to ${title} by ${author} on Podcst`}
+            url={location.href}
+          >
+            Share
+          </ShareButton>
         </div>
         <p
           className={styles.description}

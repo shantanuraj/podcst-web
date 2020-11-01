@@ -1,10 +1,12 @@
 import * as React from 'react';
 import styles from './Button.module.css';
 
-function Button({
-  className,
-  ...props
-}: React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>) {
+export type ButtonProps = React.DetailedHTMLProps<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  HTMLButtonElement
+>;
+
+function Button({ className, ...props }: ButtonProps) {
   const classes = className ? [className, styles.button].join(' ') : styles.button;
   return <button {...props} className={classes} />;
 }
