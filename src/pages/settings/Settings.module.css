@@ -1,0 +1,23 @@
+.container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.container a {
+  padding: 32px;
+  width: 100%;
+}
+
+.container a:nth-child(even) {
+  background-color: var(--color-background-light);
+}
+
+@media only screen and (max-width: 600px) {
+  .container a {
+    padding: 32px 16px;
+  }
+}
