@@ -1,3 +1,5 @@
+import { useRouter } from 'next/router';
+
 import { linkifyText } from '../../shared/link/linkify-text';
 import { stripHost } from '../../shared/link/strip-host';
 import { toggleSubscription } from '../../shared/subscriptions';
@@ -14,6 +16,7 @@ type PodcastInfoProps = {
 };
 
 export function PodcastInfo({ info }: PodcastInfoProps) {
+  const router = useRouter();
   const { title, author, cover, feed, link, description } = info;
 
   const { subs, dispatch } = useSubscriptions();
@@ -36,7 +39,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
           <ShareButton
             title={title}
             text={`Listen to ${title} by ${author} on Podcst`}
-            url={location.href}
+            url={router.pathname}
           >
             Share
           </ShareButton>
