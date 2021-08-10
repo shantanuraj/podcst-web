@@ -1,10 +1,10 @@
 import * as React from 'react';
+import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next';
 import Head from 'next/head';
 
 import { fetchFeed } from '../../data/feed';
 import { FeedType, IPodcast } from '../../types';
 import { Loading } from '../../ui/Loading';
-import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next';
 import { FEED_REVALIDATE_DURATION } from '../../data/constants';
 import { PodcastsGrid } from '../../ui/PodcastsGrid';
 

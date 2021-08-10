@@ -1,29 +1,20 @@
-import { useRouter } from 'next/router';
+import { NextPage } from 'next';
 import * as React from 'react';
-import { useEpisodesInfo } from '../../data/episodes';
+
+import { fetchEpisodesInfo, useEpisodesInfo } from '../../data/episodes';
 import { Loading } from '../../ui/Loading';
 import { EpisodesList } from '../../ui/EpisodesList';
 import { PodcastInfo } from '../../ui/PodcastInfo/PodcastInfo';
 import { SubscriptionsProvider } from '../../shared/subscriptions';
+import { IPodcastEpisodesInfo } from '../../types';
 
-export default function EpisodesPage() {
-  const router = useRouter();
-  const feed = router.query.feed;
-  return feed && typeof feed === 'string' ? (
-    <React.Suspense fallback={<Loading />}>
-      <Episodes feed={feed} />
-    </React.Suspense>
-  ) : (
-    <Loading />
-  );
-}
-
-type EpisodesProps = {
+type EpisodesPageProps = {
   feed: string;
+  info: IPodcastEpisodesInfo | null;
 };
 
-export function Episodes({ feed }: EpisodesProps) {
-  const { data: info } = useEpisodesInfo(feed);
+const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
+  const { data: info } = useEpisodesInfo(props.feed, props.info);
   if (!info) return <Loading />;
 
   const { episodes } = info;
@@ -36,4 +27,15 @@ export function Episodes({ feed }: EpisodesProps) {
       <EpisodesList episodes={episodes} />
     </React.Fragment>
   );
-}
+};
+
+EpisodesPage.getInitialProps = async (ctx) => {
+  const { feed } = ctx.query;
+  const info = typeof feed === 'string' ? await fetchEpisodesInfo(feed) : null;
+  return {
+    feed: typeof feed === 'string' ? feed : '',
+    info,
+  };
+};
+
+export default EpisodesPage;

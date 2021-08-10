@@ -9,6 +9,7 @@ type ShareButtonProps = ButtonProps & {
 };
 
 const share = ({ text, title, url }: ShareButtonProps) => {
+  if (typeof window === 'undefined') return;
   if ('share' in navigator) {
     (navigator as IShareEnabledNavigator)
       .share({ text, title, url })
@@ -18,7 +19,7 @@ const share = ({ text, title, url }: ShareButtonProps) => {
 
 export const ShareButton = memo(
   forwardRef<HTMLButtonElement, ShareButtonProps>(function ShareButton(props, ref) {
-    if (!('share' in navigator)) return null;
+    if (typeof window === 'undefined' || !('share' in navigator)) return null;
     return <Button {...(props as ButtonProps)} ref={ref} onClick={() => share(props)} />;
   }),
 );
