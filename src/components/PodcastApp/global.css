@@ -61,6 +61,10 @@ h2 {
   font-size: var(--dimen-font-larger);
 }
 
+h3 {
+  font-size: var(--dimen-font-primary);
+}
+
 ul {
   list-style: none;
 }
