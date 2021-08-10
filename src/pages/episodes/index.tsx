@@ -7,6 +7,8 @@ import { EpisodesList } from '../../ui/EpisodesList';
 import { PodcastInfo } from '../../ui/PodcastInfo/PodcastInfo';
 import { IPodcastEpisodesInfo } from '../../types';
 
+import styles from './Episodes.module.css';
+
 type EpisodesPageProps = {
   feed: string;
   info: IPodcastEpisodesInfo | null;
@@ -21,7 +23,7 @@ const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
   return (
     <React.Fragment>
       <PodcastInfo info={info} />
-      <EpisodesList episodes={episodes} />
+      <EpisodesList className={styles.episodes} episodes={episodes} />
     </React.Fragment>
   );
 };
