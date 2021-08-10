@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { memo } from 'react';
+
+import { PlayButton } from '../Button/PlayButton';
 import { IEpisodeInfo } from '../../types';
-import { Button } from '../Button';
 
 import styles from './EpisodeItem.module.css';
 
@@ -33,9 +34,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
           <span>{minutes || ''}</span>
           <span>{minutes ? minutesSuffix : ''}</span>
         </div>
-        <div className={styles.button}>
-          <Button>Play</Button>
-        </div>
+        <PlayButton />
       </a>
     </Link>
   );
