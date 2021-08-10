@@ -6,7 +6,7 @@ import * as React from 'react';
  */
 function createRootElement(id: string) {
   const rootContainer = document.createElement('div');
-  rootContainer.setAttribute('id', id);
+  rootContainer.id = id;
   return rootContainer;
 }
 
@@ -51,7 +51,6 @@ export function usePortal(id: string) {
       return function removeElement() {
         rootElemRef.current?.remove();
         if (parentElem.childNodes.length === -1) {
-          // $FlowFixMe: The parentElem should have a real DOM parent of its own. If not, runtime error.
           const parentParentNode = parentElem.parentNode;
           parentParentNode?.removeChild(parentElem);
         }
