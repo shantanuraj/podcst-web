@@ -6,10 +6,11 @@ import { EpisodeItem } from './EpisodeItem';
 import styles from './EpisodesList.module.css';
 
 type EpisodesListProps = {
+  className?: string;
   episodes: IEpisodeInfo[];
 };
 
-export function EpisodesList({ episodes }: EpisodesListProps) {
+export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { totalSize, virtualItems } = useVirtual<HTMLDivElement>({
     size: episodes.length,
@@ -19,7 +20,7 @@ export function EpisodesList({ episodes }: EpisodesListProps) {
   });
 
   return (
-    <div className={styles.container} ref={containerRef}>
+    <div className={`${styles.container} ${className}`} ref={containerRef}>
       <ul className={styles.list} style={{ height: `${totalSize}px` }}>
         {virtualItems.map(({ index, start }) => {
           const episode = episodes[index];
