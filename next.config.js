@@ -1,4 +1,9 @@
+const package = require('./package.json');
+
 module.exports = {
+  env: {
+    appVersion: package.version,
+  },
   reactStrictMode: true,
   async redirects() {
     return [
@@ -7,6 +12,6 @@ module.exports = {
         destination: '/feed/top',
         permanent: false,
       },
-    ]
+    ];
   },
-}
+};
