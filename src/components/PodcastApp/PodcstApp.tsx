@@ -3,6 +3,7 @@ import { AppProps } from 'next/app';
 import Head from 'next/head';
 import { Header } from '../../ui/Header';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
+import { SubscriptionsProvider } from '../../shared/subscriptions';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
@@ -47,7 +48,9 @@ export default function App({ Component, pageProps }: AppProps) {
       <Header />
 
       <main>
-        <Component {...pageProps} />
+        <SubscriptionsProvider>
+          <Component {...pageProps} />
+        </SubscriptionsProvider>
       </main>
     </Fragment>
   );

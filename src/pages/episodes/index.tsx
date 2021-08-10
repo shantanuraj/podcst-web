@@ -5,7 +5,6 @@ import { fetchEpisodesInfo, useEpisodesInfo } from '../../data/episodes';
 import { Loading } from '../../ui/Loading';
 import { EpisodesList } from '../../ui/EpisodesList';
 import { PodcastInfo } from '../../ui/PodcastInfo/PodcastInfo';
-import { SubscriptionsProvider } from '../../shared/subscriptions';
 import { IPodcastEpisodesInfo } from '../../types';
 
 type EpisodesPageProps = {
@@ -21,9 +20,7 @@ const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
 
   return (
     <React.Fragment>
-      <SubscriptionsProvider>
-        <PodcastInfo info={info} />
-      </SubscriptionsProvider>
+      <PodcastInfo info={info} />
       <EpisodesList episodes={episodes} />
     </React.Fragment>
   );

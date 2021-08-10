@@ -1,0 +1,11 @@
+.button {
+  min-width: 200px;
+}
+
+.button input {
+  display: none;
+}
+
+.button label {
+  cursor: pointer;
+}
