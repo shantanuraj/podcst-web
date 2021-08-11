@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Fragment, useCallback, useRef } from 'react';
+import React, { Fragment, useCallback, useRef } from 'react';
 import { Search } from '../Search';
 import MenuIcon from '../icons/svg/MenuIcon';
 
@@ -13,11 +13,14 @@ export function Header() {
 
   const onHeaderClick = useCallback(() => toggleDrawer(drawerRef.current), []);
   const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
-  const toggleDrawerShortcut = useCallback((event: KeyboardEvent) => {
-    if (event.key === shortcuts.drawer.value) {
-      onHeaderClick();
-    }
-  }, [onHeaderClick]);
+  const toggleDrawerShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === shortcuts.drawer.value) {
+        onHeaderClick();
+      }
+    },
+    [onHeaderClick],
+  );
 
   useKeydown(toggleDrawerShortcut);
 
@@ -30,7 +33,11 @@ export function Header() {
         </button>
         <Search />
       </header>
-      <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer}>
+      <nav
+        ref={drawerRef}
+        onClick={onCloseDrawer}
+        className={styles.drawer}
+      >
         <button role="button" aria-label="Close drawer" onClick={onCloseDrawer}>
           <BackIcon />
         </button>
@@ -56,6 +63,7 @@ export function Header() {
 const toggleDrawer = (drawer: HTMLDivElement | null) => {
   if (!drawer) return;
   drawer.dataset.open = drawer.dataset.open === 'open' ? '' : 'open';
+  if (drawer.dataset.open === 'open') drawer.focus();
 };
 
 const closeDrawer = (drawer: HTMLDivElement | null) => {
