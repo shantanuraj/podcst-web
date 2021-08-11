@@ -1,4 +1,4 @@
-import { NextPage } from 'next';
+import { GetServerSideProps, NextPage } from 'next';
 import * as React from 'react';
 
 import { fetchEpisodesInfo, useEpisodesInfo } from '../../data/episodes';
@@ -28,12 +28,14 @@ const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
   );
 };
 
-EpisodesPage.getInitialProps = async (ctx) => {
+export const getServerSideProps: GetServerSideProps<EpisodesPageProps> = async (ctx) => {
   const { feed } = ctx.query;
   const info = typeof feed === 'string' ? await fetchEpisodesInfo(feed) : null;
   return {
-    feed: typeof feed === 'string' ? feed : '',
-    info,
+    props: {
+      feed: typeof feed === 'string' ? feed : '',
+      info,
+    },
   };
 };
 

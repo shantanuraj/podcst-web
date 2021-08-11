@@ -1,4 +1,4 @@
-import { NextPage } from 'next';
+import { GetServerSideProps, NextPage } from 'next';
 import * as React from 'react';
 
 import { fetchEpisodesInfo, useEpisodesInfo } from '../../data/episodes';
@@ -26,13 +26,15 @@ const EpisodePage: NextPage<EpisodePageProps> = (props) => {
   return <EpisodeInfo podcast={info} episode={episode} />;
 };
 
-EpisodePage.getInitialProps = async (ctx) => {
+export const getServerSideProps: GetServerSideProps<EpisodePageProps> = async (ctx) => {
   const { feed, title } = ctx.query;
   const info = typeof feed === 'string' ? await fetchEpisodesInfo(feed) : null;
   return {
-    feed: typeof feed === 'string' ? feed : '',
-    title: typeof title === 'string' ? title : '',
-    info,
+    props: {
+      feed: typeof feed === 'string' ? feed : '',
+      title: typeof title === 'string' ? title : '',
+      info,
+    },
   };
 };
 
