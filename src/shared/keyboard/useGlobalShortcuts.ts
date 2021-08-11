@@ -1,12 +1,12 @@
 import router from 'next/router';
 import { IShortcutInfo, shortcuts } from './shortcuts';
-import { isMatchingEvent, useKeydown } from './useKeydown';
+import { useKeydown } from './useKeydown';
 
 export function useGlobalShortcuts() {
-  useKeydown(globalHandler);
+  useKeydown(globalShortcuts);
 }
 
-const handlers: Array<[IShortcutInfo, () => void]> = [
+const globalShortcuts: Array<[IShortcutInfo, () => void]> = [
   [
     shortcuts.home,
     () => {
@@ -32,11 +32,3 @@ const handlers: Array<[IShortcutInfo, () => void]> = [
     },
   ],
 ];
-
-const globalHandler = (e: KeyboardEvent) => {
-  handlers.forEach(([shortcut, handler]) => {
-    if (isMatchingEvent(e, shortcut)) {
-      handler();
-    }
-  });
-};
