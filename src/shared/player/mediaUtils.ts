@@ -4,17 +4,23 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 
+import { Dispatch } from 'react';
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
+import {
+  PlayerActions,
+  resumeEpisode,
+  seekBackward,
+  seekForward,
+  seekTo,
+  setPlayerState,
+  skipToNextEpisode,
+  skipToPreviousEpisode,
+} from './context';
 
 export const updateMetadata = (
   episode: IEpisodeInfo,
   info: IPodcastEpisodesInfo | null,
-  pause: () => void,
-  resume: () => void,
-  stop: () => void,
-  seekBack: () => void,
-  seekForward: () => void,
-  seekTo: (seconds: number) => void,
+  dispatch: Dispatch<PlayerActions>,
 ) => {
   if (typeof window === 'undefined' || typeof window.navigator === 'undefined') return;
 
@@ -38,12 +44,21 @@ export const updateMetadata = (
     title,
   });
 
+  const resume = () => dispatch(resumeEpisode(episode));
+  const pause = () => dispatch(setPlayerState('paused'));
+  const stop = () => dispatch(setPlayerState('idle'));
+  const seekForwardHandler = () => dispatch(seekForward());
+  const seekBackHandler = () => dispatch(seekBackward());
+  const seekToTimestamp = (seconds: number | null) => dispatch(seekTo(seconds || 0));
+  const previousTrack = () => dispatch(skipToPreviousEpisode());
+  const nextTrack = () => dispatch(skipToNextEpisode());
+
   mediaSession.setActionHandler('play', resume);
   mediaSession.setActionHandler('pause', pause);
   mediaSession.setActionHandler('stop', stop);
-  mediaSession.setActionHandler('seekbackward', seekBack);
-  mediaSession.setActionHandler('seekforward', seekForward);
-  mediaSession.setActionHandler('seekto', (details) => seekTo(details.seekTime || 0));
-  mediaSession.setActionHandler('previoustrack', seekForward);
-  mediaSession.setActionHandler('nexttrack', seekForward);
+  mediaSession.setActionHandler('seekbackward', seekBackHandler);
+  mediaSession.setActionHandler('seekforward', seekForwardHandler);
+  mediaSession.setActionHandler('seekto', (details) => seekToTimestamp(details.seekTime));
+  mediaSession.setActionHandler('previoustrack', previousTrack);
+  mediaSession.setActionHandler('nexttrack', nextTrack);
 };
