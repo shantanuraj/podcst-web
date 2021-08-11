@@ -7,7 +7,10 @@ export default function SettingsShortcutsPage() {
       {appShortcuts.map((shortcut) => (
         <div key={shortcut.title} className={styles.shortcut}>
           <span>{shortcut.title}</span>
-          <pre>{shortcut.value}</pre>
+          <pre>
+            {shortcut.metaKey ? 'cmd/ctrl + ' : ''}
+            {shortcut.key}
+          </pre>
         </div>
       ))}
     </div>

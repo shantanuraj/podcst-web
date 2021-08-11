@@ -6,7 +6,7 @@ import MenuIcon from '../icons/svg/MenuIcon';
 import styles from './Header.module.css';
 import BackIcon from '../icons/svg/BackIcon';
 import { shortcuts } from '../../shared/keyboard/shortcuts';
-import { useKeydown } from '../../shared/keyboard/useKeydown';
+import { isMatchingEvent, useKeydown } from '../../shared/keyboard/useKeydown';
 
 export function Header() {
   const drawerRef = useRef<HTMLDivElement | null>(null);
@@ -15,7 +15,7 @@ export function Header() {
   const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
   const toggleDrawerShortcut = useCallback(
     (event: KeyboardEvent) => {
-      if (event.key === shortcuts.drawer.value) {
+      if (isMatchingEvent(event, shortcuts.drawer)) {
         onHeaderClick();
       }
     },
