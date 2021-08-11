@@ -1,14 +1,23 @@
-import React from 'react';
+import React, { FormEvent } from 'react';
+import { useTheme } from '../../shared/theme/useTheme';
 import { ThemeMode } from '../../types';
 
 import { Icon, IconType } from '../../ui/icons/svg/Icon';
 
+import styles from './Settings.module.css';
+
 export default function SettingsThemePage() {
-  const [theme, _setTheme] = React.useState<ThemeMode>('light');
+  const { theme, changeTheme: setTheme } = useTheme();
+  const changeTheme = React.useCallback(
+    (e: FormEvent) => {
+      setTheme((e.target as HTMLInputElement).value as ThemeMode);
+    },
+    [setTheme],
+  );
   return (
-    <form>
+    <form className={styles.container} onChange={changeTheme}>
       {themes.map((item) => (
-        <Theme {...item} currentTheme={theme} />
+        <Theme key={item.theme} {...item} currentTheme={theme as ThemeMode} />
       ))}
     </form>
   );
@@ -40,7 +49,13 @@ interface ThemeProps extends IThemeInfo {
 const Theme = ({ currentTheme, name, icon, theme }: ThemeProps) => {
   return (
     <div>
-      <input type="radio" id={theme} name="theme" checked={theme === currentTheme} value={theme} />
+      <input
+        type="radio"
+        id={theme}
+        name="theme"
+        defaultChecked={theme === currentTheme}
+        value={theme}
+      />
       <label htmlFor={theme}>
         <Icon icon={icon} />
         {name}
