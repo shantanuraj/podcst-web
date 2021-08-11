@@ -7,17 +7,41 @@
   justify-content: flex-start;
 }
 
-.container a {
+.container > div,
+.container > a {
   padding: 32px;
   width: 100%;
 }
 
-.container a:nth-child(even) {
+.container > div:nth-child(even),
+.container > a:nth-child(even) {
   background-color: var(--color-background-light);
 }
 
+form.container > div {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+form.container > div,
+form.container> div > * {
+  cursor: pointer;
+}
+
+form.container label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+form.container svg {
+  fill: var(--color-text);
+}
+
 @media only screen and (max-width: 600px) {
-  .container a {
+  .container > div,
+  .container > a {
     padding: 32px 16px;
   }
 }

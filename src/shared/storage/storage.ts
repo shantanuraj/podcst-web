@@ -2,6 +2,7 @@
  * Storage manager
  */
 
+import { ThemeMode } from '../../types';
 import { Subscriptions } from '../subscriptions';
 
 const STORE_KEY = 'store@4';
@@ -10,6 +11,7 @@ const DEPRECATED_KEYS = ['store@3'] as const;
 
 export interface IStoreable {
   subscriptions: Subscriptions['subs'];
+  themeMode: ThemeMode;
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
