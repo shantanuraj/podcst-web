@@ -153,6 +153,11 @@
   resolved "https://registry.yarnpkg.com/@reach/observe-rect/-/observe-rect-1.2.0.tgz#d7a6013b8aafcc64c778a0ccb83355a11204d3b2"
   integrity sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==
 
+"@types/howler@2.2.3":
+  version "2.2.3"
+  resolved "https://registry.yarnpkg.com/@types/howler/-/howler-2.2.3.tgz#236ff8ba2da2ed25b0b0ab959ad2f15effc93dff"
+  integrity sha512-rzIE56NmGh7t8LdZT/zuBMa9iZvwqVmB65gNhwNLtrGEIHdWkEDp1fVmoM/zctR4UJZFe0uP01AmPuPzOwhecA==
+
 "@types/json-schema@^7.0.7":
   version "7.0.9"
   resolved "https://registry.yarnpkg.com/@types/json-schema/-/json-schema-7.0.9.tgz#97edc9037ea0c38585320b28964dde3b39e4660d"
@@ -201,6 +206,11 @@
   version "0.16.2"
   resolved "https://registry.yarnpkg.com/@types/scheduler/-/scheduler-0.16.2.tgz#1a62f89525723dde24ba1b01b092bf5df8ad4d39"
   integrity sha512-hppQEBDmlwhFAXKJX2KnWLYu5yMfi91yazPb2l+lbJiwW+wdo1gNeRA+3RgNSO39WYX2euey41KEwnqesU2Jew==
+
+"@types/wicg-mediasession@1.1.2":
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/@types/wicg-mediasession/-/wicg-mediasession-1.1.2.tgz#f02d76f9713f8dd53180d3ae14e23c01e34f5e4d"
+  integrity sha512-5UJ8tBtgMmIzyJafmfBjq2VcXk0SXqZnNCApepKiqLracDV4+dJdYPZCW0IwaYfOBkY54SmfCOWqMBmLCPrfuQ==
 
 "@typescript-eslint/eslint-plugin@4.29.1":
   version "4.29.1"
@@ -1457,6 +1467,11 @@ hmac-drbg@^1.0.0:
     hash.js "^1.0.3"
     minimalistic-assert "^1.0.0"
     minimalistic-crypto-utils "^1.0.1"
+
+howler@2.2.3:
+  version "2.2.3"
+  resolved "https://registry.yarnpkg.com/howler/-/howler-2.2.3.tgz#a2eff9b08b586798e7a2ee17a602a90df28715da"
+  integrity sha512-QM0FFkw0LRX1PR8pNzJVAY25JhIWvbKMBFM4gqk+QdV+kPXOhleWGCB6AiAF/goGjIHK2e/nIElplvjQwhr0jg==
 
 http-errors@1.7.3:
   version "1.7.3"

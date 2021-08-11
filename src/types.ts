@@ -144,45 +144,6 @@ export interface IOPMLJson {
 }
 
 export type PlayerState = 'playing' | 'paused' | 'idle' | 'buffering';
-export interface IArtwork {
-  src: string;
-  sizes: '96x96' | '128x128' | '192x192' | '256x256' | '384x384' | '512x512';
-  type: 'image/png' | 'image/jpeg';
-}
-
-export interface IChromeMediaMetadataProps {
-  album: string;
-  artist: string;
-  artwork: IArtwork[];
-  title: string;
-}
-
-export interface IChromeMediaMetadataClass {
-  new (props: IChromeMediaMetadataProps): IChromeMediaMetadata;
-}
-
-export interface IChromeMediaMetadata {
-  __data: string;
-}
-
-export type ChromeMediaSessionEvents =
-  | 'play'
-  | 'pause'
-  | 'seekbackward'
-  | 'seekforward'
-  | 'previoustrack'
-  | 'nexttrack';
-
-export type ChromeEventHandler = () => void;
-
-export interface IChromeMediaSession {
-  metadata: IChromeMediaMetadata;
-  setActionHandler(event: ChromeMediaSessionEvents, handleR: ChromeEventHandler): void;
-}
-
-export interface IChromeNavigator extends Navigator {
-  mediaSession: IChromeMediaSession;
-}
 
 export interface INavigatorShareProps {
   text: string;
