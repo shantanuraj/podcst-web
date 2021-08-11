@@ -34,7 +34,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
           <span>{minutes || ''}</span>
           <span>{minutes ? minutesSuffix : ''}</span>
         </div>
-        <PlayButton />
+        <PlayButton episode={episode} />
       </a>
     </Link>
   );
