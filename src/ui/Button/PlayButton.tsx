@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { playEpisode, setPlayerState } from '../../shared/player/context';
+import { playEpisode, resumeEpisode, setPlayerState } from '../../shared/player/context';
 import { usePlayerActions } from '../../shared/player/usePlayerActions';
 import { usePlayerState } from '../../shared/player/usePlayerState';
 
@@ -17,7 +17,7 @@ export const PlayButton = React.memo(
   ) {
     const { queue, currentTrackIndex, state } = usePlayerState();
     const isCurrentEpisode = queue[currentTrackIndex]?.guid === episode.guid;
-    const isPlaying = isCurrentEpisode && state === 'playing';
+    const isPlaying = isCurrentEpisode && (state === 'playing' || state === 'buffering');
 
     const dispatch = usePlayerActions();
     const play = React.useCallback(
@@ -34,14 +34,18 @@ export const PlayButton = React.memo(
       },
       [dispatch],
     );
+    const resume = React.useCallback(
+      (e: React.MouseEvent) => {
+        e.preventDefault();
+        dispatch(resumeEpisode(episode));
+      },
+      [dispatch],
+    );
+
+    const handleClick = isCurrentEpisode ? (isPlaying ? pause : resume) : play;
 
     return (
-      <Button
-        {...props}
-        ref={ref}
-        onClick={isPlaying ? pause : play}
-        data-is-current={isCurrentEpisode}
-      >
+      <Button {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
         {isCurrentEpisode ? (isPlaying ? 'Pause' : 'Resume') : 'Play'}
       </Button>
     );
