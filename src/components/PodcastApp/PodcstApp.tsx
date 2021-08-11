@@ -6,6 +6,7 @@ import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { SubscriptionsProvider } from '../../shared/subscriptions';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
+import { PlayerProvider } from '../../shared/player/PlayerProvider';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
@@ -50,13 +51,15 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <Header />
 
-      <main>
-        <SubscriptionsProvider>
-          <ThemeProvider>
-            <Component {...pageProps} />
-          </ThemeProvider>
-        </SubscriptionsProvider>
-      </main>
+      <PlayerProvider>
+        <main>
+          <SubscriptionsProvider>
+            <ThemeProvider>
+              <Component {...pageProps} />
+            </ThemeProvider>
+          </SubscriptionsProvider>
+        </main>
+      </PlayerProvider>
     </Fragment>
   );
 }

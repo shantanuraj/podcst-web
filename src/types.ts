@@ -64,6 +64,7 @@ export interface IEpisode {
   author: string | null;
   episodeArt: string | null;
   showNotes: string;
+  guid: string;
 }
 
 /**
@@ -142,42 +143,7 @@ export interface IOPMLJson {
   feeds: IOPMLFeed[];
 }
 
-export type EpisodePlayerState = 'playing' | 'paused' | 'stopped';
-
-export type KeyboardShortcuts =
-  | 'play'
-  | 'next'
-  | 'prev'
-  | 'seek-back'
-  | 'seek-forward'
-  | 'dismiss'
-  | 'focus'
-  | 'up'
-  | 'down'
-  | 'change-theme'
-  | 'episode-info'
-  | 'settings'
-  | 'toggle-drawer'
-  | 'select';
-
-export interface IKeyboardShortcutsMap {
-  [keyCode: number]: KeyboardShortcuts;
-}
-
-export interface IPodcastWebpackModule {
-  hot?: {
-    accept: (val?: string, cb?: () => void) => void;
-  };
-}
-
-export interface IProcess {
-  env: {
-    APP_VERSION: string;
-    IN_BROWSER: string;
-    NODE_ENV: 'development' | 'produciton';
-  };
-}
-
+export type PlayerState = 'playing' | 'paused' | 'idle' | 'buffering';
 export interface IArtwork {
   src: string;
   sizes: '96x96' | '128x128' | '192x192' | '256x256' | '384x384' | '512x512';
