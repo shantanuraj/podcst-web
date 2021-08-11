@@ -9,12 +9,16 @@
   outline: 0;
 }
 
-button.button:focus, button.button:hover, button.button[data-is-subscribed="true"] {
+button.button:focus,
+button.button:hover,
+button.button[data-is-subscribed='true'],
+button.button[data-is-current='true'] {
   background-color: var(--color-accent);
   color: var(--color-background);
 }
 
-button.button[data-is-subscribed="true"]:hover {
+button.button[data-is-subscribed='true']:hover
+button.button[data-is-current='true']:hover {
   background-color: transparent;
   color: var(--color-text);
 }

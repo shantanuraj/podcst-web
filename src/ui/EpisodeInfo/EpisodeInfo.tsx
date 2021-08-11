@@ -30,7 +30,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
         </h2>
         <h2>by {author}</h2>
         <div className={styles.buttons}>
-          <PlayButton />
+          <PlayButton episode={episode} />
           <ShareButton
             text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
             title={shareTitle}
