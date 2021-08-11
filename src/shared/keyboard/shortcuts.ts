@@ -1,36 +1,38 @@
 export interface IShortcutInfo {
   title: string;
-  value: string;
+  key: string;
+  metaKey?: boolean;
 }
 
 export const shortcuts = {
   home: {
     title: 'Home / Top',
-    value: 'h',
+    key: 'h',
   },
   subscriptions: {
     title: 'Subscriptions',
-    value: 's',
+    key: 's',
   },
   recents: {
     title: 'Recents',
-    value: 'r',
+    key: 'r',
   },
   settings: {
     title: 'Settings',
-    value: ',',
+    key: ',',
   },
   drawer: {
     title: 'Toggle drawer',
-    value: 'd',
+    key: 'd',
   },
   search: {
     title: 'Search',
-    value: 'cmd/ctrl + k',
+    key: 'k',
+    metaKey: true,
   },
   theme: {
     title: 'Toggle theme',
-    value: 't',
+    key: 't',
   },
   // {
   //   title: 'Show episode info',
