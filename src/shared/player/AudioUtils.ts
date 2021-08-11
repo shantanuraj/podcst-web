@@ -2,7 +2,7 @@
  * Howler player
  */
 
-import { Howl } from 'howler';
+import { Howl } from 'howler/src/howler.core';
 import { IEpisode } from '../../types';
 
 let globalHowl: Howl | null;
