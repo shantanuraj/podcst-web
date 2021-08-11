@@ -1,13 +1,30 @@
-import { info } from 'console';
 import React from 'react';
-import { IShortcutInfo } from './shortcuts';
+import { IShortcutInfo, shortcuts } from './shortcuts';
 
-export function useKeydown(handler: (e: KeyboardEvent) => void) {
+type ShortcutHandler = () => void;
+type KeyboardShortcuts = Array<[IShortcutInfo, ShortcutHandler]>;
+
+export function useKeydown(shortcuts: KeyboardShortcuts): void;
+export function useKeydown(config: IShortcutInfo, handler: ShortcutHandler): void;
+export function useKeydown(
+  shortcutsOrConfig: KeyboardShortcuts | IShortcutInfo,
+  handler?: ShortcutHandler,
+): void {
   const safeHandler = React.useCallback(
     (e: KeyboardEvent) => {
-      if (isNotIgnoreElement(e.target)) handler(e);
+      if (isNotIgnoreElement(e.target)) {
+        if (Array.isArray(shortcutsOrConfig)) {
+          shortcutsOrConfig.forEach(([shortcut, handler]) => {
+            if (isMatchingEvent(e, shortcut)) {
+              handler();
+            }
+          });
+        } else if (handler && isMatchingEvent(e, shortcutsOrConfig)) {
+          handler();
+        }
+      }
     },
-    [handler],
+    [handler, shortcutsOrConfig],
   );
 
   React.useEffect(() => {
@@ -27,6 +44,6 @@ const ignoreKeyboardSelector = 'input';
 const isNotIgnoreElement = (target: EventTarget | null) =>
   !!target && !(target as HTMLElement).matches(ignoreKeyboardSelector);
 
-export const isMatchingEvent = (e: KeyboardEvent, config: IShortcutInfo) => {
-  return e.metaKey === !!(config.metaKey) && e.key === config.key;
+const isMatchingEvent = (e: KeyboardEvent, config: IShortcutInfo) => {
+  return e.metaKey === !!config.metaKey && e.key === config.key;
 };

@@ -6,23 +6,14 @@ import MenuIcon from '../icons/svg/MenuIcon';
 import styles from './Header.module.css';
 import BackIcon from '../icons/svg/BackIcon';
 import { shortcuts } from '../../shared/keyboard/shortcuts';
-import { isMatchingEvent, useKeydown } from '../../shared/keyboard/useKeydown';
+import { useKeydown } from '../../shared/keyboard/useKeydown';
 
 export function Header() {
   const drawerRef = useRef<HTMLDivElement | null>(null);
 
   const onHeaderClick = useCallback(() => toggleDrawer(drawerRef.current), []);
   const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
-  const toggleDrawerShortcut = useCallback(
-    (event: KeyboardEvent) => {
-      if (isMatchingEvent(event, shortcuts.drawer)) {
-        onHeaderClick();
-      }
-    },
-    [onHeaderClick],
-  );
-
-  useKeydown(toggleDrawerShortcut);
+  useKeydown(shortcuts.drawer, onHeaderClick);
 
   return (
     <Fragment>

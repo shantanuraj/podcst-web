@@ -1,21 +1,17 @@
 import { useCallback, useEffect } from 'react';
 import { ThemeMode } from '../../types';
 import { shortcuts } from '../keyboard/shortcuts';
-import { isMatchingEvent, useKeydown } from '../keyboard/useKeydown';
+import { useKeydown } from '../keyboard/useKeydown';
 import { useStorage } from '../storage/useStorage';
 import { ThemeContext } from './context';
 
 export const ThemeProvider: React.FC = ({ children }) => {
   const [theme, changeTheme] = useStorage('themeMode', 'dark');
-  const cycleTheme = useCallback(
-    (e: KeyboardEvent) => {
-      if (!isMatchingEvent(e, shortcuts.theme)) return;
-      changeTheme((theme) => (theme === 'dark' ? 'light' : 'dark'));
-    },
-    [changeTheme],
-  );
+  const cycleTheme = useCallback(() => {
+    changeTheme((theme) => (theme === 'dark' ? 'light' : 'dark'));
+  }, [changeTheme]);
 
-  useKeydown(cycleTheme);
+  useKeydown(shortcuts.theme, cycleTheme);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
