@@ -25,4 +25,4 @@ const globalHandler = (e: KeyboardEvent) => {
   if (e.metaKey) return;
   const handler = handlers[e.key as keyof typeof handlers];
   handler?.();
-}
+};

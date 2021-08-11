@@ -5,6 +5,4 @@ const api = axios.create({
 });
 
 export const get = <T>(url: string, params: Record<string, unknown> = {}): Promise<T> =>
-  api
-    .get<T>(url, { params })
-    .then((res) => res.data);
+  api.get<T>(url, { params }).then((res) => res.data);

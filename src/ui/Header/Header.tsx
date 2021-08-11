@@ -33,11 +33,7 @@ export function Header() {
         </button>
         <Search />
       </header>
-      <nav
-        ref={drawerRef}
-        onClick={onCloseDrawer}
-        className={styles.drawer}
-      >
+      <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer}>
         <button role="button" aria-label="Close drawer" onClick={onCloseDrawer}>
           <BackIcon />
         </button>
