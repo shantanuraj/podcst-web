@@ -2,12 +2,14 @@ import { Fragment, useEffect } from 'react';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import { Header } from '../../ui/Header';
+import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { SubscriptionsProvider } from '../../shared/subscriptions';
 import { ThemProvider } from '../../shared/theme/ThemeProvider';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
+  useGlobalShortcuts();
   return (
     <Fragment>
       <Head>

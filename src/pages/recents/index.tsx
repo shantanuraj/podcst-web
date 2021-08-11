@@ -13,7 +13,7 @@ const RecentsPage: NextPage = () => {
 
   if (typeof window === 'undefined') return null;
 
-  if (!episodes.length) return <EpisodesList episodes={episodes} />;
+  if (episodes.length) return <EpisodesList episodes={episodes} />;
   return (
     <div className={styles.container}>
       Subscribe to a few podcasts to see their episodes in the recents list.
