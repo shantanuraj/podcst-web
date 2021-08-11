@@ -39,6 +39,12 @@ form.container svg {
   fill: var(--color-text);
 }
 
+.shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 @media only screen and (max-width: 600px) {
   .container > div,
   .container > a {
