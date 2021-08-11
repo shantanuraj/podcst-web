@@ -22,13 +22,13 @@ export const useEpisodesInfo = (feed: string, initialData: IPodcastEpisodesInfo 
 /**
  * Add feed prop to episodes
  */
-const patchEpisodesResponse = (feed: string) => (
-  res: IEpisodeListing | null,
-): IPodcastEpisodesInfo | null => {
-  if (res) {
-    const episodes: IEpisodeInfo[] = res.episodes.map((episode) => ({ ...episode, feed }));
-    return { ...res, episodes, feed };
-  } else {
-    return null;
-  }
-};
+const patchEpisodesResponse =
+  (feed: string) =>
+  (res: IEpisodeListing | null): IPodcastEpisodesInfo | null => {
+    if (res) {
+      const episodes: IEpisodeInfo[] = res.episodes.map((episode) => ({ ...episode, feed }));
+      return { ...res, episodes, feed };
+    } else {
+      return null;
+    }
+  };
