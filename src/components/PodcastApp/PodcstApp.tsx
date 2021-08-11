@@ -5,7 +5,7 @@ import { Header } from '../../ui/Header';
 import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { SubscriptionsProvider } from '../../shared/subscriptions';
-import { ThemProvider } from '../../shared/theme/ThemeProvider';
+import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
@@ -52,9 +52,9 @@ export default function App({ Component, pageProps }: AppProps) {
 
       <main>
         <SubscriptionsProvider>
-          <ThemProvider>
+          <ThemeProvider>
             <Component {...pageProps} />
-          </ThemProvider>
+          </ThemeProvider>
         </SubscriptionsProvider>
       </main>
     </Fragment>
