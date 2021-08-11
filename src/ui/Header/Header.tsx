@@ -1,15 +1,25 @@
 import Link from 'next/link';
-import { Fragment, useRef } from 'react';
+import { Fragment, useCallback, useRef } from 'react';
 import { Search } from '../Search';
 import MenuIcon from '../icons/svg/MenuIcon';
 
 import styles from './Header.module.css';
 import BackIcon from '../icons/svg/BackIcon';
+import { shortcuts } from '../../shared/keyboard/shortcuts';
+import { useKeydown } from '../../shared/keyboard/useKeydown';
 
 export function Header() {
   const drawerRef = useRef<HTMLDivElement | null>(null);
-  const onHeaderClick = () => toggleDrawer(drawerRef.current);
-  const onCloseDrawer = () => closeDrawer(drawerRef.current);
+
+  const onHeaderClick = useCallback(() => toggleDrawer(drawerRef.current), []);
+  const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
+  const toggleDrawerShortcut = useCallback((event: KeyboardEvent) => {
+    if (event.key === shortcuts.drawer.value) {
+      onHeaderClick();
+    }
+  }, [onHeaderClick]);
+
+  useKeydown(toggleDrawerShortcut);
 
   return (
     <Fragment>
