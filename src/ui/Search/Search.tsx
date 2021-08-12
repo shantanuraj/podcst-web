@@ -54,25 +54,31 @@ export function Search() {
       <ul {...getMenuProps()} className={styles.results}>
         {isOpen &&
           searchResults.map((item, index) => (
-            <>
-              <li
-                className={styles.searchItem}
-                data-highlighted={highlightedIndex === index}
-                key={`${item}${index}`}
-                {...getItemProps({ item, index })}
-              >
-                <img loading="lazy" alt={`${item.title} by ${item.author}`} src={item.thumbnail} />
-                <div>
-                  <p className={styles.title}>{item.title}</p>
-                  <p className={styles.author}>{item.author}</p>
-                </div>
-              </li>
-            </>
+            <li
+              className={styles.searchItem}
+              data-highlighted={highlightedIndex === index}
+              key={`${item}${index}`}
+              {...getItemProps({ item, index })}
+            >
+              <SearchResult podcast={item} />
+            </li>
           ))}
       </ul>
     </div>
   );
 }
+
+const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
+  return (
+    <React.Fragment>
+      <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
+      <div>
+        <p className={styles.title}>{podcast.title}</p>
+        <p className={styles.author}>{podcast.author}</p>
+      </div>
+    </React.Fragment>
+  );
+};
 
 const deferConfig = { timeoutMs: 200 };
 const emptyResult: IPodcastSearchResult[] = [];
