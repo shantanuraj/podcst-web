@@ -57,7 +57,7 @@ export function Search() {
             <li
               className={styles.searchItem}
               data-highlighted={highlightedIndex === index}
-              key={`${item}${index}`}
+              key={item.feed}
               {...getItemProps({ item, index })}
             >
               <SearchResult podcast={item} />
