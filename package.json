@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "axios": "0.21.1",
+    "downshift": "6.1.7",
     "howler": "2.2.3",
     "next": "11.0.1",
     "normalize.css": "8.0.1",
