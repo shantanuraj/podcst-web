@@ -9,6 +9,7 @@ import { useSearch } from '../../data/search';
 import { shortcuts } from '../../shared/keyboard/shortcuts';
 import { useKeydown } from '../../shared/keyboard/useKeydown';
 import { IPodcastSearchResult } from '../../types';
+import { LoadBar } from '../LoadBar';
 
 import styles from './Search.module.css';
 
@@ -46,6 +47,7 @@ export function Search() {
 
   return (
     <div {...getComboboxProps()} className={styles.search}>
+      {response.isValidating && <LoadBar />}
       <input
         {...getInputProps({ ref: searchRef })}
         aria-label="Search podcasts"
