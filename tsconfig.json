@@ -24,6 +24,7 @@
     "**/*.ts",
     "**/*.tsx"
   ],
+  "types": ["react/next", "react-dom/next"],
   "exclude": [
     "node_modules"
   ]
