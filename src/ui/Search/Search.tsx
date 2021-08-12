@@ -46,7 +46,6 @@ export function Search() {
     <div {...getComboboxProps()} className={styles.search}>
       <input
         {...getInputProps({ ref: searchRef })}
-        // className={styles.input}
         aria-label="Search podcasts"
         type="text"
         placeholder="Search"
