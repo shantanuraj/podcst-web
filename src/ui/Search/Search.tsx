@@ -1,8 +1,10 @@
 /// <reference types="react/next" />
 
 import { useCombobox, UseComboboxStateChange } from 'downshift';
+import Link from 'next/link';
 import router from 'next/router';
 import * as React from 'react';
+
 import { useSearch } from '../../data/search';
 import { shortcuts } from '../../shared/keyboard/shortcuts';
 import { useKeydown } from '../../shared/keyboard/useKeydown';
@@ -54,7 +56,6 @@ export function Search() {
         {isOpen &&
           searchResults.map((item, index) => (
             <li
-              className={styles.searchItem}
               data-highlighted={highlightedIndex === index}
               key={item.feed}
               {...getItemProps({ item, index })}
@@ -69,13 +70,15 @@ export function Search() {
 
 const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
   return (
-    <React.Fragment>
-      <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
-      <div>
-        <p className={styles.title}>{podcast.title}</p>
-        <p className={styles.author}>{podcast.author}</p>
-      </div>
-    </React.Fragment>
+    <Link href={`/episodes?feed=${podcast.feed}`}>
+      <a className={styles.searchItem}>
+        <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
+        <div>
+          <p className={styles.title}>{podcast.title}</p>
+          <p className={styles.author}>{podcast.author}</p>
+        </div>
+      </a>
+    </Link>
   );
 };
 
