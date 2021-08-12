@@ -5,7 +5,7 @@ import { get } from './api';
 
 export const searchTerm = async (term: string) => {
   try {
-    return get<IPodcastSearchResult[]>(`/search`, { term: encodeURIComponent(term) });
+    return get<IPodcastSearchResult[]>(`/search`, { term });
   } catch (err) {
     console.error(`Api.search`, `Couldn't get results for ${term}`, err);
     throw err;
