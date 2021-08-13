@@ -23,7 +23,8 @@ const getLink = (token: string, maybeSpace: string): string => {
 /**
  * Linkify text
  */
-export const linkifyText = (text: string): string => {
+export const linkifyText = (text: string | undefined): string => {
+  if (!text) return '';
   const tokens = text.split(/\s/);
   const linkifed = tokens.map((token, i) => {
     const hasSpace = i !== tokens.length - 1;
