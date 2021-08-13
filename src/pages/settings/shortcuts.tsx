@@ -8,8 +8,7 @@ export default function SettingsShortcutsPage() {
         <div key={shortcut.title} className={styles.shortcut}>
           <span>{shortcut.title}</span>
           <pre>
-            {shortcut.metaKey ? 'cmd/ctrl + ' : ''}
-            {shortcut.key}
+            {shortcut.displayKey}
           </pre>
         </div>
       ))}

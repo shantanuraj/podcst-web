@@ -1,8 +1,8 @@
 import React from 'react';
-import { IShortcutInfo, shortcuts } from './shortcuts';
+import { IShortcutInfo } from './shortcuts';
 
-type ShortcutHandler = () => void;
-type KeyboardShortcuts = Array<[IShortcutInfo, ShortcutHandler]>;
+type ShortcutHandler = (e: KeyboardEvent) => void;
+export type KeyboardShortcuts = Array<[IShortcutInfo, ShortcutHandler]>;
 
 export function useKeydown(shortcuts: KeyboardShortcuts): void;
 export function useKeydown(config: IShortcutInfo, handler: ShortcutHandler): void;
@@ -16,11 +16,11 @@ export function useKeydown(
         if (Array.isArray(shortcutsOrConfig)) {
           shortcutsOrConfig.forEach(([shortcut, handler]) => {
             if (isMatchingEvent(e, shortcut)) {
-              handler();
+              handler(e);
             }
           });
         } else if (handler && isMatchingEvent(e, shortcutsOrConfig)) {
-          handler();
+          handler(e);
         }
       }
     },
@@ -30,7 +30,7 @@ export function useKeydown(
   React.useEffect(() => {
     document.addEventListener('keydown', safeHandler);
     return () => document.removeEventListener('keydown', safeHandler);
-  }, [handler]);
+  }, [shortcutsOrConfig, handler]);
 }
 
 /**
@@ -45,5 +45,5 @@ const isNotIgnoreElement = (target: EventTarget | null) =>
   !!target && !(target as HTMLElement).matches(ignoreKeyboardSelector);
 
 const isMatchingEvent = (e: KeyboardEvent, config: IShortcutInfo) => {
-  return e.metaKey === !!config.metaKey && e.key === config.key;
+  return e.metaKey === config.metaKey && (e.key === config.key || config.key === '*');
 };

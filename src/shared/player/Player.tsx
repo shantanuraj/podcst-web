@@ -1,7 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import router from 'next/router';
 
 import { Icon } from '../../ui/icons/svg/Icon';
+import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
+import { shortcuts } from '../keyboard/shortcuts';
 
 import { resumeEpisode, seekBackward, seekForward, setPlayerState } from './context';
 import { Seekbar } from './Seekbar';
@@ -27,6 +30,35 @@ export const Player = () => {
   const seekAhead = useCallback(() => {
     dispatch(seekForward());
   }, []);
+
+  const keyboardConfig: KeyboardShortcuts = useMemo(
+    () =>
+      open
+        ? [
+            [
+              shortcuts.info,
+              () => {
+                router.push({
+                  pathname: '/episode',
+                  query: { feed: currentEpisode.feed, title: currentEpisode.title },
+                });
+              },
+            ],
+            [
+              shortcuts.togglePlayback,
+              (e) => {
+                e.preventDefault();
+                togglePlayback();
+              },
+            ],
+            [shortcuts.seekBack, seekBack],
+            [shortcuts.seekAhead, seekAhead],
+          ]
+        : [],
+    [open, currentEpisode, togglePlayback, seekBack, seekAhead],
+  );
+
+  useKeydown(keyboardConfig);
 
   return (
     <div className={styles.container} data-open={open}>

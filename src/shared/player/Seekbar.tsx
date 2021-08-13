@@ -1,7 +1,11 @@
 import { MouseEvent, useCallback, useEffect, useRef } from 'react';
-import styles from './Player.module.css';
-import AudioUtils from './AudioUtils';
+
 import { IEpisodeInfo, PlayerState } from '../../types';
+import { useKeydown } from '../keyboard/useKeydown';
+import { shortcuts } from '../keyboard/shortcuts';
+
+import AudioUtils from './AudioUtils';
+import styles from './Player.module.css';
 
 export const Seekbar: React.FC<{
   currentEpisode: IEpisodeInfo | null;
@@ -11,6 +15,13 @@ export const Seekbar: React.FC<{
   const durationRef = useRef(currentEpisode?.duration || 0);
   const seekPositionRef = useRef(0);
   const open = state !== 'idle';
+
+  useKeydown(shortcuts.seekTo, (e) => {
+    const seekPercent = parseInt(e.key, 10) / 10;
+    if (isNaN(seekPercent)) return;
+    const newSeekPosition = Math.floor(seekPercent * durationRef.current);
+    AudioUtils.seekTo(newSeekPosition);
+  });
 
   useEffect(() => {
     if (open) {
@@ -24,8 +35,7 @@ export const Seekbar: React.FC<{
   }, [open]);
 
   const syncSeekbarWidth = useCallback(() => {
-    if (!seekbarRef.current)
-      return;
+    if (!seekbarRef.current) return;
     seekbarRef.current.style.width = getSeekWidth(seekPositionRef.current, durationRef.current);
   }, []);
 
@@ -47,7 +57,8 @@ export const Seekbar: React.FC<{
         className={styles.seekbar}
         data-is-buffering={state === 'buffering'}
         ref={seekbarRef}
-        onTransitionEnd={syncSeekbarWidth} />
+        onTransitionEnd={syncSeekbarWidth}
+      />
     </div>
   );
 };
