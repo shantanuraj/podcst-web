@@ -4,7 +4,10 @@
 
 import * as React from 'react';
 
+import AirplayIcon from './AirplayIcon';
 import BackIcon from './BackIcon';
+import ChromecastConnectedIcon from './ChromecastConnectedIcon';
+import ChromecastIcon from './ChromecastIcon';
 import DayIcon from './DayIcon';
 import InfoIcon from './InfoIcon';
 import MenuIcon from './MenuIcon';
@@ -18,6 +21,9 @@ import SettingsIcon from './SettingsIcon';
 import VolumeIcon from './VolumeIcon';
 
 export type IconType =
+  | 'airplay'
+  | 'chromecast'
+  | 'chromecast-connected'
   | 'play'
   | 'pause'
   | 'settings'
@@ -38,6 +44,9 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
 }
 
 const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  airplay: AirplayIcon,
+  chromecast: ChromecastIcon,
+  'chromecast-connected': ChromecastConnectedIcon,
   play: PlayIcon,
   pause: PauseIcon,
   settings: SettingsIcon,
