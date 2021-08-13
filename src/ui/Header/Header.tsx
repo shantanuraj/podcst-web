@@ -9,6 +9,7 @@ import { Icon } from '../icons/svg/Icon';
 import styles from './Header.module.css';
 
 export function Header() {
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
 
   const onHeaderClick = useCallback(() => toggleDrawer(drawerRef.current), []);
@@ -19,9 +20,9 @@ export function Header() {
   useEffect(() => {
     const closeOnClickOutside = (event: MouseEvent) => {
       if (
-        !drawerRef.current ||
-        drawerRef.current.contains(event.target as Node) ||
-        drawerRef.current.dataset.open !== 'open'
+        menuButtonRef.current?.contains(event.target as Node) ||
+        drawerRef.current?.contains(event.target as Node) ||
+        drawerRef.current?.dataset.open !== 'open'
       )
         return;
       drawerRef.current.dataset.open = '';
@@ -35,7 +36,12 @@ export function Header() {
   return (
     <Fragment>
       <header className={styles.header}>
-        <button role="button" aria-label="Toggle drawer" onClick={onHeaderClick}>
+        <button
+          role="button"
+          aria-label="Toggle drawer"
+          onClick={onHeaderClick}
+          ref={menuButtonRef}
+        >
           <Icon icon="menu" />
           <span className={styles.title}>Podcst</span>
         </button>
