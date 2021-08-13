@@ -7,9 +7,7 @@ export default function SettingsShortcutsPage() {
       {appShortcuts.map((shortcut) => (
         <div key={shortcut.title} className={styles.shortcut}>
           <span>{shortcut.title}</span>
-          <pre>
-            {shortcut.displayKey}
-          </pre>
+          <pre>{shortcut.displayKey}</pre>
         </div>
       ))}
     </div>

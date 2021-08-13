@@ -4,6 +4,7 @@
 
 import { Howl } from 'howler/src/howler.core';
 import { IEpisode } from '../../types';
+import { updatePlaybackState } from './mediaUtils';
 
 let globalHowl: Howl | null;
 
@@ -39,6 +40,7 @@ export default class AudioUtils {
       onload() {
         AudioUtils.callbacks.setPlaybackStarted();
         AudioUtils.callbacks.duration?.(globalHowl?.duration() || 0);
+        updatePlaybackState(globalHowl);
       },
       onplay() {
         const updateSeek = () =>
@@ -57,7 +59,6 @@ export default class AudioUtils {
       },
     });
     AudioUtils.playbackId = globalHowl.play();
-    (window as any).foo = globalHowl;
   }
 
   public static pause() {

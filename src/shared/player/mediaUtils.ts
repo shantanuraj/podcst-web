@@ -5,6 +5,7 @@
  */
 
 import { Dispatch } from 'react';
+import { Howl } from 'howler/src/howler.core';
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
 import {
   PlayerActions,
@@ -17,7 +18,7 @@ import {
   skipToPreviousEpisode,
 } from './context';
 
-export const updateMetadata = (
+export const updatePlaybackHandlers = (
   episode: IEpisodeInfo,
   info: IPodcastEpisodesInfo | null,
   dispatch: Dispatch<PlayerActions>,
@@ -49,21 +50,43 @@ export const updateMetadata = (
     title,
   });
 
-  const resume = () => dispatch(resumeEpisode(episode));
-  const pause = () => dispatch(setPlayerState('paused'));
-  const stop = () => dispatch(setPlayerState('idle'));
-  const seekForwardHandler = () => dispatch(seekForward());
-  const seekBackHandler = () => dispatch(seekBackward());
-  const seekToTimestamp = (seconds: number | null) => dispatch(seekTo(seconds || 0));
-  const previousTrack = () => dispatch(skipToPreviousEpisode());
-  const nextTrack = () => dispatch(skipToNextEpisode());
+  const actionsAndHandlers = [
+    ['play', () => dispatch(resumeEpisode(episode))],
+    ['pause', () => dispatch(setPlayerState('paused'))],
+    ['stop', () => dispatch(setPlayerState('idle'))],
+    ['seekbackward', () => dispatch(seekBackward())],
+    ['seekforward', () => dispatch(seekForward())],
+    ['seekto', (details: MediaSessionActionDetails) => dispatch(seekTo(details.seekTime || 0))],
+    ['previoustrack', () => dispatch(skipToPreviousEpisode())],
+    ['nexttrack', () => dispatch(skipToNextEpisode())],
+  ] as const;
 
-  mediaSession.setActionHandler('play', resume);
-  mediaSession.setActionHandler('pause', pause);
-  mediaSession.setActionHandler('stop', stop);
-  mediaSession.setActionHandler('seekbackward', seekBackHandler);
-  mediaSession.setActionHandler('seekforward', seekForwardHandler);
-  mediaSession.setActionHandler('seekto', (details) => seekToTimestamp(details.seekTime));
-  mediaSession.setActionHandler('previoustrack', previousTrack);
-  mediaSession.setActionHandler('nexttrack', nextTrack);
+  actionsAndHandlers.forEach(([action, handler]) => {
+    try {
+      mediaSession.setActionHandler(action, handler);
+    } catch (error) {
+      console.log(`The media session action, ${action}, is not supported`);
+    }
+  });
+};
+
+export const updatePlaybackState = (howl: Howl | null) => {
+  if (
+    !howl ||
+    typeof window === 'undefined' ||
+    typeof window.navigator === 'undefined' ||
+    typeof window.navigator.mediaSession === 'undefined'
+  ) {
+    return;
+  }
+  const { mediaSession } = window.navigator;
+  try {
+    mediaSession.playbackState?.({
+      duration: howl.duration(),
+      playbackRate: howl.rate() || 1,
+      position: howl.seek() || 0,
+    });
+  } catch (err) {
+    console.error('Cannot set playback state', err);
+  }
 };

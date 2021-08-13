@@ -2,7 +2,7 @@ import * as React from 'react';
 import { IEpisodeInfo } from '../../types';
 import AudioUtils from './AudioUtils';
 import { PlayerActionsContext, PlayerStateContext, setPlayerState } from './context';
-import { updateMetadata } from './mediaUtils';
+import { updatePlaybackHandlers } from './mediaUtils';
 import { initialState, playerReducer } from './store';
 
 export const PlayerProvider: React.FC = ({ children }) => {
@@ -25,7 +25,7 @@ export const PlayerProvider: React.FC = ({ children }) => {
       return;
     }
 
-    updateMetadata(currentEpisode, null, dispatch);
+    updatePlaybackHandlers(currentEpisode, null, dispatch);
 
     currentEpisodeRef.current = currentEpisode;
   }, [value.queue, value.currentTrackIndex]);
