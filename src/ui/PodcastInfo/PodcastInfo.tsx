@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router';
+import { Fragment } from 'react';
 
 import { linkifyText } from '../../shared/link/linkify-text';
 import { stripHost } from '../../shared/link/strip-host';
@@ -30,7 +31,13 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
       <div className={styles.text}>
         <h1>{title}</h1>
         <h2>
-          {author} - <ExternalLink href={link}>{stripHost(link)}</ExternalLink>
+          {link ? (
+            <Fragment>
+              {author} - <ExternalLink href={link}>{stripHost(link)}</ExternalLink>
+            </Fragment>
+          ) : (
+            author
+          )}
         </h2>
         <div className={styles.buttons}>
           <Button data-is-subscribed={isSubscribed} onClick={onSubscribeClick}>
