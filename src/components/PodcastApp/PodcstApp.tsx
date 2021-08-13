@@ -7,6 +7,7 @@ import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { SubscriptionsProvider } from '../../shared/subscriptions';
 import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { PlayerProvider } from '../../shared/player/PlayerProvider';
+import { Player } from '../../shared/player/Player';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
@@ -59,6 +60,7 @@ export default function App({ Component, pageProps }: AppProps) {
             </ThemeProvider>
           </SubscriptionsProvider>
         </main>
+        <Player />
       </PlayerProvider>
     </Fragment>
   );

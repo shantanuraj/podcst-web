@@ -84,7 +84,21 @@ export default class AudioUtils {
 
   public static seekBy(seconds: number) {
     const seekPosition = globalHowl?.seek() as number;
+    const duration = globalHowl?.duration() as number;
     const seekTo = seekPosition + seconds;
-    AudioUtils.seekTo(seekTo);
+    AudioUtils.seekTo(normalizeSeek(seekTo, duration));
   }
 }
+
+/**
+ * Normalize seek value to handle edge-cases
+ */
+const normalizeSeek = (seekTo: number, duration: number) => {
+  if (seekTo < 0) {
+    return 0;
+  } else if (seekTo > duration) {
+    return duration;
+  }
+
+  return Math.floor(seekTo);
+};
