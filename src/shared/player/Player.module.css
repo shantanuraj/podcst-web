@@ -38,11 +38,11 @@
   gap: 8px;
 }
 
-.player .controls svg {
+.player svg {
   fill: var(--color-accent);
 }
 
-.player .controls svg:hover {
+.player svg:hover {
   opacity: 0.8;
 }
 
@@ -69,8 +69,34 @@
   font-weight: 300;
 }
 
+.spacer {
+  flex: 1;
+}
+
+.volumeControl {
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 8px;
+  gap: 8px;
+}
+
+.volumeControl input {
+  display: none;
+  cursor: pointer;
+}
+
+.volumeControl:hover input {
+  display: block;
+}
+
+.volumeControl svg {
+  height: 36px;
+  width: 36px;
+}
+
 @media only screen and (max-width: 600px) {
-  .info {
+  .spacer,
+  .volumeControl {
     display: none;
   }
 }

@@ -88,6 +88,22 @@ export default class AudioUtils {
     const seekTo = seekPosition + seconds;
     AudioUtils.seekTo(normalizeSeek(seekTo, duration));
   }
+
+  public static mute(muted: boolean) {
+    globalHowl?.mute(muted, AudioUtils.playbackId);
+  }
+
+  public static getVolume() {
+    return Math.floor((globalHowl?.volume() ?? 0) * 100);
+  }
+
+  /**
+   * Set volume for playback
+   * @param volume 0-100
+   */
+  public static setVolume(volume: number) {
+    globalHowl?.volume(volume / 100, AudioUtils.playbackId || 0);
+  }
 }
 
 /**

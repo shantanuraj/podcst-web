@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { ChangeEvent, useCallback, useEffect, useState } from 'react';
 
 import { Icon } from '../../ui/icons/svg/Icon';
 
@@ -6,6 +6,9 @@ import { usePlayerState } from './usePlayerState';
 import styles from './Player.module.css';
 import { usePlayerActions } from './usePlayerActions';
 import { resumeEpisode, seekBackward, seekForward, setPlayerState } from './context';
+import { VolumeIcon } from '../../ui/icons/svg/VolumeIcon';
+import { MuteIcon } from '../../ui/icons/svg/MuteIcon';
+import AudioUtils from './AudioUtils';
 
 export const Player = () => {
   const { queue, currentTrackIndex, state } = usePlayerState();
@@ -57,8 +60,40 @@ export const Player = () => {
             <p className={styles.title}>{currentEpisode.title}</p>
             <p className={styles.author}>{currentEpisode.author}</p>
           </div>
+          <div className={styles.spacer} />
+          <VolumeControls />
         </div>
       )}
+    </div>
+  );
+};
+
+const VolumeControls = () => {
+  const [muted, setMuted] = useState(false);
+  const toggleMute = useCallback(() => {
+    setMuted((muted) => !muted);
+  }, []);
+  const handleVolumeChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const volume = parseInt(e.target.value, 10);
+    AudioUtils.setVolume(volume);
+    setMuted(volume === 0);
+  }, []);
+
+  useEffect(() => {
+    AudioUtils.mute(muted);
+  }, [muted]);
+
+  return (
+    <div className={styles.volumeControl}>
+      <input
+        onChange={handleVolumeChange}
+        type="range"
+        name="volume"
+        min="0"
+        max="100"
+        defaultValue="100"
+      />
+      <button onClick={toggleMute}>{muted ? <MuteIcon /> : <VolumeIcon />}</button>
     </div>
   );
 };
