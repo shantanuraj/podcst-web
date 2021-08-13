@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import Link from 'next/link';
 
 import { Icon } from '../../ui/icons/svg/Icon';
 
@@ -17,12 +18,9 @@ export const Player = () => {
   const currentEpisode = queue[currentTrackIndex];
   const open = !!currentEpisode && state !== 'idle';
 
-  const pause = useCallback(() => {
-    dispatch(setPlayerState('paused'));
-  }, []);
-  const resume = useCallback(() => {
-    dispatch(resumeEpisode(currentEpisode));
-  }, []);
+  const togglePlayback = useCallback(() => {
+    dispatch(state === 'paused' ? resumeEpisode(currentEpisode) : setPlayerState('paused'));
+  }, [state, currentEpisode]);
   const seekBack = useCallback(() => {
     dispatch(seekBackward());
   }, []);
@@ -35,25 +33,26 @@ export const Player = () => {
       {currentEpisode && (
         <div className={styles.player}>
           <Seekbar currentEpisode={currentEpisode} state={state} />
-          <img
-            alt={`${currentEpisode.title} by ${currentEpisode.author}`}
-            src={currentEpisode.cover}
-          />
+          <Link
+            href={{
+              pathname: '/episode',
+              query: { feed: currentEpisode.feed, title: currentEpisode.title },
+            }}
+          >
+            <a>
+              <img
+                alt={`${currentEpisode.title} by ${currentEpisode.author}`}
+                src={currentEpisode.cover}
+              />
+            </a>
+          </Link>
           <div className={styles.controls}>
             <button onClick={seekBack}>
               <Icon icon="seek-back" />
             </button>
-            {state === 'playing' ||
-              (state === 'buffering' && (
-                <button onClick={pause}>
-                  <Icon icon="pause" />
-                </button>
-              ))}
-            {state === 'paused' && (
-              <button onClick={resume}>
-                <Icon icon="play" />
-              </button>
-            )}
+            <button onClick={togglePlayback}>
+              <Icon icon={state === 'playing' ? 'pause' : 'play'} />
+            </button>
             <button onClick={seekAhead}>
               <Icon icon="seek-forward" />
             </button>
