@@ -43,6 +43,8 @@ export function Search() {
       onInputValueChange,
       itemToString: serealizeSearchResult,
       onSelectedItemChange: onSelectionChange,
+      id: 'search',
+      inputId: 'search',
     });
 
   return (
