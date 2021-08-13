@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import React, { Fragment, useCallback, useRef } from 'react';
+import React, { Fragment, useCallback, useEffect, useRef } from 'react';
 import { Search } from '../Search';
 
 import { shortcuts } from '../../shared/keyboard/shortcuts';
@@ -15,6 +15,22 @@ export function Header() {
   const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
   useKeydown(shortcuts.drawer, onHeaderClick);
   useKeydown(shortcuts.closeDrawer, onCloseDrawer);
+
+  useEffect(() => {
+    const closeOnClickOutside = (event: MouseEvent) => {
+      if (
+        !drawerRef.current ||
+        drawerRef.current.contains(event.target as Node) ||
+        drawerRef.current.dataset.open !== 'open'
+      )
+        return;
+      drawerRef.current.dataset.open = '';
+    };
+    document.addEventListener('click', closeOnClickOutside);
+    return () => {
+      document.removeEventListener('click', closeOnClickOutside);
+    };
+  }, []);
 
   return (
     <Fragment>
