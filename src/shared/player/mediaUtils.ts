@@ -75,7 +75,8 @@ export const updatePlaybackState = (howl: Howl | null) => {
     !howl ||
     typeof window === 'undefined' ||
     typeof window.navigator === 'undefined' ||
-    typeof window.navigator.mediaSession === 'undefined'
+    typeof window.navigator.mediaSession === 'undefined' ||
+    typeof window.navigator.mediaSession.playbackState !== 'function'
   ) {
     return;
   }
