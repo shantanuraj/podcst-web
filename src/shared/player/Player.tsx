@@ -94,7 +94,9 @@ export const Player = () => {
             <p className={styles.author}>{currentEpisode.author}</p>
           </div>
           <div className={styles.spacer} />
-          <VolumeControls />
+          <div className={styles.secondaryControls}>
+            <VolumeControls />
+          </div>
         </div>
       )}
     </div>
