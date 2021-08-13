@@ -30,6 +30,14 @@ function reducer(state: PlayerContextValue, action: PlayerActions): PlayerContex
         return nextState;
       }
 
+      if (action.state === 'idle') {
+        return {
+          ...state,
+          state: action.state,
+          queue: state.queue.splice(state.currentTrackIndex, 1),
+        };
+      }
+
       return {
         ...state,
         state: action.state,
