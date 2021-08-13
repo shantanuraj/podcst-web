@@ -16,12 +16,23 @@ export const Seekbar: React.FC<{
   const seekPositionRef = useRef(0);
   const open = state !== 'idle';
 
-  useKeydown(shortcuts.seekTo, (e) => {
+  const syncSeekbarWidth = useCallback(() => {
+    if (!seekbarRef.current) return;
+    seekbarRef.current.style.width = getSeekWidth(seekPositionRef.current, durationRef.current);
+  }, []);
+
+  const seekByFraction = useCallback((seekFraction: number) => {
+    const newSeekPosition = Math.floor(seekFraction * durationRef.current);
+    AudioUtils.seekTo(newSeekPosition);
+    syncSeekbarWidth();
+  }, []);
+
+  const seekOnKeydown = useCallback((e: KeyboardEvent) => {
     const seekPercent = parseInt(e.key, 10) / 10;
     if (isNaN(seekPercent)) return;
-    const newSeekPosition = Math.floor(seekPercent * durationRef.current);
-    AudioUtils.seekTo(newSeekPosition);
-  });
+    seekByFraction(seekPercent);
+  }, []);
+  useKeydown(shortcuts.seekTo, seekOnKeydown);
 
   useEffect(() => {
     if (open) {
@@ -34,32 +45,26 @@ export const Seekbar: React.FC<{
     };
   }, [open]);
 
-  const syncSeekbarWidth = useCallback(() => {
-    if (!seekbarRef.current) return;
-    seekbarRef.current.style.width = getSeekWidth(seekPositionRef.current, durationRef.current);
-  }, []);
-
   useEffect(() => {
     if (state === 'playing') {
       syncSeekbarWidth();
     }
   }, [state, syncSeekbarWidth]);
 
-  const seekHandler = useCallback((e: MouseEvent<HTMLDivElement>) => {
+  const seekHandler = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     const seekFraction = e.nativeEvent.offsetX / e.currentTarget.offsetWidth;
-    const newSeekPosition = Math.floor(seekFraction * durationRef.current);
-    AudioUtils.seekTo(newSeekPosition);
+    seekByFraction(seekFraction);
   }, []);
 
   return (
-    <div className={styles.seekbarContainer} onClick={seekHandler}>
+    <button className={styles.seekbarContainer} onClick={seekHandler}>
       <div
         className={styles.seekbar}
         data-is-buffering={state === 'buffering'}
         ref={seekbarRef}
         onTransitionEnd={syncSeekbarWidth}
       />
-    </div>
+    </button>
   );
 };
 

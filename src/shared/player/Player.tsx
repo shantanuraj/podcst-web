@@ -82,7 +82,7 @@ export const Player = () => {
             <button onClick={seekBack}>
               <Icon icon="seek-back" />
             </button>
-            <button onClick={togglePlayback}>
+            <button onClick={togglePlayback} data-primary-control>
               <Icon icon={state === 'playing' ? 'pause' : 'play'} />
             </button>
             <button onClick={seekAhead}>

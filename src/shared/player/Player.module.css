@@ -120,12 +120,12 @@
 }
 
 .seekbarContainer {
-  cursor: pointer;
   position: absolute;
   top: 0;
   left: 0;
   height: 4px;
   width: 100%;
+  transition: height 0.3s ease;
 }
 
 .seekbarContainer:hover {
@@ -149,6 +149,10 @@
 @media only screen and (max-width: 600px) {
   .spacer,
   .volumeControl {
+    display: none;
+  }
+
+  .player .controls button:not([data-primary-control]) {
     display: none;
   }
 }
