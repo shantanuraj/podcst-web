@@ -25,6 +25,7 @@
   overflow: hidden;
   display: flex;
   gap: 8px;
+  position: relative;
 }
 
 .player img {
@@ -92,6 +93,57 @@
 .volumeControl svg {
   height: 36px;
   width: 36px;
+}
+
+@keyframes loading-dark {
+  0% {
+    background-color: #5cffa0;
+  }
+  50% {
+    background-color: #00b778;
+  }
+  100% {
+    background-color: #82ffb5;
+  }
+}
+
+@keyframes loading-light {
+  0% {
+    background-color: #c069ff;
+  }
+  50% {
+    background-color: #60347f;
+  }
+  100% {
+    background-color: #8649b2;
+  }
+}
+
+.seekbarContainer {
+  cursor: pointer;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+}
+
+.seekbarContainer:hover {
+  height: 8px;
+}
+
+.seekbar {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 1s;
+}
+
+.seekbar[data-is-buffering='true'] {
+  animation: loading-dark 2s infinite;
+  width: 100%;
+}
+:global(:root.light) .seekbar[data-is-buffering='true'] {
+  animation: loading-light 2s infinite;
 }
 
 @media only screen and (max-width: 600px) {

@@ -15,7 +15,6 @@ export const PlayerProvider: React.FC = ({ children }) => {
       setPlaybackStarted: () => {
         dispatch(setPlayerState('playing'));
       },
-      seekUpdate: () => {},
     });
   }, []);
 
