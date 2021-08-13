@@ -78,4 +78,10 @@ export const shortcuts = {
     displayKey: '0-9',
     metaKey: false,
   },
+  closeDrawer: {
+    title: 'Close drawer',
+    key: 'Escape',
+    displayKey: 'esc',
+    metaKey: false,
+  },
 } as const;
