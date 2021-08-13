@@ -22,8 +22,13 @@ export const updateMetadata = (
   info: IPodcastEpisodesInfo | null,
   dispatch: Dispatch<PlayerActions>,
 ) => {
-  if (typeof window === 'undefined' || typeof window.navigator === 'undefined') return;
-
+  if (
+    typeof window === 'undefined' ||
+    typeof window.navigator === 'undefined' ||
+    typeof window.navigator.mediaSession === 'undefined'
+  ) {
+    return;
+  }
   const { mediaSession } = window.navigator;
 
   const { title, author, episodeArt, cover } = episode;
