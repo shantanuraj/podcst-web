@@ -8,9 +8,10 @@ import { IEpisode } from '../../types';
 let globalHowl: Howl | null;
 
 interface IAudioCallbacks {
-  seekUpdate: (seekPosition: number, duration: number) => void;
   setPlaybackStarted: () => void;
   stopEpisode: () => void;
+  seekUpdate?: (seconds: number) => void;
+  duration?: (seconds: number) => void;
 }
 
 const throwError = () => {
@@ -21,7 +22,6 @@ export default class AudioUtils {
   private static playbackId: number | undefined = undefined;
 
   public static callbacks: IAudioCallbacks = {
-    seekUpdate: throwError,
     setPlaybackStarted: throwError,
     stopEpisode: throwError,
   };
@@ -38,13 +38,13 @@ export default class AudioUtils {
       html5: true,
       onload() {
         AudioUtils.callbacks.setPlaybackStarted();
+        AudioUtils.callbacks.duration?.(globalHowl?.duration() || 0);
       },
       onplay() {
         const updateSeek = () =>
           requestAnimationFrame(() => {
             const seekPosition = globalHowl?.seek() as number;
-
-            AudioUtils.callbacks.seekUpdate(seekPosition, globalHowl?.duration() || 0);
+            AudioUtils.callbacks.seekUpdate?.(seekPosition);
 
             if (globalHowl?.playing()) {
               setTimeout(updateSeek, 500);
@@ -103,6 +103,14 @@ export default class AudioUtils {
    */
   public static setVolume(volume: number) {
     globalHowl?.volume(volume / 100, AudioUtils.playbackId || 0);
+  }
+
+  public static subscribeDuration(callback?: IAudioCallbacks['duration']) {
+    AudioUtils.callbacks.duration = callback;
+  }
+
+  public static subscribeSeekUpdate(callback?: IAudioCallbacks['seekUpdate']) {
+    AudioUtils.callbacks.seekUpdate = callback;
   }
 }
 
