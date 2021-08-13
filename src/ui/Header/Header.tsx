@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import React, { Fragment, useCallback, useRef } from 'react';
 import { Search } from '../Search';
-import MenuIcon from '../icons/svg/MenuIcon';
 
-import styles from './Header.module.css';
-import BackIcon from '../icons/svg/BackIcon';
 import { shortcuts } from '../../shared/keyboard/shortcuts';
 import { useKeydown } from '../../shared/keyboard/useKeydown';
+import { Icon } from '../icons/svg/Icon';
+
+import styles from './Header.module.css';
 
 export function Header() {
   const drawerRef = useRef<HTMLDivElement | null>(null);
@@ -20,14 +20,14 @@ export function Header() {
     <Fragment>
       <header className={styles.header}>
         <button role="button" aria-label="Toggle drawer" onClick={onHeaderClick}>
-          <MenuIcon />
+          <Icon icon="menu" />
           <span className={styles.title}>Podcst</span>
         </button>
         <Search />
       </header>
       <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer}>
         <button role="button" aria-label="Close drawer" onClick={onCloseDrawer}>
-          <BackIcon />
+          <Icon icon="back" />
         </button>
         <ul>
           <li>

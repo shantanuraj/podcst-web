@@ -1,11 +1,12 @@
 import * as React from 'react';
 
-/* tslint:disable:max-line-length */
-const NightIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M10 2c-1.82 0-3.53.5-5 1.35C7.99 5.08 10 8.3 10 12s-2.01 6.92-5 8.65C6.47 21.5 8.18 22 10 22c5.52 0 10-4.48 10-10S15.52 2 10 2z" />
-    <path d="M0 0h24v24H0z" fill="none" />
-  </svg>
-);
+function NightIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" height={24} viewBox="0 0 24 24" width={24} {...props}>
+      <path fill="none" d="M0 0h24v24H0z" />
+      <path d="M11.01 3.05C6.51 3.54 3 7.36 3 12a9 9 0 009 9c4.63 0 8.45-3.5 8.95-8 .09-.79-.78-1.42-1.54-.95A5.403 5.403 0 0111.1 7.5c0-1.06.31-2.06.84-2.89.45-.67-.04-1.63-.93-1.56z" />
+    </svg>
+  );
+}
 
 export default NightIcon;

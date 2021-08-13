@@ -90,11 +90,6 @@
   display: block;
 }
 
-.volumeControl svg {
-  height: 36px;
-  width: 36px;
-}
-
 @keyframes loading-dark {
   0% {
     background-color: #5cffa0;

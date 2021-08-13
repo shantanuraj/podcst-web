@@ -8,12 +8,14 @@ import BackIcon from './BackIcon';
 import DayIcon from './DayIcon';
 import InfoIcon from './InfoIcon';
 import MenuIcon from './MenuIcon';
+import MuteIcon from './MuteIcon';
 import NightIcon from './NightIcon';
 import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
-import SeekBack from './SeekBack';
-import SeekForward from './SeekForward';
+import SeekBack from './SeekBack10';
+import SeekForward from './SeekForward10';
 import SettingsIcon from './SettingsIcon';
+import VolumeIcon from './VolumeIcon';
 
 export type IconType =
   | 'play'
@@ -25,51 +27,36 @@ export type IconType =
   | 'back'
   | 'seek-back'
   | 'seek-forward'
-  | 'info';
+  | 'info'
+  | 'mute'
+  | 'volume';
 
-interface IconProps {
+interface IconProps extends React.SVGProps<SVGSVGElement> {
   icon: IconType;
   color?: string;
   size?: string | number;
 }
 
-const getIcon = (icon: IconProps['icon']): JSX.Element => {
-  if (icon === 'play') {
-    return <PlayIcon />;
-  } else if (icon === 'pause') {
-    return <PauseIcon />;
-  } else if (icon === 'settings') {
-    return <SettingsIcon />;
-  } else if (icon === 'night') {
-    return <NightIcon />;
-  } else if (icon === 'day') {
-    return <DayIcon />;
-  } else if (icon === 'menu') {
-    return <MenuIcon />;
-  } else if (icon === 'back') {
-    return <BackIcon />;
-  } else if (icon === 'seek-back') {
-    return <SeekBack />;
-  } else if (icon === 'seek-forward') {
-    return <SeekForward />;
-  } else if (icon === 'info') {
-    return <InfoIcon />;
-  }
-
-  throw new Error('Invalid icon see IconType');
+const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  play: PlayIcon,
+  pause: PauseIcon,
+  settings: SettingsIcon,
+  night: NightIcon,
+  day: DayIcon,
+  menu: MenuIcon,
+  back: BackIcon,
+  'seek-back': SeekBack,
+  'seek-forward': SeekForward,
+  info: InfoIcon,
+  mute: MuteIcon,
+  volume: VolumeIcon,
 };
 
-export const Icon = ({ icon, color, size = 36 }: IconProps) => (
-  <React.Fragment>
-    <div className="icon">{getIcon(icon)}</div>
-    <style jsx>{`
-      .icon {
-        ${color ? `fill: ${color}` : ''}
-        height: ${size}px;
-        width: ${size}px;
-        min-height: ${size}px;
-        min-width: ${size}px;
-      }
-    `}</style>
-  </React.Fragment>
-);
+export const Icon = ({ icon, color, size = 36, ...props }: IconProps) => {
+  const dimen = `${size}px`;
+
+  const IconContent = IconMap[icon];
+  if (!IconContent) throw new Error('Invalid icon see IconType');
+
+  return <IconContent {...props} height={dimen} width={dimen} fill={color || undefined} />;
+};

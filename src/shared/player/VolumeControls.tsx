@@ -1,7 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useState } from 'react';
-import { VolumeIcon } from '../../ui/icons/svg/VolumeIcon';
-import { MuteIcon } from '../../ui/icons/svg/MuteIcon';
 
+import { Icon } from '../../ui/icons/svg/Icon';
 import AudioUtils from './AudioUtils';
 
 import styles from './Player.module.css';
@@ -31,7 +30,9 @@ export const VolumeControls = () => {
         max="100"
         defaultValue="100"
       />
-      <button onClick={toggleMute}>{muted ? <MuteIcon /> : <VolumeIcon />}</button>
+      <button onClick={toggleMute}>
+        <Icon icon={muted ? 'mute' : 'volume'} />
+      </button>
     </div>
   );
 };
