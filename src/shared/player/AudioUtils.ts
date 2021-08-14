@@ -21,6 +21,21 @@ export default class AudioUtils {
   private static playbackInstance: Howl | null;
   private static playbackId: number | undefined = undefined;
 
+  private static getAudioElement(): HTMLAudioElement | null {
+    try {
+      // @ts-expect-error Acessing untyped private API for howler
+      const node = AudioUtils.playbackInstance?._sounds[0]._node;
+      if (node instanceof HTMLAudioElement) {
+        return node;
+      }
+      console.error('AudioUtils.getAudioElement Howler node not a regular element');
+      return null;
+    } catch (err) {
+      console.error('AudioUtils.getAudioElement cannot extract audio element from howler');
+      return null;
+    }
+  }
+
   public static callbacks: IAudioCallbacks = {
     setPlaybackStarted: throwError,
     stopEpisode: throwError,
