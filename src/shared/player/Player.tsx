@@ -6,6 +6,7 @@ import { Icon } from '../../ui/icons/svg/Icon';
 import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
 import { shortcuts } from '../keyboard/shortcuts';
 
+import { Airplay } from './Airplay';
 import { resumeEpisode, seekBackward, seekForward, setPlayerState } from './context';
 import { Seekbar } from './Seekbar';
 import { usePlayerActions } from './usePlayerActions';
@@ -96,6 +97,7 @@ export const Player = () => {
           <div className={styles.spacer} />
           <div className={styles.secondaryControls}>
             <VolumeControls />
+            <Airplay />
           </div>
         </div>
       )}

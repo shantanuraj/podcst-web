@@ -78,8 +78,8 @@
 
 .secondaryControls {
   display: flex;
-  gap: 8px;
-  padding-right: 8px;
+  gap: 16px;
+  padding-right: 16px;
 }
 
 .volumeControl {

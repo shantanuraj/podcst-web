@@ -13,6 +13,16 @@ interface IAudioCallbacks {
   duration?: (seconds: number) => void;
 }
 
+interface PlaybackTargetAvailabilityChangedEvent extends Event {
+  availability?: 'available' | 'not-available';
+}
+
+type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
+
+interface AirplayAudioElement extends HTMLAudioElement {
+  webkitShowPlaybackTargetPicker: () => void;
+}
+
 const throwError = () => {
   throw new Error('Audio.init not called!');
 };
@@ -20,6 +30,8 @@ const throwError = () => {
 export default class AudioUtils {
   private static playbackInstance: Howl | null;
   private static playbackId: number | undefined = undefined;
+  private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
+  public static isAirplayEnabled: boolean = false;
 
   private static getAudioElement(): HTMLAudioElement | null {
     try {
@@ -34,6 +46,35 @@ export default class AudioUtils {
       console.error('AudioUtils.getAudioElement cannot extract audio element from howler');
       return null;
     }
+  }
+
+  private static playbackTargetAvailabilityChangeListener(
+    e: PlaybackTargetAvailabilityChangedEvent,
+  ) {
+    AudioUtils.isAirplayEnabled = e.availability === 'available';
+    AudioUtils.airplayAvailabilityListener?.(AudioUtils.isAirplayEnabled);
+  }
+
+  public static addAirplayAvailabilityListener(listener: AirplayAvailabilityCallback) {
+    AudioUtils.airplayAvailabilityListener = listener;
+    const audioElement = AudioUtils.getAudioElement();
+    audioElement?.addEventListener(
+      'webkitplaybacktargetavailabilitychanged',
+      AudioUtils.playbackTargetAvailabilityChangeListener,
+    );
+  }
+
+  public static removeAirplayAvailabilityListener() {
+    const audioElement = AudioUtils.getAudioElement();
+    audioElement?.removeEventListener(
+      'webkitplaybacktargetavailabilitychanged',
+      AudioUtils.playbackTargetAvailabilityChangeListener,
+    );
+  }
+
+  public static showAirplaySelector() {
+    const audioElement = AudioUtils.getAudioElement() as AirplayAudioElement | null;
+    audioElement?.webkitShowPlaybackTargetPicker();
   }
 
   public static callbacks: IAudioCallbacks = {
@@ -73,9 +114,12 @@ export default class AudioUtils {
         updateSeek();
       },
       onend() {
+        AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
       },
     });
+
+    // Start playback
     AudioUtils.playbackId = AudioUtils.playbackInstance.play();
   }
 
