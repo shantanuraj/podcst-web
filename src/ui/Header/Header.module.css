@@ -49,6 +49,17 @@
   transform: translateX(0px);
 }
 
+.drawer + main {
+  transition: filter 0.3s ease;
+  filter: blur(0px);
+
+}
+.drawer[data-open='open'] + main {
+  filter: blur(4px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .drawer ul {
   margin: 0;
   padding: 0;
