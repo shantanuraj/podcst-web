@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router';
+import router from 'next/router';
 import { Fragment } from 'react';
 
 import { linkifyText } from '../../shared/link/linkify-text';
@@ -17,7 +17,6 @@ type PodcastInfoProps = {
 };
 
 export function PodcastInfo({ info }: PodcastInfoProps) {
-  const router = useRouter();
   const { title, author, cover, feed, link, description } = info;
 
   const { subs, dispatch } = useSubscriptions();
@@ -46,7 +45,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
           <ShareButton
             title={title}
             text={`Listen to ${title} by ${author} on Podcst`}
-            url={router.pathname}
+            url={router.asPath}
           />
         </div>
         <p

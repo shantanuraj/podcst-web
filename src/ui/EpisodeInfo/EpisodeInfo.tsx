@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router';
+import router from 'next/router';
 
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
 import { PlayButton } from '../Button/PlayButton';
@@ -14,8 +14,6 @@ type EpisodeInfoProps = {
 };
 
 export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
-  const router = useRouter();
-
   const { author, cover, episodeArt, showNotes, summary, title } = episode;
   const showArt = episodeArt || cover;
   const shareTitle = `${podcast.title} - ${title}`;
@@ -34,7 +32,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
           <ShareButton
             text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
             title={shareTitle}
-            url={router.pathname}
+            url={router.asPath}
           />
         </div>
         <ShowNotes className={styles.episodeNotes} showNotes={showNotes} />
