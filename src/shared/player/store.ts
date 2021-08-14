@@ -1,5 +1,3 @@
-import { Howl } from 'howler';
-
 import AudioUtils from './AudioUtils';
 import { PlayerActions, PlayerContextValue } from './context';
 
