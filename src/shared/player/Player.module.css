@@ -96,27 +96,15 @@
   display: block;
 }
 
-@keyframes loading-dark {
+@keyframes loading {
   0% {
-    background-color: #5cffa0;
+    background-color: var(--color-animation-frame-1);
   }
   50% {
-    background-color: #00b778;
+    background-color: var(--color-animation-frame-2);
   }
   100% {
-    background-color: #82ffb5;
-  }
-}
-
-@keyframes loading-light {
-  0% {
-    background-color: #c069ff;
-  }
-  50% {
-    background-color: #60347f;
-  }
-  100% {
-    background-color: #8649b2;
+    background-color: var(--color-animation-frame-3);
   }
 }
 
@@ -143,11 +131,8 @@
 }
 
 .seekbar[data-is-buffering='true'] {
-  animation: loading-dark 2s infinite;
+  animation: loading 2s infinite;
   width: 100%;
-}
-:global(:root.light) .seekbar[data-is-buffering='true'] {
-  animation: loading-light 2s infinite;
 }
 
 @media only screen and (max-width: 600px) {
