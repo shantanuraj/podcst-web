@@ -46,8 +46,10 @@ export const Seekbar: React.FC<{
   }, [open]);
 
   useEffect(() => {
-    if (state === 'playing') {
+    if (state === 'playing' || state === 'paused') {
       syncSeekbarWidth();
+    } else if (state === 'buffering' && seekbarRef.current) {
+      seekbarRef.current.style.width = '100%';
     }
   }, [state, syncSeekbarWidth]);
 
