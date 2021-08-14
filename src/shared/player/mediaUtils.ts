@@ -5,7 +5,7 @@
  */
 
 import { Dispatch } from 'react';
-import { Howl } from 'howler/src/howler.core';
+
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
 import {
   PlayerActions,
@@ -70,9 +70,12 @@ export const updatePlaybackHandlers = (
   });
 };
 
-export const updatePlaybackState = (howl: Howl | null) => {
+export const updatePlaybackState = (playbackState: {
+  duration: number;
+  playbackRate: number;
+  position: number;
+}) => {
   if (
-    !howl ||
     typeof window === 'undefined' ||
     typeof window.navigator === 'undefined' ||
     typeof window.navigator.mediaSession === 'undefined' ||
@@ -82,11 +85,7 @@ export const updatePlaybackState = (howl: Howl | null) => {
   }
   const { mediaSession } = window.navigator;
   try {
-    mediaSession.playbackState?.({
-      duration: howl.duration(),
-      playbackRate: howl.rate() || 1,
-      position: howl.seek() || 0,
-    });
+    mediaSession.playbackState?.(playbackState);
   } catch (err) {
     console.error('Cannot set playback state', err);
   }

@@ -6,8 +6,6 @@ import { Howl } from 'howler/src/howler.core';
 import { IEpisode } from '../../types';
 import { updatePlaybackState } from './mediaUtils';
 
-let globalHowl: Howl | null;
-
 interface IAudioCallbacks {
   setPlaybackStarted: () => void;
   stopEpisode: () => void;
@@ -20,6 +18,7 @@ const throwError = () => {
 };
 
 export default class AudioUtils {
+  private static playbackInstance: Howl | null;
   private static playbackId: number | undefined = undefined;
 
   public static callbacks: IAudioCallbacks = {
@@ -34,21 +33,25 @@ export default class AudioUtils {
   public static play(episode: IEpisode) {
     AudioUtils.stop();
     AudioUtils.playbackId = undefined;
-    globalHowl = new Howl({
+    AudioUtils.playbackInstance = new Howl({
       src: [episode.file.url],
       html5: true,
       onload() {
         AudioUtils.callbacks.setPlaybackStarted();
-        AudioUtils.callbacks.duration?.(globalHowl?.duration() || 0);
-        updatePlaybackState(globalHowl);
+        AudioUtils.callbacks.duration?.(AudioUtils.playbackInstance?.duration() || 0);
+        updatePlaybackState({
+          duration: AudioUtils.playbackInstance?.duration() || 0,
+          position: (AudioUtils.playbackInstance?.seek() as number) || 0,
+          playbackRate: AudioUtils.playbackInstance?.rate() || 1,
+        });
       },
       onplay() {
         const updateSeek = () =>
           requestAnimationFrame(() => {
-            const seekPosition = globalHowl?.seek() as number;
+            const seekPosition = AudioUtils.playbackInstance?.seek() as number;
             AudioUtils.callbacks.seekUpdate?.(seekPosition);
 
-            if (globalHowl?.playing()) {
+            if (AudioUtils.playbackInstance?.playing()) {
               setTimeout(updateSeek, 500);
             }
           });
@@ -58,20 +61,20 @@ export default class AudioUtils {
         AudioUtils.callbacks.stopEpisode();
       },
     });
-    AudioUtils.playbackId = globalHowl.play();
+    AudioUtils.playbackId = AudioUtils.playbackInstance.play();
   }
 
   public static pause() {
-    globalHowl?.pause();
+    AudioUtils.playbackInstance?.pause();
   }
 
   public static resume() {
-    globalHowl?.play(AudioUtils.playbackId);
+    AudioUtils.playbackInstance?.play(AudioUtils.playbackId);
   }
 
   public static stop() {
-    globalHowl?.stop();
-    globalHowl?.unload();
+    AudioUtils.playbackInstance?.stop();
+    AudioUtils.playbackInstance?.unload();
   }
 
   public static skipTo(episode: IEpisode) {
@@ -80,22 +83,22 @@ export default class AudioUtils {
   }
 
   public static seekTo(seconds: number) {
-    globalHowl?.seek(seconds);
+    AudioUtils.playbackInstance?.seek(seconds);
   }
 
   public static seekBy(seconds: number) {
-    const seekPosition = globalHowl?.seek() as number;
-    const duration = globalHowl?.duration() as number;
+    const seekPosition = AudioUtils.playbackInstance?.seek() as number;
+    const duration = AudioUtils.playbackInstance?.duration() as number;
     const seekTo = seekPosition + seconds;
     AudioUtils.seekTo(normalizeSeek(seekTo, duration));
   }
 
   public static mute(muted: boolean) {
-    globalHowl?.mute(muted, AudioUtils.playbackId);
+    AudioUtils.playbackInstance?.mute(muted, AudioUtils.playbackId);
   }
 
   public static getVolume() {
-    return Math.floor((globalHowl?.volume() ?? 0) * 100);
+    return Math.floor((AudioUtils.playbackInstance?.volume() ?? 0) * 100);
   }
 
   /**
@@ -103,7 +106,7 @@ export default class AudioUtils {
    * @param volume 0-100
    */
   public static setVolume(volume: number) {
-    globalHowl?.volume(volume / 100, AudioUtils.playbackId || 0);
+    AudioUtils.playbackInstance?.volume(volume / 100, AudioUtils.playbackId || 0);
   }
 
   public static subscribeDuration(callback?: IAudioCallbacks['duration']) {
