@@ -18,7 +18,9 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>Podcst</title>
         <meta charSet="utf-8" />
         <meta name="viewport" content="initial-scale=1.0, width=device-width" />
-        <meta name="theme-color" content="#212121" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#60347f" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#00b778" />
+
         <meta property="og:title" content="Podcst | Plays your favourite podcasts on all devices" />
         <meta property="og:site_name" content="Podcst" />
         <meta property="og:type" content="website" />
