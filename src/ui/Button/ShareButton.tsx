@@ -20,6 +20,10 @@ const share = ({ text, title, url }: ShareButtonProps) => {
 export const ShareButton = memo(
   forwardRef<HTMLButtonElement, ShareButtonProps>(function ShareButton(props, ref) {
     if (typeof window === 'undefined' || !('share' in navigator)) return null;
-    return <Button {...(props as ButtonProps)} ref={ref} onClick={() => share(props)} />;
+    return (
+      <Button {...(props as ButtonProps)} ref={ref} onClick={() => share(props)}>
+        Share
+      </Button>
+    );
   }),
 );

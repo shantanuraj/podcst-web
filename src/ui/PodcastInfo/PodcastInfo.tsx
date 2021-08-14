@@ -47,9 +47,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
             title={title}
             text={`Listen to ${title} by ${author} on Podcst`}
             url={router.pathname}
-          >
-            Share
-          </ShareButton>
+          />
         </div>
         <p
           className={styles.description}
