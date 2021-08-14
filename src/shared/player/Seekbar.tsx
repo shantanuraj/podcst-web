@@ -13,18 +13,11 @@ export const Seekbar: React.FC<{
 }> = ({ currentEpisode, state }) => {
   const seekbarRef = useRef<HTMLDivElement>(null);
   const durationRef = useRef(currentEpisode?.duration || 0);
-  const seekPositionRef = useRef(0);
   const open = state !== 'idle';
-
-  const syncSeekbarWidth = useCallback(() => {
-    if (!seekbarRef.current) return;
-    seekbarRef.current.style.width = getSeekWidth(seekPositionRef.current, durationRef.current);
-  }, []);
 
   const seekByFraction = useCallback((seekFraction: number) => {
     const newSeekPosition = Math.floor(seekFraction * durationRef.current);
     AudioUtils.seekTo(newSeekPosition);
-    syncSeekbarWidth();
   }, []);
 
   const seekOnKeydown = useCallback((e: KeyboardEvent) => {
@@ -37,7 +30,10 @@ export const Seekbar: React.FC<{
   useEffect(() => {
     if (open) {
       AudioUtils.subscribeDuration((duration) => (durationRef.current = duration));
-      AudioUtils.subscribeSeekUpdate((seekPosition) => (seekPositionRef.current = seekPosition));
+      AudioUtils.subscribeSeekUpdate((seekPosition) => {
+        if (!seekbarRef.current) return;
+        seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
+      });
     }
     return () => {
       AudioUtils.subscribeDuration();
@@ -46,12 +42,10 @@ export const Seekbar: React.FC<{
   }, [open]);
 
   useEffect(() => {
-    if (state === 'playing' || state === 'paused') {
-      syncSeekbarWidth();
-    } else if (state === 'buffering' && seekbarRef.current) {
+    if (state === 'buffering' && seekbarRef.current) {
       seekbarRef.current.style.width = '100%';
     }
-  }, [state, syncSeekbarWidth]);
+  }, [state]);
 
   const seekHandler = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     const seekFraction = e.nativeEvent.offsetX / e.currentTarget.offsetWidth;
@@ -60,12 +54,7 @@ export const Seekbar: React.FC<{
 
   return (
     <button className={styles.seekbarContainer} onClick={seekHandler}>
-      <div
-        className={styles.seekbar}
-        data-is-buffering={state === 'buffering'}
-        ref={seekbarRef}
-        onTransitionEnd={syncSeekbarWidth}
-      />
+      <div className={styles.seekbar} data-is-buffering={state === 'buffering'} ref={seekbarRef} />
     </button>
   );
 };
