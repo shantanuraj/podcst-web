@@ -20,7 +20,12 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const minutesSuffix = `min${minutes > 1 ? 's' : ''}`;
 
   return (
-    <Link href={`/episode?feed=${feed}&title=${title}`}>
+    <Link
+      href={{
+        pathname: '/episode',
+        query: { feed, title },
+      }}
+    >
       <a className={styles.container}>
         <img loading="lazy" className={styles.image} src={episodeArt || cover} alt={title} />
         <div className={styles.info}>
