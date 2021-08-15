@@ -1,4 +1,4 @@
-import router from 'next/router';
+import { useRouter } from 'next/router';
 import { Fragment } from 'react';
 
 import { linkifyText } from '../../shared/link/linkify-text';
@@ -17,6 +17,7 @@ type PodcastInfoProps = {
 };
 
 export function PodcastInfo({ info }: PodcastInfoProps) {
+  const router = useRouter();
   const { title, author, cover, feed, link, description } = info;
 
   const { subs, dispatch } = useSubscriptions();
