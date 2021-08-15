@@ -29,7 +29,7 @@ export const Player = () => {
           <Link
             href={{
               pathname: '/episode',
-              query: { feed: currentEpisode.feed, title: currentEpisode.title },
+              query: { feed: currentEpisode.feed, guid: currentEpisode.guid },
             }}
           >
             <a>

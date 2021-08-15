@@ -11,7 +11,7 @@ type EpisodeItemProps = {
 };
 
 function EpisodeItem({ episode }: EpisodeItemProps) {
-  const { cover, episodeArt, feed, title, published, duration } = episode;
+  const { cover, episodeArt, feed, guid, title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
@@ -23,7 +23,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
     <Link
       href={{
         pathname: '/episode',
-        query: { feed, title },
+        query: { feed, guid },
       }}
     >
       <a className={styles.container}>

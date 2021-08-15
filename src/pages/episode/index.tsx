@@ -8,7 +8,7 @@ import { EpisodeInfo } from '../../ui/EpisodeInfo/EpisodeInfo';
 
 type EpisodePageProps = {
   feed: string;
-  title: string;
+  guid: string;
   info: IPodcastEpisodesInfo | null;
 };
 
@@ -17,7 +17,7 @@ const EpisodePage: NextPage<EpisodePageProps> = (props) => {
   if (!info) return <Loading />;
 
   const { episodes } = info;
-  const episode = episodes.find(({ title }) => title === props.title);
+  const episode = episodes.find(({ guid }) => guid === props.guid);
 
   if (!episode) {
     return <div>Couldn't get Podcasts episode</div>;
@@ -27,12 +27,12 @@ const EpisodePage: NextPage<EpisodePageProps> = (props) => {
 };
 
 export const getServerSideProps: GetServerSideProps<EpisodePageProps> = async (ctx) => {
-  const { feed, title } = ctx.query;
+  const { feed, guid } = ctx.query;
   const info = typeof feed === 'string' ? await fetchEpisodesInfo(feed) : null;
   return {
     props: {
       feed: typeof feed === 'string' ? feed : '',
-      title: typeof title === 'string' ? title : '',
+      guid: typeof guid === 'string' ? guid : '',
       info,
     },
   };
