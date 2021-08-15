@@ -11,7 +11,7 @@ const SubscriptionPage: NextPage = () => {
   const podcasts = useSubscriptions(getPodcastsList);
   const addSubscriptions = useSubscriptions(getAddSubscriptions);
 
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') return <div suppressHydrationWarning />;
 
   if (podcasts.length) return <PodcastsGrid podcasts={podcasts} />;
   return (

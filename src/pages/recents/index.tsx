@@ -10,7 +10,7 @@ import styles from './Recents.module.css';
 const RecentsPage: NextPage = () => {
   const episodes = useSubscriptions(getRecents);
 
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') return <div suppressHydrationWarning />;
 
   if (episodes.length) return <EpisodesList episodes={episodes} />;
   return (
