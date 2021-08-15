@@ -1,4 +1,5 @@
 import { GetServerSideProps, NextPage } from 'next';
+import { useRouter } from 'next/router';
 import * as React from 'react';
 
 import { fetchEpisodesInfo, useEpisodesInfo } from '../../data/episodes';
@@ -15,7 +16,8 @@ type EpisodesPageProps = {
 };
 
 const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
-  const { data: info } = useEpisodesInfo(props.feed, props.info);
+  const router = useRouter();
+  const { data: info } = useEpisodesInfo(router.query.feed as string, props.info);
   if (!info) return <Loading />;
 
   const { episodes } = info;
@@ -23,7 +25,10 @@ const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
   return (
     <React.Fragment>
       <PodcastInfo info={info} />
-      <EpisodesList className={styles.episodes} episodes={episodes} />
+      {/* TODO 2021-08-15 Check why EpisodesList crashes when rendered under EpisodesInfo page on SSR when using the PlayButton in DOM */}
+      {typeof window !== 'undefined' && (
+        <EpisodesList className={styles.episodes} episodes={episodes} />
+      )}
     </React.Fragment>
   );
 };

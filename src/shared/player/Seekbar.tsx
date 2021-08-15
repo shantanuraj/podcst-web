@@ -1,19 +1,19 @@
 import { MouseEvent, useCallback, useEffect, useRef } from 'react';
 
-import { IEpisodeInfo, PlayerState } from '../../types';
+import { IEpisodeInfo } from '../../types';
 import { useKeydown } from '../keyboard/useKeydown';
 import { shortcuts } from '../keyboard/shortcuts';
 
 import AudioUtils from './AudioUtils';
+import { getPlaybackState, usePlayer } from './usePlayer';
 import styles from './Player.module.css';
 
 export const Seekbar: React.FC<{
   currentEpisode: IEpisodeInfo | null;
-  state: PlayerState;
-}> = ({ currentEpisode, state }) => {
+}> = ({ currentEpisode }) => {
+  const state = usePlayer(getPlaybackState);
   const seekbarRef = useRef<HTMLDivElement>(null);
   const durationRef = useRef(currentEpisode?.duration || 0);
-  const open = state !== 'idle';
 
   const seekByFraction = useCallback((seekFraction: number) => {
     const newSeekPosition = Math.floor(seekFraction * durationRef.current);
@@ -28,18 +28,16 @@ export const Seekbar: React.FC<{
   useKeydown(shortcuts.seekTo, seekOnKeydown);
 
   useEffect(() => {
-    if (open) {
-      AudioUtils.subscribeDuration((duration) => (durationRef.current = duration));
-      AudioUtils.subscribeSeekUpdate((seekPosition) => {
-        if (!seekbarRef.current) return;
-        seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
-      });
-    }
+    AudioUtils.subscribeDuration((duration) => (durationRef.current = duration));
+    AudioUtils.subscribeSeekUpdate((seekPosition) => {
+      if (!seekbarRef.current) return;
+      seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
+    });
     return () => {
       AudioUtils.subscribeDuration();
       AudioUtils.subscribeSeekUpdate();
     };
-  }, [open]);
+  }, []);
 
   useEffect(() => {
     if (state === 'buffering' && seekbarRef.current) {

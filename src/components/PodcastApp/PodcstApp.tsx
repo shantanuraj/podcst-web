@@ -4,7 +4,6 @@ import Head from 'next/head';
 import { Header } from '../../ui/Header';
 import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
-import { PlayerProvider } from '../../shared/player/PlayerProvider';
 import { Player } from '../../shared/player/Player';
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -52,12 +51,10 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <Header />
 
-      <PlayerProvider>
-        <main>
-          <Component {...pageProps} />
-        </main>
-        <Player />
-      </PlayerProvider>
+      <main>
+        <Component {...pageProps} />
+      </main>
+      <Player />
     </Fragment>
   );
 }

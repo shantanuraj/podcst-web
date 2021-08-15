@@ -3,25 +3,13 @@
  * https://developers.google.com/web/updates/2015/07/media-notifications
  * https://developers.google.com/web/updates/2017/02/media-session
  */
-
-import { Dispatch } from 'react';
-
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
-import {
-  PlayerActions,
-  resumeEpisode,
-  seekBackward,
-  seekForward,
-  seekTo,
-  setPlayerState,
-  skipToNextEpisode,
-  skipToPreviousEpisode,
-} from './context';
+import AudioUtils from './AudioUtils';
+import { IPlayerState } from './usePlayer';
 
-export const updatePlaybackHandlers = (
+export const updatePlaybackMetadata = (
   episode: IEpisodeInfo,
   info: IPodcastEpisodesInfo | null,
-  dispatch: Dispatch<PlayerActions>,
 ) => {
   if (
     typeof window === 'undefined' ||
@@ -49,16 +37,27 @@ export const updatePlaybackHandlers = (
     ],
     title,
   });
+};
+
+export const updatePlaybackHandlers = (playerState: IPlayerState) => {
+  if (
+    typeof window === 'undefined' ||
+    typeof window.navigator === 'undefined' ||
+    typeof window.navigator.mediaSession === 'undefined'
+  ) {
+    return;
+  }
+  const { mediaSession } = window.navigator;
 
   const actionsAndHandlers = [
-    ['play', () => dispatch(resumeEpisode(episode))],
-    ['pause', () => dispatch(setPlayerState('paused'))],
-    ['stop', () => dispatch(setPlayerState('idle'))],
-    ['seekbackward', () => dispatch(seekBackward())],
-    ['seekforward', () => dispatch(seekForward())],
-    ['seekto', (details: MediaSessionActionDetails) => dispatch(seekTo(details.seekTime || 0))],
-    ['previoustrack', () => dispatch(skipToPreviousEpisode())],
-    ['nexttrack', () => dispatch(skipToNextEpisode())],
+    ['play', playerState.resumeEpisode],
+    ['pause', () => playerState.setPlayerState('paused')],
+    ['stop', () => playerState.setPlayerState('idle')],
+    ['seekbackward', AudioUtils.seekBackward],
+    ['seekforward', AudioUtils.seekForward],
+    ['seekto', (details: MediaSessionActionDetails) => AudioUtils.seekTo(details.seekTime || 0)],
+    ['previoustrack', playerState.skipToPreviousEpisode],
+    ['nexttrack', playerState.skipToNextEpisode],
   ] as const;
 
   actionsAndHandlers.forEach(([action, handler]) => {

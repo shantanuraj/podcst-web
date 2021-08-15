@@ -152,6 +152,14 @@ export default class AudioUtils {
     AudioUtils.seekTo(normalizeSeek(seekTo, duration));
   }
 
+  public static seekBackward() {
+    AudioUtils.seekBy(SEEK_DELTA * -1);
+  }
+
+  public static seekForward() {
+    AudioUtils.seekBy(SEEK_DELTA);
+  }
+
   public static mute(muted: boolean) {
     AudioUtils.playbackInstance?.mute(muted, AudioUtils.playbackId);
   }
@@ -189,3 +197,8 @@ const normalizeSeek = (seekTo: number, duration: number) => {
 
   return Math.floor(seekTo);
 };
+
+/**
+ * Default Seek jump delta
+ */
+const SEEK_DELTA = 10;

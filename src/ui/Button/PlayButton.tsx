@@ -1,7 +1,10 @@
-import * as React from 'react';
-import { playEpisode, resumeEpisode, setPlayerState } from '../../shared/player/context';
-import { usePlayerActions } from '../../shared/player/usePlayerActions';
-import { usePlayerState } from '../../shared/player/usePlayerState';
+import { forwardRef, useCallback, memo } from 'react';
+import {
+  getCurrentEpisode,
+  getPlaybackState,
+  IPlayerState,
+  usePlayer,
+} from '../../shared/player/usePlayer';
 
 import { IEpisodeInfo } from '../../types';
 import { Button, ButtonProps } from './Button';
@@ -10,39 +13,28 @@ type PlayButtonProps = ButtonProps & {
   episode: IEpisodeInfo;
 };
 
-export const PlayButton = React.memo(
-  React.forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButton(
-    { episode, ...props },
-    ref,
-  ) {
-    const { queue, currentTrackIndex, state } = usePlayerState();
-    const isCurrentEpisode = queue[currentTrackIndex]?.guid === episode.guid;
+export const PlayButton = memo(
+  forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButton({ episode, ...props }, ref) {
+    const state = usePlayer(getPlaybackState);
+    const isCurrentEpisode = usePlayer(useCallback(selectIsCurrentEpisode(episode), [episode]));
     const isPlaying = isCurrentEpisode && (state === 'playing' || state === 'buffering');
 
-    const dispatch = usePlayerActions();
-    const play = React.useCallback(
-      (e: React.MouseEvent) => {
-        e.preventDefault();
-        dispatch(playEpisode(episode));
-      },
-      [dispatch],
-    );
-    const pause = React.useCallback(
-      (e: React.MouseEvent) => {
-        e.preventDefault();
-        dispatch(setPlayerState('paused'));
-      },
-      [dispatch],
-    );
-    const resume = React.useCallback(
-      (e: React.MouseEvent) => {
-        e.preventDefault();
-        dispatch(resumeEpisode(episode));
-      },
-      [dispatch],
-    );
+    const play = usePlayer(selectPlay);
+    const resume = usePlayer(selectResume);
+    const setPlayerState = usePlayer(selectSetPlayerState);
 
-    const handleClick = isCurrentEpisode ? (isPlaying ? pause : resume) : play;
+    const handleClick = useCallback(
+      (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!isCurrentEpisode) return play(episode);
+        if (isPlaying) {
+          return setPlayerState('paused');
+        } else {
+          return resume();
+        }
+      },
+      [episode, isPlaying, play, resume, setPlayerState],
+    );
 
     return (
       <Button {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
@@ -51,3 +43,9 @@ export const PlayButton = React.memo(
     );
   }),
 );
+
+const selectIsCurrentEpisode = (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
+  getCurrentEpisode(playerState)?.guid === episode.guid;
+const selectPlay = (playerState: IPlayerState) => playerState.playEpisode;
+const selectResume = (playerState: IPlayerState) => playerState.resumeEpisode;
+const selectSetPlayerState = (playerState: IPlayerState) => playerState.setPlayerState;

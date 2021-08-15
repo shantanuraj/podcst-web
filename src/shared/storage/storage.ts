@@ -3,14 +3,14 @@
  */
 
 import { ThemeMode } from '../../types';
-import { Subscriptions } from '../subscriptions';
+import { SubscriptionsState } from '../subscriptions/useSubscriptions';
 
 const STORE_KEY = 'store@4';
 
 const DEPRECATED_KEYS = ['store@3'] as const;
 
 export interface IStoreable {
-  subscriptions: Subscriptions['subs'];
+  subscriptions: SubscriptionsState['subs'];
   themeMode: ThemeMode;
 }
 

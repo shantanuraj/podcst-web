@@ -1,4 +1,3 @@
-import { useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import router from 'next/router';
 
@@ -7,65 +6,26 @@ import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
 import { shortcuts } from '../keyboard/shortcuts';
 
 import { Airplay } from './Airplay';
-import { resumeEpisode, seekBackward, seekForward, setPlayerState } from './context';
+import AudioUtils from './AudioUtils';
 import { Seekbar } from './Seekbar';
-import { usePlayerActions } from './usePlayerActions';
-import { usePlayerState } from './usePlayerState';
+import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
 import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
 
+const { togglePlayback } = usePlayer.getState();
+
 export const Player = () => {
-  const { queue, currentTrackIndex, state } = usePlayerState();
-  const dispatch = usePlayerActions();
+  const currentEpisode = usePlayer(getCurrentEpisode);
+  const open = usePlayer(getIsPlayerOpen);
 
-  const currentEpisode = queue[currentTrackIndex];
-  const open = !!currentEpisode && state !== 'idle';
-
-  const togglePlayback = useCallback(() => {
-    dispatch(state === 'paused' ? resumeEpisode(currentEpisode) : setPlayerState('paused'));
-  }, [state, currentEpisode]);
-  const seekBack = useCallback(() => {
-    dispatch(seekBackward());
-  }, []);
-  const seekAhead = useCallback(() => {
-    dispatch(seekForward());
-  }, []);
-
-  const keyboardConfig: KeyboardShortcuts = useMemo(
-    () =>
-      open
-        ? [
-            [
-              shortcuts.info,
-              () => {
-                router.push({
-                  pathname: '/episode',
-                  query: { feed: currentEpisode.feed, title: currentEpisode.title },
-                });
-              },
-            ],
-            [
-              shortcuts.togglePlayback,
-              (e) => {
-                e.preventDefault();
-                togglePlayback();
-              },
-            ],
-            [shortcuts.seekBack, seekBack],
-            [shortcuts.seekAhead, seekAhead],
-          ]
-        : [],
-    [open, currentEpisode, togglePlayback, seekBack, seekAhead],
-  );
-
-  useKeydown(keyboardConfig);
+  useKeydown(open ? playerShortcuts : emptyShortcuts);
 
   return (
     <div className={styles.container} data-open={open}>
       {currentEpisode && (
         <div className={styles.player}>
-          <Seekbar currentEpisode={currentEpisode} state={state} />
+          <Seekbar currentEpisode={currentEpisode} />
           <Link
             href={{
               pathname: '/episode',
@@ -80,13 +40,11 @@ export const Player = () => {
             </a>
           </Link>
           <div className={styles.controls}>
-            <button onClick={seekBack}>
+            <button onClick={AudioUtils.seekBackward}>
               <Icon icon="seek-back" />
             </button>
-            <button onClick={togglePlayback} data-primary-control>
-              <Icon icon={state === 'playing' ? 'pause' : 'play'} />
-            </button>
-            <button onClick={seekAhead}>
+            <PlayButton />
+            <button onClick={AudioUtils.seekForward}>
               <Icon icon="seek-forward" />
             </button>
           </div>
@@ -104,3 +62,38 @@ export const Player = () => {
     </div>
   );
 };
+
+function PlayButton() {
+  const state = usePlayer(getPlaybackState);
+  return (
+    <button onClick={togglePlayback} data-primary-control>
+      <Icon icon={state === 'playing' ? 'pause' : 'play'} />
+    </button>
+  );
+}
+
+const playerShortcuts: KeyboardShortcuts = [
+  [
+    shortcuts.info,
+    () => {
+      const { currentTrackIndex, queue } = usePlayer.getState();
+      const currentEpisode = queue[currentTrackIndex];
+      if (currentEpisode) {
+        router.push({
+          pathname: '/episode',
+          query: { feed: currentEpisode.feed, title: currentEpisode.title },
+        });
+      }
+    },
+  ],
+  [
+    shortcuts.togglePlayback,
+    (e) => {
+      e.preventDefault();
+      togglePlayback();
+    },
+  ],
+  [shortcuts.seekBack, AudioUtils.seekBackward],
+  [shortcuts.seekAhead, AudioUtils.seekForward],
+];
+const emptyShortcuts: KeyboardShortcuts = [];
