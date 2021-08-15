@@ -7,6 +7,7 @@
 .info img {
   height: var(--dimen-podcast-info-cover);
   width: var(--dimen-podcast-info-cover);
+  min-width: var(--dimen-podcast-info-cover);
 }
 
 .info .text {
