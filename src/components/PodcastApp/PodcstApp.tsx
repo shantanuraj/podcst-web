@@ -5,7 +5,6 @@ import { Header } from '../../ui/Header';
 import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { SubscriptionsProvider } from '../../shared/subscriptions';
-import { ThemeProvider } from '../../shared/theme/ThemeProvider';
 import { PlayerProvider } from '../../shared/player/PlayerProvider';
 import { Player } from '../../shared/player/Player';
 
@@ -57,9 +56,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <PlayerProvider>
         <main>
           <SubscriptionsProvider>
-            <ThemeProvider>
-              <Component {...pageProps} />
-            </ThemeProvider>
+            <Component {...pageProps} />
           </SubscriptionsProvider>
         </main>
         <Player />

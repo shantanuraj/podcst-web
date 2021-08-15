@@ -1,10 +1,13 @@
 import router from 'next/router';
+import { useTheme } from '../theme/useTheme';
 import { IShortcutInfo, shortcuts } from './shortcuts';
 import { useKeydown } from './useKeydown';
 
 export function useGlobalShortcuts() {
   useKeydown(globalShortcuts);
 }
+
+const { cycleTheme } = useTheme.getState();
 
 const globalShortcuts: Array<[IShortcutInfo, () => void]> = [
   [
@@ -31,4 +34,5 @@ const globalShortcuts: Array<[IShortcutInfo, () => void]> = [
       router.push('/settings');
     },
   ],
+  [shortcuts.theme, cycleTheme],
 ];
