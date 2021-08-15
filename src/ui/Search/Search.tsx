@@ -23,7 +23,10 @@ export function Search() {
 
   const searchRef = React.useRef<HTMLInputElement>(null);
   const focusSearchShortcut = React.useCallback(() => {
-    searchRef.current?.focus();
+    // Schedule focus on next frame to avoid entering the shortcut into the input
+    requestAnimationFrame(() => {
+      searchRef.current?.focus();
+    });
   }, []);
   useKeydown(shortcuts.search, focusSearchShortcut);
 

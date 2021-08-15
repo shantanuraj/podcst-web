@@ -38,9 +38,9 @@ export const shortcuts = {
   },
   search: {
     title: 'Search',
-    key: 'k',
-    displayKey: 'cmd/ctrl + k',
-    metaKey: true,
+    key: '/',
+    displayKey: '/',
+    metaKey: false,
   },
   theme: {
     title: 'Toggle theme',
