@@ -45,7 +45,7 @@ export const PlayButton = memo(
 );
 
 const selectIsCurrentEpisode = (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
-  getCurrentEpisode(playerState)?.guid === episode.guid;
+  getCurrentEpisode(playerState)?.guid === episode.guid && playerState.state !== 'idle';
 const selectPlay = (playerState: IPlayerState) => playerState.playEpisode;
 const selectResume = (playerState: IPlayerState) => playerState.resumeEpisode;
 const selectSetPlayerState = (playerState: IPlayerState) => playerState.setPlayerState;
