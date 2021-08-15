@@ -1,7 +1,7 @@
 import create from 'zustand';
 
 import { ThemeMode } from '../../types';
-import { getValue, setValue } from '../storage/storage';
+import { getValue } from '../storage/storage';
 
 type ThemeState = {
   theme: ThemeMode;
@@ -14,10 +14,3 @@ export const useTheme = create<ThemeState>((set, get) => ({
   changeTheme: (theme) => set({ theme }),
   cycleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
 }));
-
-useTheme.subscribe(({ theme }) => {
-  setValue('themeMode', theme);
-  if (typeof window === 'undefined') return;
-  if (theme === 'light') document.documentElement.classList.add('light');
-  else document.documentElement.classList.remove('light');
-});
