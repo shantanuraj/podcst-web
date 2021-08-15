@@ -134,7 +134,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: bold;
   font-size: var(--dimen-font-regular);
+  color: var(--color-accent);
   width: 48px;
 }
 
