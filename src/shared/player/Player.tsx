@@ -83,7 +83,7 @@ const playerShortcuts: KeyboardShortcuts = [
       if (currentEpisode) {
         router.push({
           pathname: '/episode',
-          query: { feed: currentEpisode.feed, title: currentEpisode.title },
+          query: { feed: currentEpisode.feed, guid: currentEpisode.guid },
         });
       }
     },
