@@ -1,10 +1,9 @@
 import { useRouter } from 'next/router';
-import { Fragment } from 'react';
+import { Fragment, useCallback } from 'react';
 
 import { linkifyText } from '../../shared/link/linkify-text';
 import { stripHost } from '../../shared/link/strip-host';
-import { toggleSubscription } from '../../shared/subscriptions';
-import { useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
+import { isSubscribed, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { IPodcastEpisodesInfo } from '../../types';
 import { Button } from '../Button';
 import { ShareButton } from '../Button/ShareButton';
@@ -18,12 +17,7 @@ type PodcastInfoProps = {
 
 export function PodcastInfo({ info }: PodcastInfoProps) {
   const router = useRouter();
-  const { title, author, cover, feed, link, description } = info;
-
-  const { subs, dispatch } = useSubscriptions();
-
-  const isSubscribed = feed in subs;
-  const onSubscribeClick = () => dispatch(toggleSubscription(feed, info));
+  const { title, author, cover, link, description } = info;
 
   return (
     <div className={styles.info}>
@@ -40,9 +34,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
           )}
         </h2>
         <div className={styles.buttons}>
-          <Button data-is-subscribed={isSubscribed} onClick={onSubscribeClick}>
-            {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
-          </Button>
+          <SubscribeButton info={info} />
           <ShareButton
             title={title}
             text={`Listen to ${title} by ${author} on Podcst`}
@@ -55,5 +47,24 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
         />
       </div>
     </div>
+  );
+}
+
+function SubscribeButton({ info }: PodcastInfoProps) {
+  const feed = info.feed;
+  const isSubscribedToFeed = useSubscriptions(useCallback(isSubscribed(feed), [feed]));
+  const toggleSubscription = useSubscriptions(
+    useCallback((state) => state.toggleSubscription, [feed]),
+  );
+  const onSubscribeClick = useCallback(() => toggleSubscription(info.feed, info), [info]);
+
+  return (
+    <Button
+      data-is-subscribed={isSubscribedToFeed}
+      onClick={onSubscribeClick}
+      suppressHydrationWarning
+    >
+      {isSubscribedToFeed ? 'Unsubscribe' : 'Subscribe'}
+    </Button>
   );
 }

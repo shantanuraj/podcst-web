@@ -1,31 +1,27 @@
 import { NextPage } from 'next';
 import * as React from 'react';
 
-import { useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
+import { SubscriptionsState, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { ImportButton } from '../../components/ImportButton/ImportButton';
-import { addSubscriptions } from '../../shared/subscriptions';
-import { IPodcastEpisodesInfo } from '../../types';
 import { PodcastsGrid } from '../../ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';
 
 const SubscriptionPage: NextPage = () => {
-  const { subs, dispatch } = useSubscriptions();
-  const podcasts = React.useMemo(() => Object.values(subs), [subs]);
-
-  const onImport = React.useCallback(
-    (podcasts: IPodcastEpisodesInfo[]) => dispatch(addSubscriptions(podcasts)),
-    [dispatch],
-  );
+  const podcasts = useSubscriptions(getPodcastsList);
+  const addSubscriptions = useSubscriptions(getAddSubscriptions);
 
   if (typeof window === 'undefined') return null;
 
   if (podcasts.length) return <PodcastsGrid podcasts={podcasts} />;
   return (
     <div className={styles.container}>
-      <ImportButton onImport={onImport} />
+      <ImportButton onImport={addSubscriptions} />
     </div>
   );
 };
 
 export default SubscriptionPage;
+
+const getPodcastsList = (state: SubscriptionsState) => Object.values(state.subs);
+const getAddSubscriptions = (state: SubscriptionsState) => state.addSubscriptions;
