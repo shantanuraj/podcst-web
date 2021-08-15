@@ -16,7 +16,7 @@ Another major focus is on accessibility, the app is and should be accessible to 
 This project uses the [gitflow](https://github.com/nvie/gitflow) branching model.
 See the [development](#development) section below for additional details.
 
-- [master](https://github.com/shantanuraj/podcst-web/tree/master) is the production branch
+- [main](https://github.com/shantanuraj/podcst-web/tree/main) is the production branch
 - [develop](https://github.com/shantanuraj/podcst-web/tree/develop) is the active branch where commits are made
 
 ### Prerequisites
@@ -93,7 +93,7 @@ now --target production
 now
 ```
 
-On every merge to master the production deployment is automatically updated.
+On every merge to `main` the production deployment is automatically updated.
 
 ## Built With
 
