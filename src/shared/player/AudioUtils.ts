@@ -183,6 +183,11 @@ export default class AudioUtils {
   public static subscribeSeekUpdate(callback?: IAudioCallbacks['seekUpdate']) {
     AudioUtils.callbacks.seekUpdate = callback;
   }
+
+  public static changeRate(rate: number) {
+    if (!AudioUtils.playbackId) return;
+    AudioUtils.playbackInstance?.rate(rate, AudioUtils.playbackId);
+  }
 }
 
 /**

@@ -130,6 +130,14 @@
   transition: width 1s;
 }
 
+.playbackRate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--dimen-font-regular);
+  width: 48px;
+}
+
 .seekbar[data-is-buffering='true'] {
   animation: loading 2s infinite;
   width: 100%;

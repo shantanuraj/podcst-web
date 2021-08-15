@@ -12,6 +12,7 @@ import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from 
 import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
+import { PlaybackRate } from './PlaybackRate';
 
 const { togglePlayback } = usePlayer.getState();
 
@@ -55,6 +56,7 @@ export const Player = () => {
           <div className={styles.spacer} />
           <div className={styles.secondaryControls}>
             <VolumeControls />
+            <PlaybackRate />
             <Airplay />
           </div>
         </div>
