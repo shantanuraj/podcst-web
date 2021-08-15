@@ -48,16 +48,25 @@ export const removeValue = <K extends keyof IStoreable>(key: K) => {
   }
 };
 
-export const getValue = <K extends keyof IStoreable>(key: K): IStoreable[K] | null => {
+export function getValue<K extends keyof IStoreable>(key: K): IStoreable[K] | null;
+export function getValue<K extends keyof IStoreable>(
+  key: K,
+  defaultValue: IStoreable[K],
+): IStoreable[K];
+export function getValue<K extends keyof IStoreable>(
+  key: K,
+  defaultValue: IStoreable[K] | null,
+): IStoreable[K] | null;
+export function getValue<K extends keyof IStoreable>(key: K, defaultValue = null) {
   try {
     const store = getStore();
-    return store[key] || null;
+    return store[key] || defaultValue;
   } catch (err) {
     console.error(`Couldn't parse persisted store while accessing key: ${key}`, err);
     removeValue(key);
   }
   return null;
-};
+}
 
 export const setValue = <K extends keyof IStoreable>(key: K, val: IStoreable[K]) => {
   const store: IStoreable = {
