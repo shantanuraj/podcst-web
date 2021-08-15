@@ -13,7 +13,7 @@ type EpisodesListProps = {
 export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { totalSize, virtualItems } = useVirtual<HTMLDivElement>({
-    size: episodes.length,
+    size: episodes?.length || 0,
     parentRef: containerRef,
     estimateSize: getRowHeight,
     overscan: 5,
