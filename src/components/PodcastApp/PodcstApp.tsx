@@ -24,7 +24,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta property="og:site_name" content="Podcst" />
         <meta property="og:type" content="website" />
         <meta property="og:description" content="Plays your favourite podcasts on all devices" />
-        <meta property="og:url" content="https://podcst.app" />
+        <meta property="og:url" content="https://www.podcst.app" />
         <meta property="og:locale" content="en_US" />
         <meta property="og:image" content="/icons/launcher-512.png" />
 
