@@ -1,15 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {shortcuts} from '../keyboard/shortcuts';
+import {KeyboardShortcuts, useKeydown} from '../keyboard/useKeydown';
 import AudioUtils from './AudioUtils';
 
 import styles from './Player.module.css';
 
 export const PlaybackRate = () => {
-  const [rateIndex, setRateIndex] = useState(0);
+  const [rateIndex, setRateIndex] = useState(defaultRate);
+  const decreaseRate = useCallback(() => {
+    setRateIndex((rateIndex) => Math.max(0, rateIndex - 1));
+  }, []);
+  const bumpRate = useCallback(() => {
+    setRateIndex((rateIndex) => Math.min(rates.length - 1, rateIndex + 1));
+  }, []);
+  const rateShortcuts: KeyboardShortcuts = useMemo(() => [
+    [shortcuts.bumpRate, bumpRate],
+    [shortcuts.decreaseRate, decreaseRate],
+  ], []);
   const cycleRate = useCallback(() => {
     setRateIndex((rateIndex) => (rateIndex + 1) % rates.length);
   }, []);
   const rate = rates[rateIndex];
 
+  useKeydown(rateShortcuts);
   useEffect(() => {
     AudioUtils.changeRate(rate);
   }, [rate]);
@@ -21,4 +34,6 @@ export const PlaybackRate = () => {
   );
 };
 
-const rates = [1, 1.25, 1.5, 2, 0.5, 0.75];
+const rates = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const defaultRate = rates.indexOf(1);
+

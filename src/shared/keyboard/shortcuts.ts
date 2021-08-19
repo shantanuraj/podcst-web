@@ -78,6 +78,18 @@ export const shortcuts = {
     displayKey: '0-9',
     metaKey: false,
   },
+  bumpRate: {
+    title: 'Increase playback rate',
+    key: '>',
+    displayKey: '>',
+    metaKey: false,
+  },
+  decreaseRate: {
+    title: 'Lower playback rate',
+    key: '<',
+    displayKey: '<',
+    metaKey: false,
+  },
   closeDrawer: {
     title: 'Close drawer',
     key: 'Escape',

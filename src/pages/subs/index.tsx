@@ -1,5 +1,4 @@
 import { NextPage } from 'next';
-import * as React from 'react';
 
 import { SubscriptionsState, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { ImportButton } from '../../components/ImportButton/ImportButton';
