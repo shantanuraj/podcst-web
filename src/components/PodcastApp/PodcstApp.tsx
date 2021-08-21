@@ -7,10 +7,15 @@ import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { Player } from '../../shared/player/Player';
 import { ThemeListener } from '../../shared/theme/ThemeListener';
+import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
   useGlobalShortcuts();
+  const init = useSubscriptions(getInit);
+  useEffect(() => {
+    init();
+  }, []);
   return (
     <Fragment>
       <Head>

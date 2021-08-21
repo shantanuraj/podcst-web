@@ -1,10 +1,11 @@
 import create from 'zustand';
 
-import { IPodcastEpisodesInfo } from '../../types';
-import { getValue, setValue } from '../storage/storage';
+import { IPodcastEpisodesInfo, ISubscriptionsMap } from '../../types';
+import { getValue, setValue } from '../storage/idb';
 
 export type SubscriptionsState = {
-  subs: { [feed: string]: IPodcastEpisodesInfo };
+  subs: ISubscriptionsMap;
+  init: () => Promise<void>,
   addSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
   removeSubscription: (feed: string) => void;
   toggleSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
@@ -14,7 +15,13 @@ export type SubscriptionsState = {
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) => !!state.subs[feed];
 
 export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
-  subs: getValue('subscriptions', {}),
+  subs: {},
+  init: async () => {
+    const subscriptions = await getValue('subscriptions');
+    if (subscriptions) {
+      set({ subs: subscriptions });
+    }
+  },
   addSubscription: (feed: string, info: IPodcastEpisodesInfo) => {
     set({ subs: { ...get().subs, [feed]: info } });
   },
@@ -46,3 +53,5 @@ useSubscriptions.subscribe(({ subs }) => {
   // Sync subscriptions to storage
   setValue('subscriptions', subs);
 });
+
+export const getInit = (state: SubscriptionsState) => state.init;
