@@ -84,7 +84,7 @@ export const updatePlaybackState = (playbackState: {
   }
   const { mediaSession } = window.navigator;
   try {
-    // @ts-expect-error Outdated typings
+    // @ts-ignore Outdated typings
     mediaSession.playbackState?.(playbackState);
   } catch (err) {
     console.error('Cannot set playback state', err);
