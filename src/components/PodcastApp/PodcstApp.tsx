@@ -1,6 +1,7 @@
 import { Fragment, useEffect } from 'react';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
+import Script from 'next/script';
 
 import { Header } from '../../ui/Header';
 import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
@@ -8,6 +9,7 @@ import { removeDeprecatedStorage } from '../../shared/storage/storage';
 import { Player } from '../../shared/player/Player';
 import { ThemeListener } from '../../shared/theme/ThemeListener';
 import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
+import { CastManager } from '../CastManager/CastManager';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
@@ -63,6 +65,29 @@ export default function App({ Component, pageProps }: AppProps) {
       </main>
       <Player />
       <ThemeListener />
+      <CastManager />
+      <Script>
+        {`
+        window['__onGCastApiAvailable'] = function(isAvailable) {
+          if (
+            isAvailable &&
+            window.chrome &&
+            window.cast &&
+            window.chrome.cast &&
+            window.chrome.cast.media &&
+            window.cast.framework
+          ) {
+            // Custom receiver
+            window.cast.framework.CastContext.getInstance().setOptions({
+              receiverApplicationId: '5152FC99',
+              autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+            });
+            const event = new CustomEvent('cast-available', {});
+            document.dispatchEvent(event);
+          }
+        };`}
+      </Script>
+      <Script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" />
     </Fragment>
   );
 }

@@ -18,6 +18,7 @@ interface PlaybackTargetAvailabilityChangedEvent extends Event {
 }
 
 type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
+type ChromecastStateCallback = (state: cast.framework.CastState) => void;
 
 interface AirplayAudioElement extends HTMLAudioElement {
   webkitShowPlaybackTargetPicker: () => void;
@@ -29,9 +30,12 @@ const throwError = () => {
 
 export default class AudioUtils {
   private static playbackInstance: Howl | null;
+  private static currentEpisode: IEpisode | null = null;
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
+  private static chromecastStateListener: ChromecastStateCallback | null = null;
   public static isAirplayEnabled: boolean = false;
+  public static isChromecastEnabled: boolean = false;
 
   private static getAudioElement(): HTMLAudioElement | null {
     try {
@@ -77,6 +81,75 @@ export default class AudioUtils {
     audioElement?.webkitShowPlaybackTargetPicker();
   }
 
+  public static getChromecastState() {
+    const context = cast.framework.CastContext.getInstance();
+    return context.getCastState();
+  }
+
+  public static onChromecastEnabled() {
+    AudioUtils.isChromecastEnabled = true;
+  }
+
+  private static chromecastStateChangeListener(event: cast.framework.CastStateEventData) {
+    AudioUtils.chromecastStateListener?.(event.castState);
+  }
+
+  public static addChromecastStateListener(listener: ChromecastStateCallback) {
+    AudioUtils.chromecastStateListener = listener;
+    const context = cast.framework.CastContext.getInstance();
+    context.addEventListener(
+      cast.framework.CastContextEventType.CAST_STATE_CHANGED,
+      AudioUtils.chromecastStateChangeListener,
+    );
+  }
+
+  public static removeChromecastStateListener() {
+    AudioUtils.chromecastStateListener = null;
+    const context = cast.framework.CastContext.getInstance();
+    context.removeEventListener(
+      cast.framework.CastContextEventType.CAST_STATE_CHANGED,
+      AudioUtils.chromecastStateChangeListener,
+    );
+  }
+
+  public static async playEpisodeOnChromecast() {
+    const context = cast.framework.CastContext.getInstance();
+    let session = context.getCurrentSession();
+    if (!session) {
+      try {
+        await context.requestSession();
+        session = context.getCurrentSession();
+      } catch (err) {
+        console.error('Error requesting session', err);
+      }
+    }
+    if (!session || !AudioUtils.currentEpisode) return;
+
+    const mediaInfo = new chrome.cast.media.MediaInfo(
+      AudioUtils.currentEpisode.file.url,
+      AudioUtils.currentEpisode.file.type,
+    );
+    const metadata = new chrome.cast.media.MusicTrackMediaMetadata();
+    metadata.artist = AudioUtils.currentEpisode.author || '';
+    metadata.songName = AudioUtils.currentEpisode.title;
+    metadata.title = AudioUtils.currentEpisode.title;
+    if (AudioUtils.currentEpisode.published) {
+      metadata.releaseDate = new Date(AudioUtils.currentEpisode.published).toISOString();
+    }
+    metadata.images = [
+      new chrome.cast.Image(
+        AudioUtils.currentEpisode.episodeArt || AudioUtils.currentEpisode.cover,
+      ),
+    ];
+    mediaInfo.metadata = metadata;
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    try {
+      await session.loadMedia(request);
+    } catch (err) {
+      console.error('Error loading media', err);
+    }
+  }
+
   public static callbacks: IAudioCallbacks = {
     setPlaybackStarted: throwError,
     stopEpisode: throwError,
@@ -89,6 +162,7 @@ export default class AudioUtils {
   public static play(episode: IEpisode) {
     AudioUtils.stop();
     AudioUtils.playbackId = undefined;
+    AudioUtils.currentEpisode = episode;
     AudioUtils.playbackInstance = new Howl({
       src: [episode.file.url],
       html5: true,
@@ -114,6 +188,7 @@ export default class AudioUtils {
         updateSeek();
       },
       onend() {
+        AudioUtils.currentEpisode = null;
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
       },
@@ -132,6 +207,7 @@ export default class AudioUtils {
   }
 
   public static stop() {
+    AudioUtils.currentEpisode = null;
     AudioUtils.playbackInstance?.stop();
     AudioUtils.playbackInstance?.unload();
   }
