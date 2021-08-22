@@ -10,14 +10,15 @@ const SubscriptionPage: NextPage = () => {
   const podcasts = useSubscriptions(getPodcastsList);
   const addSubscriptions = useSubscriptions(getAddSubscriptions);
 
-  if (typeof window === 'undefined') return <div suppressHydrationWarning />;
+  if (typeof window === 'undefined' || !podcasts.length) {
+    return (
+      <div className={styles.container} suppressHydrationWarning>
+        <ImportButton onImport={addSubscriptions} />
+      </div>
+    );
+  }
 
-  if (podcasts.length) return <PodcastsGrid podcasts={podcasts} />;
-  return (
-    <div className={styles.container}>
-      <ImportButton onImport={addSubscriptions} />
-    </div>
-  );
+  return <PodcastsGrid podcasts={podcasts} />;
 };
 
 export default SubscriptionPage;
