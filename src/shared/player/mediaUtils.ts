@@ -25,8 +25,8 @@ export const updatePlaybackMetadata = (
   const artwork = episodeArt || cover || ((info && info.cover) as string);
 
   mediaSession.metadata = new window.MediaMetadata({
-    album: (info && info.title) || title,
-    artist: author || ((info && info.author) as string),
+    album: info?.title || title,
+    artist: author || (info?.author) as string,
     artwork: [
       { src: artwork, sizes: '96x96', type: 'image/png' },
       { src: artwork, sizes: '128x128', type: 'image/png' },
@@ -84,6 +84,7 @@ export const updatePlaybackState = (playbackState: {
   }
   const { mediaSession } = window.navigator;
   try {
+    // @ts-expect-error Outdated typings
     mediaSession.playbackState?.(playbackState);
   } catch (err) {
     console.error('Cannot set playback state', err);

@@ -7,12 +7,13 @@ import { shortcuts } from '../keyboard/shortcuts';
 
 import { Airplay } from './Airplay';
 import AudioUtils from './AudioUtils';
+import { Chromecast } from './Chromecast';
+import { PlaybackRate } from './PlaybackRate';
 import { Seekbar } from './Seekbar';
 import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
 import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
-import { PlaybackRate } from './PlaybackRate';
 
 const { togglePlayback } = usePlayer.getState();
 
@@ -58,6 +59,7 @@ export const Player = () => {
             <VolumeControls />
             <PlaybackRate />
             <Airplay />
+            <Chromecast />
           </div>
         </div>
       )}

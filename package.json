@@ -41,6 +41,7 @@
     "zustand": "3.5.8"
   },
   "devDependencies": {
+    "@types/chromecast-caf-sender": "1.0.4",
     "@types/howler": "2.2.3",
     "@types/node": "^16.4.13",
     "@types/react": "^17.0.16",
