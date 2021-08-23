@@ -18,7 +18,7 @@ type PodcastInfoProps = {
 export function PodcastInfo({ info }: PodcastInfoProps) {
   const router = useRouter();
   const { title, author, cover, link, description } = info;
-  const lastPublishedDate = info.published || info.episodes[0].published;
+  const lastPublishedDate = info.episodes[0].published || info.published;
   const lastPublished = lastPublishedDate ? new Date(lastPublishedDate).toDateString() : null;
 
   return (
