@@ -63,13 +63,13 @@ export const shortcuts = {
   seekBack: {
     title: 'Seek back',
     key: 'ArrowLeft',
-    displayKey: 'left',
+    displayKey: '←',
     metaKey: false,
   },
   seekAhead: {
     title: 'Seek ahead',
     key: 'ArrowRight',
-    displayKey: 'right',
+    displayKey: '→',
     metaKey: false,
   },
   seekTo: {
