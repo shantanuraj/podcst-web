@@ -33,7 +33,8 @@
 .buttons,
 .description,
 .info .text h1,
-.info .text h2 {
+.info .text h2,
+.info .text h5 {
   margin: 8px 0;
 }
 

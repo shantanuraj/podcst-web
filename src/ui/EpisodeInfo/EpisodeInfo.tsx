@@ -15,9 +15,10 @@ type EpisodeInfoProps = {
 
 export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
   const router = useRouter();
-  const { author, cover, episodeArt, showNotes, summary, title } = episode;
+  const { author, cover, episodeArt, published, showNotes, summary, title } = episode;
   const showArt = episodeArt || cover;
   const shareTitle = `${podcast.title} - ${title}`;
+  const releaseDate = published ? new Date(published).toDateString() : null;
 
   return (
     <div className={styles.info}>
@@ -28,6 +29,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
           from <ExternalLink href={podcast.link}>{podcast.title}</ExternalLink>
         </h2>
         <h2>by {author}</h2>
+        {releaseDate && <h5>Published: {releaseDate}</h5>}
         <div className={styles.buttons}>
           <PlayButton episode={episode} />
           <ShareButton

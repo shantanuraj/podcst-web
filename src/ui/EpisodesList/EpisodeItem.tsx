@@ -14,6 +14,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const { cover, episodeArt, feed, guid, title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
+  const utcDate = pub.toUTCString();
   const day = pub.getDate();
   const month = pub.toLocaleDateString('default', { month: 'short' });
   const minutes = Math.floor((duration || 0) / 60);
@@ -28,7 +29,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
     >
       <a className={styles.container}>
         <img loading="lazy" className={styles.image} src={episodeArt || cover} alt={title} />
-        <div className={styles.info}>
+        <div className={styles.info} title={utcDate}>
           <span>{month}</span>
           <span>{day}</span>
         </div>

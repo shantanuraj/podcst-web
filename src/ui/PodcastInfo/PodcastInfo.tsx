@@ -18,6 +18,8 @@ type PodcastInfoProps = {
 export function PodcastInfo({ info }: PodcastInfoProps) {
   const router = useRouter();
   const { title, author, cover, link, description } = info;
+  const lastPublishedDate = info.published || info.episodes[0].published;
+  const lastPublished = lastPublishedDate ? new Date(lastPublishedDate).toDateString() : null;
 
   return (
     <div className={styles.info}>
@@ -33,6 +35,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
             author
           )}
         </h2>
+        {lastPublished && <h5>Latest episode: {lastPublished}</h5>}
         <div className={styles.buttons}>
           <SubscribeButton info={info} />
           <ShareButton
