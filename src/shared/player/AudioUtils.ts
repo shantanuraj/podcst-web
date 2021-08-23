@@ -69,6 +69,8 @@ export default class AudioUtils {
   }
 
   public static removeAirplayAvailabilityListener() {
+    if (!AudioUtils.airplayAvailabilityListener) return;
+    AudioUtils.airplayAvailabilityListener = null;
     const audioElement = AudioUtils.getAudioElement();
     audioElement?.removeEventListener(
       'webkitplaybacktargetavailabilitychanged',
