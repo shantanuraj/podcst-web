@@ -1,6 +1,12 @@
 import React from 'react';
+import { Portal } from '../../shared/portal';
 import styles from './LoadBar.module.css';
 
 export function LoadBar() {
-  return <span aria-label="Loading..." className={styles.loadBar} />;
+  if (typeof window === 'undefined') return null;
+  return (
+    <Portal id="__next">
+      <span aria-label="Loading..." className={styles.loadBar} />
+    </Portal>
+  );
 }
