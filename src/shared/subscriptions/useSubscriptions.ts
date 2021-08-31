@@ -5,11 +5,12 @@ import { getValue, setValue } from '../storage/idb';
 
 export type SubscriptionsState = {
   subs: ISubscriptionsMap;
-  init: () => Promise<void>,
+  init: () => Promise<void>;
   addSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
   removeSubscription: (feed: string) => void;
   toggleSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
   addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => void;
+  syncSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
 };
 
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) => !!state.subs[feed];
@@ -46,6 +47,12 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
       nextSubscriptions[info.feed] = info;
     });
     set({ subs: nextSubscriptions });
+  },
+  syncSubscription: (feed, info) => {
+    const state = get();
+    if (isSubscribed(feed)(state)) {
+      state.addSubscription(feed, info);
+    }
   },
 }));
 
