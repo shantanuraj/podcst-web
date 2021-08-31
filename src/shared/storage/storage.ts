@@ -10,6 +10,7 @@ const DEPRECATED_KEYS = ['store@3'] as const;
 
 export interface IStoreable {
   themeMode: ThemeMode;
+  lastSyncTime: number;
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars */

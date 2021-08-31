@@ -3,6 +3,10 @@ import { fetchEpisodesInfo } from '../../data/episodes';
 
 import { IPodcastEpisodesInfo, ISubscriptionsMap } from '../../types';
 import { getValue, setValue } from '../storage/idb';
+import {
+  getValue as getLocalStorageValue,
+  setValue as setLocalStorageValue,
+} from '../storage/storage';
 
 export type SubscriptionsState = {
   subs: ISubscriptionsMap;
@@ -15,6 +19,13 @@ export type SubscriptionsState = {
   isSyncing: boolean;
   syncAllSubscriptions: () => void;
 };
+
+// 1 hour in milliseconds
+const CACHE_STALE_DELTA = 60 * 60 * 1000;
+const isCacheStale = (lastSyncTime: number) => Date.now() - lastSyncTime > CACHE_STALE_DELTA;
+
+const getLastSyncTime = () => getLocalStorageValue('lastSyncTime', 0);
+const updateLastSyncTime = () => setLocalStorageValue('lastSyncTime', Date.now());
 
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) => !!state.subs[feed];
 
@@ -59,6 +70,9 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
   },
   isSyncing: false,
   syncAllSubscriptions: async () => {
+    const lastSyncTime = getLastSyncTime();
+    if (!isCacheStale(lastSyncTime)) return;
+
     set({ isSyncing: true });
 
     const feeds = Object.keys(get().subs);
@@ -73,6 +87,7 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
     }
 
     set({ isSyncing: false });
+    updateLastSyncTime();
   },
 }));
 
