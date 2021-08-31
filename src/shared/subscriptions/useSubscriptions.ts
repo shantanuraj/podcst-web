@@ -1,4 +1,5 @@
 import create from 'zustand';
+import { fetchEpisodesInfo } from '../../data/episodes';
 
 import { IPodcastEpisodesInfo, ISubscriptionsMap } from '../../types';
 import { getValue, setValue } from '../storage/idb';
@@ -11,6 +12,8 @@ export type SubscriptionsState = {
   toggleSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
   addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => void;
   syncSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
+  isSyncing: boolean;
+  syncAllSubscriptions: () => void;
 };
 
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) => !!state.subs[feed];
@@ -53,6 +56,23 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
     if (isSubscribed(feed)(state)) {
       state.addSubscription(feed, info);
     }
+  },
+  isSyncing: false,
+  syncAllSubscriptions: async () => {
+    set({ isSyncing: true });
+
+    const feeds = Object.keys(get().subs);
+
+    for (const feed of feeds) {
+      await fetchEpisodesInfo(feed).catch((err) => {
+        console.error('Error fetching feed', feed, err);
+
+        // Wait a second in likely case of rate-limit from iTunes
+        return new Promise((resolve) => setTimeout(resolve, 1000));
+      });
+    }
+
+    set({ isSyncing: false });
   },
 }));
 

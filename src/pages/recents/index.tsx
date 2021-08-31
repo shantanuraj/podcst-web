@@ -1,18 +1,38 @@
 import { NextPage } from 'next';
 import * as React from 'react';
 
-import { SubscriptionsState, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
+import {
+  getInit,
+  SubscriptionsState,
+  useSubscriptions,
+} from '../../shared/subscriptions/useSubscriptions';
 import { IEpisodeInfo } from '../../types';
 import { EpisodesList } from '../../ui/EpisodesList';
+import { LoadBar } from '../../ui/LoadBar';
 
 import styles from './Recents.module.css';
 
 const RecentsPage: NextPage = () => {
+  const init = useSubscriptions(getInit);
+  const isSyncing = useSubscriptions(getIsSyncing);
+  const syncAllSubscriptions = useSubscriptions(getSyncSubscriptions);
   const episodes = useSubscriptions(getRecents);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    init().then(syncAllSubscriptions);
+  }, []);
 
   if (typeof window === 'undefined') return null;
 
-  if (episodes.length) return <EpisodesList episodes={episodes} />;
+  if (episodes.length) {
+    return (
+      <React.Fragment>
+        {isSyncing && <LoadBar />}
+        <EpisodesList episodes={episodes} />
+      </React.Fragment>
+    );
+  }
   return (
     <div className={styles.container}>
       Subscribe to a few podcasts to see their episodes in the recents list.
@@ -42,3 +62,7 @@ export const getRecents = (state: SubscriptionsState): IEpisodeInfo[] =>
     .reduce((acc, feedEpisodes) => [...acc, ...feedEpisodes], [])
     .sort((a, b) => (b.published || 0) - (a.published || 0))
     .slice(0, EPISODES_LIMIT);
+
+const getSyncSubscriptions = (state: SubscriptionsState) => state.syncAllSubscriptions;
+
+const getIsSyncing = (state: SubscriptionsState) => state.isSyncing;
