@@ -186,7 +186,6 @@ usePlayer.subscribe((currentState, previousState) => {
   const applyStateAudioEffects =
     currentState.state !== previousState.state &&
     !isChromecastConnected(currentState.chromecastState);
-
   if (applyStateAudioEffects) {
     switch (currentState.state) {
       case 'buffering':
@@ -211,6 +210,17 @@ usePlayer.subscribe((currentState, previousState) => {
       case 'idle':
         AudioUtils.stop();
         break;
+    }
+  }
+
+  if (isChromecastConnected(currentState.chromecastState)) {
+    const remoteState = currentState.remotePlayer?.playerState
+      ? getAdaptedPlaybackState(currentState.remotePlayer.playerState)
+      : null;
+    const applyStateCastEffects =
+      remoteState && remoteState !== 'buffering' && remoteState !== currentState.state;
+    if (applyStateCastEffects) {
+      currentState.remotePlayerController?.playOrPause();
     }
   }
 
