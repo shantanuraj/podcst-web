@@ -12,7 +12,12 @@ export const Chromecast = () => {
     return () => AudioUtils.removeChromecastStateListener();
   }, []);
 
-  if (!isChromecastEnabled || chromecastState === cast.framework.CastState.NO_DEVICES_AVAILABLE)
+  if (
+    !isChromecastEnabled ||
+    typeof window === 'undefined' ||
+    !('cast' in window) ||
+    chromecastState === cast.framework.CastState.NO_DEVICES_AVAILABLE
+  )
     return null;
 
   return (

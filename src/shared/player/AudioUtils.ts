@@ -82,6 +82,7 @@ export default class AudioUtils {
   }
 
   public static getChromecastState() {
+    if (!('cast' in window)) return null;
     const context = cast.framework.CastContext.getInstance();
     return context.getCastState();
   }
@@ -95,6 +96,7 @@ export default class AudioUtils {
   }
 
   public static addChromecastStateListener(listener: ChromecastStateCallback) {
+    if (!('cast' in window)) return null;
     AudioUtils.chromecastStateListener = listener;
     const context = cast.framework.CastContext.getInstance();
     context.addEventListener(
@@ -104,6 +106,7 @@ export default class AudioUtils {
   }
 
   public static removeChromecastStateListener() {
+    if (!('cast' in window)) return;
     AudioUtils.chromecastStateListener = null;
     const context = cast.framework.CastContext.getInstance();
     context.removeEventListener(
@@ -113,6 +116,7 @@ export default class AudioUtils {
   }
 
   public static async playEpisodeOnChromecast() {
+    if (!('cast' in window)) return null;
     const context = cast.framework.CastContext.getInstance();
     let session = context.getCurrentSession();
     if (!session) {
