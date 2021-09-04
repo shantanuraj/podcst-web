@@ -7,7 +7,7 @@ import { IEpisode } from '../../types';
 import { updatePlaybackState } from './mediaUtils';
 
 type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
-type ChromecastStateCallback = (state: cast.framework.CastState) => void;
+
 interface IAudioCallbacks {
   setPlaybackStarted: () => void;
   stopEpisode: () => void;
@@ -33,8 +33,6 @@ export default class AudioUtils {
   private static currentEpisode: IEpisode | null = null;
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
-  private static chromecastStateListener: ChromecastStateCallback | null = null;
-  public static isChromecastEnabled: boolean = false;
 
   private static getAudioElement(): HTMLAudioElement | null {
     try {
@@ -79,83 +77,6 @@ export default class AudioUtils {
   public static showAirplaySelector() {
     const audioElement = AudioUtils.getAudioElement() as AirplayAudioElement | null;
     audioElement?.webkitShowPlaybackTargetPicker();
-  }
-
-  public static getChromecastState() {
-    if (!('cast' in window)) return null;
-    const context = cast.framework.CastContext.getInstance();
-    return context.getCastState();
-  }
-
-  public static onChromecastEnabled() {
-    AudioUtils.isChromecastEnabled = true;
-  }
-
-  private static chromecastStateChangeListener(event: cast.framework.CastStateEventData) {
-    AudioUtils.chromecastStateListener?.(event.castState);
-  }
-
-  public static addChromecastStateListener(listener: ChromecastStateCallback) {
-    if (!('cast' in window)) return null;
-    AudioUtils.chromecastStateListener = listener;
-    const context = cast.framework.CastContext.getInstance();
-    context.addEventListener(
-      cast.framework.CastContextEventType.CAST_STATE_CHANGED,
-      AudioUtils.chromecastStateChangeListener,
-    );
-  }
-
-  public static removeChromecastStateListener() {
-    if (!('cast' in window)) return;
-    AudioUtils.chromecastStateListener = null;
-    const context = cast.framework.CastContext.getInstance();
-    context.removeEventListener(
-      cast.framework.CastContextEventType.CAST_STATE_CHANGED,
-      AudioUtils.chromecastStateChangeListener,
-    );
-  }
-
-  public static async playEpisodeOnChromecast() {
-    if (!('cast' in window)) return null;
-    const context = cast.framework.CastContext.getInstance();
-    let session = context.getCurrentSession();
-    if (!session) {
-      try {
-        await context.requestSession();
-        session = context.getCurrentSession();
-      } catch (err) {
-        console.error('Error requesting session', err);
-      }
-    }
-    if (!session || !AudioUtils.currentEpisode) return;
-
-    const mediaInfo = new chrome.cast.media.MediaInfo(
-      AudioUtils.currentEpisode.file.url,
-      AudioUtils.currentEpisode.file.type,
-    );
-    const metadata = new chrome.cast.media.MusicTrackMediaMetadata();
-    metadata.artist = AudioUtils.currentEpisode.author || '';
-    metadata.songName = AudioUtils.currentEpisode.title;
-    metadata.title = AudioUtils.currentEpisode.title;
-    if (AudioUtils.currentEpisode.published) {
-      metadata.releaseDate = new Date(AudioUtils.currentEpisode.published).toISOString();
-    }
-    metadata.images = [
-      new chrome.cast.Image(
-        AudioUtils.currentEpisode.episodeArt || AudioUtils.currentEpisode.cover,
-      ),
-    ];
-    mediaInfo.metadata = metadata;
-    const request = new chrome.cast.media.LoadRequest(mediaInfo);
-    request.currentTime = (AudioUtils.playbackInstance?.seek() as number) || 0;
-    // @ts-expect-error Missing type definiton in upstream
-    // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
-    request.playbackRate = AudioUtils.playbackInstance?.rate() ?? 1;
-    try {
-      await session.loadMedia(request);
-    } catch (err) {
-      console.error('Error loading media', err);
-    }
   }
 
   public static callbacks: IAudioCallbacks = {
