@@ -1,15 +1,9 @@
-import { useEffect, useState } from 'react';
-
 import { Icon } from '../../ui/icons/svg/Icon';
 import AudioUtils from './AudioUtils';
+import { getIsAirplayEnabled, usePlayer } from './usePlayer';
 
 export const Airplay = () => {
-  const [isAirplayEnabled, setIsAirplayEnabled] = useState(AudioUtils.isAirplayEnabled);
-
-  useEffect(() => {
-    AudioUtils.addAirplayAvailabilityListener(setIsAirplayEnabled);
-    return () => AudioUtils.removeAirplayAvailabilityListener();
-  }, []);
+  const isAirplayEnabled = usePlayer(getIsAirplayEnabled);
 
   if (!isAirplayEnabled) return null;
 
