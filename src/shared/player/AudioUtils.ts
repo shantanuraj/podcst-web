@@ -6,19 +6,19 @@ import { Howl } from 'howler/src/howler.core';
 import { IEpisode } from '../../types';
 import { updatePlaybackState } from './mediaUtils';
 
+type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
+type ChromecastStateCallback = (state: cast.framework.CastState) => void;
 interface IAudioCallbacks {
   setPlaybackStarted: () => void;
   stopEpisode: () => void;
   seekUpdate: (seconds: number) => void;
   duration: (seconds: number) => void;
+  setIsAirplayEnabled: AirplayAvailabilityCallback;
 }
 
 interface PlaybackTargetAvailabilityChangedEvent extends Event {
   availability?: 'available' | 'not-available';
 }
-
-type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
-type ChromecastStateCallback = (state: cast.framework.CastState) => void;
 
 interface AirplayAudioElement extends HTMLAudioElement {
   webkitShowPlaybackTargetPicker: () => void;
@@ -34,7 +34,6 @@ export default class AudioUtils {
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
   private static chromecastStateListener: ChromecastStateCallback | null = null;
-  public static isAirplayEnabled: boolean = false;
   public static isChromecastEnabled: boolean = false;
 
   private static getAudioElement(): HTMLAudioElement | null {
@@ -55,11 +54,10 @@ export default class AudioUtils {
   private static playbackTargetAvailabilityChangeListener(
     e: PlaybackTargetAvailabilityChangedEvent,
   ) {
-    AudioUtils.isAirplayEnabled = e.availability === 'available';
-    AudioUtils.airplayAvailabilityListener?.(AudioUtils.isAirplayEnabled);
+    AudioUtils.airplayAvailabilityListener?.(e.availability === 'available');
   }
 
-  public static addAirplayAvailabilityListener(listener: AirplayAvailabilityCallback) {
+  private static addAirplayAvailabilityListener(listener: AirplayAvailabilityCallback) {
     AudioUtils.airplayAvailabilityListener = listener;
     const audioElement = AudioUtils.getAudioElement();
     audioElement?.addEventListener(
@@ -161,6 +159,7 @@ export default class AudioUtils {
     setPlaybackStarted: throwError,
     stopEpisode: throwError,
     duration: throwError,
+    setIsAirplayEnabled: throwError,
   };
 
   public static init(callbacks: IAudioCallbacks) {
@@ -183,12 +182,14 @@ export default class AudioUtils {
           playbackRate: AudioUtils.playbackInstance?.rate() || 1,
         });
         AudioUtils.getAudioElement()?.addEventListener('timeupdate', AudioUtils.seekPositionListener);
+        AudioUtils.addAirplayAvailabilityListener(AudioUtils.callbacks.setIsAirplayEnabled);
       },
       onend() {
         AudioUtils.currentEpisode = null;
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
         AudioUtils.getAudioElement()?.removeEventListener('timeupdate', AudioUtils.seekPositionListener);
+        AudioUtils.removeAirplayAvailabilityListener();
       },
     });
 

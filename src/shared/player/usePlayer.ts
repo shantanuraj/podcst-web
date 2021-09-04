@@ -14,6 +14,9 @@ export interface IPlayerState extends IPlaybackControls {
   queueEpisode: (episode: IEpisodeInfo) => void;
   skipToNextEpisode: () => void;
   skipToPreviousEpisode: () => void;
+
+  isAirplayEnabled: boolean;
+  setIsAirplayEnabled: (isAirplayEnabled: boolean) => void;
 }
 
 export const usePlayer = create<IPlayerState>((set) => ({
@@ -23,6 +26,7 @@ export const usePlayer = create<IPlayerState>((set) => ({
   seekPosition: 0,
   duration: 0,
   state: 'idle',
+  isAirplayEnabled: false,
 
   queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
 
@@ -68,6 +72,10 @@ export const usePlayer = create<IPlayerState>((set) => ({
     set({ duration });
   },
 
+  setIsAirplayEnabled: (isAirplayEnabled) => {
+    set({ isAirplayEnabled });
+  },
+
   skipToNextEpisode: () =>
     set((prevState) => ({
       state: 'buffering',
@@ -111,6 +119,7 @@ usePlayer.subscribe((currentState, previousState) => {
             setPlaybackStarted: () => currentState.setPlayerState('playing'),
             seekUpdate: currentState.setSeekPosition,
             duration: currentState.setDuration,
+            setIsAirplayEnabled: currentState.setIsAirplayEnabled,
           });
           updatePlaybackHandlers(currentState);
         }
@@ -146,3 +155,4 @@ export const getSeekTo = (state: IPlayerState) => state.seekTo;
 export const getSetVolume = (state: IPlayerState) => state.setVolume;
 export const getSetRate = (state: IPlayerState) => state.setRate;
 export const getMute = (state: IPlayerState) => state.mute;
+export const getIsAirplayEnabled = (state: IPlayerState) => state.isAirplayEnabled;
