@@ -9,7 +9,7 @@ import { updatePlaybackState } from './mediaUtils';
 interface IAudioCallbacks {
   setPlaybackStarted: () => void;
   stopEpisode: () => void;
-  seekUpdate?: (seconds: number) => void;
+  seekUpdate: (seconds: number) => void;
   duration?: (seconds: number) => void;
 }
 
@@ -145,7 +145,7 @@ export default class AudioUtils {
     ];
     mediaInfo.metadata = metadata;
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
-    request.currentTime = AudioUtils.playbackInstance?.seek() as number || 0;
+    request.currentTime = (AudioUtils.playbackInstance?.seek() as number) || 0;
     // @ts-expect-error Missing type definiton in upstream
     // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
     request.playbackRate = AudioUtils.playbackInstance?.rate() ?? 1;
@@ -157,6 +157,7 @@ export default class AudioUtils {
   }
 
   public static callbacks: IAudioCallbacks = {
+    seekUpdate: throwError,
     setPlaybackStarted: throwError,
     stopEpisode: throwError,
   };
@@ -180,23 +181,13 @@ export default class AudioUtils {
           position: (AudioUtils.playbackInstance?.seek() as number) || 0,
           playbackRate: AudioUtils.playbackInstance?.rate() || 1,
         });
-      },
-      onplay() {
-        const updateSeek = () =>
-          requestAnimationFrame(() => {
-            const seekPosition = AudioUtils.playbackInstance?.seek() as number;
-            AudioUtils.callbacks.seekUpdate?.(seekPosition);
-
-            if (AudioUtils.playbackInstance?.playing()) {
-              setTimeout(updateSeek, 500);
-            }
-          });
-        updateSeek();
+        AudioUtils.getAudioElement()?.addEventListener('timeupdate', AudioUtils.seekPositionListener);
       },
       onend() {
         AudioUtils.currentEpisode = null;
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
+        AudioUtils.getAudioElement()?.removeEventListener('timeupdate', AudioUtils.seekPositionListener);
       },
     });
 
@@ -262,8 +253,8 @@ export default class AudioUtils {
     AudioUtils.callbacks.duration = callback;
   }
 
-  public static subscribeSeekUpdate(callback?: IAudioCallbacks['seekUpdate']) {
-    AudioUtils.callbacks.seekUpdate = callback;
+  private static seekPositionListener() {
+    AudioUtils.callbacks.seekUpdate(AudioUtils.playbackInstance?.seek() as number);
   }
 
   public static setRate(rate: number) {
