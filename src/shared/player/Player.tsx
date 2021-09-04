@@ -6,7 +6,6 @@ import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
 import { shortcuts } from '../keyboard/shortcuts';
 
 import { Airplay } from './Airplay';
-import AudioUtils from './AudioUtils';
 import { Chromecast } from './Chromecast';
 import { PlaybackRate } from './PlaybackRate';
 import { Seekbar } from './Seekbar';
@@ -15,7 +14,7 @@ import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
 
-const { togglePlayback } = usePlayer.getState();
+const { togglePlayback, seekBackward, seekForward } = usePlayer.getState();
 
 export const Player = () => {
   const currentEpisode = usePlayer(getCurrentEpisode);
@@ -42,11 +41,11 @@ export const Player = () => {
             </a>
           </Link>
           <div className={styles.controls}>
-            <button onClick={AudioUtils.seekBackward}>
+            <button onClick={seekBackward}>
               <Icon icon="seek-back" />
             </button>
             <PlayButton />
-            <button onClick={AudioUtils.seekForward}>
+            <button onClick={seekForward}>
               <Icon icon="seek-forward" />
             </button>
           </div>
@@ -97,7 +96,7 @@ const playerShortcuts: KeyboardShortcuts = [
       togglePlayback();
     },
   ],
-  [shortcuts.seekBack, AudioUtils.seekBackward],
-  [shortcuts.seekAhead, AudioUtils.seekForward],
+  [shortcuts.seekBack, seekBackward],
+  [shortcuts.seekAhead, seekForward],
 ];
 const emptyShortcuts: KeyboardShortcuts = [];

@@ -154,3 +154,16 @@ export interface INavigatorShareProps {
 export interface IShareEnabledNavigator extends Navigator {
   share(info: INavigatorShareProps): Promise<undefined>;
 }
+
+export interface IPlaybackControls {
+  playEpisode: (episode: IEpisodeInfo) => void;
+  resumeEpisode: () => void;
+  togglePlayback: () => void;
+  setPlayerState: (state: 'playing' | 'paused' | 'idle') => void;
+  seekBackward: () => void;
+  seekForward: () => void;
+  seekTo: (seconds: number) => void;
+  setVolume: (volume: number) => void;
+  mute: (muted: boolean) => void;
+  setRate: (rate: number) => void;
+}

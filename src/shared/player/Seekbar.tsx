@@ -5,19 +5,20 @@ import { useKeydown } from '../keyboard/useKeydown';
 import { shortcuts } from '../keyboard/shortcuts';
 
 import AudioUtils from './AudioUtils';
-import { getPlaybackState, usePlayer } from './usePlayer';
+import { getPlaybackState, getSeekTo, usePlayer } from './usePlayer';
 import styles from './Player.module.css';
 
 export const Seekbar: React.FC<{
   currentEpisode: IEpisodeInfo | null;
 }> = ({ currentEpisode }) => {
   const state = usePlayer(getPlaybackState);
+  const seekTo = usePlayer(getSeekTo);
   const seekbarRef = useRef<HTMLDivElement>(null);
   const durationRef = useRef(currentEpisode?.duration || 0);
 
   const seekByFraction = useCallback((seekFraction: number) => {
     const newSeekPosition = Math.floor(seekFraction * durationRef.current);
-    AudioUtils.seekTo(newSeekPosition);
+    seekTo(newSeekPosition);
   }, []);
 
   const seekOnKeydown = useCallback((e: KeyboardEvent) => {
