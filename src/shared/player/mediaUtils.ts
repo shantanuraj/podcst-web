@@ -4,7 +4,6 @@
  * https://developers.google.com/web/updates/2017/02/media-session
  */
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
-import AudioUtils from './AudioUtils';
 import { IPlayerState } from './usePlayer';
 
 export const updatePlaybackMetadata = (
@@ -53,9 +52,9 @@ export const updatePlaybackHandlers = (playerState: IPlayerState) => {
     ['play', playerState.resumeEpisode],
     ['pause', () => playerState.setPlayerState('paused')],
     ['stop', () => playerState.setPlayerState('idle')],
-    ['seekbackward', AudioUtils.seekBackward],
-    ['seekforward', AudioUtils.seekForward],
-    ['seekto', (details: MediaSessionActionDetails) => AudioUtils.seekTo(details.seekTime || 0)],
+    ['seekbackward', playerState.seekBackward],
+    ['seekforward', playerState.seekForward],
+    ['seekto', (details: MediaSessionActionDetails) => playerState.seekTo(details.seekTime || 0)],
     ['previoustrack', playerState.skipToPreviousEpisode],
     ['nexttrack', playerState.skipToNextEpisode],
   ] as const;

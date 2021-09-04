@@ -1,21 +1,17 @@
 import create from 'zustand';
 
-import { IEpisodeInfo, PlayerState } from '../../types';
+import { IEpisodeInfo, IPlaybackControls, PlayerState } from '../../types';
 import AudioUtils from './AudioUtils';
 import { updatePlaybackHandlers, updatePlaybackMetadata } from './mediaUtils';
 
-export interface IPlayerState {
+export interface IPlayerState extends IPlaybackControls {
   audioInitialised: boolean;
   queue: IEpisodeInfo[];
   currentTrackIndex: number;
   state: PlayerState;
   queueEpisode: (episode: IEpisodeInfo) => void;
-  playEpisode: (episode: IEpisodeInfo) => void;
-  resumeEpisode: () => void;
-  togglePlayback: () => void;
   skipToNextEpisode: () => void;
   skipToPreviousEpisode: () => void;
-  setPlayerState: (state: 'playing' | 'paused' | 'idle') => void;
 }
 
 export const usePlayer = create<IPlayerState>((set) => ({
@@ -73,6 +69,19 @@ export const usePlayer = create<IPlayerState>((set) => ({
           ? prevState.queue.length - 1
           : (prevState.currentTrackIndex - 1) / prevState.queue.length,
     })),
+
+  // Effects only
+  seekBackward: AudioUtils.seekBackward,
+
+  seekForward: AudioUtils.seekForward,
+
+  seekTo: AudioUtils.seekTo,
+
+  setVolume: AudioUtils.setVolume,
+
+  setRate: AudioUtils.setRate,
+
+  mute: AudioUtils.mute,
 }));
 
 usePlayer.subscribe((currentState, previousState) => {
@@ -115,3 +124,9 @@ export const getCurrentEpisode = (state: IPlayerState): IEpisodeInfo | undefined
   state.queue[state.currentTrackIndex];
 export const getIsPlayerOpen = (state: IPlayerState) =>
   getCurrentEpisode(state) !== undefined && state.state !== 'idle';
+export const getSeekBackward = (state: IPlayerState) => state.seekBackward;
+export const getSeekForward = (state: IPlayerState) => state.seekForward;
+export const getSeekTo = (state: IPlayerState) => state.seekTo;
+export const getSetVolume = (state: IPlayerState) => state.setVolume;
+export const getSetRate = (state: IPlayerState) => state.setRate;
+export const getMute = (state: IPlayerState) => state.mute;

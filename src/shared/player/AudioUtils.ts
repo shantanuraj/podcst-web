@@ -266,7 +266,7 @@ export default class AudioUtils {
     AudioUtils.callbacks.seekUpdate = callback;
   }
 
-  public static changeRate(rate: number) {
+  public static setRate(rate: number) {
     if (!AudioUtils.playbackId) return;
     AudioUtils.playbackInstance?.rate(rate, AudioUtils.playbackId);
   }
