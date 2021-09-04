@@ -17,10 +17,11 @@ export const Chromecast = () => {
 
   return (
     <button onClick={AudioUtils.playEpisodeOnChromecast}>
-      {chromecastState === cast.framework.CastState.CONNECTED && (
+      {chromecastState === cast.framework.CastState.CONNECTED ? (
         <Icon icon="chromecast-connected" />
+      ) : (
+        <Icon icon="chromecast" />
       )}
-      {chromecastState !== cast.framework.CastState.CONNECTED && <Icon icon="chromecast" />}
     </button>
   );
 };

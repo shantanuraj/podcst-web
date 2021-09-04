@@ -145,6 +145,10 @@ export default class AudioUtils {
     ];
     mediaInfo.metadata = metadata;
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    request.currentTime = AudioUtils.playbackInstance?.seek() as number || 0;
+    // @ts-expect-error Missing type definiton in upstream
+    // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
+    request.playbackRate = AudioUtils.playbackInstance?.rate() ?? 1;
     try {
       await session.loadMedia(request);
     } catch (err) {
