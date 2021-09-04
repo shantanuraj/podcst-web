@@ -1,15 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 
 import { Icon } from '../../ui/icons/svg/Icon';
-import AudioUtils from './AudioUtils';
+import { getChromecastState, getIsChromecastEnabled, getPlayOnChromecast, getSetChromecastState, usePlayer } from './usePlayer';
 
 export const Chromecast = () => {
-  const [isChromecastEnabled] = useState(AudioUtils.isChromecastEnabled);
-  const [chromecastState, setChromecastState] = useState(AudioUtils.getChromecastState);
+  const isChromecastEnabled = usePlayer(getIsChromecastEnabled);
+  const chromecastState = usePlayer(getChromecastState);
+  const setChromecastState = usePlayer(getSetChromecastState);
+  const playOnChromecast = usePlayer(getPlayOnChromecast);
 
   useEffect(() => {
-    AudioUtils.addChromecastStateListener(setChromecastState);
-    return () => AudioUtils.removeChromecastStateListener();
+    if (!('cast' in window)) return;
+    const chromecastStateListener = (event: cast.framework.CastStateEventData) => {
+      setChromecastState(event.castState);
+    }
+
+    const context = cast.framework.CastContext.getInstance();
+    context.addEventListener(
+      cast.framework.CastContextEventType.CAST_STATE_CHANGED,
+      chromecastStateListener,
+    );
+
+    return () => {
+      context.removeEventListener(
+        cast.framework.CastContextEventType.CAST_STATE_CHANGED,
+        chromecastStateListener,
+      );
+    };
   }, []);
 
   if (
@@ -21,7 +38,7 @@ export const Chromecast = () => {
     return null;
 
   return (
-    <button onClick={AudioUtils.playEpisodeOnChromecast}>
+    <button onClick={playOnChromecast}>
       {chromecastState === cast.framework.CastState.CONNECTED ? (
         <Icon icon="chromecast-connected" />
       ) : (

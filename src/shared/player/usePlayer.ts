@@ -17,9 +17,17 @@ export interface IPlayerState extends IPlaybackControls {
 
   isAirplayEnabled: boolean;
   setIsAirplayEnabled: (isAirplayEnabled: boolean) => void;
+
+  isChromecastEnabled: boolean;
+  setIsChromecastEnabled: (isChromecastEnabled: boolean) => void;
+
+  chromecastState: cast.framework.CastState | undefined;
+  setChromecastState: (chromecastState: cast.framework.CastState | undefined) => void;
+
+  playOnChromecast: () => void;
 }
 
-export const usePlayer = create<IPlayerState>((set) => ({
+export const usePlayer = create<IPlayerState>((set, get) => ({
   audioInitialised: false,
   queue: [] as IEpisodeInfo[],
   currentTrackIndex: 0,
@@ -27,6 +35,8 @@ export const usePlayer = create<IPlayerState>((set) => ({
   duration: 0,
   state: 'idle',
   isAirplayEnabled: false,
+  isChromecastEnabled: false,
+  chromecastState: undefined,
 
   queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
 
@@ -74,6 +84,59 @@ export const usePlayer = create<IPlayerState>((set) => ({
 
   setIsAirplayEnabled: (isAirplayEnabled) => {
     set({ isAirplayEnabled });
+  },
+
+  setIsChromecastEnabled: (isChromecastEnabled) => {
+    set({ isChromecastEnabled });
+  },
+
+  setChromecastState: (chromecastState) => {
+    set({ chromecastState });
+  },
+
+  playOnChromecast: async () => {
+    const currentEpisode = getCurrentEpisode(get());
+    if (!('cast' in window) || !currentEpisode) return;
+
+    const context = cast.framework.CastContext.getInstance();
+    let session = context.getCurrentSession();
+    if (!session) {
+      try {
+        await context.requestSession();
+        session = context.getCurrentSession();
+      } catch (err) {
+        console.error('Error requesting session', err);
+      }
+    }
+    if (!session) return;
+
+    const mediaInfo = new chrome.cast.media.MediaInfo(
+      currentEpisode.file.url,
+      currentEpisode.file.type,
+    );
+    const metadata = new chrome.cast.media.MusicTrackMediaMetadata();
+    metadata.artist = currentEpisode.author || '';
+    metadata.songName = currentEpisode.title;
+    metadata.title = currentEpisode.title;
+    if (currentEpisode.published) {
+      metadata.releaseDate = new Date(currentEpisode.published).toISOString();
+    }
+    metadata.images = [
+      new chrome.cast.Image(
+        currentEpisode.episodeArt || currentEpisode.cover,
+      ),
+    ];
+    mediaInfo.metadata = metadata;
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    request.currentTime = getSeekPosition(get()) || 0;
+    // @ts-expect-error Missing type definiton in upstream
+    // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
+    request.playbackRate = 1;
+    try {
+      await session.loadMedia(request);
+    } catch (err) {
+      console.error('Error loading media', err);
+    }
   },
 
   skipToNextEpisode: () =>
@@ -156,3 +219,8 @@ export const getSetVolume = (state: IPlayerState) => state.setVolume;
 export const getSetRate = (state: IPlayerState) => state.setRate;
 export const getMute = (state: IPlayerState) => state.mute;
 export const getIsAirplayEnabled = (state: IPlayerState) => state.isAirplayEnabled;
+export const getIsChromecastEnabled = (state: IPlayerState) => state.isChromecastEnabled;
+export const getSetIsChromecastEnabled = (state: IPlayerState) => state.setIsChromecastEnabled;
+export const getChromecastState = (state: IPlayerState) => state.chromecastState;
+export const getSetChromecastState = (state: IPlayerState) => state.setChromecastState;
+export const getPlayOnChromecast = (state: IPlayerState) => state.playOnChromecast;
