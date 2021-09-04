@@ -18,6 +18,10 @@
   transform: translateY(0);
 }
 
+.container button[disabled] {
+  filter: opacity(0.6);
+}
+
 .player {
   background-color: var(--color-background);
   height: 100%;

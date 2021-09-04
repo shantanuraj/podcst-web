@@ -253,3 +253,4 @@ export const getSetChromecastState = (state: IPlayerState) => state.setChromecas
 export const getPlayOnChromecast = (state: IPlayerState) => state.playOnChromecast;
 export const getRemotePlayer = (state: IPlayerState) => state.remotePlayer;
 export const getRemotePlayerController = (state: IPlayerState) => state.remotePlayerController;
+export const getIsChromecastConnected = (state: IPlayerState) => isChromecastConnected(state.chromecastState);
