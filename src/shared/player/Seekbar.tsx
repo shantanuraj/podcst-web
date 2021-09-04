@@ -30,15 +30,25 @@ export const Seekbar: React.FC<{
 
   useEffect(() => {
     AudioUtils.subscribeDuration((duration) => (durationRef.current = duration));
-    AudioUtils.subscribeSeekUpdate((seekPosition) => {
-      if (!seekbarRef.current) return;
-      seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
-    });
     return () => {
       AudioUtils.subscribeDuration();
-      AudioUtils.subscribeSeekUpdate();
     };
   }, []);
+
+  useEffect(
+    () =>
+      usePlayer.subscribe(
+        (seekPosition) => {
+          if (!seekbarRef.current) return;
+          seekbarRef.current.style.width = getSeekWidth(
+            seekPosition as number,
+            durationRef.current,
+          );
+        },
+        (playerState) => playerState.seekPosition,
+      ),
+    [],
+  );
 
   useEffect(() => {
     if (state === 'buffering' && seekbarRef.current) {

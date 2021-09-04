@@ -18,6 +18,7 @@ export const usePlayer = create<IPlayerState>((set) => ({
   audioInitialised: false,
   queue: [] as IEpisodeInfo[],
   currentTrackIndex: 0,
+  seekPosition: 0,
   state: 'idle',
 
   queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
@@ -45,6 +46,7 @@ export const usePlayer = create<IPlayerState>((set) => ({
       state,
       queue:
         state === 'idle' ? prevState.queue.splice(prevState.currentTrackIndex, 1) : prevState.queue,
+      seekPosition: state === 'idle' ? 0 : prevState.seekPosition,
     })),
 
   resumeEpisode: () => {
@@ -53,6 +55,10 @@ export const usePlayer = create<IPlayerState>((set) => ({
 
   togglePlayback: () => {
     set((prevState) => ({ state: prevState.state === 'playing' ? 'paused' : 'playing' }));
+  },
+
+  setSeekPosition: (seekPosition: number) => {
+    set({ seekPosition });
   },
 
   skipToNextEpisode: () =>
@@ -96,6 +102,7 @@ usePlayer.subscribe((currentState, previousState) => {
           AudioUtils.init({
             stopEpisode: () => currentState.setPlayerState('idle'),
             setPlaybackStarted: () => currentState.setPlayerState('playing'),
+            seekUpdate: currentState.setSeekPosition,
           });
           updatePlaybackHandlers(currentState);
         }
@@ -124,6 +131,7 @@ export const getCurrentEpisode = (state: IPlayerState): IEpisodeInfo | undefined
   state.queue[state.currentTrackIndex];
 export const getIsPlayerOpen = (state: IPlayerState) =>
   getCurrentEpisode(state) !== undefined && state.state !== 'idle';
+export const getSeekPosition = (state: IPlayerState) => state.seekPosition;
 export const getSeekBackward = (state: IPlayerState) => state.seekBackward;
 export const getSeekForward = (state: IPlayerState) => state.seekForward;
 export const getSeekTo = (state: IPlayerState) => state.seekTo;

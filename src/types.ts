@@ -156,6 +156,8 @@ export interface IShareEnabledNavigator extends Navigator {
 }
 
 export interface IPlaybackControls {
+  seekPosition: number;
+  setSeekPosition: (position: number) => void;
   playEpisode: (episode: IEpisodeInfo) => void;
   resumeEpisode: () => void;
   togglePlayback: () => void;
