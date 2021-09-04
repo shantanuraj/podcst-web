@@ -10,7 +10,7 @@ interface IAudioCallbacks {
   setPlaybackStarted: () => void;
   stopEpisode: () => void;
   seekUpdate: (seconds: number) => void;
-  duration?: (seconds: number) => void;
+  duration: (seconds: number) => void;
 }
 
 interface PlaybackTargetAvailabilityChangedEvent extends Event {
@@ -160,6 +160,7 @@ export default class AudioUtils {
     seekUpdate: throwError,
     setPlaybackStarted: throwError,
     stopEpisode: throwError,
+    duration: throwError,
   };
 
   public static init(callbacks: IAudioCallbacks) {
@@ -175,7 +176,7 @@ export default class AudioUtils {
       html5: true,
       onload() {
         AudioUtils.callbacks.setPlaybackStarted();
-        AudioUtils.callbacks.duration?.(AudioUtils.playbackInstance?.duration() || 0);
+        AudioUtils.callbacks.duration(AudioUtils.playbackInstance?.duration() || 0);
         updatePlaybackState({
           duration: AudioUtils.playbackInstance?.duration() || 0,
           position: (AudioUtils.playbackInstance?.seek() as number) || 0,
@@ -247,10 +248,6 @@ export default class AudioUtils {
    */
   public static setVolume(volume: number) {
     AudioUtils.playbackInstance?.volume(volume / 100, AudioUtils.playbackId || 0);
-  }
-
-  public static subscribeDuration(callback?: IAudioCallbacks['duration']) {
-    AudioUtils.callbacks.duration = callback;
   }
 
   private static seekPositionListener() {

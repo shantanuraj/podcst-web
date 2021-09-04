@@ -8,7 +8,9 @@ export interface IPlayerState extends IPlaybackControls {
   audioInitialised: boolean;
   queue: IEpisodeInfo[];
   currentTrackIndex: number;
+  duration: number;
   state: PlayerState;
+  setDuration: (duration: number) => void;
   queueEpisode: (episode: IEpisodeInfo) => void;
   skipToNextEpisode: () => void;
   skipToPreviousEpisode: () => void;
@@ -19,6 +21,7 @@ export const usePlayer = create<IPlayerState>((set) => ({
   queue: [] as IEpisodeInfo[],
   currentTrackIndex: 0,
   seekPosition: 0,
+  duration: 0,
   state: 'idle',
 
   queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
@@ -57,8 +60,12 @@ export const usePlayer = create<IPlayerState>((set) => ({
     set((prevState) => ({ state: prevState.state === 'playing' ? 'paused' : 'playing' }));
   },
 
-  setSeekPosition: (seekPosition: number) => {
+  setSeekPosition: (seekPosition) => {
     set({ seekPosition });
+  },
+
+  setDuration: (duration) => {
+    set({ duration });
   },
 
   skipToNextEpisode: () =>
@@ -103,6 +110,7 @@ usePlayer.subscribe((currentState, previousState) => {
             stopEpisode: () => currentState.setPlayerState('idle'),
             setPlaybackStarted: () => currentState.setPlayerState('playing'),
             seekUpdate: currentState.setSeekPosition,
+            duration: currentState.setDuration,
           });
           updatePlaybackHandlers(currentState);
         }

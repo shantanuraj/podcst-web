@@ -4,7 +4,6 @@ import { IEpisodeInfo } from '../../types';
 import { useKeydown } from '../keyboard/useKeydown';
 import { shortcuts } from '../keyboard/shortcuts';
 
-import AudioUtils from './AudioUtils';
 import { getPlaybackState, getSeekTo, usePlayer } from './usePlayer';
 import styles from './Player.module.css';
 
@@ -28,22 +27,28 @@ export const Seekbar: React.FC<{
   }, []);
   useKeydown(shortcuts.seekTo, seekOnKeydown);
 
-  useEffect(() => {
-    AudioUtils.subscribeDuration((duration) => (durationRef.current = duration));
-    return () => {
-      AudioUtils.subscribeDuration();
-    };
-  }, []);
+  useEffect(
+    () =>
+      usePlayer.subscribe(
+        (duration) => {
+          durationRef.current = duration as number;
+        },
+        (playerState) => playerState.duration,
+      ),
+    [],
+  );
 
   useEffect(
     () =>
       usePlayer.subscribe(
         (seekPosition) => {
-          if (!seekbarRef.current) return;
-          seekbarRef.current.style.width = getSeekWidth(
-            seekPosition as number,
-            durationRef.current,
-          );
+          requestAnimationFrame(() => {
+            if (!seekbarRef.current) return;
+            seekbarRef.current.style.width = getSeekWidth(
+              seekPosition as number,
+              durationRef.current,
+            );
+          });
         },
         (playerState) => playerState.seekPosition,
       ),
