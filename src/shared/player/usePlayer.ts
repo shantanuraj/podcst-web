@@ -29,6 +29,8 @@ export interface IPlayerState extends IPlaybackControls {
 
   remotePlayer: cast.framework.RemotePlayer | undefined;
   remotePlayerController: cast.framework.RemotePlayerController | undefined;
+
+  disconnectChromecast: () => void;
 }
 
 export const usePlayer = create<IPlayerState>((set, get) => ({
@@ -69,7 +71,6 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
       state,
       queue:
         state === 'idle' ? prevState.queue.splice(prevState.currentTrackIndex, 1) : prevState.queue,
-      seekPosition: state === 'idle' ? 0 : prevState.seekPosition,
     })),
 
   resumeEpisode: () => {
@@ -148,6 +149,17 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     } catch (err) {
       console.error('Error loading media', err);
     }
+  },
+
+  disconnectChromecast: () => {
+    set({
+      remotePlayer: undefined,
+      remotePlayerController: undefined,
+      chromecastState: undefined,
+      state: 'paused',
+    });
+    // Sync local audio seek to Chromecast
+    AudioUtils.seekTo(get().seekPosition);
   },
 
   skipToNextEpisode: () =>
@@ -315,3 +327,4 @@ export const getRemotePlayer = (state: IPlayerState) => state.remotePlayer;
 export const getRemotePlayerController = (state: IPlayerState) => state.remotePlayerController;
 export const getIsChromecastConnected = (state: IPlayerState) =>
   isChromecastConnected(state.chromecastState);
+export const getDisconnectChromecast = (state: IPlayerState) => state.disconnectChromecast;
