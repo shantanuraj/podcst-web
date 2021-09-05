@@ -106,14 +106,20 @@ export default class AudioUtils {
           position: (AudioUtils.playbackInstance?.seek() as number) || 0,
           playbackRate: AudioUtils.playbackInstance?.rate() || 1,
         });
-        AudioUtils.getAudioElement()?.addEventListener('timeupdate', AudioUtils.seekPositionListener);
+        AudioUtils.getAudioElement()?.addEventListener(
+          'timeupdate',
+          AudioUtils.seekPositionListener,
+        );
         AudioUtils.addAirplayAvailabilityListener(AudioUtils.callbacks.setIsAirplayEnabled);
       },
       onend() {
         AudioUtils.currentEpisode = null;
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
-        AudioUtils.getAudioElement()?.removeEventListener('timeupdate', AudioUtils.seekPositionListener);
+        AudioUtils.getAudioElement()?.removeEventListener(
+          'timeupdate',
+          AudioUtils.seekPositionListener,
+        );
         AudioUtils.removeAirplayAvailabilityListener();
       },
     });
@@ -145,15 +151,14 @@ export default class AudioUtils {
     AudioUtils.playbackInstance?.seek(seconds);
   }
 
-  public static seekBy(seconds: number) {
+  private static seekBy(seconds: number) {
     const seekPosition = AudioUtils.playbackInstance?.seek() as number;
     const duration = AudioUtils.playbackInstance?.duration() as number;
-    const seekTo = seekPosition + seconds;
-    AudioUtils.seekTo(normalizeSeek(seekTo, duration));
+    AudioUtils.seekTo(seekUtils.seekBy(seekPosition, seconds, duration));
   }
 
   public static seekBackward() {
-    AudioUtils.seekBy(SEEK_DELTA * -1);
+    AudioUtils.seekBy(-SEEK_DELTA);
   }
 
   public static seekForward() {
@@ -202,4 +207,16 @@ const normalizeSeek = (seekTo: number, duration: number) => {
 /**
  * Default Seek jump delta
  */
-const SEEK_DELTA = 10;
+export const SEEK_DELTA = 10;
+
+export const seekUtils = {
+  seekBy: (currentPosition: number, seconds: number, duration: number) => {
+    return normalizeSeek(currentPosition + seconds, duration);
+  },
+  seekForward: (currentPosition: number, duration: number) => {
+    return seekUtils.seekBy(currentPosition, SEEK_DELTA, duration);
+  },
+  seekBackward: (currentPosition: number, duration: number) => {
+    return seekUtils.seekBy(currentPosition, -SEEK_DELTA, duration);
+  },
+};
