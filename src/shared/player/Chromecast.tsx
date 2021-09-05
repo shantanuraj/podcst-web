@@ -89,13 +89,18 @@ export const Chromecast = () => {
   )
     return null;
 
-  return (
+  return chromecastState === cast.framework.CastState.CONNECTED ? (
+    <button onClick={showSelector}>
+      <Icon icon="chromecast-connected" />
+    </button>
+  ) : (
     <button onClick={playOnChromecast}>
-      {chromecastState === cast.framework.CastState.CONNECTED ? (
-        <Icon icon="chromecast-connected" />
-      ) : (
-        <Icon icon="chromecast" />
-      )}
+      <Icon icon="chromecast" />
     </button>
   );
+};
+
+const showSelector = () => {
+  const context = cast.framework.CastContext.getInstance();
+  context.requestSession();
 };
