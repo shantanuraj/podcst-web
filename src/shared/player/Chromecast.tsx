@@ -4,6 +4,7 @@ import { Icon } from '../../ui/icons/svg/Icon';
 import { getAdaptedPlaybackState } from './castUtils';
 import {
   getChromecastState,
+  getDisconnectChromecast,
   getIsChromecastEnabled,
   getPlayOnChromecast,
   getRemotePlayerController,
@@ -19,6 +20,7 @@ export const Chromecast = () => {
   const chromecastState = usePlayer(getChromecastState);
   const setChromecastState = usePlayer(getSetChromecastState);
   const playOnChromecast = usePlayer(getPlayOnChromecast);
+  const disconnectChromecast = usePlayer(getDisconnectChromecast);
 
   const controller = usePlayer(getRemotePlayerController);
   const setSeekPosition = usePlayer(getSetSeekPosition);
@@ -50,7 +52,8 @@ export const Chromecast = () => {
     const chromecastStateSync = (event: cast.framework.RemotePlayerChangedEvent) => {
       switch (event.field) {
         case 'currentTime':
-          return setSeekPosition(event.value);
+          if (event.value) setSeekPosition(event.value);
+          return;
         case 'mediaInfo': {
           const mediaInfo = event.value as chrome.cast.media.MediaInfo;
           if (!mediaInfo) return;
@@ -60,7 +63,8 @@ export const Chromecast = () => {
         case 'playerState': {
           const remoteState = event.value as chrome.cast.media.PlayerState;
           const playerState = getAdaptedPlaybackState(remoteState);
-          if (playerState !== 'buffering') setPlayerState(playerState);
+          if (playerState === 'idle') disconnectChromecast();
+          else if (playerState !== 'buffering') setPlayerState(playerState);
           return;
         }
       }
