@@ -1,0 +1,8 @@
+.background {
+  background: center no-repeat url(/receiver/cast-background.jpg);
+  background-size: cover;
+}
+
+.logo {
+  background-image: url(/icons/launcher-512.png);
+}
