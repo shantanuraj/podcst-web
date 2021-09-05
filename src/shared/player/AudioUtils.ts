@@ -147,20 +147,6 @@ export default class AudioUtils {
     AudioUtils.playbackInstance?.seek(seconds);
   }
 
-  private static seekBy(seconds: number) {
-    const seekPosition = AudioUtils.playbackInstance?.seek() as number;
-    const duration = AudioUtils.playbackInstance?.duration() as number;
-    AudioUtils.seekTo(seekUtils.seekBy(seekPosition, seconds, duration));
-  }
-
-  public static seekBackward() {
-    AudioUtils.seekBy(-SEEK_DELTA);
-  }
-
-  public static seekForward() {
-    AudioUtils.seekBy(SEEK_DELTA);
-  }
-
   public static mute(muted: boolean) {
     AudioUtils.playbackInstance?.mute(muted, AudioUtils.playbackId);
   }
@@ -215,4 +201,6 @@ export const seekUtils = {
   seekBackward: (currentPosition: number, duration: number) => {
     return seekUtils.seekBy(currentPosition, -SEEK_DELTA, duration);
   },
+  onSeekSuccess: () => {}, // noop
+  onSeekError: (error: chrome.cast.Error) => console.error('Error seeking', error),
 };
