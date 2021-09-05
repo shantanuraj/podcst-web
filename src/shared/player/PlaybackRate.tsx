@@ -7,7 +7,7 @@ import styles from './Player.module.css';
 
 export const PlaybackRate = () => {
   const [rateIndex, setRateIndex] = useState(defaultRate);
-  const setRate = usePlayer(getSetRate)
+  const setRate = usePlayer(getSetRate);
   const decreaseRate = useCallback(() => {
     setRateIndex((rateIndex) => Math.max(0, rateIndex - 1));
   }, []);

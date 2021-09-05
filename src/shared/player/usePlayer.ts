@@ -228,15 +228,14 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
      * {@link https://github.com/jellyfin-archive/cordova-plugin-chromecast/issues/64}
      * {@link https://developers.google.com/cast/docs/reference/web_receiver/cast.framework.messages.SetPlaybackRateRequestData}
      */
-    session?.sendMessage(
-      'urn:x-cast:com.google.cast.media',
-      {
+    session
+      ?.sendMessage('urn:x-cast:com.google.cast.media', {
         type: 'SET_PLAYBACK_RATE',
         playbackRate: rate,
         requestId: Date.now(),
         mediaSessionId: mediaSession?.mediaSessionId,
-      }
-    ).catch(error => console.error('Error setting rate', error));
+      })
+      .catch((error) => console.error('Error setting rate', error));
   },
 }));
 
