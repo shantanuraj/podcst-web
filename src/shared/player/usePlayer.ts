@@ -39,6 +39,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
   currentTrackIndex: 0,
   seekPosition: 0,
   duration: 0,
+  rate: 1,
   state: 'idle',
   isAirplayEnabled: false,
   isChromecastEnabled: false,
@@ -135,7 +136,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     request.currentTime = getSeekPosition(get()) || 0;
     // @ts-expect-error Missing type definiton in upstream
     // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
-    request.playbackRate = 1;
+    request.playbackRate = getRate(get());
     try {
       await session.loadMedia(request);
       const remotePlayer = new cast.framework.RemotePlayer();
@@ -231,7 +232,9 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
   setRate: (rate) => {
     const { chromecastState } = get();
     if (!isChromecastConnected(chromecastState)) {
-      return AudioUtils.setRate(rate);
+      AudioUtils.setRate(rate);
+      set({ rate })
+      return;
     }
 
     const context = cast.framework.CastContext.getInstance();
@@ -250,6 +253,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
         requestId: Date.now(),
         mediaSessionId: mediaSession?.mediaSessionId,
       })
+      .then(() => set({ rate }))
       .catch((error) => console.error('Error setting rate', error));
   },
 }));
@@ -324,6 +328,7 @@ export const getSeekBackward = (state: IPlayerState) => state.seekBackward;
 export const getSeekForward = (state: IPlayerState) => state.seekForward;
 export const getSeekTo = (state: IPlayerState) => state.seekTo;
 export const getSetVolume = (state: IPlayerState) => state.setVolume;
+export const getRate = (state: IPlayerState) => state.rate;
 export const getSetRate = (state: IPlayerState) => state.setRate;
 export const getSetDuration = (state: IPlayerState) => state.setDuration;
 export const getMute = (state: IPlayerState) => state.mute;

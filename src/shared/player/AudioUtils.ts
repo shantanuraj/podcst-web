@@ -139,6 +139,8 @@ export default class AudioUtils {
   public static stop() {
     AudioUtils.playbackInstance?.stop();
     AudioUtils.playbackInstance?.unload();
+    AudioUtils.playbackInstance = null;
+    AudioUtils.playbackId = undefined;
   }
 
   public static skipTo(episode: IEpisode) {
