@@ -7,7 +7,6 @@ import {
   getIsChromecastEnabled,
   getPlayOnChromecast,
   getRemotePlayerController,
-  getSetChromecastState,
   getSetDuration,
   getSetPlayerState,
   getSetSeekPosition,
@@ -18,7 +17,6 @@ import {
 export const Chromecast = () => {
   const isChromecastEnabled = usePlayer(getIsChromecastEnabled);
   const chromecastState = usePlayer(getChromecastState);
-  const setChromecastState = usePlayer(getSetChromecastState);
   const playOnChromecast = usePlayer(getPlayOnChromecast);
   const syncSeekAndPause = usePlayer(getSyncSeekAndPause);
 
@@ -28,28 +26,8 @@ export const Chromecast = () => {
   const setPlayerState = usePlayer(getSetPlayerState);
 
   useEffect(() => {
-    if (!('cast' in window)) return;
-    const chromecastStateListener = (event: cast.framework.CastStateEventData) => {
-      setChromecastState(event.castState);
-    };
-
-    const context = cast.framework.CastContext.getInstance();
-    context.addEventListener(
-      cast.framework.CastContextEventType.CAST_STATE_CHANGED,
-      chromecastStateListener,
-    );
-
-    return () => {
-      context.removeEventListener(
-        cast.framework.CastContextEventType.CAST_STATE_CHANGED,
-        chromecastStateListener,
-      );
-    };
-  }, []);
-
-  useEffect(() => {
     if (!controller) return;
-    const chromecastStateSync = (event: cast.framework.RemotePlayerChangedEvent) => {
+    const chromecastPlaybackStateSync = (event: cast.framework.RemotePlayerChangedEvent) => {
       switch (event.field) {
         case 'currentTime':
           if (event.value) setSeekPosition(event.value);
@@ -71,12 +49,12 @@ export const Chromecast = () => {
     };
     controller.addEventListener(
       cast.framework.RemotePlayerEventType.ANY_CHANGE,
-      chromecastStateSync,
+      chromecastPlaybackStateSync,
     );
     return () => {
       controller.removeEventListener(
         cast.framework.RemotePlayerEventType.ANY_CHANGE,
-        chromecastStateSync,
+        chromecastPlaybackStateSync,
       );
     };
   }, [controller]);
