@@ -125,7 +125,10 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     );
     const metadata = new chrome.cast.media.GenericMediaMetadata();
     metadata.title = currentEpisode.title;
-    metadata.subtitle = currentEpisode.author || '';
+    metadata.subtitle =
+      currentEpisode.podcastTitle && currentEpisode.author
+        ? `${currentEpisode.podcastTitle} – ${currentEpisode.author}`
+        : currentEpisode.podcastTitle || currentEpisode.author || '';
     if (currentEpisode.published) {
       metadata.releaseDate = new Date(currentEpisode.published).toISOString();
     }
@@ -232,7 +235,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     const { chromecastState } = get();
     if (!isChromecastConnected(chromecastState)) {
       AudioUtils.setRate(rate);
-      set({ rate })
+      set({ rate });
       return;
     }
 
@@ -311,7 +314,7 @@ usePlayer.subscribe((currentState, previousState) => {
 
   const applyMetadatEffect = currentEpisode !== previousEpisode;
   if (applyMetadatEffect) {
-    updatePlaybackMetadata(currentEpisode, null);
+    updatePlaybackMetadata(currentEpisode, currentEpisode.podcastTitle);
   }
 });
 

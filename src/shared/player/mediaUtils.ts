@@ -8,7 +8,7 @@ import { IPlayerState } from './usePlayer';
 
 export const updatePlaybackMetadata = (
   episode: IEpisodeInfo,
-  info: IPodcastEpisodesInfo | null,
+  podcastTitle?: string,
 ) => {
   if (
     typeof window === 'undefined' ||
@@ -21,11 +21,11 @@ export const updatePlaybackMetadata = (
 
   const { title, author, episodeArt, cover } = episode;
 
-  const artwork = episodeArt || cover || ((info && info.cover) as string);
+  const artwork = episodeArt || cover;
 
   mediaSession.metadata = new window.MediaMetadata({
-    album: info?.title || title,
-    artist: author || (info?.author as string),
+    album: podcastTitle || title,
+    artist: author || podcastTitle,
     artwork: [
       { src: artwork, sizes: '96x96', type: 'image/png' },
       { src: artwork, sizes: '128x128', type: 'image/png' },
