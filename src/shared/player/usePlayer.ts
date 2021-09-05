@@ -123,10 +123,9 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
       currentEpisode.file.url,
       currentEpisode.file.type,
     );
-    const metadata = new chrome.cast.media.MusicTrackMediaMetadata();
-    metadata.artist = currentEpisode.author || '';
-    metadata.songName = currentEpisode.title;
+    const metadata = new chrome.cast.media.GenericMediaMetadata();
     metadata.title = currentEpisode.title;
+    metadata.subtitle = currentEpisode.author || '';
     if (currentEpisode.published) {
       metadata.releaseDate = new Date(currentEpisode.published).toISOString();
     }
