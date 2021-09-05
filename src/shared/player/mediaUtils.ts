@@ -25,7 +25,7 @@ export const updatePlaybackMetadata = (
 
   mediaSession.metadata = new window.MediaMetadata({
     album: info?.title || title,
-    artist: author || (info?.author) as string,
+    artist: author || (info?.author as string),
     artwork: [
       { src: artwork, sizes: '96x96', type: 'image/png' },
       { src: artwork, sizes: '128x128', type: 'image/png' },

@@ -49,7 +49,8 @@ export const Chromecast = () => {
     if (!controller) return;
     const chromecastStateSync = (event: cast.framework.RemotePlayerChangedEvent) => {
       switch (event.field) {
-        case 'currentTime': return setSeekPosition(event.value);
+        case 'currentTime':
+          return setSeekPosition(event.value);
         case 'mediaInfo': {
           const mediaInfo = event.value as chrome.cast.media.MediaInfo;
           if (!mediaInfo) return;
@@ -64,7 +65,10 @@ export const Chromecast = () => {
         }
       }
     };
-    controller.addEventListener(cast.framework.RemotePlayerEventType.ANY_CHANGE, chromecastStateSync);
+    controller.addEventListener(
+      cast.framework.RemotePlayerEventType.ANY_CHANGE,
+      chromecastStateSync,
+    );
     return () => {
       controller.removeEventListener(
         cast.framework.RemotePlayerEventType.ANY_CHANGE,
