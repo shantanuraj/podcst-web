@@ -167,5 +167,6 @@ export interface IPlaybackControls {
   seekTo: (seconds: number) => void;
   setVolume: (volume: number) => void;
   mute: (muted: boolean) => void;
+  rate: number;
   setRate: (rate: number) => void;
 }
