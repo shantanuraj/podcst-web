@@ -72,6 +72,7 @@ export interface IEpisode {
  */
 export interface IEpisodeInfo extends IEpisode {
   feed: string;
+  podcastTitle?: string;
 }
 
 /**
