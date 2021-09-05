@@ -188,18 +188,56 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
 
     const context = cast.framework.CastContext.getInstance();
     const session = context.getCurrentSession();
-    session?.getMediaSession()?.seek(
-      seekRequest,
-      seekUtils.onSeekSuccess,
-      seekUtils.onSeekError,
-    );
+    session?.getMediaSession()?.seek(seekRequest, seekUtils.onSeekSuccess, seekUtils.onSeekError);
   },
 
-  setVolume: AudioUtils.setVolume,
+  setVolume: (volume) => {
+    const { chromecastState } = get();
+    if (!isChromecastConnected(chromecastState)) {
+      return AudioUtils.setVolume(volume);
+    }
 
-  setRate: AudioUtils.setRate,
+    const context = cast.framework.CastContext.getInstance();
+    const session = context.getCurrentSession();
+    session?.setVolume(volume);
+  },
 
-  mute: AudioUtils.mute,
+  mute: (muted) => {
+    const { chromecastState } = get();
+    if (!isChromecastConnected(chromecastState)) {
+      return AudioUtils.mute(muted);
+    }
+
+    const context = cast.framework.CastContext.getInstance();
+    const session = context.getCurrentSession();
+    session?.setMute(muted);
+  },
+
+  setRate: (rate) => {
+    const { chromecastState } = get();
+    if (!isChromecastConnected(chromecastState)) {
+      return AudioUtils.setRate(rate);
+    }
+
+    const context = cast.framework.CastContext.getInstance();
+    const session = context.getCurrentSession();
+    const mediaSession = session?.getMediaSession();
+
+    /**
+     * Source
+     * {@link https://github.com/jellyfin-archive/cordova-plugin-chromecast/issues/64}
+     * {@link https://developers.google.com/cast/docs/reference/web_receiver/cast.framework.messages.SetPlaybackRateRequestData}
+     */
+    session?.sendMessage(
+      'urn:x-cast:com.google.cast.media',
+      {
+        type: 'SET_PLAYBACK_RATE',
+        playbackRate: rate,
+        requestId: Date.now(),
+        mediaSessionId: mediaSession?.mediaSessionId,
+      }
+    ).catch(error => console.error('Error setting rate', error));
+  },
 }));
 
 usePlayer.subscribe((currentState, previousState) => {
