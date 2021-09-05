@@ -30,7 +30,6 @@ const throwError = () => {
 
 export default class AudioUtils {
   private static playbackInstance: Howl | null;
-  private static currentEpisode: IEpisode | null = null;
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
 
@@ -94,7 +93,6 @@ export default class AudioUtils {
   public static play(episode: IEpisode) {
     AudioUtils.stop();
     AudioUtils.playbackId = undefined;
-    AudioUtils.currentEpisode = episode;
     AudioUtils.playbackInstance = new Howl({
       src: [episode.file.url],
       html5: true,
@@ -113,7 +111,6 @@ export default class AudioUtils {
         AudioUtils.addAirplayAvailabilityListener(AudioUtils.callbacks.setIsAirplayEnabled);
       },
       onend() {
-        AudioUtils.currentEpisode = null;
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
         AudioUtils.getAudioElement()?.removeEventListener(
@@ -137,7 +134,6 @@ export default class AudioUtils {
   }
 
   public static stop() {
-    AudioUtils.currentEpisode = null;
     AudioUtils.playbackInstance?.stop();
     AudioUtils.playbackInstance?.unload();
   }
