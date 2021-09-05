@@ -29,7 +29,11 @@ const patchEpisodesResponse =
   (feed: string) =>
   (res: IEpisodeListing | null): IPodcastEpisodesInfo | null => {
     if (res) {
-      const episodes: IEpisodeInfo[] = res.episodes.map((episode) => ({ ...episode, feed }));
+      const episodes: IEpisodeInfo[] = res.episodes.map((episode) => ({
+        ...episode,
+        feed,
+        podcastTitle: res.title,
+      }));
       return { ...res, episodes, feed };
     } else {
       return null;
