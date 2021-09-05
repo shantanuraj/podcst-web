@@ -30,7 +30,7 @@ export interface IPlayerState extends IPlaybackControls {
   remotePlayer: cast.framework.RemotePlayer | undefined;
   remotePlayerController: cast.framework.RemotePlayerController | undefined;
 
-  disconnectChromecast: () => void;
+  syncSeekAndPause: () => void;
 }
 
 export const usePlayer = create<IPlayerState>((set, get) => ({
@@ -63,6 +63,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
         queue,
         state: 'buffering',
         currentTrackIndex: trackIndex,
+        seekPosition: 0,
       };
     }),
 
@@ -140,6 +141,9 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
       const remotePlayer = new cast.framework.RemotePlayer();
       const remotePlayerController = new cast.framework.RemotePlayerController(remotePlayer);
 
+      // Unload native audio element
+      AudioUtils.stop();
+
       // Update player state using Chromecast
       set({
         remotePlayer,
@@ -151,15 +155,14 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     }
   },
 
-  disconnectChromecast: () => {
+  syncSeekAndPause: () => {
     set({
-      remotePlayer: undefined,
-      remotePlayerController: undefined,
-      chromecastState: undefined,
       state: 'paused',
     });
     // Sync local audio seek to Chromecast
-    AudioUtils.seekTo(get().seekPosition);
+    const currentEpisode = getCurrentEpisode(get());
+    const seekPosition = getSeekPosition(get());
+    if (currentEpisode) AudioUtils.loadAtSeek(currentEpisode, seekPosition);
   },
 
   skipToNextEpisode: () =>
@@ -258,7 +261,25 @@ usePlayer.subscribe((currentState, previousState) => {
   const applyStateAudioEffects =
     currentState.state !== previousState.state &&
     !isChromecastConnected(currentState.chromecastState);
-  if (applyStateAudioEffects) {
+
+  if (isChromecastConnected(currentState.chromecastState)) {
+    const remoteState = currentState.remotePlayer?.playerState
+      ? getAdaptedPlaybackState(currentState.remotePlayer.playerState)
+      : null;
+    const applyStateCastEffects =
+      remoteState && remoteState !== 'buffering' && remoteState !== currentState.state;
+    if (applyStateCastEffects) {
+      currentState.remotePlayerController?.playOrPause();
+    }
+    if (
+      currentEpisode &&
+      previousEpisode &&
+      currentEpisode.guid !== previousEpisode.guid &&
+      (previousState.state === 'playing' || previousState.state === 'paused')
+    ) {
+      currentState.playOnChromecast();
+    }
+  } else if (applyStateAudioEffects) {
     switch (currentState.state) {
       case 'buffering':
         if (!previousState.audioInitialised) {
@@ -282,17 +303,6 @@ usePlayer.subscribe((currentState, previousState) => {
       case 'idle':
         AudioUtils.stop();
         break;
-    }
-  }
-
-  if (isChromecastConnected(currentState.chromecastState)) {
-    const remoteState = currentState.remotePlayer?.playerState
-      ? getAdaptedPlaybackState(currentState.remotePlayer.playerState)
-      : null;
-    const applyStateCastEffects =
-      remoteState && remoteState !== 'buffering' && remoteState !== currentState.state;
-    if (applyStateCastEffects) {
-      currentState.remotePlayerController?.playOrPause();
     }
   }
 
@@ -327,4 +337,4 @@ export const getRemotePlayer = (state: IPlayerState) => state.remotePlayer;
 export const getRemotePlayerController = (state: IPlayerState) => state.remotePlayerController;
 export const getIsChromecastConnected = (state: IPlayerState) =>
   isChromecastConnected(state.chromecastState);
-export const getDisconnectChromecast = (state: IPlayerState) => state.disconnectChromecast;
+export const getSyncSeekAndPause = (state: IPlayerState) => state.syncSeekAndPause;

@@ -90,7 +90,7 @@ export default class AudioUtils {
     AudioUtils.callbacks = callbacks;
   }
 
-  public static play(episode: IEpisode) {
+  public static play(episode: IEpisode, start: boolean = true) {
     AudioUtils.stop();
     AudioUtils.playbackId = undefined;
     AudioUtils.playbackInstance = new Howl({
@@ -110,6 +110,9 @@ export default class AudioUtils {
         );
         AudioUtils.addAirplayAvailabilityListener(AudioUtils.callbacks.setIsAirplayEnabled);
       },
+      onplay(playbackId) {
+        AudioUtils.playbackId = playbackId;
+      },
       onend() {
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
@@ -122,7 +125,7 @@ export default class AudioUtils {
     });
 
     // Start playback
-    AudioUtils.playbackId = AudioUtils.playbackInstance.play();
+    if (start) AudioUtils.playbackId = AudioUtils.playbackInstance.play();
   }
 
   public static pause() {
@@ -170,6 +173,11 @@ export default class AudioUtils {
   public static setRate(rate: number) {
     if (!AudioUtils.playbackId) return;
     AudioUtils.playbackInstance?.rate(rate, AudioUtils.playbackId);
+  }
+
+  public static loadAtSeek(episode: IEpisode, seekPosition: number) {
+    AudioUtils.play(episode, false);
+    AudioUtils.seekTo(seekPosition);
   }
 }
 
