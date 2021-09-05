@@ -60,7 +60,9 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
       }
 
       return {
-        audioInitialised: true,
+        audioInitialised: prevState.audioInitialised
+          ? true
+          : !isChromecastConnected(prevState.chromecastState),
         queue,
         state: 'buffering',
         currentTrackIndex: trackIndex,
@@ -162,6 +164,18 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     set({
       state: 'paused',
     });
+    // Initialize audio if not configured
+    const currentState = get();
+    if (!currentState.audioInitialised) {
+      AudioUtils.init({
+        stopEpisode: () => currentState.setPlayerState('idle'),
+        setPlaybackStarted: () => currentState.setPlayerState('playing'),
+        seekUpdate: currentState.setSeekPosition,
+        duration: currentState.setDuration,
+        setIsAirplayEnabled: currentState.setIsAirplayEnabled,
+      });
+    }
+
     // Sync local audio seek to Chromecast
     const currentEpisode = getCurrentEpisode(get());
     const seekPosition = getSeekPosition(get());
@@ -283,6 +297,8 @@ usePlayer.subscribe((currentState, previousState) => {
       currentEpisode.guid !== previousEpisode.guid &&
       (previousState.state === 'playing' || previousState.state === 'paused')
     ) {
+      currentState.playOnChromecast();
+    } else if (currentEpisode && !previousEpisode && currentState.state === 'buffering') {
       currentState.playOnChromecast();
     }
   } else if (applyStateAudioEffects) {
