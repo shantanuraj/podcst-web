@@ -1,7 +1,7 @@
 import create from 'zustand';
 
 import { IEpisodeInfo, IPlaybackControls, PlayerState } from '../../types';
-import AudioUtils from './AudioUtils';
+import AudioUtils, { seekUtils } from './AudioUtils';
 import { getAdaptedPlaybackState, isChromecastConnected } from './castUtils';
 import { updatePlaybackHandlers, updatePlaybackMetadata } from './mediaUtils';
 
@@ -165,12 +165,35 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
           : (prevState.currentTrackIndex - 1) / prevState.queue.length,
     })),
 
-  // Effects only
-  seekBackward: AudioUtils.seekBackward,
+  seekBackward: () => {
+    const { duration, seekPosition, seekTo } = get();
+    const newSeekPosition = seekUtils.seekBackward(seekPosition, duration);
+    seekTo(newSeekPosition);
+  },
 
-  seekForward: AudioUtils.seekForward,
+  seekForward: () => {
+    const { duration, seekPosition, seekTo } = get();
+    const newSeekPosition = seekUtils.seekForward(seekPosition, duration);
+    seekTo(newSeekPosition);
+  },
 
-  seekTo: AudioUtils.seekTo,
+  seekTo: (seconds) => {
+    const { chromecastState } = get();
+    if (!isChromecastConnected(chromecastState)) {
+      return AudioUtils.seekTo(seconds);
+    }
+
+    const seekRequest = new chrome.cast.media.SeekRequest();
+    seekRequest.currentTime = seconds;
+
+    const context = cast.framework.CastContext.getInstance();
+    const session = context.getCurrentSession();
+    session?.getMediaSession()?.seek(
+      seekRequest,
+      seekUtils.onSeekSuccess,
+      seekUtils.onSeekError,
+    );
+  },
 
   setVolume: AudioUtils.setVolume,
 
@@ -253,4 +276,5 @@ export const getSetChromecastState = (state: IPlayerState) => state.setChromecas
 export const getPlayOnChromecast = (state: IPlayerState) => state.playOnChromecast;
 export const getRemotePlayer = (state: IPlayerState) => state.remotePlayer;
 export const getRemotePlayerController = (state: IPlayerState) => state.remotePlayerController;
-export const getIsChromecastConnected = (state: IPlayerState) => isChromecastConnected(state.chromecastState);
+export const getIsChromecastConnected = (state: IPlayerState) =>
+  isChromecastConnected(state.chromecastState);
