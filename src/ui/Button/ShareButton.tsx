@@ -1,5 +1,4 @@
 import { forwardRef, memo } from 'react';
-import { IShareEnabledNavigator } from '../../types';
 import { Button, ButtonProps } from './Button';
 
 interface ShareButtonProps extends ButtonProps {
@@ -11,7 +10,7 @@ interface ShareButtonProps extends ButtonProps {
 const share = ({ text, title, url }: ShareButtonProps) => {
   if (typeof window === 'undefined') return;
   if ('share' in navigator) {
-    (navigator as IShareEnabledNavigator)
+    navigator
       .share({ text, title, url })
       .catch((err) => console.error('Error sharing', err));
   }

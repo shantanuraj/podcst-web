@@ -146,16 +146,6 @@ export interface IOPMLJson {
 
 export type PlayerState = 'playing' | 'paused' | 'idle' | 'buffering';
 
-export interface INavigatorShareProps {
-  text: string;
-  title: string;
-  url: string;
-}
-
-export interface IShareEnabledNavigator extends Navigator {
-  share(info: INavigatorShareProps): Promise<undefined>;
-}
-
 export interface IPlaybackControls {
   seekPosition: number;
   setSeekPosition: (position: number) => void;
