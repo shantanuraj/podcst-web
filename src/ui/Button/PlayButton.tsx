@@ -9,7 +9,7 @@ import {
 import { IEpisodeInfo } from '../../types';
 import { Button, ButtonProps } from './Button';
 
-type PlayButtonProps = ButtonProps & {
+interface PlayButtonProps extends ButtonProps {
   episode: IEpisodeInfo;
 };
 

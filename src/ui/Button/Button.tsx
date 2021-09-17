@@ -1,10 +1,7 @@
 import * as React from 'react';
 import styles from './Button.module.css';
 
-export type ButtonProps = React.DetailedHTMLProps<
-  React.ButtonHTMLAttributes<HTMLButtonElement>,
-  HTMLButtonElement
->;
+export interface ButtonProps extends React.ComponentProps<'button'> {};
 
 export const Button = React.memo(
   React.forwardRef<HTMLButtonElement, ButtonProps>(function Button({ className, ...props }, ref) {

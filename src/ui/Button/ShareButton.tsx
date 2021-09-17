@@ -2,7 +2,7 @@ import { forwardRef, memo } from 'react';
 import { IShareEnabledNavigator } from '../../types';
 import { Button, ButtonProps } from './Button';
 
-type ShareButtonProps = ButtonProps & {
+interface ShareButtonProps extends ButtonProps {
   text: string;
   title: string;
   url: string;
