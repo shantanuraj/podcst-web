@@ -17,8 +17,8 @@ export const fetchEpisodesInfo = async (feed: string) => {
   }
 };
 
-export const useEpisodesInfo = (feed: string, initialData: IPodcastEpisodesInfo | null = null) => {
-  const response = useSWR(feed, fetchEpisodesInfo, { suspense: true, initialData });
+export const useEpisodesInfo = (feed: string, fallbackData: IPodcastEpisodesInfo | null = null) => {
+  const response = useSWR(feed, fetchEpisodesInfo, { suspense: true, fallbackData });
   return response;
 };
 
