@@ -15,6 +15,10 @@ html, body {
   box-sizing: border-box;
 }
 
+html, body {
+  accent-color: var(--color-accent);
+}
+
 #__next,
 main {
   height: 100%;
