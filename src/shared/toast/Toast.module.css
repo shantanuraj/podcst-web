@@ -1,0 +1,14 @@
+.toast {
+  position: fixed;
+  right: 1rem;
+  bottom: var(--dimen-player-height);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text);
+  border-radius: 0.5rem;
+}
