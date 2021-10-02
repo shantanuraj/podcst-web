@@ -5,6 +5,7 @@ import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
 import { Icon } from '../icons/svg/Icon';
+import { FeatureToggle } from '../../shared/features';
 
 type EpisodesListProps = {
   className?: string;
@@ -24,23 +25,25 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
       {children}
-      <div className={styles.episodeListOptions}>
-        <div className={styles.episodeListCount}>
-          {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
+      <FeatureToggle feature="episodesFilter">
+        <div className={styles.episodeListOptions}>
+          <div className={styles.episodeListCount}>
+            {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
+          </div>
+          <div className={styles.episodeListSearch}>
+            <Icon icon="search" />
+            <input placeholder="Search episodes" />
+          </div>
+          <div className={styles.episodeListOptionsSort}>
+            <span>Sort by:</span>
+            <select>
+              <option>Latest episodes</option>
+              <option>Earliest episodes</option>
+              <option>Duration</option>
+            </select>
+          </div>
         </div>
-        <div className={styles.episodeListSearch}>
-          <Icon icon="search" />
-          <input placeholder="Search episodes" />
-        </div>
-        <div className={styles.episodeListOptionsSort}>
-          <span>Sort by:</span>
-          <select>
-            <option>Latest episodes</option>
-            <option>Earliest episodes</option>
-            <option>Duration</option>
-          </select>
-        </div>
-      </div>
+      </FeatureToggle>
       <ul className={styles.list} style={{ height: `${totalSize}px` }}>
         {virtualItems.map(({ index, start }) => {
           const episode = episodes[index];
