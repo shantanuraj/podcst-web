@@ -4,8 +4,10 @@
 
 import * as React from 'react';
 
+import AddToQueue from './AddToQueue';
 import AirplayIcon from './AirplayIcon';
 import BackIcon from './BackIcon';
+import Caret from './Caret';
 import ChromecastConnectedIcon from './ChromecastConnectedIcon';
 import ChromecastIcon from './ChromecastIcon';
 import DayIcon from './DayIcon';
@@ -15,6 +17,7 @@ import MuteIcon from './MuteIcon';
 import NightIcon from './NightIcon';
 import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
+import Search from './Search';
 import SeekBack from './SeekBack10';
 import SeekForward from './SeekForward10';
 import SettingsIcon from './SettingsIcon';
@@ -35,6 +38,9 @@ export type IconType =
   | 'seek-forward'
   | 'info'
   | 'mute'
+  | 'search'
+  | 'queue'
+  | 'caret'
   | 'volume';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -59,6 +65,9 @@ const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
   info: InfoIcon,
   mute: MuteIcon,
   volume: VolumeIcon,
+  queue: AddToQueue,
+  search: Search,
+  caret: Caret,
 };
 
 export const Icon = ({ icon, color, size = 36, ...props }: IconProps) => {
