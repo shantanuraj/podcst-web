@@ -1,53 +1,25 @@
-import { forwardRef, useCallback, memo } from 'react';
-import {
-  getCurrentEpisode,
-  getPlaybackState,
-  IPlayerState,
-  usePlayer,
-} from '../../shared/player/usePlayer';
+import { forwardRef, memo } from 'react';
 
-import styles from './Button.module.css';
-import { IEpisodeInfo } from '../../types';
-import { Button, ButtonProps } from './Button';
 import { Icon } from '../icons/svg/Icon';
-
-interface PlayButtonProps extends ButtonProps {
-  episode: IEpisodeInfo;
-};
+import { PlayButton, PlayButtonProps } from './PlayButton';
+import styles from './Button.module.css';
 
 export const PlayButtonIcon = memo(
-  forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButton({ episode, ...props }, ref) {
-    const state = usePlayer(getPlaybackState);
-    const isCurrentEpisode = usePlayer(useCallback(selectIsCurrentEpisode(episode), [episode]));
-    const isPlaying = isCurrentEpisode && (state === 'playing' || state === 'buffering');
-
-    const play = usePlayer(selectPlay);
-    const resume = usePlayer(selectResume);
-    const setPlayerState = usePlayer(selectSetPlayerState);
-
-    const handleClick = useCallback(
-      (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (!isCurrentEpisode) return play(episode);
-        if (isPlaying) {
-          return setPlayerState('paused');
-        } else {
-          return resume();
-        }
-      },
-      [episode, isPlaying, play, resume, setPlayerState],
-    );
-
+  forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButtonIcon({ episode }, ref) {
     return (
-      <Button className={styles.withIcon} {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
-        {isCurrentEpisode ? (isPlaying ? <Icon icon="pause" size={24}/> : <Icon icon="play" size={24}/>) : <Icon icon="play" size={24}/>}
-      </Button>
+      <PlayButton className={styles.withIcon} episode={episode} ref={ref}>
+        {PlayButtonContent}
+      </PlayButton>
     );
   }),
 );
 
-const selectIsCurrentEpisode = (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
-  getCurrentEpisode(playerState)?.guid === episode.guid && playerState.state !== 'idle';
-const selectPlay = (playerState: IPlayerState) => playerState.playEpisode;
-const selectResume = (playerState: IPlayerState) => playerState.resumeEpisode;
-const selectSetPlayerState = (playerState: IPlayerState) => playerState.setPlayerState;
+const PlayButtonContent = ({
+  isCurrentEpisode,
+  isPlaying,
+}: {
+  isCurrentEpisode: boolean;
+  isPlaying: boolean;
+}) => {
+  return <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={24} />;
+};
