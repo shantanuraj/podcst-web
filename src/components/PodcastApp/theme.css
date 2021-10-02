@@ -37,6 +37,8 @@
   --dimen-icon-primary: 24px;
   --dimen-load-bar-height: 4px;
 
+  --dimen-player-height: 96px;
+
   --dimen-podcast-info-padding: 32px 32px 0;
   --dimen-podcast-info-cover: 300px;
   --dimen-podcast-info-direction: row;

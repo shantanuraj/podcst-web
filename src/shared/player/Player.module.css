@@ -1,5 +1,4 @@
 .container {
-  --dimen-player-height: 96px;
   --dimen-player-padding: 8px;
   --dimen-player-cover: calc(var(--dimen-player-height) - var(--dimen-player-padding));
   height: var(--dimen-player-height);

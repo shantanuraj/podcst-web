@@ -10,6 +10,7 @@ import { Player } from '../../shared/player/Player';
 import { ThemeListener } from '../../shared/theme/ThemeListener';
 import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { CastManager } from '../CastManager/CastManager';
+import { Toast } from '../../shared/toast/Toast';
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
@@ -63,6 +64,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <main>
         <Component {...pageProps} />
       </main>
+      <Toast />
       <Player />
       <ThemeListener />
       <CastManager />
