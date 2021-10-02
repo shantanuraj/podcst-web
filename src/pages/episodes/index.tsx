@@ -8,8 +8,6 @@ import { EpisodesList } from '../../ui/EpisodesList';
 import { PodcastInfo } from '../../ui/PodcastInfo/PodcastInfo';
 import { IPodcastEpisodesInfo } from '../../types';
 
-import styles from './Episodes.module.css';
-
 type EpisodesPageProps = {
   feed: string;
   info: IPodcastEpisodesInfo | null;
@@ -22,14 +20,12 @@ const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
 
   const { episodes } = info;
 
+  /* TODO 2021-08-15 Check why EpisodesList crashes when rendered under EpisodesInfo page on SSR when using the PlayButton in DOM */
+  if (typeof window === 'undefined') return null;
   return (
-    <React.Fragment>
+    <EpisodesList episodes={episodes}>
       <PodcastInfo info={info} />
-      {/* TODO 2021-08-15 Check why EpisodesList crashes when rendered under EpisodesInfo page on SSR when using the PlayButton in DOM */}
-      {typeof window !== 'undefined' && (
-        <EpisodesList className={styles.episodes} episodes={episodes} />
-      )}
-    </React.Fragment>
+    </EpisodesList>
   );
 };
 

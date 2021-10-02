@@ -8,10 +8,11 @@ import { Icon } from '../icons/svg/Icon';
 
 type EpisodesListProps = {
   className?: string;
+  children?: React.ReactNode;
   episodes: IEpisodeInfo[];
 };
 
-export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
+export function EpisodesList({ className = '', children, episodes }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { totalSize, virtualItems } = useVirtual<HTMLDivElement>({
     size: episodes?.length || 0,
@@ -22,6 +23,7 @@ export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
 
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
+      {children}
       <div className={styles.episodeListOptions}>
         <div className={styles.episodeListCount}>
           {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
