@@ -30,7 +30,7 @@
 }
 
 .episodeListOptions {
-  margin: 15px 32px;
+  margin: 15px;
   padding: 15px 0;
 }
 
@@ -68,22 +68,23 @@
   padding: 10px;
 }
 
-@media only screen and (min-width: 700px) {
+@media only screen and (min-width: 600px) {
   .episodeListOptions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     row-gap: 10px;
     column-gap: 40px;
+    margin-left: 32px;
+    margin-right: 32px;
   }
 
   .episodeListCount {
-    flex: 1 1 25%; 
+    flex: 1 1 35%; 
   }
 
   .episodeListSearch {
     margin-left: auto;
     flex: 1 1 350px;
-    max-width: 350px;
   }
 }
