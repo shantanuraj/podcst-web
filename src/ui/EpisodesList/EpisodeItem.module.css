@@ -48,6 +48,11 @@
 
 .queue svg {
   margin-top: 5px;
+  fill: var(--color-accent-gray);
+}
+
+.queue:hover svg {
+  fill: var(--color-accent-gray-hover);
 }
 
 .actions {

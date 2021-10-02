@@ -45,9 +45,9 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
         </div>
         <div className={styles.actions}>
           <PlayButtonIcon episode={episode} />
-          <div className={styles.queue}>
-            <Icon className="actionIcon" icon="queue" size={25}/>
-          </div>
+          <button className={styles.queue}>
+            <Icon icon="queue" size={24} />
+          </button>
         </div>
       </a>
     </Link>
