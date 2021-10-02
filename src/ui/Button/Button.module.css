@@ -9,20 +9,6 @@
   outline: 0;
 }
 
-button.button:focus,
-button.button:hover,
-button.button[data-is-subscribed='true'],
-button.button[data-is-current='true'] {
-  background-color: var(--color-accent);
-  color: var(--color-background);
-}
-
-button.button[data-is-subscribed='true']:hover
-button.button[data-is-current='true']:hover {
-  background-color: transparent;
-  color: var(--color-text);
-}
-
 .withIcon {
   border-radius: 50%;
   display: flex;
@@ -33,13 +19,34 @@ button.button[data-is-current='true']:hover {
   border: 2px solid var(--color-accent);
 }
 
-.withIcon svg {
+.button.withIcon svg {
   fill: var(--color-accent);
   transition: transform 0.25s ease-out;
 }
 
-.withIcon:focus svg,
-.withIcon:hover svg {
+button.button:focus,
+button.button:hover,
+button.button[data-is-subscribed='true'],
+button.button[data-is-current='true'] {
+  background-color: var(--color-accent);
+  color: var(--color-background);
+}
+
+button.button.withIcon:focus svg,
+button.button.withIcon:hover svg,
+button.button.withIcon[data-is-subscribed='true'] svg,
+button.button.withIcon[data-is-current='true'] svg{
   fill: var(--color-background);
   transform: scale(1.4);
+}
+
+button.button[data-is-subscribed='true']:hover,
+button.button[data-is-current='true']:hover {
+  background-color: transparent;
+  color: var(--color-text);
+}
+
+button.button.withIcon[data-is-subscribed='true']:hover svg,
+button.button.withIcon[data-is-current='true']:hover svg {
+  fill: var(--color-accent);
 }
