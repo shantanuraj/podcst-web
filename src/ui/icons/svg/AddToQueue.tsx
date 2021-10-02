@@ -1,10 +1,14 @@
 import * as React from 'react';
 
-export default function AddToQueue(props: React.SVGProps<SVGSVGElement>) {
+interface AddToQueueProps extends React.SVGProps<SVGSVGElement> {
+  title?: string;
+}
+
+export default function AddToQueue(props: AddToQueueProps) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" height={24} width={24} {...props}>
-      <path d="M0 0h24v24H0V0z" fill="none" />
-      <path d="M3 6c-.55 0-1 .45-1 1v13c0 1.1.9 2 2 2h13c.55 0 1-.45 1-1s-.45-1-1-1H5c-.55 0-1-.45-1-1V7c0-.55-.45-1-1-1zm17-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 9h-3v3c0 .55-.45 1-1 1s-1-.45-1-1v-3h-3c-.55 0-1-.45-1-1s.45-1 1-1h3V6c0-.55.45-1 1-1s1 .45 1 1v3h3c.55 0 1 .45 1 1s-.45 1-1 1z" />
+    <svg xmlns="http://www.w3.org/2000/svg" height={24} width={24} viewBow="0 0 24 24" {...props}>
+      {props.title && <title>{props.title}</title>}
+      <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v1c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-1h5c1.1 0 2-.9 2-2V5a2 2 0 00-2-2zm-1 14H4c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h16c.55 0 1 .45 1 1v10c0 .55-.45 1-1 1zm-4-6c0 .55-.45 1-1 1h-2v2c0 .55-.45 1-1 1s-1-.45-1-1v-2H9c-.55 0-1-.45-1-1s.45-1 1-1h2V8c0-.55.45-1 1-1s1 .45 1 1v2h2c.55 0 1 .45 1 1z" />
     </svg>
   );
 }

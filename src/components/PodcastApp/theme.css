@@ -7,7 +7,8 @@
 
   --color-background-search: #131313;
 
-  --color-accent-gray: #777777;
+  --color-accent-gray: #999999;
+  --color-accent-gray-hover: #dddddd;
 
   --color-text: #ffffff;
   --color-sub-title: #cccccc;
@@ -53,6 +54,9 @@
   --color-background-search: #cccccc;
 
   --color-accent-gray: #ddd;
+
+  --color-accent-gray: #777777;
+  --color-accent-gray-hover: #131313;
 
   --color-text: #000000;
   --color-sub-title: #555555;

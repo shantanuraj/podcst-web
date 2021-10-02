@@ -72,3 +72,11 @@ h3 {
 ul {
   list-style: none;
 }
+
+.actionIcon {
+  fill: var(--color-accent-gray);
+}
+
+.actionIcon:hover {
+  fill: var(--color-accent-gray-hover);
+}
