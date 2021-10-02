@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { memo } from 'react';
 
 import { PlayButtonIcon } from '../Button/PlayButtonIcon';
+import { QueueButton } from '../Button/QueueButton';
 import { IEpisodeInfo } from '../../types';
 
 import styles from './EpisodeItem.module.css';
-import { Icon } from '../icons/svg/Icon';
 
 type EpisodeItemProps = {
   episode: IEpisodeInfo;
@@ -45,9 +45,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
         </div>
         <div className={styles.actions}>
           <PlayButtonIcon episode={episode} />
-          <button className={styles.queue}>
-            <Icon icon="queue" size={24} />
-          </button>
+          <QueueButton episode={episode} />
         </div>
       </a>
     </Link>
