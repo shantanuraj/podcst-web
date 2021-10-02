@@ -4,6 +4,7 @@ import { IEpisodeInfo } from '../../types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
+import { Icon } from '../icons/svg/Icon';
 
 type EpisodesListProps = {
   className?: string;
@@ -21,6 +22,23 @@ export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
 
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
+      <div className={styles.episodeListOptions}>
+        <div className={styles.episodeListCount}>
+          30 total episodes
+        </div>
+        <div className={styles.episodeListSearch}>
+          <Icon icon="search" />
+          <input placeholder="Search episodes"/>
+        </div>
+        <div className={styles.episodeListOptionsSort}>
+          <span>Sort by:</span>
+          <select>
+            <option>Latest episodes</option>
+            <option>Earliest episodes</option>
+            <option>Duration</option>
+          </select>
+        </div>
+      </div>
       <ul className={styles.list} style={{ height: `${totalSize}px` }}>
         {virtualItems.map(({ index, start }) => {
           const episode = episodes[index];
