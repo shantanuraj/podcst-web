@@ -13,7 +13,7 @@ interface PlayButtonProps extends ButtonProps {
   episode: IEpisodeInfo;
 };
 
-export const PlayButtonIcon = memo(
+export const PlayButton = memo(
   forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButton({ episode, ...props }, ref) {
     const state = usePlayer(getPlaybackState);
     const isCurrentEpisode = usePlayer(useCallback(selectIsCurrentEpisode(episode), [episode]));
