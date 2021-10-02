@@ -6,8 +6,10 @@ import {
   usePlayer,
 } from '../../shared/player/usePlayer';
 
+import styles from './Button.module.css';
 import { IEpisodeInfo } from '../../types';
 import { Button, ButtonProps } from './Button';
+import { Icon } from '../icons/svg/Icon';
 
 interface PlayButtonProps extends ButtonProps {
   episode: IEpisodeInfo;
@@ -37,8 +39,8 @@ export const PlayButtonIcon = memo(
     );
 
     return (
-      <Button {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
-        {isCurrentEpisode ? (isPlaying ? 'Pause' : 'Resume') : 'Play'}
+      <Button className={styles.withIcon} {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
+        {isCurrentEpisode ? (isPlaying ? <Icon icon="pause"/> : <Icon icon="resume"/>) : <Icon icon="play"/>}
       </Button>
     );
   }),
