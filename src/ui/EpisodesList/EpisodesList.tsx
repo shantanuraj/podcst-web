@@ -24,11 +24,11 @@ export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
     <div className={`${styles.container} ${className}`} ref={containerRef}>
       <div className={styles.episodeListOptions}>
         <div className={styles.episodeListCount}>
-          30 total episodes
+          {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
         </div>
         <div className={styles.episodeListSearch}>
           <Icon icon="search" />
-          <input placeholder="Search episodes"/>
+          <input placeholder="Search episodes" />
         </div>
         <div className={styles.episodeListOptionsSort}>
           <span>Sort by:</span>
