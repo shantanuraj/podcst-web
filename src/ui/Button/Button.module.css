@@ -38,6 +38,7 @@ button.button[data-is-current='true']:hover {
   transition: transform 0.25s ease-out;
 }
 
+.withIcon:focus svg,
 .withIcon:hover svg {
   fill: var(--color-background);
   transform: scale(1.4);
