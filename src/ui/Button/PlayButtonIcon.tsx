@@ -40,7 +40,7 @@ export const PlayButtonIcon = memo(
 
     return (
       <Button className={styles.withIcon} {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
-        {isCurrentEpisode ? (isPlaying ? <Icon icon="pause"/> : <Icon icon="resume"/>) : <Icon icon="play"/>}
+        {isCurrentEpisode ? (isPlaying ? <Icon icon="pause" size={24}/> : <Icon icon="play" size={24}/>) : <Icon icon="play" size={35}/>}
       </Button>
     );
   }),

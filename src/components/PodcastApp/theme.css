@@ -45,6 +45,12 @@
   --dimen-episode-list-item-size: 84px;
 }
 
+@media only screen and (max-width: 600px) {
+  :root {
+    --dimen-episode-list-item-size: 100px;
+  }
+}
+
 :root.light {
   --color-background: #ffffff;
   --color-accent: #8649b2;

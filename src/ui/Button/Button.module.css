@@ -34,12 +34,11 @@ button.button[data-is-current='true']:hover {
 }
 
 .withIcon svg {
-  width: 40px;
   fill: var(--color-accent);
-  transition: transform 0.35s ease-in-out;
+  transition: transform 0.25s ease-out;
 }
 
 .withIcon:hover svg {
   fill: var(--color-background);
-  transform: scale(1.3);
+  transform: scale(1.4);
 }
