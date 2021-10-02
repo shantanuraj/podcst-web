@@ -4,6 +4,7 @@
   column-gap: 15px;
   padding: 0 16px 0 0;
   font-size: var(--dimen-font-regular);
+  height: 100%;
 }
 
 @media only screen and (min-width: 600px) {
@@ -13,8 +14,8 @@
 }
 
 .image {
-  height: 100px;
-  width: 100px;
+  height: 100%;
+  width: var(--dimen-episode-list-item-size);
 }
 
 .title {
@@ -28,11 +29,6 @@
 @media only screen and (min-width: 600px) {
   .container {
     padding: 0 32px;
-    height: 100px;
-  }
-  .image {
-    height: 84px;
-    width: 84px;
   }
   .title {
     -webkit-line-clamp: 3;

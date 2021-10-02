@@ -42,6 +42,7 @@
   --dimen-podcast-info-direction: row;
 
   --border-radius-control: 4px;
+  --dimen-episode-list-item-size: 84px;
 }
 
 :root.light {
