@@ -58,4 +58,10 @@ export function EpisodesList({ className = '', episodes }: EpisodesListProps) {
   );
 }
 
-const getRowHeight = () => 84;
+const getRowHeight = () =>
+  parseInt(
+    getComputedStyle(document.documentElement)
+      .getPropertyValue('--dimen-episode-list-item-size')
+      .trim()
+      .replace('px', ''),
+  );
