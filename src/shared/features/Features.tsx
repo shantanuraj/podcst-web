@@ -3,7 +3,7 @@ import React from 'react';
 type Features = 'episodesFilter';
 
 export const features: Record<Features, boolean> = {
-  episodesFilter: true,
+  episodesFilter: false,
 };
 
 interface FeatureToggleProps {

@@ -88,27 +88,27 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
       {children}
-      <FeatureToggle feature="episodesFilter">
-        <div className={styles.episodeListOptions}>
-          <div className={styles.episodeListCount}>
-            {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
-          </div>
+      <div className={styles.episodeListOptions}>
+        <div className={styles.episodeListCount}>
+          {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
+        </div>
+        <FeatureToggle feature="episodesFilter">
           <div className={styles.episodeListSearch}>
             <Icon icon="search" />
             <input placeholder="Search episodes" />
           </div>
-          <div className={styles.episodeListOptionsSort}>
-            <span>Sort by:</span>
-            <select onChange={onSortChange}>
-              {sortOptions.map(({ title, value }) => (
-                <option key={value} value={value}>
-                  {title}
-                </option>
-              ))}
-            </select>
-          </div>
+        </FeatureToggle>
+        <div className={styles.episodeListOptionsSort}>
+          <span>Sort by:</span>
+          <select onChange={onSortChange}>
+            {sortOptions.map(({ title, value }) => (
+              <option key={value} value={value}>
+                {title}
+              </option>
+            ))}
+          </select>
         </div>
-      </FeatureToggle>
+      </div>
       <ul className={styles.list} style={{ height: `${totalSize}px` }}>
         {virtualItems.map(({ index, start }) => {
           const episode = sortedEpisodes[index];
