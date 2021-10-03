@@ -49,6 +49,7 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
           const episode = episodes[index];
           return (
             <li
+              className={index % 2 === 0 ? styles.even : undefined}
               key={`${index}-${episode.title}`}
               style={{
                 transform: `translateY(${start}px)`,
