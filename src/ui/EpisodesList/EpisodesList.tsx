@@ -1,11 +1,11 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useVirtual } from 'react-virtual';
 import { IEpisodeInfo } from '../../types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
 import { Icon } from '../icons/svg/Icon';
-import { FeatureToggle } from '../../shared/features';
+import { useEpisodesFilter } from './useEpisodesFilter';
 
 interface EpisodesListProps {
   className?: string;
@@ -54,32 +54,18 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
   const [sortPreference, setSortPreference] = useState<SortPreference>(
     sortOptionsMap.releaseDesc.value,
   );
+  const [query, setQuery] = useState('');
   const onSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setSortPreference(e.target.value as SortPreference);
   }, []);
-  const sortedEpisodes = useMemo(() => {
-    const sortFn = (a: IEpisodeInfo, b: IEpisodeInfo) => {
-      switch (sortPreference) {
-        case sortOptionsMap.releaseAsc.value:
-          return (a.published || 0) - (b.published || 0);
-        case sortOptionsMap.titleAsc.value:
-          return a.title.localeCompare(b.title);
-        case sortOptionsMap.titleDesc.value:
-          return b.title.localeCompare(a.title);
-        case sortOptionsMap.lengthAsc.value:
-          return (a.duration || 0) - (b.duration || 0);
-        case sortOptionsMap.lengthDesc.value:
-          return (b.duration || 0) - (a.duration || 0);
-        default:
-          return 0;
-      }
-    };
-    return sortPreference === sortOptionsMap.releaseDesc.value
-      ? episodes
-      : episodes.slice().sort(sortFn);
-  }, [episodes, sortPreference]);
+  const onQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+  }, []);
+
+  const filteredEpisodes = useEpisodesFilter(episodes, sortPreference, query);
+
   const { totalSize, virtualItems } = useVirtual<HTMLDivElement>({
-    size: episodes?.length || 0,
+    size: filteredEpisodes.length || 0,
     parentRef: containerRef,
     estimateSize: getRowHeight,
     overscan: 5,
@@ -92,12 +78,10 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
         <div className={styles.episodeListCount}>
           {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
         </div>
-        <FeatureToggle feature="episodesFilter">
-          <div className={styles.episodeListSearch}>
-            <Icon icon="search" />
-            <input placeholder="Search episodes" />
-          </div>
-        </FeatureToggle>
+        <div className={styles.episodeListSearch}>
+          <Icon icon="search" />
+          <input onChange={onQueryChange} placeholder="Search episodes" />
+        </div>
         <div className={styles.episodeListOptionsSort}>
           <span>Sort by:</span>
           <select onChange={onSortChange}>
@@ -111,7 +95,7 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
       </div>
       <ul className={styles.list} style={{ height: `${totalSize}px` }}>
         {virtualItems.map(({ index, start }) => {
-          const episode = sortedEpisodes[index];
+          const episode = filteredEpisodes[index];
           return (
             <li
               className={index % 2 === 0 ? styles.even : undefined}
