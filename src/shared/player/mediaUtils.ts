@@ -6,10 +6,7 @@
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
 import { IPlayerState } from './usePlayer';
 
-export const updatePlaybackMetadata = (
-  episode: IEpisodeInfo,
-  podcastTitle?: string,
-) => {
+export const updatePlaybackMetadata = (episode: IEpisodeInfo, podcastTitle?: string) => {
   if (
     typeof window === 'undefined' ||
     typeof window.navigator === 'undefined' ||
