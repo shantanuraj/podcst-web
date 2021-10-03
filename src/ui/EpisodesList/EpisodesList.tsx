@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useVirtual } from 'react-virtual';
 import { IEpisodeInfo } from '../../types';
 import { EpisodeItem } from './EpisodeItem';
@@ -7,14 +7,77 @@ import styles from './EpisodesList.module.css';
 import { Icon } from '../icons/svg/Icon';
 import { FeatureToggle } from '../../shared/features';
 
-type EpisodesListProps = {
+interface EpisodesListProps {
   className?: string;
   children?: React.ReactNode;
   episodes: IEpisodeInfo[];
+}
+
+type SortPreference =
+  | 'releaseAsc'
+  | 'releaseDesc'
+  | 'titleAsc'
+  | 'titleDesc'
+  | 'lengthAsc'
+  | 'lengthDesc';
+
+const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: string }> = {
+  releaseDesc: {
+    title: 'Release date (New → Old)',
+    value: 'releaseDesc',
+  },
+  releaseAsc: {
+    title: 'Release date (Old → New)',
+    value: 'releaseAsc',
+  },
+  titleAsc: {
+    title: 'Title (A → Z)',
+    value: 'titleAsc',
+  },
+  titleDesc: {
+    title: 'Title (Z → A)',
+    value: 'titleDesc',
+  },
+  lengthAsc: {
+    title: 'Duration (Short → Long)',
+    value: 'lengthAsc',
+  },
+  lengthDesc: {
+    title: 'Duration (Long → Short)',
+    value: 'lengthDesc',
+  },
 };
+const sortOptions = Object.values(sortOptionsMap);
 
 export function EpisodesList({ className = '', children, episodes }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [sortPreference, setSortPreference] = useState<SortPreference>(
+    sortOptionsMap.releaseDesc.value,
+  );
+  const onSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortPreference(e.target.value as SortPreference);
+  }, []);
+  const sortedEpisodes = useMemo(() => {
+    const sortFn = (a: IEpisodeInfo, b: IEpisodeInfo) => {
+      switch (sortPreference) {
+        case sortOptionsMap.releaseAsc.value:
+          return (a.published || 0) - (b.published || 0);
+        case sortOptionsMap.titleAsc.value:
+          return a.title.localeCompare(b.title);
+        case sortOptionsMap.titleDesc.value:
+          return b.title.localeCompare(a.title);
+        case sortOptionsMap.lengthAsc.value:
+          return (a.duration || 0) - (b.duration || 0);
+        case sortOptionsMap.lengthDesc.value:
+          return (b.duration || 0) - (a.duration || 0);
+        default:
+          return 0;
+      }
+    };
+    return sortPreference === sortOptionsMap.releaseDesc.value
+      ? episodes
+      : episodes.slice().sort(sortFn);
+  }, [episodes, sortPreference]);
   const { totalSize, virtualItems } = useVirtual<HTMLDivElement>({
     size: episodes?.length || 0,
     parentRef: containerRef,
@@ -36,17 +99,19 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
           </div>
           <div className={styles.episodeListOptionsSort}>
             <span>Sort by:</span>
-            <select>
-              <option>Latest episodes</option>
-              <option>Earliest episodes</option>
-              <option>Duration</option>
+            <select onChange={onSortChange}>
+              {sortOptions.map(({ title, value }) => (
+                <option key={value} value={value}>
+                  {title}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </FeatureToggle>
       <ul className={styles.list} style={{ height: `${totalSize}px` }}>
         {virtualItems.map(({ index, start }) => {
-          const episode = episodes[index];
+          const episode = sortedEpisodes[index];
           return (
             <li
               className={index % 2 === 0 ? styles.even : undefined}
