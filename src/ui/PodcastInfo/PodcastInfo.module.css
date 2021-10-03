@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: var(--dimen-podcast-info-direction);
   padding: var(--dimen-podcast-info-padding);
+  position: relative;
 }
 
 .info img {
@@ -26,8 +27,10 @@
   font-weight: bold;
 }
 
-.info .text p {
+.info .text .description {
   font-size: var(--dimen-font-regular);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .buttons,
@@ -51,12 +54,26 @@
 }
 
 @media only screen and (max-width: 600px) {
+  .info {
+    color: var(--color-text-light);
+  }
+
+  .info img {
+    filter: brightness(0.3);
+  }
+
+  .info .text {
+    height: 100%;
+    position: absolute;
+  }
+
   .buttons {
     width: 100%;
     flex-direction: column;
   }
 
   .buttons button {
+    color: var(--color-text-light);
     width: 100%;
   }
 

@@ -44,7 +44,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
             url={router.asPath}
           />
         </div>
-        <p
+        <div
           className={styles.description}
           dangerouslySetInnerHTML={{ __html: linkifyText(description) }}
         />
