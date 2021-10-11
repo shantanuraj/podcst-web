@@ -1,12 +1,11 @@
 .container {
   --dimen-player-padding: 8px;
-  --dimen-player-cover: calc(var(--dimen-player-height) - var(--dimen-player-padding));
+  --dimen-player-cover: var(--dimen-player-height);
   height: var(--dimen-player-height);
   position: fixed;
   left: 0;
   bottom: 0;
   width: 100%;
-  padding: var(--dimen-player-padding);
   opacity: 0;
   transition: all 0.3s ease;
   transform: translateY(calc(var(--dimen-player-height) * 2));
@@ -24,19 +23,23 @@
 .player {
   background-color: var(--color-background);
   height: 100%;
-  border-radius: 8px;
-  box-shadow: 0px 4px 32px 4px rgba(0, 0, 0, 0.75);
-  overflow: hidden;
   display: flex;
-  gap: 8px;
+  column-gap: 15px;
+  align-items: center;
   position: relative;
+  padding-right: 20px;
+  border-top: 1px solid var(--color-background-search);
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.15);
+}
+
+.imageCoverLink {
+  display: flex;
 }
 
 .player img {
   height: var(--dimen-player-cover);
   width: var(--dimen-player-cover);
   object-fit: cover;
-  transform: translateY(calc(var(--dimen-player-padding) / -2));
 }
 
 .player .controls {
@@ -46,6 +49,7 @@
 
 .player svg {
   fill: var(--color-accent);
+  cursor: pointer;
 }
 
 .player svg:hover {
@@ -53,21 +57,19 @@
 }
 
 .player .info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  overflow: hidden;
+  flex: 1;
 }
 
-.player .info .p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.player .info p:nth-of-type(1) {
+  margin-bottom: 3px;
 }
 
 .player .info .title {
   font-weight: bold;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;  
+  overflow: hidden;
 }
 
 .player .info .author {
@@ -75,14 +77,9 @@
   font-weight: 300;
 }
 
-.spacer {
-  flex: 1;
-}
-
-.secondaryControls {
+.desktopControls {
   display: flex;
   gap: 16px;
-  padding-right: 16px;
 }
 
 .volumeControl {
@@ -114,11 +111,11 @@
 .seekbarContainer {
   --dimen-seekbar-offset: var(--dimen-player-cover);
   --dimen-seekbar-width: calc(100% - var(--dimen-player-cover));
-
+  background: var(--color-background-light);
   position: absolute;
   top: 0;
   left: var(--dimen-seekbar-offset);
-  height: 4px;
+  height: 6px;
   width: var(--dimen-seekbar-width);
   transition: height 0.3s ease;
 }
@@ -134,13 +131,10 @@
 }
 
 .playbackRate {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-weight: bold;
   font-size: var(--dimen-font-regular);
   color: var(--color-accent);
-  width: 48px;
+  width: 40px;
 }
 
 .seekbar[data-is-buffering='true'] {
@@ -149,11 +143,7 @@
 }
 
 @media only screen and (max-width: 600px) {
-  .spacer,
-  .secondaryControls {
-    display: none;
-  }
-
+  .desktopControls,
   .player .controls button:not([data-primary-control]) {
     display: none;
   }

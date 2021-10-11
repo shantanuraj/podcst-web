@@ -33,7 +33,7 @@ export const Player = () => {
               query: { feed: currentEpisode.feed, guid: currentEpisode.guid },
             }}
           >
-            <a>
+            <a className={styles.imageCoverLink}>
               <img
                 alt={`${currentEpisode.title} by ${currentEpisode.author}`}
                 src={currentEpisode.cover}
@@ -53,10 +53,12 @@ export const Player = () => {
             <p className={styles.title}>{currentEpisode.title}</p>
             <p className={styles.author}>{currentEpisode.author}</p>
           </div>
-          <div className={styles.spacer} />
-          <div className={styles.secondaryControls}>
+          <div className={styles.desktopControls}>
             <VolumeControls />
+          </div>
             <PlaybackRate />
+            <Icon icon="queue" title="Add to queue"/>
+          <div className={styles.desktopControls}>
             <Airplay />
             <Chromecast />
           </div>
