@@ -56,8 +56,12 @@ export const Player = () => {
           <div className={styles.desktopControls}>
             <VolumeControls />
           </div>
-            <PlaybackRate />
-            <Icon icon="queue" title="Add to queue"/>
+          <PlaybackRate />
+          <Link href="/queue">
+            <Icon icon="queue-list">
+              <title>Add to queue</title>
+            </Icon>
+          </Link>
           <div className={styles.desktopControls}>
             <Airplay />
             <Chromecast />

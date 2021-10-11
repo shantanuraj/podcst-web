@@ -17,6 +17,7 @@ import MuteIcon from './MuteIcon';
 import NightIcon from './NightIcon';
 import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
+import QueueList from './QueueList';
 import Search from './Search';
 import SeekBack from './SeekBack10';
 import SeekForward from './SeekForward10';
@@ -40,6 +41,7 @@ export type IconType =
   | 'mute'
   | 'search'
   | 'queue'
+  | 'queue-list'
   | 'caret'
   | 'volume';
 
@@ -66,6 +68,7 @@ const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
   mute: MuteIcon,
   volume: VolumeIcon,
   queue: AddToQueue,
+  'queue-list': QueueList,
   search: Search,
   caret: Caret,
 };
