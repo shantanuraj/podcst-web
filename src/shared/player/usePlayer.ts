@@ -379,3 +379,4 @@ export const getIsChromecastConnected = (state: IPlayerState) =>
   isChromecastConnected(state.chromecastState);
 export const getSyncSeekAndPause = (state: IPlayerState) => state.syncSeekAndPause;
 export const getQueueEpisode = (state: IPlayerState) => state.queueEpisode;
+export const getEpisodesQueue = (state: IPlayerState) => state.queue;
