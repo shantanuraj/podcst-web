@@ -36,7 +36,7 @@ export function useKeydown(
 /**
  * Element selector for ignoring keyboard events
  */
-const ignoreKeyboardSelector = 'input';
+const ignoreKeyboardSelector = 'input,select,textarea,a,button,[role="button"]';
 
 /**
  * Boolean check for ignore selector
