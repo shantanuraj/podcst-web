@@ -52,7 +52,7 @@
 @media only screen and (max-width: 600px) {
   :root {
     --dimen-episode-list-item-size: 100px;
-    --dimen-player-height: 75px;
+    --dimen-player-height: 80px;
   }
 }
 

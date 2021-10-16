@@ -21,5 +21,5 @@ const PlayButtonContent = ({
   isCurrentEpisode: boolean;
   isPlaying: boolean;
 }) => {
-  return <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={24} />;
+  return <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={30} />;
 };

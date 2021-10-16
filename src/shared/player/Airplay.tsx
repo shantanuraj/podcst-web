@@ -9,7 +9,7 @@ export const Airplay = () => {
 
   return (
     <button onClick={AudioUtils.showAirplaySelector}>
-      <Icon icon="airplay" />
+      <Icon icon="airplay" size={26}/>
     </button>
   );
 };
