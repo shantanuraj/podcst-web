@@ -40,31 +40,41 @@ export const Player = () => {
               />
             </a>
           </Link>
-          <div className={styles.controls}>
-            <button onClick={seekBackward}>
-              <Icon icon="seek-back" />
-            </button>
-            <PlayButton />
-            <button onClick={seekForward}>
-              <Icon icon="seek-forward" />
-            </button>
+          <div className={styles.duration}>
+            <span>
+              00:00
+            </span>
+            <span>
+              00:00
+            </span>
           </div>
-          <div className={styles.info}>
-            <p className={styles.title}>{currentEpisode.title}</p>
-            <p className={styles.author}>{currentEpisode.author}</p>
-          </div>
-          <div className={styles.desktopControls}>
-            <VolumeControls />
-          </div>
-          <PlaybackRate />
-          <Link href="/queue">
-            <Icon icon="queue-list">
-              <title>Add to queue</title>
-            </Icon>
-          </Link>
-          <div className={styles.desktopControls}>
-            <Airplay />
-            <Chromecast />
+          <div className={styles.controlInfoGroup}>
+            <div className={styles.info}>
+              <p className={styles.title}>{currentEpisode.title}</p>
+              <p className={styles.author}>{currentEpisode.author}</p>
+            </div>
+            <div className={styles.controls}>
+              <button onClick={seekBackward}>
+                <Icon icon="seek-back" size={30}/>
+              </button>
+              <PlayButton />
+              <button onClick={seekForward}>
+                <Icon icon="seek-forward" size={30}/>
+              </button>
+            </div>
+            <div className={styles.desktopControls}>
+              <VolumeControls />
+            </div>
+            <PlaybackRate />
+            <Link href="/queue">
+              <Icon icon="queue-list" size={26}>
+                <title>Add to queue</title>
+              </Icon>
+            </Link>
+            <div className={styles.desktopControls}>
+              <Airplay />
+              <Chromecast />
+            </div>
           </div>
         </div>
       )}
@@ -76,7 +86,7 @@ function PlayButton() {
   const state = usePlayer(getPlaybackState);
   return (
     <button onClick={togglePlayback} data-primary-control>
-      <Icon icon={state === 'playing' ? 'pause' : 'play'} />
+      <Icon icon={state === 'playing' ? 'pause' : 'play'}/>
     </button>
   );
 }

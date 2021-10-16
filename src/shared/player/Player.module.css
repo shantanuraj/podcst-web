@@ -23,17 +23,16 @@
 .player {
   background-color: var(--color-background);
   height: 100%;
-  display: flex;
-  column-gap: 15px;
-  align-items: center;
+  display: grid;
+  grid: 28px auto / var(--dimen-player-cover) 1fr;
   position: relative;
-  padding-right: 20px;
   border-top: 1px solid var(--color-background-search);
   box-shadow: 0 -2px 5px rgba(0,0,0,0.15);
 }
 
 .imageCoverLink {
   display: flex;
+  grid-row: span 2;
 }
 
 .player img {
@@ -45,6 +44,7 @@
 .player .controls {
   display: flex;
   gap: 8px;
+  margin-right: auto;
 }
 
 .player svg {
@@ -57,7 +57,8 @@
 }
 
 .player .info {
-  flex: 1;
+  flex: auto;
+  max-width: calc(50% - var(--dimen-player-cover));
 }
 
 .player .info p:nth-of-type(1) {
@@ -135,6 +136,13 @@
   font-size: var(--dimen-font-regular);
   color: var(--color-accent);
   width: 40px;
+  justify-content: center;
+}
+
+.playbackRate code {
+  font-size: var(--dimen-font-secondary);
+  letter-spacing: -0.5px;
+  font-weight: 400;
 }
 
 .seekbar[data-is-buffering='true'] {
@@ -142,10 +150,47 @@
   width: 100%;
 }
 
+.duration {
+  display: flex;
+  font-size: var(--dimen-font-smallest);
+  padding: 15px 15px 0;
+  color: var(--color-accent-gray);
+}
+
+.duration span:last-of-type {
+  margin-left: auto;
+}
+
+.controlInfoGroup {
+  display: flex;
+  align-items: center;
+  column-gap: 15px;
+  flex: 1;
+  padding: 0 15px 10px;
+}
+
+.controlInfoGroup button {
+  display: flex;
+  align-items: center;
+}
+
 @media only screen and (max-width: 600px) {
   .desktopControls,
   .player .controls button:not([data-primary-control]) {
     display: none;
+  }
+
+  .player .info {
+    max-width: none;
+  }
+
+  .player .controlInfoGroup {
+    column-gap: 5px;
+    padding-bottom: 5px;
+  }
+
+  .player .info .title {
+    font-size: var(--dimen-font-regular);
   }
 
   .seekbarContainer {

@@ -48,7 +48,7 @@ export const VolumeControls = () => {
         />
       )}
       <button onClick={toggleMute} disabled={!canControlVolume}>
-        <Icon icon={muted ? 'mute' : 'volume'} />
+        <Icon icon={muted ? 'mute' : 'volume'}  size={24}/>
       </button>
     </div>
   );
