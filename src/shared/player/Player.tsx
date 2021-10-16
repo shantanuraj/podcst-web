@@ -7,6 +7,7 @@ import { shortcuts } from '../keyboard/shortcuts';
 
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';
+import { Duration } from './Duration';
 import { PlaybackRate } from './PlaybackRate';
 import { Seekbar } from './Seekbar';
 import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
@@ -40,14 +41,7 @@ export const Player = () => {
               />
             </a>
           </Link>
-          <div className={styles.duration}>
-            <span>
-              00:00
-            </span>
-            <span>
-              00:00
-            </span>
-          </div>
+          <Duration />
           <div className={styles.controlInfoGroup}>
             <div className={styles.info}>
               <p className={styles.title}>{currentEpisode.title}</p>
