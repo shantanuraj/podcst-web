@@ -10,6 +10,7 @@ import { Player } from '../../shared/player/Player';
 import { ThemeListener } from '../../shared/theme/ThemeListener';
 import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { CastManager } from '../CastManager/CastManager';
+import { RouteTransistion } from '../RouteTransistion';
 import { Toast } from '../../shared/toast/Toast';
 
 import styles from './PodcstApp.module.css';
@@ -70,6 +71,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <Player />
       <ThemeListener />
       <CastManager />
+      <RouteTransistion />
       <Script>
         {`
         window['__onGCastApiAvailable'] = function(isAvailable) {
