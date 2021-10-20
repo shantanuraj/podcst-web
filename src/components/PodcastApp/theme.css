@@ -1,6 +1,7 @@
 :root {
   --color-background: #292929;
   --color-accent: #82ffb5;
+  --color-accent-hover: #00b778;;
 
   --color-background-dark: #131313;
   --color-background-light: #333333;
@@ -60,6 +61,7 @@
 :root.light {
   --color-background: #ffffff;
   --color-accent: #8649b2;
+  --color-accent-hover: #60347f;
 
   --color-background-dark: #131313;
   --color-background-light: #e3e3e3;

@@ -18,10 +18,6 @@
   padding: 0 16px 16px;
 }
 
-.info .text a {
-  color: var(--color-accent);
-}
-
 .info .text h1 {
   font-weight: bold;
 }

@@ -8,6 +8,7 @@ import { IPodcastEpisodesInfo } from '../../types';
 import { Button } from '../Button';
 import { ShareButton } from '../Button/ShareButton';
 import { ExternalLink } from '../ExternalLink';
+import { Icon } from '../icons/svg/Icon';
 
 import styles from './PodcastInfo.module.css';
 
@@ -29,7 +30,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
         <h2>
           {link ? (
             <Fragment>
-              {author} - <ExternalLink href={link}>{stripHost(link)}</ExternalLink>
+              {author} - <ExternalLink href={link} title="Visit podcast website">{stripHost(link)} <Icon icon="external-link" size={18}/></ExternalLink>
             </Fragment>
           ) : (
             author
