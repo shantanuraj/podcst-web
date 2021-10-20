@@ -8,12 +8,6 @@
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.header > button {
-  display: flex;
-  margin: 0 16px;
 }
 
 .header svg,
@@ -23,59 +17,69 @@
   width: var(--dimen-icon-primary);
 }
 
-.title {
-  margin-left: 16px;
+.hamburgerIcon {
+  padding: 18px 8px 12px 15px;
 }
 
-.header, .drawer {
-  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.75);
+@media only screen and (min-width: 900px) {
+  .hamburgerIcon {
+    display: none;
+  }
+}
+
+.title {
+  margin-left: 15px;
+  margin-right: auto;
+}
+
+.header {
+  box-shadow: 0px 3px 5px 0px rgba(0, 0, 0, 0.15);
 }
 
 .drawer {
   position: fixed;
-  top: 0;
+  padding-top: 25px;
+  top: var(--dimen-header-height);
   left: 0;
   z-index: var(--dimen-drawer-z-index);
   height: 100%;
-  width: 0%;
-  transform: translateX(calc(-1 * var(--dimen-drawer-width)));
+  width: var(--dimen-drawer-width);
   transition: all 0.3s ease;
   background-color: var(--color-background);
+  border-right: solid 1px var(--color-background-light);
 }
 
-.drawer[data-open='open'] {
-  width: var(--dimen-drawer-width);
-  min-width: var(--dimen-drawer-width);
-  transform: translateX(0px);
+@media only screen and (max-width: 900px) {
+  .drawer {
+    transform: translate(calc(-1.15 * var(--dimen-drawer-width)), calc(-1 * var(--dimen-header-height)));
+  }
+
+  .drawer[data-open='open'] {
+    width: var(--dimen-drawer-width);
+    min-width: var(--dimen-drawer-width);
+    transform: translate(0px, calc(-1 * var(--dimen-header-height)));
+  }
+}
+
+@media only screen and (min-width: 900px) {
+  .drawer .closeNav {
+    display: none;
+  }
 }
 
 .drawer + main {
-  transition: filter 0.3s ease;
+  transition: 0.3s ease;
   filter: blur(0px);
-
 }
+
 .drawer[data-open='open'] + main {
   filter: blur(4px);
-  overflow: hidden;
   pointer-events: none;
 }
 
 .drawer ul {
   margin: 0;
   padding: 0;
-}
-
-.drawer button {
-  width: 100%;
-}
-
-.drawer button,
-.drawer a {
-  display: flex;
-  align-items: center;
-  height: var(--dimen-header-height);
-  padding: 16px;
-  border-bottom: solid 1px var(--color-background-light);
 }
 
 .drawer button:focus,
@@ -86,7 +90,21 @@
   background-color: var(--color-accent);
 }
 
-.drawer button:focus svg,
-.drawer button:hover svg {
-  fill: var(--color-background);
+.drawer button, .drawer a {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 15px;
+}
+
+.navGroup h6 {
+  margin: 1rem 15px 0;
+  padding-bottom: 0.25rem;
+  border-bottom: solid 1px var(--color-background-light);
+  color: var( --color-sub-title);
+  text-transform: uppercase;
+}
+
+.navGroup a {
+  padding-left: 30px;
 }

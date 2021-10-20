@@ -24,7 +24,7 @@
   --dimen-header-z-index: 501;
   --dimen-header-height: 64px;
 
-  --dimen-drawer-z-index: 502;
+  --dimen-drawer-z-index: 500;
   --dimen-drawer-width: 240px;
 
   --dimen-font-largest: 40px;
@@ -70,7 +70,7 @@
   --color-accent-gray-hover: #131313;
 
   --color-text: #000000;
-  --color-sub-title: #555555;
+  --color-sub-title: #777777;
 
   --color-animation-frame-1: #c069ff;
   --color-animation-frame-2: #60347f;

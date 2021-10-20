@@ -1,0 +1,6 @@
+@media only screen and (min-width: 900px) {
+  .mainContainer {
+    transition: 0.45s ease-in-out;
+    padding-left: var(--dimen-drawer-width);
+  }
+}
