@@ -30,7 +30,10 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
         <h2>
           {link ? (
             <Fragment>
-              {author} - <ExternalLink href={link} title="Visit podcast website">{stripHost(link)} <Icon icon="external-link" size={18}/></ExternalLink>
+              {author} -{' '}
+              <ExternalLink href={link} title="Visit podcast website">
+                {stripHost(link)} <Icon icon="external-link" size={18} />
+              </ExternalLink>
             </Fragment>
           ) : (
             author

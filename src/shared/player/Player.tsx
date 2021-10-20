@@ -49,11 +49,11 @@ export const Player = () => {
             </div>
             <div className={styles.controls}>
               <button onClick={seekBackward}>
-                <Icon icon="seek-back" size={30}/>
+                <Icon icon="seek-back" size={30} />
               </button>
               <PlayButton />
               <button onClick={seekForward}>
-                <Icon icon="seek-forward" size={30}/>
+                <Icon icon="seek-forward" size={30} />
               </button>
             </div>
             <div className={styles.desktopControls}>
@@ -80,7 +80,7 @@ function PlayButton() {
   const state = usePlayer(getPlaybackState);
   return (
     <button onClick={togglePlayback} data-primary-control>
-      <Icon icon={state === 'playing' ? 'pause' : 'play'}/>
+      <Icon icon={state === 'playing' ? 'pause' : 'play'} />
     </button>
   );
 }
