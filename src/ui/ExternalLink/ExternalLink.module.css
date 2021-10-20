@@ -1,0 +1,12 @@
+.externalLink {
+  color: var(--color-accent);
+}
+
+.externalLink:hover {
+  color: var(--color-accent-hover);
+}
+
+.externalLink > svg {
+  vertical-align: middle;
+  margin-left: 2px;
+}
