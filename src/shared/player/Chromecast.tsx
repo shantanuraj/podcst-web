@@ -69,11 +69,11 @@ export const Chromecast = () => {
 
   return chromecastState === cast.framework.CastState.CONNECTED ? (
     <button onClick={showSelector}>
-      <Icon icon="chromecast-connected" size={26}/>
+      <Icon icon="chromecast-connected" size={26} />
     </button>
   ) : (
     <button onClick={playOnChromecast}>
-      <Icon icon="chromecast"  size={26}/>
+      <Icon icon="chromecast" size={26} />
     </button>
   );
 };

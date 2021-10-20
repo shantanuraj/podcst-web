@@ -27,7 +27,10 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
       <div className={styles.text}>
         <h1>{episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}</h1>
         <h2>
-          from <ExternalLink href={podcast.link} title="Visit podcast website">{podcast.title} <Icon icon="external-link" size={18}/></ExternalLink>
+          from{' '}
+          <ExternalLink href={podcast.link} title="Visit podcast website">
+            {podcast.title} <Icon icon="external-link" size={18} />
+          </ExternalLink>
         </h2>
         <h2>by {author}</h2>
         {releaseDate && <h5>Published: {releaseDate}</h5>}
