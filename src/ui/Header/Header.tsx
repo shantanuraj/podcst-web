@@ -57,7 +57,7 @@ export function Header() {
           <h6>Your Library</h6>
           <ul>
             <li>
-              <Link href="/subs">Liked Podcasts</Link>
+              <Link href="/subs">Subscriptions</Link>
             </li>
             <li>
               <Link href="/queue">Queue</Link>

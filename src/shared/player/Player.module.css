@@ -9,6 +9,7 @@
   opacity: 0;
   transition: all 0.3s ease;
   transform: translateY(calc(var(--dimen-player-height) * 2));
+  z-index: var(--dimen-player-z-index);
 }
 
 .container[data-open='true'] {
@@ -69,7 +70,7 @@
   font-weight: bold;
   display: -webkit-box;
   -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;  
+  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 

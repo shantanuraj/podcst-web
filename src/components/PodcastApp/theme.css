@@ -40,6 +40,7 @@
   --dimen-page-padding: 32px;
 
   --dimen-player-height: 96px;
+  --dimen-player-z-index: 502;
 
   --dimen-podcast-info-padding: 32px 32px 0;
   --dimen-podcast-info-cover: 300px;
