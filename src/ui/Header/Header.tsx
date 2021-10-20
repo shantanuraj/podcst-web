@@ -41,30 +41,33 @@ export function Header() {
           aria-label="Toggle drawer"
           onClick={onHeaderClick}
           ref={menuButtonRef}
+          className={styles.hamburgerIcon}
         >
           <Icon icon="menu" />
-          <span className={styles.title}>Podcst</span>
         </button>
+        <span className={styles.title}>Podcst</span>
         <Search />
       </header>
       <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer}>
-        <button role="button" aria-label="Close drawer" onClick={onCloseDrawer}>
+        <button role="button" aria-label="Close drawer" onClick={onCloseDrawer} className={styles.closeNav}>
           <Icon icon="back" />
         </button>
-        <ul>
-          <li>
-            <Link href="/feed/top">Top</Link>
-          </li>
-          <li>
-            <Link href="/subs">Subscriptions</Link>
-          </li>
-          <li>
-            <Link href="/recents">Recents</Link>
-          </li>
-          <li>
-            <Link href="/settings">Settings</Link>
-          </li>
-        </ul>
+        <Link href="/feed/top">Home</Link>
+        <div className={styles.navGroup}>
+          <h6>Your Library</h6>
+          <ul>
+            <li>
+              <Link href="/subs">Liked Podcasts</Link>
+            </li>
+            <li>
+              <Link href="/queue">Queue</Link>
+            </li>
+            <li>
+              <Link href="/recents">Recent Episodes</Link>
+            </li>
+          </ul>
+        </div>
+        <Link href="/settings">Settings</Link>
       </nav>
     </Fragment>
   );

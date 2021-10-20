@@ -12,6 +12,8 @@ import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscri
 import { CastManager } from '../CastManager/CastManager';
 import { Toast } from '../../shared/toast/Toast';
 
+import styles from './PodcstApp.module.css';
+
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(removeDeprecatedStorage, []);
   useGlobalShortcuts();
@@ -61,7 +63,7 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <Header />
 
-      <main>
+      <main className={styles.mainContainer}>
         <Component {...pageProps} />
       </main>
       <Toast />
