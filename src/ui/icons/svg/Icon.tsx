@@ -15,6 +15,7 @@ import InfoIcon from './InfoIcon';
 import MenuIcon from './MenuIcon';
 import MuteIcon from './MuteIcon';
 import NightIcon from './NightIcon';
+import OpenInNew from './OpenInNew';
 import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
 import QueueList from './QueueList';
@@ -28,6 +29,7 @@ export type IconType =
   | 'airplay'
   | 'chromecast'
   | 'chromecast-connected'
+  | 'external-link'
   | 'play'
   | 'pause'
   | 'settings'
@@ -71,6 +73,7 @@ const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
   'queue-list': QueueList,
   search: Search,
   caret: Caret,
+  'external-link': OpenInNew,
 };
 
 export const Icon = ({ icon, color, size = 36, ...props }: IconProps) => {
