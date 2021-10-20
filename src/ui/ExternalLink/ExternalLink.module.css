@@ -9,4 +9,10 @@
 .externalLink > svg {
   vertical-align: middle;
   margin-left: 2px;
+  fill: var(--color-accent);
 }
+
+.externalLink:hover > svg {
+  fill: var(--color-accent-hover);
+}
+
