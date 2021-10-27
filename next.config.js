@@ -5,6 +5,7 @@ module.exports = {
     appVersion: package.version,
   },
   reactStrictMode: true,
+  swcMinify: true,
   async redirects() {
     return [
       {
