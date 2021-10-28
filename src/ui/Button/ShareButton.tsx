@@ -24,3 +24,5 @@ export const ShareButton = memo(
     );
   }),
 );
+
+ShareButton.displayName = 'ShareButton';

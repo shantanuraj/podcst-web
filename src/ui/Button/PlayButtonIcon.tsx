@@ -14,6 +14,8 @@ export const PlayButtonIcon = memo(
   }),
 );
 
+PlayButtonIcon.displayName = 'PlayButtonIcon';
+
 const PlayButtonContent = ({
   isCurrentEpisode,
   isPlaying,

@@ -36,3 +36,5 @@ export const QueueButton = React.memo(
     );
   }),
 );
+
+QueueButton.displayName = 'QueueButton';

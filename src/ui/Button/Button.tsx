@@ -9,3 +9,5 @@ export const Button = React.memo(
     return <button {...props} className={classes} ref={ref} />;
   }),
 );
+
+Button.displayName = 'Button';

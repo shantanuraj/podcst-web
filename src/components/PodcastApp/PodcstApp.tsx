@@ -72,7 +72,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <ThemeListener />
       <CastManager />
       <RouteTransistion />
-      <Script>
+      <Script id="castsetup">
         {`
         window['__onGCastApiAvailable'] = function(isAvailable) {
           if (

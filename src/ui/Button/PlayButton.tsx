@@ -48,6 +48,8 @@ export const PlayButton = memo(
   }),
 );
 
+PlayButton.displayName = 'PlayButton';
+
 const PlayButtonContent = (props: { isCurrentEpisode: boolean; isPlaying: boolean }) => {
   const { isCurrentEpisode, isPlaying } = props;
   return isCurrentEpisode ? (isPlaying ? 'Pause' : 'Resume') : 'Play';

@@ -20,7 +20,7 @@ const EpisodePage: NextPage<EpisodePageProps> = (props) => {
   const episode = episodes.find(({ guid }) => guid === props.guid);
 
   if (!episode) {
-    return <div>Couldn't get Podcasts episode</div>;
+    return <div>{`Couldn't get Podcasts episode`}</div>;
   }
 
   return <EpisodeInfo podcast={info} episode={episode} />;
