@@ -9,6 +9,7 @@ const STORE_KEY = 'store@4';
 const DEPRECATED_KEYS = ['store@3'] as const;
 
 export interface IStoreable {
+  volume: number;
   themeMode: ThemeMode;
   lastSyncTime: number;
 }
