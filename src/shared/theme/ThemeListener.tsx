@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { setValue } from '../storage/storage';
+import { setValue } from '../storage/local';
 import { useTheme } from './useTheme';
 
 export function ThemeListener() {

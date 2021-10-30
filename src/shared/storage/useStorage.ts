@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { getValue, IStoreable, removeValue, setValue } from './storage';
+import { getValue, IStoreable, removeValue, setValue } from './local';
 
 type StoredValue<T> = [T, Dispatch<SetStateAction<T>>];
 
