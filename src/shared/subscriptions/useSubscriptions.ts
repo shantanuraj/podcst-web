@@ -6,7 +6,7 @@ import { getValue, setValue } from '../storage/idb';
 import {
   getValue as getLocalStorageValue,
   setValue as setLocalStorageValue,
-} from '../storage/storage';
+} from '../storage/local';
 
 export type SubscriptionsState = {
   subs: ISubscriptionsMap;

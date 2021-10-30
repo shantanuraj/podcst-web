@@ -5,7 +5,7 @@ import Script from 'next/script';
 
 import { Header } from '../../ui/Header';
 import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
-import { removeDeprecatedStorage } from '../../shared/storage/storage';
+import { removeDeprecatedStorage } from '../../shared/storage/local';
 import { Player } from '../../shared/player/Player';
 import { ThemeListener } from '../../shared/theme/ThemeListener';
 import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
