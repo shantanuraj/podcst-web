@@ -21,7 +21,7 @@ See the [development](#development) section below for additional details.
 
 ### Prerequisites
 
-* [Node](https://nodejs.org/)   - node version 8+ for using latest ES2016+ features
+* [Node](https://nodejs.org/)   - node [LTS](https://nodejs.org/en/about/releases/) for using latest ES2016+ features
 * [yarn](https://yarnpkg.com/)  - package manager
 
 ### Getting the Source Code
