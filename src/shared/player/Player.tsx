@@ -15,7 +15,13 @@ import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
 
-const { togglePlayback, seekBackward, seekForward } = usePlayer.getState();
+const {
+  togglePlayback,
+  seekBackward,
+  seekForward,
+  skipToNextEpisode,
+  skipToPreviousEpisode,
+} = usePlayer.getState();
 
 export const Player = () => {
   const currentEpisode = usePlayer(getCurrentEpisode);
@@ -100,6 +106,12 @@ const playerShortcuts: KeyboardShortcuts = [
     },
   ],
   [
+    shortcuts.queue,
+    () => {
+      router.push('/queue');
+    },
+  ],
+  [
     shortcuts.togglePlayback,
     (e) => {
       e.preventDefault();
@@ -108,5 +120,7 @@ const playerShortcuts: KeyboardShortcuts = [
   ],
   [shortcuts.seekBack, seekBackward],
   [shortcuts.seekAhead, seekForward],
+  [shortcuts.previousEpisode, skipToPreviousEpisode],
+  [shortcuts.nextEpisode, skipToNextEpisode],
 ];
 const emptyShortcuts: KeyboardShortcuts = [];

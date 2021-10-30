@@ -34,5 +34,11 @@ const globalShortcuts: KeyboardShortcuts = [
       router.push('/settings');
     },
   ],
+  [
+    shortcuts.shortcuts,
+    () => {
+      router.push('/settings/shortcuts');
+    },
+  ],
   [shortcuts.theme, cycleTheme],
 ];

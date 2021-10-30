@@ -14,8 +14,6 @@ export function Header() {
 
   const onHeaderClick = useCallback(() => toggleDrawer(drawerRef.current), []);
   const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
-  useKeydown(shortcuts.drawer, onHeaderClick);
-  useKeydown(shortcuts.closeDrawer, onCloseDrawer);
 
   useEffect(() => {
     const closeOnClickOutside = (event: MouseEvent) => {

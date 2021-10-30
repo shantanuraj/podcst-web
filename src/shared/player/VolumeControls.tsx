@@ -1,6 +1,8 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Icon } from '../../ui/icons/svg/Icon';
+import { shortcuts } from '../keyboard/shortcuts';
+import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
 
 import styles from './Player.module.css';
 import {
@@ -34,6 +36,14 @@ export const VolumeControls = () => {
   useEffect(() => {
     mute(muted);
   }, [muted]);
+
+  const rateShortcuts: KeyboardShortcuts = useMemo(
+    () => [
+      [shortcuts.mute, toggleMute],
+    ],
+    [toggleMute],
+  );
+  useKeydown(rateShortcuts);
 
   return (
     <div className={styles.volumeControl}>

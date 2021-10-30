@@ -1,5 +1,5 @@
 import React from 'react';
-import { IShortcutInfo } from './shortcuts';
+import { IKeyboardShortcut, IShortcutInfo } from './shortcuts';
 
 type ShortcutHandler = (e: KeyboardEvent) => void;
 export type KeyboardShortcuts = Array<[IShortcutInfo, ShortcutHandler]>;
@@ -44,6 +44,18 @@ const ignoreKeyboardSelector = 'input,select,textarea,a,button,[role="button"]';
 const isNotIgnoreElement = (target: EventTarget | null) =>
   !!target && !(target as HTMLElement).matches(ignoreKeyboardSelector);
 
+const isMatchingShortcut = (e: KeyboardEvent, config: IKeyboardShortcut) => {
+  return (
+    e.metaKey === config.metaKey &&
+    e.shiftKey === config.shiftKey &&
+    (e.key === config.key || config.key === '*')
+  );
+};
+
 const isMatchingEvent = (e: KeyboardEvent, config: IShortcutInfo) => {
-  return e.metaKey === config.metaKey && (e.key === config.key || config.key === '*');
+  return (
+    isMatchingShortcut(e, config) ||
+    config.secondary?.some((shortcut) => isMatchingShortcut(e, shortcut)) ||
+    false
+  );
 };

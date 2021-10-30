@@ -212,7 +212,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
       currentTrackIndex:
         prevState.currentTrackIndex === 0
           ? prevState.queue.length - 1
-          : (prevState.currentTrackIndex - 1) / prevState.queue.length,
+          : prevState.currentTrackIndex - 1,
     })),
 
   seekBackward: () => {
