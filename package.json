@@ -29,15 +29,14 @@
   },
   "dependencies": {
     "@shopify/react-web-worker": "2.1.7",
-    "axios": "0.21.4",
     "downshift": "6.1.7",
     "howler": "2.2.3",
     "idb-keyval": "6.0.2",
     "match-sorter": "6.3.1",
-    "next": "12.0.1",
+    "next": "12.0.7",
     "normalize.css": "8.0.1",
-    "react": "18.0.0-alpha-4298ddbc5-20211023",
-    "react-dom": "18.0.0-alpha-4298ddbc5-20211023",
+    "react": "18.0.0-rc.0-next-20212349a-20211223",
+    "react-dom": "18.0.0-rc.0-next-20212349a-20211223",
     "react-virtual": "2.8.1",
     "swr": "1.0.1",
     "zustand": "3.6.5"

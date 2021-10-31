@@ -1,8 +1,10 @@
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: 'https://data.podcst.io',
-});
-
-export const get = <T>(url: string, params: Record<string, unknown> = {}): Promise<T> =>
-  api.get<T>(url, { params }).then((res) => res.data);
+export const get = async <T>(endpoint: string, params: Record<string, unknown>): Promise<T> => {
+  const url = new URL('https://data.podcst.io' + endpoint);
+  Object.keys(params).forEach((key) => {
+    url.searchParams.append(key, params[key] as string);
+  });
+  const response = await fetch(url.toString());
+  const text = await response.text();
+  const json = JSON.parse(text);
+  return json as T;
+}
