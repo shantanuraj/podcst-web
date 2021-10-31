@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next';
+import { GetStaticProps, InferGetStaticPropsType } from 'next';
 import Head from 'next/head';
 
 import { fetchFeed } from '../../data/feed';
@@ -7,13 +7,6 @@ import { FeedType, IPodcast } from '../../types';
 import { Loading } from '../../ui/Loading';
 import { FEED_REVALIDATE_DURATION } from '../../data/constants';
 import { PodcastsGrid } from '../../ui/PodcastsGrid';
-
-export const getStaticPaths: GetStaticPaths = async () => {
-  return {
-    paths: [{ params: { feed: 'top' } }],
-    fallback: true,
-  };
-};
 
 export const getStaticProps: GetStaticProps<{ podcasts: IPodcast[] }> = async (context) => {
   const feed = isAllowedFeed(context.params?.feed) ? (context.params?.feed as FeedType) : 'top';
