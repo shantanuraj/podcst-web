@@ -21,6 +21,7 @@ export interface IPlayerState extends IPlaybackControls {
   setIsAirplayEnabled: (isAirplayEnabled: boolean) => void;
 
   isChromecastEnabled: boolean;
+  isChromecastConnecting: boolean;
   setIsChromecastEnabled: (isChromecastEnabled: boolean) => void;
 
   chromecastState: cast.framework.CastState | undefined;
@@ -44,6 +45,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
   state: 'idle',
   isAirplayEnabled: false,
   isChromecastEnabled: false,
+  isChromecastConnecting: false,
   chromecastState: undefined,
   remotePlayer: undefined,
   remotePlayerController: undefined,
@@ -86,7 +88,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
   setPlayerState: (state) =>
     set((prevState) => {
       const queue =
-        state === 'idle'
+        state === 'idle' && !prevState.isChromecastConnecting
           ? prevState.queue.filter((_, index) => index !== prevState.currentTrackIndex)
           : prevState.queue;
       return {
@@ -160,6 +162,7 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
     // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
     request.playbackRate = getRate(get());
     try {
+      set({ isChromecastConnecting: true });
       await session.loadMedia(request);
       const remotePlayer = new cast.framework.RemotePlayer();
       const remotePlayerController = new cast.framework.RemotePlayerController(remotePlayer);
@@ -175,6 +178,8 @@ export const usePlayer = create<IPlayerState>((set, get) => ({
       });
     } catch (err) {
       console.error('Error loading media', err);
+    } finally {
+      set({ isChromecastConnecting: false });
     }
   },
 
