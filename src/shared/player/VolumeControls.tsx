@@ -4,6 +4,7 @@ import { Icon } from '../../ui/icons/svg/Icon';
 import { shortcuts } from '../keyboard/shortcuts';
 import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
 import { getValue, setValue } from '../storage/local';
+import { defaultVolume, getInitialVolume } from './AudioUtils';
 
 import styles from './Player.module.css';
 import {
@@ -13,9 +14,6 @@ import {
   getSetVolume,
   usePlayer,
 } from './usePlayer';
-
-const defaultVolume = 50;
-const getInitialVolume = () => getValue('volume', defaultVolume);
 
 export const VolumeControls = () => {
   const [initialVolume] = useState(getInitialVolume);

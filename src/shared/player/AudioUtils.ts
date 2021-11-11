@@ -4,6 +4,7 @@
 
 import { Howl } from 'howler/src/howler.core';
 import { IEpisode } from '../../types';
+import { getValue } from '../storage/local';
 import { updatePlaybackState } from './mediaUtils';
 
 type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
@@ -28,10 +29,14 @@ const throwError = () => {
   throw new Error('Audio.init not called!');
 };
 
+export const defaultVolume = 50;
+export const getInitialVolume = () => getValue('volume', defaultVolume);
+
 export default class AudioUtils {
   private static playbackInstance: Howl | null;
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
+  private static volume: number = defaultVolume;
 
   private static getAudioElement(): HTMLAudioElement | null {
     try {
@@ -88,6 +93,7 @@ export default class AudioUtils {
 
   public static init(callbacks: IAudioCallbacks) {
     AudioUtils.callbacks = callbacks;
+    AudioUtils.volume = getInitialVolume();
   }
 
   public static play(episode: IEpisode, start: boolean = true) {
@@ -95,6 +101,7 @@ export default class AudioUtils {
     AudioUtils.playbackId = undefined;
     AudioUtils.playbackInstance = new Howl({
       src: [episode.file.url],
+      volume: AudioUtils.volume / 100,
       html5: true,
       onload() {
         AudioUtils.callbacks.setPlaybackStarted();
@@ -165,6 +172,7 @@ export default class AudioUtils {
    * @param volume 0-100
    */
   public static setVolume(volume: number) {
+    AudioUtils.volume = volume;
     AudioUtils.playbackInstance?.volume(volume / 100, AudioUtils.playbackId || 0);
   }
 
