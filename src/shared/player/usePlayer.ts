@@ -1,4 +1,5 @@
-import create from 'zustand';
+import create, { GetState, SetState } from 'zustand';
+import { StoreApiWithSubscribeWithSelector, subscribeWithSelector } from 'zustand/middleware';
 
 import { IEpisodeInfo, IPlaybackControls, PlayerState } from '../../types';
 import AudioUtils, { seekUtils } from './AudioUtils';
@@ -35,267 +36,274 @@ export interface IPlayerState extends IPlaybackControls {
   syncSeekAndPause: () => void;
 }
 
-export const usePlayer = create<IPlayerState>((set, get) => ({
-  audioInitialised: false,
-  queue: [] as IEpisodeInfo[],
-  currentTrackIndex: 0,
-  seekPosition: 0,
-  duration: 0,
-  rate: 1,
-  state: 'idle',
-  isAirplayEnabled: false,
-  isChromecastEnabled: false,
-  isChromecastConnecting: false,
-  chromecastState: undefined,
-  remotePlayer: undefined,
-  remotePlayerController: undefined,
+export const usePlayer = create<
+  IPlayerState,
+  SetState<IPlayerState>,
+  GetState<IPlayerState>,
+  StoreApiWithSubscribeWithSelector<IPlayerState>
+>(
+  subscribeWithSelector((set, get) => ({
+    audioInitialised: false,
+    queue: [] as IEpisodeInfo[],
+    currentTrackIndex: 0,
+    seekPosition: 0,
+    duration: 0,
+    rate: 1,
+    state: 'idle',
+    isAirplayEnabled: false,
+    isChromecastEnabled: false,
+    isChromecastConnecting: false,
+    chromecastState: undefined,
+    remotePlayer: undefined,
+    remotePlayerController: undefined,
 
-  queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
+    queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
 
-  onPlaybackEnd: () => {
-    const { setPlayerState, queue } = get();
-    setPlayerState('idle');
-    // Play queued episode on end
-    if (queue.length > 1) {
-      set({
-        state: 'buffering',
-        seekPosition: 0,
-      });
-    }
-  },
-
-  playEpisode: (episode) =>
-    set((prevState) => {
-      let queue = prevState.queue;
-      let trackIndex = queue.findIndex((queuedEpisode) => queuedEpisode.guid === episode.guid);
-      // Queue episode if not in the queue
-      if (trackIndex === -1) {
-        trackIndex = queue.length;
-        queue = queue.concat(episode);
+    onPlaybackEnd: () => {
+      const { setPlayerState, queue } = get();
+      setPlayerState('idle');
+      // Play queued episode on end
+      if (queue.length > 1) {
+        set({
+          state: 'buffering',
+          seekPosition: 0,
+        });
       }
+    },
 
-      return {
-        audioInitialised: prevState.audioInitialised
-          ? true
-          : !isChromecastConnected(prevState.chromecastState),
-        queue,
-        state: 'buffering',
-        currentTrackIndex: trackIndex,
-        seekPosition: 0,
-      };
-    }),
+    playEpisode: (episode) =>
+      set((prevState) => {
+        let queue = prevState.queue;
+        let trackIndex = queue.findIndex((queuedEpisode) => queuedEpisode.guid === episode.guid);
+        // Queue episode if not in the queue
+        if (trackIndex === -1) {
+          trackIndex = queue.length;
+          queue = queue.concat(episode);
+        }
 
-  setPlayerState: (state) =>
-    set((prevState) => {
-      const queue =
-        state === 'idle' && !prevState.isChromecastConnecting
-          ? prevState.queue.filter((_, index) => index !== prevState.currentTrackIndex)
-          : prevState.queue;
-      return {
-        state,
-        queue,
-      };
-    }),
+        return {
+          audioInitialised: prevState.audioInitialised
+            ? true
+            : !isChromecastConnected(prevState.chromecastState),
+          queue,
+          state: 'buffering',
+          currentTrackIndex: trackIndex,
+          seekPosition: 0,
+        };
+      }),
 
-  resumeEpisode: () => {
-    set({ state: 'playing' });
-  },
+    setPlayerState: (state) =>
+      set((prevState) => {
+        const queue =
+          state === 'idle' && !prevState.isChromecastConnecting
+            ? prevState.queue.filter((_, index) => index !== prevState.currentTrackIndex)
+            : prevState.queue;
+        return {
+          state,
+          queue,
+        };
+      }),
 
-  togglePlayback: () => {
-    set((prevState) => ({ state: prevState.state === 'playing' ? 'paused' : 'playing' }));
-  },
+    resumeEpisode: () => {
+      set({ state: 'playing' });
+    },
 
-  setSeekPosition: (seekPosition) => {
-    set({ seekPosition });
-  },
+    togglePlayback: () => {
+      set((prevState) => ({ state: prevState.state === 'playing' ? 'paused' : 'playing' }));
+    },
 
-  setDuration: (duration) => {
-    set({ duration });
-  },
+    setSeekPosition: (seekPosition) => {
+      set({ seekPosition });
+    },
 
-  setIsAirplayEnabled: (isAirplayEnabled) => {
-    set({ isAirplayEnabled });
-  },
+    setDuration: (duration) => {
+      set({ duration });
+    },
 
-  setIsChromecastEnabled: (isChromecastEnabled) => {
-    set({ isChromecastEnabled });
-  },
+    setIsAirplayEnabled: (isAirplayEnabled) => {
+      set({ isAirplayEnabled });
+    },
 
-  setChromecastState: (chromecastState) => {
-    set({ chromecastState });
-  },
+    setIsChromecastEnabled: (isChromecastEnabled) => {
+      set({ isChromecastEnabled });
+    },
 
-  playOnChromecast: async () => {
-    const currentEpisode = getCurrentEpisode(get());
-    if (!('cast' in window) || !currentEpisode) return;
+    setChromecastState: (chromecastState) => {
+      set({ chromecastState });
+    },
 
-    const context = cast.framework.CastContext.getInstance();
-    let session = context.getCurrentSession();
-    if (!session) {
+    playOnChromecast: async () => {
+      const currentEpisode = getCurrentEpisode(get());
+      if (!('cast' in window) || !currentEpisode) return;
+
+      const context = cast.framework.CastContext.getInstance();
+      let session = context.getCurrentSession();
+      if (!session) {
+        try {
+          await context.requestSession();
+          session = context.getCurrentSession();
+        } catch (err) {
+          console.error('Error requesting session', err);
+        }
+      }
+      if (!session) return;
+
+      const mediaInfo = new chrome.cast.media.MediaInfo(
+        currentEpisode.file.url,
+        currentEpisode.file.type,
+      );
+      const metadata = new chrome.cast.media.GenericMediaMetadata();
+      metadata.title = currentEpisode.title;
+      metadata.subtitle =
+        currentEpisode.podcastTitle && currentEpisode.author
+          ? `${currentEpisode.podcastTitle} – ${currentEpisode.author}`
+          : currentEpisode.podcastTitle || currentEpisode.author || '';
+      if (currentEpisode.published) {
+        metadata.releaseDate = new Date(currentEpisode.published).toISOString();
+      }
+      metadata.images = [new chrome.cast.Image(currentEpisode.episodeArt || currentEpisode.cover)];
+      mediaInfo.metadata = metadata;
+      const request = new chrome.cast.media.LoadRequest(mediaInfo);
+      request.currentTime = getSeekPosition(get()) || 0;
+      // @ts-expect-error Missing type definiton in upstream
+      // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
+      request.playbackRate = getRate(get());
       try {
-        await context.requestSession();
-        session = context.getCurrentSession();
+        set({ isChromecastConnecting: true });
+        await session.loadMedia(request);
+        const remotePlayer = new cast.framework.RemotePlayer();
+        const remotePlayerController = new cast.framework.RemotePlayerController(remotePlayer);
+
+        // Unload native audio element
+        AudioUtils.stop();
+
+        // Update player state using Chromecast
+        set({
+          remotePlayer,
+          remotePlayerController,
+          state: getAdaptedPlaybackState(remotePlayer.playerState),
+        });
       } catch (err) {
-        console.error('Error requesting session', err);
+        console.error('Error loading media', err);
+      } finally {
+        set({ isChromecastConnecting: false });
       }
-    }
-    if (!session) return;
+    },
 
-    const mediaInfo = new chrome.cast.media.MediaInfo(
-      currentEpisode.file.url,
-      currentEpisode.file.type,
-    );
-    const metadata = new chrome.cast.media.GenericMediaMetadata();
-    metadata.title = currentEpisode.title;
-    metadata.subtitle =
-      currentEpisode.podcastTitle && currentEpisode.author
-        ? `${currentEpisode.podcastTitle} – ${currentEpisode.author}`
-        : currentEpisode.podcastTitle || currentEpisode.author || '';
-    if (currentEpisode.published) {
-      metadata.releaseDate = new Date(currentEpisode.published).toISOString();
-    }
-    metadata.images = [new chrome.cast.Image(currentEpisode.episodeArt || currentEpisode.cover)];
-    mediaInfo.metadata = metadata;
-    const request = new chrome.cast.media.LoadRequest(mediaInfo);
-    request.currentTime = getSeekPosition(get()) || 0;
-    // @ts-expect-error Missing type definiton in upstream
-    // Source {@link https://developers.google.com/cast/docs/reference/web_sender/chrome.cast.media.LoadRequest#playbackRate}
-    request.playbackRate = getRate(get());
-    try {
-      set({ isChromecastConnecting: true });
-      await session.loadMedia(request);
-      const remotePlayer = new cast.framework.RemotePlayer();
-      const remotePlayerController = new cast.framework.RemotePlayerController(remotePlayer);
-
-      // Unload native audio element
-      AudioUtils.stop();
-
-      // Update player state using Chromecast
+    syncSeekAndPause: () => {
       set({
-        remotePlayer,
-        remotePlayerController,
-        state: getAdaptedPlaybackState(remotePlayer.playerState),
+        state: 'paused',
       });
-    } catch (err) {
-      console.error('Error loading media', err);
-    } finally {
-      set({ isChromecastConnecting: false });
-    }
-  },
+      // Initialize audio if not configured
+      const currentState = get();
+      if (!currentState.audioInitialised) {
+        AudioUtils.init({
+          stopEpisode: currentState.onPlaybackEnd,
+          setPlaybackStarted: () => currentState.setPlayerState('playing'),
+          seekUpdate: currentState.setSeekPosition,
+          duration: currentState.setDuration,
+          setIsAirplayEnabled: currentState.setIsAirplayEnabled,
+        });
+      }
 
-  syncSeekAndPause: () => {
-    set({
-      state: 'paused',
-    });
-    // Initialize audio if not configured
-    const currentState = get();
-    if (!currentState.audioInitialised) {
-      AudioUtils.init({
-        stopEpisode: currentState.onPlaybackEnd,
-        setPlaybackStarted: () => currentState.setPlayerState('playing'),
-        seekUpdate: currentState.setSeekPosition,
-        duration: currentState.setDuration,
-        setIsAirplayEnabled: currentState.setIsAirplayEnabled,
-      });
-    }
+      // Sync local audio seek to Chromecast
+      const currentEpisode = getCurrentEpisode(get());
+      const seekPosition = getSeekPosition(get());
+      if (currentEpisode) AudioUtils.loadAtSeek(currentEpisode, seekPosition);
+    },
 
-    // Sync local audio seek to Chromecast
-    const currentEpisode = getCurrentEpisode(get());
-    const seekPosition = getSeekPosition(get());
-    if (currentEpisode) AudioUtils.loadAtSeek(currentEpisode, seekPosition);
-  },
+    skipToNextEpisode: () =>
+      set((prevState) => ({
+        state: 'buffering',
+        currentTrackIndex: (prevState.currentTrackIndex + 1) % prevState.queue.length,
+      })),
 
-  skipToNextEpisode: () =>
-    set((prevState) => ({
-      state: 'buffering',
-      currentTrackIndex: (prevState.currentTrackIndex + 1) % prevState.queue.length,
-    })),
+    skipToPreviousEpisode: () =>
+      set((prevState) => ({
+        state: 'buffering',
+        currentTrackIndex:
+          prevState.currentTrackIndex === 0
+            ? prevState.queue.length - 1
+            : prevState.currentTrackIndex - 1,
+      })),
 
-  skipToPreviousEpisode: () =>
-    set((prevState) => ({
-      state: 'buffering',
-      currentTrackIndex:
-        prevState.currentTrackIndex === 0
-          ? prevState.queue.length - 1
-          : prevState.currentTrackIndex - 1,
-    })),
+    seekBackward: () => {
+      const { duration, seekPosition, seekTo } = get();
+      const newSeekPosition = seekUtils.seekBackward(seekPosition, duration);
+      seekTo(newSeekPosition);
+    },
 
-  seekBackward: () => {
-    const { duration, seekPosition, seekTo } = get();
-    const newSeekPosition = seekUtils.seekBackward(seekPosition, duration);
-    seekTo(newSeekPosition);
-  },
+    seekForward: () => {
+      const { duration, seekPosition, seekTo } = get();
+      const newSeekPosition = seekUtils.seekForward(seekPosition, duration);
+      seekTo(newSeekPosition);
+    },
 
-  seekForward: () => {
-    const { duration, seekPosition, seekTo } = get();
-    const newSeekPosition = seekUtils.seekForward(seekPosition, duration);
-    seekTo(newSeekPosition);
-  },
+    seekTo: (seconds) => {
+      const { chromecastState } = get();
+      if (!isChromecastConnected(chromecastState)) {
+        return AudioUtils.seekTo(seconds);
+      }
 
-  seekTo: (seconds) => {
-    const { chromecastState } = get();
-    if (!isChromecastConnected(chromecastState)) {
-      return AudioUtils.seekTo(seconds);
-    }
+      const seekRequest = new chrome.cast.media.SeekRequest();
+      seekRequest.currentTime = seconds;
 
-    const seekRequest = new chrome.cast.media.SeekRequest();
-    seekRequest.currentTime = seconds;
+      const context = cast.framework.CastContext.getInstance();
+      const session = context.getCurrentSession();
+      session?.getMediaSession()?.seek(seekRequest, seekUtils.onSeekSuccess, seekUtils.onSeekError);
+    },
 
-    const context = cast.framework.CastContext.getInstance();
-    const session = context.getCurrentSession();
-    session?.getMediaSession()?.seek(seekRequest, seekUtils.onSeekSuccess, seekUtils.onSeekError);
-  },
+    setVolume: (volume) => {
+      const { chromecastState } = get();
+      if (!isChromecastConnected(chromecastState)) {
+        return AudioUtils.setVolume(volume);
+      }
 
-  setVolume: (volume) => {
-    const { chromecastState } = get();
-    if (!isChromecastConnected(chromecastState)) {
-      return AudioUtils.setVolume(volume);
-    }
+      const context = cast.framework.CastContext.getInstance();
+      const session = context.getCurrentSession();
+      session?.setVolume(volume);
+    },
 
-    const context = cast.framework.CastContext.getInstance();
-    const session = context.getCurrentSession();
-    session?.setVolume(volume);
-  },
+    mute: (muted) => {
+      const { chromecastState } = get();
+      if (!isChromecastConnected(chromecastState)) {
+        return AudioUtils.mute(muted);
+      }
 
-  mute: (muted) => {
-    const { chromecastState } = get();
-    if (!isChromecastConnected(chromecastState)) {
-      return AudioUtils.mute(muted);
-    }
+      const context = cast.framework.CastContext.getInstance();
+      const session = context.getCurrentSession();
+      session?.setMute(muted);
+    },
 
-    const context = cast.framework.CastContext.getInstance();
-    const session = context.getCurrentSession();
-    session?.setMute(muted);
-  },
+    setRate: (rate) => {
+      const { chromecastState } = get();
+      if (!isChromecastConnected(chromecastState)) {
+        AudioUtils.setRate(rate);
+        set({ rate });
+        return;
+      }
 
-  setRate: (rate) => {
-    const { chromecastState } = get();
-    if (!isChromecastConnected(chromecastState)) {
-      AudioUtils.setRate(rate);
-      set({ rate });
-      return;
-    }
+      const context = cast.framework.CastContext.getInstance();
+      const session = context.getCurrentSession();
+      const mediaSession = session?.getMediaSession();
 
-    const context = cast.framework.CastContext.getInstance();
-    const session = context.getCurrentSession();
-    const mediaSession = session?.getMediaSession();
-
-    /**
-     * Source
-     * {@link https://github.com/jellyfin-archive/cordova-plugin-chromecast/issues/64}
-     * {@link https://developers.google.com/cast/docs/reference/web_receiver/cast.framework.messages.SetPlaybackRateRequestData}
-     */
-    session
-      ?.sendMessage('urn:x-cast:com.google.cast.media', {
-        type: 'SET_PLAYBACK_RATE',
-        playbackRate: rate,
-        requestId: Date.now(),
-        mediaSessionId: mediaSession?.mediaSessionId,
-      })
-      .then(() => set({ rate }))
-      .catch((error) => console.error('Error setting rate', error));
-  },
-}));
+      /**
+       * Source
+       * {@link https://github.com/jellyfin-archive/cordova-plugin-chromecast/issues/64}
+       * {@link https://developers.google.com/cast/docs/reference/web_receiver/cast.framework.messages.SetPlaybackRateRequestData}
+       */
+      session
+        ?.sendMessage('urn:x-cast:com.google.cast.media', {
+          type: 'SET_PLAYBACK_RATE',
+          playbackRate: rate,
+          requestId: Date.now(),
+          mediaSessionId: mediaSession?.mediaSessionId,
+        })
+        .then(() => set({ rate }))
+        .catch((error) => console.error('Error setting rate', error));
+    },
+  }) as IPlayerState),
+);
 
 usePlayer.subscribe((currentState, previousState) => {
   const currentEpisode = currentState.queue[currentState.currentTrackIndex];

@@ -12,12 +12,12 @@ export const Duration = () => {
   useEffect(
     () =>
       usePlayer.subscribe(
+        (playerState) => playerState.seekPosition,
         (seekPosition) => {
           const seekPositionEl = seekPositionRef.current;
           if (!seekPositionEl) return;
-          seekPositionEl.innerText = formatSecondsToTimestamp(seekPosition as number);
+          seekPositionEl.innerText = formatSecondsToTimestamp(seekPosition);
         },
-        (playerState) => playerState.seekPosition,
       ),
     [],
   );
@@ -25,12 +25,12 @@ export const Duration = () => {
   useEffect(
     () =>
       usePlayer.subscribe(
+        (playerState) => playerState.duration,
         (duration) => {
           const durationEl = durationRef.current;
           if (!durationEl) return;
-          durationEl.innerText = formatSecondsToTimestamp(duration as number);
+          durationEl.innerText = formatSecondsToTimestamp(duration);
         },
-        (playerState) => playerState.duration,
       ),
     [],
   );

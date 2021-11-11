@@ -40,7 +40,7 @@
     "react-dom": "18.0.0-alpha-4298ddbc5-20211023",
     "react-virtual": "2.8.1",
     "swr": "1.0.1",
-    "zustand": "3.5.10"
+    "zustand": "3.6.5"
   },
   "devDependencies": {
     "@types/chromecast-caf-sender": "1.0.4",

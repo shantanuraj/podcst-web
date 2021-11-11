@@ -30,10 +30,10 @@ export const Seekbar: React.FC<{
   useEffect(
     () =>
       usePlayer.subscribe(
-        (duration) => {
-          durationRef.current = duration as number;
-        },
         (playerState) => playerState.duration,
+        (duration) => {
+          durationRef.current = duration;
+        },
       ),
     [],
   );
@@ -41,16 +41,16 @@ export const Seekbar: React.FC<{
   useEffect(
     () =>
       usePlayer.subscribe(
+        (playerState) => playerState.seekPosition,
         (seekPosition) => {
           requestAnimationFrame(() => {
             if (!seekbarRef.current) return;
             seekbarRef.current.style.width = getSeekWidth(
-              seekPosition as number,
+              seekPosition,
               durationRef.current,
             );
           });
         },
-        (playerState) => playerState.seekPosition,
       ),
     [],
   );
