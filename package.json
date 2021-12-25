@@ -28,7 +28,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@shopify/react-web-worker": "2.1.7",
+    "@shopify/react-web-worker": "4.0.1",
     "downshift": "6.1.7",
     "howler": "2.2.3",
     "idb-keyval": "6.0.2",
