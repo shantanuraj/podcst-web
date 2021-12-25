@@ -1,5 +1,8 @@
 const package = require('./package.json');
 
+/**
+ * @type {import('next').NextConfig}
+ */
 module.exports = {
   env: {
     appVersion: package.version,
@@ -11,6 +14,7 @@ module.exports = {
     esmExternals: false,
     legacyBrowsers: false,
     browsersListForSwc: true,
+    runtime: 'nodejs'
   },
   async redirects() {
     return [
