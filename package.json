@@ -33,10 +33,10 @@
     "howler": "2.2.3",
     "idb-keyval": "6.0.2",
     "match-sorter": "6.3.1",
-    "next": "12.0.7",
+    "next": "12.1.0",
     "normalize.css": "8.0.1",
-    "react": "18.0.0-rc.0-next-20212349a-20211223",
-    "react-dom": "18.0.0-rc.0-next-20212349a-20211223",
+    "react": "18.0.0-rc.3",
+    "react-dom": "18.0.0-rc.3",
     "react-virtual": "2.8.1",
     "swr": "1.0.1",
     "zustand": "3.6.5"
