@@ -28,15 +28,15 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@shopify/react-web-worker": "4.0.1",
+    "@shopify/react-web-worker": "5.0.1",
     "downshift": "6.1.7",
     "howler": "2.2.3",
     "idb-keyval": "6.0.2",
     "match-sorter": "6.3.1",
-    "next": "12.1.0",
+    "next": "12.1.6",
     "normalize.css": "8.0.1",
-    "react": "18.0.0-rc.3",
-    "react-dom": "18.0.0-rc.3",
+    "react": "18.1.0",
+    "react-dom": "18.1.0",
     "react-virtual": "2.8.1",
     "swr": "1.0.1",
     "zustand": "3.6.5"
