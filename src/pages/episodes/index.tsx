@@ -20,8 +20,6 @@ const EpisodesPage: NextPage<EpisodesPageProps> = (props) => {
 
   const { episodes } = info;
 
-  /* TODO 2021-08-15 Check why EpisodesList crashes when rendered under EpisodesInfo page on SSR when using the PlayButton in DOM */
-  if (typeof window === 'undefined') return null;
   return (
     <EpisodesList episodes={episodes}>
       <PodcastInfo info={info} />

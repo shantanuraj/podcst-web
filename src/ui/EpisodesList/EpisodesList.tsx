@@ -49,7 +49,7 @@ const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: str
 };
 const sortOptions = Object.values(sortOptionsMap);
 
-export function EpisodesList({ className = '', children, episodes }: EpisodesListProps) {
+export function EpisodesList({ className = '', children, episodes = [] }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [sortPreference, setSortPreference] = useState<SortPreference>(
     sortOptionsMap.releaseDesc.value,
@@ -115,8 +115,10 @@ export function EpisodesList({ className = '', children, episodes }: EpisodesLis
 
 const getRowHeight = () =>
   parseInt(
-    getComputedStyle(document.documentElement)
-      .getPropertyValue('--dimen-episode-list-item-size')
-      .trim()
-      .replace('px', ''),
+    'getComputedStyle' in global
+      ? getComputedStyle(document.documentElement)
+          .getPropertyValue('--dimen-episode-list-item-size')
+          .trim()
+          .replace('px', '')
+      : '84',
   );
