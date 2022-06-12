@@ -23,8 +23,6 @@ const RecentsPage: NextPage = () => {
     init().then(syncAllSubscriptions);
   }, []);
 
-  if (typeof window === 'undefined') return null;
-
   if (episodes.length) {
     return (
       <React.Fragment>
