@@ -18,6 +18,14 @@
   background-color: var(--color-background-light);
 }
 
+.container.export {
+  justify-content: center;
+}
+
+.container.export button {
+  min-width: 200px;
+}
+
 form.container > div {
   display: flex;
   align-items: center;

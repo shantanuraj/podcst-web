@@ -13,6 +13,9 @@ const SettingsPage: NextPage = () => {
       <Link href="/settings/shortcuts">
         <a>Shortcuts</a>
       </Link>
+      <Link href="/settings/export">
+        <a>Export</a>
+      </Link>
       <Link href="#about">
         <a>Version: {process.env.appVersion}</a>
       </Link>
