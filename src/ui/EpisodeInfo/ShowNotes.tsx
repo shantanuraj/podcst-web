@@ -23,10 +23,13 @@ export const ShowNotes = ({ className = '', episode }: IShowNotesProps) => {
     },
     [episode, seekTo],
   );
+  const showNotes = React.useMemo(() => {
+    return { __html: linkifyText(episode.showNotes) }
+  }, [episode.showNotes]);
   return (
     <div className={`${styles.showNotes} ${className}`} onClick={handleTimestampClick}>
       <h3>Show Notes</h3>
-      <div dangerouslySetInnerHTML={{ __html: linkifyText(episode.showNotes) }} />
+      <div dangerouslySetInnerHTML={showNotes} />
     </div>
   );
 };
