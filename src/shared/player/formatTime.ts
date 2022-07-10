@@ -10,3 +10,9 @@ export const formatSecondsToTimestamp = (seconds: number): string => {
     .join(':');
   return time;
 };
+
+// Format hh:mm:ss or mm:ss format into seconds
+export const getSecondsFromTimestamp = (timestamp: string): number => {
+  const [ss, mm, hh = 0] = timestamp.split(':').map((t) => parseInt(t, 10)).reverse();
+  return hh * 3600 + mm * 60 + ss;
+}
