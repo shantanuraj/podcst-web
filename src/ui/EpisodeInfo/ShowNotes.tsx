@@ -1,31 +1,32 @@
 import React from 'react';
 import { linkifyText } from '../../shared/link/linkify-text';
 import { getSecondsFromTimestamp } from '../../shared/player/formatTime';
-import { getSeekTo, usePlayer } from '../../shared/player/usePlayer';
+import { getSeekOrStartAt, usePlayer } from '../../shared/player/usePlayer';
+import { IEpisodeInfo } from '../../types';
 
 import styles from './EpisodeInfo.module.css';
 
 interface IShowNotesProps {
   className?: string;
-  showNotes: string;
+  episode: IEpisodeInfo;
 }
 
-export const ShowNotes = ({ className = '', showNotes }: IShowNotesProps) => {
-  const seekTo = usePlayer(getSeekTo);
+export const ShowNotes = ({ className = '', episode }: IShowNotesProps) => {
+  const seekTo = usePlayer(getSeekOrStartAt);
   const handleTimestampClick = React.useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (isTimeStampButton(e.target)) {
         const timestamp = e.target.dataset.timestamp;
         if (!timestamp) return;
-        seekTo(getSecondsFromTimestamp(timestamp));
+        seekTo(episode, getSecondsFromTimestamp(timestamp));
       }
     },
-    [seekTo],
+    [episode, seekTo],
   );
   return (
     <div className={`${styles.showNotes} ${className}`} onClick={handleTimestampClick}>
       <h3>Show Notes</h3>
-      <div dangerouslySetInnerHTML={{ __html: linkifyText(showNotes) }} />
+      <div dangerouslySetInnerHTML={{ __html: linkifyText(episode.showNotes) }} />
     </div>
   );
 };

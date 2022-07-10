@@ -149,7 +149,7 @@ export type PlayerState = 'playing' | 'paused' | 'idle' | 'buffering';
 export interface IPlaybackControls {
   seekPosition: number;
   setSeekPosition: (position: number) => void;
-  playEpisode: (episode: IEpisodeInfo) => void;
+  playEpisode: (episode: IEpisodeInfo, seekPosition?: number) => void;
   resumeEpisode: () => void;
   togglePlayback: () => void;
   setPlayerState: (state: 'playing' | 'paused' | 'idle') => void;
@@ -160,4 +160,5 @@ export interface IPlaybackControls {
   mute: (muted: boolean) => void;
   rate: number;
   setRate: (rate: number) => void;
+  seekOrStartAt: (episode: IEpisodeInfo, seekPosition: number) => void;
 }

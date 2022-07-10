@@ -42,7 +42,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             url={router.asPath}
           />
         </div>
-        <ShowNotes className={styles.episodeNotes} showNotes={showNotes} />
+        <ShowNotes className={styles.episodeNotes} episode={episode} />
       </div>
     </div>
   );
