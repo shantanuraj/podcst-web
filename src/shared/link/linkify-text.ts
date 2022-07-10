@@ -1,4 +1,5 @@
 const URL_REGEX = /^https?:\//;
+const TIME_REGEX = /(?:(?:([0-9]|0[0-9]|1[0-9]|2[0-3]):)?([0-5][0-9])):?([0-5][0-9])/;
 
 /**
  * Returns normalized link
@@ -32,6 +33,15 @@ export const linkifyText = (text: string | undefined): string => {
 
     if (URL_REGEX.test(token)) {
       return getLink(token, maybeSpace);
+    }
+    if (TIME_REGEX.test(token)) {
+      const timestamp = TIME_REGEX.exec(token)!.slice(1)
+        .filter(t => t)
+        .join(':');
+      return token.replace(
+        timestamp,
+        `<button data-timestamp="${timestamp}">${timestamp}</button>`,
+      );
     } else {
       return token + maybeSpace;
     }

@@ -71,6 +71,10 @@
   padding: 0;
 }
 
+.showNotes button[data-timestamp] {
+  color: var(--color-accent);
+}
+
 @media only screen and (max-width: 600px) {
   .buttons {
     width: 100%;
