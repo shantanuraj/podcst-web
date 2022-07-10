@@ -96,7 +96,7 @@ export default class AudioUtils {
     AudioUtils.volume = getInitialVolume();
   }
 
-  public static play(episode: IEpisode, start: boolean = true) {
+  public static play(episode: IEpisode, start: boolean = true, seekPosition: number = 0) {
     AudioUtils.stop();
     AudioUtils.playbackId = undefined;
     AudioUtils.playbackInstance = new Howl({
@@ -131,6 +131,7 @@ export default class AudioUtils {
       },
     });
 
+    AudioUtils.playbackInstance.seek(seekPosition);
     // Start playback
     if (start) AudioUtils.playbackId = AudioUtils.playbackInstance.play();
   }

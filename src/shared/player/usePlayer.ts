@@ -71,7 +71,7 @@ export const usePlayer = create<
       }
     },
 
-    playEpisode: (episode) =>
+    playEpisode: (episode, seekPosition = 0) =>
       set((prevState) => {
         let queue = prevState.queue;
         let trackIndex = queue.findIndex((queuedEpisode) => queuedEpisode.guid === episode.guid);
@@ -88,7 +88,7 @@ export const usePlayer = create<
           queue,
           state: 'buffering',
           currentTrackIndex: trackIndex,
-          seekPosition: 0,
+          seekPosition,
         };
       }),
 
@@ -302,6 +302,15 @@ export const usePlayer = create<
         .then(() => set({ rate }))
         .catch((error) => console.error('Error setting rate', error));
     },
+
+    seekOrStartAt(episode, seekPosition) {
+      const playerState = get();
+      const isCurrentEpisode = getCurrentEpisode(playerState)?.guid === episode.guid && playerState.state !== 'idle';
+      if (isCurrentEpisode) {
+        return playerState.seekTo(seekPosition);
+      }
+      return playerState.playEpisode(episode, seekPosition);
+    },
   }) as IPlayerState),
 );
 
@@ -345,7 +354,7 @@ usePlayer.subscribe((currentState, previousState) => {
           });
           updatePlaybackHandlers(currentState);
         }
-        if (currentEpisode) AudioUtils.play(currentEpisode);
+        if (currentEpisode) AudioUtils.play(currentEpisode, true, currentState.seekPosition);
         break;
       case 'paused':
         AudioUtils.pause();
@@ -393,3 +402,4 @@ export const getIsChromecastConnected = (state: IPlayerState) =>
 export const getSyncSeekAndPause = (state: IPlayerState) => state.syncSeekAndPause;
 export const getQueueEpisode = (state: IPlayerState) => state.queueEpisode;
 export const getEpisodesQueue = (state: IPlayerState) => state.queue;
+export const getSeekOrStartAt = (state: IPlayerState) => state.seekOrStartAt;
