@@ -60,7 +60,7 @@ export function Search() {
         placeholder="Search"
       />
       <ul {...getMenuProps()} className={styles.results}>
-        {isOpen &&
+        {isOpen && Array.isArray(searchResults) &&
           searchResults.map((item, index) => (
             <li
               data-highlighted={highlightedIndex === index}
