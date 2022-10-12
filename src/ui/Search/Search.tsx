@@ -32,7 +32,6 @@ export function Search() {
 
   const response = useSearch(term);
   const searchResults = response.data || emptyResult;
-  console.log({ response, searchResults });
 
   const onInputValueChange = React.useCallback(
     (changes: UseComboboxStateChange<IPodcastSearchResult>) => {
