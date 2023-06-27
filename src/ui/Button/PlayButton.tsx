@@ -7,16 +7,18 @@ import {
 } from '../../shared/player/usePlayer';
 
 import { IEpisodeInfo } from '../../types';
+import { Icon } from '../icons/svg/Icon';
 import { Button, ButtonProps } from './Button';
+import styles from './Button.module.css';
 
-export interface PlayButtonProps extends ButtonProps {
+export type PlayButtonProps = ButtonProps & {
   episode: IEpisodeInfo;
-  children?: (props: { isCurrentEpisode: boolean; isPlaying: boolean }) => JSX.Element;
-}
+  icon?: boolean;
+};
 
 export const PlayButton = memo(
   forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButton(
-    { episode, children = PlayButtonContent, ...props },
+    { episode, icon, ...props },
     ref,
   ) {
     const state = usePlayer(getPlaybackState);
@@ -26,6 +28,9 @@ export const PlayButton = memo(
     const play = usePlayer(selectPlay);
     const resume = usePlayer(selectResume);
     const setPlayerState = usePlayer(selectSetPlayerState);
+
+    const children = icon ? PlayButtonIconContent : PlayButtonContent;
+    const className = `${props.className || ''} ${icon ? styles.withIcon : ''}`.trim();
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
@@ -41,7 +46,13 @@ export const PlayButton = memo(
     );
 
     return (
-      <Button {...props} ref={ref} onClick={handleClick} data-is-current={isCurrentEpisode}>
+      <Button
+        {...props}
+        className={className}
+        ref={ref}
+        onClick={handleClick}
+        data-is-current={isCurrentEpisode}
+      >
         {children({ isCurrentEpisode, isPlaying })}
       </Button>
     );
@@ -53,6 +64,16 @@ PlayButton.displayName = 'PlayButton';
 const PlayButtonContent = (props: { isCurrentEpisode: boolean; isPlaying: boolean }) => {
   const { isCurrentEpisode, isPlaying } = props;
   return isCurrentEpisode ? (isPlaying ? 'Pause' : 'Resume') : 'Play';
+};
+
+const PlayButtonIconContent = ({
+  isCurrentEpisode,
+  isPlaying,
+}: {
+  isCurrentEpisode: boolean;
+  isPlaying: boolean;
+}) => {
+  return <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={30} />;
 };
 
 const selectIsCurrentEpisode = (episode: IEpisodeInfo) => (playerState: IPlayerState) =>

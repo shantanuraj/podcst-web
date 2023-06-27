@@ -15,13 +15,8 @@ import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
 
-const {
-  togglePlayback,
-  seekBackward,
-  seekForward,
-  skipToNextEpisode,
-  skipToPreviousEpisode,
-} = usePlayer.getState();
+const { togglePlayback, seekBackward, seekForward, skipToNextEpisode, skipToPreviousEpisode } =
+  usePlayer.getState();
 
 export const Player = () => {
   const currentEpisode = usePlayer(getCurrentEpisode);
@@ -39,13 +34,12 @@ export const Player = () => {
               pathname: '/episode',
               query: { feed: currentEpisode.feed, guid: currentEpisode.guid },
             }}
+            className={styles.imageCoverLink}
           >
-            <a className={styles.imageCoverLink}>
-              <img
-                alt={`${currentEpisode.title} by ${currentEpisode.author}`}
-                src={currentEpisode.cover}
-              />
-            </a>
+            <img
+              alt={`${currentEpisode.title} by ${currentEpisode.author}`}
+              src={currentEpisode.cover}
+            />
           </Link>
           <Duration />
           <div className={styles.controlInfoGroup}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import create from 'zustand';
+import { create } from 'zustand';
 
 type ToastState = {
   message: React.ReactNode | null;

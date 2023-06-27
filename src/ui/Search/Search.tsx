@@ -1,5 +1,3 @@
-/// <reference types="react/next" />
-
 import { useCombobox, UseComboboxStateChange } from 'downshift';
 import Link from 'next/link';
 import router from 'next/router';
@@ -40,18 +38,17 @@ export function Search() {
     [],
   );
 
-  const { isOpen, getMenuProps, getInputProps, getComboboxProps, highlightedIndex, getItemProps } =
-    useCombobox({
-      items: searchResults,
-      onInputValueChange,
-      itemToString: serealizeSearchResult,
-      onSelectedItemChange: onSelectionChange,
-      id: 'search',
-      inputId: 'search',
-    });
+  const { isOpen, getMenuProps, getInputProps, highlightedIndex, getItemProps } = useCombobox({
+    items: searchResults,
+    onInputValueChange,
+    itemToString: serealizeSearchResult,
+    onSelectedItemChange: onSelectionChange,
+    id: 'search',
+    inputId: 'search',
+  });
 
   return (
-    <div {...getComboboxProps()} className={styles.search}>
+    <div className={styles.search}>
       {response.isValidating && <LoadBar />}
       <input
         {...getInputProps({ ref: searchRef })}
@@ -60,7 +57,8 @@ export function Search() {
         placeholder="Search"
       />
       <ul {...getMenuProps()} className={styles.results}>
-        {isOpen && Array.isArray(searchResults) &&
+        {isOpen &&
+          Array.isArray(searchResults) &&
           searchResults.map((item, index) => (
             <li
               data-highlighted={highlightedIndex === index}
@@ -77,14 +75,12 @@ export function Search() {
 
 const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
   return (
-    <Link href={`/episodes?feed=${podcast.feed}`}>
-      <a className={styles.searchItem}>
-        <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
-        <div>
-          <p className={styles.title}>{podcast.title}</p>
-          <p className={styles.author}>{podcast.author}</p>
-        </div>
-      </a>
+    <Link href={`/episodes?feed=${podcast.feed}`} className={styles.searchItem}>
+      <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
+      <div>
+        <p className={styles.title}>{podcast.title}</p>
+        <p className={styles.author}>{podcast.author}</p>
+      </div>
     </Link>
   );
 };

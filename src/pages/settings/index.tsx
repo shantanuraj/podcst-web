@@ -8,16 +8,16 @@ const SettingsPage: NextPage = () => {
   return (
     <nav className={styles.container}>
       <Link href="/settings/theme">
-        <a>Change Theme</a>
+        Change Theme
       </Link>
       <Link href="/settings/shortcuts">
-        <a>Shortcuts</a>
+        Shortcuts
       </Link>
       <Link href="/settings/export">
-        <a>Export</a>
+        Export
       </Link>
-      <Link href="#about">
-        <a>Version: {process.env.appVersion}</a>
+      <Link href="#about" legacyBehavior>
+        Version:{process.env.appVersion}
       </Link>
     </nav>
   );

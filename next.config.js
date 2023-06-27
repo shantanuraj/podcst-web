@@ -1,11 +1,11 @@
-const package = require('./package.json');
+const pkg = require('./package.json');
 
 /**
  * @type {import('next').NextConfig}
  */
 module.exports = {
   env: {
-    appVersion: package.version,
+    appVersion: pkg.version,
   },
   reactStrictMode: true,
   swcMinify: true,
@@ -13,8 +13,6 @@ module.exports = {
     // TODO 2021-12-25 Remove when shopify-web-workers are fixed
     esmExternals: false,
     legacyBrowsers: false,
-    browsersListForSwc: true,
-    runtime: 'nodejs'
   },
   async redirects() {
     return [
