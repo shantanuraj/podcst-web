@@ -1,4 +1,3 @@
-import Head from 'next/head';
 import Script from 'next/script';
 
 import { CastManager } from '../components/CastManager/CastManager';
@@ -10,48 +9,63 @@ import { Init } from './Init';
 
 import '../styles/global.css';
 import styles from './PodcstApp.module.css';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  metadataBase: new URL('https://www.podcst.app'),
+  title: {
+    default: 'Plays your favourite podcasts on all devices',
+    template: '%s | Podcst',
+  },
+  description: 'Plays your favourite podcasts on all devices',
+  authors: {
+    name: 'Shantanu Raj',
+    url: 'https://sraj.me',
+  },
+  viewport: 'initial-scale=1.0, width=device-width',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#60347f' },
+    { media: '(prefers-color-scheme: dark)', color: '#00b778' },
+  ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Podcst',
+  },
+  openGraph: {
+    url: 'https://www.podcst.app',
+    locale: 'en_US',
+    siteName: 'Podcst',
+    type: 'website',
+    title: 'Podcst | Plays your favourite podcasts on all devices',
+    description: 'Plays your favourite podcasts on all devices',
+    images: 'https://www.podcst.app/receiver/cast-background.jpg',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    creator: '@shantanuraj',
+    images: [
+      'https://www.podcst.app/receiver/cast-background.jpg',
+      'https://www.podcst.app/icons/launcher-512.png',
+    ],
+  },
+  icons: {
+    apple: [
+      'https://www.podcst.app/icons/launcher-96.png',
+      'https://www.podcst.app/icons/launcher-144.png',
+      'https://www.podcst.app/icons/launcher-192.png',
+      'https://www.podcst.app/icons/launcher-512.png',
+    ],
+    icon: '/icons/launcher-192.png',
+  },
+};
 
 export default function App({ children }: { children: React.ReactNode }) {
   return (
     <html>
-      <Head>
-        <title>Podcst</title>
+      <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="initial-scale=1.0, width=device-width" />
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#60347f" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#00b778" />
-
-        <meta property="og:title" content="Podcst | Plays your favourite podcasts on all devices" />
-        <meta property="og:site_name" content="Podcst" />
-        <meta property="og:type" content="website" />
-        <meta property="og:description" content="Plays your favourite podcasts on all devices" />
-        <meta property="og:url" content="https://www.podcst.app" />
-        <meta property="og:locale" content="en_US" />
-        <meta property="og:image" content="/icons/launcher-512.png" />
-
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:description" content="Plays your favourite podcasts on all devices" />
-        <meta
-          name="twitter:title"
-          content="Podcst | Plays your favourite podcasts on all devices"
-        />
-        <meta name="twitter:site" content="@shantanuraj" />
-        <meta name="twitter:image" content="/icons/launcher-512.png" />
-        <meta name="twitter:creator" content="@shantanuraj" />
-
-        <link rel="shortcut icon" href="/icons/launcher-192.png" />
-        <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/ico" href="/icons/launcher-48.png" />
-
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Podcst" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-        <link rel="apple-touch-icon" href="/icons/launcher-96.png" />
-        <link rel="apple-touch-icon" sizes="144x144" href="/icons/launcher-144.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icons/launcher-192.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icons/launcher-512.png" />
-      </Head>
+      </head>
       <body>
         <Init />
         <Header />

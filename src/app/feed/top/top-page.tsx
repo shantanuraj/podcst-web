@@ -1,4 +1,3 @@
-import Head from 'next/head';
 import * as React from 'react';
 
 import { IPodcast } from '../../../types';
@@ -10,9 +9,6 @@ export function Feed({ podcasts }: { podcasts: IPodcast[] }) {
 
   return (
     <React.Fragment>
-      <Head>
-        <title>Podcst | Top Podcasts</title>
-      </Head>
       <PodcastsGrid podcasts={podcasts} />
     </React.Fragment>
   );

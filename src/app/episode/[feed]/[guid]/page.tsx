@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Metadata } from 'next';
 
 import { fetchEpisodesInfo } from '../../../../data/episodes';
 import { IPodcastEpisodesInfo } from '../../../../types';
@@ -24,6 +25,32 @@ const Episode = (props: EpisodePageProps) => {
 
   return <EpisodeInfo podcast={info} episode={episode} />;
 };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { feed: string; guid: string };
+}): Promise<Partial<Metadata>> {
+  const feed = decodeURIComponent(params.feed);
+  const guid = decodeURIComponent(params.guid);
+  const guidParam = guid;
+
+  const info = typeof feed === 'string' && feed ? await fetchEpisodesInfo(feed) : null;
+  if (!info) return {};
+
+  const { episodes } = info;
+  const episode = episodes.find(({ guid }) => guid === guidParam);
+  if (!episode) return {};
+
+  const metadata: Metadata = {
+    title: episode.title,
+    description: episode.summary || `Listen to ${episode.title} from ${info.title}`,
+    openGraph: {
+      images: info.cover,
+    },
+  };
+  return metadata;
+}
 
 export default async function Page({
   params,

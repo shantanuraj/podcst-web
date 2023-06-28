@@ -1,6 +1,10 @@
 import { shortcuts } from '../../../shared/keyboard/shortcuts';
 import styles from '../Settings.module.css';
 
+export const metadata = {
+  title: 'Shortcuts',
+};
+
 export default function SettingsShortcutsPage() {
   return (
     <li className={styles.container}>
