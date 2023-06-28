@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@shopify/react-web-worker": "5.0.13",
+    "@vercel/analytics": "1.0.1",
     "downshift": "7.6.0",
     "howler": "2.2.3",
     "idb-keyval": "6.2.1",

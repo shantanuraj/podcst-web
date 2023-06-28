@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import Script from 'next/script';
 
 import { CastManager } from '../components/CastManager/CastManager';
@@ -97,6 +98,7 @@ document.dispatchEvent(event);
 };`}
         </Script>
         <Script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" />
+        <Analytics />
       </body>
     </html>
   );
