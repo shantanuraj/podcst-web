@@ -1,6 +1,8 @@
+'use client';
+
 import { useCombobox, UseComboboxStateChange } from 'downshift';
 import Link from 'next/link';
-import router from 'next/router';
+import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { useSearch } from '../../data/search';
@@ -12,6 +14,14 @@ import { LoadBar } from '../LoadBar';
 import styles from './Search.module.css';
 
 export function Search() {
+  const router = useRouter();
+  const onSelectionChange = React.useCallback(
+    (changes: UseComboboxStateChange<IPodcastSearchResult>) => {
+      if (!changes.selectedItem) return;
+      router.push(`/episodes/${encodeURIComponent(changes.selectedItem.feed)}`);
+    },
+    [router],
+  );
   const [inputTerm, setTerm] = React.useState('');
   const term = React.useDeferredValue(
     inputTerm,
@@ -75,7 +85,7 @@ export function Search() {
 
 const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
   return (
-    <Link href={`/episodes?feed=${podcast.feed}`} className={styles.searchItem}>
+    <Link href={`/episodes/${encodeURIComponent(podcast.feed)}`} className={styles.searchItem}>
       <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
       <div>
         <p className={styles.title}>{podcast.title}</p>
@@ -89,8 +99,4 @@ const deferConfig = { timeoutMs: 200 };
 const emptyResult: IPodcastSearchResult[] = [];
 const serealizeSearchResult = (item: IPodcastSearchResult | null) => {
   return item?.title || '';
-};
-const onSelectionChange = (changes: UseComboboxStateChange<IPodcastSearchResult>) => {
-  if (!changes.selectedItem) return;
-  router.push(`/episodes?feed=${changes.selectedItem.feed}`);
 };

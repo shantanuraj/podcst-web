@@ -1,4 +1,3 @@
-import router from 'next/router';
 import { useTheme } from '../theme/useTheme';
 import { shortcuts } from './shortcuts';
 import { KeyboardShortcuts, useKeydown } from './useKeydown';
@@ -9,7 +8,7 @@ export function useGlobalShortcuts() {
 
 const { cycleTheme } = useTheme.getState();
 
-const globalShortcuts: KeyboardShortcuts = [
+const globalShortcuts: KeyboardShortcuts = (router) => [
   [
     shortcuts.home,
     () => {

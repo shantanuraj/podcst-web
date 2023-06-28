@@ -1,7 +1,7 @@
 export interface IKeyboardShortcut {
-    key: string;
-    metaKey: boolean;
-    shiftKey: boolean;
+  key: string;
+  metaKey: boolean;
+  shiftKey: boolean;
 }
 
 export interface IShortcutInfo extends IKeyboardShortcut {

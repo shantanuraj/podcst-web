@@ -1,29 +1,19 @@
-import { Fragment, useEffect } from 'react';
-import { AppProps } from 'next/app';
 import Head from 'next/head';
 import Script from 'next/script';
 
-import { Header } from '../../ui/Header';
-import { useGlobalShortcuts } from '../../shared/keyboard/useGlobalShortcuts';
-import { removeDeprecatedStorage } from '../../shared/storage/local';
-import { Player } from '../../shared/player/Player';
-import { ThemeListener } from '../../shared/theme/ThemeListener';
-import { getInit, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
-import { CastManager } from '../CastManager/CastManager';
-import { RouteTransistion } from '../RouteTransistion';
-import { Toast } from '../../shared/toast/Toast';
+import { CastManager } from '../components/CastManager/CastManager';
+import { Player } from '../shared/player/Player';
+import { ThemeListener } from '../shared/theme/ThemeListener';
+import { Toast } from '../shared/toast/Toast';
+import { Header } from '../ui/Header';
+import { Init } from './Init';
 
+import '../styles/global.css';
 import styles from './PodcstApp.module.css';
 
-export default function App({ Component, pageProps }: AppProps) {
-  useEffect(removeDeprecatedStorage, []);
-  useGlobalShortcuts();
-  const init = useSubscriptions(getInit);
-  useEffect(() => {
-    init();
-  }, []);
+export default function App({ children }: { children: React.ReactNode }) {
   return (
-    <Fragment>
+    <html>
       <Head>
         <title>Podcst</title>
         <meta charSet="utf-8" />
@@ -62,38 +52,38 @@ export default function App({ Component, pageProps }: AppProps) {
         <link rel="apple-touch-icon" sizes="192x192" href="/icons/launcher-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/launcher-512.png" />
       </Head>
-      <Header />
+      <body>
+        <Init />
+        <Header />
 
-      <main className={styles.mainContainer}>
-        <Component {...pageProps} />
-      </main>
-      <Toast />
-      <Player />
-      <ThemeListener />
-      <CastManager />
-      <RouteTransistion />
-      <Script id="castsetup">
-        {`
-        window['__onGCastApiAvailable'] = function(isAvailable) {
-          if (
-            isAvailable &&
-            window.chrome &&
-            window.cast &&
-            window.chrome.cast &&
-            window.chrome.cast.media &&
-            window.cast.framework
-          ) {
-            // Custom receiver
-            window.cast.framework.CastContext.getInstance().setOptions({
-              receiverApplicationId: '5152FC99',
-              autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-            });
-            const event = new CustomEvent('cast-available', {});
-            document.dispatchEvent(event);
-          }
-        };`}
-      </Script>
-      <Script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" />
-    </Fragment>
+        <main className={styles.mainContainer}>{children}</main>
+        <Toast />
+        <Player />
+        <ThemeListener />
+        <CastManager />
+        <Script id="castsetup">
+          {`
+window['__onGCastApiAvailable'] = function(isAvailable) {
+if (
+isAvailable &&
+window.chrome &&
+window.cast &&
+window.chrome.cast &&
+window.chrome.cast.media &&
+window.cast.framework
+) {
+// Custom receiver
+window.cast.framework.CastContext.getInstance().setOptions({
+receiverApplicationId: '5152FC99',
+autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+});
+const event = new CustomEvent('cast-available', {});
+document.dispatchEvent(event);
+}
+};`}
+        </Script>
+        <Script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" />
+      </body>
+    </html>
   );
 }

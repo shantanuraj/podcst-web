@@ -1,9 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import React, { Fragment, useCallback, useEffect, useRef } from 'react';
 import { Search } from '../Search';
 
-import { shortcuts } from '../../shared/keyboard/shortcuts';
-import { useKeydown } from '../../shared/keyboard/useKeydown';
 import { Icon } from '../icons/svg/Icon';
 
 import styles from './Header.module.css';
@@ -47,7 +47,12 @@ export function Header() {
         <Search />
       </header>
       <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer}>
-        <button role="button" aria-label="Close drawer" onClick={onCloseDrawer} className={styles.closeNav}>
+        <button
+          role="button"
+          aria-label="Close drawer"
+          onClick={onCloseDrawer}
+          className={styles.closeNav}
+        >
           <Icon icon="back" />
         </button>
         <Link href="/feed/top">Home</Link>

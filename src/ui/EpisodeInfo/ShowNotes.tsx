@@ -1,10 +1,11 @@
+'use client';
+
 import React from 'react';
 import { linkifyText } from '../../shared/link/linkify-text';
-import { getSecondsFromTimestamp } from '../../shared/player/formatTime';
-import { getSeekOrStartAt, usePlayer } from '../../shared/player/usePlayer';
 import { IEpisodeInfo } from '../../types';
 
 import styles from './EpisodeInfo.module.css';
+import { ShowNotesHandler } from './ShowNotesHandler';
 
 interface IShowNotesProps {
   className?: string;
@@ -12,28 +13,14 @@ interface IShowNotesProps {
 }
 
 export const ShowNotes = ({ className = '', episode }: IShowNotesProps) => {
-  const seekTo = usePlayer(getSeekOrStartAt);
-  const handleTimestampClick = React.useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (isTimeStampButton(e.target)) {
-        const timestamp = e.target.dataset.timestamp;
-        if (!timestamp) return;
-        seekTo(episode, getSecondsFromTimestamp(timestamp));
-      }
-    },
-    [episode, seekTo],
-  );
   const showNotes = React.useMemo(() => {
-    return { __html: linkifyText(episode.showNotes) }
+    return { __html: linkifyText(episode.showNotes) };
   }, [episode.showNotes]);
   return (
-    <div className={`${styles.showNotes} ${className}`} onClick={handleTimestampClick}>
+    <div id="show-notes" className={`${styles.showNotes} ${className}`}>
       <h3>Show Notes</h3>
       <div dangerouslySetInnerHTML={showNotes} />
+      <ShowNotesHandler id="show-notes" episode={episode} />
     </div>
   );
 };
-
-function isTimeStampButton(target: EventTarget): target is HTMLButtonElement {
-  return (target as HTMLElement)?.matches('button[data-timestamp]');
-}

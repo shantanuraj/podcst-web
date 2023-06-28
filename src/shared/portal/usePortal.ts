@@ -1,3 +1,5 @@
+'use client';
+
 // Based on https://www.jayfreestone.com/writing/react-portals-with-hooks/
 import * as React from 'react';
 

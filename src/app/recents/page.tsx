@@ -1,3 +1,5 @@
+'use client';
+
 import { NextPage } from 'next';
 import * as React from 'react';
 
@@ -54,7 +56,7 @@ const EPISODES_LIMIT = 50;
  * Returns list of episodes sorted by publish date in descending order
  * @param subs - User Subcriptions
  */
-export const getRecents = (state: SubscriptionsState): IEpisodeInfo[] =>
+const getRecents = (state: SubscriptionsState): IEpisodeInfo[] =>
   Object.keys(state.subs)
     .map((feed) => state.subs[feed].episodes.slice(0, FEED_EPISODES_LIMIT))
     .reduce((acc, feedEpisodes) => [...acc, ...feedEpisodes], [])

@@ -8,12 +8,18 @@
 }
 
 .container > div,
+.container > ul,
 .container > a {
   padding: 32px;
   width: 100%;
 }
 
+.container > ul {
+  margin: 0;
+}
+
 .container > div:nth-child(even),
+.container > ul:nth-child(even),
 .container > a:nth-child(even) {
   background-color: var(--color-background-light);
 }
@@ -65,6 +71,7 @@ form.container svg {
 
 @media only screen and (max-width: 600px) {
   .container > div,
+  .container > ul,
   .container > a {
     padding: 32px 16px;
   }

@@ -1,15 +1,22 @@
 import React from 'react';
+
 import { IKeyboardShortcut, IShortcutInfo } from './shortcuts';
+import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context';
+import { useRouter } from 'next/navigation';
 
 type ShortcutHandler = (e: KeyboardEvent) => void;
-export type KeyboardShortcuts = Array<[IShortcutInfo, ShortcutHandler]>;
+export type KeyboardShortcuts = (
+  router: AppRouterInstance,
+) => Array<[IShortcutInfo, ShortcutHandler]>;
 
 export function useKeydown(shortcuts: KeyboardShortcuts): void;
 export function useKeydown(config: IShortcutInfo, handler: ShortcutHandler): void;
 export function useKeydown(
-  shortcutsOrConfig: KeyboardShortcuts | IShortcutInfo,
+  arg: KeyboardShortcuts | IShortcutInfo,
   handler?: ShortcutHandler,
 ): void {
+  const router = useRouter();
+  const shortcutsOrConfig = typeof arg === 'function' ? arg(router) : arg;
   const safeHandler = React.useCallback(
     (e: KeyboardEvent) => {
       if (isNotIgnoreElement(e.target)) {

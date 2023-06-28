@@ -23,10 +23,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
 
   return (
     <Link
-      href={{
-        pathname: '/episode',
-        query: { feed, guid },
-      }}
+      href={`/episode/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`}
       className={styles.container}
     >
       <img loading="lazy" className={styles.image} src={episodeArt || cover} alt={title} />

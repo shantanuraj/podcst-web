@@ -50,9 +50,7 @@ export const VolumeControls = () => {
   }, []);
 
   const volumeShortcuts: KeyboardShortcuts = useMemo(
-    () => [
-      [shortcuts.mute, toggleMute],
-    ],
+    () => (_) => [[shortcuts.mute, toggleMute]],
     [toggleMute],
   );
   useKeydown(volumeShortcuts);

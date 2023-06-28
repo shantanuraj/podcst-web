@@ -47,6 +47,7 @@
 
 .showNotes {
   font-size: var(--dimen-font-primary);
+  margin-bottom: 48px;
 }
 
 .showNotes h3 {

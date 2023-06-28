@@ -1,9 +1,10 @@
 @import 'normalize.css';
 
-@import '../../styles/colors.css';
+@import './colors.css';
 @import './theme.css';
 
-html, body {
+html,
+body {
   color: var(--color-text);
   background-color: var(--color-background);
   font-family: var(--font-primary);
@@ -15,7 +16,8 @@ html, body {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   accent-color: var(--color-accent);
 }
 
@@ -25,11 +27,14 @@ main {
   width: 100%;
 }
 
-*,*:before,*:after {
+*,
+*:before,
+*:after {
   box-sizing: inherit;
 }
 
-p, pre {
+p,
+pre {
   margin: 0;
 }
 
@@ -43,7 +48,8 @@ button {
   background-color: inherit;
 }
 
-input, button {
+input,
+button {
   font-family: var(--font-primary);
   color: var(--color-text);
   border: none;
@@ -72,4 +78,3 @@ h3 {
 ul {
   list-style: none;
 }
-

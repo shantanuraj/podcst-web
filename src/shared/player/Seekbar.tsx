@@ -45,10 +45,7 @@ export const Seekbar: React.FC<{
         (seekPosition) => {
           requestAnimationFrame(() => {
             if (!seekbarRef.current) return;
-            seekbarRef.current.style.width = getSeekWidth(
-              seekPosition,
-              durationRef.current,
-            );
+            seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
           });
         },
       ),

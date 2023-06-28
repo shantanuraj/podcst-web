@@ -7,6 +7,16 @@ module.exports = {
   env: {
     appVersion: pkg.version,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*',
+        port: '',
+        pathname: '**',
+      },
+    ],
+  },
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
@@ -18,6 +28,16 @@ module.exports = {
     return [
       {
         source: '/',
+        destination: '/feed/top',
+        permanent: false,
+      },
+      {
+        source: '/episode',
+        destination: '/feed/top',
+        permanent: false,
+      },
+      {
+        source: '/episodes',
         destination: '/feed/top',
         permanent: false,
       },

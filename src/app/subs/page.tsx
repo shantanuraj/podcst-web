@@ -1,3 +1,5 @@
+'use client';
+
 import { NextPage } from 'next';
 
 import { SubscriptionsState, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';

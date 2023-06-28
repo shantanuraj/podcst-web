@@ -1,3 +1,5 @@
+'use client';
+
 import { getEpisodesQueue, usePlayer } from '../../shared/player/usePlayer';
 import { EpisodesList } from '../../ui/EpisodesList';
 

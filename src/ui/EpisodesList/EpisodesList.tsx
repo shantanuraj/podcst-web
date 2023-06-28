@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useCallback, useRef, useState } from 'react';
 import { useVirtual } from 'react-virtual';
 import { IEpisodeInfo } from '../../types';

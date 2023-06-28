@@ -1,5 +1,7 @@
+'use client';
+
 import Link from 'next/link';
-import router from 'next/router';
+import router from 'next/navigation';
 
 import { Icon } from '../../ui/icons/svg/Icon';
 import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
@@ -30,10 +32,9 @@ export const Player = () => {
         <div className={styles.player}>
           <Seekbar currentEpisode={currentEpisode} />
           <Link
-            href={{
-              pathname: '/episode',
-              query: { feed: currentEpisode.feed, guid: currentEpisode.guid },
-            }}
+            href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
+              currentEpisode.guid,
+            )}`}
             className={styles.imageCoverLink}
           >
             <img
@@ -85,17 +86,18 @@ function PlayButton() {
   );
 }
 
-const playerShortcuts: KeyboardShortcuts = [
+const playerShortcuts: KeyboardShortcuts = (router) => [
   [
     shortcuts.info,
     () => {
       const { currentTrackIndex, queue } = usePlayer.getState();
       const currentEpisode = queue[currentTrackIndex];
       if (currentEpisode) {
-        router.push({
-          pathname: '/episode',
-          query: { feed: currentEpisode.feed, guid: currentEpisode.guid },
-        });
+        router.push(
+          `/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
+            currentEpisode.guid,
+          )}`,
+        );
       }
     },
   ],
@@ -117,4 +119,5 @@ const playerShortcuts: KeyboardShortcuts = [
   [shortcuts.previousEpisode, skipToPreviousEpisode],
   [shortcuts.nextEpisode, skipToNextEpisode],
 ];
-const emptyShortcuts: KeyboardShortcuts = [];
+
+const emptyShortcuts: KeyboardShortcuts = () => [];

@@ -1,3 +1,5 @@
+'use client';
+
 import { forwardRef, useCallback, memo } from 'react';
 import {
   getCurrentEpisode,

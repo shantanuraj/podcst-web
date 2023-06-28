@@ -1,8 +1,14 @@
-import React from 'react';
-import { SubscriptionsState, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
-import { Button } from '../../ui/Button';
+'use client';
 
-import styles from './Settings.module.css';
+import React from 'react';
+
+import {
+  useSubscriptions,
+  SubscriptionsState,
+} from '../../../shared/subscriptions/useSubscriptions';
+import { Button } from '../../../ui/Button';
+
+import styles from '../Settings.module.css';
 
 export default function SettingsExportPage() {
   const subs = useSubscriptions(getExportList);
@@ -36,7 +42,7 @@ export default function SettingsExportPage() {
     let xmlStr = `<?xml version="1.0" encoding="utf-8" standalone="no"?>\n`;
     xmlStr += new XMLSerializer().serializeToString(opml);
 
-    const blob = new Blob([xmlStr], {type : 'text/xml'});
+    const blob = new Blob([xmlStr], { type: 'text/xml' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

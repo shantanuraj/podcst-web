@@ -1,10 +1,11 @@
+'use client';
+
 import React, { FormEvent } from 'react';
-import { useTheme } from '../../shared/theme/useTheme';
-import { ThemeMode } from '../../types';
+import { useTheme } from '../../../shared/theme/useTheme';
+import { ThemeMode } from '../../../types';
+import { IconType, Icon } from '../../../ui/icons/svg/Icon';
 
-import { Icon, IconType } from '../../ui/icons/svg/Icon';
-
-import styles from './Settings.module.css';
+import styles from '../Settings.module.css';
 
 export default function SettingsThemePage() {
   const { theme, changeTheme: setTheme } = useTheme();

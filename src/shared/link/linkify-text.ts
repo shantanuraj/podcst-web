@@ -35,8 +35,9 @@ export const linkifyText = (text: string | undefined): string => {
       return getLink(token, maybeSpace);
     }
     if (TIME_REGEX.test(token)) {
-      const timestamp = TIME_REGEX.exec(token)!.slice(1)
-        .filter(t => t)
+      const timestamp = TIME_REGEX.exec(token)!
+        .slice(1)
+        .filter((t) => t)
         .join(':');
       return token.replace(
         timestamp,

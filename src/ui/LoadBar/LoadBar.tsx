@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { Portal } from '../../shared/portal';
 import styles from './LoadBar.module.css';

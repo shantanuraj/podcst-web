@@ -1,16 +1,16 @@
-import { shortcuts } from '../../shared/keyboard/shortcuts';
-import styles from './Settings.module.css';
+import { shortcuts } from '../../../shared/keyboard/shortcuts';
+import styles from '../Settings.module.css';
 
 export default function SettingsShortcutsPage() {
   return (
-    <div className={styles.container}>
+    <li className={styles.container}>
       {appShortcuts.map((shortcut) => (
-        <div key={shortcut.title} className={styles.shortcut}>
+        <ul key={shortcut.title} className={styles.shortcut}>
           <span>{shortcut.title}</span>
           <kbd>{shortcut.displayKey}</kbd>
-        </div>
+        </ul>
       ))}
-    </div>
+    </li>
   );
 }
 

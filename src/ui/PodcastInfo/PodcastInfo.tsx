@@ -1,23 +1,20 @@
-import { useRouter } from 'next/router';
-import { Fragment, useCallback } from 'react';
+import { Fragment } from 'react';
 
 import { linkifyText } from '../../shared/link/linkify-text';
 import { stripHost } from '../../shared/link/strip-host';
-import { isSubscribed, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
 import { IPodcastEpisodesInfo } from '../../types';
-import { Button } from '../Button';
 import { ShareButton } from '../Button/ShareButton';
 import { ExternalLink } from '../ExternalLink';
 import { Icon } from '../icons/svg/Icon';
 
 import styles from './PodcastInfo.module.css';
+import { SubscribeButton } from '../../app/episodes/[feed]/SubscribeButton';
 
-type PodcastInfoProps = {
+export interface PodcastInfoProps {
   info: IPodcastEpisodesInfo;
-};
+}
 
 export function PodcastInfo({ info }: PodcastInfoProps) {
-  const router = useRouter();
   const { title, author, cover, link, description } = info;
   const lastPublishedDate = info.episodes?.[0].published || info.published;
   const lastPublished = lastPublishedDate ? new Date(lastPublishedDate).toDateString() : null;
@@ -42,11 +39,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
         {lastPublished && <h5>Latest episode: {lastPublished}</h5>}
         <div className={styles.buttons}>
           <SubscribeButton info={info} />
-          <ShareButton
-            title={title}
-            text={`Listen to ${title} by ${author} on Podcst`}
-            url={router.asPath}
-          />
+          <ShareButton title={title} text={`Listen to ${title} by ${author} on Podcst`} />
         </div>
         <div
           className={styles.description}
@@ -54,24 +47,5 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
         />
       </div>
     </div>
-  );
-}
-
-function SubscribeButton({ info }: PodcastInfoProps) {
-  const feed = info.feed;
-  const isSubscribedToFeed = useSubscriptions(useCallback(isSubscribed(feed), [feed]));
-  const toggleSubscription = useSubscriptions(
-    useCallback((state) => state.toggleSubscription, [feed]),
-  );
-  const onSubscribeClick = useCallback(() => toggleSubscription(info.feed, info), [info]);
-
-  return (
-    <Button
-      data-is-subscribed={isSubscribedToFeed}
-      onClick={onSubscribeClick}
-      suppressHydrationWarning
-    >
-      {isSubscribedToFeed ? 'Unsubscribe' : 'Subscribe'}
-    </Button>
   );
 }

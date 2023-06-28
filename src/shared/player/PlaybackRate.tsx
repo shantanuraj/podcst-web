@@ -15,10 +15,11 @@ export const PlaybackRate = () => {
     setRateIndex((rateIndex) => Math.min(rates.length - 1, rateIndex + 1));
   }, []);
   const rateShortcuts: KeyboardShortcuts = useMemo(
-    () => [
-      [shortcuts.bumpRate, bumpRate],
-      [shortcuts.decreaseRate, decreaseRate],
-    ],
+    () => (_) =>
+      [
+        [shortcuts.bumpRate, bumpRate],
+        [shortcuts.decreaseRate, decreaseRate],
+      ],
     [],
   );
   const cycleRate = useCallback(() => {
