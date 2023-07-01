@@ -1,4 +1,3 @@
-import useSWR from 'swr';
 import { useSubscriptions } from '../shared/subscriptions/useSubscriptions';
 
 import { IEpisodeInfo, IEpisodeListing, IPodcastEpisodesInfo } from '../types';
@@ -15,11 +14,6 @@ export const fetchEpisodesInfo = async (feed: string) => {
     console.error(`Api.episodes`, `Couldn't fetch episodes from feed`, err);
     throw err;
   }
-};
-
-export const useEpisodesInfo = (feed: string, fallbackData: IPodcastEpisodesInfo | null = null) => {
-  const response = useSWR(feed, fetchEpisodesInfo, { suspense: true, fallbackData });
-  return response;
 };
 
 /**

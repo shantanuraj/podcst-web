@@ -3,7 +3,7 @@ export const get = async <T>(
   params: Record<string, unknown>,
   revalidate?: number,
 ): Promise<T> => {
-  const url = new URL('https://data.podcst.io' + endpoint);
+  const url = new URL('https://www.podcst.app/api' + endpoint);
   Object.keys(params).forEach((key) => {
     url.searchParams.append(key, params[key] as string);
   });

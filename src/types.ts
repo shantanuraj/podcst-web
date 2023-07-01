@@ -8,6 +8,104 @@ export type ExplicitState = 'explicit' | 'cleaned' | 'notExplicit';
 export type FeedType = 'top';
 
 /**
+ * iTunes typings
+ */
+export namespace iTunes {
+  /**
+   * Search response interface
+   */
+  export interface Response {
+    results: Podcast[];
+  }
+
+  export interface Podcast {
+    /**
+     * Podcast author name
+     */
+    artistName: string;
+    /**
+     * Podcast cover art 100x100 size
+     */
+    artworkUrl100: string;
+    /**
+     * Podcast cover art 600x600 size
+     */
+    artworkUrl600: string;
+    /**
+     * Censored Podcast name
+     */
+    collectionCensoredName: string;
+    /**
+     * Explicit status
+     */
+    collectionExplicitness: ExplicitState;
+    /**
+     * Podcast ID
+     */
+    collectionId: number;
+    /**
+     * Podcast name
+     */
+    collectionName: string;
+    /**
+     * iTunes URL
+     */
+    collectionViewUrl: string;
+    /**
+     * RSS feed url
+     */
+    feedUrl: string;
+    /**
+     * Podcast categories list numeric string ids
+     */
+    genreIds: string[];
+    /**
+     * Podcast categories list
+     */
+    genres: string[];
+    /**
+     * Entity type must always be `podcast`
+     */
+    kind: 'podcast';
+    /**
+     * Primary category
+     */
+    primaryGenreName: string;
+    /**
+     * ISO Release date
+     */
+    releaseDate: string;
+    /**
+     * Episodes count
+     */
+    trackCount: number;
+  }
+
+  /**
+   * Feed Response interface
+   */
+  export interface FeedResponse {
+    feed: {
+      /**
+       * List of feed podcasts
+       */
+      entry: FeedPodcast[];
+    };
+  }
+
+  export interface FeedPodcast {
+    id: {
+      attributes: {
+        /**
+         * Numeric string id
+         */
+        'im:id': string;
+      };
+    };
+  }
+}
+
+/**
  * Adapted Podcast interface
  */
 export interface IPodcast {
@@ -104,7 +202,7 @@ export type RenderablePodcast = IPodcast | IPodcastEpisodesInfo;
  * Podcasts Search result interface
  */
 export interface IPodcastSearchResult {
-  id: number;
+  id?: number;
   author: string;
   feed: string;
   thumbnail: string;
