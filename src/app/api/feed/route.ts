@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  const res = await feed(safeUrl);
 
+  const res = await feed(safeUrl);
   return NextResponse.json(res.entity);
 }
