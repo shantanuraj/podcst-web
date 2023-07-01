@@ -1,8 +1,4 @@
-import {
-  CACHE_STALE_DELTA,
-  DEFAULT_PODCASTS_LOCALE,
-  ITUNES_API,
-} from '../../../data/constants';
+import { CACHE_STALE_DELTA, DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '../../../data/constants';
 import { cache, cacheMiss, isCached } from '../redis';
 import { IPodcast, iTunes } from '../../../types';
 import { adaptResponse } from '../adapter';
