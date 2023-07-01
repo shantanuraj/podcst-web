@@ -1,4 +1,5 @@
-import { kv } from '@vercel/kv';
+import { Redis } from 'ioredis';
+
 import { CACHE_STALE_DELTA, KEY_PARSED_FEED, KEY_TOP_PODCASTS } from '../../data/constants';
 import { IEpisodeListing, IPodcast } from '../../types';
 
@@ -45,7 +46,11 @@ const parse = <T>(val: string) => JSON.parse(val) as CachedEntity<T>;
  */
 const stringify = <T>(val: CachedEntity<T>) => JSON.stringify(val);
 
-const redis = kv;
+const redis = new Redis({
+  host: process.env.KV_REDIS_HOST,
+  password: process.env.KV_REDIS_PASS,
+  port: parseInt(process.env.KV_REDIS_PORT || '0', 10),
+})
 
 /**
  * Save key, value pair to redis
@@ -67,7 +72,7 @@ const save = async <T>(key: string, value: T) => {
  */
 const read = async <T>(key: string): CacheResponse<T | null> => {
   try {
-    const res = await redis.get<string>(key);
+    const res = await redis.get(key);
     if (!res) {
       return cacheMiss(null);
     }
