@@ -13,7 +13,7 @@ interface EpisodePageProps {
   info: IPodcastEpisodesInfo | null;
 }
 
-const fetchFeed =  feed;
+const fetchFeed = feed;
 
 const Episode = (props: EpisodePageProps) => {
   const { info } = props;

@@ -50,7 +50,7 @@ const redis = new Redis({
   host: process.env.KV_REDIS_HOST,
   password: process.env.KV_REDIS_PASS,
   port: parseInt(process.env.KV_REDIS_PORT || '0', 10),
-})
+});
 
 /**
  * Save key, value pair to redis
