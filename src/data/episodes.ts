@@ -19,7 +19,7 @@ export const fetchEpisodesInfo = async (feed: string) => {
 /**
  * Add feed prop to episodes
  */
-const patchEpisodesResponse =
+export const patchEpisodesResponse =
   (feed: string) =>
   (res: IEpisodeListing | null): IPodcastEpisodesInfo | null => {
     if (res) {

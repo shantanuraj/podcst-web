@@ -3,7 +3,6 @@
  */
 
 import { IEpisodeListing, IPodcastSearchResult } from '../../../types';
-import { CachedEntity } from '../redis';
 
 /**
  * Extract base link from a url
@@ -45,7 +44,7 @@ export const showNotesSorter = (a: string, b: string) => a.length - b.length;
  */
 export const feedToSearchResponse =
   (feed: string) =>
-  ({ entity: res }: CachedEntity<IEpisodeListing | null>): IPodcastSearchResult[] =>
+  (res: IEpisodeListing | null): IPodcastSearchResult[] =>
     res
       ? [
           {

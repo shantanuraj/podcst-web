@@ -1,15 +1,19 @@
 import * as React from 'react';
-import { fetchEpisodesInfo } from '../../../data/episodes';
+import { Metadata } from 'next';
+
 import { IPodcastEpisodesInfo } from '../../../types';
 import { EpisodesList } from '../../../ui/EpisodesList';
 import { Loading } from '../../../ui/Loading';
 import { PodcastInfo } from '../../../ui/PodcastInfo/PodcastInfo';
-import { Metadata } from 'next';
+import { feed } from '../../api/feed/feed';
+import { patchEpisodesResponse } from '../../../data/episodes';
 
 interface EpisodesPageProps {
   feed: string;
   info: IPodcastEpisodesInfo | null;
 }
+
+const fetchFeed = feed;
 
 const EpisodesPage = (props: EpisodesPageProps) => {
   const { info } = props;
@@ -30,7 +34,7 @@ export async function generateMetadata({
   params: { feed: string };
 }): Promise<Partial<Metadata>> {
   const feed = decodeURIComponent(params.feed);
-  const info = typeof feed === 'string' && feed ? await fetchEpisodesInfo(feed) : null;
+  const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;
   if (!info) return {};
   const metadata: Metadata = {
     title: info.title,
@@ -44,6 +48,7 @@ export async function generateMetadata({
 
 export default async function Page({ params }: { params: { feed: string } }) {
   const feed = decodeURIComponent(params.feed);
-  const info = typeof feed === 'string' && feed ? await fetchEpisodesInfo(feed) : null;
-  return <EpisodesPage feed={feed} info={info} />;
+  const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;
+  const data = patchEpisodesResponse(feed)(info);
+  return <EpisodesPage feed={feed} info={data} />;
 }

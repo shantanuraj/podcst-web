@@ -13,15 +13,15 @@ export async function feed(url: string) {
   try {
     const data = await cache.feed(url);
     if (isCached(data)) {
-      return data;
+      return data.entity;
     }
     const feedData = await fetchFeed(url);
     if (feedData) {
       cache.saveFeed(url, feedData);
     }
-    return cacheMiss(feedData);
+    return cacheMiss(feedData).entity;
   } catch (err) {
-    return cacheMiss(null);
+    return cacheMiss(null).entity;
   }
 }
 

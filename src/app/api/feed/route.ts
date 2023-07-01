@@ -29,5 +29,5 @@ export async function GET(request: NextRequest) {
   }
 
   const res = await feed(safeUrl);
-  return NextResponse.json(res.entity);
+  return NextResponse.json(res);
 }

@@ -1,14 +1,14 @@
 import * as React from 'react';
 
-import { fetchFeed } from '../../../data/feed';
 import { Feed } from './top-page';
 import { Metadata } from 'next';
+import { top } from '../../api/top/top';
 
 export const metadata: Metadata = {
   title: 'Top Podcasts',
 };
 
 export default async function Page() {
-  const podcasts = await fetchFeed('top');
+  const podcasts = await top(100);
   return <Feed podcasts={podcasts} />;
 }
