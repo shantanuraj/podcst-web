@@ -10,7 +10,7 @@ type ThemeState = {
 };
 
 export const useTheme = create<ThemeState>((set, get) => ({
-  theme: getValue('themeMode', 'dark'),
+  theme: getValue('themeMode', 'light'),
   changeTheme: (theme) => set({ theme }),
   cycleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
 }));
