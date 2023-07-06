@@ -127,7 +127,7 @@
 
 .seekbar {
   height: 100%;
-  background-color: var(--brand);
+  background-color: var(--brand-dark);
   transition: width 1s;
 }
 
