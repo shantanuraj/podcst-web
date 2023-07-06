@@ -21,7 +21,13 @@
 .container > div:nth-child(even),
 .container > ul:nth-child(even),
 .container > a:nth-child(even) {
-  background-color: var(--color-background-light);
+  background-color: var(--surface3);
+}
+
+.container > div:nth-child(odd),
+.container > ul:nth-child(odd),
+.container > a:nth-child(odd) {
+  background-color: var(--surface4);
 }
 
 .container.export {
@@ -49,10 +55,6 @@ form.container label {
   gap: 16px;
 }
 
-form.container svg {
-  fill: var(--color-text);
-}
-
 .shortcut {
   display: flex;
   align-items: center;
@@ -61,9 +63,8 @@ form.container svg {
 
 .shortcut kbd {
   font-weight: bold;
-  background-color: var(--color-background-light);
   border-radius: 6px;
-  border-top: 1px solid var(--color-background-dark);
+  border-top: 1px solid;
   border-width: 1px 1px 3px;
   padding: 2px 8px;
   white-space: nowrap;

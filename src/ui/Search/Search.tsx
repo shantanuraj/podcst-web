@@ -62,15 +62,17 @@ export function Search() {
       {response.isValidating && <LoadBar />}
       <input
         {...getInputProps({ ref: searchRef })}
+        data-surface={4}
         aria-label="Search podcasts"
         type="text"
         placeholder="Search"
       />
-      <ul {...getMenuProps()} className={styles.results}>
+      <ul {...getMenuProps()} className={styles.results} data-surface={2} data-shadow>
         {isOpen &&
           Array.isArray(searchResults) &&
           searchResults.map((item, index) => (
             <li
+              data-surface={index % 2 === 0 ? 3 : 4}
               data-highlighted={highlightedIndex === index}
               key={item.feed}
               {...getItemProps({ item, index })}

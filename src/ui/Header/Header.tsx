@@ -33,7 +33,7 @@ export function Header() {
 
   return (
     <Fragment>
-      <header className={styles.header}>
+      <header className={styles.header} data-surface={1}>
         <button
           role="button"
           aria-label="Toggle drawer"
@@ -46,7 +46,7 @@ export function Header() {
         <span className={styles.title}>Podcst</span>
         <Search />
       </header>
-      <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer}>
+      <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer} data-surface={1}>
         <button
           role="button"
           aria-label="Close drawer"

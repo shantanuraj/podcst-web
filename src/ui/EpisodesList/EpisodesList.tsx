@@ -86,7 +86,7 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
         </div>
         <div className={styles.episodeListOptionsSort}>
           <span>Sort by:</span>
-          <select onChange={onSortChange}>
+          <select onChange={onSortChange} data-surface={4}>
             {sortOptions.map(({ title, value }) => (
               <option key={value} value={value}>
                 {title}
@@ -100,7 +100,7 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
           const episode = filteredEpisodes[index];
           return (
             <li
-              className={index % 2 === 0 ? styles.even : undefined}
+              data-surface={index % 2 === 0 ? 3 : 4}
               key={`${index}-${episode.title}`}
               style={{
                 transform: `translateY(${start}px)`,
