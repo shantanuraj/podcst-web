@@ -1,9 +1,8 @@
 .queue svg {
   margin-top: 5px;
-  fill: var(--color-accent-gray);
 }
 
 .queue:focus svg,
 .queue:hover svg {
-  fill: var(--color-accent-gray-hover);
+  fill: var(--brand-dark);
 }

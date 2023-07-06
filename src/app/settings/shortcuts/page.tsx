@@ -11,7 +11,7 @@ export default function SettingsShortcutsPage() {
       {appShortcuts.map((shortcut) => (
         <ul key={shortcut.title} className={styles.shortcut}>
           <span>{shortcut.title}</span>
-          <kbd>{shortcut.displayKey}</kbd>
+          <kbd data-surface={2}>{shortcut.displayKey}</kbd>
         </ul>
       ))}
     </li>

@@ -1,6 +1,5 @@
 .header {
   position: fixed;
-  background-color: var(--color-background);
   top: 0;
   left: 0;
   z-index: var(--dimen-header-z-index);
@@ -12,7 +11,6 @@
 
 .header svg,
 .drawer svg {
-  fill: var(--color-text);
   height: var(--dimen-icon-primary);
   width: var(--dimen-icon-primary);
 }
@@ -45,13 +43,16 @@
   height: 100%;
   width: var(--dimen-drawer-width);
   transition: all 0.3s ease;
-  background-color: var(--color-background);
-  border-right: solid 1px var(--color-background-light);
+  /* FIXME */
+  border-right: solid 1px var(--surface4);
 }
 
 @media only screen and (max-width: 900px) {
   .drawer {
-    transform: translate(calc(-1.15 * var(--dimen-drawer-width)), calc(-1 * var(--dimen-header-height)));
+    transform: translate(
+      calc(-1.15 * var(--dimen-drawer-width)),
+      calc(-1 * var(--dimen-header-height))
+    );
   }
 
   .drawer[data-open='open'] {
@@ -86,11 +87,12 @@
 .drawer button:hover,
 .drawer a:hover,
 .drawer a:focus {
-  color: var(--color-background);
-  background-color: var(--color-accent);
+  background-color: var(--surface3);
+  color: var(--text1);
 }
 
-.drawer button, .drawer a {
+.drawer button,
+.drawer a {
   display: block;
   width: 100%;
   text-align: left;
@@ -100,8 +102,6 @@
 .navGroup h6 {
   margin: 1rem 15px 0;
   padding-bottom: 0.25rem;
-  border-bottom: solid 1px var(--color-background-light);
-  color: var( --color-sub-title);
   text-transform: uppercase;
 }
 

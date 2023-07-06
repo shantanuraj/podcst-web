@@ -73,7 +73,12 @@
 }
 
 .showNotes button[data-timestamp] {
-  color: var(--color-accent);
+  color: var(--text1);
+}
+
+.showNotes a {
+  /* font-weight: bold; */
+  text-decoration: underline;
 }
 
 @media only screen and (max-width: 600px) {

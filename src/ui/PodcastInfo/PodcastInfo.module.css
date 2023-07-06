@@ -3,6 +3,7 @@
   flex-direction: var(--dimen-podcast-info-direction);
   padding: var(--dimen-podcast-info-padding);
   position: relative;
+  --color-almost-white: hsla(0, 0%, 100%, 0.85);
 }
 
 .info img {
@@ -30,11 +31,14 @@
 }
 
 .buttons,
-.description,
 .info .text h1,
 .info .text h2,
 .info .text h5 {
   margin: 8px 0;
+}
+
+.description {
+  margin-top: 8px;
 }
 
 .buttons {
@@ -51,7 +55,7 @@
 
 @media only screen and (max-width: 600px) {
   .info {
-    color: var(--color-text-light);
+    color: var(--color-almost-white);
   }
 
   .info img {
@@ -69,7 +73,7 @@
   }
 
   .buttons button {
-    color: var(--color-text-light);
+    color: var(--color-almost-white);
     width: 100%;
   }
 

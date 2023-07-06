@@ -4,8 +4,7 @@
   display: inline-block;
   padding: 8px;
   background: transparent;
-  color: var(--color-text);
-  border: 2px solid var(--color-accent);
+  border: 2px solid;
   outline: 0;
 }
 
@@ -17,11 +16,10 @@
   padding: 0;
   width: 45px;
   height: 45px;
-  border: 2px solid var(--color-accent);
+  border: 2px solid;
 }
 
 .button.withIcon svg {
-  fill: var(--color-accent);
   transition: transform 0.25s ease-out;
 }
 
@@ -29,25 +27,24 @@ button.button:focus,
 button.button:hover,
 button.button[data-is-subscribed='true'],
 button.button[data-is-current='true'] {
-  background-color: var(--color-accent);
-  color: var(--color-background);
+  color: var(--brand-dark);
 }
 
 button.button.withIcon:focus svg,
 button.button.withIcon:hover svg,
 button.button.withIcon[data-is-subscribed='true'] svg,
-button.button.withIcon[data-is-current='true'] svg{
-  fill: var(--color-background);
+button.button.withIcon[data-is-current='true'] svg {
+  fill: var(--brand-dark);
   transform: scale(1.4);
 }
 
 button.button[data-is-subscribed='true']:hover,
 button.button[data-is-current='true']:hover {
   background-color: transparent;
-  color: var(--color-text);
+  color: var(--text1);
 }
 
 button.button.withIcon[data-is-subscribed='true']:hover svg,
 button.button.withIcon[data-is-current='true']:hover svg {
-  fill: var(--color-accent);
+  fill: var(--brand-dark);
 }

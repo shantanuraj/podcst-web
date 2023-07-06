@@ -4,8 +4,6 @@
 
 html,
 body {
-  color: var(--color-text);
-  background-color: var(--color-background);
   font-family: var(--font-primary);
   font-size: var(--dimen-font-primary);
   margin: 0;
@@ -17,7 +15,7 @@ body {
 
 html,
 body {
-  accent-color: var(--color-accent);
+  accent-color: var(--brand);
 }
 
 #__next,
@@ -50,7 +48,6 @@ button {
 input,
 button {
   font-family: var(--font-primary);
-  color: var(--color-text);
   border: none;
 }
 
@@ -79,7 +76,8 @@ ul {
 }
 
 [data-tile] {
-  background: linear-gradient(to bottom,
+  background: linear-gradient(
+      to bottom,
       rgba(0, 0, 0, 0) 0%,
       rgba(0, 0, 0, 0) 12%,
       rgba(0, 0, 0, 0) 23%,
@@ -90,7 +88,50 @@ ul {
       rgba(17, 17, 17, 0.5) 88%,
       rgba(28, 28, 28, 0.5) 94%,
       rgba(43, 43, 43, 0.6) 95%,
-      rgba(19, 19, 19, 0.8) 100%),
+      rgba(19, 19, 19, 0.8) 100%
+    ),
     no-repeat var(--asset-tile);
   background-size: cover;
+}
+
+body,
+[data-surface='1'] {
+  background-color: var(--surface1);
+  color: var(--text2);
+}
+[data-surface='1'] svg {
+  fill: var(--text2);
+}
+
+[data-surface='2'] {
+  background-color: var(--surface2);
+  color: var(--text2);
+}
+[data-surface='2'] svg {
+  fill: var(--text2);
+}
+
+[data-surface='3'] {
+  background-color: var(--surface3);
+  color: var(--text1);
+}
+[data-surface='3'] svg {
+  fill: var(--text1);
+}
+
+[data-surface='4'] {
+  background-color: var(--surface4);
+  color: var(--text1);
+}
+[data-surface='4'] svg {
+  fill: var(--text1);
+}
+
+[data-shadow='true'] {
+  box-shadow: 0 2.8px 2.2px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.03)),
+    0 6.7px 5.3px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.01)),
+    0 12.5px 10px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.02)),
+    0 22.3px 17.9px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.02)),
+    0 41.8px 33.4px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.03)),
+    0 100px 80px hsl(var(--surface-shadow) / var(--shadow-strength));
 }

@@ -37,10 +37,8 @@
 
 .info {
   margin: 5px 0;
-  color: var(--color-sub-title);
   font-size: 80%;
 }
-
 
 .info span {
   margin: 2px;

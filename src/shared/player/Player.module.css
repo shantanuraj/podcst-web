@@ -22,12 +22,12 @@
 }
 
 .player {
-  background-color: var(--color-background);
   height: 100%;
   display: grid;
   grid: 28px auto / var(--dimen-player-cover) 1fr;
   position: relative;
-  border-top: 1px solid var(--color-background-search);
+  /* FIXME */
+  border-top: 1px solid var(--surface4);
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.15);
 }
 
@@ -49,7 +49,6 @@
 }
 
 .player svg {
-  fill: var(--color-accent);
   cursor: pointer;
 }
 
@@ -113,7 +112,7 @@
 .seekbarContainer {
   --dimen-seekbar-offset: var(--dimen-player-cover);
   --dimen-seekbar-width: calc(100% - var(--dimen-player-cover));
-  background: var(--color-background-light);
+  background: var(--surface4);
   position: absolute;
   top: 0;
   left: var(--dimen-seekbar-offset);
@@ -128,19 +127,19 @@
 
 .seekbar {
   height: 100%;
-  background-color: var(--color-accent);
+  background-color: var(--brand);
   transition: width 1s;
 }
 
 .playbackRate {
   font-weight: bold;
   font-size: var(--dimen-font-regular);
-  color: var(--color-accent);
   width: 40px;
   justify-content: center;
 }
 
 .playbackRate code {
+  color: var(--text2);
   font-size: var(--dimen-font-secondary);
   letter-spacing: -0.5px;
   font-weight: 400;
@@ -155,7 +154,6 @@
   display: flex;
   font-size: var(--dimen-font-smallest);
   padding: 15px 15px 0;
-  color: var(--color-accent-gray);
 }
 
 .duration span:last-of-type {

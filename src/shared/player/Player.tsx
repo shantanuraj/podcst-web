@@ -28,7 +28,7 @@ export const Player = () => {
   return (
     <div className={styles.container} data-open={open}>
       {currentEpisode && (
-        <div className={styles.player}>
+        <div className={styles.player} data-surface={1}>
           <Seekbar currentEpisode={currentEpisode} />
           <Link
             href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(

@@ -1,23 +1,66 @@
 :root {
-  --color-background: #292929;
-  --color-accent: #82ffb5;
-  --color-accent-hover: #00b778;
+  --brand-hue: 345;
+  --brand-saturation: 48%;
+  --brand-lightness: 81%;
 
-  --color-background-dark: #131313;
-  --color-background-light: #333333;
+  --brand-light: hsl(var(--brand-hue) var(--brand-saturation) var(--brand-lightness));
+  --text1-light: hsl(var(--brand-hue) var(--brand-saturation) 10%);
+  --text2-light: hsl(var(--brand-hue) 30% 30%);
 
-  --color-background-search: #555;
+  --surface1-light: hsl(var(--brand-hue) 25% 90%);
+  --surface2-light: hsl(var(--brand-hue) 20% 99%);
+  --surface3-light: hsl(var(--brand-hue) 20% 92%);
+  --surface4-light: hsl(var(--brand-hue) 20% 85%);
 
-  --color-accent-gray: #999999;
-  --color-accent-gray-hover: #dddddd;
+  --surface-shadow-light: var(--brand-hue) 10% 20%;
+  --shadow-strength-light: 0.02;
 
-  --color-text: #ffffff;
-  --color-sub-title: #cccccc;
-  --color-text-light: #ffffff;
+  --brand-dark: hsl(
+    var(--brand-hue) calc(var(--brand-saturation) / 2) calc(var(--brand-lightness) / 1.5)
+  );
+  --text1-dark: hsl(var(--brand-hue) 15% 85%);
+  --text2-dark: hsl(var(--brand-hue) 5% 65%);
 
-  --color-animation-frame-1: #5cffa0;
-  --color-animation-frame-2: #00b778;
-  --color-animation-frame-3: #82ffb5;
+  --surface1-dark: hsl(var(--brand-hue) 10% 10%);
+  --surface2-dark: hsl(var(--brand-hue) 10% 15%);
+  --surface3-dark: hsl(var(--brand-hue) 5% 20%);
+  --surface4-dark: hsl(var(--brand-hue) 5% 25%);
+
+  --surface-shadow-dark: var(--brand-hue) 50% 3%;
+  --shadow-strength-dark: 0.8;
+
+  color-scheme: dark;
+
+  --brand: var(--brand-dark);
+  --text1: var(--text1-dark);
+  --text2: var(--text2-dark);
+  --text-dark-bg: var(--text1-dark);
+  --surface1: var(--surface1-dark);
+  --surface2: var(--surface2-dark);
+  --surface3: var(--surface3-dark);
+  --surface4: var(--surface4-dark);
+  --surface-shadow: var(--surface-shadow-dark);
+  --shadow-strength: var(--shadow-strength-dark);
+
+  --color-background: red;
+  --color-accent: blue;
+  --color-accent-hover: yellow;
+
+  --color-background-dark: blue;
+  --color-background-light: red;
+
+  --color-background-search: green;
+
+  --color-accent-gray: purple;
+  --color-accent-gray-hover: orange;
+
+  --color-text: violet;
+  --color-sub-title: pink;
+  --color-text-light: green;
+
+  --color-animation-frame-1: var(--brand-light);
+  --color-animation-frame-2: var(--brand);
+  --color-animation-frame-3: var(--brand-dark);
 
   --font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
     'Open Sans', 'Helvetica Neue', sans-serif;
@@ -51,33 +94,25 @@
   --dimen-episode-list-item-size: 84px;
 }
 
+:root.light {
+  color-scheme: light;
+
+  --brand: var(--brand-light);
+  --text1: var(--text1-light);
+  --text2: var(--text2-light);
+  --surface1: var(--surface1-light);
+  --surface2: var(--surface2-light);
+  --surface3: var(--surface3-light);
+  --surface4: var(--surface4-light);
+  --surface-shadow: var(--surface-shadow-light);
+  --shadow-strength: var(--shadow-strength-light);
+}
+
 @media only screen and (max-width: 600px) {
   :root {
     --dimen-episode-list-item-size: 100px;
     --dimen-player-height: 80px;
   }
-}
-
-:root.light {
-  --color-background: #ffffff;
-  --color-accent: #8649b2;
-  --color-accent-hover: #60347f;
-
-  --color-background-dark: #131313;
-  --color-background-light: #e3e3e3;
-
-  --color-background-search: #cccccc;
-
-
-  --color-accent-gray: #777777;
-  --color-accent-gray-hover: #131313;
-
-  --color-text: #000000;
-  --color-sub-title: #777777;
-
-  --color-animation-frame-1: #c069ff;
-  --color-animation-frame-2: #60347f;
-  --color-animation-frame-3: #8649b2;
 }
 
 @media only screen and (max-width: 600px) {
