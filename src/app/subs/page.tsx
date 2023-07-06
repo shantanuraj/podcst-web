@@ -2,9 +2,9 @@
 
 import { NextPage } from 'next';
 
-import { SubscriptionsState, useSubscriptions } from '../../shared/subscriptions/useSubscriptions';
-import { ImportButton } from '../../components/ImportButton/ImportButton';
-import { PodcastsGrid } from '../../ui/PodcastsGrid';
+import { SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import { ImportButton } from '@/components/ImportButton/ImportButton';
+import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';
 

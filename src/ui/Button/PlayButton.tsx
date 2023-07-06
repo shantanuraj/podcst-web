@@ -6,10 +6,10 @@ import {
   getPlaybackState,
   IPlayerState,
   usePlayer,
-} from '../../shared/player/usePlayer';
+} from '@/shared/player/usePlayer';
 
-import { IEpisodeInfo } from '../../types';
-import { Icon } from '../icons/svg/Icon';
+import { IEpisodeInfo } from '@/types';
+import { Icon } from '@/ui/icons/svg/Icon';
 import { Button, ButtonProps } from './Button';
 import styles from './Button.module.css';
 

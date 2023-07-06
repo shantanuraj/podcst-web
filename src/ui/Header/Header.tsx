@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import React, { Fragment, useCallback, useEffect, useRef } from 'react';
-import { Search } from '../Search';
+import { Search } from '@/ui/Search';
 
-import { Icon } from '../icons/svg/Icon';
+import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './Header.module.css';
 

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-import { setValue } from '../storage/local';
+import { setValue } from '@/shared/storage/local';
 import { useTheme } from './useTheme';
 
 export function ThemeListener() {

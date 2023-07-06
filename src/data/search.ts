@@ -1,6 +1,6 @@
 import useSWR from 'swr';
 
-import { IPodcastSearchResult } from '../types';
+import { IPodcastSearchResult } from '@/types';
 import { get } from './api';
 
 export const searchTerm = async (term: string) => {

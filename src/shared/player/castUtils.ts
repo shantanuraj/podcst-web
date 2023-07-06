@@ -1,4 +1,4 @@
-import { PlayerState } from '../../types';
+import { PlayerState } from '@/types';
 
 export const getAdaptedPlaybackState = (
   remoteState: chrome.cast.media.PlayerState | null,

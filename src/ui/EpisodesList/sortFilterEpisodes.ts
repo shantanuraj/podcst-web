@@ -1,4 +1,4 @@
-import { IEpisodeInfo } from '../../types';
+import { IEpisodeInfo } from '@/types';
 import { filterEpisodes } from './filterEpisodes';
 import { sortEpisodes } from './sortEpisodes';
 import { SortPreference } from './types';

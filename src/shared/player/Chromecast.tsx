@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 
-import { Icon } from '../../ui/icons/svg/Icon';
+import { Icon } from '@/ui/icons/svg/Icon';
 import { getAdaptedPlaybackState } from './castUtils';
 import {
   getChromecastState,

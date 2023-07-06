@@ -1,6 +1,6 @@
 import { matchSorter, rankings, MatchSorterOptions } from 'match-sorter';
 
-import { IEpisodeInfo } from '../../types';
+import { IEpisodeInfo } from '@/types';
 
 const matchSorterOptions: MatchSorterOptions<IEpisodeInfo> = {
   threshold: rankings.CONTAINS,

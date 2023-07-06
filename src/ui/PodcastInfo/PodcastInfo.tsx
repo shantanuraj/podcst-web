@@ -1,14 +1,14 @@
 import { Fragment } from 'react';
 
-import { linkifyText } from '../../shared/link/linkify-text';
-import { stripHost } from '../../shared/link/strip-host';
-import { IPodcastEpisodesInfo } from '../../types';
-import { ShareButton } from '../Button/ShareButton';
-import { ExternalLink } from '../ExternalLink';
-import { Icon } from '../icons/svg/Icon';
+import { SubscribeButton } from '@/components/SubscribeButton/SubscribeButton';
+import { linkifyText } from '@/shared/link/linkify-text';
+import { stripHost } from '@/shared/link/strip-host';
+import { IPodcastEpisodesInfo } from '@/types';
+import { ShareButton } from '@/ui/Button/ShareButton';
+import { ExternalLink } from '@/ui/ExternalLink';
+import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './PodcastInfo.module.css';
-import { SubscribeButton } from '../../app/episodes/[feed]/SubscribeButton';
 
 export interface PodcastInfoProps {
   info: IPodcastEpisodesInfo;

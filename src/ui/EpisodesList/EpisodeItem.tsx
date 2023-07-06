@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { memo } from 'react';
 
-import { PlayButton } from '../Button/PlayButton';
-import { QueueButton } from '../Button/QueueButton';
-import { IEpisodeInfo } from '../../types';
+import { PlayButton } from '@/ui/Button/PlayButton';
+import { QueueButton } from '@/ui/Button/QueueButton';
+import { IEpisodeInfo } from '@/types';
 
 import styles from './EpisodeItem.module.css';
 

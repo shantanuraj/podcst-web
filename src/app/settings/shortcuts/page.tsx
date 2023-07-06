@@ -1,5 +1,5 @@
-import { shortcuts } from '../../../shared/keyboard/shortcuts';
-import styles from '../Settings.module.css';
+import { shortcuts } from '@/shared/keyboard/shortcuts';
+import styles from '@/app/settings/Settings.module.css';
 
 export const metadata = {
   title: 'Shortcuts',

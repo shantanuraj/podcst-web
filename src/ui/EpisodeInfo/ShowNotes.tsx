@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { linkifyText } from '../../shared/link/linkify-text';
-import { IEpisodeInfo } from '../../types';
+import { linkifyText } from '@/shared/link/linkify-text';
+import { IEpisodeInfo } from '@/types';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotesHandler } from './ShowNotesHandler';

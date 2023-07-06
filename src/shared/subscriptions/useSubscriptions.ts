@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import { fetchEpisodesInfo } from '../../data/episodes';
+import { fetchEpisodesInfo } from '@/data/episodes';
 
-import { IPodcastEpisodesInfo, ISubscriptionsMap } from '../../types';
-import { getValue, setValue } from '../storage/idb';
+import { IPodcastEpisodesInfo, ISubscriptionsMap } from '@/types';
+import { getValue, setValue } from '@/shared/storage/idb';
 import {
   getValue as getLocalStorageValue,
   setValue as setLocalStorageValue,
-} from '../storage/local';
+} from '@/shared/storage/local';
 
 export type SubscriptionsState = {
   subs: ISubscriptionsMap;

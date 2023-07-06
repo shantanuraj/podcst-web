@@ -1,11 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import router from 'next/navigation';
 
-import { Icon } from '../../ui/icons/svg/Icon';
-import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
-import { shortcuts } from '../keyboard/shortcuts';
+import { Icon } from '@/ui/icons/svg/Icon';
+import { KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import { shortcuts } from '@/shared/keyboard/shortcuts';
 
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';

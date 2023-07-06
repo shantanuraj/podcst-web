@@ -1,8 +1,8 @@
 import { MouseEvent, useCallback, useEffect, useRef } from 'react';
 
-import { IEpisodeInfo } from '../../types';
-import { useKeydown } from '../keyboard/useKeydown';
-import { shortcuts } from '../keyboard/shortcuts';
+import { IEpisodeInfo } from '@/types';
+import { useKeydown } from '@/shared/keyboard/useKeydown';
+import { shortcuts } from '@/shared/keyboard/shortcuts';
 
 import { getPlaybackState, getSeekTo, usePlayer } from './usePlayer';
 import styles from './Player.module.css';

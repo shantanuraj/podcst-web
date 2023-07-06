@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import * as React from 'react';
-import { RenderablePodcast } from '../../types';
+import { RenderablePodcast } from '@/types';
 
 import styles from './PodcastTile.module.css';
 import Image from 'next/image';

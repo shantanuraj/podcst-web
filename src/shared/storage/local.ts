@@ -2,7 +2,7 @@
  * Storage manager
  */
 
-import { ThemeMode } from '../../types';
+import { ThemeMode } from '@/types';
 
 const STORE_KEY = 'store@4';
 

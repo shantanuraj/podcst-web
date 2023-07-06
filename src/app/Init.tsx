@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useGlobalShortcuts } from '../shared/keyboard/useGlobalShortcuts';
-import { removeDeprecatedStorage } from '../shared/storage/local';
-import { useSubscriptions, getInit } from '../shared/subscriptions/useSubscriptions';
+import { useGlobalShortcuts } from '@/shared/keyboard/useGlobalShortcuts';
+import { removeDeprecatedStorage } from '@/shared/storage/local';
+import { useSubscriptions, getInit } from '@/shared/subscriptions/useSubscriptions';
 
 export function Init() {
   useEffect(removeDeprecatedStorage, []);

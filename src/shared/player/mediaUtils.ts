@@ -3,7 +3,7 @@
  * https://developers.google.com/web/updates/2015/07/media-notifications
  * https://developers.google.com/web/updates/2017/02/media-session
  */
-import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
+import { IEpisodeInfo } from '@/types';
 import { IPlayerState } from './usePlayer';
 
 export const updatePlaybackMetadata = (episode: IEpisodeInfo, podcastTitle?: string) => {

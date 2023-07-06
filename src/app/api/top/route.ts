@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import {
-  DEFAULT_PODCASTS_COUNT,
-  MAX_PODCASTS_COUNT,
-  MIN_PODCASTS_COUNT,
-} from '../../../data/constants';
+import { DEFAULT_PODCASTS_COUNT, MAX_PODCASTS_COUNT, MIN_PODCASTS_COUNT } from '@/data/constants';
 import { top } from './top';
 
 export async function GET(request: NextRequest) {

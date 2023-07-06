@@ -2,13 +2,10 @@
 
 import React from 'react';
 
-import {
-  useSubscriptions,
-  SubscriptionsState,
-} from '../../../shared/subscriptions/useSubscriptions';
-import { Button } from '../../../ui/Button';
+import { useSubscriptions, SubscriptionsState } from '@/shared/subscriptions/useSubscriptions';
+import { Button } from '@/ui/Button';
 
-import styles from '../Settings.module.css';
+import styles from '@/app/settings/Settings.module.css';
 
 export default function SettingsExportPage() {
   const subs = useSubscriptions(getExportList);

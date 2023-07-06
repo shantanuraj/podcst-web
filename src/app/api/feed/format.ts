@@ -2,7 +2,7 @@
  * Podcast parsing utilities
  */
 
-import { IEpisodeListing, IPodcastSearchResult } from '../../../types';
+import { IEpisodeListing, IPodcastSearchResult } from '@/types';
 
 /**
  * Extract base link from a url

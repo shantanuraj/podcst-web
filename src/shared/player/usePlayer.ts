@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
-import { IEpisodeInfo, IPlaybackControls, PlayerState } from '../../types';
+import { IEpisodeInfo, IPlaybackControls, PlayerState } from '@/types';
 import AudioUtils, { seekUtils } from './AudioUtils';
 import { getAdaptedPlaybackState, isChromecastConnected } from './castUtils';
 import { updatePlaybackHandlers, updatePlaybackMetadata } from './mediaUtils';

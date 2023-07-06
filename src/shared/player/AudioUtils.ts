@@ -3,8 +3,8 @@
  */
 
 import { Howl } from 'howler/src/howler.core';
-import { IEpisode } from '../../types';
-import { getValue } from '../storage/local';
+import { IEpisode } from '@/types';
+import { getValue } from '@/shared/storage/local';
 import { updatePlaybackState } from './mediaUtils';
 
 type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;

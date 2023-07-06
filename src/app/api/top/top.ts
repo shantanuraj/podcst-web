@@ -1,7 +1,8 @@
-import { CACHE_STALE_DELTA, DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '../../../data/constants';
-import { cache, cacheMiss, isCached } from '../redis';
-import { IPodcast, iTunes } from '../../../types';
-import { adaptResponse } from '../adapter';
+import { CACHE_STALE_DELTA, DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
+import { IPodcast, iTunes } from '@/types';
+
+import { cache, cacheMiss, isCached } from '@/app/api/redis';
+import { adaptResponse } from '@/app/api/adapter';
 
 export async function top(limit: number, locale = DEFAULT_PODCASTS_LOCALE) {
   try {

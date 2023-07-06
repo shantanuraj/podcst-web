@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { getQueueEpisode, usePlayer } from '../../shared/player/usePlayer';
-import { getShowToast, useToast } from '../../shared/toast/useToast';
-import { IEpisodeInfo } from '../../types';
-import { Icon } from '../icons/svg/Icon';
+import { getQueueEpisode, usePlayer } from '@/shared/player/usePlayer';
+import { getShowToast, useToast } from '@/shared/toast/useToast';
+import { IEpisodeInfo } from '@/types';
+import { Icon } from '@/ui/icons/svg/Icon';
 import styles from './QueueButton.module.css';
 
 export interface QueueButtonProps extends React.ComponentProps<'button'> {

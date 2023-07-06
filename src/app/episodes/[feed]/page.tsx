@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { Metadata } from 'next';
 
-import { IPodcastEpisodesInfo } from '../../../types';
-import { EpisodesList } from '../../../ui/EpisodesList';
-import { Loading } from '../../../ui/Loading';
-import { PodcastInfo } from '../../../ui/PodcastInfo/PodcastInfo';
-import { feed } from '../../api/feed/feed';
-import { patchEpisodesResponse } from '../../../data/episodes';
+import { IPodcastEpisodesInfo } from '@/types';
+import { EpisodesList } from '@/ui/EpisodesList';
+import { Loading } from '@/ui/Loading';
+import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
+import { feed } from '@/app/api/feed/feed';
+import { patchEpisodesResponse } from '@/data/episodes';
 
 interface EpisodesPageProps {
   feed: string;

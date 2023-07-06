@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { RenderablePodcast } from '../../types';
-import { PodcastTile } from '../PodcastTile';
+import { RenderablePodcast } from '@/types';
+import { PodcastTile } from '@/ui/PodcastTile';
 
 import styles from './PodcastsGrid.module.css';
 

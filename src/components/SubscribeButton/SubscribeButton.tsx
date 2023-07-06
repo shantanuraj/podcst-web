@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useSubscriptions, isSubscribed } from '../../../shared/subscriptions/useSubscriptions';
-import { Button } from '../../../ui/Button';
-import { PodcastInfoProps } from '../../../ui/PodcastInfo/PodcastInfo';
+import { useSubscriptions, isSubscribed } from '@/shared/subscriptions/useSubscriptions';
+import { Button } from '@/ui/Button';
+import { PodcastInfoProps } from '@/ui/PodcastInfo/PodcastInfo';
 
 export function SubscribeButton({ info }: PodcastInfoProps) {
   const feed = info.feed;

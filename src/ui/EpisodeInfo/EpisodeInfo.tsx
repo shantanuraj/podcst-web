@@ -1,8 +1,8 @@
-import { IEpisodeInfo, IPodcastEpisodesInfo } from '../../types';
-import { PlayButton } from '../Button/PlayButton';
-import { ShareButton } from '../Button/ShareButton';
-import { ExternalLink } from '../ExternalLink';
-import { Icon } from '../icons/svg/Icon';
+import { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import { PlayButton } from '@/ui/Button/PlayButton';
+import { ShareButton } from '@/ui/Button/ShareButton';
+import { ExternalLink } from '@/ui/ExternalLink';
+import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';

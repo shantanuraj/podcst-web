@@ -1,4 +1,4 @@
-import { Icon } from '../../ui/icons/svg/Icon';
+import { Icon } from '@/ui/icons/svg/Icon';
 import AudioUtils from './AudioUtils';
 import { getIsAirplayEnabled, usePlayer } from './usePlayer';
 

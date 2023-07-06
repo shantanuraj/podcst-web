@@ -2,7 +2,7 @@ import * as React from 'react';
 
 import { Feed } from './top-page';
 import { Metadata } from 'next';
-import { top } from '../../api/top/top';
+import { top } from '@/app/api/top/top';
 
 export const metadata: Metadata = {
   title: 'Top Podcasts',

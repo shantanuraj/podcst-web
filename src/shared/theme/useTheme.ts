@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-import { ThemeMode } from '../../types';
-import { getValue } from '../storage/local';
+import { ThemeMode } from '@/types';
+import { getValue } from '@/shared/storage/local';
 
 type ThemeState = {
   theme: ThemeMode;

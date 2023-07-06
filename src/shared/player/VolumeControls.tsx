@@ -1,9 +1,9 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Icon } from '../../ui/icons/svg/Icon';
-import { shortcuts } from '../keyboard/shortcuts';
-import { KeyboardShortcuts, useKeydown } from '../keyboard/useKeydown';
-import { getValue, setValue } from '../storage/local';
+import { Icon } from '@/ui/icons/svg/Icon';
+import { shortcuts } from '@/shared/keyboard/shortcuts';
+import { KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import { getValue, setValue } from '@/shared/storage/local';
 import { defaultVolume, getInitialVolume } from './AudioUtils';
 
 import styles from './Player.module.css';

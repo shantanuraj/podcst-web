@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { useSearch } from '../../data/search';
-import { shortcuts } from '../../shared/keyboard/shortcuts';
-import { useKeydown } from '../../shared/keyboard/useKeydown';
-import { IPodcastSearchResult } from '../../types';
-import { LoadBar } from '../LoadBar';
+import { useSearch } from '@/data/search';
+import { shortcuts } from '@/shared/keyboard/shortcuts';
+import { useKeydown } from '@/shared/keyboard/useKeydown';
+import { IPodcastSearchResult } from '@/types';
+import { LoadBar } from '@/ui/LoadBar';
 
 import styles from './Search.module.css';
 

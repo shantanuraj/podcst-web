@@ -7,10 +7,10 @@ import {
   getInit,
   SubscriptionsState,
   useSubscriptions,
-} from '../../shared/subscriptions/useSubscriptions';
-import { IEpisodeInfo } from '../../types';
-import { EpisodesList } from '../../ui/EpisodesList';
-import { LoadBar } from '../../ui/LoadBar';
+} from '@/shared/subscriptions/useSubscriptions';
+import { IEpisodeInfo } from '@/types';
+import { EpisodesList } from '@/ui/EpisodesList';
+import { LoadBar } from '@/ui/LoadBar';
 
 import styles from './Recents.module.css';
 

@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { fetchEpisodesInfo } from '../../data/episodes';
+import { fetchEpisodesInfo } from '@/data/episodes';
 
-import { IOPMLFeed, IOPMLJson, IPodcastEpisodesInfo } from '../../types';
-import { Button } from '../../ui/Button/Button';
+import { IOPMLFeed, IOPMLJson, IPodcastEpisodesInfo } from '@/types';
+import { Button } from '@/ui/Button/Button';
 
 import styles from './ImportButton.module.css';
 

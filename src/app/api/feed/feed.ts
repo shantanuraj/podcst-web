@@ -1,9 +1,9 @@
 /**
  * Data caching module
  */
-import { CACHE_STALE_DELTA } from '../../../data/constants';
-import { IEpisodeListing } from '../../../types';
-import { cache, cacheMiss, isCached } from '../redis';
+import { CACHE_STALE_DELTA } from '@/data/constants';
+import { IEpisodeListing } from '@/types';
+import { cache, cacheMiss, isCached } from '@/app/api/redis';
 import { adaptFeed } from './parser';
 
 /**

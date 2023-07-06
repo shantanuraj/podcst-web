@@ -1,11 +1,11 @@
 /**
  * Podcast Search API
  */
-import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '../../../data/constants';
-import { IPodcastSearchResult, iTunes } from '../../../types';
-import { adaptResponse } from '../adapter';
-import { feedToSearchResponse } from '../feed/format';
-import { feed } from '../feed/feed';
+import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
+import { IPodcastSearchResult, iTunes } from '@/types';
+import { adaptResponse } from '@/app/api/adapter';
+import { feedToSearchResponse } from '@/app/api/feed/format';
+import { feed } from '@/app/api/feed/feed';
 
 export async function search(term: string, locale = DEFAULT_PODCASTS_LOCALE) {
   const res: IPodcastSearchResult[] = await (isURL(term)

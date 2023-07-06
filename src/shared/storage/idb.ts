@@ -2,7 +2,7 @@
  * IDB Storage manager
  */
 import { get, set, del } from 'idb-keyval';
-import { ISubscriptionsMap } from '../../types';
+import { ISubscriptionsMap } from '@/types';
 
 export interface IIDBStoreable {
   subscriptions: ISubscriptionsMap;

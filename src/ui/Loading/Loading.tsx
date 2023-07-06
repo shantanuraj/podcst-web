@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LoadBar } from '../LoadBar';
+import { LoadBar } from '@/ui/LoadBar';
 import styles from './Loading.module.css';
 
 export const Loading = React.memo(function Loading() {

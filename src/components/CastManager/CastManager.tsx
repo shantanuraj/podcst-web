@@ -6,7 +6,7 @@ import {
   getSetChromecastState,
   getSetIsChromecastEnabled,
   usePlayer,
-} from '../../shared/player/usePlayer';
+} from '@/shared/player/usePlayer';
 
 export const CastManager: React.FC = () => {
   const isChromecastEnabled = usePlayer(getIsChromecastEnabled);

@@ -1,14 +1,14 @@
 import { Analytics } from '@vercel/analytics/react';
 import Script from 'next/script';
 
-import { CastManager } from '../components/CastManager/CastManager';
-import { Player } from '../shared/player/Player';
-import { ThemeListener } from '../shared/theme/ThemeListener';
-import { Toast } from '../shared/toast/Toast';
-import { Header } from '../ui/Header';
+import { CastManager } from '@/components/CastManager/CastManager';
+import { Player } from '@/shared/player/Player';
+import { ThemeListener } from '@/shared/theme/ThemeListener';
+import { Toast } from '@/shared/toast/Toast';
+import { Header } from '@/ui/Header';
 import { Init } from './Init';
 
-import '../styles/global.css';
+import '@/styles/global.css';
 import styles from './PodcstApp.module.css';
 import { Metadata } from 'next';
 

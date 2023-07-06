@@ -5,7 +5,7 @@
 import { Parser } from 'xml2js';
 
 import { reformatShowNotes, showNotesSorter } from './format';
-import { IEpisode, IEpisodeListing } from '../../../types';
+import { IEpisode, IEpisodeListing } from '@/types';
 
 /**
  * Read itunes file prop

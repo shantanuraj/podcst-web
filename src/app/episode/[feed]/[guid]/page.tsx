@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Metadata } from 'next';
 
-import { patchEpisodesResponse } from '../../../../data/episodes';
-import { IPodcastEpisodesInfo } from '../../../../types';
-import { EpisodeInfo } from '../../../../ui/EpisodeInfo/EpisodeInfo';
-import { Loading } from '../../../../ui/Loading';
-import { feed } from '../../../api/feed/feed';
+import { patchEpisodesResponse } from '@/data/episodes';
+import { IPodcastEpisodesInfo } from '@/types';
+import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
+import { Loading } from '@/ui/Loading';
+import { feed } from '@/app/api/feed/feed';
 
 interface EpisodePageProps {
   feed: string;

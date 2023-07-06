@@ -1,4 +1,4 @@
-import { useTheme } from '../theme/useTheme';
+import { useTheme } from '@/shared/theme/useTheme';
 import { shortcuts } from './shortcuts';
 import { KeyboardShortcuts, useKeydown } from './useKeydown';
 

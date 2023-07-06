@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 
-import { CACHE_STALE_DELTA, KEY_PARSED_FEED, KEY_TOP_PODCASTS } from '../../data/constants';
-import { IEpisodeListing, IPodcast } from '../../types';
+import { CACHE_STALE_DELTA, KEY_PARSED_FEED, KEY_TOP_PODCASTS } from '@/data/constants';
+import { IEpisodeListing, IPodcast } from '@/types';
 
 /**
  * Redis cached entity with timestamp

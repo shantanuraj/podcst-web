@@ -2,11 +2,11 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import { useVirtual } from 'react-virtual';
-import { IEpisodeInfo } from '../../types';
+import { IEpisodeInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
-import { Icon } from '../icons/svg/Icon';
+import { Icon } from '@/ui/icons/svg/Icon';
 import { useEpisodesFilter } from './useEpisodesFilter';
 
 interface EpisodesListProps {

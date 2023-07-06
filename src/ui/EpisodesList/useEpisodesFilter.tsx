@@ -1,7 +1,7 @@
 import React from 'react';
 import { createWorkerFactory, useWorker } from '@shopify/react-web-worker';
 
-import { IEpisodeInfo } from '../../types';
+import { IEpisodeInfo } from '@/types';
 import { SortPreference } from './types';
 
 const createWorker = createWorkerFactory(() => import('./sortFilterEpisodes'));
