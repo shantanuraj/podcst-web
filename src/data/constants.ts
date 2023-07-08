@@ -1,9 +1,4 @@
 /**
- * Time duration in seconds after which feed pages are revalidated
- */
-export const FEED_REVALIDATE_DURATION = 3600000; // 1 hour
-
-/**
  * iTunes API host
  **/
 export const ITUNES_API = `https://itunes.apple.com`;
@@ -39,6 +34,6 @@ export const KEY_TOP_PODCASTS = 'top';
 export const KEY_PARSED_FEED = 'feed';
 
 /**
- * Time delta to determine if cache is stale
+ * Time delta to determine if cache is stale in seconds
  */
-export const CACHE_STALE_DELTA = 3600000; // 1 hour
+export const CACHE_STALE_DELTA = 3600; // 1 hour
