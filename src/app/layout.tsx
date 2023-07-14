@@ -63,7 +63,7 @@ export const metadata: Metadata = {
 
 export default function App({ children }: { children: React.ReactNode }) {
   return (
-    <html>
+    <html className="light" data-scheme="autumn">
       <head>
         <meta charSet="utf-8" />
       </head>
