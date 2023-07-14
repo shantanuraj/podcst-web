@@ -1,8 +1,4 @@
 :root {
-  --brand-hue: 215;
-  --brand-saturation: 97%;
-  --brand-lightness: 59%;
-
   --brand-light: hsl(var(--brand-hue) var(--brand-saturation) var(--brand-lightness));
   --text1-light: hsl(var(--brand-hue) var(--brand-saturation) 10%);
   --text2-light: hsl(var(--brand-hue) 30% 30%);
@@ -106,6 +102,36 @@
   --surface4: var(--surface4-light);
   --surface-shadow: var(--surface-shadow-light);
   --shadow-strength: var(--shadow-strength-light);
+}
+
+:root[data-scheme='autumn'] {
+  --brand-hue: 30;
+  --brand-saturation: 100%;
+  --brand-lightness: 50%;
+}
+
+:root[data-scheme='spring'] {
+  --brand-hue: 120;
+  --brand-saturation: 100%;
+  --brand-lightness: 50%;
+}
+
+:root[data-scheme='winter'] {
+  --brand-hue: 215;
+  --brand-saturation: 97%;
+  --brand-lightness: 59%;
+}
+
+:root[data-scheme='calm'] {
+  --brand-hue: 59;
+  --brand-saturation: 100%;
+  --brand-lightness: 6%;
+}
+
+:root[data-scheme='rose'] {
+  --brand-hue: 345;
+  --brand-saturation: 88%;
+  --brand-lightness: 41%;
 }
 
 @media only screen and (max-width: 600px) {
