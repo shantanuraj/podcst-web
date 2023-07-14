@@ -3,6 +3,7 @@
  */
 
 import { ThemeMode } from '@/types';
+import { Scheme } from '@/shared/theme/useTheme';
 
 const STORE_KEY = 'store@4';
 
@@ -11,6 +12,7 @@ const DEPRECATED_KEYS = ['store@3'] as const;
 export interface IStoreable {
   volume: number;
   themeMode: ThemeMode;
+  scheme: Scheme;
   lastSyncTime: number;
 }
 

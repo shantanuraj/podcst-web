@@ -6,7 +6,7 @@ export function useGlobalShortcuts() {
   useKeydown(globalShortcuts);
 }
 
-const { cycleTheme } = useTheme.getState();
+const { cycleScheme } = useTheme.getState();
 
 const globalShortcuts: KeyboardShortcuts = (router) => [
   [
@@ -39,5 +39,6 @@ const globalShortcuts: KeyboardShortcuts = (router) => [
       router.push('/settings/shortcuts');
     },
   ],
-  [shortcuts.theme, cycleTheme],
+  [shortcuts.previousTheme, () => cycleScheme('left')],
+  [shortcuts.theme, () => cycleScheme('right')],
 ];

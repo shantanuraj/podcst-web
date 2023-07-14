@@ -17,6 +17,7 @@ type DisplayableShortcuts =
   | 'settings'
   | 'search'
   | 'theme'
+  | 'previousTheme'
   | 'info'
   | 'queue'
   | 'togglePlayback'
@@ -72,6 +73,13 @@ export const shortcuts: Record<DisplayableShortcuts, IShortcutInfo> = {
     displayKey: 't',
     metaKey: false,
     shiftKey: false,
+  },
+  previousTheme: {
+    title: 'Previous theme',
+    key: 'T',
+    displayKey: 'T',
+    metaKey: false,
+    shiftKey: true,
   },
   info: {
     title: 'Show episode info',

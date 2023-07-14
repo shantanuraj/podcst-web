@@ -6,7 +6,13 @@ import { setValue } from '@/shared/storage/local';
 import { useTheme } from './useTheme';
 
 export function ThemeListener() {
-  const { theme } = useTheme();
+  const { scheme, theme } = useTheme();
+  useEffect(() => {
+    setValue('scheme', scheme);
+    if (typeof window === 'undefined') return;
+    document.documentElement.dataset.scheme = scheme;
+  }, [scheme]);
+
   useEffect(() => {
     setValue('themeMode', theme);
     if (typeof window === 'undefined') return;
