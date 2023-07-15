@@ -110,19 +110,13 @@
   --brand-lightness: 50%;
 }
 
-:root[data-scheme='spring'] {
-  --brand-hue: 120;
-  --brand-saturation: 100%;
-  --brand-lightness: 50%;
-}
-
 :root[data-scheme='winter'] {
   --brand-hue: 215;
   --brand-saturation: 97%;
   --brand-lightness: 59%;
 }
 
-:root[data-scheme='calm'] {
+:root[data-scheme='spring'] {
   --brand-hue: 59;
   --brand-saturation: 100%;
   --brand-lightness: 6%;

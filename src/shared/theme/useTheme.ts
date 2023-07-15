@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { ThemeMode } from '@/types';
 import { getValue } from '@/shared/storage/local';
 
-const schemes = ['autumn', 'calm', 'rose', 'spring', 'winter'] as const;
+const schemes = ['autumn', 'spring', 'rose', 'winter'] as const;
 
 export type Scheme = (typeof schemes)[number];
 
