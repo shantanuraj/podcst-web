@@ -222,7 +222,7 @@ const adaptEpisode = (
 /**
  * Helper funciton to parse xml to json via promises
  */
-export const xmlToJSON = (xml: string) => {
+const xmlToJSON = (xml: string) => {
   return new Promise((resolve, reject) => {
     const { parseString } = new Parser();
     parseString(xml, (err, res) => (err ? reject(err) : resolve(res)));
@@ -232,7 +232,7 @@ export const xmlToJSON = (xml: string) => {
 /**
  * Adapt json to better format
  */
-export const adaptJSON = (json: any): IEpisodeListing | null => {
+const adaptJSON = (json: any): IEpisodeListing | null => {
   try {
     const channel = json.rss.channel[0];
     const cover = readCover(channel) as string;
@@ -264,4 +264,4 @@ export const adaptFeed = async (xml: string) => xmlToJSON(xml).then(adaptJSON);
 /**
  * Filters null feeds out
  */
-export const validEpisode = (e: IEpisode | null): e is IEpisode => e !== null;
+const validEpisode = (e: IEpisode | null): e is IEpisode => e !== null;
