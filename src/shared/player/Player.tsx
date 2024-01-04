@@ -16,8 +16,22 @@ import { VolumeControls } from './VolumeControls';
 
 import styles from './Player.module.css';
 
-const { togglePlayback, seekBackward, seekForward, skipToNextEpisode, skipToPreviousEpisode } =
-  usePlayer.getState();
+const {
+  togglePlayback,
+  seekBackward,
+  seekForward,
+  setOverridenRate,
+  skipToNextEpisode,
+  skipToPreviousEpisode,
+} = usePlayer.getState();
+
+function overrideRate() {
+  setOverridenRate(2);
+}
+
+function resetRate() {
+  setOverridenRate(undefined);
+}
 
 export const Player = () => {
   const currentEpisode = usePlayer(getCurrentEpisode);
@@ -28,7 +42,12 @@ export const Player = () => {
   return (
     <div className={styles.container} data-open={open}>
       {currentEpisode && (
-        <div className={styles.player} data-surface={1}>
+        <div
+          className={styles.player}
+          data-surface={1}
+          onMouseDown={overrideRate}
+          onMouseUp={resetRate}
+        >
           <Seekbar currentEpisode={currentEpisode} />
           <Link
             href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(

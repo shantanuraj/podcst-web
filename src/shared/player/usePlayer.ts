@@ -46,6 +46,7 @@ export const usePlayer = create<IPlayerState>()(
         seekPosition: 0,
         duration: 0,
         rate: 1,
+        savedRate: undefined,
         state: 'idle',
         isAirplayEnabled: false,
         isChromecastEnabled: false,
@@ -302,6 +303,12 @@ export const usePlayer = create<IPlayerState>()(
             })
             .then(() => set({ rate }))
             .catch((error) => console.error('Error setting rate', error));
+        },
+
+        setOverridenRate: (rateOrStop) => {
+          const { savedRate, rate, setRate } = get();
+          set({ savedRate: rateOrStop ? rate : undefined });
+          setRate(rateOrStop ? rateOrStop : savedRate || 1);
         },
 
         seekOrStartAt(episode, seekPosition) {
