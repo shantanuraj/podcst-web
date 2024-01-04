@@ -66,7 +66,7 @@ export const Player = () => {
             onMouseDown={overrideRate}
             onMouseUp={resetRate}
           >
-            <div className={styles.info}>
+            <div className={styles.info} data-rate-control>
               <p className={styles.title}>{currentEpisode.title}</p>
               <p className={styles.author}>{currentEpisode.author}</p>
             </div>
