@@ -25,12 +25,7 @@ export const useEpisodesFilter = (
 
   React.useEffect(() => {
     async function sortAndFilter() {
-      // TODO 2021-05-30 Investigate ForcePromiseArray type
-      const result = (await worker.sortFilterEpisodes(
-        episodes,
-        sortPreference,
-        query,
-      )) as unknown as IEpisodeInfo[];
+      const result = await worker.sortFilterEpisodes(episodes, sortPreference, query);
       if (cancelUpdate.current) return;
       setFilteredEpisodes(result);
     }
