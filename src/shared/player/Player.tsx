@@ -25,7 +25,11 @@ const {
   skipToPreviousEpisode,
 } = usePlayer.getState();
 
-function overrideRate() {
+function overrideRate(e: React.MouseEvent) {
+  const { target } = e;
+  if ((target as HTMLElement).dataset.rateControl === undefined) {
+    return;
+  }
   setOverridenRate(2);
 }
 
@@ -42,12 +46,7 @@ export const Player = () => {
   return (
     <div className={styles.container} data-open={open}>
       {currentEpisode && (
-        <div
-          className={styles.player}
-          data-surface={1}
-          onMouseDown={overrideRate}
-          onMouseUp={resetRate}
-        >
+        <div className={styles.player} data-surface={1}>
           <Seekbar currentEpisode={currentEpisode} />
           <Link
             href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
@@ -61,7 +60,12 @@ export const Player = () => {
             />
           </Link>
           <Duration />
-          <div className={styles.controlInfoGroup}>
+          <div
+            className={styles.controlInfoGroup}
+            data-rate-control
+            onMouseDown={overrideRate}
+            onMouseUp={resetRate}
+          >
             <div className={styles.info}>
               <p className={styles.title}>{currentEpisode.title}</p>
               <p className={styles.author}>{currentEpisode.author}</p>
