@@ -258,5 +258,7 @@ export interface IPlaybackControls {
   mute: (muted: boolean) => void;
   rate: number;
   setRate: (rate: number) => void;
+  savedRate: number | undefined;
+  setOverridenRate: (rate: number | undefined) => void;
   seekOrStartAt: (episode: IEpisodeInfo, seekPosition: number) => void;
 }
