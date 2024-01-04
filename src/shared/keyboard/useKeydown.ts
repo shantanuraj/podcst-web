@@ -1,12 +1,11 @@
 import React from 'react';
 
 import { IKeyboardShortcut, IShortcutInfo } from './shortcuts';
-import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context';
 import { useRouter } from 'next/navigation';
 
 type ShortcutHandler = (e: KeyboardEvent) => void;
 export type KeyboardShortcuts = (
-  router: AppRouterInstance,
+  router: ReturnType<typeof useRouter>,
 ) => Array<[IShortcutInfo, ShortcutHandler]>;
 
 export function useKeydown(shortcuts: KeyboardShortcuts): void;

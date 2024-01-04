@@ -10,7 +10,7 @@ import { Init } from './Init';
 
 import '@/styles/global.css';
 import styles from './PodcstApp.module.css';
-import { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.podcst.app'),
@@ -23,11 +23,6 @@ export const metadata: Metadata = {
     name: 'Shantanu Raj',
     url: 'https://sraj.me',
   },
-  viewport: 'initial-scale=1.0, width=device-width',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#60347f' },
-    { media: '(prefers-color-scheme: dark)', color: '#00b778' },
-  ],
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -59,6 +54,15 @@ export const metadata: Metadata = {
     ],
     icon: '/icons/launcher-192.png',
   },
+};
+
+export const viewport: Viewport = {
+  initialScale: 1.0,
+  width: 'device-width',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#60347f' },
+    { media: '(prefers-color-scheme: dark)', color: '#00b778' },
+  ],
 };
 
 export default function App({ children }: { children: React.ReactNode }) {

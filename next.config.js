@@ -22,7 +22,6 @@ module.exports = {
   experimental: {
     // TODO 2021-12-25 Remove when shopify-web-workers are fixed
     esmExternals: false,
-    legacyBrowsers: false,
   },
   async headers() {
     return [
