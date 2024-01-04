@@ -16,7 +16,6 @@ function getLocale(request: NextRequest): string | undefined {
   // @ts-expect-error: Readonly array is not assignable to mutable array
   const languages = new Negotiator({ headers: negotiatorHeaders }).languages(locales);
 
-  // @ts-expect-error: Readonly array is not assignable to mutable array
   const locale = matchLocale(languages, locales, i18n.defaultLocale);
 
   return locale;
