@@ -1,36 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
-import { getSetRate, usePlayer } from './usePlayer';
+import { getRate, getSetRate, usePlayer } from './usePlayer';
 
 import styles from './Player.module.css';
 
 export const PlaybackRate = () => {
-  const [rateIndex, setRateIndex] = useState(defaultRate);
   const setRate = usePlayer(getSetRate);
+  const rate = usePlayer(getRate);
+  const rateIndex = useMemo(() => rates.indexOf(rate), [rate]);
   const decreaseRate = useCallback(() => {
-    setRateIndex((rateIndex) => Math.max(0, rateIndex - 1));
-  }, []);
+    setRate(Math.max(0, rateIndex - 1));
+  }, [rateIndex, setRate]);
   const bumpRate = useCallback(() => {
-    setRateIndex((rateIndex) => Math.min(rates.length - 1, rateIndex + 1));
-  }, []);
+    setRate(Math.min(rates.length - 1, rateIndex + 1));
+  }, [rateIndex, setRate]);
   const rateShortcuts: KeyboardShortcuts = useMemo(
     () => (_) =>
       [
         [shortcuts.bumpRate, bumpRate],
         [shortcuts.decreaseRate, decreaseRate],
       ],
-    [],
+    [bumpRate, decreaseRate],
   );
   const cycleRate = useCallback(() => {
-    setRateIndex((rateIndex) => (rateIndex + 1) % rates.length);
-  }, []);
-  const rate = rates[rateIndex];
+    const nextRateIndex = (rateIndex + 1) % rates.length;
+    const nextRate = rates[nextRateIndex];
+    setRate(nextRate);
+  }, [setRate, rateIndex]);
 
   useKeydown(rateShortcuts);
-  useEffect(() => {
-    setRate(rate);
-  }, [rate]);
 
   return (
     <button className={styles.playbackRate} onClick={cycleRate}>
@@ -40,4 +39,3 @@ export const PlaybackRate = () => {
 };
 
 const rates = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const defaultRate = rates.indexOf(1);
