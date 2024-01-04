@@ -7,8 +7,8 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background-color: var(--color-background);
-  border: 1px solid var(--color-accent);
-  color: var(--color-text);
+  background-color: var(--surface1);
+  border: 1px solid var(--text2);
+  color: var(--text2);
   border-radius: 0.5rem;
 }
