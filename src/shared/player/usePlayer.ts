@@ -307,6 +307,9 @@ export const usePlayer = create<IPlayerState>()(
 
         setOverridenRate: (rateOrStop) => {
           const { savedRate, rate, setRate } = get();
+
+          if (rateOrStop === undefined && savedRate === undefined) return;
+
           set({ savedRate: rateOrStop ? rate : undefined });
           setRate(rateOrStop ? rateOrStop : savedRate || 1);
         },
