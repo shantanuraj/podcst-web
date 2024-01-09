@@ -17,7 +17,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const pub = new Date(published || Date.now());
   const utcDate = pub.toUTCString();
   const day = pub.getDate();
-  const month = pub.toLocaleDateString('default', { month: 'short' });
+  const month = pub.toLocaleDateString('default', { month: 'short' }).slice(0, 3);
   const minutes = Math.floor((duration || 0) / 60);
   const minutesSuffix = `min${minutes > 1 ? 's' : ''}`;
 
