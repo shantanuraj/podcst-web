@@ -73,6 +73,8 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
     overscan: 5,
   });
 
+  const shouldUseVirtualList = filteredEpisodes.length > 750;
+
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
       {children}
@@ -95,23 +97,59 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
           </select>
         </div>
       </div>
-      <ul className={styles.list} style={{ height: `${totalSize}px` }}>
-        {virtualItems.map(({ index, start }) => {
-          const episode = filteredEpisodes[index];
-          return (
-            <li
-              data-surface={index % 2 === 0 ? 3 : 4}
-              key={`${index}-${episode.title}`}
-              style={{
-                transform: `translateY(${start}px)`,
-              }}
-            >
-              <EpisodeItem episode={episode} />
-            </li>
-          );
-        })}
-      </ul>
+      {shouldUseVirtualList ? (
+        <ul className={styles.list} style={{ height: `${totalSize}px` }}>
+          {virtualItems.map(({ index, start }) => {
+            const episode = filteredEpisodes[index];
+            return (
+              <EpisodeListItem
+                key={episode.guid || `${index}-${episode.title}`}
+                episode={episode}
+                index={index}
+                start={start}
+              />
+            );
+          })}
+        </ul>
+      ) : (
+        <ul className={styles.list}>
+          {filteredEpisodes.map((episode, index) => {
+            return (
+              <EpisodeListItem
+                key={episode.guid || `${index}-${episode.title}`}
+                episode={episode}
+                index={index}
+              />
+            );
+          })}
+        </ul>
+      )}
     </div>
+  );
+}
+
+interface EpisodeListItemProps {
+  episode: IEpisodeInfo;
+  index: number;
+  start?: number;
+}
+
+function EpisodeListItem({ episode, index, start }: EpisodeListItemProps) {
+  const virtual = start !== undefined;
+  return (
+    <li
+      data-virtual={virtual}
+      data-surface={index % 2 === 0 ? 3 : 4}
+      style={
+        virtual
+          ? {
+              transform: `translateY(${start}px)`,
+            }
+          : undefined
+      }
+    >
+      <EpisodeItem episode={episode} />
+    </li>
   );
 }
 
