@@ -16,7 +16,6 @@ export const useEpisodesFilter = (
   const worker = useWorker(createWorker);
 
   React.useEffect(() => {
-    if (!query) return;
     cancelUpdate.current = false;
     return () => {
       cancelUpdate.current = true;
@@ -30,6 +29,7 @@ export const useEpisodesFilter = (
       setFilteredEpisodes(result);
     }
     sortAndFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, sortPreference, episodes]);
 
   return filteredEpisodes;
