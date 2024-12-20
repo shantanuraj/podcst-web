@@ -28,11 +28,12 @@ const EpisodesPage = (props: EpisodesPageProps) => {
   );
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { feed: string };
-}): Promise<Partial<Metadata>> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ feed: string }>;
+  }
+): Promise<Partial<Metadata>> {
+  const params = await props.params;
   const feed = decodeURIComponent(params.feed);
   const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;
   if (!info) return {};
@@ -46,7 +47,8 @@ export async function generateMetadata({
   return metadata;
 }
 
-export default async function Page({ params }: { params: { feed: string } }) {
+export default async function Page(props: { params: Promise<{ feed: string }> }) {
+  const params = await props.params;
   const feed = decodeURIComponent(params.feed);
   const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;
   const data = patchEpisodesResponse(feed)(info);

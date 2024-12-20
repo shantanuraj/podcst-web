@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 import { useSubscriptions, SubscriptionsState } from '@/shared/subscriptions/useSubscriptions';
 import { Button } from '@/ui/Button';
@@ -8,7 +9,7 @@ import { Button } from '@/ui/Button';
 import styles from '@/app/settings/Settings.module.css';
 
 export default function SettingsExportPage() {
-  const subs = useSubscriptions(getExportList);
+  const subs = useSubscriptions(useShallow(getExportList));
   // Generates the OPML format XML file from subscriptions.
   const exportSubscriptions = React.useCallback(() => {
     const doc = document.implementation.createDocument('', '', null);
