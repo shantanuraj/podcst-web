@@ -8,7 +8,8 @@ export const metadata: Metadata = {
   title: 'Top Podcasts',
 };
 
-export default async function Page({ params }: { params: { locale: string } }) {
+export default async function Page(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const podcasts = await top(100, params.locale);
   return <PodcastsGrid podcasts={podcasts} />;
 }

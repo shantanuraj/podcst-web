@@ -29,11 +29,12 @@ const Episode = (props: EpisodePageProps) => {
   return <EpisodeInfo podcast={info} episode={episode} />;
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { feed: string; guid: string };
-}): Promise<Partial<Metadata>> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ feed: string; guid: string }>;
+  }
+): Promise<Partial<Metadata>> {
+  const params = await props.params;
   const feed = decodeURIComponent(params.feed);
   const guid = decodeURIComponent(params.guid);
   const guidParam = guid;
@@ -55,14 +56,15 @@ export async function generateMetadata({
   return metadata;
 }
 
-export default async function Page({
-  params,
-}: {
-  params: {
-    feed: string;
-    guid: string;
-  };
-}) {
+export default async function Page(
+  props: {
+    params: Promise<{
+      feed: string;
+      guid: string;
+    }>;
+  }
+) {
+  const params = await props.params;
   const feed = decodeURIComponent(params.feed);
   const guid = decodeURIComponent(params.guid);
 

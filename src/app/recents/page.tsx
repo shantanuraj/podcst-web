@@ -2,6 +2,7 @@
 
 import { NextPage } from 'next';
 import * as React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 import {
   getInit,
@@ -18,7 +19,7 @@ const RecentsPage: NextPage = () => {
   const init = useSubscriptions(getInit);
   const isSyncing = useSubscriptions(getIsSyncing);
   const syncAllSubscriptions = useSubscriptions(getSyncSubscriptions);
-  const episodes = useSubscriptions(getRecents);
+  const episodes = useSubscriptions(useShallow(getRecents));
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;

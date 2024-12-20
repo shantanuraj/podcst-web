@@ -29,8 +29,10 @@ const updateLastSyncTime = () => setLocalStorageValue('lastSyncTime', Date.now()
 
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) => !!state.subs[feed];
 
+const emptySubs: ISubscriptionsMap = {};
+
 export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
-  subs: {},
+  subs: emptySubs,
   init: async () => {
     const subscriptions = await getValue('subscriptions');
     if (subscriptions) {

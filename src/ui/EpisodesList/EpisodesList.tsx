@@ -66,7 +66,7 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
 
   const filteredEpisodes = useEpisodesFilter(episodes, sortPreference, query);
 
-  const { totalSize, virtualItems } = useVirtual<HTMLDivElement>({
+  const { totalSize, virtualItems } = useVirtual<HTMLDivElement | null>({
     size: filteredEpisodes.length || 0,
     parentRef: containerRef,
     estimateSize: getRowHeight,

@@ -3,6 +3,7 @@
   flex-direction: var(--dimen-podcast-info-direction);
   padding: var(--dimen-podcast-info-padding);
   position: relative;
+  outline: none;
   --color-almost-white: hsla(0, 0%, 100%, 0.85);
 }
 
