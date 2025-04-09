@@ -157,14 +157,21 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
     const data = ctx['itunes:image'];
     const link = data[0]['$']['href'];
 
+    let url = '';
     try {
-      return new URL(link).toString();
+      url = new URL(link).toString();
     } catch (err) {
       if (baseLink) {
-        return new URL(link, baseLink).toString();
+        url = new URL(link, baseLink).toString();
       }
       return null;
     }
+
+    if (!url) return null;
+
+    const imgProxy = new URL('https://assets.podcst.app/');
+    imgProxy.searchParams.set('p', encodeURIComponent(url));
+    return imgProxy.toString();
   } catch (err) {
     return null;
   }
