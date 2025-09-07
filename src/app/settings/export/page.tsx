@@ -9,7 +9,8 @@ import { Button } from '@/ui/Button';
 import styles from '@/app/settings/Settings.module.css';
 
 export default function SettingsExportPage() {
-  const subs = useSubscriptions(useShallow(getExportList));
+  const subsState = useSubscriptions.getState();
+  const subs = useShallow(getExportList)(subsState);
   // Generates the OPML format XML file from subscriptions.
   const exportSubscriptions = React.useCallback(() => {
     const doc = document.implementation.createDocument('', '', null);
