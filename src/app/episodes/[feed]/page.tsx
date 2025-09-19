@@ -28,11 +28,9 @@ const EpisodesPage = (props: EpisodesPageProps) => {
   );
 };
 
-export async function generateMetadata(
-  props: {
-    params: Promise<{ feed: string }>;
-  }
-): Promise<Partial<Metadata>> {
+export async function generateMetadata(props: {
+  params: Promise<{ feed: string }>;
+}): Promise<Partial<Metadata>> {
   const params = await props.params;
   const feed = decodeURIComponent(params.feed);
   const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;

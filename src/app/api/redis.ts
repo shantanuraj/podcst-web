@@ -1,7 +1,12 @@
 import { Redis } from 'ioredis';
 
-import { CACHE_STALE_DELTA, KEY_PARSED_FEED, KEY_TOP_PODCASTS } from '@/data/constants';
-import { IEpisodeListing, IPodcast } from '@/types';
+import {
+  CACHE_STALE_DELTA,
+  KEY_PARSED_FEED,
+  KEY_TOP_PODCASTS,
+  KEY_SHORT_URL,
+} from '@/data/constants';
+import { IEpisodeListing, IPodcast, IShortUrl } from '@/types';
 
 /**
  * Redis cached entity with timestamp
@@ -35,6 +40,11 @@ export const isCached = <T>(entry: CachedEntity<T>) => entry.timestamp !== 0;
  * Redis key for feed
  */
 const feedKey = (url: string) => `${KEY_PARSED_FEED}-${url.trim()}`;
+
+/**
+ * Redis key for short URL
+ */
+const shortUrlKey = (slug: string) => `${KEY_SHORT_URL}-${slug}`;
 
 /**
  * Parse stringified JSON to Object
@@ -143,5 +153,35 @@ export const cache = {
    */
   async saveFeed(url: string, feed: IEpisodeListing) {
     return save(feedKey(url), feed);
+  },
+
+  /**
+   * Get short URL mapping from redis (permanent storage)
+   */
+  async getShortUrl(slug: string) {
+    try {
+      const res = await redis.get(shortUrlKey(slug));
+      if (!res) {
+        return null;
+      }
+      const cached = parse<IShortUrl>(res);
+      return cached.entity;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  },
+
+  /**
+   * Save short URL mapping in redis (permanent storage)
+   */
+  async saveShortUrl(slug: string, shortUrl: IShortUrl) {
+    return redis.set(
+      shortUrlKey(slug),
+      stringify({
+        entity: shortUrl,
+        timestamp: Date.now(),
+      }),
+    );
   },
 };

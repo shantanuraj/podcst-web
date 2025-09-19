@@ -34,6 +34,11 @@ export const KEY_TOP_PODCASTS = 'top';
 export const KEY_PARSED_FEED = 'feed';
 
 /**
+ * Redis key for short URLs
+ */
+export const KEY_SHORT_URL = 'short';
+
+/**
  * Time delta to determine if cache is stale in seconds
  */
 export const CACHE_STALE_DELTA = 3600; // 1 hour

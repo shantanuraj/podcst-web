@@ -262,3 +262,8 @@ export interface IPlaybackControls {
   setOverridenRate: (rate: number | undefined) => void;
   seekOrStartAt: (episode: IEpisodeInfo, seekPosition: number) => void;
 }
+
+export interface IShortUrl {
+  feed: string;
+  guid: string;
+}
