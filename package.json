@@ -24,7 +24,8 @@
     "start": "next start",
     "format": "prettier --write \"src/**/{*.ts,*.tsx}\"",
     "lint": "next lint",
-    "deploy": "vercel"
+    "deploy": "vercel",
+    "short-url": "bun scripts/generate-short-url.ts"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "0.5.9",

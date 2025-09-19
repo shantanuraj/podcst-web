@@ -323,7 +323,7 @@ export const usePlayer = create<IPlayerState>()(
           }
           return playerState.playEpisode(episode, seekPosition);
         },
-      } as IPlayerState),
+      }) as IPlayerState,
   ),
 );
 
