@@ -15,6 +15,7 @@ import type { IEpisodeInfo } from '@/types';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { LoadBar } from '@/ui/LoadBar';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
+import { ItemListSchema } from '@/components/Schema';
 
 import styles from './Subscriptions.module.css';
 
@@ -88,7 +89,12 @@ const LibraryPage: NextPage = () => {
           </button>
         </nav>
       </header>
-      {activeTab === 'subscriptions' && <PodcastsGrid podcasts={podcasts} />}
+      {activeTab === 'subscriptions' && (
+        <>
+          <ItemListSchema items={podcasts} title="Subscriptions" />
+          <PodcastsGrid podcasts={podcasts} />
+        </>
+      )}
       {activeTab === 'new' && <EpisodesList episodes={episodes} />}
     </>
   );

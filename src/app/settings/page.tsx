@@ -60,9 +60,9 @@ const SettingsPage = () => {
           <div className={styles.author}>
             <span>Made by</span>
             <Link
-              href="https://sraj.me"
+              href="https://sraj.me/"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className={styles.authorLink}
             >
               Shantanu Raj

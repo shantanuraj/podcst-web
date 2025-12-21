@@ -10,6 +10,7 @@ import { ThemeListener } from '@/shared/theme/ThemeListener';
 import '@/styles/global.css';
 import type { Metadata, Viewport } from 'next';
 import { SiteHeader } from '@/ui/SiteHeader';
+import { WebSiteSchema } from '@/components/Schema';
 import styles from './PodcstApp.module.css';
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
   description: 'A beautiful way to discover and listen to podcasts',
   authors: {
     name: 'Shantanu Raj',
-    url: 'https://sraj.me',
+    url: 'https://sraj.me/',
   },
   appleWebApp: {
     capable: true,
@@ -61,6 +62,7 @@ export default function App({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
+        <WebSiteSchema />
         <QueryProvider>
           <Init />
           <ThemeListener />
