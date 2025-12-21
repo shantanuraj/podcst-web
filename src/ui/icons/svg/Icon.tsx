@@ -23,6 +23,7 @@ import Search from './Search';
 import SeekBack from './SeekBack10';
 import SeekForward from './SeekForward10';
 import SettingsIcon from './SettingsIcon';
+import UserIcon from './UserIcon';
 import VolumeIcon from './VolumeIcon';
 
 export type IconType =
@@ -45,6 +46,7 @@ export type IconType =
   | 'queue'
   | 'queue-list'
   | 'caret'
+  | 'user'
   | 'volume';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -73,6 +75,7 @@ const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
   'queue-list': QueueList,
   search: Search,
   caret: Caret,
+  user: UserIcon,
   'external-link': OpenInNew,
 };
 

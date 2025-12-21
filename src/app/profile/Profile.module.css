@@ -1,0 +1,214 @@
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-6);
+}
+
+.content {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+}
+
+.section {
+  margin-bottom: var(--space-12);
+}
+
+.sectionTitle {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+  margin-bottom: var(--space-4);
+}
+
+.accountCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-rule);
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-ink);
+  color: var(--color-surface);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.accountInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.email {
+  font-size: var(--text-base);
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-size: var(--text-sm);
+  color: var(--color-ink-tertiary);
+}
+
+.signOutButton {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
+  border: 1px solid var(--color-rule);
+  background-color: var(--color-surface);
+  transition: all 0.15s ease;
+}
+
+.signOutButton:hover {
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+}
+
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.themeOption {
+  padding: var(--space-4);
+  border: 1px solid var(--color-rule);
+  background-color: var(--color-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.themeOption:hover {
+  border-color: var(--color-ink-tertiary);
+}
+
+.themeOption[data-selected="true"] {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-subtle);
+}
+
+.themeLabel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.shortcutsList {
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-rule);
+  font-size: var(--text-sm);
+}
+
+.shortcutRow:last-child {
+  border-bottom: none;
+}
+
+.kbd {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  min-width: 2rem;
+  text-align: center;
+}
+
+.exportSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.exportDescription {
+  flex: 1;
+  min-width: 200px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
+}
+
+.exportButton {
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background-color: var(--color-ink);
+  color: var(--color-surface);
+  border: 1px solid var(--color-ink);
+  transition: background-color 0.15s ease;
+}
+
+.exportButton:hover {
+  background-color: var(--color-ink-secondary);
+}
+
+.exportCount {
+  font-size: var(--text-xs);
+  color: var(--color-ink-tertiary);
+}
+
+.footer {
+  margin-top: var(--space-16);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-rule);
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--color-ink-tertiary);
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .accountCard {
+    flex-wrap: wrap;
+  }
+
+  .signOutButton {
+    width: 100%;
+    margin-top: var(--space-2);
+  }
+
+  .exportSection {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .exportButton {
+    width: 100%;
+  }
+}

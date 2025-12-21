@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { Search } from '@/ui/Search/Search';
+import { useSession } from '@/shared/auth/useAuth';
 
 import styles from './SiteHeader.module.css';
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const { data: user } = useSession();
 
   return (
     <header className={styles.header}>
@@ -38,9 +40,20 @@ export function SiteHeader() {
         </nav>
         <div className={styles.actions}>
           <Search />
-          <Link href="/settings" className={styles.iconLink} title="Settings">
-            <Icon icon="settings" size={20} />
-          </Link>
+          {user ? (
+            <Link href="/profile" className={styles.iconLink} title={user.email}>
+              <Icon icon="user" size={20} />
+            </Link>
+          ) : (
+            <>
+              <Link href="/settings" className={styles.iconLink} title="Settings">
+                <Icon icon="settings" size={20} />
+              </Link>
+              <Link href="/auth" className={styles.authLink}>
+                Sign in
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
