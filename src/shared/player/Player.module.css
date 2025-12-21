@@ -45,7 +45,7 @@
 }
 
 .player svg {
-  fill: currentColor;
+  color: currentColor;
 }
 
 .seekbar {

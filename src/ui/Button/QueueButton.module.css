@@ -1,8 +1,13 @@
-.queue svg {
-  margin-top: 5px;
+.queue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.queue:focus svg,
+.queue svg {
+  color: currentColor;
+}
+
 .queue:hover svg {
-  fill: var(--brand-dark);
+  color: var(--color-accent);
 }

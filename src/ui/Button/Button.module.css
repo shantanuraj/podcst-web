@@ -49,7 +49,7 @@
 }
 
 .withIcon svg {
-  fill: currentColor;
+  color: currentColor;
   transition: transform 0.15s ease;
 }
 

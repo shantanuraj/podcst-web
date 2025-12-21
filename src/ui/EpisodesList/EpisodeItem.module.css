@@ -91,7 +91,7 @@
 }
 
 .actions svg {
-  fill: currentColor;
+  color: currentColor;
 }
 
 @media (max-width: 768px) {
