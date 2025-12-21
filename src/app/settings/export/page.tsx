@@ -2,11 +2,9 @@
 
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
-
-import { useSubscriptions, SubscriptionsState } from '@/shared/subscriptions/useSubscriptions';
-import { Button } from '@/ui/Button';
-
 import styles from '@/app/settings/Settings.module.css';
+import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import { Button } from '@/ui/Button';
 
 export default function SettingsExportPage() {
   const subsState = useSubscriptions.getState();

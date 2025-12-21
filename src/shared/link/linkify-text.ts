@@ -35,17 +35,22 @@ export const linkifyText = (text: string | undefined): string => {
       return getLink(token, maybeSpace);
     }
     if (TIME_REGEX.test(token)) {
-      const timestamp = TIME_REGEX.exec(token)!
-        .slice(1)
-        .filter((t) => t)
-        .join(':');
-      return token.replace(
-        timestamp,
-        `<button data-timestamp="${timestamp}">${timestamp}</button>`,
-      );
-    } else {
-      return token + maybeSpace;
+      const match = TIME_REGEX.exec(token);
+      const timestamp = match
+        ? match
+            .slice(1)
+            .filter((t) => t)
+            .join(':')
+        : null;
+
+      if (timestamp) {
+        return token.replace(
+          timestamp,
+          `<button data-timestamp="${timestamp}">${timestamp}</button>`,
+        );
+      }
     }
+    return token + maybeSpace;
   });
 
   return linkifed.join('').trim();

@@ -1,5 +1,5 @@
 import { SpaLink } from '@/shared/spa';
-import { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';

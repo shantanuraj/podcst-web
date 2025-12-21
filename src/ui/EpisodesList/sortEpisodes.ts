@@ -1,6 +1,6 @@
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 
-import { SortPreference } from './types';
+import type { SortPreference } from './types';
 
 export const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: string }> = {
   releaseDesc: {

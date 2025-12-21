@@ -3,10 +3,10 @@ import { Redis } from 'ioredis';
 import {
   CACHE_STALE_DELTA,
   KEY_PARSED_FEED,
-  KEY_TOP_PODCASTS,
   KEY_SHORT_URL,
+  KEY_TOP_PODCASTS,
 } from '@/data/constants';
-import { IEpisodeListing, IPodcast, IShortUrl } from '@/types';
+import type { IEpisodeListing, IPodcast, IShortUrl } from '@/types';
 
 /**
  * Redis cached entity with timestamp
@@ -115,7 +115,7 @@ export const cache = {
    */
   async top(count: number, locale: string) {
     try {
-      let cached = await read<IPodcast[]>(keys.top(locale));
+      const cached = await read<IPodcast[]>(keys.top(locale));
       if (cached.entity && cached.entity.length >= count) {
         cached.entity = cached.entity.slice(0, count);
         return cacheHit(cached);

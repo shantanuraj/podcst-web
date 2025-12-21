@@ -1,20 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-
-import { Icon } from '@/ui/icons/svg/Icon';
-import { KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
+import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import { Icon } from '@/ui/icons/svg/Icon';
 
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';
 import { Duration } from './Duration';
 import { PlaybackRate } from './PlaybackRate';
+import styles from './Player.module.css';
 import { Seekbar } from './Seekbar';
 import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
 import { VolumeControls } from './VolumeControls';
-
-import styles from './Player.module.css';
 
 const {
   togglePlayback,

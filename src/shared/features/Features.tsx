@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 type Features = 'episodesFilter';
 
@@ -14,5 +14,5 @@ interface FeatureToggleProps {
 export const FeatureToggle = (props: FeatureToggleProps) => {
   const { feature, children } = props;
   const isEnabled = features[feature];
-  return isEnabled ? <React.Fragment>{children}</React.Fragment> : null;
+  return isEnabled ? children : null;
 };

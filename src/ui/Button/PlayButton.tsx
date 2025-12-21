@@ -1,16 +1,16 @@
 'use client';
 
-import { forwardRef, useCallback, memo } from 'react';
+import { forwardRef, memo, useCallback } from 'react';
 import {
   getCurrentEpisode,
   getPlaybackState,
-  IPlayerState,
+  type IPlayerState,
   usePlayer,
 } from '@/shared/player/usePlayer';
 
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 import { Icon } from '@/ui/icons/svg/Icon';
-import { Button, ButtonProps } from './Button';
+import { Button, type ButtonProps } from './Button';
 import styles from './Button.module.css';
 
 export type PlayButtonProps = ButtonProps & {
@@ -24,7 +24,7 @@ export const PlayButton = memo(
     ref,
   ) {
     const state = usePlayer(getPlaybackState);
-    const isCurrentEpisode = usePlayer(useCallback(selectIsCurrentEpisode(episode), [episode]));
+    const isCurrentEpisode = usePlayer(useCallback(selectIsCurrentEpisode(episode), []));
     const isPlaying = isCurrentEpisode && (state === 'playing' || state === 'buffering');
 
     const play = usePlayer(selectPlay);
@@ -44,7 +44,7 @@ export const PlayButton = memo(
           return resume();
         }
       },
-      [episode, isPlaying, play, resume, setPlayerState],
+      [episode, isPlaying, play, resume, setPlayerState, isCurrentEpisode],
     );
 
     return (

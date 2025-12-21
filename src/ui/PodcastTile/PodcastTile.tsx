@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { RenderablePodcast } from '@/types';
+import type { RenderablePodcast } from '@/types';
 
 import styles from './PodcastTile.module.css';
 

@@ -8,7 +8,7 @@ export const Airplay = () => {
   if (!isAirplayEnabled) return null;
 
   return (
-    <button onClick={AudioUtils.showAirplaySelector}>
+    <button type="button" onClick={AudioUtils.showAirplaySelector}>
       <Icon icon="airplay" size={26} />
     </button>
   );

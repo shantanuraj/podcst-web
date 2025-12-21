@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { IPodcastSearchResult } from '@/types';
+import type { IPodcastSearchResult } from '@/types';
 import { get } from './api';
 
 const searchTerm = async (term: string): Promise<IPodcastSearchResult[]> => {

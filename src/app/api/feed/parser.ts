@@ -3,9 +3,8 @@
  */
 
 import { Parser } from 'xml2js';
-
+import type { IEpisode, IEpisodeListing } from '@/types';
 import { reformatShowNotes, showNotesSorter } from './format';
-import { IEpisode, IEpisodeListing } from '@/types';
 
 /**
  * Read itunes file prop
@@ -29,7 +28,7 @@ const readDate = (ctx: any): number | null => {
 const readSummary = (ctx: any): string | null => {
   const data = ctx['itunes:summary'] || ctx['itunes:subtitle'];
   if (Array.isArray(data)) {
-    return (data[0]['_'] || data[0]).trim();
+    return (data[0]._ || data[0]).trim();
   }
 
   return null;
@@ -61,7 +60,7 @@ const readDuration = (ctx: any): number | null => {
   if (!_data) {
     return null;
   }
-  const data = _data[0]['_'] || _data[0];
+  const data = _data[0]._ || _data[0];
   if (data.indexOf(':') === -1) {
     return parseInt(data, 10);
   }
@@ -100,19 +99,15 @@ const readExplicit = (ctx: any): boolean => {
  */
 const readEpisodeArtwork = (ctx: any): string | null => {
   try {
-    const url = ctx['media:content'][0]['$'].url;
-    const type: string | null =
-      (ctx['media:content'][0] &&
-        ctx['media:content'][0]['$'] &&
-        ctx['media:content'][0]['$'].type) ||
-      null;
+    const url = ctx['media:content'][0].$.url;
+    const type: string | null = ctx['media:content'][0]?.$?.type || null;
 
-    if (type && type.includes('image')) {
+    if (type?.includes('image')) {
       return url;
     } else {
       return null;
     }
-  } catch (err) {
+  } catch (_err) {
     return null;
   }
 };
@@ -129,7 +124,7 @@ const readKeywords = (ctx: any): string[] => {
   if (typeof record === 'string') {
     return record.split(',').map((e) => e.trim());
   } else if (typeof record === 'object') {
-    return record['_'].split(',').map((e: string) => e.trim());
+    return record._.split(',').map((e: string) => e.trim());
   }
   return [];
 };
@@ -138,10 +133,10 @@ const readKeywords = (ctx: any): string[] => {
  * Read show notes
  */
 const readShowNotes = (ctx: any): string => {
-  const description = (Array.isArray(ctx['description']) && ctx['description'][0]) || '';
+  const description = (Array.isArray(ctx.description) && ctx.description[0]) || '';
   const contentEncoded =
     (Array.isArray(ctx['content:encoded']) &&
-      (ctx['content:encoded'][0]['_'] || ctx['content:encoded'][0])) ||
+      (ctx['content:encoded'][0]._ || ctx['content:encoded'][0])) ||
     '';
   const summary = readSummary(ctx) || '';
 
@@ -155,12 +150,12 @@ const readShowNotes = (ctx: any): string => {
 const readCover = (ctx: any, baseLink?: string | null): string | null => {
   try {
     const data = ctx['itunes:image'];
-    const link = data[0]['$']['href'];
+    const link = data[0].$.href;
 
     let url = '';
     try {
       url = new URL(link).toString();
-    } catch (err) {
+    } catch (_err) {
       if (baseLink) {
         url = new URL(link, baseLink).toString();
       }
@@ -172,7 +167,7 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
     const imgProxy = new URL('https://assets.podcst.app/');
     imgProxy.searchParams.set('p', encodeURIComponent(url));
     return imgProxy.toString();
-  } catch (err) {
+  } catch (_err) {
     return null;
   }
 };
@@ -182,15 +177,15 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
  */
 const readLink = (ctx: any): string | null => {
   const link = Array.isArray(ctx.link) ? (ctx.link[0] as string) : null;
-  return link || ctx['guid'][0]['_'];
+  return link || ctx.guid[0]._;
 };
 
 /**
  * Read GUID
  */
 const readGuid = (ctx: any): string => {
-  const guid = ctx['guid'][0];
-  return guid['_'] || guid;
+  const guid = ctx.guid[0];
+  return guid._ || guid;
 };
 
 /**
@@ -201,7 +196,7 @@ const adaptEpisode = (
   fallbackCover: string,
   fallbackAuthor: string,
 ): IEpisode | null => {
-  if (!item['enclosure']) {
+  if (!item.enclosure) {
     return null;
   }
 
@@ -217,7 +212,7 @@ const adaptEpisode = (
     explicit: readExplicit(item),
     duration: readDuration(item),
     link,
-    file: readFile(item['enclosure'][0]['$']),
+    file: readFile(item.enclosure[0].$),
     author:
       (Array.isArray(item['itunes:author']) ? (item['itunes:author'][0] as string) : null) ||
       fallbackAuthor,
@@ -253,7 +248,7 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
       cover: cover,
       keywords: readKeywords(channel),
       explicit: readExplicit(channel),
-      episodes: (channel['item'] as Array<any>)
+      episodes: (channel.item as Array<any>)
         .map((e) => adaptEpisode(e, cover, author))
         .filter(validEpisode),
     };

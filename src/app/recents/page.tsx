@@ -1,15 +1,15 @@
 'use client';
 
-import { NextPage } from 'next';
+import type { NextPage } from 'next';
 import * as React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import {
   getInit,
-  SubscriptionsState,
+  type SubscriptionsState,
   useSubscriptions,
 } from '@/shared/subscriptions/useSubscriptions';
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { LoadBar } from '@/ui/LoadBar';
 
@@ -24,7 +24,7 @@ const RecentsPage: NextPage = () => {
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     init().then(syncAllSubscriptions);
-  }, []);
+  }, [init, syncAllSubscriptions]);
 
   if (episodes.length) {
     return (
@@ -59,8 +59,7 @@ const EPISODES_LIMIT = 50;
  */
 const getRecents = (state: SubscriptionsState): IEpisodeInfo[] =>
   Object.keys(state.subs)
-    .map((feed) => state.subs[feed].episodes.slice(0, FEED_EPISODES_LIMIT))
-    .reduce((acc, feedEpisodes) => [...acc, ...feedEpisodes], [])
+    .flatMap((feed) => state.subs[feed].episodes.slice(0, FEED_EPISODES_LIMIT))
     .sort((a, b) => (b.published || 0) - (a.published || 0))
     .slice(0, EPISODES_LIMIT);
 

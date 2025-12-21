@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 
 function DayIcon(props: React.SVGProps<SVGSVGElement>) {
   return (

@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 
 import { feed } from '@/app/api/feed/feed';
 import { patchEpisodesResponse } from '@/data/episodes';
@@ -56,4 +56,3 @@ export default async function Page(props: { params: Promise<{ slugs: string[] }>
 
   return <EpisodesSpaClient feedUrl={feedUrl} initialGuid={guid} initialData={data} />;
 }
-

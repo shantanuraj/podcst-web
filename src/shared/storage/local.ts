@@ -2,8 +2,8 @@
  * Storage manager
  */
 
-import { ThemeMode } from '@/types';
-import { Scheme } from '@/shared/theme/useTheme';
+import type { Scheme } from '@/shared/theme/useTheme';
+import type { ThemeMode } from '@/types';
 
 const STORE_KEY = 'store@4';
 
@@ -44,7 +44,7 @@ export const removeValue = <K extends keyof IStoreable>(key: K) => {
     const store = getStore();
     delete store[key];
     storage.setItem(STORE_KEY, JSON.stringify(store));
-  } catch (err) {
+  } catch (_err) {
     console.error(`Fatal error couldn't remove key from store purging persisted data`);
     storage.removeItem(STORE_KEY);
   }

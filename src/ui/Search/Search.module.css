@@ -12,7 +12,9 @@
   border-bottom: 1px solid var(--color-rule);
   color: var(--color-ink);
   outline: none;
-  transition: border-color 0.2s ease, width 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    width 0.2s ease;
 }
 
 .search input::placeholder {
@@ -52,7 +54,7 @@
   border-bottom: none;
 }
 
-.results li[data-highlighted='true'] {
+.results li[data-highlighted="true"] {
   background-color: var(--color-cream);
 }
 

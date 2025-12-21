@@ -41,7 +41,7 @@
   color: var(--color-ink);
 }
 
-.navLink[data-active='true'] {
+.navLink[data-active="true"] {
   color: var(--color-ink);
 }
 

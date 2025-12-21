@@ -2,7 +2,7 @@
  * SVG Icons
  */
 
-import * as React from 'react';
+import type * as React from 'react';
 
 import AddToQueue from './AddToQueue';
 import AirplayIcon from './AirplayIcon';

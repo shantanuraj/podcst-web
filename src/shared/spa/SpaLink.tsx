@@ -1,6 +1,6 @@
 'use client';
 
-import { MouseEvent, ReactNode, useCallback } from 'react';
+import { type MouseEvent, type ReactNode, useCallback } from 'react';
 
 interface SpaLinkProps {
   href: string;
@@ -28,7 +28,7 @@ export function SpaLink({ href, className, children }: SpaLinkProps) {
       // Dispatch a popstate event to trigger usePathname update
       window.dispatchEvent(new PopStateEvent('popstate'));
     },
-    [href]
+    [href],
   );
 
   return (
@@ -37,4 +37,3 @@ export function SpaLink({ href, className, children }: SpaLinkProps) {
     </a>
   );
 }
-

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { getQueueEpisode, usePlayer } from '@/shared/player/usePlayer';
 import { getShowToast, useToast } from '@/shared/toast/useToast';
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 import { Icon } from '@/ui/icons/svg/Icon';
 import styles from './QueueButton.module.css';
 

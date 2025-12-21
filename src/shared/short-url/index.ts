@@ -1,1 +1,1 @@
-export { generateShortUrl, generateCustomShortUrl } from './generateShortUrl';
+export { generateCustomShortUrl, generateShortUrl } from './generateShortUrl';

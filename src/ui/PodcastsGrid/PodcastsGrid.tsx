@@ -1,4 +1,4 @@
-import { RenderablePodcast } from '@/types';
+import type { RenderablePodcast } from '@/types';
 import { PodcastTile } from '@/ui/PodcastTile';
 
 import styles from './PodcastsGrid.module.css';

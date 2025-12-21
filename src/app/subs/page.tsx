@@ -1,11 +1,10 @@
 'use client';
 
+import type { NextPage } from 'next';
 import Link from 'next/link';
-import { NextPage } from 'next';
 import { useShallow } from 'zustand/react/shallow';
-
-import { SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import { ImportButton } from '@/components/ImportButton/ImportButton';
+import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';

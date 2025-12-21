@@ -1,9 +1,10 @@
 /**
  * Data caching module
  */
-import { CACHE_STALE_DELTA } from '@/data/constants';
-import { IEpisodeListing } from '@/types';
+
 import { cache, cacheMiss, isCached } from '@/app/api/redis';
+import { CACHE_STALE_DELTA } from '@/data/constants';
+import type { IEpisodeListing } from '@/types';
 import { adaptFeed } from './parser';
 
 /**
@@ -20,7 +21,7 @@ export async function feed(url: string) {
       cache.saveFeed(url, feedData);
     }
     return cacheMiss(feedData).entity;
-  } catch (err) {
+  } catch (_err) {
     return cacheMiss(null).entity;
   }
 }

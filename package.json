@@ -7,23 +7,17 @@
       "pre-commit": "lint-staged"
     }
   },
-  "prettier": {
-    "printWidth": 100,
-    "singleQuote": true,
-    "trailingComma": "all"
-  },
   "lint-staged": {
     "src/**/{*.ts,*.tsx}": [
-      "prettier --write",
-      "eslint"
+      "biome check --write --no-errors-on-unmatched"
     ]
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "format": "prettier --write \"src/**/{*.ts,*.tsx}\"",
-    "lint": "eslint .",
+    "format": "biome format --write src",
+    "lint": "biome check src",
     "short-url": "bun scripts/generate-short-url.ts"
   },
   "dependencies": {
@@ -40,15 +34,15 @@
     "normalize.css": "8.0.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "typescript": "5.8.3",
     "xml2js": "0.6.2",
     "zustand": "5.0.9"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
     "@flydotio/dockerfile": "^0.7.10",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/chromecast-caf-sender": "1.0.11",
-    "@types/eslint": "9.6.1",
-    "@types/eslint-config-prettier": "6.11.3",
     "@types/howler": "2.2.12",
     "@types/negotiator": "0.6.4",
     "@types/node": "22.15.32",
@@ -56,18 +50,11 @@
     "@types/react-dom": "19.1.6",
     "@types/wicg-mediasession": "1.1.8",
     "@types/xml2js": "0.4.14",
-    "@typescript-eslint/eslint-plugin": "8.34.1",
-    "@typescript-eslint/parser": "8.34.1",
     "autoprefixer": "^10.4.23",
-    "eslint": "9.28.0",
-    "eslint-config-next": "16.1.0",
-    "eslint-config-prettier": "10.1.5",
     "husky": "9.1.7",
     "lint-staged": "16.1.0",
     "postcss": "^8.5.6",
-    "prettier": "3.5.3",
-    "tailwindcss": "^4.1.18",
-    "typescript": "5.8.3"
+    "tailwindcss": "^4.1.18"
   },
   "packageManager": "yarn@1.22.22+sha1.ee5da4406e890e2e897069b6c9d4bf0d1ad5e3ec"
 }

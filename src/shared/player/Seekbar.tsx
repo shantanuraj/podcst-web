@@ -1,11 +1,9 @@
-import { MouseEvent, useCallback, useEffect, useRef } from 'react';
-
-import { IEpisodeInfo } from '@/types';
-import { useKeydown } from '@/shared/keyboard/useKeydown';
+import { type MouseEvent, useCallback, useEffect, useRef } from 'react';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-
-import { getPlaybackState, getSeekTo, usePlayer } from './usePlayer';
+import { useKeydown } from '@/shared/keyboard/useKeydown';
+import type { IEpisodeInfo } from '@/types';
 import styles from './Player.module.css';
+import { getPlaybackState, getSeekTo, usePlayer } from './usePlayer';
 
 export const Seekbar: React.FC<{
   currentEpisode: IEpisodeInfo | null;
@@ -15,16 +13,22 @@ export const Seekbar: React.FC<{
   const seekbarRef = useRef<HTMLDivElement>(null);
   const durationRef = useRef(currentEpisode?.duration || 0);
 
-  const seekByFraction = useCallback((seekFraction: number) => {
-    const newSeekPosition = Math.floor(seekFraction * durationRef.current);
-    seekTo(newSeekPosition);
-  }, []);
+  const seekByFraction = useCallback(
+    (seekFraction: number) => {
+      const newSeekPosition = Math.floor(seekFraction * durationRef.current);
+      seekTo(newSeekPosition);
+    },
+    [seekTo],
+  );
 
-  const seekOnKeydown = useCallback((e: KeyboardEvent) => {
-    const seekPercent = parseInt(e.key, 10) / 10;
-    if (isNaN(seekPercent)) return;
-    seekByFraction(seekPercent);
-  }, []);
+  const seekOnKeydown = useCallback(
+    (e: KeyboardEvent) => {
+      const seekPercent = parseInt(e.key, 10) / 10;
+      if (Number.isNaN(seekPercent)) return;
+      seekByFraction(seekPercent);
+    },
+    [seekByFraction],
+  );
   useKeydown(shortcuts.seekTo, seekOnKeydown);
 
   useEffect(
@@ -58,10 +62,13 @@ export const Seekbar: React.FC<{
     }
   }, [state]);
 
-  const seekHandler = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    const seekFraction = e.nativeEvent.offsetX / e.currentTarget.offsetWidth;
-    seekByFraction(seekFraction);
-  }, []);
+  const seekHandler = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      const seekFraction = e.nativeEvent.offsetX / e.currentTarget.offsetWidth;
+      seekByFraction(seekFraction);
+    },
+    [seekByFraction],
+  );
 
   return (
     <button className={styles.seekbar} onClick={seekHandler}>

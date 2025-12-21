@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, memo } from 'react';
-import { Button, ButtonProps } from './Button';
+import { Button, type ButtonProps } from './Button';
 
 interface ShareButtonProps extends ButtonProps {
   text: string;

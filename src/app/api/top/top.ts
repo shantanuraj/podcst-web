@@ -1,8 +1,7 @@
-import { CACHE_STALE_DELTA, DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
-import { IPodcast, iTunes } from '@/types';
-
-import { cache, cacheMiss, isCached } from '@/app/api/redis';
 import { adaptResponse } from '@/app/api/adapter';
+import { cache, cacheMiss, isCached } from '@/app/api/redis';
+import { CACHE_STALE_DELTA, DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
+import type { IPodcast, iTunes } from '@/types';
 
 export async function top(limit: number, locale = DEFAULT_PODCASTS_LOCALE) {
   try {
@@ -19,14 +18,14 @@ export async function top(limit: number, locale = DEFAULT_PODCASTS_LOCALE) {
  */
 async function getTopPodcasts(limit: number, locale: string) {
   try {
-    let data = await cache.top(limit, locale);
+    const data = await cache.top(limit, locale);
     if (isCached(data) && data.entity.length > 0) {
       return data;
     }
-    let podcasts = await getTopFromApi(limit, locale);
+    const podcasts = await getTopFromApi(limit, locale);
     cache.saveTop(podcasts, locale);
     return cacheMiss(podcasts);
-  } catch (err) {
+  } catch (_err) {
     return cacheMiss([]);
   }
 }

@@ -1,10 +1,15 @@
 'use client';
 
-import { useTheme, themes, Scheme, ThemeConfig, IThemeInfo } from '@/shared/theme/useTheme';
-import { ThemeMode } from '@/types';
-import React, { FormEvent } from 'react';
-
+import React, { type FormEvent } from 'react';
 import styles from '@/app/settings/Settings.module.css';
+import {
+  type IThemeInfo,
+  type Scheme,
+  type ThemeConfig,
+  themes,
+  useTheme,
+} from '@/shared/theme/useTheme';
+import type { ThemeMode } from '@/types';
 
 export default function SettingsThemePage() {
   const { scheme, theme, changeTheme: setTheme } = useTheme();
@@ -20,7 +25,7 @@ export default function SettingsThemePage() {
   return (
     <form className={styles.container} onChange={changeTheme}>
       {themes.map((item) => (
-        <Theme key={item.scheme + '/' + item.theme} {...item} currentTheme={currentTheme} />
+        <Theme key={`${item.scheme}/${item.theme}`} {...item} currentTheme={currentTheme} />
       ))}
     </form>
   );
