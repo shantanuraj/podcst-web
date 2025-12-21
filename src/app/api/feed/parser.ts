@@ -246,7 +246,7 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
     const author = channel['itunes:author'][0];
     return {
       title: channel.title[0].trim(),
-      link: channel.link[0],
+      link: channel.link?.[0] ?? '',
       published: readDate(channel),
       description: readDescription(channel),
       author: author,

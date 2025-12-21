@@ -35,7 +35,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             {episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}
           </h1>
           <p className={styles.podcast}>
-            <ExternalLink href={podcast.link}>
+            <ExternalLink href={podcast.link || '#'}>
               {podcast.title}
               <Icon icon="external-link" size={14} />
             </ExternalLink>

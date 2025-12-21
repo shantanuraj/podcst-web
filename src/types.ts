@@ -178,7 +178,7 @@ export interface IEpisodeInfo extends IEpisode {
  */
 export interface IEpisodeListing {
   title: string;
-  link: string;
+  link: string | null;
   published: number | null;
   description: string;
   author: string;
