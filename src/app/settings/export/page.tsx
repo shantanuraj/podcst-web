@@ -1,19 +1,19 @@
 'use client';
 
 import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import { Button } from '@/ui/Button';
 import styles from '../Settings.module.css';
 
 export default function SettingsExportPage() {
-  const subs = useSubscriptions(
-    useShallow((state: SubscriptionsState) =>
-      Object.values(state.subs).map((sub) => ({
+  const subsMap = useSubscriptions((state: SubscriptionsState) => state.subs);
+  const subs = React.useMemo(
+    () =>
+      Object.values(subsMap).map((sub) => ({
         title: sub.title,
         feed: sub.feed,
       })),
-    ),
+    [subsMap],
   );
 
   // Generates the OPML format XML file from subscriptions.
