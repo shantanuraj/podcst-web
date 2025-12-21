@@ -23,11 +23,7 @@ export function Search() {
     [router],
   );
   const [inputTerm, setTerm] = React.useState('');
-  const term = React.useDeferredValue(
-    inputTerm,
-    // @ts-expect-error React next typings are incorrect.
-    deferConfig,
-  );
+  const term = React.useDeferredValue(inputTerm);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
   const focusSearchShortcut = React.useCallback(() => {
@@ -95,7 +91,6 @@ const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) 
   );
 };
 
-const deferConfig = { timeoutMs: 200 };
 const emptyResult: IPodcastSearchResult[] = [];
 const serealizeSearchResult = (item: IPodcastSearchResult | null) => {
   return item?.title || '';

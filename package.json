@@ -24,13 +24,10 @@
     "start": "next start",
     "format": "prettier --write \"src/**/{*.ts,*.tsx}\"",
     "lint": "next lint",
-    "deploy": "vercel",
     "short-url": "bun scripts/generate-short-url.ts"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "0.5.9",
-    "@shopify/react-web-worker": "5.1.6",
-    "@vercel/analytics": "1.4.1",
     "downshift": "9.0.8",
     "howler": "2.2.4",
     "idb-keyval": "6.2.1",

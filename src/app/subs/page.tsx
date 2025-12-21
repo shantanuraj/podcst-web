@@ -18,7 +18,14 @@ const SubscriptionPage: NextPage = () => {
     return (
       <div className={styles.empty} suppressHydrationWarning>
         <div className={styles.emptyIcon}>
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
             <path d="M19 11a7 7 0 0 1-7 7m0 0a7 7 0 0 1-7-7m7 7v4m0 0h-3m3 0h3M12 4a7 7 0 0 0-7 7m14 0a7 7 0 0 0-7-7" />
           </svg>
         </div>
