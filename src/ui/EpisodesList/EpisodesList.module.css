@@ -3,18 +3,79 @@
   overflow: auto;
 }
 
-.list {
-  position: relative;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid;
+.header {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-6);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-rule);
 }
 
-@media only screen and (max-width: 600px) {
-  .list {
-    margin: 0;
-  }
+.count {
+  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
+}
+
+.search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+  margin-left: auto;
+}
+
+.search input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-rule);
+  background-color: var(--color-surface);
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--color-ink-tertiary);
+}
+
+.sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sort span {
+  font-size: var(--text-sm);
+  color: var(--color-ink-tertiary);
+}
+
+.sort select {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-rule);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.sort select:focus {
+  outline: none;
+  border-color: var(--color-ink-tertiary);
+}
+
+.list {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  position: relative;
+}
+
+.list li {
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.list li:last-child {
+  border-bottom: none;
 }
 
 .list li[data-virtual='true'] {
@@ -24,59 +85,19 @@
   width: 100%;
 }
 
-.episodeListOptions {
-  margin: 15px;
-  padding: 15px 0;
-}
-
-.episodeListSearch {
-  position: relative;
-  border-bottom: 1px solid;
-  margin: 15px 0;
-}
-
-.episodeListSearch svg {
-  fill: var(--text2);
-  width: 25px;
-  position: absolute;
-  top: 50%;
-  left: 4px;
-  transform: translateY(-50%);
-}
-
-.episodeListSearch input {
-  background: transparent;
-  padding: 8px 0 10px 35px;
-  width: 100%;
-}
-
-.episodeListOptionsSort > span {
-  margin-right: 15px;
-}
-
-.episodeListOptionsSort select {
-  border: none;
-  border-radius: var(--border-radius-control);
-  padding: 10px;
-}
-
-@media only screen and (min-width: 600px) {
-  .episodeListOptions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    row-gap: 10px;
-    column-gap: 40px;
-    margin-left: 32px;
-    margin-right: 32px;
+@media (max-width: 640px) {
+  .header {
+    padding: var(--space-4);
+    gap: var(--space-3);
   }
 
-  .episodeListCount {
-    flex: 1 1 35%;
+  .search {
+    order: -1;
+    flex-basis: 100%;
+    max-width: none;
   }
 
-  .episodeListSearch {
-    margin-left: auto;
-    flex: 1 1 350px;
+  .sort span {
+    display: none;
   }
 }

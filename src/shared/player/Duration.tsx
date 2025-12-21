@@ -37,8 +37,9 @@ export const Duration = () => {
 
   return (
     <div className={styles.duration}>
-      <span ref={seekPositionRef}>00:00</span>
-      <span ref={durationRef}>00:00</span>
+      <span ref={seekPositionRef}>0:00</span>
+      <span>/</span>
+      <span ref={durationRef}>0:00</span>
     </div>
   );
 };

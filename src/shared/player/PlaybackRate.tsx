@@ -31,8 +31,8 @@ export const PlaybackRate = () => {
   useKeydown(rateShortcuts);
 
   return (
-    <button className={styles.playbackRate} onClick={cycleRate}>
-      <code>{rate}x</code>
+    <button className={styles.rate} onClick={cycleRate}>
+      {rate}x
     </button>
   );
 };

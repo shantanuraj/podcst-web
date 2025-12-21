@@ -8,12 +8,15 @@ import styles from './Queue.module.css';
 const QueuePage = () => {
   const episodes = usePlayer(getEpisodesQueue);
 
+  if (episodes.length === 0) {
+    return <div className={styles.empty}>Add some episodes to queue to see them here</div>;
+  }
+
   return (
     <EpisodesList episodes={episodes}>
-      <div className={styles.root}>
-        {episodes.length === 0 && 'Add some episodes to queue to see them here'}
-        {episodes.length > 0 && <h1>Queue</h1>}
-      </div>
+      <header className={styles.header}>
+        <h1>Queue</h1>
+      </header>
     </EpisodesList>
   );
 };

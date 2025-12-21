@@ -1,84 +1,177 @@
-.info {
+.header {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-8);
+}
+
+.top {
   display: flex;
-  flex-direction: var(--dimen-podcast-info-direction);
-  padding: var(--dimen-podcast-info-padding);
-  position: relative;
-  outline: none;
-  --color-almost-white: hsla(0, 0%, 100%, 0.85);
+  gap: var(--space-8);
 }
 
-.info img {
-  height: var(--dimen-podcast-info-cover);
-  width: var(--dimen-podcast-info-cover);
-  min-width: var(--dimen-podcast-info-cover);
+.artwork {
+  flex-shrink: 0;
+  width: 200px;
+  height: 200px;
 }
 
-.info .text {
+.artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--color-rule);
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 0 16px 16px;
+  justify-content: center;
 }
 
-.info .text h1 {
-  font-weight: bold;
+.title {
+  font-family: var(--font-serif);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+  margin-bottom: var(--space-2);
 }
 
-.info .text .description {
-  font-size: var(--dimen-font-regular);
-  overflow: hidden;
-  text-overflow: ellipsis;
+.author {
+  font-size: var(--text-lg);
+  color: var(--color-ink-secondary);
+  margin-bottom: var(--space-2);
 }
 
-.buttons,
-.info .text h1,
-.info .text h2,
-.info .text h5 {
-  margin: 8px 0;
+.author a {
+  color: var(--color-accent);
+  transition: opacity 0.15s ease;
+}
+
+.author a:hover {
+  opacity: 0.8;
+}
+
+.author svg {
+  display: inline;
+  vertical-align: middle;
+  margin-left: var(--space-1);
+}
+
+.lastUpdated {
+  font-size: var(--text-sm);
+  color: var(--color-ink-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.actions button {
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid var(--color-rule);
+  background-color: var(--color-surface);
+  transition: all 0.15s ease;
+}
+
+.actions button:hover {
+  border-color: var(--color-ink);
+}
+
+.actions button:first-child {
+  background-color: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
+
+.actions button:first-child:hover {
+  background-color: var(--color-ink-secondary);
 }
 
 .description {
-  margin-top: 8px;
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-rule);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--color-ink-secondary);
+  max-width: 65ch;
 }
 
-.buttons {
-  display: flex;
+.description a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.buttons button {
-  width: 120px;
+.description a:hover {
+  text-decoration: none;
 }
 
-.buttons button:not(:first-child) {
-  margin-left: 16px;
-}
-
-@media only screen and (max-width: 600px) {
-  .info {
-    color: var(--color-almost-white);
+@media (max-width: 768px) {
+  .header {
+    padding: var(--space-6);
   }
 
-  .info img {
-    filter: brightness(0.3);
-  }
-
-  .info .text {
-    height: 100%;
-    position: absolute;
-  }
-
-  .buttons {
-    width: 100%;
+  .top {
     flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
 
-  .buttons button {
-    color: var(--color-almost-white);
+  .artwork {
+    width: 180px;
+    height: 180px;
+  }
+
+  .meta {
+    align-items: center;
+  }
+
+  .title {
+    font-size: var(--text-2xl);
+  }
+
+  .actions {
+    justify-content: center;
+  }
+
+  .description {
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: var(--space-4);
+  }
+
+  .artwork {
+    width: 140px;
+    height: 140px;
+  }
+
+  .title {
+    font-size: var(--text-xl);
+  }
+
+  .author {
+    font-size: var(--text-base);
+  }
+
+  .actions {
+    flex-direction: column;
     width: 100%;
   }
 
-  .buttons button:not(:first-child) {
-    margin: 16px 0 0;
+  .actions button {
+    width: 100%;
   }
 }

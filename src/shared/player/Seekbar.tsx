@@ -64,8 +64,8 @@ export const Seekbar: React.FC<{
   }, []);
 
   return (
-    <button className={styles.seekbarContainer} onClick={seekHandler}>
-      <div className={styles.seekbar} data-is-buffering={state === 'buffering'} ref={seekbarRef} />
+    <button className={styles.seekbar} onClick={seekHandler}>
+      <div className={styles.progress} data-buffering={state === 'buffering'} ref={seekbarRef} />
     </button>
   );
 };

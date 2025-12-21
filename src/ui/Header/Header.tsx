@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import React, { Fragment, useCallback, useEffect, useRef } from 'react';
+import { Fragment, useCallback, useEffect, useRef } from 'react';
 import { Search } from '@/ui/Search';
-
 import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './Header.module.css';
@@ -12,8 +11,15 @@ export function Header() {
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
 
-  const onHeaderClick = useCallback(() => toggleDrawer(drawerRef.current), []);
-  const onCloseDrawer = useCallback(() => closeDrawer(drawerRef.current), []);
+  const onToggleDrawer = useCallback(() => {
+    if (!drawerRef.current) return;
+    drawerRef.current.dataset.open = drawerRef.current.dataset.open === 'open' ? '' : 'open';
+  }, []);
+
+  const onCloseDrawer = useCallback(() => {
+    if (!drawerRef.current) return;
+    drawerRef.current.dataset.open = '';
+  }, []);
 
   useEffect(() => {
     const closeOnClickOutside = (event: MouseEvent) => {
@@ -26,63 +32,64 @@ export function Header() {
       drawerRef.current.dataset.open = '';
     };
     document.addEventListener('click', closeOnClickOutside);
-    return () => {
-      document.removeEventListener('click', closeOnClickOutside);
-    };
+    return () => document.removeEventListener('click', closeOnClickOutside);
   }, []);
 
   return (
     <Fragment>
-      <header className={styles.header} data-surface={1}>
-        <button
-          role="button"
-          aria-label="Toggle drawer"
-          onClick={onHeaderClick}
-          ref={menuButtonRef}
-          className={styles.hamburgerIcon}
-        >
-          <Icon icon="menu" />
-        </button>
-        <span className={styles.title}>Podcst</span>
-        <Search />
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <div className={styles.masthead}>
+            <Link href="/feed/top" className={styles.title}>
+              Podcst
+            </Link>
+            <nav className={styles.nav}>
+              <Link href="/feed/top">Discover</Link>
+              <Link href="/subs">Library</Link>
+              <Link href="/queue">Queue</Link>
+              <Link href="/recents">Recent</Link>
+            </nav>
+          </div>
+          <div className={styles.actions}>
+            <Search />
+            <button
+              aria-label="Menu"
+              onClick={onToggleDrawer}
+              ref={menuButtonRef}
+              className={styles.hamburgerIcon}
+            >
+              <Icon icon="menu" />
+            </button>
+          </div>
+        </div>
       </header>
-      <nav ref={drawerRef} onClick={onCloseDrawer} className={styles.drawer} data-surface={1}>
-        <button
-          role="button"
-          aria-label="Close drawer"
-          onClick={onCloseDrawer}
-          className={styles.closeNav}
-        >
+      <nav ref={drawerRef} className={styles.drawer}>
+        <button aria-label="Close" onClick={onCloseDrawer} className={styles.closeNav}>
           <Icon icon="back" />
         </button>
-        <Link href="/feed/top">Home</Link>
+        <Link href="/feed/top" onClick={onCloseDrawer}>
+          Discover
+        </Link>
+        <Link href="/subs" onClick={onCloseDrawer}>
+          Library
+        </Link>
+        <Link href="/queue" onClick={onCloseDrawer}>
+          Queue
+        </Link>
+        <Link href="/recents" onClick={onCloseDrawer}>
+          Recent
+        </Link>
         <div className={styles.navGroup}>
-          <h6>Your Library</h6>
+          <h6>Settings</h6>
           <ul>
             <li>
-              <Link href="/subs">Subscriptions</Link>
-            </li>
-            <li>
-              <Link href="/queue">Queue</Link>
-            </li>
-            <li>
-              <Link href="/recents">Recent Episodes</Link>
+              <Link href="/settings" onClick={onCloseDrawer}>
+                Preferences
+              </Link>
             </li>
           </ul>
         </div>
-        <Link href="/settings">Settings</Link>
       </nav>
     </Fragment>
   );
 }
-
-const toggleDrawer = (drawer: HTMLDivElement | null) => {
-  if (!drawer) return;
-  drawer.dataset.open = drawer.dataset.open === 'open' ? '' : 'open';
-  if (drawer.dataset.open === 'open') drawer.focus();
-};
-
-const closeDrawer = (drawer: HTMLDivElement | null) => {
-  if (!drawer) return;
-  drawer.dataset.open = '';
-};

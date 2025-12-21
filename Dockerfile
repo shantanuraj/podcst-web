@@ -30,7 +30,7 @@ RUN yarn install --frozen-lockfile --production=false
 COPY . .
 
 # Build application
-RUN npx next build --experimental-build-mode compile
+RUN npx next build
 
 # Remove development dependencies
 RUN yarn install --production=true

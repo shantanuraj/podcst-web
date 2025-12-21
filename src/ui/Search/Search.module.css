@@ -1,59 +1,122 @@
 .search {
-  height: 100%;
+  position: relative;
 }
 
 .search input {
-  height: 100%;
+  width: 220px;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-rule);
+  color: var(--color-ink);
   outline: none;
-  padding: 16px;
+  transition: border-color 0.2s ease, width 0.2s ease;
+}
+
+.search input::placeholder {
+  color: var(--color-ink-faint);
+  font-style: italic;
+}
+
+.search input:focus {
+  width: 280px;
+  border-color: var(--color-ink);
 }
 
 .results {
-  margin: 0;
-  max-height: 500px;
-  overflow: auto;
   position: absolute;
+  top: calc(100% + 0.75rem);
   right: 0;
-  width: 100%;
-  max-width: 400px;
-  list-style: none;
+  width: 400px;
+  max-height: 500px;
+  margin: 0;
   padding: 0;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  box-shadow: var(--shadow-elevated);
+  overflow: auto;
+  z-index: 150;
+}
+
+.results:empty {
+  display: none;
+}
+
+.results li {
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.results li:last-child {
+  border-bottom: none;
 }
 
 .results li[data-highlighted='true'] {
-  background-color: var(--surface-1);
+  background-color: var(--color-cream);
 }
 
 .searchItem {
   display: flex;
-  flex-direction: row;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  text-decoration: none;
+  color: inherit;
 }
 
 .searchItem img {
-  height: 50px;
-  width: 50px;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
 }
 
 .searchItem div {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  font-size: var(--dimen-font-smallest);
-  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  padding-top: 0.125rem;
 }
 
 .searchItem p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin: 0;
 }
 
 .searchItem .title {
-  font-weight: bold;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--color-ink);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .searchItem .author {
-  font-weight: 300;
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 768px) {
+  .search input {
+    width: 160px;
+  }
+
+  .search input:focus {
+    width: 200px;
+  }
+
+  .results {
+    position: fixed;
+    top: 3.5rem;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: calc(100vh - 3.5rem);
+  }
 }

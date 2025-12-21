@@ -1,31 +1,29 @@
-import { Analytics } from '@vercel/analytics/react';
 import Script from 'next/script';
 
 import { CastManager } from '@/components/CastManager/CastManager';
 import { Player } from '@/shared/player/Player';
-import { ThemeListener } from '@/shared/theme/ThemeListener';
 import { Toast } from '@/shared/toast/Toast';
-import { Header } from '@/ui/Header';
 import { Init } from './Init';
 
 import '@/styles/global.css';
 import styles from './PodcstApp.module.css';
 import type { Metadata, Viewport } from 'next';
+import { SiteHeader } from '@/ui/SiteHeader';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.podcst.app'),
   title: {
-    default: 'Plays your favourite podcasts on all devices',
-    template: '%s | Podcst',
+    default: 'Podcst',
+    template: '%s — Podcst',
   },
-  description: 'Plays your favourite podcasts on all devices',
+  description: 'A beautiful way to discover and listen to podcasts',
   authors: {
     name: 'Shantanu Raj',
     url: 'https://sraj.me',
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Podcst',
   },
   openGraph: {
@@ -33,25 +31,14 @@ export const metadata: Metadata = {
     locale: 'en_US',
     siteName: 'Podcst',
     type: 'website',
-    title: 'Podcst | Plays your favourite podcasts on all devices',
-    description: 'Plays your favourite podcasts on all devices',
-    images: 'https://www.podcst.app/receiver/cast-background.jpg',
+    title: 'Podcst',
+    description: 'A beautiful way to discover and listen to podcasts',
   },
   twitter: {
-    card: 'summary_large_image',
+    card: 'summary',
     creator: '@shantanuraj',
-    images: [
-      'https://www.podcst.app/receiver/cast-background.jpg',
-      'https://www.podcst.app/icons/launcher-512.png',
-    ],
   },
   icons: {
-    apple: [
-      'https://www.podcst.app/icons/launcher-96.png',
-      'https://www.podcst.app/icons/launcher-144.png',
-      'https://www.podcst.app/icons/launcher-192.png',
-      'https://www.podcst.app/icons/launcher-512.png',
-    ],
     icon: '/icons/launcher-192.png',
   },
 };
@@ -59,50 +46,40 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   initialScale: 1.0,
   width: 'device-width',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#60347f' },
-    { media: '(prefers-color-scheme: dark)', color: '#00b778' },
-  ],
+  themeColor: '#FAF9F7',
 };
 
 export default function App({ children }: { children: React.ReactNode }) {
   return (
-    <html className="light" data-scheme="autumn">
+    <html lang="en">
       <head>
         <meta charSet="utf-8" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
       </head>
       <body>
         <Init />
-        <Header />
-
-        <main className={styles.mainContainer}>{children}</main>
-        <Toast />
+        <SiteHeader />
+        <main className={styles.main}>{children}</main>
         <Player />
-        <ThemeListener />
+        <Toast />
         <CastManager />
         <Script id="castsetup">
-          {`
-window['__onGCastApiAvailable'] = function(isAvailable) {
-if (
-isAvailable &&
-window.chrome &&
-window.cast &&
-window.chrome.cast &&
-window.chrome.cast.media &&
-window.cast.framework
-) {
-// Custom receiver
-window.cast.framework.CastContext.getInstance().setOptions({
-receiverApplicationId: '5152FC99',
-autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-});
-const event = new CustomEvent('cast-available', {});
-document.dispatchEvent(event);
-}
-};`}
+          {`window['__onGCastApiAvailable'] = function(isAvailable) {
+            if (isAvailable && window.chrome && window.cast && window.chrome.cast && window.chrome.cast.media && window.cast.framework) {
+              window.cast.framework.CastContext.getInstance().setOptions({
+                receiverApplicationId: '5152FC99',
+                autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+              });
+              document.dispatchEvent(new CustomEvent('cast-available', {}));
+            }
+          };`}
         </Script>
         <Script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" />
-        <Analytics />
       </body>
     </html>
   );

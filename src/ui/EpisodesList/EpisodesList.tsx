@@ -6,7 +6,6 @@ import { IEpisodeInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
-import { Icon } from '@/ui/icons/svg/Icon';
 import { useEpisodesFilter } from './useEpisodesFilter';
 
 interface EpisodesListProps {
@@ -78,17 +77,16 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
       {children}
-      <div className={styles.episodeListOptions}>
-        <div className={styles.episodeListCount}>
-          {episodes.length} total {`${episodes.length !== 1 ? 'episodes' : 'episode'}`}
+      <div className={styles.header}>
+        <div className={styles.count}>
+          {episodes.length} {episodes.length !== 1 ? 'episodes' : 'episode'}
         </div>
-        <div className={styles.episodeListSearch}>
-          <Icon icon="search" />
+        <div className={styles.search}>
           <input onChange={onQueryChange} placeholder="Search episodes" />
         </div>
-        <div className={styles.episodeListOptionsSort}>
-          <span>Sort by:</span>
-          <select onChange={onSortChange} data-surface={4}>
+        <div className={styles.sort}>
+          <span>Sort:</span>
+          <select onChange={onSortChange}>
             {sortOptions.map(({ title, value }) => (
               <option key={value} value={value}>
                 {title}
@@ -139,7 +137,6 @@ function EpisodeListItem({ episode, index, start }: EpisodeListItemProps) {
   return (
     <li
       data-virtual={virtual}
-      data-surface={index % 2 === 0 ? 3 : 4}
       style={
         virtual
           ? {

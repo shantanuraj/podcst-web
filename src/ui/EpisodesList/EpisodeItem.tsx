@@ -15,30 +15,25 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const { cover, episodeArt, feed, guid, title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
-  const utcDate = pub.toUTCString();
   const day = pub.getDate();
-  const month = pub.toLocaleDateString('default', { month: 'short' }).slice(0, 3);
+  const month = pub.toLocaleDateString('default', { month: 'short' }).toUpperCase();
   const minutes = Math.floor((duration || 0) / 60);
-  const minutesSuffix = `min${minutes > 1 ? 's' : ''}`;
 
   return (
     <Link
       href={`/episode/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`}
       className={styles.container}
     >
-      <img loading="lazy" className={styles.image} src={episodeArt || cover} alt={title} />
-      <div className={styles.infoParent}>
-        <div className={styles.info} title={utcDate}>
-          <span>{month}</span>
-          <span>{day}</span>
-        </div>
-        <span title={title} className={styles.title}>
-          {title}
-        </span>
-        <div className={styles.info}>
-          <span>{minutes || ''}</span>
-          <span>{minutes ? minutesSuffix : ''}</span>
-        </div>
+      <div className={styles.artwork}>
+        <img loading="lazy" src={episodeArt || cover} alt="" />
+      </div>
+      <div className={styles.meta}>
+        <div className={styles.date}>{month}</div>
+        <div className={styles.day}>{day}</div>
+      </div>
+      <div className={styles.content}>
+        <h3 className={styles.title}>{title}</h3>
+        {minutes > 0 && <div className={styles.duration}>{minutes} min</div>}
       </div>
       <div className={styles.actions}>
         <PlayButton icon episode={episode} />
