@@ -9,8 +9,8 @@ interface ShareButtonProps extends ButtonProps {
 }
 
 const share = ({ text, title }: ShareButtonProps, url: string) => {
-  if (typeof window === 'undefined') return;
-  if ('share' in navigator) {
+  if (typeof window === 'undefined' || !navigator.canShare) return;
+  if (navigator.canShare({ text, title, url })) {
     navigator.share({ text, title, url }).catch((err) => console.error('Error sharing', err));
   }
 };

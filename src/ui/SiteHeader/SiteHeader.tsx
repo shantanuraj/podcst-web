@@ -21,15 +21,15 @@ export function SiteHeader() {
           <Link
             href="/feed/top"
             className={styles.navLink}
-            data-active={pathname === '/feed/top' || pathname.startsWith('/us/') || pathname.startsWith('/episodes/')}
+            data-active={
+              pathname === '/feed/top' ||
+              pathname.startsWith('/us/') ||
+              pathname.startsWith('/episodes/')
+            }
           >
             Discover
           </Link>
-          <Link
-            href="/subs"
-            className={styles.navLink}
-            data-active={pathname === '/subs'}
-          >
+          <Link href="/subs" className={styles.navLink} data-active={pathname === '/subs'}>
             Library
           </Link>
         </nav>

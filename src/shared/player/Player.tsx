@@ -55,10 +55,7 @@ export const Player = () => {
               )}`}
               className={styles.artwork}
             >
-              <img
-                alt=""
-                src={currentEpisode.cover}
-              />
+              <img alt="" src={currentEpisode.cover} />
             </Link>
             <div
               className={styles.info}
@@ -98,7 +95,11 @@ export const Player = () => {
 function PlayButton() {
   const state = usePlayer(getPlaybackState);
   return (
-    <button onClick={togglePlayback} className={styles.playButton} aria-label={state === 'playing' ? 'Pause' : 'Play'}>
+    <button
+      onClick={togglePlayback}
+      className={styles.playButton}
+      aria-label={state === 'playing' ? 'Pause' : 'Play'}
+    >
       <Icon icon={state === 'playing' ? 'pause' : 'play'} size={24} />
     </button>
   );
