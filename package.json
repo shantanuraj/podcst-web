@@ -23,7 +23,7 @@
     "build": "next build",
     "start": "next start",
     "format": "prettier --write \"src/**/{*.ts,*.tsx}\"",
-    "lint": "next lint",
+    "lint": "eslint .",
     "short-url": "bun scripts/generate-short-url.ts"
   },
   "dependencies": {
@@ -36,7 +36,7 @@
     "ioredis": "5.8.2",
     "match-sorter": "8.2.0",
     "negotiator": "1.0.0",
-    "next": "15.5.9",
+    "next": "16.1.0",
     "normalize.css": "8.0.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -60,7 +60,7 @@
     "@typescript-eslint/parser": "8.34.1",
     "autoprefixer": "^10.4.23",
     "eslint": "9.28.0",
-    "eslint-config-next": "15.5.9",
+    "eslint-config-next": "16.1.0",
     "eslint-config-prettier": "10.1.5",
     "husky": "9.1.7",
     "lint-staged": "16.1.0",

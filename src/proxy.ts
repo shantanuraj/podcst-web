@@ -21,7 +21,7 @@ function getLocale(request: NextRequest): string | undefined {
   return locale;
 }
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   if (!pathname.includes('/feed/top')) return NextResponse.next();
 
@@ -38,3 +38,4 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/((?!_next).*)', '/'],
 };
+
