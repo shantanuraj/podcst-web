@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 
 function BackIcon(props: React.SVGProps<SVGSVGElement>) {
   return (

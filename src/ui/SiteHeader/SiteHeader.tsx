@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-import { Search } from '@/ui/Search/Search';
 import { Icon } from '@/ui/icons/svg/Icon';
+import { Search } from '@/ui/Search/Search';
 
 import styles from './SiteHeader.module.css';
 

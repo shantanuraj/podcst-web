@@ -1,5 +1,5 @@
 import { cache } from '@/app/api/redis';
-import { IEpisodeInfo, IShortUrl } from '@/types';
+import type { IEpisodeInfo, IShortUrl } from '@/types';
 
 /**
  * Generate a random slug for short URLs

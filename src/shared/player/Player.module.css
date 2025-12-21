@@ -6,11 +6,13 @@
   z-index: 200;
   opacity: 0;
   transform: translateY(100%);
-  transition: opacity 0.2s ease, transform 0.3s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s ease;
   pointer-events: none;
 }
 
-.container[data-open='true'] {
+.container[data-open="true"] {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
@@ -42,14 +44,19 @@
   transition: width 0.1s linear;
 }
 
-.progress[data-buffering='true'] {
+.progress[data-buffering="true"] {
   background-color: var(--color-ink-tertiary);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .content {
@@ -124,8 +131,8 @@
 }
 
 .playButton {
-  width: 48px !important;
-  height: 48px !important;
+  width: 48px;
+  height: 48px;
 }
 
 .duration {
@@ -193,8 +200,8 @@
   }
 
   .playButton {
-    width: 44px !important;
-    height: 44px !important;
+    width: 44px;
+    height: 44px;
   }
 
   .controls button:not(.playButton) {

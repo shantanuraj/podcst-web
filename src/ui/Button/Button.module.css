@@ -21,15 +21,15 @@
   outline-offset: 2px;
 }
 
-.button[data-is-subscribed='true'],
-.button[data-is-current='true'] {
+.button[data-is-subscribed="true"],
+.button[data-is-current="true"] {
   background-color: var(--color-ink);
   color: var(--color-surface);
   border-color: var(--color-ink);
 }
 
-.button[data-is-subscribed='true']:hover,
-.button[data-is-current='true']:hover {
+.button[data-is-subscribed="true"]:hover,
+.button[data-is-current="true"]:hover {
   background-color: var(--color-ink-secondary);
 }
 
@@ -57,14 +57,14 @@
   transform: scale(1.1);
 }
 
-.withIcon[data-is-subscribed='true'],
-.withIcon[data-is-current='true'] {
+.withIcon[data-is-subscribed="true"],
+.withIcon[data-is-current="true"] {
   background-color: var(--color-accent);
   border-color: var(--color-accent);
   color: white;
 }
 
-.withIcon[data-is-subscribed='true']:hover,
-.withIcon[data-is-current='true']:hover {
+.withIcon[data-is-subscribed="true"]:hover,
+.withIcon[data-is-current="true"]:hover {
   opacity: 0.9;
 }

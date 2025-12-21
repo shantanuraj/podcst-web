@@ -15,7 +15,7 @@ export const Portal = ({ id, children }: Props) => {
   useEffect(() => {
     setMounted(true);
     rootElemRef.current = document.getElementById(id);
-  }, []);
+  }, [id]);
 
   return mounted && rootElemRef.current ? createPortal(children, rootElemRef.current) : null;
 };

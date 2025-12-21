@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import type React from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   getIsChromecastEnabled,
   getSetChromecastState,
@@ -12,14 +13,17 @@ export const CastManager: React.FC = () => {
   const isChromecastEnabled = usePlayer(getIsChromecastEnabled);
   const setIsChromecastEnabled = usePlayer(getSetIsChromecastEnabled);
   const setChromecastState = usePlayer(getSetChromecastState);
-  const onChromecastEnabled = useCallback(() => setIsChromecastEnabled(true), []);
+  const onChromecastEnabled = useCallback(
+    () => setIsChromecastEnabled(true),
+    [setIsChromecastEnabled],
+  );
   // Setup cast availability listener
   useEffect(() => {
     document.addEventListener('cast-available', onChromecastEnabled);
     return () => {
       document.removeEventListener('cast-available', onChromecastEnabled);
     };
-  }, []);
+  }, [onChromecastEnabled]);
 
   // Setup cast state listener
   useEffect(() => {
@@ -40,6 +44,6 @@ export const CastManager: React.FC = () => {
         chromecastStateListener,
       );
     };
-  }, [isChromecastEnabled]);
+  }, [isChromecastEnabled, setChromecastState]);
   return null;
 };

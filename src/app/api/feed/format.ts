@@ -2,7 +2,7 @@
  * Podcast parsing utilities
  */
 
-import { IEpisodeListing, IPodcastSearchResult } from '@/types';
+import type { IEpisodeListing, IPodcastSearchResult } from '@/types';
 
 /**
  * Extract base link from a url
@@ -15,7 +15,7 @@ export const extractBaseLink = (url: string): string | null => {
     const parsed = new URL(url);
     const { protocol, host } = parsed;
     return `${protocol}//${host}`;
-  } catch (err) {
+  } catch (_err) {
     return null;
   }
 };
@@ -23,7 +23,7 @@ export const extractBaseLink = (url: string): string | null => {
 /**
  * Style attribute regex
  */
-const STYLE_ATTR_REGEX = /style="[^\"]*"/g;
+const STYLE_ATTR_REGEX = /style="[^"]*"/g;
 
 /**
  * Reformat show notes to strip out custom styles

@@ -1,9 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-import { KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
-import { getRate, getSetRate, usePlayer } from './usePlayer';
-
+import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
 import styles from './Player.module.css';
+import { getRate, getSetRate, usePlayer } from './usePlayer';
 
 export const PlaybackRate = () => {
   const setRate = usePlayer(getSetRate);

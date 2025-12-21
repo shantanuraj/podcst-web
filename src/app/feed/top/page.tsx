@@ -1,6 +1,4 @@
-import * as React from 'react';
-
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { top } from '@/app/api/top/top';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { feed } from './feed';
 
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     // Check if url is valid
     new URL(safeUrl);
-  } catch (err) {
+  } catch (_err) {
     return NextResponse.json(
       {
         message: 'parameter `url` cannot be parsed',

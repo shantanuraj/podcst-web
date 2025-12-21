@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { linkifyText } from '@/shared/link/linkify-text';
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotesHandler } from './ShowNotesHandler';

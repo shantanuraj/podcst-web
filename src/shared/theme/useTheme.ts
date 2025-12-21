@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-
-import { ThemeMode } from '@/types';
 import { getValue } from '@/shared/storage/local';
+import type { ThemeMode } from '@/types';
 
 const schemes = ['autumn', 'spring', 'rose', 'winter'] as const;
 

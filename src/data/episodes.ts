@@ -1,6 +1,6 @@
 import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 
-import { IEpisodeInfo, IEpisodeListing, IPodcastEpisodesInfo } from '@/types';
+import type { IEpisodeInfo, IEpisodeListing, IPodcastEpisodesInfo } from '@/types';
 import { get } from './api';
 
 export const fetchEpisodesInfo = async (feed: string) => {

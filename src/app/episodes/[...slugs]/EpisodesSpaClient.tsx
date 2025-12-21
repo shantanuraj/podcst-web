@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { useFeed } from '@/data/feed';
-import { IPodcastEpisodesInfo } from '@/types';
+import type { IPodcastEpisodesInfo } from '@/types';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { Loading } from '@/ui/Loading';
@@ -36,7 +36,11 @@ function parsePathname(pathname: string): { feed: string | null; guid: string | 
   return { feed, guid };
 }
 
-export function EpisodesSpaClient({ feedUrl, initialGuid, initialData }: EpisodesSpaClientProps) {
+export function EpisodesSpaClient({
+  feedUrl,
+  initialGuid: _initialGuid,
+  initialData,
+}: EpisodesSpaClientProps) {
   const pathname = usePathname();
 
   // Parse current URL to determine what to render
@@ -68,4 +72,3 @@ export function EpisodesSpaClient({ feedUrl, initialGuid, initialData }: Episode
     </EpisodesList>
   );
 }
-

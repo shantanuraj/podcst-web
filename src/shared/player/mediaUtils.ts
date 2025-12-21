@@ -3,8 +3,8 @@
  * https://developers.google.com/web/updates/2015/07/media-notifications
  * https://developers.google.com/web/updates/2017/02/media-session
  */
-import { IEpisodeInfo } from '@/types';
-import { IPlayerState } from './usePlayer';
+import type { IEpisodeInfo } from '@/types';
+import type { IPlayerState } from './usePlayer';
 
 export const updatePlaybackMetadata = (episode: IEpisodeInfo, podcastTitle?: string) => {
   if (
@@ -59,7 +59,7 @@ export const updatePlaybackHandlers = (playerState: IPlayerState) => {
   actionsAndHandlers.forEach(([action, handler]) => {
     try {
       mediaSession.setActionHandler(action, handler);
-    } catch (error) {
+    } catch (_error) {
       console.log(`The media session action, ${action}, is not supported`);
     }
   });
@@ -80,7 +80,7 @@ export const updatePlaybackState = (playbackState: {
   }
   const { mediaSession } = window.navigator;
   try {
-    // @ts-ignore Outdated typings
+    // @ts-expect-error Outdated typings
     mediaSession.playbackState?.(playbackState);
   } catch (err) {
     console.error('Cannot set playback state', err);

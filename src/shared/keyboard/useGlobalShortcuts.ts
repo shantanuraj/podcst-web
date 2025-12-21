@@ -1,6 +1,6 @@
 import { useTheme } from '@/shared/theme/useTheme';
 import { shortcuts } from './shortcuts';
-import { KeyboardShortcuts, useKeydown } from './useKeydown';
+import { type KeyboardShortcuts, useKeydown } from './useKeydown';
 
 export function useGlobalShortcuts() {
   useKeydown(globalShortcuts);

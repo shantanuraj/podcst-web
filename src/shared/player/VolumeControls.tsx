@@ -1,9 +1,8 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
-
-import { Icon } from '@/ui/icons/svg/Icon';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-import { KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
 import { getValue, setValue } from '@/shared/storage/local';
+import { Icon } from '@/ui/icons/svg/Icon';
 import { defaultVolume, getInitialVolume } from './AudioUtils';
 
 import styles from './Player.module.css';
@@ -30,24 +29,33 @@ export const VolumeControls = () => {
   const toggleMute = useCallback(() => {
     setMuted((muted) => !muted);
   }, []);
-  const handleVolumeChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const volume = parseInt(e.target.value, 10);
-    // Update the volume in the player
-    setVolume(volume);
-    // Mute the player if the volume is 0
-    setMuted(volume === 0);
-    // Save the volume in the local storage
-    setValue('volume', volume);
-  }, []);
+  const handleVolumeChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const volume = parseInt(e.target.value, 10);
+      // Update the volume in the player
+      setVolume(volume);
+      // Mute the player if the volume is 0
+      setMuted(volume === 0);
+      // Save the volume in the local storage
+      setValue('volume', volume);
+    },
+    [
+      // Update the volume in the player
+      setVolume,
+    ],
+  );
 
   useEffect(() => {
     mute(muted);
-  }, [muted]);
+  }, [muted, mute]);
 
   useEffect(() => {
     // Initialize volume preference on mount
     setVolume(getValue('volume', defaultVolume));
-  }, []);
+  }, [
+    // Initialize volume preference on mount
+    setVolume,
+  ]);
 
   const volumeShortcuts: KeyboardShortcuts = useMemo(
     () => (_) => [[shortcuts.mute, toggleMute]],

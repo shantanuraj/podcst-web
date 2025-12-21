@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 import { formatSecondsToTimestamp } from './formatTime';
-import { usePlayer } from './usePlayer';
-
 import styles from './Player.module.css';
+import { usePlayer } from './usePlayer';
 
 export const Duration = () => {
   const seekPositionRef = useRef<HTMLSpanElement>(null);

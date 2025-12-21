@@ -1,7 +1,7 @@
 import { memo } from 'react';
 
 import { SpaLink } from '@/shared/spa';
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
 

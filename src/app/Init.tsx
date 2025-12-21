@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useGlobalShortcuts } from '@/shared/keyboard/useGlobalShortcuts';
 import { removeDeprecatedStorage } from '@/shared/storage/local';
-import { useSubscriptions, getInit } from '@/shared/subscriptions/useSubscriptions';
+import { getInit, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 
 export function Init() {
   useEffect(removeDeprecatedStorage, []);
@@ -11,7 +11,7 @@ export function Init() {
   const init = useSubscriptions(getInit);
   useEffect(() => {
     init();
-  }, []);
+  }, [init]);
 
   return null;
 }

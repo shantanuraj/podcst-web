@@ -1,17 +1,18 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useSubscriptions, isSubscribed } from '@/shared/subscriptions/useSubscriptions';
+import { isSubscribed, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import { Button } from '@/ui/Button';
-import { PodcastInfoProps } from '@/ui/PodcastInfo/PodcastInfo';
+import type { PodcastInfoProps } from '@/ui/PodcastInfo/PodcastInfo';
 
 export function SubscribeButton({ info }: PodcastInfoProps) {
   const feed = info.feed;
-  const isSubscribedToFeed = useSubscriptions(useCallback(isSubscribed(feed), [feed]));
-  const toggleSubscription = useSubscriptions(
-    useCallback((state) => state.toggleSubscription, [feed]),
+  const isSubscribedToFeed = useSubscriptions(useCallback(isSubscribed(feed), []));
+  const toggleSubscription = useSubscriptions(useCallback((state) => state.toggleSubscription, []));
+  const onSubscribeClick = useCallback(
+    () => toggleSubscription(info.feed, info),
+    [info, toggleSubscription],
   );
-  const onSubscribeClick = useCallback(() => toggleSubscription(info.feed, info), [info]);
 
   return (
     <Button

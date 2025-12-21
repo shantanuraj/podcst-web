@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
-import { IEpisodeListing, IPodcastEpisodesInfo } from '@/types';
+import type { IEpisodeListing, IPodcastEpisodesInfo } from '@/types';
 import { get } from './api';
 import { patchEpisodesResponse } from './episodes';
 
@@ -15,7 +15,7 @@ const fetchFeed = async (feedUrl: string): Promise<IPodcastEpisodesInfo | null> 
 export const useFeed = (feedUrl: string | null) => {
   return useQuery({
     queryKey: ['feed', feedUrl],
-    queryFn: () => fetchFeed(feedUrl!),
+    queryFn: () => fetchFeed(feedUrl as string),
     enabled: !!feedUrl,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

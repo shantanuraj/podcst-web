@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 import { filterEpisodes } from './filterEpisodes';
 import { sortEpisodes } from './sortEpisodes';
-import { SortPreference } from './types';
+import type { SortPreference } from './types';
 
 export const useEpisodesFilter = (
   episodes: IEpisodeInfo[],

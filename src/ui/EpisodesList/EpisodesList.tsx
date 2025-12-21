@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { IEpisodeInfo } from '@/types';
+import type React from 'react';
+import { useCallback, useRef, useState } from 'react';
+import type { IEpisodeInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
@@ -135,7 +136,7 @@ interface EpisodeListItemProps {
   start?: number;
 }
 
-function EpisodeListItem({ episode, index, start }: EpisodeListItemProps) {
+function EpisodeListItem({ episode, index: _index, start }: EpisodeListItemProps) {
   const virtual = start !== undefined;
   return (
     <li
@@ -161,4 +162,5 @@ const getRowHeight = () =>
           .trim()
           .replace('px', '')
       : '84',
+    10,
   );

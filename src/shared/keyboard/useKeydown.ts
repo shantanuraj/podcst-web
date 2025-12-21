@@ -1,7 +1,6 @@
-import React from 'react';
-
-import { IKeyboardShortcut, IShortcutInfo } from './shortcuts';
 import { useRouter } from 'next/navigation';
+import React from 'react';
+import type { IKeyboardShortcut, IShortcutInfo } from './shortcuts';
 
 type ShortcutHandler = (e: KeyboardEvent) => void;
 export type KeyboardShortcuts = (
@@ -36,7 +35,7 @@ export function useKeydown(
   React.useEffect(() => {
     document.addEventListener('keydown', safeHandler);
     return () => document.removeEventListener('keydown', safeHandler);
-  }, [shortcutsOrConfig, handler]);
+  }, [safeHandler]);
 }
 
 /**

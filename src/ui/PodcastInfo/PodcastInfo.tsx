@@ -1,7 +1,7 @@
 import { SubscribeButton } from '@/components/SubscribeButton/SubscribeButton';
 import { linkifyText } from '@/shared/link/linkify-text';
 import { stripHost } from '@/shared/link/strip-host';
-import { IPodcastEpisodesInfo } from '@/types';
+import type { IPodcastEpisodesInfo } from '@/types';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { Icon } from '@/ui/icons/svg/Icon';

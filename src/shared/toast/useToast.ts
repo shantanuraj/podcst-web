@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import { create } from 'zustand';
 
 type ToastState = {

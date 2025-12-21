@@ -1,7 +1,7 @@
 /**
  * Podcast Search API
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { search } from './search';
 
 export async function GET(request: NextRequest) {

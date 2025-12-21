@@ -3,8 +3,8 @@
  */
 
 import { Howl } from 'howler/src/howler.core';
-import { IEpisode } from '@/types';
 import { getValue } from '@/shared/storage/local';
+import type { IEpisode } from '@/types';
 import { updatePlaybackState } from './mediaUtils';
 
 type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
@@ -47,7 +47,7 @@ export default class AudioUtils {
       }
       console.error('AudioUtils.getAudioElement Howler node not a regular element');
       return null;
-    } catch (err) {
+    } catch (_err) {
       console.error('AudioUtils.getAudioElement cannot extract audio element from howler');
       return null;
     }

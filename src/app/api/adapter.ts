@@ -2,7 +2,7 @@
  * Podcast adapter module
  */
 
-import { IPodcast, iTunes } from '@/types';
+import type { IPodcast, iTunes } from '@/types';
 
 /**
  * Adapt iTunes podcast to App podcast

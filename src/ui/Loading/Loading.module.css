@@ -18,7 +18,7 @@
 }
 
 .loading::after {
-  content: '';
+  content: "";
   width: 32px;
   height: 32px;
   border: 2px solid var(--color-rule);

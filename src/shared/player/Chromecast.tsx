@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 import { Icon } from '@/ui/icons/svg/Icon';
 import { getAdaptedPlaybackState } from './castUtils';
@@ -57,7 +57,7 @@ export const Chromecast = () => {
         chromecastPlaybackStateSync,
       );
     };
-  }, [controller]);
+  }, [controller, setDuration, setPlayerState, setSeekPosition, syncSeekAndPause]);
 
   if (
     !isChromecastEnabled ||

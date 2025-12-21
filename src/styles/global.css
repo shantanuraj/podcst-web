@@ -1,20 +1,20 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @theme {
-  --font-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 
-  --color-paper: #FAF9F7;
-  --color-surface: #FFFFFF;
-  --color-ink: #1A1A1A;
-  --color-ink-secondary: #6B6B6B;
-  --color-ink-tertiary: #9A9A9A;
-  --color-rule: #E8E6E3;
-  --color-accent: #C84B31;
-  --color-accent-subtle: #FDF6F4;
-  --color-cream: #F5F3F0;
+  --color-paper: #faf9f7;
+  --color-surface: #ffffff;
+  --color-ink: #1a1a1a;
+  --color-ink-secondary: #6b6b6b;
+  --color-ink-tertiary: #9a9a9a;
+  --color-rule: #e8e6e3;
+  --color-accent: #c84b31;
+  --color-accent-subtle: #fdf6f4;
+  --color-cream: #f5f3f0;
   --color-ink-muted: #888888;
-  --color-ink-faint: #AAAAAA;
+  --color-ink-faint: #aaaaaa;
   --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   --text-xs: 0.75rem;
@@ -84,7 +84,12 @@ body {
   background-color: var(--color-paper);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-serif);
   font-weight: 400;
   line-height: var(--leading-tight);
@@ -117,7 +122,8 @@ input::placeholder {
   color: var(--color-ink-tertiary);
 }
 
-ul, ol {
+ul,
+ol {
   list-style: none;
 }
 

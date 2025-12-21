@@ -3,7 +3,7 @@
 import React from 'react';
 import { getSecondsFromTimestamp } from '@/shared/player/formatTime';
 import { getSeekOrStartAt, usePlayer } from '@/shared/player/usePlayer';
-import { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 
 interface ShowNotesHandlerProps {
   id: string;

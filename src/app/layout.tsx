@@ -7,9 +7,9 @@ import { Toast } from '@/shared/toast/Toast';
 import { Init } from './Init';
 
 import '@/styles/global.css';
-import styles from './PodcstApp.module.css';
 import type { Metadata, Viewport } from 'next';
 import { SiteHeader } from '@/ui/SiteHeader';
+import styles from './PodcstApp.module.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.podcst.app'),
