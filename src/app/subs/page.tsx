@@ -2,16 +2,38 @@
 
 import type { NextPage } from 'next';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+
 import { ImportButton } from '@/components/ImportButton/ImportButton';
-import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import {
+  getInit,
+  type SubscriptionsState,
+  useSubscriptions,
+} from '@/shared/subscriptions/useSubscriptions';
+import type { IEpisodeInfo } from '@/types';
+import { EpisodesList } from '@/ui/EpisodesList';
+import { LoadBar } from '@/ui/LoadBar';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';
 
-const SubscriptionPage: NextPage = () => {
+type Tab = 'subscriptions' | 'new';
+
+const LibraryPage: NextPage = () => {
+  const [activeTab, setActiveTab] = useState<Tab>('subscriptions');
+
+  const init = useSubscriptions(getInit);
+  const isSyncing = useSubscriptions(getIsSyncing);
+  const syncAllSubscriptions = useSubscriptions(getSyncSubscriptions);
   const podcasts = useSubscriptions(useShallow(getPodcastsList));
+  const episodes = useSubscriptions(useShallow(getRecents));
   const addSubscriptions = useSubscriptions(getAddSubscriptions);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    init().then(syncAllSubscriptions);
+  }, [init, syncAllSubscriptions]);
 
   if (!podcasts.length) {
     return (
@@ -43,10 +65,47 @@ const SubscriptionPage: NextPage = () => {
     );
   }
 
-  return <PodcastsGrid podcasts={podcasts} title="Subscriptions" />;
+  return (
+    <>
+      {isSyncing && <LoadBar />}
+      <header className={styles.header}>
+        <nav className={styles.tabs}>
+          <button
+            type="button"
+            className={styles.tab}
+            data-active={activeTab === 'subscriptions'}
+            onClick={() => setActiveTab('subscriptions')}
+          >
+            Subscriptions
+          </button>
+          <button
+            type="button"
+            className={styles.tab}
+            data-active={activeTab === 'new'}
+            onClick={() => setActiveTab('new')}
+          >
+            New Releases
+          </button>
+        </nav>
+      </header>
+      {activeTab === 'subscriptions' && <PodcastsGrid podcasts={podcasts} />}
+      {activeTab === 'new' && <EpisodesList episodes={episodes} />}
+    </>
+  );
 };
 
-export default SubscriptionPage;
+export default LibraryPage;
+
+const FEED_EPISODES_LIMIT = 4;
+const EPISODES_LIMIT = 50;
 
 const getPodcastsList = (state: SubscriptionsState) => Object.values(state.subs);
 const getAddSubscriptions = (state: SubscriptionsState) => state.addSubscriptions;
+const getSyncSubscriptions = (state: SubscriptionsState) => state.syncAllSubscriptions;
+const getIsSyncing = (state: SubscriptionsState) => state.isSyncing;
+
+const getRecents = (state: SubscriptionsState): IEpisodeInfo[] =>
+  Object.keys(state.subs)
+    .flatMap((feed) => state.subs[feed].episodes.slice(0, FEED_EPISODES_LIMIT))
+    .sort((a, b) => (b.published || 0) - (a.published || 0))
+    .slice(0, EPISODES_LIMIT);

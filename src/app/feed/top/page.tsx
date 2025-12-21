@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 
 export default async function Page() {
   const podcasts = await top(100);
-  return <PodcastsGrid podcasts={podcasts} />;
+  return <PodcastsGrid podcasts={podcasts} title="Trending" />;
 }
