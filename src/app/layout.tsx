@@ -5,6 +5,7 @@ import { Player } from '@/shared/player/Player';
 import { QueryProvider } from '@/shared/query/QueryProvider';
 import { Toast } from '@/shared/toast/Toast';
 import { Init } from './Init';
+import { ThemeListener } from '@/shared/theme/ThemeListener';
 
 import '@/styles/global.css';
 import type { Metadata, Viewport } from 'next';
@@ -65,6 +66,7 @@ export default function App({ children }: { children: React.ReactNode }) {
       <body>
         <QueryProvider>
           <Init />
+          <ThemeListener />
           <SiteHeader />
           <main className={styles.main}>{children}</main>
           <Player />

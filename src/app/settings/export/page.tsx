@@ -2,13 +2,20 @@
 
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import styles from '@/app/settings/Settings.module.css';
 import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import { Button } from '@/ui/Button';
+import styles from '../Settings.module.css';
 
 export default function SettingsExportPage() {
-  const subsState = useSubscriptions.getState();
-  const subs = useShallow(getExportList)(subsState);
+  const subs = useSubscriptions(
+    useShallow((state: SubscriptionsState) =>
+      Object.values(state.subs).map((sub) => ({
+        title: sub.title,
+        feed: sub.feed,
+      })),
+    ),
+  );
+
   // Generates the OPML format XML file from subscriptions.
   const exportSubscriptions = React.useCallback(() => {
     const doc = document.implementation.createDocument('', '', null);
@@ -36,7 +43,7 @@ export default function SettingsExportPage() {
       feeds.appendChild(outline);
     });
 
-    let xmlStr = `<?xml version="1.0" encoding="utf-8" standalone="no"?>\n`;
+    let xmlStr = '<?xml version="1.0" encoding="utf-8" standalone="no"?>\n';
     xmlStr += new XMLSerializer().serializeToString(opml);
 
     const blob = new Blob([xmlStr], { type: 'text/xml' });
@@ -46,15 +53,43 @@ export default function SettingsExportPage() {
     link.download = 'podcst-subscriptions.opml';
     link.click();
   }, [subs]);
+
   return (
-    <div className={`${styles.container} ${styles.export}`}>
-      <Button onClick={exportSubscriptions}>Export subscriptions as OPML</Button>
+    <div className={styles.container}>
+      <div className={styles.content}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Export Library</h1>
+        </header>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <div className="w-16 h-16 mb-6 text-ink-tertiary">
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3" />
+            </svg>
+          </div>
+          <p className="text-base text-ink-secondary max-w-[40ch] mb-8 leading-relaxed">
+            Download your subscriptions as an OPML file. You can use this file to import your
+            podcasts into other applications.
+          </p>
+          <div className="flex flex-col items-center gap-4">
+            <Button
+              onClick={exportSubscriptions}
+              className="px-8 py-4 text-base font-medium bg-ink text-surface border border-ink hover:bg-ink-secondary transition-all"
+            >
+              Download OPML File
+            </Button>
+            <p className="text-xs text-ink-tertiary">
+              {subs.length} {subs.length === 1 ? 'podcast' : 'podcasts'} in your library
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-const getExportList = (state: SubscriptionsState) =>
-  Object.values(state.subs).map((sub) => ({
-    title: sub.title,
-    feed: sub.feed,
-  }));

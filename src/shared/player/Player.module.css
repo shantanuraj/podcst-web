@@ -22,6 +22,31 @@
   position: relative;
   background-color: var(--color-paper);
   border-top: 1px solid var(--color-rule);
+  color: var(--color-ink);
+}
+
+.player button,
+.player a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  transition: opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.player button:hover,
+.player a:hover {
+  opacity: 0.6;
+}
+
+.player button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.player svg {
+  fill: currentColor;
 }
 
 .seekbar {
@@ -32,6 +57,9 @@
   height: 2px;
   background-color: var(--color-rule);
   cursor: pointer;
+  border: none;
+  padding: 0;
+  width: 100%;
 }
 
 .seekbar:hover {
@@ -109,30 +137,36 @@
 }
 
 .controls button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 40px;
   height: 40px;
-  color: var(--color-ink);
-  transition: opacity 0.15s ease;
-}
-
-.controls button:hover {
-  opacity: 0.6;
-}
-
-.controls button:disabled {
-  opacity: 0.3;
-}
-
-.controls svg {
-  fill: currentColor;
 }
 
 .playButton {
   width: 48px;
   height: 48px;
+}
+
+.volumeControl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.volumeControl input[type="range"] {
+  width: 80px;
+  height: 2px;
+  appearance: none;
+  background: var(--color-rule);
+  outline: none;
+  cursor: pointer;
+}
+
+.volumeControl input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  background: var(--color-ink);
+  cursor: pointer;
 }
 
 .duration {

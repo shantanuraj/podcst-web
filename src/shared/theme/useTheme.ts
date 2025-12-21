@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getValue } from '@/shared/storage/local';
 import type { ThemeMode } from '@/types';
 
-const schemes = ['autumn', 'spring', 'rose', 'winter'] as const;
+const schemes = ['autumn'] as const;
 
 export type Scheme = (typeof schemes)[number];
 
@@ -13,17 +13,10 @@ export interface IThemeInfo {
   theme: ThemeMode;
 }
 
-export const themes: readonly IThemeInfo[] = schemes
-  .map(
-    (scheme): IThemeInfo => ({
-      scheme,
-      theme: 'light',
-    }),
-  )
-  .concat({
-    scheme: 'autumn',
-    theme: 'dark',
-  });
+export const themes: readonly IThemeInfo[] = schemes.flatMap((scheme) => [
+  { scheme, theme: 'light' as const },
+  { scheme, theme: 'dark' as const },
+]);
 
 type ThemeState = {
   currentIndex: number;

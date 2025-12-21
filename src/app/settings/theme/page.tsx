@@ -1,7 +1,6 @@
 'use client';
 
 import React, { type FormEvent } from 'react';
-import styles from '@/app/settings/Settings.module.css';
 import {
   type IThemeInfo,
   type Scheme,
@@ -10,6 +9,7 @@ import {
   useTheme,
 } from '@/shared/theme/useTheme';
 import type { ThemeMode } from '@/types';
+import styles from '../Settings.module.css';
 
 export default function SettingsThemePage() {
   const { scheme, theme, changeTheme: setTheme } = useTheme();
@@ -22,12 +22,20 @@ export default function SettingsThemePage() {
     [setTheme],
   );
   const currentTheme = `${scheme}/${theme}` as const;
+
   return (
-    <form className={styles.container} onChange={changeTheme}>
-      {themes.map((item) => (
-        <Theme key={`${item.scheme}/${item.theme}`} {...item} currentTheme={currentTheme} />
-      ))}
-    </form>
+    <div className={styles.container}>
+      <div className={styles.content}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Theme</h1>
+        </header>
+        <form onChange={changeTheme}>
+          {themes.map((item) => (
+            <Theme key={`${item.scheme}/${item.theme}`} {...item} currentTheme={currentTheme} />
+          ))}
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -37,17 +45,36 @@ interface ThemeProps extends IThemeInfo {
 
 const Theme = ({ currentTheme, scheme, theme }: ThemeProps) => {
   const config: ThemeConfig = `${scheme}/${theme}`;
+  const id = `theme-${config}`;
+
   return (
-    <div>
-      <input
-        type="radio"
-        id={config}
-        name="theme"
-        defaultChecked={config === currentTheme}
-        value={config}
-      />
-      <label htmlFor={config}>
-        {theme === 'dark' ? 'Dark' : scheme.charAt(0).toUpperCase() + scheme.slice(1)}
+    <div className={styles.shortcutRow}>
+      <label
+        htmlFor={id}
+        className="flex items-center justify-between flex-1 cursor-pointer group has-[:checked]:bg-accent-subtle hover:bg-accent-subtle transition-colors px-4 -mx-4 py-4"
+      >
+        <input
+          type="radio"
+          id={id}
+          name="theme"
+          checked={config === currentTheme}
+          onChange={() => {}} // Controlled by form onChange, but React needs this to avoid warnings
+          value={config}
+          className="sr-only"
+        />
+        <div className="flex flex-col">
+          <span className="text-lg font-medium group-hover:text-accent transition-colors">
+            {scheme.charAt(0).toUpperCase() + scheme.slice(1)} {theme === 'dark' ? 'Dark' : 'Light'}
+          </span>
+          <span className="text-sm text-ink-secondary">
+            {theme === 'dark'
+              ? 'Optimized for low-light environments'
+              : 'Clean and bright appearance'}
+          </span>
+        </div>
+        <div className="w-6 h-6 border border-rule flex items-center justify-center bg-surface transition-all group-has-[:checked]:border-accent group-hover:border-accent">
+          <div className="w-3 h-3 bg-accent opacity-0 group-has-[:checked]:opacity-100 transition-opacity" />
+        </div>
       </label>
     </div>
   );
