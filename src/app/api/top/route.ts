@@ -1,16 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server';
-
 import { DEFAULT_PODCASTS_COUNT, MAX_PODCASTS_COUNT, MIN_PODCASTS_COUNT } from '@/data/constants';
-import { top } from './top';
+import { getTopPodcasts } from '@/server/ingest/top';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
 
   const limit = validLimit(params.get('limit'));
-  const locale = params.get('locale') || undefined;
+  const locale = params.get('locale') || 'us';
 
-  const res = await top(limit, locale);
-  return NextResponse.json(res);
+  const podcasts = await getTopPodcasts(limit, locale);
+  return NextResponse.json(podcasts);
 }
 
 function validLimit(limitStr: string | null) {

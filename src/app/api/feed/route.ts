@@ -1,33 +1,39 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { feed } from './feed';
+import { cache, isCached } from '@/app/api/redis';
+import { getPodcastByFeedUrl, ingestPodcast } from '@/server/ingest/podcast';
+import { patchFeedResponse } from './patch';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const url = params.get('url');
   if (!url) {
-    return NextResponse.json(
-      {
-        message: 'parameter `url` cannot be empty',
-      },
-      { status: 400 },
-    );
+    return NextResponse.json({ message: 'parameter `url` cannot be empty' }, { status: 400 });
   }
 
-  const safeUrl = decodeURIComponent(url);
+  const feedUrl = decodeURIComponent(url);
   try {
-    // Check if url is valid
-    new URL(safeUrl);
-  } catch (_err) {
-    return NextResponse.json(
-      {
-        message: 'parameter `url` cannot be parsed',
-        url,
-        safeUrl,
-      },
-      { status: 400 },
-    );
+    new URL(feedUrl);
+  } catch {
+    return NextResponse.json({ message: 'parameter `url` cannot be parsed' }, { status: 400 });
   }
 
-  const res = await feed(safeUrl);
-  return NextResponse.json(res);
+  const redisData = await cache.feed(feedUrl);
+  if (isCached(redisData) && redisData.entity) {
+    return NextResponse.json(patchFeedResponse(feedUrl, redisData.entity));
+  }
+
+  let podcast = await getPodcastByFeedUrl(feedUrl);
+
+  if (podcast) {
+    cache.saveFeed(feedUrl, podcast);
+    return NextResponse.json(podcast);
+  }
+
+  podcast = await ingestPodcast(feedUrl);
+
+  if (podcast) {
+    cache.saveFeed(feedUrl, podcast);
+  }
+
+  return NextResponse.json(podcast);
 }
