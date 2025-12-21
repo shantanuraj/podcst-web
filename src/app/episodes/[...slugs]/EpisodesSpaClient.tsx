@@ -9,6 +9,7 @@ import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { Loading } from '@/ui/Loading';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
+import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 
 interface EpisodesSpaClientProps {
   feedUrl: string;
@@ -50,6 +51,9 @@ export function EpisodesSpaClient({
   const { data: info } = useFeed(feedUrl);
   const feedData = info ?? initialData;
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.podcst.app';
+  const currentUrl = `${origin}${pathname}`;
+
   if (!feedData) {
     return <Loading />;
   }
@@ -62,13 +66,21 @@ export function EpisodesSpaClient({
       return <div>Episode not found</div>;
     }
 
-    return <EpisodeInfo podcast={feedData} episode={episode} />;
+    return (
+      <>
+        <PodcastEpisodeSchema podcast={feedData} episode={episode} url={currentUrl} />
+        <EpisodeInfo podcast={feedData} episode={episode} />
+      </>
+    );
   }
 
   // Otherwise show the episodes list
   return (
-    <EpisodesList episodes={feedData.episodes}>
-      <PodcastInfo info={feedData} />
-    </EpisodesList>
+    <>
+      <PodcastSeriesSchema podcast={feedData} url={currentUrl} />
+      <EpisodesList episodes={feedData.episodes}>
+        <PodcastInfo info={feedData} />
+      </EpisodesList>
+    </>
   );
 }
