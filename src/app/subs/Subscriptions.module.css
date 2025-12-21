@@ -22,14 +22,16 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .tab:hover {
   color: var(--color-ink-secondary);
 }
 
-.tab[data-active='true'] {
+.tab[data-active="true"] {
   color: var(--color-ink);
   border-bottom-color: var(--color-ink);
 }

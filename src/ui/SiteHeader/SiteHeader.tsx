@@ -28,7 +28,11 @@ export function SiteHeader() {
           >
             Discover
           </Link>
-          <Link href="/subs" className={styles.navLink} data-active={pathname === '/subs' || pathname === '/recents'}>
+          <Link
+            href="/subs"
+            className={styles.navLink}
+            data-active={pathname === '/subs' || pathname === '/recents'}
+          >
             Library
           </Link>
         </nav>

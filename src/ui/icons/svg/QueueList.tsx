@@ -2,10 +2,22 @@ import type * as React from 'react';
 
 function QueueList(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" height={24} width={24} {...props}>
-      {props.children}
-      <path fill="none" d="M0 0h24v24H0z" />
-      <path d="M22 6h-5v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6zm-7 0H3v2h12V6zm0 4H3v2h12v-2zm-4 4H3v2h8v-2z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <line x1={4} y1={6} x2={14} y2={6} />
+      <line x1={4} y1={10} x2={14} y2={10} />
+      <line x1={4} y1={14} x2={10} y2={14} />
+      <circle cx={17} cy={17} r={3} fill="currentColor" stroke="none" />
     </svg>
   );
 }
