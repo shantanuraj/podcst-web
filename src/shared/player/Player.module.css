@@ -29,7 +29,6 @@
 .player a {
   display: flex;
   align-items: center;
-  justify-content: center;
   color: inherit;
   transition: opacity 0.15s ease;
   cursor: pointer;
@@ -177,6 +176,7 @@
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-ink-secondary);
+  justify-content: center;
   min-width: 40px;
   text-align: center;
 }
