@@ -38,9 +38,11 @@ const readSummary = (ctx: any): string | null => {
  * Read description from json
  */
 const readDescription = (ctx: any): string => {
-  return (
-    (Array.isArray(ctx.description) && (ctx.description[0] || '').trim()) || readSummary(ctx) || ''
-  );
+  if (!ctx.description || !Array.isArray(ctx.description)) {
+    return readSummary(ctx) || '';
+  }
+  const data = ctx.description[0];
+  return typeof data === 'object' ? (data._ || '').trim() : data.trim();
 };
 
 /**
