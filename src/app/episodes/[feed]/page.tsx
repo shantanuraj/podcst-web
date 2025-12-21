@@ -1,54 +1,29 @@
-import * as React from 'react';
 import { Metadata } from 'next';
 
-import { IPodcastEpisodesInfo } from '@/types';
-import { EpisodesList } from '@/ui/EpisodesList';
-import { Loading } from '@/ui/Loading';
-import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
 import { feed } from '@/app/api/feed/feed';
 import { patchEpisodesResponse } from '@/data/episodes';
-
-interface EpisodesPageProps {
-  feed: string;
-  info: IPodcastEpisodesInfo | null;
-}
+import { EpisodesClient } from './EpisodesClient';
 
 const fetchFeed = feed;
-
-const EpisodesPage = (props: EpisodesPageProps) => {
-  const { info } = props;
-  if (!info) return <Loading />;
-
-  const { episodes } = info;
-
-  return (
-    <EpisodesList episodes={episodes}>
-      <PodcastInfo info={info} />
-    </EpisodesList>
-  );
-};
 
 export async function generateMetadata(props: {
   params: Promise<{ feed: string }>;
 }): Promise<Partial<Metadata>> {
   const params = await props.params;
-  const feed = decodeURIComponent(params.feed);
-  const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;
+  const feedUrl = decodeURIComponent(params.feed);
+  const info = feedUrl ? await fetchFeed(feedUrl) : null;
   if (!info) return {};
-  const metadata: Metadata = {
+  return {
     title: info.title,
     description: info.description,
-    openGraph: {
-      images: info.cover,
-    },
+    openGraph: { images: info.cover },
   };
-  return metadata;
 }
 
 export default async function Page(props: { params: Promise<{ feed: string }> }) {
   const params = await props.params;
-  const feed = decodeURIComponent(params.feed);
-  const info = typeof feed === 'string' && feed ? await fetchFeed(feed) : null;
-  const data = patchEpisodesResponse(feed)(info);
-  return <EpisodesPage feed={feed} info={data} />;
+  const feedUrl = decodeURIComponent(params.feed);
+  const info = feedUrl ? await fetchFeed(feedUrl) : null;
+  const data = patchEpisodesResponse(feedUrl)(info);
+  return <EpisodesClient feedUrl={feedUrl} initialData={data} />;
 }

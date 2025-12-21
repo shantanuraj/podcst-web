@@ -24,6 +24,7 @@ export function Search() {
   );
   const [inputTerm, setTerm] = React.useState('');
   const term = React.useDeferredValue(inputTerm);
+  const { data: searchResults = emptyResult, isFetching } = useSearch(term);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
   const focusSearchShortcut = React.useCallback(() => {
@@ -33,9 +34,6 @@ export function Search() {
     });
   }, []);
   useKeydown(shortcuts.search, focusSearchShortcut);
-
-  const response = useSearch(term);
-  const searchResults = response.data || emptyResult;
 
   const onInputValueChange = React.useCallback(
     (changes: UseComboboxStateChange<IPodcastSearchResult>) => {
@@ -55,7 +53,7 @@ export function Search() {
 
   return (
     <div className={styles.search}>
-      {response.isValidating && <LoadBar />}
+      {isFetching && <LoadBar />}
       <input
         {...getInputProps({ ref: searchRef })}
         aria-label="Search podcasts"
