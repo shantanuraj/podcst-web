@@ -1,20 +1,50 @@
 @import "tailwindcss";
 
-@theme {
-  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+:root {
+  color-scheme: dark;
+  --color-paper: #1c1b1a;
+  --color-surface: #262423;
+  --color-ink: #f2f0ed;
+  --color-ink-secondary: #b0ada9;
+  --color-ink-tertiary: #8c8882;
+  --color-ink-muted: #6b6864;
+  --color-ink-faint: #4d4a46;
+  --color-rule: #33312f;
+  --color-accent: #e06b52;
+  --color-accent-subtle: #2e1d1a;
+  --color-cream: #2a2826;
+}
 
+:root.light {
+  color-scheme: light;
   --color-paper: #faf9f7;
   --color-surface: #ffffff;
   --color-ink: #1a1a1a;
   --color-ink-secondary: #6b6b6b;
   --color-ink-tertiary: #9a9a9a;
+  --color-ink-muted: #888888;
+  --color-ink-faint: #aaaaaa;
   --color-rule: #e8e6e3;
   --color-accent: #c84b31;
   --color-accent-subtle: #fdf6f4;
   --color-cream: #f5f3f0;
-  --color-ink-muted: #888888;
-  --color-ink-faint: #aaaaaa;
+}
+
+@theme {
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --color-paper: var(--color-paper);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-ink-tertiary: var(--color-ink-tertiary);
+  --color-rule: var(--color-rule);
+  --color-accent: var(--color-accent);
+  --color-accent-subtle: var(--color-accent-subtle);
+  --color-cream: var(--color-cream);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-faint: var(--color-ink-faint);
   --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   --text-xs: 0.75rem;

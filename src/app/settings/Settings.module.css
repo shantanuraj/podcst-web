@@ -1,100 +1,116 @@
 .container {
-  height: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-6);
   width: 100%;
+}
+
+.content {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: var(
+    --text-2xl
+  ); /* Slightly larger than PodcastsGrid's xl, but following the pattern */
+  line-height: var(--leading-tight);
+}
+
+.nav {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
 }
 
-.container > div,
-.container > ul,
-.container > a {
-  padding: 32px;
-  width: 100%;
-}
-
-.container > ul {
-  margin: 0;
-}
-
-.container > div:nth-child(even),
-.container > ul:nth-child(even),
-.container > a:nth-child(even) {
-  background-color: var(--surface3);
-}
-
-.container > div:nth-child(odd),
-.container > ul:nth-child(odd),
-.container > a:nth-child(odd) {
-  background-color: var(--surface4);
-}
-
-.container.export {
-  justify-content: center;
-}
-
-.container.export button {
-  min-width: 200px;
-}
-
-form.container > div {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-form.container > div,
-form.container > div > * {
-  cursor: pointer;
-}
-
-form.container label {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.shortcut {
+.linkItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: var(--space-8) 0; /* More breathing room */
+  border-bottom: 1px solid var(--color-rule);
+  transition: background-color 0.2s ease;
 }
 
-.shortcut kbd {
-  font-weight: bold;
-  border-radius: 6px;
-  border-top: 1px solid;
-  border-width: 1px 1px 3px;
-  padding: 2px 8px;
-  white-space: nowrap;
+.linkItem:hover {
+  background-color: var(--color-accent-subtle);
+  margin-left: calc(-1 * var(--space-4));
+  margin-right: calc(-1 * var(--space-4));
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
 }
 
-@media only screen and (max-width: 600px) {
-  .container > div,
-  .container > ul,
-  .container > a {
-    padding: 32px 16px;
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) 0; /* More breathing room for shortcuts */
+  border-bottom: 1px solid var(--color-rule);
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .linkItem:hover {
+    margin-left: calc(-1 * var(--space-2));
+    margin-right: calc(-1 * var(--space-2));
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
   }
 }
 
 .footer {
+  margin-top: var(--space-24);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--color-rule);
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
-  opacity: 0.8;
-  font-size: 0.9rem;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-ink-tertiary);
 }
 
-.footer a {
-  color: var(--accent);
-  text-decoration: none;
+.footerRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
-.footer a:hover {
-  opacity: 1;
+.author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.authorLink {
+  color: var(--color-ink);
+  font-weight: 500;
   text-decoration: underline;
+  text-decoration-color: var(--color-rule);
+  text-underline-offset: 4px;
+  transition: all 0.2s ease;
+}
+
+.authorLink:hover {
+  color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
+}
+
+@media (min-width: 640px) {
+  .footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
 }
