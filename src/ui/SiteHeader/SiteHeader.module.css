@@ -70,6 +70,17 @@
   stroke: currentColor;
 }
 
+.authLink {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  transition: color 0.15s ease;
+}
+
+.authLink:hover {
+  color: var(--color-ink);
+}
+
 @media (max-width: 768px) {
   .container {
     padding: var(--space-3) var(--space-4);
