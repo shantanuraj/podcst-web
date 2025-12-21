@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useRef, useState } from 'react';
-import { useVirtual } from 'react-virtual';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { IEpisodeInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 
@@ -65,12 +65,15 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
 
   const filteredEpisodes = useEpisodesFilter(episodes, sortPreference, query);
 
-  const { totalSize, virtualItems } = useVirtual<HTMLDivElement | null>({
-    size: filteredEpisodes.length || 0,
-    parentRef: containerRef,
+  const virtualizer = useVirtualizer({
+    count: filteredEpisodes.length || 0,
+    getScrollElement: () => containerRef.current,
     estimateSize: getRowHeight,
     overscan: 5,
   });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
 
   const shouldUseVirtualList = filteredEpisodes.length > 750;
 
