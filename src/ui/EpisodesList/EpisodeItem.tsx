@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { memo } from 'react';
 
+import { SpaLink } from '@/shared/spa';
+import { IEpisodeInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
-import { IEpisodeInfo } from '@/types';
 
 import styles from './EpisodeItem.module.css';
 
@@ -20,8 +20,8 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const minutes = Math.floor((duration || 0) / 60);
 
   return (
-    <Link
-      href={`/episode/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`}
+    <SpaLink
+      href={`/episodes/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`}
       className={styles.container}
     >
       <div className={styles.artwork}>
@@ -39,7 +39,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
         <PlayButton icon episode={episode} />
         <QueueButton episode={episode} />
       </div>
-    </Link>
+    </SpaLink>
   );
 }
 

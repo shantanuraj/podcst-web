@@ -1,3 +1,4 @@
+import { SpaLink } from '@/shared/spa';
 import { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
@@ -35,10 +36,14 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             {episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}
           </h1>
           <p className={styles.podcast}>
-            <ExternalLink href={podcast.link || '#'}>
+            <SpaLink href={`/episodes/${encodeURIComponent(podcast.feed)}`}>
               {podcast.title}
-              <Icon icon="external-link" size={14} />
-            </ExternalLink>
+            </SpaLink>
+            {podcast.link && (
+              <ExternalLink href={podcast.link}>
+                <Icon icon="external-link" size={14} />
+              </ExternalLink>
+            )}
           </p>
           <p className={styles.author}>{author}</p>
           {releaseDate && <p className={styles.published}>{releaseDate}</p>}

@@ -50,6 +50,12 @@ const config: NextConfig = {
         destination: '/feed/top',
         permanent: false,
       },
+      // Redirect old singular /episode/ URLs to plural /episodes/
+      {
+        source: '/episode/:feed/:guid',
+        destination: '/episodes/:feed/:guid',
+        permanent: true,
+      },
     ];
   },
 };
