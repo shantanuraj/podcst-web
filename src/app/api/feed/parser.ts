@@ -1,138 +1,162 @@
 /**
- * Helpers
+ * Parser for XML Podcast Feeds
+ * Handles iTunes tags and various RSS/Atom structures
  */
 
 import { Parser } from 'xml2js';
-import type { IEpisode, IEpisodeListing } from '@/types';
+import type { IEpisode, IEpisodeListing, IFileInfo } from '@/types';
 import { reformatShowNotes, showNotesSorter } from './format';
 
 /**
- * Read itunes file prop
+ * Read enclosure/file properties
  */
-const readFile = (file: any) => ({
-  ...file,
-  length: parseInt(file.length, 10),
-});
-
-/**
- * Read data from json
- */
-const readDate = (ctx: any): number | null => {
-  const data = ctx.pubDate || ctx.lastBuildDate;
-  return data ? +new Date(data[0]) : null;
+const readFile = (file: any): IFileInfo => {
+  const length = parseInt(file.length, 10);
+  return {
+    url: file.url || '',
+    type: file.type || '',
+    length: isNaN(length) ? 0 : length,
+  };
 };
 
 /**
- * Read summary from json
+ * Read date from XML context (handles pubDate and lastBuildDate)
+ */
+const readDate = (ctx: any): number | null => {
+  const data = ctx.pubDate || ctx.lastBuildDate;
+  if (!Array.isArray(data) || !data[0]) {
+    return null;
+  }
+  const dateStr = typeof data[0] === 'object' ? data[0]._ : data[0];
+  if (!dateStr) return null;
+
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? null : date.getTime();
+};
+
+/**
+ * Read summary from iTunes summary or subtitle tags
  */
 const readSummary = (ctx: any): string | null => {
   const data = ctx['itunes:summary'] || ctx['itunes:subtitle'];
-  if (Array.isArray(data)) {
-    return (data[0]._ || data[0]).trim();
+  if (Array.isArray(data) && data[0]) {
+    const val = typeof data[0] === 'object' ? data[0]._ || '' : data[0];
+    return typeof val === 'string' ? val.trim() : null;
   }
-
   return null;
 };
 
 /**
- * Read description from json
+ * Read description from RSS description tag, falls back to summary
  */
 const readDescription = (ctx: any): string => {
-  if (!ctx.description || !Array.isArray(ctx.description)) {
+  const data = ctx.description;
+  if (!Array.isArray(data) || !data[0]) {
     return readSummary(ctx) || '';
   }
-  const data = ctx.description[0];
-  return typeof data === 'object' ? (data._ || '').trim() : data.trim();
+  const val = typeof data[0] === 'object' ? data[0]._ || '' : data[0];
+  return typeof val === 'string' ? val.trim() : '';
 };
 
 /**
- * Map of index position to number of miliseconds
- */
-const indexToSecondsMap = {
-  0: 1,
-  1: 60,
-  2: 60 * 60,
-};
-
-/**
- * Read duration from json
+ * Read duration and convert to seconds
+ * Handles HH:MM:SS, MM:SS, and plain seconds
  */
 const readDuration = (ctx: any): number | null => {
   const _data = ctx['itunes:duration'];
-  if (!_data) {
+  if (!_data || !Array.isArray(_data) || !_data[0]) {
     return null;
   }
-  const data = _data[0]._ || _data[0];
+
+  const rawData = typeof _data[0] === 'object' ? _data[0]._ : _data[0];
+  if (typeof rawData === 'number') return rawData;
+  if (typeof rawData !== 'string') return null;
+
+  const data = rawData.trim();
+  if (!data) return null;
+
   if (data.indexOf(':') === -1) {
-    return parseInt(data, 10);
+    const parsed = parseInt(data, 10);
+    return isNaN(parsed) ? null : parsed;
   }
-  const vals = data
-    .split(':')
-    .map((e: string) => parseInt(e, 10))
-    .reverse();
-  return vals.reduce(
-    (acc: number, val: number, i: number) =>
-      acc + val * indexToSecondsMap[i as keyof typeof indexToSecondsMap],
-    0,
-  );
+
+  const parts = data.split(':').map((e) => parseInt(e.trim(), 10));
+  if (parts.some(isNaN)) {
+    return null;
+  }
+
+  let seconds = 0;
+  if (parts.length === 3) {
+    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    seconds = parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    seconds = parts[0];
+  }
+
+  return seconds;
 };
 
 /**
- * Read explicit status from json
+ * Read explicit status
  */
 const readExplicit = (ctx: any): boolean => {
   const data = ctx['itunes:explicit'];
-  if (!Array.isArray(data)) {
+  if (!Array.isArray(data) || !data[0]) {
     return false;
   }
-  switch (data[0]) {
-    case 'no':
-    case 'clean':
-      return false;
-    case 'yes':
-      return true;
-    default:
-      return false;
-  }
+  const val = String(typeof data[0] === 'object' ? data[0]._ : data[0])
+    .toLowerCase()
+    .trim();
+  return val === 'yes' || val === 'true' || val === 'explicit' || val === '1';
 };
 
 /**
- * Read episode artwork if present
+ * Read episode artwork from media:content or itunes:image
  */
 const readEpisodeArtwork = (ctx: any): string | null => {
   try {
-    const url = ctx['media:content'][0].$.url;
-    const type: string | null = ctx['media:content'][0]?.$?.type || null;
-
-    if (type?.includes('image')) {
-      return url;
-    } else {
-      return null;
+    const mediaContent = ctx['media:content'];
+    if (Array.isArray(mediaContent)) {
+      for (const content of mediaContent) {
+        if (content?.$?.type?.includes('image') && content.$.url) {
+          return content.$.url;
+        }
+      }
     }
+
+    const itunesImage = ctx['itunes:image'];
+    if (Array.isArray(itunesImage) && itunesImage[0]?.$.href) {
+      return itunesImage[0].$.href;
+    }
+
+    return null;
   } catch (_err) {
     return null;
   }
 };
 
 /**
- * Read keywords from json
+ * Read keywords from iTunes keywords tag
  */
 const readKeywords = (ctx: any): string[] => {
   const data = ctx['itunes:keywords'];
-  if (!Array.isArray(data)) {
+  if (!Array.isArray(data) || !data[0]) {
     return [];
   }
   const record = data[0];
-  if (typeof record === 'string') {
-    return record.split(',').map((e) => e.trim());
-  } else if (typeof record === 'object') {
-    return record._.split(',').map((e: string) => e.trim());
+  const words = typeof record === 'object' ? record._ : record;
+  if (typeof words === 'string') {
+    return words
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean);
   }
   return [];
 };
 
 /**
- * Read show notes
+ * Extract show notes by picking the best available text
  */
 const readShowNotes = (ctx: any): string => {
   const description = (Array.isArray(ctx.description) && ctx.description[0]) || '';
@@ -142,32 +166,52 @@ const readShowNotes = (ctx: any): string => {
     '';
   const summary = readSummary(ctx) || '';
 
-  const notes = [description, contentEncoded, summary].sort(showNotesSorter);
-  return reformatShowNotes(notes[notes.length - 1]).trim();
+  const notes = [
+    typeof description === 'object' ? description._ || '' : description,
+    typeof contentEncoded === 'object' ? contentEncoded._ || '' : contentEncoded,
+    summary,
+  ].sort(showNotesSorter);
+
+  return reformatShowNotes(notes[notes.length - 1] || '').trim();
 };
 
 /**
- * Read cover
+ * Read cover art and wrap in proxy if needed
  */
 const readCover = (ctx: any, baseLink?: string | null): string | null => {
   try {
-    const data = ctx['itunes:image'];
-    const link = data[0].$.href;
+    let link = '';
+    const itunesImage = ctx['itunes:image'];
 
-    let url = '';
-    try {
-      url = new URL(link).toString();
-    } catch (_err) {
-      if (baseLink) {
-        url = new URL(link, baseLink).toString();
+    if (Array.isArray(itunesImage) && itunesImage[0]?.$.href) {
+      link = itunesImage[0].$.href;
+    } else {
+      // Fallback to channel image if available
+      const channelImage = ctx.image;
+      if (Array.isArray(channelImage) && channelImage[0]?.url?.[0]) {
+        link = channelImage[0].url[0];
       }
-      return null;
     }
 
-    if (!url) return null;
+    if (!link) return null;
+
+    let url: URL;
+    try {
+      url = new URL(link);
+    } catch (_err) {
+      if (baseLink) {
+        try {
+          url = new URL(link, baseLink);
+        } catch (__err) {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
 
     const imgProxy = new URL('https://assets.podcst.app/');
-    imgProxy.searchParams.set('p', encodeURIComponent(url));
+    imgProxy.searchParams.set('p', encodeURIComponent(url.toString()));
     return imgProxy.toString();
   } catch (_err) {
     return null;
@@ -175,39 +219,61 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
 };
 
 /**
- * Read link
+ * Read link from RSS link tag or GUID
  */
 const readLink = (ctx: any): string | null => {
-  const link = Array.isArray(ctx.link) ? (ctx.link[0] as string) : null;
-  return link || ctx.guid[0]._;
+  if (Array.isArray(ctx.link)) {
+    const link = ctx.link[0];
+    if (typeof link === 'string') return link;
+    if (typeof link === 'object' && link.$.href) return link.$.href;
+  }
+  if (Array.isArray(ctx.guid) && ctx.guid[0]) {
+    const guid = ctx.guid[0];
+    const guidVal = typeof guid === 'object' ? guid._ || guid : guid;
+    // Only use GUID as link if it looks like a URL
+    if (typeof guidVal === 'string' && guidVal.startsWith('http')) {
+      return guidVal;
+    }
+  }
+  return null;
 };
 
 /**
- * Read GUID
+ * Read GUID for an episode
  */
 const readGuid = (ctx: any): string => {
-  const guid = ctx.guid[0];
-  return guid._ || guid;
+  if (Array.isArray(ctx.guid) && ctx.guid[0]) {
+    const guid = ctx.guid[0];
+    return (typeof guid === 'object' ? guid._ || guid : guid || '').toString();
+  }
+  return '';
 };
 
 /**
- * Adapt episode json to formatted one
+ * Adapt episode JSON to internal IEpisode format
  */
 const adaptEpisode = (
   item: any,
   fallbackCover: string,
   fallbackAuthor: string,
 ): IEpisode | null => {
-  if (!item.enclosure) {
+  if (!item.enclosure || !Array.isArray(item.enclosure) || !item.enclosure[0]?.$) {
     return null;
   }
 
   const guid = readGuid(item);
+  const titleRaw = Array.isArray(item.title) ? item.title[0] : item.title;
+  const title = (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) || 'Untitled Episode';
+
+  if (!guid && (!title || title === 'Untitled Episode')) {
+    return null;
+  }
+
   const link = readLink(item);
 
   return {
     guid,
-    title: item.title[0] as string,
+    title: title.toString().trim(),
     summary: readSummary(item),
     published: readDate(item),
     cover: readCover(item, link) || fallbackCover,
@@ -224,48 +290,67 @@ const adaptEpisode = (
 };
 
 /**
- * Helper funciton to parse xml to json via promises
+ * Parse XML string to JSON using xml2js
  */
 const xmlToJSON = (xml: string) => {
   return new Promise((resolve, reject) => {
-    const { parseString } = new Parser();
+    const { parseString } = new Parser({
+      trim: true,
+      explicitArray: true,
+      normalize: true,
+    });
     parseString(xml, (err, res) => (err ? reject(err) : resolve(res)));
   });
 };
 
 /**
- * Adapt json to better format
+ * Transform parsed XML JSON into IEpisodeListing
  */
 const adaptJSON = (json: any): IEpisodeListing | null => {
+  if (!json?.rss?.channel?.[0]) {
+    console.error('Invalid Podcast RSS: Missing channel');
+    return null;
+  }
+
   try {
     const channel = json.rss.channel[0];
-    const cover = readCover(channel) as string;
-    const author = channel['itunes:author'][0];
+    const cover = (readCover(channel) || '') as string;
+
+    const author =
+      (Array.isArray(channel['itunes:author']) ? channel['itunes:author'][0] : null) ||
+      (Array.isArray(channel['itunes:owner'])
+        ? channel['itunes:owner'][0]?.['itunes:name']?.[0]
+        : null) ||
+      'Unknown Author';
+
+    const titleRaw = Array.isArray(channel.title) ? channel.title[0] : channel.title;
+    const title = (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) || 'Unknown Podcast';
+
     return {
-      title: channel.title[0].trim(),
+      title: title.toString().trim(),
       link: channel.link?.[0] ?? '',
       published: readDate(channel),
       description: readDescription(channel),
-      author: author,
+      author: author.toString().trim(),
       cover: cover,
       keywords: readKeywords(channel),
       explicit: readExplicit(channel),
-      episodes: (channel.item as Array<any>)
-        .map((e) => adaptEpisode(e, cover, author))
-        .filter(validEpisode),
+      episodes: Array.isArray(channel.item)
+        ? channel.item.map((e: any) => adaptEpisode(e, cover, author)).filter(validEpisode)
+        : [],
     };
   } catch (err) {
-    console.log(err);
+    console.error('Error adapting podcast JSON:', err);
     return null;
   }
 };
 
 /**
- * Adapt xml to cleaned up json
+ * Main entry point: parses XML and adapts to cleaned up JSON
  */
 export const adaptFeed = async (xml: string) => xmlToJSON(xml).then(adaptJSON);
 
 /**
- * Filters null feeds out
+ * Type guard for valid episodes
  */
 const validEpisode = (e: IEpisode | null): e is IEpisode => e !== null;

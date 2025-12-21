@@ -229,7 +229,7 @@ export interface ISubscriptionsMap {
 
 export interface IFileInfo {
   url: string;
-  length: string;
+  length: number;
   type: string;
 }
 
