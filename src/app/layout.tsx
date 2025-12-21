@@ -40,9 +40,6 @@ export const metadata: Metadata = {
     card: 'summary',
     creator: '@shantanuraj',
   },
-  icons: {
-    icon: '/icons/launcher-192.png',
-  },
 };
 
 export const viewport: Viewport = {
