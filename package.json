@@ -18,7 +18,8 @@
     "start": "next start",
     "format": "biome format --write src",
     "lint": "biome check src",
-    "short-url": "bun scripts/generate-short-url.ts"
+    "short-url": "bun scripts/generate-short-url.ts",
+    "db:migrate": "bun src/server/migrate.ts"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "0.7.2",
