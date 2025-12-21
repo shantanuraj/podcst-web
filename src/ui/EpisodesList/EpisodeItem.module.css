@@ -1,66 +1,124 @@
 .container {
   display: flex;
   align-items: center;
-  column-gap: 15px;
-  padding: 0 16px 0 0;
-  font-size: var(--dimen-font-regular);
-  height: var(--dimen-episode-list-item-size);
+  gap: var(--space-6);
+  padding: var(--space-6);
+  transition: background-color 0.15s ease;
 }
 
-@media only screen and (min-width: 600px) {
-  .container {
-    padding: 0 32px;
-  }
+.container:hover {
+  background-color: var(--color-surface);
 }
 
-.image {
+.artwork {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+}
+
+.artwork img {
+  width: 100%;
   height: 100%;
-  width: var(--dimen-episode-list-item-size);
+  object-fit: cover;
+  border: 1px solid var(--color-rule);
+}
+
+.meta {
+  flex-shrink: 0;
+  width: 64px;
+  text-align: center;
+}
+
+.date {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--color-ink-tertiary);
+}
+
+.day {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  color: var(--color-ink-secondary);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
 }
 
 .title {
-  flex: 1;
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  color: var(--color-ink);
   display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-@media only screen and (min-width: 600px) {
-  .container {
-    padding: 0 32px;
-  }
-  .title {
-    -webkit-line-clamp: 3;
-  }
-}
-
-.info {
-  margin: 5px 0;
-  font-size: 80%;
-}
-
-.info span {
-  margin: 2px;
+.duration {
+  font-size: var(--text-sm);
+  color: var(--color-ink-tertiary);
+  margin-top: var(--space-2);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  margin-left: auto;
-  column-gap: 15px;
+  gap: var(--space-3);
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-@media only screen and (min-width: 600px) {
-  .infoParent {
-    display: flex;
-    align-items: center;
-    column-gap: inherit;
+.container:hover .actions {
+  opacity: 1;
+}
+
+.actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-ink-secondary);
+  transition: color 0.15s ease;
+}
+
+.actions button:hover {
+  color: var(--color-ink);
+}
+
+.actions svg {
+  fill: currentColor;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-4);
+    gap: var(--space-4);
   }
-  .info {
-    font-size: var(--dimen-font-regular);
+
+  .artwork {
+    width: 56px;
+    height: 56px;
   }
+
+  .meta {
+    display: none;
+  }
+
+  .title {
+    font-size: var(--text-base);
+  }
+
   .actions {
-    column-gap: 25px;
+    opacity: 1;
+  }
+
+  .actions button {
+    width: 36px;
+    height: 36px;
   }
 }

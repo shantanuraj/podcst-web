@@ -16,30 +16,42 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
   const { author, cover, episodeArt, published, summary, title } = episode;
   const showArt = episodeArt || cover;
   const shareTitle = `${podcast.title} - ${title}`;
-  const releaseDate = published ? new Date(published).toDateString() : null;
+  const releaseDate = published
+    ? new Date(published).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
 
   return (
-    <div className={styles.info}>
-      <img loading="lazy" alt={`${title} by ${author}`} src={showArt} />
-      <div className={styles.text}>
-        <h1>{episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}</h1>
-        <h2>
-          from{' '}
-          <ExternalLink href={podcast.link} title="Visit podcast website">
-            {podcast.title} <Icon icon="external-link" size={18} />
-          </ExternalLink>
-        </h2>
-        <h2>by {author}</h2>
-        {releaseDate && <h5>Published: {releaseDate}</h5>}
-        <div className={styles.buttons}>
-          <PlayButton episode={episode} />
-          <ShareButton
-            text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
-            title={shareTitle}
-          />
+    <article className={styles.header}>
+      <div className={styles.top}>
+        <div className={styles.artwork}>
+          <img loading="lazy" alt="" src={showArt} />
         </div>
-        <ShowNotes className={styles.episodeNotes} episode={episode} />
+        <div className={styles.meta}>
+          <h1 className={styles.title}>
+            {episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}
+          </h1>
+          <p className={styles.podcast}>
+            <ExternalLink href={podcast.link}>
+              {podcast.title}
+              <Icon icon="external-link" size={14} />
+            </ExternalLink>
+          </p>
+          <p className={styles.author}>{author}</p>
+          {releaseDate && <p className={styles.published}>{releaseDate}</p>}
+          <div className={styles.actions}>
+            <PlayButton episode={episode} />
+            <ShareButton
+              text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
+              title={shareTitle}
+            />
+          </div>
+        </div>
       </div>
-    </div>
+      <ShowNotes className={styles.showNotes} episode={episode} />
+    </article>
   );
 }

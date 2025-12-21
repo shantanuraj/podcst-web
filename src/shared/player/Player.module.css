@@ -1,199 +1,207 @@
 .container {
-  --dimen-player-padding: 8px;
-  --dimen-player-cover: var(--dimen-player-height);
-  height: var(--dimen-player-height);
   position: fixed;
   left: 0;
+  right: 0;
   bottom: 0;
-  width: 100%;
+  z-index: 200;
   opacity: 0;
-  transition: all 0.3s ease;
-  transform: translateY(calc(var(--dimen-player-height) * 2));
-  z-index: var(--dimen-player-z-index);
+  transform: translateY(100%);
+  transition: opacity 0.2s ease, transform 0.3s ease;
+  pointer-events: none;
 }
 
 .container[data-open='true'] {
   opacity: 1;
   transform: translateY(0);
-}
-
-.container button[disabled] {
-  filter: opacity(0.6);
+  pointer-events: auto;
 }
 
 .player {
-  height: 100%;
-  display: grid;
-  grid: 28px auto / var(--dimen-player-cover) 1fr;
   position: relative;
-  /* FIXME */
-  border-top: 1px solid var(--surface4);
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.15);
+  background-color: var(--color-paper);
+  border-top: 1px solid var(--color-rule);
 }
 
-.imageCoverLink {
-  display: flex;
-  grid-row: span 2;
-}
-
-.player img {
-  height: var(--dimen-player-cover);
-  width: var(--dimen-player-cover);
-  object-fit: cover;
-}
-
-.player .controls {
-  display: flex;
-  gap: 8px;
-  margin-right: auto;
-}
-
-.player svg {
+.seekbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--color-rule);
   cursor: pointer;
 }
 
-.player svg:hover {
-  opacity: 0.8;
+.seekbar:hover {
+  height: 4px;
 }
 
-.player .info {
-  flex: auto;
-  max-width: calc(50% - var(--dimen-player-cover));
+.progress {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.1s linear;
 }
 
-.player .info p:nth-of-type(1) {
-  margin-bottom: 3px;
+.progress[data-buffering='true'] {
+  background-color: var(--color-ink-tertiary);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-.player .info .title {
-  font-weight: bold;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.content {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.artwork {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+}
+
+.artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--color-rule);
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.episodeTitle {
+  font-family: var(--font-serif);
+  font-size: var(--text-base);
+  color: var(--color-ink);
+  margin-bottom: var(--space-1);
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.player .info .author {
-  font-size: var(--dimen-font-smallest);
-  font-weight: 300;
+.podcastName {
+  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
 }
 
-.desktopControls {
+.controls {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: var(--space-4);
 }
 
-.volumeControl {
+.controls button {
   display: flex;
-  gap: 8px;
-}
-
-.volumeControl input {
-  display: none;
-  cursor: pointer;
-}
-
-.volumeControl:hover input {
-  display: block;
-}
-
-@keyframes loading {
-  0% {
-    background-color: var(--color-animation-frame-1);
-  }
-  50% {
-    background-color: var(--color-animation-frame-2);
-  }
-  100% {
-    background-color: var(--color-animation-frame-3);
-  }
-}
-
-.seekbarContainer {
-  --dimen-seekbar-offset: var(--dimen-player-cover);
-  --dimen-seekbar-width: calc(100% - var(--dimen-player-cover));
-  background: var(--surface4);
-  position: absolute;
-  top: 0;
-  left: var(--dimen-seekbar-offset);
-  height: 6px;
-  width: var(--dimen-seekbar-width);
-  transition: height 0.3s ease;
-}
-
-.seekbarContainer:hover {
-  height: 8px;
-}
-
-.seekbar {
-  height: 100%;
-  background-color: var(--brand-dark);
-  transition: width 1s;
-}
-
-.playbackRate {
-  font-weight: bold;
-  font-size: var(--dimen-font-regular);
-  width: 40px;
+  align-items: center;
   justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-ink);
+  transition: opacity 0.15s ease;
 }
 
-.playbackRate code {
-  color: var(--text2);
-  font-size: var(--dimen-font-secondary);
-  letter-spacing: -0.5px;
-  font-weight: 400;
+.controls button:hover {
+  opacity: 0.6;
 }
 
-.seekbar[data-is-buffering='true'] {
-  animation: loading 2s infinite;
-  width: 100%;
+.controls button:disabled {
+  opacity: 0.3;
+}
+
+.controls svg {
+  fill: currentColor;
+}
+
+.playButton {
+  width: 48px !important;
+  height: 48px !important;
 }
 
 .duration {
-  display: flex;
-  font-size: var(--dimen-font-smallest);
-  padding: 15px 15px 0;
+  display: none;
 }
 
-.duration span:last-of-type {
-  margin-left: auto;
+.rate {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  min-width: 40px;
+  text-align: center;
 }
 
-.controlInfoGroup {
-  display: flex;
-  align-items: center;
-  column-gap: 15px;
-  flex: 1;
-  padding: 0 15px 10px;
+.rate:hover {
+  color: var(--color-ink);
 }
 
-.controlInfoGroup button {
-  display: flex;
-  align-items: center;
+.desktopOnly {
+  display: none;
 }
 
-@media only screen and (max-width: 600px) {
-  .desktopControls,
-  .player .controls button:not([data-primary-control]) {
+@media (min-width: 768px) {
+  .content {
+    padding: var(--space-6);
+  }
+
+  .desktopOnly {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .duration {
+    display: flex;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--color-ink-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (max-width: 767px) {
+  .content {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .artwork {
+    width: 48px;
+    height: 48px;
+  }
+
+  .episodeTitle {
+    font-size: var(--text-sm);
+  }
+
+  .podcastName {
+    font-size: var(--text-xs);
+  }
+
+  .controls button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .playButton {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .controls button:not(.playButton) {
     display: none;
   }
 
-  .player .info {
-    max-width: none;
-  }
-
-  .player .controlInfoGroup {
-    column-gap: 5px;
-    padding-bottom: 5px;
-  }
-
-  .player .info .title {
-    font-size: var(--dimen-font-regular);
-  }
-
-  .seekbarContainer {
-    --dimen-seekbar-offset: 0;
-    --dimen-seekbar-width: 100%;
+  .rate {
+    font-size: var(--text-xs);
   }
 }

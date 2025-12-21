@@ -46,49 +46,45 @@ export const Player = () => {
   return (
     <div className={styles.container} data-open={open}>
       {currentEpisode && (
-        <div className={styles.player} data-surface={1}>
+        <div className={styles.player}>
           <Seekbar currentEpisode={currentEpisode} />
-          <Link
-            href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
-              currentEpisode.guid,
-            )}`}
-            className={styles.imageCoverLink}
-          >
-            <img
-              alt={`${currentEpisode.title} by ${currentEpisode.author}`}
-              src={currentEpisode.cover}
-            />
-          </Link>
-          <Duration />
-          <div
-            className={styles.controlInfoGroup}
-            data-rate-control
-            onMouseDown={overrideRate}
-            onMouseUp={resetRate}
-          >
-            <div className={styles.info} data-rate-control>
-              <p className={styles.title}>{currentEpisode.title}</p>
-              <p className={styles.author}>{currentEpisode.author}</p>
+          <div className={styles.content}>
+            <Link
+              href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
+                currentEpisode.guid,
+              )}`}
+              className={styles.artwork}
+            >
+              <img
+                alt=""
+                src={currentEpisode.cover}
+              />
+            </Link>
+            <div
+              className={styles.info}
+              data-rate-control
+              onMouseDown={overrideRate}
+              onMouseUp={resetRate}
+            >
+              <p className={styles.episodeTitle}>{currentEpisode.title}</p>
+              <p className={styles.podcastName}>{currentEpisode.author}</p>
             </div>
+            <Duration />
             <div className={styles.controls}>
-              <button onClick={seekBackward}>
-                <Icon icon="seek-back" size={30} />
+              <button onClick={seekBackward} aria-label="Seek backward">
+                <Icon icon="seek-back" size={20} />
               </button>
               <PlayButton />
-              <button onClick={seekForward}>
-                <Icon icon="seek-forward" size={30} />
+              <button onClick={seekForward} aria-label="Seek forward">
+                <Icon icon="seek-forward" size={20} />
               </button>
             </div>
-            <div className={styles.desktopControls}>
-              <VolumeControls />
-            </div>
             <PlaybackRate />
-            <Link href="/queue">
-              <Icon icon="queue-list" size={26}>
-                <title>Add to queue</title>
-              </Icon>
-            </Link>
-            <div className={styles.desktopControls}>
+            <div className={styles.desktopOnly}>
+              <VolumeControls />
+              <Link href="/queue" aria-label="View queue">
+                <Icon icon="queue-list" size={20} />
+              </Link>
               <Airplay />
               <Chromecast />
             </div>
@@ -102,8 +98,8 @@ export const Player = () => {
 function PlayButton() {
   const state = usePlayer(getPlaybackState);
   return (
-    <button onClick={togglePlayback} data-primary-control>
-      <Icon icon={state === 'playing' ? 'pause' : 'play'} />
+    <button onClick={togglePlayback} className={styles.playButton} aria-label={state === 'playing' ? 'Pause' : 'Play'}>
+      <Icon icon={state === 'playing' ? 'pause' : 'play'} size={24} />
     </button>
   );
 }

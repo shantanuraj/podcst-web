@@ -8,9 +8,10 @@ import styles from './ImportButton.module.css';
 
 interface ImportButtonProps {
   onImport: (episodes: IPodcastEpisodesInfo[]) => void;
+  className?: string;
 }
 
-export function ImportButton(props: ImportButtonProps) {
+export function ImportButton({ onImport: onImportProp, className }: ImportButtonProps) {
   const onImport = React.useMemo(
     () =>
       onFileImport(async (file) => {
@@ -22,16 +23,16 @@ export function ImportButton(props: ImportButtonProps) {
             const info = await fetchEpisodesInfo(item.feed);
             if (info) episodes.push(info);
           }
-          props.onImport(episodes);
+          onImportProp(episodes);
         } catch (err) {
           console.error('Import failed', err);
         }
       }),
-    [props.onImport],
+    [onImportProp],
   );
 
   return (
-    <Button className={styles.button}>
+    <Button className={`${styles.button} ${className || ''}`}>
       <input id="opml-import" accept=".xml, .opml" name="file" type="file" onChange={onImport} />
       <label htmlFor="opml-import">Upload OPML file</label>
     </Button>

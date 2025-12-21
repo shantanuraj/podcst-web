@@ -2,109 +2,161 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: var(--dimen-header-z-index);
-  height: var(--dimen-header-height);
-  width: 100%;
+  right: 0;
+  z-index: 100;
+  background: var(--color-cream);
+}
+
+.headerInner {
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid var(--color-rule);
 }
 
-.header svg,
-.drawer svg {
-  height: var(--dimen-icon-primary);
-  width: var(--dimen-icon-primary);
-}
-
-.hamburgerIcon {
-  padding: 18px 8px 12px 15px;
-}
-
-@media only screen and (min-width: 900px) {
-  .hamburgerIcon {
-    display: none;
-  }
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 2rem;
 }
 
 .title {
-  margin-left: 15px;
-  margin-right: auto;
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--color-ink);
 }
 
-.header {
-  box-shadow: 0px 3px 5px 0px rgba(0, 0, 0, 0.15);
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav a {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-muted);
+  transition: color 0.15s ease;
+}
+
+.nav a:hover {
+  color: var(--color-ink);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--color-ink-muted);
+}
+
+.hamburgerIcon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 .drawer {
-  position: fixed;
-  padding-top: 25px;
-  top: var(--dimen-header-height);
-  left: 0;
-  z-index: var(--dimen-drawer-z-index);
-  height: 100%;
-  width: var(--dimen-drawer-width);
-  transition: all 0.3s ease;
-  /* FIXME */
-  border-right: solid 1px var(--surface4);
+  display: none;
 }
 
-@media only screen and (max-width: 900px) {
+.closeNav {
+  display: none;
+}
+
+.navGroup {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .headerInner {
+    padding: 0.875rem 1.25rem;
+  }
+
+  .title {
+    font-size: 1.375rem;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .hamburgerIcon {
+    display: flex;
+  }
+
   .drawer {
-    transform: translate(
-      calc(-1.15 * var(--dimen-drawer-width)),
-      calc(-1 * var(--dimen-header-height))
-    );
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: var(--color-cream);
+    padding: 6rem 2rem 2rem;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .drawer[data-open='open'] {
-    width: var(--dimen-drawer-width);
-    min-width: var(--dimen-drawer-width);
-    transform: translate(0px, calc(-1 * var(--dimen-header-height)));
+    transform: translateX(0);
   }
-}
 
-@media only screen and (min-width: 900px) {
-  .drawer .closeNav {
-    display: none;
+  .closeNav {
+    display: flex;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    align-items: center;
+    justify-content: center;
   }
-}
 
-.drawer + main {
-  transition: 0.3s ease;
-  filter: blur(0px);
-}
+  .drawer a {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: 1.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-rule);
+    color: var(--color-ink);
+  }
 
-.drawer[data-open='open'] + main {
-  filter: blur(4px);
-  pointer-events: none;
-}
+  .navGroup {
+    display: block;
+    margin-top: 1.5rem;
+  }
 
-.drawer ul {
-  margin: 0;
-  padding: 0;
-}
+  .navGroup h6 {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-ink-faint);
+    margin-bottom: 0.75rem;
+  }
 
-.drawer button:focus,
-.drawer button:hover,
-.drawer a:hover,
-.drawer a:focus {
-  background-color: var(--surface3);
-  color: var(--text1);
-}
+  .navGroup ul {
+    display: flex;
+    flex-direction: column;
+  }
 
-.drawer button,
-.drawer a {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 15px;
-}
-
-.navGroup h6 {
-  margin: 1rem 15px 0;
-  padding-bottom: 0.25rem;
-  text-transform: uppercase;
-}
-
-.navGroup a {
-  padding-left: 30px;
+  .navGroup a {
+    font-size: 1.25rem;
+    padding: 0.5rem 0;
+    border-bottom: none;
+  }
 }
