@@ -109,35 +109,42 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
   for (let i = 0; i < podcasts.length; i++) {
     const p = podcasts[i];
 
-    const [author] = await sql`
-      INSERT INTO authors (name, itunes_id)
-      VALUES (${p.author}, ${String(p.id)})
-      ON CONFLICT (itunes_id) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
+    let [author] = await sql`
+      SELECT id FROM authors WHERE name = ${p.author}
     `;
+    if (!author) {
+      [author] = await sql`
+        INSERT INTO authors (name) VALUES (${p.author})
+        RETURNING id
+      `;
+    }
 
-    const [podcast] = await sql`
-      INSERT INTO podcasts (
-        itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
-      ) VALUES (
-        ${p.id},
-        ${p.feed},
-        ${p.title},
-        ${author.id},
-        ${p.cover},
-        ${p.thumbnail},
-        ${p.explicit === 'explicit'},
-        ${p.count}
-      )
-      ON CONFLICT (itunes_id) DO UPDATE SET
-        feed_url = EXCLUDED.feed_url,
-        title = EXCLUDED.title,
-        cover = EXCLUDED.cover,
-        thumbnail = EXCLUDED.thumbnail,
-        episode_count = EXCLUDED.episode_count,
-        updated_at = now()
-      RETURNING id
+    let [podcast] = await sql`
+      SELECT id FROM podcasts WHERE itunes_id = ${p.id} OR feed_url = ${p.feed}
     `;
+    if (!podcast) {
+      [podcast] = await sql`
+        INSERT INTO podcasts (
+          itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
+        ) VALUES (
+          ${p.id}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
+          ${p.explicit === 'explicit'}, ${p.count}
+        )
+        RETURNING id
+      `;
+    } else {
+      await sql`
+        UPDATE podcasts SET
+          itunes_id = ${p.id},
+          feed_url = ${p.feed},
+          title = ${p.title},
+          cover = ${p.cover},
+          thumbnail = ${p.thumbnail},
+          episode_count = ${p.count},
+          updated_at = now()
+        WHERE id = ${podcast.id}
+      `;
+    }
 
     await sql`
       INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
