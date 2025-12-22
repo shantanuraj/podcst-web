@@ -30,7 +30,9 @@ RUN yarn install --frozen-lockfile --production=false
 COPY . .
 
 # Build application
-RUN npx next build
+RUN --mount=type=secret,id=ALL_SECRETS \
+    eval "$(base64 -d /run/secrets/ALL_SECRETS)" && \
+    npx next build
 
 # Remove development dependencies
 RUN yarn install --production=true
