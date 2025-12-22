@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   let podcast = await getPodcastByFeedUrl(feedUrl);
 
-  if (podcast) {
+  if (podcast && podcast.episodes.length > 0) {
     cache.saveFeed(feedUrl, podcast);
     return NextResponse.json(podcast);
   }

@@ -106,25 +106,15 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
     ON CONFLICT (id) DO NOTHING
   `;
 
-  await sql`
-    DELETE FROM top_podcasts
-    WHERE country_id = ${locale} AND genre_id = 0
-  `;
-
   for (let i = 0; i < podcasts.length; i++) {
     const p = podcasts[i];
 
-    let [author] = await sql`
-      SELECT id FROM authors WHERE name = ${p.author}
+    const [author] = await sql`
+      INSERT INTO authors (name, itunes_id)
+      VALUES (${p.author}, ${String(p.id)})
+      ON CONFLICT (itunes_id) DO UPDATE SET name = EXCLUDED.name
+      RETURNING id
     `;
-    if (!author) {
-      [author] = await sql`
-        INSERT INTO authors (name, itunes_id)
-        VALUES (${p.author}, ${String(p.id)})
-        ON CONFLICT (itunes_id) DO UPDATE SET name = EXCLUDED.name
-        RETURNING id
-      `;
-    }
 
     const [podcast] = await sql`
       INSERT INTO podcasts (
@@ -139,8 +129,8 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
         ${p.explicit === 'explicit'},
         ${p.count}
       )
-      ON CONFLICT (feed_url) DO UPDATE SET
-        itunes_id = COALESCE(podcasts.itunes_id, EXCLUDED.itunes_id),
+      ON CONFLICT (itunes_id) DO UPDATE SET
+        feed_url = EXCLUDED.feed_url,
         title = EXCLUDED.title,
         cover = EXCLUDED.cover,
         thumbnail = EXCLUDED.thumbnail,
@@ -150,8 +140,11 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
     `;
 
     await sql`
-      INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id)
-      VALUES (${locale}, 0, ${i + 1}, ${podcast.id})
+      INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
+      VALUES (${locale}, 0, ${i + 1}, ${podcast.id}, now())
+      ON CONFLICT (country_id, genre_id, rank) DO UPDATE SET
+        podcast_id = EXCLUDED.podcast_id,
+        fetched_at = EXCLUDED.fetched_at
     `;
   }
 }
