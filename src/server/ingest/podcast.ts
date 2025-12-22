@@ -4,7 +4,7 @@ import type { IEpisode, IEpisodeListing, IPodcastEpisodesInfo, IEpisodeInfo } fr
 
 export async function ingestPodcast(feedUrl: string): Promise<IPodcastEpisodesInfo | null> {
   const existing = await getPodcastByFeedUrl(feedUrl);
-  if (existing) {
+  if (existing && existing.episodes.length > 0) {
     return existing;
   }
 
