@@ -110,9 +110,13 @@ export namespace iTunes {
  */
 export interface IPodcast {
   /**
-   * iTunes id of the podcast
+   * Database id of the podcast
    */
   id: number;
+  /**
+   * iTunes id of the podcast
+   */
+  itunes_id?: number;
   /**
    * Podcast author
    */

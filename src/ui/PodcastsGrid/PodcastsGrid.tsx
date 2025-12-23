@@ -23,7 +23,7 @@ export function PodcastsGrid({ podcasts, title }: PodcastsGridProps) {
         )}
         <div className={styles.grid}>
           {podcasts.map((podcast) => (
-            <PodcastTile key={podcast.feed} podcast={podcast} />
+            <PodcastTile key={podcast.id || podcast.feed} podcast={podcast} />
           ))}
         </div>
       </section>
