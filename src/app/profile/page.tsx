@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import React from 'react';
 import { useSession, useLogout } from '@/shared/auth/useAuth';
 import {
@@ -76,8 +77,21 @@ export default function ProfilePage() {
         </section>
 
         <footer className={styles.footer}>
-          <span>Version {process.env.appVersion}</span>
-          <span>© {new Date().getFullYear()} Podcst</span>
+          <div className={styles.footerRow}>
+            <span>Version {process.env.appVersion}</span>
+            <span>© {new Date().getFullYear()} Podcst</span>
+          </div>
+          <div className={styles.author}>
+            <span>Made by</span>
+            <Link
+              href="https://sraj.me/"
+              target="_blank"
+              rel="noopener"
+              className={styles.authorLink}
+            >
+              Shantanu Raj
+            </Link>
+          </div>
         </footer>
       </div>
     </div>
