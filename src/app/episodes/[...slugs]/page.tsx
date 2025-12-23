@@ -92,7 +92,11 @@ export default async function Page(props: { params: Promise<{ slugs: string[] }>
 
     const initialEpisodeId = parsed.episodeId;
     return (
-      <EpisodesSpaClient podcastId={parsed.podcastId} initialEpisodeId={initialEpisodeId} initialData={info} />
+      <EpisodesSpaClient
+        podcastId={parsed.podcastId}
+        initialEpisodeId={initialEpisodeId}
+        initialData={info}
+      />
     );
   }
 

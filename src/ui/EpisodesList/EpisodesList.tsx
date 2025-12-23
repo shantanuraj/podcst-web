@@ -52,7 +52,12 @@ const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: str
 };
 const sortOptions = Object.values(sortOptionsMap);
 
-export function EpisodesList({ className = '', children, episodes = [], podcast }: EpisodesListProps) {
+export function EpisodesList({
+  className = '',
+  children,
+  episodes = [],
+  podcast,
+}: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [sortPreference, setSortPreference] = useState<SortPreference>(
     sortOptionsMap.releaseDesc.value,
@@ -101,7 +106,7 @@ export function EpisodesList({ className = '', children, episodes = [], podcast 
         </div>
       </div>
       {shouldUseVirtualList ? (
-        <ul className={styles.list} style={{ height: `${totalSize}px` }}>
+        <ul className={styles.list} style={{ height: `${totalSize}px` }} suppressHydrationWarning>
           {virtualItems.map(({ index, start }) => {
             const episode = filteredEpisodes[index];
             return (
