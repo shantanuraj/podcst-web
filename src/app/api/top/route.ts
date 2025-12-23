@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { DEFAULT_PODCASTS_COUNT, MAX_PODCASTS_COUNT, MIN_PODCASTS_COUNT } from '@/data/constants';
-import { getTopPodcasts } from '@/server/ingest/top';
+import { top } from './top';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const limit = validLimit(params.get('limit'));
   const locale = params.get('locale') || 'us';
 
-  const podcasts = await getTopPodcasts(limit, locale);
+  const podcasts = await top(limit, locale);
   return NextResponse.json(podcasts);
 }
 
