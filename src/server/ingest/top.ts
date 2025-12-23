@@ -110,19 +110,41 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
     const p = podcasts[i];
 
     let [author] = await sql`
-      SELECT id FROM authors WHERE name = ${p.author}
+      SELECT id FROM authors WHERE name = ${p.author} LIMIT 1
     `;
     if (!author) {
       [author] = await sql`
-        INSERT INTO authors (name) VALUES (${p.author})
+        INSERT INTO authors (name)
+        VALUES (${p.author})
         RETURNING id
       `;
     }
 
     let [podcast] = await sql`
-      SELECT id FROM podcasts WHERE itunes_id = ${p.id} OR feed_url = ${p.feed}
+      SELECT id FROM podcasts WHERE itunes_id = ${p.id}
     `;
+
     if (!podcast) {
+      [podcast] = await sql`
+        SELECT id FROM podcasts WHERE feed_url = ${p.feed}
+      `;
+    }
+
+    if (podcast) {
+      await sql`
+        UPDATE podcasts SET
+          itunes_id = ${p.id},
+          feed_url = ${p.feed},
+          title = ${p.title},
+          author_id = ${author.id},
+          cover = ${p.cover},
+          thumbnail = ${p.thumbnail},
+          explicit = ${p.explicit === 'explicit'},
+          episode_count = ${p.count},
+          updated_at = now()
+        WHERE id = ${podcast.id}
+      `;
+    } else {
       [podcast] = await sql`
         INSERT INTO podcasts (
           itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
@@ -130,19 +152,16 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
           ${p.id}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
           ${p.explicit === 'explicit'}, ${p.count}
         )
-        RETURNING id
-      `;
-    } else {
-      await sql`
-        UPDATE podcasts SET
-          itunes_id = ${p.id},
-          feed_url = ${p.feed},
-          title = ${p.title},
-          cover = ${p.cover},
-          thumbnail = ${p.thumbnail},
-          episode_count = ${p.count},
+        ON CONFLICT (feed_url) DO UPDATE SET
+          itunes_id = COALESCE(podcasts.itunes_id, EXCLUDED.itunes_id),
+          title = EXCLUDED.title,
+          author_id = EXCLUDED.author_id,
+          cover = EXCLUDED.cover,
+          thumbnail = EXCLUDED.thumbnail,
+          explicit = EXCLUDED.explicit,
+          episode_count = EXCLUDED.episode_count,
           updated_at = now()
-        WHERE id = ${podcast.id}
+        RETURNING id
       `;
     }
 
