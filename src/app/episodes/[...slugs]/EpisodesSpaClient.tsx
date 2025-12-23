@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 
-import { useFeed } from '@/data/feed';
+import { usePodcast } from '@/data/feed';
 import type { IPodcastEpisodesInfo } from '@/types';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { EpisodesList } from '@/ui/EpisodesList';
@@ -12,43 +12,40 @@ import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
 import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 
 interface EpisodesSpaClientProps {
-  feedUrl: string;
-  initialGuid: string | null;
+  podcastId: number;
+  initialEpisodeId: number | null;
   initialData: IPodcastEpisodesInfo | null;
 }
 
-/**
- * Parse the current pathname to extract feed and guid
- * Expected formats:
- * - /episodes/[encodedFeed] -> { feed, guid: null }
- * - /episodes/[encodedFeed]/[encodedGuid] -> { feed, guid }
- */
-function parsePathname(pathname: string): { feed: string | null; guid: string | null } {
+function isNumeric(str: string): boolean {
+  return /^\d+$/.test(str);
+}
+
+function parsePathname(pathname: string): { episodeId: number | null } {
   const parts = pathname.split('/').filter(Boolean);
 
-  // parts[0] should be 'episodes'
-  if (parts[0] !== 'episodes' || parts.length < 2) {
-    return { feed: null, guid: null };
+  if (parts[0] !== 'episodes' || parts.length < 3) {
+    return { episodeId: null };
   }
 
-  const feed = decodeURIComponent(parts[1]);
-  const guid = parts.length >= 3 ? decodeURIComponent(parts[2]) : null;
+  const episodeSlug = parts[2];
+  if (isNumeric(episodeSlug)) {
+    return { episodeId: parseInt(episodeSlug, 10) };
+  }
 
-  return { feed, guid };
+  return { episodeId: null };
 }
 
 export function EpisodesSpaClient({
-  feedUrl,
-  initialGuid: _initialGuid,
+  podcastId,
+  initialEpisodeId: _initialEpisodeId,
   initialData,
 }: EpisodesSpaClientProps) {
   const pathname = usePathname();
 
-  // Parse current URL to determine what to render
-  const { guid: currentGuid } = useMemo(() => parsePathname(pathname), [pathname]);
+  const { episodeId: currentEpisodeId } = useMemo(() => parsePathname(pathname), [pathname]);
 
-  // Use the same feed hook - React Query will cache the data
-  const { data: info } = useFeed(feedUrl);
+  const { data: info } = usePodcast(podcastId, initialData);
   const feedData = info ?? initialData;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.podcst.app';
@@ -58,9 +55,8 @@ export function EpisodesSpaClient({
     return <Loading />;
   }
 
-  // If we have a guid, show the episode detail view
-  if (currentGuid) {
-    const episode = feedData.episodes.find((ep) => ep.guid === currentGuid);
+  if (currentEpisodeId) {
+    const episode = feedData.episodes.find((ep) => ep.id === currentEpisodeId);
 
     if (!episode) {
       return <div>Episode not found</div>;
@@ -74,11 +70,10 @@ export function EpisodesSpaClient({
     );
   }
 
-  // Otherwise show the episodes list
   return (
     <>
       <PodcastSeriesSchema podcast={feedData} url={currentUrl} />
-      <EpisodesList episodes={feedData.episodes}>
+      <EpisodesList episodes={feedData.episodes} podcast={feedData}>
         <PodcastInfo info={feedData} />
       </EpisodesList>
     </>

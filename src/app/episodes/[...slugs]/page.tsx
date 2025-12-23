@@ -1,35 +1,69 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 
-import { feed } from '@/app/api/feed/feed';
-import { patchEpisodesResponse } from '@/data/episodes';
+import { getPodcastById, getPodcastByFeedUrl, ingestPodcast } from '@/server/ingest/podcast';
 import { EpisodesSpaClient } from './EpisodesSpaClient';
 
-const fetchFeed = feed;
+function isNumeric(str: string): boolean {
+  return /^\d+$/.test(str);
+}
 
-/**
- * Parse slugs to extract feed URL and optional guid
- * Expected formats:
- * - [encodedFeed] -> { feed, guid: null }
- * - [encodedFeed, encodedGuid] -> { feed, guid }
- */
-function parseSlugs(slugs: string[]): { feed: string; guid: string | null } {
-  const feedUrl = decodeURIComponent(slugs[0] || '');
-  const guid = slugs.length >= 2 ? decodeURIComponent(slugs[1]) : null;
-  return { feed: feedUrl, guid };
+type ParsedSlugs =
+  | { type: 'id'; podcastId: number; episodeId: number | null }
+  | { type: 'legacy'; feedUrl: string; guid: string | null };
+
+function parseSlugs(slugs: string[]): ParsedSlugs {
+  const first = slugs[0] || '';
+
+  if (isNumeric(first)) {
+    const podcastId = parseInt(first, 10);
+    const episodeId = slugs[1] && isNumeric(slugs[1]) ? parseInt(slugs[1], 10) : null;
+    return { type: 'id', podcastId, episodeId };
+  }
+
+  return {
+    type: 'legacy',
+    feedUrl: decodeURIComponent(first),
+    guid: slugs[1] ? decodeURIComponent(slugs[1]) : null,
+  };
+}
+
+function buildCleanUrl(podcastId: number, episodeId?: number | null): string {
+  if (episodeId) {
+    return `/episodes/${podcastId}/${episodeId}`;
+  }
+  return `/episodes/${podcastId}`;
 }
 
 export async function generateMetadata(props: {
   params: Promise<{ slugs: string[] }>;
 }): Promise<Partial<Metadata>> {
   const params = await props.params;
-  const { feed: feedUrl, guid } = parseSlugs(params.slugs);
+  const parsed = parseSlugs(params.slugs);
 
-  const info = feedUrl ? await fetchFeed(feedUrl) : null;
+  let info;
+  if (parsed.type === 'id') {
+    info = await getPodcastById(parsed.podcastId);
+  } else {
+    info = await getPodcastByFeedUrl(parsed.feedUrl);
+    if (!info) {
+      info = await ingestPodcast(parsed.feedUrl);
+    }
+  }
+
   if (!info) return {};
 
-  // If viewing a specific episode, use episode metadata
-  if (guid) {
-    const episode = info.episodes.find((ep) => ep.guid === guid);
+  if (parsed.type === 'id' && parsed.episodeId) {
+    const episode = info.episodes.find((ep) => ep.id === parsed.episodeId);
+    if (episode) {
+      return {
+        title: episode.title,
+        description: episode.summary || `Listen to ${episode.title} from ${info.title}`,
+        openGraph: { images: info.cover },
+      };
+    }
+  } else if (parsed.type === 'legacy' && parsed.guid) {
+    const episode = info.episodes.find((ep) => ep.guid === parsed.guid);
     if (episode) {
       return {
         title: episode.title,
@@ -39,7 +73,6 @@ export async function generateMetadata(props: {
     }
   }
 
-  // Otherwise use podcast metadata
   return {
     title: info.title,
     description: info.description,
@@ -49,10 +82,34 @@ export async function generateMetadata(props: {
 
 export default async function Page(props: { params: Promise<{ slugs: string[] }> }) {
   const params = await props.params;
-  const { feed: feedUrl, guid } = parseSlugs(params.slugs);
+  const parsed = parseSlugs(params.slugs);
 
-  const info = feedUrl ? await fetchFeed(feedUrl) : null;
-  const data = patchEpisodesResponse(feedUrl)(info);
+  if (parsed.type === 'id') {
+    const info = await getPodcastById(parsed.podcastId);
+    if (!info) {
+      return <div>Podcast not found</div>;
+    }
 
-  return <EpisodesSpaClient feedUrl={feedUrl} initialGuid={guid} initialData={data} />;
+    const initialEpisodeId = parsed.episodeId;
+    return (
+      <EpisodesSpaClient podcastId={parsed.podcastId} initialEpisodeId={initialEpisodeId} initialData={info} />
+    );
+  }
+
+  let info = await getPodcastByFeedUrl(parsed.feedUrl);
+  if (!info) {
+    info = await ingestPodcast(parsed.feedUrl);
+  }
+
+  if (!info || !info.id) {
+    return <div>Podcast not found</div>;
+  }
+
+  let episodeId: number | null = null;
+  if (parsed.guid) {
+    const episode = info.episodes.find((ep) => ep.guid === parsed.guid);
+    episodeId = episode?.id ?? null;
+  }
+
+  redirect(buildCleanUrl(info.id, episodeId));
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import type { IEpisodeInfo } from '@/types';
 import { Icon } from '@/ui/icons/svg/Icon';
 
 import { Airplay } from './Airplay';
@@ -13,6 +14,13 @@ import styles from './Player.module.css';
 import { Seekbar } from './Seekbar';
 import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
 import { VolumeControls } from './VolumeControls';
+
+function getEpisodeHref(episode: IEpisodeInfo): string {
+  if (episode.podcastId && episode.id) {
+    return `/episodes/${episode.podcastId}/${episode.id}`;
+  }
+  return `/episodes/${encodeURIComponent(episode.feed)}/${encodeURIComponent(episode.guid)}`;
+}
 
 const {
   togglePlayback,
@@ -47,12 +55,7 @@ export const Player = () => {
         <div className={styles.player}>
           <Seekbar currentEpisode={currentEpisode} />
           <div className={styles.content}>
-            <Link
-              href={`/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
-                currentEpisode.guid,
-              )}`}
-              className={styles.artwork}
-            >
+            <Link href={getEpisodeHref(currentEpisode)} className={styles.artwork}>
               <img alt="" src={currentEpisode.cover} />
             </Link>
             <div
@@ -110,11 +113,7 @@ const playerShortcuts: KeyboardShortcuts = (router) => [
       const { currentTrackIndex, queue } = usePlayer.getState();
       const currentEpisode = queue[currentTrackIndex];
       if (currentEpisode) {
-        router.push(
-          `/episode/${encodeURIComponent(currentEpisode.feed)}/${encodeURIComponent(
-            currentEpisode.guid,
-          )}`,
-        );
+        router.push(getEpisodeHref(currentEpisode));
       }
     },
   ],

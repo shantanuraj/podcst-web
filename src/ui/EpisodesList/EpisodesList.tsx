@@ -3,7 +3,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import { useCallback, useRef, useState } from 'react';
-import type { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
@@ -13,6 +13,7 @@ interface EpisodesListProps {
   className?: string;
   children?: React.ReactNode;
   episodes: IEpisodeInfo[];
+  podcast?: IPodcastEpisodesInfo;
 }
 
 type SortPreference =
@@ -51,7 +52,7 @@ const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: str
 };
 const sortOptions = Object.values(sortOptionsMap);
 
-export function EpisodesList({ className = '', children, episodes = [] }: EpisodesListProps) {
+export function EpisodesList({ className = '', children, episodes = [], podcast }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [sortPreference, setSortPreference] = useState<SortPreference>(
     sortOptionsMap.releaseDesc.value,
@@ -107,6 +108,7 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
               <EpisodeListItem
                 key={episode.guid || `${index}-${episode.title}`}
                 episode={episode}
+                podcast={podcast}
                 index={index}
                 start={start}
               />
@@ -120,6 +122,7 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
               <EpisodeListItem
                 key={episode.guid || `${index}-${episode.title}`}
                 episode={episode}
+                podcast={podcast}
                 index={index}
               />
             );
@@ -132,11 +135,12 @@ export function EpisodesList({ className = '', children, episodes = [] }: Episod
 
 interface EpisodeListItemProps {
   episode: IEpisodeInfo;
+  podcast?: IPodcastEpisodesInfo;
   index: number;
   start?: number;
 }
 
-function EpisodeListItem({ episode, index: _index, start }: EpisodeListItemProps) {
+function EpisodeListItem({ episode, podcast, index: _index, start }: EpisodeListItemProps) {
   const virtual = start !== undefined;
   return (
     <li
@@ -149,7 +153,7 @@ function EpisodeListItem({ episode, index: _index, start }: EpisodeListItemProps
           : undefined
       }
     >
-      <EpisodeItem episode={episode} />
+      <EpisodeItem episode={episode} podcast={podcast} />
     </li>
   );
 }

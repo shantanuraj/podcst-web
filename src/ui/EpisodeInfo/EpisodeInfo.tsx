@@ -13,6 +13,13 @@ type EpisodeInfoProps = {
   episode: IEpisodeInfo;
 };
 
+function getPodcastHref(podcast: IPodcastEpisodesInfo): string {
+  if (podcast.id) {
+    return `/episodes/${podcast.id}`;
+  }
+  return `/episodes/${encodeURIComponent(podcast.feed)}`;
+}
+
 export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
   const { author, cover, episodeArt, published, summary, title } = episode;
   const showArt = episodeArt || cover;
@@ -36,9 +43,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             {episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}
           </h1>
           <p className={styles.podcast}>
-            <SpaLink href={`/episodes/${encodeURIComponent(podcast.feed)}`}>
-              {podcast.title}
-            </SpaLink>
+            <SpaLink href={getPodcastHref(podcast)}>{podcast.title}</SpaLink>
             {podcast.link && (
               <ExternalLink href={podcast.link}>
                 <Icon icon="external-link" size={14} />

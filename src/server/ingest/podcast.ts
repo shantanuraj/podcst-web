@@ -172,6 +172,7 @@ export async function getPodcastByFeedUrl(feedUrl: string): Promise<IPodcastEpis
   `;
 
   return {
+    id: podcast.id,
     feed: feedUrl,
     title: podcast.title,
     author: podcast.author_name,
@@ -183,6 +184,8 @@ export async function getPodcastByFeedUrl(feedUrl: string): Promise<IPodcastEpis
     keywords: [],
     episodes: episodes.map(
       (ep): IEpisodeInfo => ({
+        id: ep.id,
+        podcastId: podcast.id,
         feed: feedUrl,
         podcastTitle: podcast.title,
         guid: ep.guid,
@@ -208,10 +211,90 @@ export async function getPodcastByFeedUrl(feedUrl: string): Promise<IPodcastEpis
 
 export async function getPodcastById(id: number): Promise<IPodcastEpisodesInfo | null> {
   const [podcast] = await sql`
-    SELECT feed_url FROM podcasts WHERE id = ${id}
+    SELECT p.*, a.name as author_name
+    FROM podcasts p
+    JOIN authors a ON a.id = p.author_id
+    WHERE p.id = ${id}
   `;
 
   if (!podcast) return null;
 
-  return getPodcastByFeedUrl(podcast.feed_url);
+  const episodes = await sql`
+    SELECT * FROM episodes
+    WHERE podcast_id = ${podcast.id}
+    ORDER BY published DESC
+  `;
+
+  return {
+    id: podcast.id,
+    feed: podcast.feed_url,
+    title: podcast.title,
+    author: podcast.author_name,
+    cover: podcast.cover,
+    description: podcast.description || '',
+    link: podcast.website_url,
+    published: podcast.last_published?.getTime() || null,
+    explicit: podcast.explicit,
+    keywords: [],
+    episodes: episodes.map(
+      (ep): IEpisodeInfo => ({
+        id: ep.id,
+        podcastId: podcast.id,
+        feed: podcast.feed_url,
+        podcastTitle: podcast.title,
+        guid: ep.guid,
+        title: ep.title,
+        summary: ep.summary,
+        showNotes: ep.summary || '',
+        published: ep.published?.getTime() || null,
+        duration: ep.duration,
+        cover: podcast.cover,
+        episodeArt: ep.episode_art,
+        explicit: podcast.explicit,
+        link: null,
+        author: podcast.author_name,
+        file: {
+          url: ep.file_url,
+          length: Number(ep.file_length) || 0,
+          type: ep.file_type || 'audio/mpeg',
+        },
+      }),
+    ),
+  };
+}
+
+export async function getEpisodeById(episodeId: number): Promise<IEpisodeInfo | null> {
+  const [row] = await sql`
+    SELECT e.*, p.id as podcast_id, p.feed_url, p.title as podcast_title, p.cover as podcast_cover,
+           p.explicit as podcast_explicit, a.name as author_name
+    FROM episodes e
+    JOIN podcasts p ON p.id = e.podcast_id
+    JOIN authors a ON a.id = p.author_id
+    WHERE e.id = ${episodeId}
+  `;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    podcastId: row.podcast_id,
+    feed: row.feed_url,
+    podcastTitle: row.podcast_title,
+    guid: row.guid,
+    title: row.title,
+    summary: row.summary,
+    showNotes: row.summary || '',
+    published: row.published?.getTime() || null,
+    duration: row.duration,
+    cover: row.podcast_cover,
+    episodeArt: row.episode_art,
+    explicit: row.podcast_explicit,
+    link: null,
+    author: row.author_name,
+    file: {
+      url: row.file_url,
+      length: Number(row.file_length) || 0,
+      type: row.file_type || 'audio/mpeg',
+    },
+  };
 }

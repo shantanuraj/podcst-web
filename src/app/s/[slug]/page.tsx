@@ -16,7 +16,5 @@ export default async function ShortUrlPage({ params }: ShortUrlPageProps) {
   }
 
   const { feed, guid } = shortUrl;
-  const episodeUrl = `/episode/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`;
-
-  redirect(episodeUrl);
+  redirect(`/episodes/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`);
 }
