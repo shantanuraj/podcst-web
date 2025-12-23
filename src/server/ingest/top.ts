@@ -47,7 +47,8 @@ async function getTopFromDb(limit: number, locale: string): Promise<IPodcast[]> 
   }
 
   return rows.map((r) => ({
-    id: r.itunes_id || r.id,
+    id: r.id,
+    itunes_id: r.itunes_id,
     author: r.author_name,
     feed: r.feed_url,
     title: r.title,

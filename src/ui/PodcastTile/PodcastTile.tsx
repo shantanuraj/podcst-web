@@ -7,12 +7,8 @@ type PodcastTileProps = {
   podcast: RenderablePodcast;
 };
 
-function isPodcastEpisodesInfo(p: RenderablePodcast): p is IPodcastEpisodesInfo {
-  return 'episodes' in p;
-}
-
 function getPodcastHref(podcast: RenderablePodcast): string {
-  if (isPodcastEpisodesInfo(podcast) && podcast.id) {
+  if (podcast.id) {
     return `/episodes/${podcast.id}`;
   }
   return `/episodes/${encodeURIComponent(podcast.feed)}`;
