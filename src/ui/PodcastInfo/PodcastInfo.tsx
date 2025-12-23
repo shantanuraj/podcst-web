@@ -14,7 +14,7 @@ export interface PodcastInfoProps {
 
 export function PodcastInfo({ info }: PodcastInfoProps) {
   const { title, author, cover, link, description } = info;
-  const lastPublishedDate = info.episodes?.[0].published || info.published;
+  const lastPublishedDate = info.episodes?.[0]?.published || info.published;
   const lastPublished = lastPublishedDate
     ? new Date(lastPublishedDate).toLocaleDateString('en-US', {
         year: 'numeric',
