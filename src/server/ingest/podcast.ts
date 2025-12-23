@@ -75,7 +75,7 @@ async function storePodcast(feedUrl: string, data: IEpisodeListing) {
   const authorName = data.author || 'Unknown';
 
   let [author] = await sql`
-    SELECT id FROM authors WHERE name = ${authorName}
+    SELECT id FROM authors WHERE name = ${authorName} LIMIT 1
   `;
 
   if (!author) {
