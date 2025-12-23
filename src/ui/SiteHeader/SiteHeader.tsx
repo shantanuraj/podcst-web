@@ -12,6 +12,10 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { data: user } = useSession();
 
+  const libraryHref = user ? '/profile/subscriptions' : '/subs';
+  const isLibraryActive =
+    pathname === '/subs' || pathname === '/recents' || pathname === '/profile/subscriptions';
+
   return (
     <header className={styles.header}>
       <div className={styles.container}>
@@ -30,11 +34,7 @@ export function SiteHeader() {
           >
             Discover
           </Link>
-          <Link
-            href="/subs"
-            className={styles.navLink}
-            data-active={pathname === '/subs' || pathname === '/recents'}
-          >
+          <Link href={libraryHref} className={styles.navLink} data-active={isLibraryActive}>
             Library
           </Link>
         </nav>
