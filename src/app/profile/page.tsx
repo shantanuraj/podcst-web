@@ -13,6 +13,10 @@ import {
 import type { ThemeMode } from '@/types';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import {
+  useServerSubscriptions,
+  useSyncToCloud,
+} from '@/shared/subscriptions/useServerSubscriptions';
 
 import styles from './Profile.module.css';
 
@@ -63,6 +67,8 @@ export default function ProfilePage() {
           <h2 className={styles.sectionTitle}>Keyboard Shortcuts</h2>
           <ShortcutsList />
         </section>
+
+        <SyncSubscriptions />
 
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Export</h2>
@@ -140,15 +146,46 @@ function ShortcutsList() {
   );
 }
 
+function SyncSubscriptions() {
+  const localSubs = useSubscriptions((state: SubscriptionsState) => state.subs);
+  const clearSubs = useSubscriptions((state: SubscriptionsState) => state.addSubscriptions);
+  const localFeedUrls = React.useMemo(() => Object.keys(localSubs), [localSubs]);
+
+  const syncToCloud = useSyncToCloud();
+
+  if (localFeedUrls.length === 0) return null;
+
+  const handleSync = async () => {
+    await syncToCloud.mutateAsync(localFeedUrls);
+    clearSubs([]);
+  };
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Subscriptions</h2>
+      <div className={styles.syncSection}>
+        <p className={styles.syncDescription}>
+          You have {localFeedUrls.length} {localFeedUrls.length === 1 ? 'podcast' : 'podcasts'}{' '}
+          saved on this device. Import them to your account to sync across all your devices.
+        </p>
+        <button onClick={handleSync} disabled={syncToCloud.isPending} className={styles.syncButton}>
+          {syncToCloud.isPending ? 'Importing...' : 'Import from Device'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ExportSubscriptions() {
-  const subsMap = useSubscriptions((state: SubscriptionsState) => state.subs);
+  const { data: serverSubs } = useServerSubscriptions();
+
   const subs = React.useMemo(
     () =>
-      Object.values(subsMap).map((sub) => ({
+      (serverSubs || []).map((sub) => ({
         title: sub.title,
         feed: sub.feed,
       })),
-    [subsMap],
+    [serverSubs],
   );
 
   const exportOPML = React.useCallback(() => {
