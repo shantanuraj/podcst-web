@@ -169,6 +169,8 @@ export interface IEpisode {
  * Adapted Episode with feed info
  */
 export interface IEpisodeInfo extends IEpisode {
+  id?: number;
+  podcastId?: number;
   feed: string;
   podcastTitle?: string;
 }
@@ -192,6 +194,7 @@ export interface IEpisodeListing {
  * Episode info listing
  */
 export interface IPodcastEpisodesInfo extends IEpisodeListing {
+  id?: number;
   episodes: IEpisodeInfo[];
   feed: string;
 }

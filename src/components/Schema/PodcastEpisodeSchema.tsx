@@ -37,7 +37,9 @@ export const PodcastEpisodeSchema = ({ podcast, episode, url }: PodcastEpisodeSc
     partOfSeries: {
       '@type': 'PodcastSeries',
       name: podcast.title,
-      url: `${new URL(url).origin}/episodes/${encodeURIComponent(podcast.feed)}`,
+      url: podcast.id
+        ? `${new URL(url).origin}/episodes/${podcast.id}`
+        : `${new URL(url).origin}/episodes/${encodeURIComponent(podcast.feed)}`,
     },
   };
 

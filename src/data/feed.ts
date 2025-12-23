@@ -23,3 +23,22 @@ export const useFeed = (feedUrl: string | null) => {
 };
 
 export const feedQueryKey = (feedUrl: string) => ['feed', feedUrl];
+
+const fetchPodcast = async (podcastId: number): Promise<IPodcastEpisodesInfo | null> => {
+  const res = await get<IPodcastEpisodesInfo | null>(`/feed`, { id: String(podcastId) });
+  if (res) useSubscriptions.getState().syncSubscription(res.feed, res);
+  return res;
+};
+
+export const usePodcast = (podcastId: number, initialData?: IPodcastEpisodesInfo | null) => {
+  return useQuery({
+    queryKey: ['podcast', podcastId],
+    queryFn: () => fetchPodcast(podcastId),
+    enabled: !!podcastId,
+    initialData: initialData ?? undefined,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+};
+
+export const podcastQueryKey = (podcastId: number) => ['podcast', podcastId];

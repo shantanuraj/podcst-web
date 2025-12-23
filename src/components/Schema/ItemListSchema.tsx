@@ -1,9 +1,16 @@
-import type { RenderablePodcast } from '@/types';
+import type { RenderablePodcast, IPodcastEpisodesInfo } from '@/types';
 import { Schema } from './Schema';
 
 interface ItemListSchemaProps {
   items: RenderablePodcast[];
   title: string;
+}
+
+function getPodcastUrl(item: RenderablePodcast): string {
+  if ('episodes' in item && (item as IPodcastEpisodesInfo).id) {
+    return `https://www.podcst.app/episodes/${(item as IPodcastEpisodesInfo).id}`;
+  }
+  return `https://www.podcst.app/episodes/${encodeURIComponent(item.feed)}`;
 }
 
 export const ItemListSchema = ({ items, title }: ItemListSchemaProps) => {
@@ -18,11 +25,11 @@ export const ItemListSchema = ({ items, title }: ItemListSchemaProps) => {
         item: {
           '@type': 'PodcastSeries',
           name: item.title,
-          url: `https://www.podcst.app/episodes/${encodeURIComponent(item.feed)}`,
+          url: getPodcastUrl(item),
           image: 'cover' in item ? item.cover : undefined,
         },
       }))
-      .slice(0, 10), // Limit to first 10 items
+      .slice(0, 10),
   };
 
   return <Schema data={data} />;

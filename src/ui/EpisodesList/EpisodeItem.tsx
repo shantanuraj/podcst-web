@@ -1,7 +1,7 @@
 import { memo } from 'react';
 
 import { SpaLink } from '@/shared/spa';
-import type { IEpisodeInfo } from '@/types';
+import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
 
@@ -9,10 +9,19 @@ import styles from './EpisodeItem.module.css';
 
 type EpisodeItemProps = {
   episode: IEpisodeInfo;
+  podcast?: IPodcastEpisodesInfo;
 };
 
-function EpisodeItem({ episode }: EpisodeItemProps) {
-  const { cover, episodeArt, feed, guid, title, published, duration } = episode;
+function getEpisodeHref(episode: IEpisodeInfo, podcast?: IPodcastEpisodesInfo): string {
+  const podcastId = podcast?.id ?? episode.podcastId;
+  if (podcastId && episode.id) {
+    return `/episodes/${podcastId}/${episode.id}`;
+  }
+  return `/episodes/${encodeURIComponent(episode.feed)}/${encodeURIComponent(episode.guid)}`;
+}
+
+function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
+  const { cover, episodeArt, title, published, duration } = episode;
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
@@ -20,10 +29,7 @@ function EpisodeItem({ episode }: EpisodeItemProps) {
   const minutes = Math.floor((duration || 0) / 60);
 
   return (
-    <SpaLink
-      href={`/episodes/${encodeURIComponent(feed)}/${encodeURIComponent(guid)}`}
-      className={styles.container}
-    >
+    <SpaLink href={getEpisodeHref(episode, podcast)} className={styles.container}>
       <div className={styles.artwork}>
         <img loading="lazy" src={episodeArt || cover} alt="" />
       </div>
