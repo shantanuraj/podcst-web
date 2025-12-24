@@ -80,3 +80,17 @@
   font-size: var(--text-sm);
   color: var(--color-ink-tertiary);
 }
+
+.link {
+  margin-top: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-ink-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link:hover {
+  color: var(--color-ink);
+}

@@ -98,6 +98,18 @@ CREATE TABLE oauth_accounts (
   PRIMARY KEY (provider, provider_account_id)
 );
 
+CREATE TABLE email_verifications (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_email_verifications_email ON email_verifications(email);
+CREATE INDEX idx_email_verifications_expires ON email_verifications(expires_at);
+
 CREATE TABLE subscriptions (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   podcast_id INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
