@@ -23,18 +23,19 @@ export async function ingestPodcast(feedUrl: string): Promise<IPodcastEpisodesIn
   return getPodcastByFeedUrl(feedUrl);
 }
 
-export async function refreshPodcast(feedUrl: string): Promise<IPodcastEpisodesInfo | null> {
-  const feedData = await fetchAndParseFeed(feedUrl);
-  if (!feedData) {
-    return null;
-  }
-
+export async function refreshPodcast(podcastId: number): Promise<IPodcastEpisodesInfo | null> {
   const [existing] = await sql`
-    SELECT id FROM podcasts WHERE feed_url = ${feedUrl}
+    SELECT id, feed_url FROM podcasts WHERE id = ${podcastId}
   `;
 
   if (!existing) {
-    return ingestPodcast(feedUrl);
+    return null;
+  }
+
+  const feedUrl = existing.feed_url;
+  const feedData = await fetchAndParseFeed(feedUrl);
+  if (!feedData) {
+    return null;
   }
 
   await sql`
@@ -226,7 +227,7 @@ export async function getPodcastById(id: number): Promise<IPodcastEpisodesInfo |
   `;
 
   if (episodes.length === 0 && podcast.feed_url) {
-    await refreshPodcast(podcast.feed_url);
+    await refreshPodcast(podcast.id);
     episodes = await sql`
       SELECT * FROM episodes
       WHERE podcast_id = ${podcast.id}
