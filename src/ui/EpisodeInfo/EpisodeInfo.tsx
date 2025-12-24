@@ -4,6 +4,7 @@ import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { Icon } from '@/ui/icons/svg/Icon';
+import { getPodcastHref } from '@/shared/links';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';
@@ -12,13 +13,6 @@ type EpisodeInfoProps = {
   podcast: IPodcastEpisodesInfo;
   episode: IEpisodeInfo;
 };
-
-function getPodcastHref(podcast: IPodcastEpisodesInfo): string {
-  if (podcast.id) {
-    return `/episodes/${podcast.id}`;
-  }
-  return `/episodes/${encodeURIComponent(podcast.feed)}`;
-}
 
 export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
   const { author, cover, episodeArt, published, summary, title } = episode;

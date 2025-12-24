@@ -4,6 +4,7 @@ import { SpaLink } from '@/shared/spa';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
+import { getEpisodeHref } from '@/shared/links';
 
 import styles from './EpisodeItem.module.css';
 
@@ -11,14 +12,6 @@ type EpisodeItemProps = {
   episode: IEpisodeInfo;
   podcast?: IPodcastEpisodesInfo;
 };
-
-function getEpisodeHref(episode: IEpisodeInfo, podcast?: IPodcastEpisodesInfo): string {
-  const podcastId = podcast?.id ?? episode.podcastId;
-  if (podcastId && episode.id) {
-    return `/episodes/${podcastId}/${episode.id}`;
-  }
-  return `/episodes/${encodeURIComponent(episode.feed)}/${encodeURIComponent(episode.guid)}`;
-}
 
 function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
   const { cover, episodeArt, title, published, duration } = episode;
