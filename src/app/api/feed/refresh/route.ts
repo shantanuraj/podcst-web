@@ -3,13 +3,13 @@ import { refreshPodcast } from '@/server/ingest/podcast';
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { url } = body;
+  const { podcastId } = body;
 
-  if (!url) {
-    return NextResponse.json({ message: 'url required' }, { status: 400 });
+  if (!podcastId) {
+    return NextResponse.json({ message: 'podcastId required' }, { status: 400 });
   }
 
-  const podcast = await refreshPodcast(url);
+  const podcast = await refreshPodcast(Number(podcastId));
 
   if (!podcast) {
     return NextResponse.json({ message: 'Failed to refresh feed' }, { status: 500 });
