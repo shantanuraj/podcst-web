@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, useLogin, useRegister } from '@/shared/auth/useAuth';
 
 import styles from './Auth.module.css';
+
+const redirectTo = '/profile/subscriptions';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -13,15 +15,24 @@ export default function AuthPage() {
   const register = useRegister();
 
   const [email, setEmail] = useState('');
-  const [mode, setMode] = useState<'initial' | 'login' | 'register'>('initial');
+  const [mode, setMode] = useState<'initial' | 'register'>('initial');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode === 'register') {
+      register
+        .mutateAsync(email)
+        .then(() => router.push(redirectTo))
+        .catch((err) => setError(err instanceof Error ? err.message : 'Failed to create passkey'));
+    }
+  }, [mode]);
 
   if (isLoading) {
     return null;
   }
 
   if (user) {
-    router.replace('/subs');
+    router.replace(redirectTo);
     return null;
   }
 
@@ -29,34 +40,11 @@ export default function AuthPage() {
     e.preventDefault();
     setError(null);
 
-    if (mode === 'initial') {
-      setMode('login');
-      try {
-        await login.mutateAsync(email);
-        router.push('/subs');
-      } catch {
-        setMode('register');
-      }
-      return;
-    }
-
-    if (mode === 'register') {
-      try {
-        await register.mutateAsync(email);
-        router.push('/subs');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Registration failed');
-      }
-      return;
-    }
-
-    if (mode === 'login') {
-      try {
-        await login.mutateAsync(email);
-        router.push('/subs');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Login failed');
-      }
+    try {
+      await login.mutateAsync(email);
+      router.push(redirectTo);
+    } catch {
+      setMode('register');
     }
   };
 
@@ -65,12 +53,8 @@ export default function AuthPage() {
   return (
     <main className={styles.container}>
       <div className={styles.card}>
-        <h1 className={styles.title}>{mode === 'register' ? 'Create Account' : 'Sign In'}</h1>
-        <p className={styles.subtitle}>
-          {mode === 'register'
-            ? 'Create a passkey to secure your account'
-            : 'Use your email to continue with a passkey'}
-        </p>
+        <h1 className={styles.title}>Sign In</h1>
+        <p className={styles.subtitle}>Use your email to continue with a passkey</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <input
@@ -91,13 +75,9 @@ export default function AuthPage() {
           {error && <p className={styles.error}>{error}</p>}
 
           <button type="submit" disabled={isPending} className={styles.button}>
-            {isPending ? 'Continue...' : mode === 'register' ? 'Create Passkey' : 'Continue'}
+            {isPending ? 'Authenticating...' : 'Continue'}
           </button>
         </form>
-
-        {mode === 'register' && (
-          <p className={styles.hint}>No account found. We'll create one for you.</p>
-        )}
       </div>
     </main>
   );
