@@ -2,15 +2,16 @@
 
 import { Database } from 'bun:sqlite';
 import { unlinkSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import postgres from 'postgres';
 
 const PODCAST_INDEX_URL = 'https://public.podcastindex.org/podcastindex_feeds.db.tgz';
 const TEMP_DIR = join(process.cwd(), '.tmp');
-const TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
-const DB_PATH = join(TEMP_DIR, 'podcastindex_feeds.db');
+const DEFAULT_TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
 
 const BATCH_SIZE = 1000;
+
+const localPath = process.argv[2];
 
 interface PodcastIndexRow {
   id: number;
@@ -32,23 +33,39 @@ interface PodcastIndexRow {
   description: string;
 }
 
-async function downloadAndExtract(): Promise<void> {
-  if (!existsSync(TEMP_DIR)) {
-    mkdirSync(TEMP_DIR, { recursive: true });
+async function downloadAndExtract(): Promise<string> {
+  const tgzPath = localPath || DEFAULT_TGZ_PATH;
+  const extractDir = localPath ? dirname(localPath) : TEMP_DIR;
+  const dbPath = join(extractDir, 'podcastindex_feeds.db');
+
+  if (existsSync(dbPath)) {
+    console.log(`Using existing database: ${dbPath}`);
+    return dbPath;
   }
 
-  console.log('Downloading Podcast Index database...');
-  const response = await fetch(PODCAST_INDEX_URL);
-  if (!response.ok) {
-    throw new Error(`Failed to download: ${response.status}`);
-  }
+  if (localPath) {
+    if (!existsSync(localPath)) {
+      throw new Error(`Local file not found: ${localPath}`);
+    }
+    console.log(`Using local archive: ${localPath}`);
+  } else {
+    if (!existsSync(TEMP_DIR)) {
+      mkdirSync(TEMP_DIR, { recursive: true });
+    }
 
-  const buffer = await response.arrayBuffer();
-  await Bun.write(TGZ_PATH, buffer);
-  console.log(`Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
+    console.log('Downloading Podcast Index database...');
+    const response = await fetch(PODCAST_INDEX_URL);
+    if (!response.ok) {
+      throw new Error(`Failed to download: ${response.status}`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    await Bun.write(tgzPath, buffer);
+    console.log(`Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
+  }
 
   console.log('Extracting...');
-  const proc = Bun.spawn(['tar', '-xzf', TGZ_PATH, '-C', TEMP_DIR], {
+  const proc = Bun.spawn(['tar', '-xzf', tgzPath, '-C', extractDir], {
     stdout: 'inherit',
     stderr: 'inherit',
   });
@@ -57,6 +74,8 @@ async function downloadAndExtract(): Promise<void> {
   if (proc.exitCode !== 0) {
     throw new Error('Failed to extract archive');
   }
+
+  return dbPath;
 }
 
 async function getLastSyncTime(sql: postgres.Sql): Promise<Date | null> {
@@ -84,88 +103,77 @@ async function syncBatch(
   sql: postgres.Sql,
   batch: PodcastIndexRow[],
   authorCache: Map<string, number>,
-): Promise<{ inserted: number; updated: number }> {
+): Promise<{ inserted: number; updated: number; skipped: number }> {
   let inserted = 0;
   let updated = 0;
+  let skipped = 0;
 
   for (const row of batch) {
-    const authorName = row.itunesAuthor || 'Unknown';
-    let authorId = authorCache.get(authorName);
-    if (!authorId) {
-      authorId = await ensureAuthor(sql, authorName);
-      authorCache.set(authorName, authorId);
-    }
+    try {
+      const authorName = row.itunesAuthor || 'Unknown';
+      let authorId = authorCache.get(authorName);
+      if (!authorId) {
+        authorId = await ensureAuthor(sql, authorName);
+        authorCache.set(authorName, authorId);
+      }
 
-    const lastPublished = row.newestItemPubdate
-      ? new Date(row.newestItemPubdate * 1000)
-      : null;
+      const lastPublished = row.newestItemPubdate
+        ? new Date(row.newestItemPubdate * 1000)
+        : null;
 
-    const [result] = await sql`
-      INSERT INTO podcasts (
-        podcast_index_id,
-        itunes_id,
-        feed_url,
-        title,
-        author_id,
-        description,
-        cover,
-        website_url,
-        explicit,
-        episode_count,
-        last_published,
-        is_active,
-        language,
-        popularity_score,
-        priority,
-        update_frequency,
-        updated_at
-      ) VALUES (
-        ${row.id},
-        ${row.itunesId},
-        ${row.url},
-        ${row.title},
-        ${authorId},
-        ${row.description || null},
-        ${row.imageUrl || 'https://podcst.app/placeholder.png'},
-        ${row.link || null},
-        ${row.explicit === 1},
-        ${row.episodeCount || 0},
-        ${lastPublished},
-        ${row.dead !== 1},
-        ${row.language || null},
-        ${row.popularityScore},
-        ${row.priority},
-        ${row.updateFrequency},
-        now()
-      )
-      ON CONFLICT (podcast_index_id) DO UPDATE SET
-        itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),
-        feed_url = EXCLUDED.feed_url,
-        title = EXCLUDED.title,
-        author_id = EXCLUDED.author_id,
-        description = COALESCE(EXCLUDED.description, podcasts.description),
-        cover = CASE WHEN EXCLUDED.cover != 'https://podcst.app/placeholder.png' THEN EXCLUDED.cover ELSE podcasts.cover END,
-        website_url = COALESCE(EXCLUDED.website_url, podcasts.website_url),
-        explicit = EXCLUDED.explicit,
-        episode_count = GREATEST(EXCLUDED.episode_count, podcasts.episode_count),
-        last_published = GREATEST(EXCLUDED.last_published, podcasts.last_published),
-        is_active = EXCLUDED.is_active,
-        language = COALESCE(EXCLUDED.language, podcasts.language),
-        popularity_score = EXCLUDED.popularity_score,
-        priority = EXCLUDED.priority,
-        update_frequency = EXCLUDED.update_frequency,
-        updated_at = now()
-      RETURNING (xmax = 0) as is_insert
-    `;
+      const [existing] = await sql`
+        SELECT id, podcast_index_id FROM podcasts
+        WHERE feed_url = ${row.url}
+           OR (itunes_id = ${row.itunesId} AND ${row.itunesId} IS NOT NULL)
+           OR podcast_index_id = ${row.id}
+        LIMIT 1
+      `;
 
-    if (result.is_insert) {
-      inserted++;
-    } else {
-      updated++;
+      if (existing) {
+        await sql`
+          UPDATE podcasts SET
+            podcast_index_id = ${row.id},
+            itunes_id = COALESCE(${row.itunesId}, itunes_id),
+            feed_url = ${row.url},
+            title = ${row.title},
+            author_id = ${authorId},
+            description = COALESCE(${row.description || null}, description),
+            cover = CASE WHEN ${row.imageUrl || ''} != '' AND ${row.imageUrl || ''} != 'https://podcst.app/placeholder.png' THEN ${row.imageUrl} ELSE cover END,
+            website_url = COALESCE(${row.link || null}, website_url),
+            explicit = ${row.explicit === 1},
+            episode_count = GREATEST(${row.episodeCount || 0}, episode_count),
+            last_published = GREATEST(${lastPublished}, last_published),
+            is_active = ${row.dead !== 1},
+            language = COALESCE(${row.language || null}, language),
+            popularity_score = ${row.popularityScore},
+            priority = ${row.priority},
+            update_frequency = ${row.updateFrequency},
+            updated_at = now()
+          WHERE id = ${existing.id}
+        `;
+        updated++;
+      } else {
+        await sql`
+          INSERT INTO podcasts (
+            podcast_index_id, itunes_id, feed_url, title, author_id, description,
+            cover, website_url, explicit, episode_count, last_published,
+            is_active, language, popularity_score, priority, update_frequency, updated_at
+          ) VALUES (
+            ${row.id}, ${row.itunesId}, ${row.url}, ${row.title}, ${authorId},
+            ${row.description || null}, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
+            ${row.link || null}, ${row.explicit === 1}, ${row.episodeCount || 0},
+            ${lastPublished}, ${row.dead !== 1}, ${row.language || null},
+            ${row.popularityScore}, ${row.priority}, ${row.updateFrequency}, now()
+          )
+        `;
+        inserted++;
+      }
+    } catch (err) {
+      skipped++;
     }
   }
 
-  return { inserted, updated };
+  return { inserted, updated, skipped };
 }
 
 async function sync(): Promise<void> {
@@ -174,10 +182,10 @@ async function sync(): Promise<void> {
     throw new Error('DATABASE_URL environment variable is required');
   }
 
-  await downloadAndExtract();
+  const dbPath = await downloadAndExtract();
 
   console.log('Opening SQLite database...');
-  const sqlite = new Database(DB_PATH, { readonly: true });
+  const sqlite = new Database(dbPath, { readonly: true });
 
   const sql = postgres(connectionString, {
     max: 5,
@@ -200,7 +208,7 @@ async function sync(): Promise<void> {
     console.log('Nothing to sync');
     sqlite.close();
     await sql.end();
-    cleanup();
+    if (!localPath) cleanup();
     return;
   }
 
@@ -219,15 +227,17 @@ async function sync(): Promise<void> {
   let processed = 0;
   let totalInserted = 0;
   let totalUpdated = 0;
+  let totalSkipped = 0;
   let offset = 0;
 
   while (processed < totalCount) {
     const batch = selectQuery.all({ $lastSync: lastSyncUnix, $limit: BATCH_SIZE, $offset: offset });
     if (batch.length === 0) break;
 
-    const { inserted, updated } = await syncBatch(sql, batch, authorCache);
+    const { inserted, updated, skipped } = await syncBatch(sql, batch, authorCache);
     totalInserted += inserted;
     totalUpdated += updated;
+    totalSkipped += skipped;
     processed += batch.length;
     offset += BATCH_SIZE;
 
@@ -238,16 +248,22 @@ async function sync(): Promise<void> {
   console.log(`\nSync complete:`);
   console.log(`  Inserted: ${totalInserted.toLocaleString()}`);
   console.log(`  Updated: ${totalUpdated.toLocaleString()}`);
+  console.log(`  Skipped: ${totalSkipped.toLocaleString()}`);
 
   sqlite.close();
   await sql.end();
-  cleanup();
+
+  if (!localPath) {
+    cleanup();
+  }
 }
 
 function cleanup(): void {
   console.log('Cleaning up...');
-  if (existsSync(TGZ_PATH)) unlinkSync(TGZ_PATH);
-  if (existsSync(DB_PATH)) unlinkSync(DB_PATH);
+  const tgzPath = DEFAULT_TGZ_PATH;
+  const dbPath = join(TEMP_DIR, 'podcastindex_feeds.db');
+  if (existsSync(tgzPath)) unlinkSync(tgzPath);
+  if (existsSync(dbPath)) unlinkSync(dbPath);
 }
 
 sync().catch((err) => {
