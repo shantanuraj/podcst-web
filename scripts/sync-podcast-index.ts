@@ -1,9 +1,21 @@
 #!/usr/bin/env bun
 
 import { Database } from 'bun:sqlite';
-import { unlinkSync, existsSync, mkdirSync } from 'fs';
+import { unlinkSync, existsSync, mkdirSync, appendFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import postgres from 'postgres';
+
+interface LogEntry {
+  timestamp: string;
+  action: 'inserted' | 'updated' | 'skipped';
+  itunes_id: number | null;
+  name: string;
+  podcast_index_id: number;
+  feed_url: string;
+  error?: string;
+}
+
+let logFilePath: string;
 
 const PODCAST_INDEX_URL = 'https://public.podcastindex.org/podcastindex_feeds.db.tgz';
 const TEMP_DIR = join(process.cwd(), '.tmp');
@@ -76,6 +88,35 @@ async function downloadAndExtract(): Promise<string> {
   }
 
   return dbPath;
+}
+
+function initLogFile(): void {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  logFilePath = join(TEMP_DIR, `sync-log-${timestamp}.jsonl`);
+
+  if (!existsSync(TEMP_DIR)) {
+    mkdirSync(TEMP_DIR, { recursive: true });
+  }
+
+  writeFileSync(logFilePath, '');
+  console.log(`Action log: ${logFilePath}`);
+}
+
+function logAction(entry: LogEntry): void {
+  appendFileSync(logFilePath, JSON.stringify(entry) + '\n');
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 async function getLastSyncTime(sql: postgres.Sql): Promise<Date | null> {
@@ -151,6 +192,14 @@ async function syncBatch(
             updated_at = now()
           WHERE id = ${existing.id}
         `;
+        logAction({
+          timestamp: new Date().toISOString(),
+          action: 'updated',
+          itunes_id: row.itunesId,
+          name: row.title,
+          podcast_index_id: row.id,
+          feed_url: row.url,
+        });
         updated++;
       } else {
         await sql`
@@ -166,9 +215,26 @@ async function syncBatch(
             ${row.popularityScore}, ${row.priority}, ${row.updateFrequency}, now()
           )
         `;
+        logAction({
+          timestamp: new Date().toISOString(),
+          action: 'inserted',
+          itunes_id: row.itunesId,
+          name: row.title,
+          podcast_index_id: row.id,
+          feed_url: row.url,
+        });
         inserted++;
       }
     } catch (err) {
+      logAction({
+        timestamp: new Date().toISOString(),
+        action: 'skipped',
+        itunes_id: row.itunesId,
+        name: row.title,
+        podcast_index_id: row.id,
+        feed_url: row.url,
+        error: err instanceof Error ? err.message : String(err),
+      });
       skipped++;
     }
   }
@@ -183,6 +249,8 @@ async function sync(): Promise<void> {
   }
 
   const dbPath = await downloadAndExtract();
+
+  initLogFile();
 
   console.log('Opening SQLite database...');
   const sqlite = new Database(dbPath, { readonly: true });
@@ -229,6 +297,7 @@ async function sync(): Promise<void> {
   let totalUpdated = 0;
   let totalSkipped = 0;
   let offset = 0;
+  const startTime = Date.now();
 
   while (processed < totalCount) {
     const batch = selectQuery.all({ $lastSync: lastSyncUnix, $limit: BATCH_SIZE, $offset: offset });
@@ -242,7 +311,11 @@ async function sync(): Promise<void> {
     offset += BATCH_SIZE;
 
     const percent = ((processed / totalCount) * 100).toFixed(1);
-    console.log(`Progress: ${processed.toLocaleString()}/${totalCount.toLocaleString()} (${percent}%)`);
+    const elapsed = Date.now() - startTime;
+    const rate = processed / elapsed; // items per ms
+    const remaining = (totalCount - processed) / rate;
+    const eta = formatDuration(remaining);
+    console.log(`Progress: ${processed.toLocaleString()}/${totalCount.toLocaleString()} (${percent}%) - ETA: ${eta}`);
   }
 
   console.log(`\nSync complete:`);
