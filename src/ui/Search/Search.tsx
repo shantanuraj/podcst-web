@@ -14,12 +14,19 @@ import { ProxiedImage } from '@/ui/Image';
 
 import styles from './Search.module.css';
 
+function getSearchResultHref(result: IPodcastSearchResult): string {
+  if (result.id) {
+    return `/episodes/${result.id}`;
+  }
+  return `/episodes/${encodeURIComponent(result.feed)}`;
+}
+
 export function Search() {
   const router = useRouter();
   const onSelectionChange = React.useCallback(
     (changes: UseComboboxStateChange<IPodcastSearchResult>) => {
       if (!changes.selectedItem) return;
-      router.push(`/episodes/${encodeURIComponent(changes.selectedItem.feed)}`);
+      router.push(getSearchResultHref(changes.selectedItem));
     },
     [router],
   );
@@ -80,7 +87,7 @@ export function Search() {
 
 const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
   return (
-    <Link href={`/episodes/${encodeURIComponent(podcast.feed)}`} className={styles.searchItem}>
+    <Link href={getSearchResultHref(podcast)} className={styles.searchItem}>
       <ProxiedImage
         loading="lazy"
         alt={`${podcast.title} by ${podcast.author}`}
