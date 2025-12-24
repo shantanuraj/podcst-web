@@ -19,8 +19,7 @@
     "format": "biome format --write src",
     "lint": "biome check src",
     "short-url": "bun scripts/generate-short-url.ts",
-    "db:migrate": "bun src/server/migrate.ts",
-    "db:migrate:incremental": "bun scripts/migrate.ts",
+    "db:migrate": "bun scripts/migrate.ts",
     "sync:podcast-index": "bun scripts/sync-podcast-index.ts"
   },
   "dependencies": {
