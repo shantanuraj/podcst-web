@@ -10,6 +10,7 @@ import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { useKeydown } from '@/shared/keyboard/useKeydown';
 import type { IPodcastSearchResult } from '@/types';
 import { LoadBar } from '@/ui/LoadBar';
+import { ProxiedImage } from '@/ui/Image';
 
 import styles from './Search.module.css';
 
@@ -80,7 +81,11 @@ export function Search() {
 const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
   return (
     <Link href={`/episodes/${encodeURIComponent(podcast.feed)}`} className={styles.searchItem}>
-      <img loading="lazy" alt={`${podcast.title} by ${podcast.author}`} src={podcast.thumbnail} />
+      <ProxiedImage
+        loading="lazy"
+        alt={`${podcast.title} by ${podcast.author}`}
+        src={podcast.thumbnail}
+      />
       <div>
         <p className={styles.title}>{podcast.title}</p>
         <p className={styles.author}>{podcast.author}</p>

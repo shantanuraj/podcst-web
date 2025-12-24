@@ -5,6 +5,7 @@ import type { IPodcastEpisodesInfo } from '@/types';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { Icon } from '@/ui/icons/svg/Icon';
+import { ProxiedImage } from '@/ui/Image';
 
 import styles from './PodcastInfo.module.css';
 
@@ -27,7 +28,7 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
     <header className={styles.header}>
       <div className={styles.top}>
         <div className={styles.artwork}>
-          <img loading="lazy" alt="" src={cover} />
+          <ProxiedImage loading="lazy" alt="" src={cover} />
         </div>
         <div className={styles.meta}>
           <h1 className={styles.title}>{title}</h1>
