@@ -165,7 +165,7 @@ async function syncBatch(
       const [existing] = await sql`
         SELECT id, podcast_index_id FROM podcasts
         WHERE feed_url = ${row.url}
-           OR (itunes_id = ${row.itunesId} AND ${row.itunesId} IS NOT NULL)
+           OR (itunes_id = ${row.itunesId}::INTEGER AND ${row.itunesId}::INTEGER IS NOT NULL)
            OR podcast_index_id = ${row.id}
         LIMIT 1
       `;
@@ -174,21 +174,21 @@ async function syncBatch(
         await sql`
           UPDATE podcasts SET
             podcast_index_id = ${row.id},
-            itunes_id = COALESCE(${row.itunesId}, itunes_id),
+            itunes_id = COALESCE(${row.itunesId}::INTEGER, itunes_id),
             feed_url = ${row.url},
             title = ${row.title},
             author_id = ${authorId},
-            description = COALESCE(${row.description || null}, description),
+            description = COALESCE(${row.description || null}::TEXT, description),
             cover = CASE WHEN ${row.imageUrl || ''} != '' AND ${row.imageUrl || ''} != 'https://podcst.app/placeholder.png' THEN ${row.imageUrl} ELSE cover END,
-            website_url = COALESCE(${row.link || null}, website_url),
+            website_url = COALESCE(${row.link || null}::TEXT, website_url),
             explicit = ${row.explicit === 1},
             episode_count = GREATEST(${row.episodeCount || 0}, episode_count),
-            last_published = GREATEST(${lastPublished}, last_published),
+            last_published = GREATEST(${lastPublished}::TIMESTAMPTZ, last_published),
             is_active = ${row.dead !== 1},
-            language = COALESCE(${row.language || null}, language),
-            popularity_score = ${row.popularityScore},
-            priority = ${row.priority},
-            update_frequency = ${row.updateFrequency},
+            language = COALESCE(${row.language || null}::VARCHAR(10), language),
+            popularity_score = ${row.popularityScore}::INTEGER,
+            priority = ${row.priority}::INTEGER,
+            update_frequency = ${row.updateFrequency}::INTEGER,
             updated_at = now()
           WHERE id = ${existing.id}
         `;
@@ -208,11 +208,11 @@ async function syncBatch(
             cover, website_url, explicit, episode_count, last_published,
             is_active, language, popularity_score, priority, update_frequency, updated_at
           ) VALUES (
-            ${row.id}, ${row.itunesId}, ${row.url}, ${row.title}, ${authorId},
-            ${row.description || null}, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
-            ${row.link || null}, ${row.explicit === 1}, ${row.episodeCount || 0},
-            ${lastPublished}, ${row.dead !== 1}, ${row.language || null},
-            ${row.popularityScore}, ${row.priority}, ${row.updateFrequency}, now()
+            ${row.id}, ${row.itunesId}::INTEGER, ${row.url}, ${row.title}, ${authorId},
+            ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
+            ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
+            ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
+            ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency}::INTEGER, now()
           )
         `;
         logAction({
