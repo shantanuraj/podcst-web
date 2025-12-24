@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import postgres from 'postgres';
 
-const SCRIPTS_DIR = join(import.meta.dir);
+const MIGRATIONS_DIR = join(process.cwd(), 'migrations');
 
 async function migrate(filename?: string) {
   const connectionString = process.env.DATABASE_URL;
@@ -20,8 +20,8 @@ async function migrate(filename?: string) {
   if (filename) {
     await runMigration(sql, filename);
   } else {
-    const files = readdirSync(SCRIPTS_DIR)
-      .filter((f) => f.startsWith('migrate-') && f.endsWith('.sql'))
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
       .sort();
 
     for (const file of files) {
@@ -34,7 +34,7 @@ async function migrate(filename?: string) {
 }
 
 async function runMigration(sql: postgres.Sql, filename: string) {
-  const filepath = join(SCRIPTS_DIR, filename);
+  const filepath = join(MIGRATIONS_DIR, filename);
   const content = readFileSync(filepath, 'utf-8');
 
   console.log(`Running ${filename}...`);
