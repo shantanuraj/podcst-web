@@ -183,13 +183,25 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
     let link = '';
     const itunesImage = ctx['itunes:image'];
 
-    if (Array.isArray(itunesImage) && itunesImage[0]?.$.href) {
-      link = itunesImage[0].$.href;
-    } else {
+    if (Array.isArray(itunesImage) && itunesImage[0]) {
+      if (itunesImage[0].$?.href) {
+        link = itunesImage[0].$.href;
+      } else {
+        const val = typeof itunesImage[0] === 'object' ? itunesImage[0]._ : itunesImage[0];
+        if (typeof val === 'string') {
+          link = val.trim();
+        }
+      }
+    }
+
+    if (!link) {
       // Fallback to channel image if available
       const channelImage = ctx.image;
       if (Array.isArray(channelImage) && channelImage[0]?.url?.[0]) {
-        link = channelImage[0].url[0];
+        link =
+          typeof channelImage[0].url[0] === 'object'
+            ? channelImage[0].url[0]._
+            : channelImage[0].url[0];
       }
     }
 
@@ -211,7 +223,7 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
     }
 
     const imgProxy = new URL('https://assets.podcst.app/');
-    imgProxy.searchParams.set('p', encodeURIComponent(url.toString()));
+    imgProxy.searchParams.set('p', url.toString());
     return imgProxy.toString();
   } catch (_err) {
     return null;
