@@ -150,6 +150,7 @@ async function syncBatch(
   let skipped = 0;
 
   for (const row of batch) {
+    const itunesId = row.itunesId || null;
     try {
       const authorName = row.itunesAuthor || 'Unknown';
       let authorId = authorCache.get(authorName);
@@ -157,7 +158,6 @@ async function syncBatch(
         authorId = await ensureAuthor(sql, authorName);
         authorCache.set(authorName, authorId);
       }
-
       const lastPublished = row.newestItemPubdate
         ? new Date(row.newestItemPubdate * 1000)
         : null;
@@ -165,7 +165,7 @@ async function syncBatch(
       const [existing] = await sql`
         SELECT id, podcast_index_id FROM podcasts
         WHERE feed_url = ${row.url}
-           OR (itunes_id = ${row.itunesId}::INTEGER AND ${row.itunesId}::INTEGER IS NOT NULL)
+           OR (itunes_id = ${itunesId}::INTEGER AND ${itunesId}::INTEGER IS NOT NULL)
            OR podcast_index_id = ${row.id}
         LIMIT 1
       `;
@@ -174,7 +174,7 @@ async function syncBatch(
         await sql`
           UPDATE podcasts SET
             podcast_index_id = ${row.id},
-            itunes_id = COALESCE(${row.itunesId}::INTEGER, itunes_id),
+            itunes_id = COALESCE(${itunesId}::INTEGER, itunes_id),
             feed_url = ${row.url},
             title = ${row.title},
             author_id = ${authorId},
@@ -195,7 +195,7 @@ async function syncBatch(
         logAction({
           timestamp: new Date().toISOString(),
           action: 'updated',
-          itunes_id: row.itunesId,
+          itunes_id: itunesId,
           name: row.title,
           podcast_index_id: row.id,
           feed_url: row.url,
@@ -208,7 +208,7 @@ async function syncBatch(
             cover, website_url, explicit, episode_count, last_published,
             is_active, language, popularity_score, priority, update_frequency, updated_at
           ) VALUES (
-            ${row.id}, ${row.itunesId}::INTEGER, ${row.url}, ${row.title}, ${authorId},
+            ${row.id}, ${itunesId}::INTEGER, ${row.url}, ${row.title}, ${authorId},
             ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
             ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
             ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
@@ -218,7 +218,7 @@ async function syncBatch(
         logAction({
           timestamp: new Date().toISOString(),
           action: 'inserted',
-          itunes_id: row.itunesId,
+          itunes_id: itunesId,
           name: row.title,
           podcast_index_id: row.id,
           feed_url: row.url,
@@ -229,7 +229,7 @@ async function syncBatch(
       logAction({
         timestamp: new Date().toISOString(),
         action: 'skipped',
-        itunes_id: row.itunesId,
+        itunes_id: itunesId,
         name: row.title,
         podcast_index_id: row.id,
         feed_url: row.url,
