@@ -18,11 +18,11 @@ export function useSubscribe() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (feedUrl: string) => {
+    mutationFn: async (podcastId: number) => {
       const res = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedUrl }),
+        body: JSON.stringify({ podcastId }),
       });
       if (!res.ok) throw new Error('Failed to subscribe');
       return res.json();
@@ -37,8 +37,8 @@ export function useUnsubscribe() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (feedUrl: string) => {
-      const res = await fetch(`/api/subscriptions?feedUrl=${encodeURIComponent(feedUrl)}`, {
+    mutationFn: async (podcastId: number) => {
+      const res = await fetch(`/api/subscriptions?podcastId=${podcastId}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to unsubscribe');

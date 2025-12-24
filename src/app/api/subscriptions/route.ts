@@ -3,7 +3,7 @@ import { getSession } from '@/server/auth/session';
 import {
   getSubscriptions,
   addSubscription,
-  addSubscriptions,
+  importSubscriptions,
   removeSubscription,
 } from '@/server/subscriptions';
 
@@ -26,18 +26,18 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
 
   if (Array.isArray(body.feedUrls)) {
-    const result = await addSubscriptions(session.userId, body.feedUrls);
+    const result = await importSubscriptions(session.userId, body.feedUrls);
     return NextResponse.json(result);
   }
 
-  const feedUrl = body.feedUrl;
-  if (!feedUrl || typeof feedUrl !== 'string') {
-    return NextResponse.json({ error: 'feedUrl or feedUrls required' }, { status: 400 });
+  const podcastId = body.podcastId;
+  if (!podcastId || typeof podcastId !== 'number') {
+    return NextResponse.json({ error: 'podcastId required' }, { status: 400 });
   }
 
-  const success = await addSubscription(session.userId, feedUrl);
+  const success = await addSubscription(session.userId, podcastId);
   if (!success) {
-    return NextResponse.json({ error: 'Failed to subscribe' }, { status: 500 });
+    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });
@@ -50,11 +50,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const feedUrl = searchParams.get('feedUrl');
-  if (!feedUrl) {
-    return NextResponse.json({ error: 'feedUrl required' }, { status: 400 });
+  const podcastId = searchParams.get('podcastId');
+  if (!podcastId) {
+    return NextResponse.json({ error: 'podcastId required' }, { status: 400 });
   }
 
-  await removeSubscription(session.userId, feedUrl);
+  await removeSubscription(session.userId, Number(podcastId));
   return NextResponse.json({ success: true });
 }

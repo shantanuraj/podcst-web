@@ -18,24 +18,26 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
   const { mutate: serverUnsubscribe, isPending: isUnsubscribing } = useUnsubscribe();
 
   const feed = info.feed;
+  const podcastId = info.id;
   const isLocalSubscribed = useSubscriptions(useCallback(isSubscribed(feed), [feed]));
   const addSubscription = useSubscriptions((state) => state.addSubscription);
   const removeSubscription = useSubscriptions((state) => state.removeSubscription);
 
   const isServerSubscribed = useMemo(
-    () => serverSubs?.some((sub) => sub.feed === feed) ?? false,
-    [serverSubs, feed],
+    () => serverSubs?.some((sub) => sub.id === podcastId) ?? false,
+    [serverSubs, podcastId],
   );
 
-  const isSubscribedToFeed = user ? isServerSubscribed : isLocalSubscribed;
+  const canUseServer = user && podcastId;
+  const isSubscribedToFeed = canUseServer ? isServerSubscribed : isLocalSubscribed;
   const isPending = isSubscribing || isUnsubscribing;
 
   const onSubscribeClick = useCallback(() => {
-    if (user) {
+    if (canUseServer) {
       if (isServerSubscribed) {
-        serverUnsubscribe(feed);
+        serverUnsubscribe(podcastId);
       } else {
-        serverSubscribe(feed);
+        serverSubscribe(podcastId);
       }
     } else {
       if (isLocalSubscribed) {
@@ -45,9 +47,10 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
       }
     }
   }, [
-    user,
+    canUseServer,
     isServerSubscribed,
     isLocalSubscribed,
+    podcastId,
     feed,
     info,
     addSubscription,

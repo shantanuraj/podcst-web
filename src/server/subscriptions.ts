@@ -82,51 +82,31 @@ export async function getSubscriptions(userId: string): Promise<IPodcastEpisodes
   return podcasts;
 }
 
-export async function addSubscription(userId: string, feedUrl: string): Promise<boolean> {
-  let podcast = await getPodcastByFeedUrl(feedUrl);
-  if (!podcast) {
-    podcast = await ingestPodcast(feedUrl);
-  }
-  if (!podcast) return false;
-
-  const [row] = await sql`
-    SELECT id FROM podcasts WHERE feed_url = ${feedUrl}
+export async function addSubscription(userId: string, podcastId: number): Promise<boolean> {
+  const [exists] = await sql`
+    SELECT 1 FROM podcasts WHERE id = ${podcastId}
   `;
-  if (!row) return false;
+  if (!exists) return false;
 
   await sql`
     INSERT INTO subscriptions (user_id, podcast_id)
-    VALUES (${userId}, ${row.id})
+    VALUES (${userId}, ${podcastId})
     ON CONFLICT (user_id, podcast_id) DO NOTHING
   `;
 
   return true;
 }
 
-export async function removeSubscription(userId: string, feedUrl: string): Promise<boolean> {
-  const [row] = await sql`
-    SELECT id FROM podcasts WHERE feed_url = ${feedUrl}
-  `;
-  if (!row) return false;
-
+export async function removeSubscription(userId: string, podcastId: number): Promise<boolean> {
   await sql`
     DELETE FROM subscriptions
-    WHERE user_id = ${userId} AND podcast_id = ${row.id}
+    WHERE user_id = ${userId} AND podcast_id = ${podcastId}
   `;
 
   return true;
 }
 
-export async function isSubscribed(userId: string, feedUrl: string): Promise<boolean> {
-  const [row] = await sql`
-    SELECT 1 FROM subscriptions s
-    JOIN podcasts p ON p.id = s.podcast_id
-    WHERE s.user_id = ${userId} AND p.feed_url = ${feedUrl}
-  `;
-  return !!row;
-}
-
-export async function addSubscriptions(
+export async function importSubscriptions(
   userId: string,
   feedUrls: string[],
 ): Promise<{ succeeded: number; failed: number }> {
@@ -134,12 +114,21 @@ export async function addSubscriptions(
   let failed = 0;
 
   for (const feedUrl of feedUrls) {
-    const success = await addSubscription(userId, feedUrl);
-    if (success) {
-      succeeded++;
-    } else {
-      failed++;
+    let podcast = await getPodcastByFeedUrl(feedUrl);
+    if (!podcast) {
+      podcast = await ingestPodcast(feedUrl);
     }
+    if (!podcast?.id) {
+      failed++;
+      continue;
+    }
+
+    await sql`
+      INSERT INTO subscriptions (user_id, podcast_id)
+      VALUES (${userId}, ${podcast.id})
+      ON CONFLICT (user_id, podcast_id) DO NOTHING
+    `;
+    succeeded++;
   }
 
   return { succeeded, failed };
