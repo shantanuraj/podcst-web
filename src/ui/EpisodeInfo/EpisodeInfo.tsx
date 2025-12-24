@@ -5,6 +5,7 @@ import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { getPodcastHref } from '@/shared/links';
+import { ProxiedImage } from '@/ui/Image';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';
@@ -30,7 +31,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
     <article className={styles.header}>
       <div className={styles.top}>
         <div className={styles.artwork}>
-          <img loading="lazy" alt="" src={showArt} />
+          <ProxiedImage loading="lazy" alt="" src={showArt} />
         </div>
         <div className={styles.meta}>
           <h1 className={styles.title}>

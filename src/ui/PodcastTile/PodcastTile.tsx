@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { RenderablePodcast } from '@/types';
 import { getPodcastHref } from '@/shared/links';
+import { ProxiedImage } from '@/ui/Image';
 
 import styles from './PodcastTile.module.css';
 
@@ -14,7 +15,7 @@ export function PodcastTile({ podcast }: PodcastTileProps) {
   return (
     <Link href={getPodcastHref(podcast)} className={styles.tile}>
       <div className={styles.artwork}>
-        <img src={cover || undefined} alt="" loading="lazy" />
+        <ProxiedImage src={cover || undefined} alt="" loading="lazy" />
       </div>
       <h3 className={styles.title}>{title}</h3>
       <p className={styles.author}>{author}</p>

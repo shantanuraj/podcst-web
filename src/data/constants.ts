@@ -42,3 +42,8 @@ export const KEY_SHORT_URL = 'short';
  * Time delta to determine if cache is stale in seconds
  */
 export const CACHE_STALE_DELTA = 3600; // 1 hour
+
+/**
+ * Image proxy URL
+ */
+export const IMAGE_PROXY_URL = 'https://assets.podcst.app/';

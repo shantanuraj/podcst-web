@@ -5,6 +5,7 @@ import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
 import { getEpisodeHref } from '@/shared/links';
+import { ProxiedImage } from '@/ui/Image';
 
 import styles from './EpisodeItem.module.css';
 
@@ -24,7 +25,7 @@ function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
   return (
     <SpaLink href={getEpisodeHref(episode, podcast)} className={styles.container}>
       <div className={styles.artwork}>
-        <img loading="lazy" src={episodeArt || cover || undefined} alt="" />
+        <ProxiedImage loading="lazy" src={episodeArt || cover || undefined} alt="" />
       </div>
       <div className={styles.meta}>
         <div className={styles.date}>{month}</div>

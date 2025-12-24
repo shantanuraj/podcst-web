@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
 import { Icon } from '@/ui/icons/svg/Icon';
+import { ProxiedImage } from '@/ui/Image';
 
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';
@@ -49,7 +50,7 @@ export const Player = () => {
           <Seekbar currentEpisode={currentEpisode} />
           <div className={styles.content}>
             <Link href={getEpisodeHref(currentEpisode)} className={styles.artwork}>
-              <img alt="" src={currentEpisode.cover} />
+              <ProxiedImage alt="" src={currentEpisode.cover} />
             </Link>
             <div
               className={styles.info}
