@@ -18,6 +18,7 @@ CREATE TABLE countries (
 
 CREATE TABLE podcasts (
   id SERIAL PRIMARY KEY,
+  podcast_index_id INTEGER UNIQUE,
   itunes_id INTEGER UNIQUE,
   feed_url TEXT UNIQUE NOT NULL,
   title TEXT NOT NULL,
@@ -29,6 +30,11 @@ CREATE TABLE podcasts (
   explicit BOOLEAN NOT NULL DEFAULT false,
   episode_count INTEGER NOT NULL DEFAULT 0,
   last_published TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  language VARCHAR(10),
+  popularity_score INTEGER,
+  priority INTEGER,
+  update_frequency INTEGER,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -136,7 +142,11 @@ CREATE TABLE transcripts (
 
 CREATE INDEX idx_podcasts_feed_url ON podcasts(feed_url);
 CREATE INDEX idx_podcasts_itunes_id ON podcasts(itunes_id);
+CREATE INDEX idx_podcasts_podcast_index_id ON podcasts(podcast_index_id);
 CREATE INDEX idx_podcasts_updated ON podcasts(updated_at);
+CREATE INDEX idx_podcasts_is_active ON podcasts(is_active) WHERE is_active = true;
+CREATE INDEX idx_podcasts_popularity ON podcasts(popularity_score DESC NULLS LAST);
+CREATE INDEX idx_podcasts_search ON podcasts USING gin(to_tsvector('english', title || ' ' || COALESCE(description, '')));
 CREATE INDEX idx_episodes_podcast ON episodes(podcast_id);
 CREATE INDEX idx_episodes_published ON episodes(published DESC);
 CREATE INDEX idx_sessions_user ON sessions(user_id);
