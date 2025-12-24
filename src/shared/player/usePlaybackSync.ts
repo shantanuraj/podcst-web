@@ -35,8 +35,7 @@ export function usePlaybackSync() {
   const restoredRef = useRef(false);
   const lastSavedRef = useRef<{ episodeId: number; position: number } | null>(null);
 
-  const queueEpisode = usePlayer((s) => s.queueEpisode);
-  const setSeekPosition = usePlayer((s) => s.setSeekPosition);
+  const restoreEpisode = usePlayer((s) => s.restoreEpisode);
   const duration = usePlayer((s) => s.duration);
 
   useEffect(() => {
@@ -48,10 +47,9 @@ export function usePlaybackSync() {
 
     fetchCurrentProgress().then((progress) => {
       if (!progress?.episode) return;
-      queueEpisode(progress.episode);
-      setSeekPosition(progress.position);
+      restoreEpisode(progress.episode, progress.position);
     });
-  }, [user, sessionLoading, queueEpisode, setSeekPosition]);
+  }, [user, sessionLoading, restoreEpisode]);
 
   const saveCurrentProgress = useCallback(
     (completed = false) => {

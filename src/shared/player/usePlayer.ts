@@ -14,6 +14,7 @@ export interface IPlayerState extends IPlaybackControls {
   state: PlayerState;
   setDuration: (duration: number) => void;
   queueEpisode: (episode: IEpisodeInfo) => void;
+  restoreEpisode: (episode: IEpisodeInfo, seekPosition: number) => void;
   onPlaybackEnd: () => void;
   skipToNextEpisode: () => void;
   skipToPreviousEpisode: () => void;
@@ -56,6 +57,23 @@ export const usePlayer = create<IPlayerState>()(
         remotePlayerController: undefined,
 
         queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
+
+        restoreEpisode: (episode, seekPosition) =>
+          set((prevState) => {
+            let queue = prevState.queue;
+            let trackIndex = queue.findIndex((q) => q.guid === episode.guid);
+            if (trackIndex === -1) {
+              trackIndex = queue.length;
+              queue = queue.concat(episode);
+            }
+            return {
+              queue,
+              currentTrackIndex: trackIndex,
+              seekPosition,
+              duration: episode.duration || 0,
+              state: 'paused',
+            };
+          }),
 
         onPlaybackEnd: () => {
           const { setPlayerState, queue } = get();
@@ -109,7 +127,12 @@ export const usePlayer = create<IPlayerState>()(
         },
 
         togglePlayback: () => {
-          set((prevState) => ({ state: prevState.state === 'playing' ? 'paused' : 'playing' }));
+          set((prevState) => {
+            if (prevState.state === 'playing') {
+              return { state: 'paused' };
+            }
+            return { state: prevState.audioInitialised ? 'playing' : 'buffering' };
+          });
         },
 
         setSeekPosition: (seekPosition) => {
