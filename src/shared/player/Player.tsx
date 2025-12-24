@@ -13,6 +13,7 @@ import { PlaybackRate } from './PlaybackRate';
 import styles from './Player.module.css';
 import { Seekbar } from './Seekbar';
 import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
+import { usePlaybackSync } from './usePlaybackSync';
 import { VolumeControls } from './VolumeControls';
 import { getEpisodeHref } from '../links';
 
@@ -41,6 +42,7 @@ export const Player = () => {
   const currentEpisode = usePlayer(getCurrentEpisode);
   const open = usePlayer(getIsPlayerOpen);
 
+  usePlaybackSync();
   useKeydown(open ? playerShortcuts : emptyShortcuts);
 
   return (
