@@ -36,6 +36,40 @@ export function useSession() {
   });
 }
 
+export function useSendCode() {
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      return data;
+    },
+  });
+}
+
+export function useVerifyCode() {
+  return useMutation({
+    mutationFn: async ({ email, code }: { email: string; code: string }) => {
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      return data;
+    },
+  });
+}
+
 export function useRegister() {
   const queryClient = useQueryClient();
 
