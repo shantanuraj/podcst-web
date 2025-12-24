@@ -24,7 +24,7 @@ function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
   return (
     <SpaLink href={getEpisodeHref(episode, podcast)} className={styles.container}>
       <div className={styles.artwork}>
-        <img loading="lazy" src={episodeArt || cover} alt="" />
+        <img loading="lazy" src={episodeArt || cover || undefined} alt="" />
       </div>
       <div className={styles.meta}>
         <div className={styles.date}>{month}</div>
