@@ -38,6 +38,7 @@ export const Seekbar: React.FC<{
         (duration) => {
           durationRef.current = duration;
         },
+        { fireImmediately: true },
       ),
     [],
   );
@@ -52,6 +53,7 @@ export const Seekbar: React.FC<{
             seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
           });
         },
+        { fireImmediately: true },
       ),
     [],
   );
@@ -78,5 +80,6 @@ export const Seekbar: React.FC<{
 };
 
 function getSeekWidth(seekPosition: number, duration: number): string {
+  if (!duration) return '0%';
   return `${(seekPosition / duration) * 100}%`;
 }

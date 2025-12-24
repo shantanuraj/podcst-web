@@ -17,6 +17,7 @@ export const Duration = () => {
           if (!seekPositionEl) return;
           seekPositionEl.innerText = formatSecondsToTimestamp(seekPosition);
         },
+        { fireImmediately: true },
       ),
     [],
   );
@@ -30,6 +31,7 @@ export const Duration = () => {
           if (!durationEl) return;
           durationEl.innerText = formatSecondsToTimestamp(duration);
         },
+        { fireImmediately: true },
       ),
     [],
   );
