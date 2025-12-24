@@ -21,6 +21,9 @@ import styles from './Subscriptions.module.css';
 
 type Tab = 'subscriptions' | 'new';
 
+/**
+ * @deprecated Use /profile/subscriptions instead
+ */
 const LibraryPage: NextPage = () => {
   const [activeTab, setActiveTab] = useState<Tab>('subscriptions');
 

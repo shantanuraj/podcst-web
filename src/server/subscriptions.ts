@@ -25,6 +25,7 @@ export async function getSubscriptions(userId: string): Promise<IPodcastEpisodes
   for (const row of rows) {
     const episodes = await sql`
       SELECT
+        e.id,
         e.guid,
         e.title,
         e.summary,
@@ -41,6 +42,8 @@ export async function getSubscriptions(userId: string): Promise<IPodcastEpisodes
     `;
 
     const mappedEpisodes = episodes.map((e) => ({
+      id: e.id,
+      podcastId: row.id,
       guid: e.guid,
       title: e.title,
       summary: e.summary,
@@ -62,6 +65,7 @@ export async function getSubscriptions(userId: string): Promise<IPodcastEpisodes
     }));
 
     podcasts.push({
+      id: row.id,
       feed: row.feed_url,
       title: row.title,
       description: row.description || '',
