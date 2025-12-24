@@ -1,57 +1,79 @@
-/**
- * Podcast Search API
- */
-
 import { adaptResponse } from '@/app/api/adapter';
 import { feed } from '@/app/api/feed/feed';
 import { feedToSearchResponse } from '@/app/api/feed/format';
 import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
+import { searchPodcasts, searchPodcastsByFeedUrl } from '@/server/search';
 import type { IPodcastSearchResult, iTunes } from '@/types';
 
 export async function search(term: string, locale = DEFAULT_PODCASTS_LOCALE) {
-  const res: IPodcastSearchResult[] = await (isURL(term)
-    ? feed(term).then(feedToSearchResponse(term))
-    : searchFromApi(term, locale));
-  return res;
+  if (isURL(term)) {
+    return searchByUrl(term);
+  }
+  return searchByTerm(term, locale);
 }
 
-/**
- * Url check regex
- */
-const URL_REGEX = /^https?:\//;
+async function searchByUrl(url: string): Promise<IPodcastSearchResult[]> {
+  const dbResult = await searchPodcastsByFeedUrl(url);
+  if (dbResult) {
+    return [dbResult];
+  }
 
-/**
- * Returns true if given string is url-like
- */
+  const feedResult = await feed(url);
+  return feedToSearchResponse(url)(feedResult);
+}
+
+async function searchByTerm(
+  term: string,
+  locale: string,
+): Promise<IPodcastSearchResult[]> {
+  const [dbResults, itunesResults] = await Promise.all([
+    searchPodcasts(term, 20).catch(() => [] as IPodcastSearchResult[]),
+    searchFromItunes(term, locale).catch(() => [] as IPodcastSearchResult[]),
+  ]);
+
+  return mergeResults(dbResults, itunesResults);
+}
+
+function mergeResults(
+  dbResults: IPodcastSearchResult[],
+  itunesResults: IPodcastSearchResult[],
+): IPodcastSearchResult[] {
+  const seen = new Set<string>();
+  const merged: IPodcastSearchResult[] = [];
+
+  for (const result of dbResults) {
+    seen.add(result.feed);
+    merged.push(result);
+  }
+
+  for (const result of itunesResults) {
+    if (!seen.has(result.feed)) {
+      seen.add(result.feed);
+      merged.push(result);
+    }
+  }
+
+  return merged;
+}
+
+const URL_REGEX = /^https?:\//;
 const isURL = (str: string) => URL_REGEX.test(str);
 
-/**
- * Returns list of podcasts from search
- */
-async function searchFromApi(term: string, locale: string): Promise<IPodcastSearchResult[]> {
-  try {
-    const url = getSearchUrl(term, locale);
-    const res = await fetch(url);
-    if (res.status !== 200) {
-      console.error('Could not perform search:', term);
-      return [];
-    }
-    const data = (await res.json()) as iTunes.Response;
-    return adaptResponse(data);
-  } catch (err) {
-    console.error(err);
-    return [];
-  }
-}
-
-function getSearchUrl(term: string, locale: string) {
+async function searchFromItunes(
+  term: string,
+  locale: string,
+): Promise<IPodcastSearchResult[]> {
   const url = new URL(ITUNES_API);
   url.pathname = '/search';
-  const params = new URLSearchParams({
+  url.search = new URLSearchParams({
     country: locale,
     media: 'podcast',
     term,
-  });
-  url.search = params.toString();
-  return url.toString();
+  }).toString();
+
+  const res = await fetch(url);
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as iTunes.Response;
+  return adaptResponse(data);
 }
