@@ -134,44 +134,33 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
     }
 
     let [podcast] = await sql`
-      SELECT id FROM podcasts
-      WHERE feed_url = ${p.feed} OR itunes_id = ${p.id}
-      LIMIT 1
+      SELECT id FROM podcasts WHERE feed_url = ${p.feed} LIMIT 1
     `;
-
-    if (podcast) {
-      await sql`
-        UPDATE podcasts SET
-          itunes_id = COALESCE(${p.id}, itunes_id),
-          feed_url = ${p.feed},
-          title = ${p.title},
-          author_id = ${author.id},
-          cover = ${p.cover},
-          thumbnail = ${p.thumbnail},
-          explicit = ${p.explicit === 'explicit'},
-          episode_count = GREATEST(${p.count}, episode_count),
-          updated_at = now()
-        WHERE id = ${podcast.id}
-      `;
-    } else {
-      [podcast] = await sql`
-        INSERT INTO podcasts (
-          itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
-        ) VALUES (
-          ${p.id}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
-          ${p.explicit === 'explicit'}, ${p.count}
-        )
-        ON CONFLICT (feed_url) DO UPDATE SET
-          itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),
-          title = EXCLUDED.title,
-          author_id = EXCLUDED.author_id,
-          cover = EXCLUDED.cover,
-          thumbnail = EXCLUDED.thumbnail,
-          explicit = EXCLUDED.explicit,
-          episode_count = GREATEST(EXCLUDED.episode_count, podcasts.episode_count),
-          updated_at = now()
-        RETURNING id
-      `;
+    if (!podcast) {
+      try {
+        [podcast] = await sql`
+          INSERT INTO podcasts (
+            itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
+          ) VALUES (
+            ${p.id}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
+            ${p.explicit === 'explicit'}, ${p.count}
+          )
+          ON CONFLICT (feed_url) DO UPDATE SET
+            itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),
+            title = EXCLUDED.title,
+            author_id = EXCLUDED.author_id,
+            cover = EXCLUDED.cover,
+            thumbnail = EXCLUDED.thumbnail,
+            explicit = EXCLUDED.explicit,
+            episode_count = GREATEST(EXCLUDED.episode_count, podcasts.episode_count),
+            updated_at = now()
+          RETURNING id
+        `;
+      } catch {
+        [podcast] = await sql`
+          SELECT id FROM podcasts WHERE feed_url = ${p.feed} LIMIT 1
+        `;
+      }
     }
 
     await sql`
