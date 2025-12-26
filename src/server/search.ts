@@ -25,7 +25,7 @@ export async function searchPodcasts(
       AND p.is_active = true
       AND to_tsvector('english', p.title || ' ' || COALESCE(p.description, ''))
           @@ to_tsquery('english', ${searchQuery})
-    ORDER BY p.popularity_score DESC NULLS LAST
+    ORDER BY p.priority DESC NULLS LAST, p.popularity_score DESC NULLS LAST
     LIMIT ${limit}
   `;
 
