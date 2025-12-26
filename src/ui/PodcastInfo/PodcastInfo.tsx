@@ -44,10 +44,15 @@ export function PodcastInfo({ info }: PodcastInfoProps) {
               </>
             )}
           </p>
-          {lastPublished && <p className={styles.lastUpdated}>Updated {lastPublished}</p>}
+          {lastPublished && (
+            <p className={styles.lastUpdated}>Updated {lastPublished}</p>
+          )}
           <div className={styles.actions}>
             <SubscribeButton info={info} />
-            <ShareButton title={title} text={`Listen to ${title} by ${author} on Podcst`} />
+            <ShareButton
+              title={title}
+              text={`Listen to ${title} by ${author} on Podcst`}
+            />
           </div>
         </div>
       </div>

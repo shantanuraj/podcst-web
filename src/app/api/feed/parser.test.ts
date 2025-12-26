@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 test('parsing DutchPod101 feed', async () => {
-  const xmlPath = join(process.cwd(), 'src/app/api/feed/__fixtures__/dutchpod.xml');
+  const xmlPath = join(
+    process.cwd(),
+    'src/app/api/feed/__fixtures__/dutchpod.xml',
+  );
   const xml = readFileSync(xmlPath, 'utf-8');
   const result = await adaptFeed(xml);
 
@@ -42,7 +45,9 @@ test('parsing DutchPod101 feed', async () => {
   const audioEpisode = result.episodes[1];
   expect(audioEpisode.title).toBe('How This Feed Works');
   expect(audioEpisode.duration).toBe(95); // 1:35
-  expect(audioEpisode.file.url).toBe('https://mdn.illops.net/dutchpod101/dutch_pubfeed_l1.mp3');
+  expect(audioEpisode.file.url).toBe(
+    'https://mdn.illops.net/dutchpod101/dutch_pubfeed_l1.mp3',
+  );
   expect(audioEpisode.file.type).toBe('audio/mpeg');
 
   // Check show notes/description

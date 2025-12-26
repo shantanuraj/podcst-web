@@ -15,7 +15,9 @@ export const QueueButton = React.memo(
     ref,
   ) {
     const showToast = useToast(getShowToast);
-    const classes = className ? [className, styles.queue].join(' ') : styles.queue;
+    const classes = className
+      ? [className, styles.queue].join(' ')
+      : styles.queue;
     const queueEpisode = usePlayer(getQueueEpisode);
     const handleClick = React.useCallback(
       (e: React.MouseEvent) => {

@@ -5,7 +5,8 @@ import type { IEpisodeInfo, IShortUrl } from '@/types';
  * Generate a random slug for short URLs
  */
 function generateSlug(length: number = 6): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const chars =
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));

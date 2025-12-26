@@ -15,13 +15,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sent: true });
     } catch (err) {
       console.error('Failed to send verification email:', err);
-      return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to send verification email' },
+        { status: 500 },
+      );
     }
   }
 
   const verified = await verifyCode(email, code);
   if (!verified) {
-    return NextResponse.json({ error: 'Invalid or expired code' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Invalid or expired code' },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({ verified: true });

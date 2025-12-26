@@ -22,7 +22,11 @@ async function fetchCurrentProgress(): Promise<PlaybackProgress | null> {
   return res.json();
 }
 
-async function saveProgress(episodeId: number, position: number, completed: boolean) {
+async function saveProgress(
+  episodeId: number,
+  position: number,
+  completed: boolean,
+) {
   await fetch('/api/progress', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -33,7 +37,9 @@ async function saveProgress(episodeId: number, position: number, completed: bool
 export function usePlaybackSync() {
   const { data: user, isLoading: sessionLoading } = useSession();
   const restoredRef = useRef(false);
-  const lastSavedRef = useRef<{ episodeId: number; position: number } | null>(null);
+  const lastSavedRef = useRef<{ episodeId: number; position: number } | null>(
+    null,
+  );
 
   const restoreEpisode = usePlayer((s) => s.restoreEpisode);
   const duration = usePlayer((s) => s.duration);
@@ -62,7 +68,11 @@ export function usePlaybackSync() {
       const position = getSeekPosition(state);
       const last = lastSavedRef.current;
 
-      if (!completed && last?.episodeId === episode.id && last?.position === position) {
+      if (
+        !completed &&
+        last?.episodeId === episode.id &&
+        last?.position === position
+      ) {
         return;
       }
 
@@ -78,10 +88,16 @@ export function usePlaybackSync() {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const unsubscribe = usePlayer.subscribe(
-      (state) => ({ playbackState: getPlaybackState(state), episode: getCurrentEpisode(state) }),
+      (state) => ({
+        playbackState: getPlaybackState(state),
+        episode: getCurrentEpisode(state),
+      }),
       ({ playbackState, episode }, prev) => {
         if (playbackState === 'playing' && !intervalId) {
-          intervalId = setInterval(() => saveCurrentProgress(), SYNC_INTERVAL_MS);
+          intervalId = setInterval(
+            () => saveCurrentProgress(),
+            SYNC_INTERVAL_MS,
+          );
         }
 
         if (playbackState === 'paused' && prev.playbackState === 'playing') {
@@ -92,7 +108,11 @@ export function usePlaybackSync() {
           }
         }
 
-        if (playbackState === 'idle' && prev.playbackState !== 'idle' && prev.episode?.id) {
+        if (
+          playbackState === 'idle' &&
+          prev.playbackState !== 'idle' &&
+          prev.episode?.id
+        ) {
           saveProgress(prev.episode.id, 0, true);
           lastSavedRef.current = null;
           if (intervalId) {
@@ -101,7 +121,11 @@ export function usePlaybackSync() {
           }
         }
       },
-      { equalityFn: (a, b) => a.playbackState === b.playbackState && a.episode?.id === b.episode?.id },
+      {
+        equalityFn: (a, b) =>
+          a.playbackState === b.playbackState &&
+          a.episode?.id === b.episode?.id,
+      },
     );
 
     return () => {
@@ -135,7 +159,11 @@ export function usePlaybackSync() {
           const position = getSeekPosition(state);
           navigator.sendBeacon(
             '/api/progress',
-            JSON.stringify({ episodeId: episode.id, position, completed: false }),
+            JSON.stringify({
+              episodeId: episode.id,
+              position,
+              completed: false,
+            }),
           );
         }
       }

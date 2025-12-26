@@ -15,7 +15,8 @@ export const adaptPodcast = (podcast: iTunes.Podcast): IPodcast => ({
   cover: podcast.artworkUrl600,
   explicit: podcast.collectionExplicitness,
   feed:
-    podcast.feedUrl || feedURLExceptions[podcast.collectionId as keyof typeof feedURLExceptions],
+    podcast.feedUrl ||
+    feedURLExceptions[podcast.collectionId as keyof typeof feedURLExceptions],
   thumbnail: podcast.artworkUrl100,
   title: podcast.collectionName,
 });

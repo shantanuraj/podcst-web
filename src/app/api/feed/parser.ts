@@ -159,7 +159,8 @@ const readKeywords = (ctx: any): string[] => {
  * Extract show notes by picking the best available text
  */
 const readShowNotes = (ctx: any): string => {
-  const description = (Array.isArray(ctx.description) && ctx.description[0]) || '';
+  const description =
+    (Array.isArray(ctx.description) && ctx.description[0]) || '';
   const contentEncoded =
     (Array.isArray(ctx['content:encoded']) &&
       (ctx['content:encoded'][0]._ || ctx['content:encoded'][0])) ||
@@ -168,7 +169,9 @@ const readShowNotes = (ctx: any): string => {
 
   const notes = [
     typeof description === 'object' ? description._ || '' : description,
-    typeof contentEncoded === 'object' ? contentEncoded._ || '' : contentEncoded,
+    typeof contentEncoded === 'object'
+      ? contentEncoded._ || ''
+      : contentEncoded,
     summary,
   ].sort(showNotesSorter);
 
@@ -187,7 +190,10 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
       if (itunesImage[0].$?.href) {
         link = itunesImage[0].$.href;
       } else {
-        const val = typeof itunesImage[0] === 'object' ? itunesImage[0]._ : itunesImage[0];
+        const val =
+          typeof itunesImage[0] === 'object'
+            ? itunesImage[0]._
+            : itunesImage[0];
         if (typeof val === 'string') {
           link = val.trim();
         }
@@ -269,13 +275,19 @@ const adaptEpisode = (
   fallbackCover: string,
   fallbackAuthor: string,
 ): IEpisode | null => {
-  if (!item.enclosure || !Array.isArray(item.enclosure) || !item.enclosure[0]?.$) {
+  if (
+    !item.enclosure ||
+    !Array.isArray(item.enclosure) ||
+    !item.enclosure[0]?.$
+  ) {
     return null;
   }
 
   const guid = readGuid(item);
   const titleRaw = Array.isArray(item.title) ? item.title[0] : item.title;
-  const title = (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) || 'Untitled Episode';
+  const title =
+    (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) ||
+    'Untitled Episode';
 
   if (!guid && (!title || title === 'Untitled Episode')) {
     return null;
@@ -294,8 +306,9 @@ const adaptEpisode = (
     link,
     file: readFile(item.enclosure[0].$),
     author:
-      (Array.isArray(item['itunes:author']) ? (item['itunes:author'][0] as string) : null) ||
-      fallbackAuthor,
+      (Array.isArray(item['itunes:author'])
+        ? (item['itunes:author'][0] as string)
+        : null) || fallbackAuthor,
     episodeArt: readEpisodeArtwork(item),
     showNotes: readShowNotes(item),
   };
@@ -329,14 +342,20 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
     const cover = (readCover(channel) || '') as string;
 
     const author =
-      (Array.isArray(channel['itunes:author']) ? channel['itunes:author'][0] : null) ||
+      (Array.isArray(channel['itunes:author'])
+        ? channel['itunes:author'][0]
+        : null) ||
       (Array.isArray(channel['itunes:owner'])
         ? channel['itunes:owner'][0]?.['itunes:name']?.[0]
         : null) ||
       'Unknown Author';
 
-    const titleRaw = Array.isArray(channel.title) ? channel.title[0] : channel.title;
-    const title = (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) || 'Unknown Podcast';
+    const titleRaw = Array.isArray(channel.title)
+      ? channel.title[0]
+      : channel.title;
+    const title =
+      (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) ||
+      'Unknown Podcast';
 
     return {
       title: title.toString().trim(),
@@ -348,7 +367,9 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
       keywords: readKeywords(channel),
       explicit: readExplicit(channel),
       episodes: Array.isArray(channel.item)
-        ? channel.item.map((e: any) => adaptEpisode(e, cover, author)).filter(validEpisode)
+        ? channel.item
+            .map((e: any) => adaptEpisode(e, cover, author))
+            .filter(validEpisode)
         : [],
     };
   } catch (err) {

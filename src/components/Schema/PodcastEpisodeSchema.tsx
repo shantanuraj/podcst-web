@@ -19,7 +19,11 @@ function secondsToIsoDuration(seconds: number): string {
   return iso;
 }
 
-export const PodcastEpisodeSchema = ({ podcast, episode, url }: PodcastEpisodeSchemaProps) => {
+export const PodcastEpisodeSchema = ({
+  podcast,
+  episode,
+  url,
+}: PodcastEpisodeSchemaProps) => {
   const data = {
     '@context': 'https://schema.org',
     '@type': 'PodcastEpisode',
@@ -27,8 +31,12 @@ export const PodcastEpisodeSchema = ({ podcast, episode, url }: PodcastEpisodeSc
     description: episode.summary || episode.title,
     url: url,
     image: episode.episodeArt || episode.cover || podcast.cover,
-    datePublished: episode.published ? new Date(episode.published).toISOString() : undefined,
-    duration: episode.duration ? secondsToIsoDuration(episode.duration) : undefined,
+    datePublished: episode.published
+      ? new Date(episode.published).toISOString()
+      : undefined,
+    duration: episode.duration
+      ? secondsToIsoDuration(episode.duration)
+      : undefined,
     associatedMedia: {
       '@type': 'MediaObject',
       contentUrl: episode.file.url,

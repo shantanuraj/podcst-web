@@ -27,7 +27,9 @@ export const Chromecast = () => {
 
   useEffect(() => {
     if (!controller) return;
-    const chromecastPlaybackStateSync = (event: cast.framework.RemotePlayerChangedEvent) => {
+    const chromecastPlaybackStateSync = (
+      event: cast.framework.RemotePlayerChangedEvent,
+    ) => {
       switch (event.field) {
         case 'currentTime':
           if (event.value) setSeekPosition(event.value);
@@ -35,7 +37,8 @@ export const Chromecast = () => {
         case 'mediaInfo': {
           const mediaInfo = event.value as chrome.cast.media.MediaInfo;
           if (!mediaInfo) return;
-          if (typeof mediaInfo.duration === 'number') setDuration(mediaInfo.duration);
+          if (typeof mediaInfo.duration === 'number')
+            setDuration(mediaInfo.duration);
           return;
         }
         case 'playerState': {
@@ -57,7 +60,13 @@ export const Chromecast = () => {
         chromecastPlaybackStateSync,
       );
     };
-  }, [controller, setDuration, setPlayerState, setSeekPosition, syncSeekAndPause]);
+  }, [
+    controller,
+    setDuration,
+    setPlayerState,
+    setSeekPosition,
+    syncSeekAndPause,
+  ]);
 
   if (
     !isChromecastEnabled ||

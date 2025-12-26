@@ -1,5 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import {
+  startRegistration,
+  startAuthentication,
+} from '@simplewebauthn/browser';
 
 type User = {
   id: string;

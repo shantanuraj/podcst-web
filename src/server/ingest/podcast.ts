@@ -1,8 +1,15 @@
 import { sql } from '../db';
 import { adaptFeed } from '@/app/api/feed/parser';
-import type { IEpisode, IEpisodeListing, IPodcastEpisodesInfo, IEpisodeInfo } from '@/types';
+import type {
+  IEpisode,
+  IEpisodeListing,
+  IPodcastEpisodesInfo,
+  IEpisodeInfo,
+} from '@/types';
 
-export async function ingestPodcast(feedUrl: string): Promise<IPodcastEpisodesInfo | null> {
+export async function ingestPodcast(
+  feedUrl: string,
+): Promise<IPodcastEpisodesInfo | null> {
   const existing = await getPodcastByFeedUrl(feedUrl);
   if (existing && existing.episodes.length > 0) {
     return existing;
@@ -23,7 +30,9 @@ export async function ingestPodcast(feedUrl: string): Promise<IPodcastEpisodesIn
   return getPodcastByFeedUrl(feedUrl);
 }
 
-export async function refreshPodcast(podcastId: number): Promise<IPodcastEpisodesInfo | null> {
+export async function refreshPodcast(
+  podcastId: number,
+): Promise<IPodcastEpisodesInfo | null> {
   const [existing] = await sql`
     SELECT id, feed_url FROM podcasts WHERE id = ${podcastId}
   `;
@@ -55,7 +64,9 @@ export async function refreshPodcast(podcastId: number): Promise<IPodcastEpisode
   return getPodcastByFeedUrl(feedUrl);
 }
 
-async function fetchAndParseFeed(feedUrl: string): Promise<IEpisodeListing | null> {
+async function fetchAndParseFeed(
+  feedUrl: string,
+): Promise<IEpisodeListing | null> {
   try {
     const res = await fetch(feedUrl, {
       headers: { 'User-Agent': 'Podcst/1.0' },
@@ -116,7 +127,11 @@ async function storePodcast(feedUrl: string, data: IEpisodeListing) {
   return podcast;
 }
 
-async function storeEpisodes(podcastId: number, feedUrl: string, episodes: IEpisode[]) {
+async function storeEpisodes(
+  podcastId: number,
+  feedUrl: string,
+  episodes: IEpisode[],
+) {
   if (episodes.length === 0) return;
 
   for (const ep of episodes) {
@@ -154,7 +169,9 @@ async function storeEpisodes(podcastId: number, feedUrl: string, episodes: IEpis
   `;
 }
 
-export async function getPodcastByFeedUrl(feedUrl: string): Promise<IPodcastEpisodesInfo | null> {
+export async function getPodcastByFeedUrl(
+  feedUrl: string,
+): Promise<IPodcastEpisodesInfo | null> {
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
@@ -210,7 +227,9 @@ export async function getPodcastByFeedUrl(feedUrl: string): Promise<IPodcastEpis
   };
 }
 
-export async function getPodcastById(id: number): Promise<IPodcastEpisodesInfo | null> {
+export async function getPodcastById(
+  id: number,
+): Promise<IPodcastEpisodesInfo | null> {
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
@@ -273,7 +292,9 @@ export async function getPodcastById(id: number): Promise<IPodcastEpisodesInfo |
   };
 }
 
-export async function getEpisodeById(episodeId: number): Promise<IEpisodeInfo | null> {
+export async function getEpisodeById(
+  episodeId: number,
+): Promise<IEpisodeInfo | null> {
   const [row] = await sql`
     SELECT e.*, p.id as podcast_id, p.feed_url, p.title as podcast_title, p.cover as podcast_cover,
            p.explicit as podcast_explicit, a.name as author_name

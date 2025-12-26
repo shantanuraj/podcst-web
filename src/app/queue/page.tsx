@@ -9,7 +9,11 @@ const QueuePage = () => {
   const episodes = usePlayer(getEpisodesQueue);
 
   if (episodes.length === 0) {
-    return <div className={styles.empty}>Add some episodes to queue to see them here</div>;
+    return (
+      <div className={styles.empty}>
+        Add some episodes to queue to see them here
+      </div>
+    );
   }
 
   return (

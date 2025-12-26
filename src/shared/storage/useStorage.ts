@@ -3,7 +3,9 @@ import { getValue, type IStoreable, removeValue, setValue } from './local';
 
 type StoredValue<T> = [T, Dispatch<SetStateAction<T>>];
 
-export function useStorage<K extends keyof IStoreable>(key: K): StoredValue<IStoreable[K] | null>;
+export function useStorage<K extends keyof IStoreable>(
+  key: K,
+): StoredValue<IStoreable[K] | null>;
 export function useStorage<K extends keyof IStoreable>(
   key: K,
   defaultValue: IStoreable[K],

@@ -35,7 +35,11 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
         </div>
         <div className={styles.meta}>
           <h1 className={styles.title}>
-            {episode.link ? <ExternalLink href={episode.link}>{title}</ExternalLink> : title}
+            {episode.link ? (
+              <ExternalLink href={episode.link}>{title}</ExternalLink>
+            ) : (
+              title
+            )}
           </h1>
           <p className={styles.podcast}>
             <SpaLink href={getPodcastHref(podcast)}>{podcast.title}</SpaLink>

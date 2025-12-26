@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
-import { getPodcastById, getPodcastByFeedUrl, ingestPodcast } from '@/server/ingest/podcast';
+import {
+  getPodcastById,
+  getPodcastByFeedUrl,
+  ingestPodcast,
+} from '@/server/ingest/podcast';
 import { EpisodesSpaClient } from './EpisodesSpaClient';
 
 function isNumeric(str: string): boolean {
@@ -17,7 +21,8 @@ function parseSlugs(slugs: string[]): ParsedSlugs {
 
   if (isNumeric(first)) {
     const podcastId = parseInt(first, 10);
-    const episodeId = slugs[1] && isNumeric(slugs[1]) ? parseInt(slugs[1], 10) : null;
+    const episodeId =
+      slugs[1] && isNumeric(slugs[1]) ? parseInt(slugs[1], 10) : null;
     return { type: 'id', podcastId, episodeId };
   }
 
@@ -58,7 +63,8 @@ export async function generateMetadata(props: {
     if (episode) {
       return {
         title: episode.title,
-        description: episode.summary || `Listen to ${episode.title} from ${info.title}`,
+        description:
+          episode.summary || `Listen to ${episode.title} from ${info.title}`,
         openGraph: { images: info.cover },
       };
     }
@@ -67,7 +73,8 @@ export async function generateMetadata(props: {
     if (episode) {
       return {
         title: episode.title,
-        description: episode.summary || `Listen to ${episode.title} from ${info.title}`,
+        description:
+          episode.summary || `Listen to ${episode.title} from ${info.title}`,
         openGraph: { images: info.cover },
       };
     }
@@ -80,7 +87,9 @@ export async function generateMetadata(props: {
   };
 }
 
-export default async function Page(props: { params: Promise<{ slugs: string[] }> }) {
+export default async function Page(props: {
+  params: Promise<{ slugs: string[] }>;
+}) {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
 

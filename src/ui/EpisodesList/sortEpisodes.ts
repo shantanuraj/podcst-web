@@ -2,7 +2,10 @@ import type { IEpisodeInfo } from '@/types';
 
 import type { SortPreference } from './types';
 
-export const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: string }> = {
+export const sortOptionsMap: Record<
+  SortPreference,
+  { value: SortPreference; title: string }
+> = {
   releaseDesc: {
     title: 'Release date (New → Old)',
     value: 'releaseDesc',
@@ -31,7 +34,10 @@ export const sortOptionsMap: Record<SortPreference, { value: SortPreference; tit
 
 export const sortOptions = Object.values(sortOptionsMap);
 
-export const sortEpisodes = (episodes: IEpisodeInfo[], sortPreference: SortPreference) => {
+export const sortEpisodes = (
+  episodes: IEpisodeInfo[],
+  sortPreference: SortPreference,
+) => {
   const sortFn = (a: IEpisodeInfo, b: IEpisodeInfo) => {
     switch (sortPreference) {
       case sortOptionsMap.releaseAsc.value:

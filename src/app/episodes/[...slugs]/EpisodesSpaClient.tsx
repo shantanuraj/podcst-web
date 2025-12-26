@@ -43,12 +43,18 @@ export function EpisodesSpaClient({
 }: EpisodesSpaClientProps) {
   const pathname = usePathname();
 
-  const { episodeId: currentEpisodeId } = useMemo(() => parsePathname(pathname), [pathname]);
+  const { episodeId: currentEpisodeId } = useMemo(
+    () => parsePathname(pathname),
+    [pathname],
+  );
 
   const { data: info } = usePodcast(podcastId, initialData);
   const feedData = info ?? initialData;
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.podcst.app';
+  const origin =
+    typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://www.podcst.app';
   const currentUrl = `${origin}${pathname}`;
 
   if (!feedData) {
@@ -64,7 +70,11 @@ export function EpisodesSpaClient({
 
     return (
       <>
-        <PodcastEpisodeSchema podcast={feedData} episode={episode} url={currentUrl} />
+        <PodcastEpisodeSchema
+          podcast={feedData}
+          episode={episode}
+          url={currentUrl}
+        />
         <EpisodeInfo podcast={feedData} episode={episode} />
       </>
     );

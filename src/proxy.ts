@@ -13,8 +13,10 @@ function getLocale(request: NextRequest): string | undefined {
   });
 
   // Use negotiator and intl-localematcher to get best locale
-  // @ts-expect-error: Readonly array is not assignable to mutable array
-  const languages = new Negotiator({ headers: negotiatorHeaders }).languages(locales);
+  const languages = new Negotiator({ headers: negotiatorHeaders }).languages(
+    // @ts-expect-error: Readonly array is not assignable to mutable array
+    locales,
+  );
 
   const locale = matchLocale(languages, locales, i18n.defaultLocale);
 
@@ -26,12 +28,15 @@ export default function proxy(request: NextRequest) {
   if (!pathname.includes('/feed/top')) return NextResponse.next();
 
   const pathnameIsMissingLocale = locales.every(
-    (locale) => !pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`,
+    (locale) =>
+      !pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`,
   );
 
   if (pathnameIsMissingLocale) {
     const locale = getLocale(request);
-    return NextResponse.redirect(new URL(`/${locale}/${pathname}`, request.url));
+    return NextResponse.redirect(
+      new URL(`/${locale}/${pathname}`, request.url),
+    );
   }
 }
 

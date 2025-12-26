@@ -70,15 +70,22 @@ export default function AuthPage() {
   };
 
   const isPending =
-    login.isPending || register.isPending || sendCode.isPending || verifyCode.isPending;
+    login.isPending ||
+    register.isPending ||
+    sendCode.isPending ||
+    verifyCode.isPending;
 
   if (mode === 'code' || mode === 'passkey') {
     return (
       <main className={styles.container}>
         <div className={styles.card}>
-          <h1 className={styles.title}>{mode === 'passkey' ? 'Create Passkey' : 'Enter Code'}</h1>
+          <h1 className={styles.title}>
+            {mode === 'passkey' ? 'Create Passkey' : 'Enter Code'}
+          </h1>
           <p className={styles.subtitle}>
-            {mode === 'passkey' ? 'Creating your passkey...' : `We sent a code to ${email}`}
+            {mode === 'passkey'
+              ? 'Creating your passkey...'
+              : `We sent a code to ${email}`}
           </p>
 
           {mode === 'code' && (
@@ -114,10 +121,14 @@ export default function AuthPage() {
           )}
 
           {mode === 'passkey' && !error && (
-            <p className={styles.subtitle}>Follow the prompts to create your passkey</p>
+            <p className={styles.subtitle}>
+              Follow the prompts to create your passkey
+            </p>
           )}
 
-          {error && mode === 'passkey' && <p className={styles.error}>{error}</p>}
+          {error && mode === 'passkey' && (
+            <p className={styles.error}>{error}</p>
+          )}
 
           <button
             type="button"
@@ -139,7 +150,9 @@ export default function AuthPage() {
     <main className={styles.container}>
       <div className={styles.card}>
         <h1 className={styles.title}>Sign In</h1>
-        <p className={styles.subtitle}>Use your email to continue with a passkey</p>
+        <p className={styles.subtitle}>
+          Use your email to continue with a passkey
+        </p>
 
         <form onSubmit={handleEmailSubmit} className={styles.form}>
           <input

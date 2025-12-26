@@ -28,7 +28,9 @@ export const CastManager: React.FC = () => {
   // Setup cast state listener
   useEffect(() => {
     if (!('cast' in window) || !isChromecastEnabled) return;
-    const chromecastStateListener = (event: cast.framework.CastStateEventData) => {
+    const chromecastStateListener = (
+      event: cast.framework.CastStateEventData,
+    ) => {
       setChromecastState(event.castState);
     };
 

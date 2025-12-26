@@ -31,7 +31,9 @@ export async function setValue<K extends keyof IIDBStoreable>(
   }
 }
 
-export async function removeValue<K extends keyof IIDBStoreable>(key: K): Promise<void> {
+export async function removeValue<K extends keyof IIDBStoreable>(
+  key: K,
+): Promise<void> {
   try {
     await del(key);
   } catch (err) {

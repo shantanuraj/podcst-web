@@ -40,9 +40,11 @@ export const useTheme = create<ThemeState>((set, get) => ({
   cycleScheme: (direction) => {
     const { themes, currentIndex } = get();
     const tmpIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-    const nextIndex = tmpIndex < 0 ? themes.length - 1 : tmpIndex % themes.length;
+    const nextIndex =
+      tmpIndex < 0 ? themes.length - 1 : tmpIndex % themes.length;
     const { scheme, theme } = themes[nextIndex];
     set({ scheme, theme, currentIndex: nextIndex });
   },
-  toggleDarkMode: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
+  toggleDarkMode: () =>
+    set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
 }));

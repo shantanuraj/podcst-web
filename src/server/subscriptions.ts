@@ -2,7 +2,9 @@ import { sql } from './db';
 import { ingestPodcast, getPodcastByFeedUrl } from './ingest/podcast';
 import type { IPodcastEpisodesInfo } from '@/types';
 
-export async function getSubscriptions(userId: string): Promise<IPodcastEpisodesInfo[]> {
+export async function getSubscriptions(
+  userId: string,
+): Promise<IPodcastEpisodesInfo[]> {
   const rows = await sql`
     SELECT
       p.id,
@@ -82,7 +84,10 @@ export async function getSubscriptions(userId: string): Promise<IPodcastEpisodes
   return podcasts;
 }
 
-export async function addSubscription(userId: string, podcastId: number): Promise<boolean> {
+export async function addSubscription(
+  userId: string,
+  podcastId: number,
+): Promise<boolean> {
   const [exists] = await sql`
     SELECT 1 FROM podcasts WHERE id = ${podcastId}
   `;
@@ -97,7 +102,10 @@ export async function addSubscription(userId: string, podcastId: number): Promis
   return true;
 }
 
-export async function removeSubscription(userId: string, podcastId: number): Promise<boolean> {
+export async function removeSubscription(
+  userId: string,
+  podcastId: number,
+): Promise<boolean> {
   await sql`
     DELETE FROM subscriptions
     WHERE user_id = ${userId} AND podcast_id = ${podcastId}

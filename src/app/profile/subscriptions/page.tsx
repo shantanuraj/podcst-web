@@ -52,8 +52,8 @@ function EmptyState() {
       </div>
       <h1 className={styles.emptyTitle}>Your Library is Empty</h1>
       <p className={styles.emptyText}>
-        Subscribe to podcasts to build your personal library. Your subscriptions sync across all
-        your devices.
+        Subscribe to podcasts to build your personal library. Your subscriptions
+        sync across all your devices.
       </p>
       <Link href="/feed/top" className={styles.browseLink}>
         Browse popular podcasts

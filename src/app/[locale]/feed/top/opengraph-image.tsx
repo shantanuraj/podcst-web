@@ -8,7 +8,9 @@ export const size = {
 
 export const contentType = 'image/png';
 
-export default async function Image(props: { params: Promise<{ locale: string }> }) {
+export default async function Image(props: {
+  params: Promise<{ locale: string }>;
+}) {
   const params = await props.params;
   const podcasts = await top(4, params.locale);
 

@@ -1,7 +1,10 @@
 'use client';
 
 import React from 'react';
-import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import {
+  type SubscriptionsState,
+  useSubscriptions,
+} from '@/shared/subscriptions/useSubscriptions';
 import { Button } from '@/ui/Button';
 import styles from '../Settings.module.css';
 
@@ -74,8 +77,8 @@ export default function SettingsExportPage() {
             </svg>
           </div>
           <p className="text-base text-ink-secondary max-w-[40ch] mb-8 leading-relaxed">
-            Download your subscriptions as an OPML file. You can use this file to import your
-            podcasts into other applications.
+            Download your subscriptions as an OPML file. You can use this file
+            to import your podcasts into other applications.
           </p>
           <div className="flex flex-col items-center gap-4">
             <Button
@@ -85,7 +88,8 @@ export default function SettingsExportPage() {
               Download OPML File
             </Button>
             <p className="text-xs text-ink-tertiary">
-              {subs.length} {subs.length === 1 ? 'podcast' : 'podcasts'} in your library
+              {subs.length} {subs.length === 1 ? 'podcast' : 'podcasts'} in your
+              library
             </p>
           </div>
         </div>

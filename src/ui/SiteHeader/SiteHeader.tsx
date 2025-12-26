@@ -14,7 +14,9 @@ export function SiteHeader() {
 
   const libraryHref = user ? '/profile/subscriptions' : '/subs';
   const isLibraryActive =
-    pathname === '/subs' || pathname === '/recents' || pathname === '/profile/subscriptions';
+    pathname === '/subs' ||
+    pathname === '/recents' ||
+    pathname === '/profile/subscriptions';
 
   return (
     <header className={styles.header}>
@@ -34,19 +36,31 @@ export function SiteHeader() {
           >
             Discover
           </Link>
-          <Link href={libraryHref} className={styles.navLink} data-active={isLibraryActive}>
+          <Link
+            href={libraryHref}
+            className={styles.navLink}
+            data-active={isLibraryActive}
+          >
             Library
           </Link>
         </nav>
         <div className={styles.actions}>
           <Search />
           {user ? (
-            <Link href="/profile" className={styles.iconLink} title={user.email}>
+            <Link
+              href="/profile"
+              className={styles.iconLink}
+              title={user.email}
+            >
               <Icon icon="user" size={20} />
             </Link>
           ) : (
             <>
-              <Link href="/settings" className={styles.iconLink} title="Settings">
+              <Link
+                href="/settings"
+                className={styles.iconLink}
+                title="Settings"
+              >
                 <Icon icon="settings" size={20} />
               </Link>
               <Link href="/auth" className={styles.authLink}>

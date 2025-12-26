@@ -6,7 +6,10 @@
 import type { IEpisodeInfo } from '@/types';
 import type { IPlayerState } from './usePlayer';
 
-export const updatePlaybackMetadata = (episode: IEpisodeInfo, podcastTitle?: string) => {
+export const updatePlaybackMetadata = (
+  episode: IEpisodeInfo,
+  podcastTitle?: string,
+) => {
   if (
     typeof window === 'undefined' ||
     typeof window.navigator === 'undefined' ||
@@ -51,7 +54,11 @@ export const updatePlaybackHandlers = (playerState: IPlayerState) => {
     ['stop', () => playerState.setPlayerState('idle')],
     ['seekbackward', playerState.seekBackward],
     ['seekforward', playerState.seekForward],
-    ['seekto', (details: MediaSessionActionDetails) => playerState.seekTo(details.seekTime || 0)],
+    [
+      'seekto',
+      (details: MediaSessionActionDetails) =>
+        playerState.seekTo(details.seekTime || 0),
+    ],
     ['previoustrack', playerState.skipToPreviousEpisode],
     ['nexttrack', playerState.skipToNextEpisode],
   ] as const;

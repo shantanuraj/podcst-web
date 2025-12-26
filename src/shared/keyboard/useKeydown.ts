@@ -8,7 +8,10 @@ export type KeyboardShortcuts = (
 ) => Array<[IShortcutInfo, ShortcutHandler]>;
 
 export function useKeydown(shortcuts: KeyboardShortcuts): void;
-export function useKeydown(config: IShortcutInfo, handler: ShortcutHandler): void;
+export function useKeydown(
+  config: IShortcutInfo,
+  handler: ShortcutHandler,
+): void;
 export function useKeydown(
   arg: KeyboardShortcuts | IShortcutInfo,
   handler?: ShortcutHandler,

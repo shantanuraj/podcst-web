@@ -30,7 +30,8 @@ export default function NotFound() {
       </div>
       <h1 className={styles.title}>Lost in the airwaves</h1>
       <p className={styles.text}>
-        The page you&apos;re looking for doesn&apos;t exist or has been moved to a different frequency.
+        The page you&apos;re looking for doesn&apos;t exist or has been moved to
+        a different frequency.
       </p>
       <div className={styles.actions}>
         <Link href="/" className={styles.homeButton}>
@@ -40,4 +41,3 @@ export default function NotFound() {
     </div>
   );
 }
-

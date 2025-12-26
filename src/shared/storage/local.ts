@@ -23,7 +23,8 @@ const storage =
         length: 0,
       };
 
-const getStore = (): IStoreable => JSON.parse(storage.getItem(STORE_KEY) as string) || {};
+const getStore = (): IStoreable =>
+  JSON.parse(storage.getItem(STORE_KEY) as string) || {};
 
 export const removeValue = <K extends keyof IStoreable>(key: K) => {
   try {
@@ -35,7 +36,9 @@ export const removeValue = <K extends keyof IStoreable>(key: K) => {
   }
 };
 
-export function getValue<K extends keyof IStoreable>(key: K): IStoreable[K] | null;
+export function getValue<K extends keyof IStoreable>(
+  key: K,
+): IStoreable[K] | null;
 export function getValue<K extends keyof IStoreable>(
   key: K,
   defaultValue: IStoreable[K],
@@ -44,7 +47,10 @@ export function getValue<K extends keyof IStoreable>(
   key: K,
   defaultValue: IStoreable[K] | null,
 ): IStoreable[K] | null;
-export function getValue<K extends keyof IStoreable>(key: K, defaultValue = null) {
+export function getValue<K extends keyof IStoreable>(
+  key: K,
+  defaultValue = null,
+) {
   try {
     const store = getStore();
     return store[key] || defaultValue;
@@ -54,7 +60,10 @@ export function getValue<K extends keyof IStoreable>(key: K, defaultValue = null
   return null;
 }
 
-export const setValue = <K extends keyof IStoreable>(key: K, val: IStoreable[K]) => {
+export const setValue = <K extends keyof IStoreable>(
+  key: K,
+  val: IStoreable[K],
+) => {
   const store: IStoreable = {
     ...getStore(),
     [key]: val,

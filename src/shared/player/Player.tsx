@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import {
+  type KeyboardShortcuts,
+  useKeydown,
+} from '@/shared/keyboard/useKeydown';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { ProxiedImage } from '@/ui/Image';
 
@@ -12,7 +15,12 @@ import { Duration } from './Duration';
 import { PlaybackRate } from './PlaybackRate';
 import styles from './Player.module.css';
 import { Seekbar } from './Seekbar';
-import { getCurrentEpisode, getIsPlayerOpen, getPlaybackState, usePlayer } from './usePlayer';
+import {
+  getCurrentEpisode,
+  getIsPlayerOpen,
+  getPlaybackState,
+  usePlayer,
+} from './usePlayer';
 import { usePlaybackSync } from './usePlaybackSync';
 import { VolumeControls } from './VolumeControls';
 import { getEpisodeHref } from '../links';
@@ -51,7 +59,10 @@ export const Player = () => {
         <div className={styles.player}>
           <Seekbar currentEpisode={currentEpisode} />
           <div className={styles.content}>
-            <Link href={getEpisodeHref(currentEpisode)} className={styles.artwork}>
+            <Link
+              href={getEpisodeHref(currentEpisode)}
+              className={styles.artwork}
+            >
               <ProxiedImage alt="" src={currentEpisode.cover} />
             </Link>
             <div

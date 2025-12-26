@@ -54,7 +54,9 @@ export function useSyncToCloud() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (feedUrls: string[]): Promise<{ succeeded: number; failed: number }> => {
+    mutationFn: async (
+      feedUrls: string[],
+    ): Promise<{ succeeded: number; failed: number }> => {
       const res = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -24,7 +24,10 @@ type SortPreference =
   | 'lengthAsc'
   | 'lengthDesc';
 
-const sortOptionsMap: Record<SortPreference, { value: SortPreference; title: string }> = {
+const sortOptionsMap: Record<
+  SortPreference,
+  { value: SortPreference; title: string }
+> = {
   releaseDesc: {
     title: 'Release date (New → Old)',
     value: 'releaseDesc',
@@ -63,12 +66,18 @@ export function EpisodesList({
     sortOptionsMap.releaseDesc.value,
   );
   const [query, setQuery] = useState('');
-  const onSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortPreference(e.target.value as SortPreference);
-  }, []);
-  const onQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value);
-  }, []);
+  const onSortChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setSortPreference(e.target.value as SortPreference);
+    },
+    [],
+  );
+  const onQueryChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setQuery(e.target.value);
+    },
+    [],
+  );
 
   const filteredEpisodes = useEpisodesFilter(episodes, sortPreference, query);
 
@@ -106,7 +115,11 @@ export function EpisodesList({
         </div>
       </div>
       {shouldUseVirtualList ? (
-        <ul className={styles.list} style={{ height: `${totalSize}px` }} suppressHydrationWarning>
+        <ul
+          className={styles.list}
+          style={{ height: `${totalSize}px` }}
+          suppressHydrationWarning
+        >
           {virtualItems.map(({ index, start }) => {
             const episode = filteredEpisodes[index];
             return (
@@ -145,7 +158,12 @@ interface EpisodeListItemProps {
   start?: number;
 }
 
-function EpisodeListItem({ episode, podcast, index: _index, start }: EpisodeListItemProps) {
+function EpisodeListItem({
+  episode,
+  podcast,
+  index: _index,
+  start,
+}: EpisodeListItemProps) {
   const virtual = start !== undefined;
   return (
     <li

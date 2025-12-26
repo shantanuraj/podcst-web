@@ -6,7 +6,10 @@ interface PodcastSeriesSchemaProps {
   url: string;
 }
 
-export const PodcastSeriesSchema = ({ podcast, url }: PodcastSeriesSchemaProps) => {
+export const PodcastSeriesSchema = ({
+  podcast,
+  url,
+}: PodcastSeriesSchemaProps) => {
   const data = {
     '@context': 'https://schema.org',
     '@type': 'PodcastSeries',

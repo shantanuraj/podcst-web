@@ -29,7 +29,8 @@ export const cacheMiss = <T>(entity: T) => ({ entity, timestamp: 0 });
 /**
  * Cache hit helper (removes nullability from return type)
  */
-export const cacheHit = <T>(entry: CachedEntity<T | null>) => entry as CachedEntity<T>;
+export const cacheHit = <T>(entry: CachedEntity<T | null>) =>
+  entry as CachedEntity<T>;
 
 /**
  * Returns true if given object is a cache hit

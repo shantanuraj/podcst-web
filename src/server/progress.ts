@@ -6,7 +6,9 @@ export interface PlaybackProgress {
   position: number;
 }
 
-export async function getCurrentProgress(userId: string): Promise<PlaybackProgress | null> {
+export async function getCurrentProgress(
+  userId: string,
+): Promise<PlaybackProgress | null> {
   const [row] = await sql`
     SELECT
       pp.position,

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticationOptions, verifyAuthentication } from '@/server/auth/passkey';
+import {
+  getAuthenticationOptions,
+  verifyAuthentication,
+} from '@/server/auth/passkey';
 import { createSession } from '@/server/auth/session';
 
 export async function POST(request: NextRequest) {
@@ -16,10 +19,14 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const { options, userId } = await getAuthenticationOptions(email, visitorId);
+      const { options, userId } = await getAuthenticationOptions(
+        email,
+        visitorId,
+      );
       return NextResponse.json({ options, userId });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Authentication failed';
+      const message =
+        err instanceof Error ? err.message : 'Authentication failed';
       return NextResponse.json({ error: message }, { status: 400 });
     }
   }
@@ -37,7 +44,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Authentication failed';
+    const message =
+      err instanceof Error ? err.message : 'Authentication failed';
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

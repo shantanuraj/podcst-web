@@ -4,7 +4,10 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
-import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/server';
 import { sql } from '../db';
 import { generateId } from './session';
 
@@ -55,7 +58,9 @@ export async function getRegistrationOptions(email: string, visitorId: string) {
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
-    userID: new Uint8Array(new TextEncoder().encode(user.id).buffer) as Uint8Array<ArrayBuffer>,
+    userID: new Uint8Array(
+      new TextEncoder().encode(user.id).buffer,
+    ) as Uint8Array<ArrayBuffer>,
     userName: email,
     attestationType: 'none',
     excludeCredentials: existingPasskeys.map((p) => ({
@@ -93,7 +98,8 @@ export async function verifyRegistration(
     throw new Error('Registration verification failed');
   }
 
-  const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+  const { credential, credentialDeviceType, credentialBackedUp } =
+    verification.registrationInfo;
 
   await sql`
     INSERT INTO passkeys (id, user_id, credential_id, public_key, counter)
@@ -111,7 +117,10 @@ export async function verifyRegistration(
   return { verified: true };
 }
 
-export async function getAuthenticationOptions(email: string, visitorId: string) {
+export async function getAuthenticationOptions(
+  email: string,
+  visitorId: string,
+) {
   const [user] = await sql`SELECT id FROM users WHERE email = ${email}`;
   if (!user) {
     throw new Error('User not found');
