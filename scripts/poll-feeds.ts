@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 
 import postgres from 'postgres';
-import { parseStringPromise } from 'xml2js';
 import { createHash } from 'crypto';
+import { adaptFeed } from '../src/app/api/feed/parser';
+import type { IEpisodeListing } from '../src/types';
 
 const BATCH_SIZE = 500;
 const DEFAULT_UPDATE_FREQUENCY = 86400;
@@ -27,102 +28,6 @@ interface FetchResult {
   etag?: string;
   lastModified?: string;
   hash?: string;
-}
-
-interface ParsedEpisode {
-  guid: string;
-  title: string;
-  summary: string | null;
-  published: Date;
-  duration: number | null;
-  episodeArt: string | null;
-  fileUrl: string;
-  fileLength: number;
-  fileType: string;
-}
-
-interface ParsedFeed {
-  title: string;
-  description: string;
-  cover: string;
-  link: string | null;
-  explicit: boolean;
-  lastPublished: Date | null;
-  episodes: ParsedEpisode[];
-}
-
-function parseDuration(str: string | undefined): number | null {
-  if (!str) return null;
-  const parts = str.split(':').map(Number);
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  const num = Number(str);
-  return isNaN(num) ? null : num;
-}
-
-function getText(item: unknown): string {
-  if (!item) return '';
-  if (typeof item === 'string') return item;
-  if (Array.isArray(item)) return getText(item[0]);
-  if (typeof item === 'object' && item !== null) {
-    const obj = item as Record<string, unknown>;
-    if ('_' in obj) return String(obj._);
-    if ('$' in obj && typeof obj.$ === 'object') {
-      const attrs = obj.$ as Record<string, unknown>;
-      if ('href' in attrs) return String(attrs.href);
-    }
-  }
-  return String(item);
-}
-
-async function parseFeed(xml: string): Promise<ParsedFeed | null> {
-  try {
-    const result = await parseStringPromise(xml, { explicitArray: true });
-    const channel = result?.rss?.channel?.[0];
-    if (!channel) return null;
-
-    const itunesImage = channel['itunes:image']?.[0]?.['$']?.href;
-    const regularImage = channel.image?.[0]?.url?.[0];
-
-    const episodes: ParsedEpisode[] = (channel.item || [])
-      .filter((item: Record<string, unknown>) => item.enclosure)
-      .map((item: Record<string, unknown>) => {
-        const enclosure = (item.enclosure as Array<{ $: Record<string, string> }>)?.[0]?.['$'] || {};
-        const itemImage =
-          (item['itunes:image'] as Array<{ $: { href: string } }>)?.[0]?.['$']?.href ||
-          (item['media:thumbnail'] as Array<{ $: { url: string } }>)?.[0]?.['$']?.url;
-
-        return {
-          guid: getText(item.guid) || getText(item.link) || enclosure.url,
-          title: getText(item.title),
-          summary: getText(item['itunes:summary']) || getText(item.description),
-          published: new Date(getText(item.pubDate) || Date.now()),
-          duration: parseDuration(getText(item['itunes:duration'])),
-          episodeArt: itemImage || null,
-          fileUrl: enclosure.url || '',
-          fileLength: Number(enclosure.length) || 0,
-          fileType: enclosure.type || 'audio/mpeg',
-        };
-      })
-      .filter((ep: ParsedEpisode) => ep.fileUrl && ep.guid);
-
-    const lastPublished = episodes.length > 0
-      ? new Date(Math.max(...episodes.map((ep) => ep.published.getTime())))
-      : null;
-
-    return {
-      title: getText(channel.title),
-      description: getText(channel['itunes:summary']) || getText(channel.description),
-      cover: itunesImage || regularImage || '',
-      link: getText(channel.link),
-      explicit: getText(channel['itunes:explicit']) === 'yes',
-      lastPublished,
-      episodes,
-    };
-  } catch (err) {
-    console.error('Parse error:', err);
-    return null;
-  }
 }
 
 async function fetchFeed(url: string, podcast: PodcastRow): Promise<FetchResult> {
@@ -187,10 +92,12 @@ async function pollPodcast(sql: postgres.Sql, podcast: PodcastRow): Promise<Poll
     return 'not_modified';
   }
 
-  const feed = await parseFeed(result.body!);
+  const feed = await adaptFeed(result.body!);
   if (!feed) {
     return 'error';
   }
+
+  const lastPublished = feed.published ? new Date(feed.published) : null;
 
   await sql`
     UPDATE podcasts SET
@@ -199,7 +106,7 @@ async function pollPodcast(sql: postgres.Sql, podcast: PodcastRow): Promise<Poll
       cover = ${feed.cover || podcast.feed_url},
       website_url = ${feed.link || null}::TEXT,
       explicit = ${feed.explicit},
-      last_published = ${feed.lastPublished}::TIMESTAMPTZ,
+      last_published = ${lastPublished}::TIMESTAMPTZ,
       episode_count = ${feed.episodes.length},
       feed_etag = ${result.etag || null}::TEXT,
       feed_last_modified = ${result.lastModified || null}::TEXT,
@@ -211,6 +118,9 @@ async function pollPodcast(sql: postgres.Sql, podcast: PodcastRow): Promise<Poll
   for (const ep of feed.episodes) {
     if (!ep.guid) continue;
 
+    const published = ep.published ? new Date(ep.published) : new Date();
+    const duration = ep.duration ? Math.floor(ep.duration) : null;
+
     await sql`
       INSERT INTO episodes (
         podcast_id, guid, title, summary, published, duration,
@@ -220,12 +130,12 @@ async function pollPodcast(sql: postgres.Sql, podcast: PodcastRow): Promise<Poll
         ${ep.guid},
         ${ep.title},
         ${ep.summary || null}::TEXT,
-        ${ep.published},
-        ${ep.duration}::INTEGER,
+        ${published},
+        ${duration}::INTEGER,
         ${ep.episodeArt || null}::TEXT,
-        ${ep.fileUrl},
-        ${ep.fileLength},
-        ${ep.fileType}
+        ${ep.file.url},
+        ${ep.file.length},
+        ${ep.file.type}
       )
       ON CONFLICT (podcast_id, guid) DO UPDATE SET
         title = EXCLUDED.title,
