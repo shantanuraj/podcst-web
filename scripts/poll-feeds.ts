@@ -6,6 +6,7 @@ import { adaptFeed } from '../src/app/api/feed/parser';
 import type { IEpisodeListing } from '../src/types';
 
 const BATCH_SIZE = 500;
+const CONCURRENCY = 5;
 const DEFAULT_UPDATE_FREQUENCY = 86400;
 const MAX_FAILURES = 5;
 const BACKOFF_BASE = 3600;
@@ -92,7 +93,12 @@ async function pollPodcast(sql: postgres.Sql, podcast: PodcastRow): Promise<Poll
     return 'not_modified';
   }
 
-  const feed = await adaptFeed(result.body!);
+  let feed;
+  try {
+    feed = await adaptFeed(result.body!);
+  } catch {
+    return 'error';
+  }
   if (!feed) {
     return 'error';
   }
@@ -189,19 +195,15 @@ async function main() {
     LIMIT ${BATCH_SIZE}
   `;
 
-  console.log(`Found ${podcasts.length} podcasts to poll`);
+  console.log(`Found ${podcasts.length} podcasts to poll (concurrency: ${CONCURRENCY})`);
 
   const startTime = Date.now();
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
+  let processed = 0;
 
-  for (let i = 0; i < podcasts.length; i++) {
-    const podcast = podcasts[i];
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    const rate = i > 0 ? (i / ((Date.now() - startTime) / 1000)).toFixed(1) : '0';
-    process.stdout.write(`[${i + 1}/${podcasts.length}] [${elapsed}s ${rate}/s] ${podcast.title.slice(0, 30)}... `);
-
+  async function processPodcast(podcast: PodcastRow): Promise<void> {
     const result = await pollPodcast(sql, podcast);
 
     if (result === 'updated') {
@@ -213,10 +215,8 @@ async function main() {
           poll_failures = 0
         WHERE id = ${podcast.id}
       `;
-      console.log('✓ updated');
       updated++;
     } else if (result === 'not_modified') {
-      console.log('○ unchanged');
       unchanged++;
     } else {
       const failures = podcast.poll_failures + 1;
@@ -230,7 +230,7 @@ async function main() {
             last_polled_at = now()
           WHERE id = ${podcast.id}
         `;
-        console.log(`✗ deactivated after ${failures} failures`);
+        console.log(`\n[${podcast.id}] deactivated: ${podcast.feed_url}`);
       } else {
         await sql`
           UPDATE podcasts SET
@@ -239,11 +239,22 @@ async function main() {
             last_polled_at = now()
           WHERE id = ${podcast.id}
         `;
-        console.log(`✗ retry in ${Math.round(backoff / 3600)}h`);
       }
       failed++;
     }
+
+    processed++;
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const rate = (processed / ((Date.now() - startTime) / 1000)).toFixed(1);
+    process.stdout.write(`\r[${processed}/${podcasts.length}] [${elapsed}s ${rate}/s] ✓${updated} ○${unchanged} ✗${failed}`);
   }
+
+  for (let i = 0; i < podcasts.length; i += CONCURRENCY) {
+    const batch = podcasts.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(processPodcast));
+  }
+
+  console.log('');
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
   const finalRate = (podcasts.length / ((Date.now() - startTime) / 1000)).toFixed(1);
