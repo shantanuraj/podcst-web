@@ -4,12 +4,14 @@ import { ITUNES_API } from '@/data/constants';
 
 const TOP_PODCASTS_CACHE_HOURS = 1;
 
+const isBuild = process.env.npm_lifecycle_event === 'build';
+
 export async function getTopPodcasts(
   limit: number,
   locale: string,
 ): Promise<IPodcast[]> {
   const cached = await getTopFromDb(limit, locale);
-  if (cached.length > 0) {
+  if (cached.length > 0 || isBuild) {
     return cached;
   }
 
