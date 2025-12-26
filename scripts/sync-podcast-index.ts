@@ -190,7 +190,7 @@ async function syncBatch(
               language = COALESCE(${row.language || null}::VARCHAR(10), language),
               popularity_score = ${row.popularityScore}::INTEGER,
               priority = ${row.priority}::INTEGER,
-              update_frequency = ${row.updateFrequency}::INTEGER,
+              update_frequency = ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER,
               updated_at = now()
             WHERE id = ${existing.id}
           `;
@@ -206,7 +206,7 @@ async function syncBatch(
               ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
               ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
               ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
-              ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency}::INTEGER, now()
+              ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER, now()
             )
           `;
           inserted++;
@@ -222,7 +222,7 @@ async function syncBatch(
             ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
             ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
             ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
-            ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency}::INTEGER, now()
+            ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER, now()
           )
           ON CONFLICT (podcast_index_id) DO UPDATE SET
             itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),

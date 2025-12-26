@@ -1,11 +1,19 @@
 import { sql } from '../db';
 import { adaptFeed } from '@/app/api/feed/parser';
+import { createHash } from 'crypto';
 import type {
   IEpisode,
   IEpisodeListing,
   IPodcastEpisodesInfo,
   IEpisodeInfo,
 } from '@/types';
+
+interface FeedFetchResult {
+  data: IEpisodeListing;
+  etag: string | null;
+  lastModified: string | null;
+  hash: string;
+}
 
 export async function ingestPodcast(
   feedUrl: string,
@@ -15,17 +23,18 @@ export async function ingestPodcast(
     return existing;
   }
 
-  const feedData = await fetchAndParseFeed(feedUrl);
-  if (!feedData) {
+  const result = await fetchAndParseFeed(feedUrl);
+  if (!result) {
     return null;
   }
 
-  const podcast = await storePodcast(feedUrl, feedData);
+  const { data, etag, lastModified, hash } = result;
+  const podcast = await storePodcast(feedUrl, data, { etag, lastModified, hash });
   if (!podcast) {
     return null;
   }
 
-  await storeEpisodes(podcast.id, feedUrl, feedData.episodes);
+  await storeEpisodes(podcast.id, feedUrl, data.episodes);
 
   return getPodcastByFeedUrl(feedUrl);
 }
@@ -34,7 +43,7 @@ export async function refreshPodcast(
   podcastId: number,
 ): Promise<IPodcastEpisodesInfo | null> {
   const [existing] = await sql`
-    SELECT id, feed_url FROM podcasts WHERE id = ${podcastId}
+    SELECT id, feed_url, update_frequency FROM podcasts WHERE id = ${podcastId}
   `;
 
   if (!existing) {
@@ -42,31 +51,41 @@ export async function refreshPodcast(
   }
 
   const feedUrl = existing.feed_url;
-  const feedData = await fetchAndParseFeed(feedUrl);
-  if (!feedData) {
+  const result = await fetchAndParseFeed(feedUrl);
+  if (!result) {
     return null;
   }
 
+  const { data, etag, lastModified, hash } = result;
+  const updateFrequency = existing.update_frequency || 86400;
+
   await sql`
     UPDATE podcasts SET
-      title = ${feedData.title},
-      description = ${feedData.description},
-      cover = ${feedData.cover},
-      website_url = ${feedData.link},
-      explicit = ${feedData.explicit},
-      last_published = ${feedData.published ? new Date(feedData.published) : null},
+      title = ${data.title},
+      description = ${data.description},
+      cover = ${data.cover},
+      website_url = ${data.link},
+      explicit = ${data.explicit},
+      episode_count = ${data.episodes.length},
+      last_published = ${data.published ? new Date(data.published) : null},
+      last_polled_at = now(),
+      next_poll_at = now() + interval '1 second' * ${updateFrequency},
+      poll_failures = 0,
+      feed_etag = ${etag},
+      feed_last_modified = ${lastModified},
+      feed_hash = ${hash},
       updated_at = now()
     WHERE id = ${existing.id}
   `;
 
-  await storeEpisodes(existing.id, feedUrl, feedData.episodes);
+  await storeEpisodes(existing.id, feedUrl, data.episodes);
 
   return getPodcastByFeedUrl(feedUrl);
 }
 
 async function fetchAndParseFeed(
   feedUrl: string,
-): Promise<IEpisodeListing | null> {
+): Promise<FeedFetchResult | null> {
   try {
     const res = await fetch(feedUrl, {
       headers: { 'User-Agent': 'Podcst/1.0' },
@@ -76,14 +95,28 @@ async function fetchAndParseFeed(
       return null;
     }
     const xml = await res.text();
-    return adaptFeed(xml);
+    const data = await adaptFeed(xml);
+    if (!data) return null;
+
+    return {
+      data,
+      etag: res.headers.get('etag'),
+      lastModified: res.headers.get('last-modified'),
+      hash: createHash('sha256').update(xml).digest('hex'),
+    };
   } catch (err) {
     console.error(`Error fetching feed ${feedUrl}:`, err);
     return null;
   }
 }
 
-async function storePodcast(feedUrl: string, data: IEpisodeListing) {
+interface FeedMeta {
+  etag: string | null;
+  lastModified: string | null;
+  hash: string;
+}
+
+async function storePodcast(feedUrl: string, data: IEpisodeListing, meta: FeedMeta) {
   const authorName = data.author || 'Unknown';
 
   let [author] = await sql`
@@ -100,7 +133,9 @@ async function storePodcast(feedUrl: string, data: IEpisodeListing) {
   const [podcast] = await sql`
     INSERT INTO podcasts (
       feed_url, title, author_id, description, cover, website_url,
-      explicit, episode_count, last_published
+      explicit, episode_count, last_published,
+      last_polled_at, next_poll_at, poll_failures,
+      feed_etag, feed_last_modified, feed_hash
     ) VALUES (
       ${feedUrl},
       ${data.title},
@@ -110,7 +145,13 @@ async function storePodcast(feedUrl: string, data: IEpisodeListing) {
       ${data.link},
       ${data.explicit},
       ${data.episodes.length},
-      ${data.published ? new Date(data.published) : null}
+      ${data.published ? new Date(data.published) : null},
+      now(),
+      now() + interval '1 day',
+      0,
+      ${meta.etag},
+      ${meta.lastModified},
+      ${meta.hash}
     )
     ON CONFLICT (feed_url) DO UPDATE SET
       title = EXCLUDED.title,
@@ -120,6 +161,12 @@ async function storePodcast(feedUrl: string, data: IEpisodeListing) {
       explicit = EXCLUDED.explicit,
       episode_count = EXCLUDED.episode_count,
       last_published = EXCLUDED.last_published,
+      last_polled_at = now(),
+      next_poll_at = now() + interval '1 day',
+      poll_failures = 0,
+      feed_etag = EXCLUDED.feed_etag,
+      feed_last_modified = EXCLUDED.feed_last_modified,
+      feed_hash = EXCLUDED.feed_hash,
       updated_at = now()
     RETURNING id
   `;
@@ -137,6 +184,9 @@ async function storeEpisodes(
   for (const ep of episodes) {
     if (!ep.guid) continue;
 
+    const published = ep.published ? new Date(ep.published) : new Date();
+    const duration = ep.duration ? Math.floor(ep.duration) : null;
+
     await sql`
       INSERT INTO episodes (
         podcast_id, guid, title, summary, published, duration,
@@ -146,8 +196,8 @@ async function storeEpisodes(
         ${ep.guid},
         ${ep.title},
         ${ep.showNotes || ep.summary},
-        ${ep.published ? new Date(ep.published) : new Date()},
-        ${ep.duration},
+        ${published},
+        ${duration},
         ${ep.episodeArt},
         ${ep.file.url},
         ${ep.file.length},
