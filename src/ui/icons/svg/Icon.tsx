@@ -85,5 +85,12 @@ export const Icon = ({ icon, color, size = 36, ...props }: IconProps) => {
   const IconContent = IconMap[icon];
   if (!IconContent) throw new Error('Invalid icon see IconType');
 
-  return <IconContent {...props} height={dimen} width={dimen} fill={color || undefined} />;
+  return (
+    <IconContent
+      {...props}
+      height={dimen}
+      width={dimen}
+      fill={color || undefined}
+    />
+  );
 };

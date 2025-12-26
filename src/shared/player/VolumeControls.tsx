@@ -1,6 +1,15 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import {
+  type KeyboardShortcuts,
+  useKeydown,
+} from '@/shared/keyboard/useKeydown';
 import { getValue, setValue } from '@/shared/storage/local';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { defaultVolume, getInitialVolume } from './AudioUtils';

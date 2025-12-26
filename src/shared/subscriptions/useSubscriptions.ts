@@ -21,12 +21,15 @@ export type SubscriptionsState = {
 
 // 1 hour in milliseconds
 const CACHE_STALE_DELTA = 60 * 60 * 1000;
-const isCacheStale = (lastSyncTime: number) => Date.now() - lastSyncTime > CACHE_STALE_DELTA;
+const isCacheStale = (lastSyncTime: number) =>
+  Date.now() - lastSyncTime > CACHE_STALE_DELTA;
 
 const getLastSyncTime = () => getLocalStorageValue('lastSyncTime', 0);
-const updateLastSyncTime = () => setLocalStorageValue('lastSyncTime', Date.now());
+const updateLastSyncTime = () =>
+  setLocalStorageValue('lastSyncTime', Date.now());
 
-export const isSubscribed = (feed: string) => (state: SubscriptionsState) => !!state.subs[feed];
+export const isSubscribed = (feed: string) => (state: SubscriptionsState) =>
+  !!state.subs[feed];
 
 const emptySubs: ISubscriptionsMap = {};
 
@@ -44,7 +47,9 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
   removeSubscription: (feed: string) => {
     set({
       subs: Object.fromEntries(
-        Object.entries(get().subs).filter(([subbedFeed]) => subbedFeed !== feed),
+        Object.entries(get().subs).filter(
+          ([subbedFeed]) => subbedFeed !== feed,
+        ),
       ),
     });
   },

@@ -56,11 +56,14 @@ const LibraryPage: NextPage = () => {
         </div>
         <h1 className={styles.emptyTitle}>Your Library is Empty</h1>
         <p className={styles.emptyText}>
-          Subscribe to podcasts to build your personal library, or import your existing
-          subscriptions from another app.
+          Subscribe to podcasts to build your personal library, or import your
+          existing subscriptions from another app.
         </p>
         <div className={styles.emptyActions}>
-          <ImportButton onImport={addSubscriptions} className={styles.importButton} />
+          <ImportButton
+            onImport={addSubscriptions}
+            className={styles.importButton}
+          />
           <Link href="/feed/top" className={styles.browseLink}>
             Browse popular podcasts
           </Link>
@@ -108,9 +111,12 @@ export default LibraryPage;
 const FEED_EPISODES_LIMIT = 4;
 const EPISODES_LIMIT = 50;
 
-const getPodcastsList = (state: SubscriptionsState) => Object.values(state.subs);
-const getAddSubscriptions = (state: SubscriptionsState) => state.addSubscriptions;
-const getSyncSubscriptions = (state: SubscriptionsState) => state.syncAllSubscriptions;
+const getPodcastsList = (state: SubscriptionsState) =>
+  Object.values(state.subs);
+const getAddSubscriptions = (state: SubscriptionsState) =>
+  state.addSubscriptions;
+const getSyncSubscriptions = (state: SubscriptionsState) =>
+  state.syncAllSubscriptions;
 const getIsSyncing = (state: SubscriptionsState) => state.isSyncing;
 
 const getRecents = (state: SubscriptionsState): IEpisodeInfo[] =>

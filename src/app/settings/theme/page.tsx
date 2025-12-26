@@ -31,7 +31,11 @@ export default function SettingsThemePage() {
         </header>
         <form onChange={changeTheme}>
           {themes.map((item) => (
-            <Theme key={`${item.scheme}/${item.theme}`} {...item} currentTheme={currentTheme} />
+            <Theme
+              key={`${item.scheme}/${item.theme}`}
+              {...item}
+              currentTheme={currentTheme}
+            />
           ))}
         </form>
       </div>
@@ -64,7 +68,8 @@ const Theme = ({ currentTheme, scheme, theme }: ThemeProps) => {
         />
         <div className="flex flex-col">
           <span className="text-lg font-medium group-hover:text-accent transition-colors">
-            {scheme.charAt(0).toUpperCase() + scheme.slice(1)} {theme === 'dark' ? 'Dark' : 'Light'}
+            {scheme.charAt(0).toUpperCase() + scheme.slice(1)}{' '}
+            {theme === 'dark' ? 'Dark' : 'Light'}
           </span>
           <span className="text-sm text-ink-secondary">
             {theme === 'dark'

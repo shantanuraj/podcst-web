@@ -24,15 +24,19 @@ export const PlayButton = memo(
     ref,
   ) {
     const state = usePlayer(getPlaybackState);
-    const isCurrentEpisode = usePlayer(useCallback(selectIsCurrentEpisode(episode), []));
-    const isPlaying = isCurrentEpisode && (state === 'playing' || state === 'buffering');
+    const isCurrentEpisode = usePlayer(
+      useCallback(selectIsCurrentEpisode(episode), []),
+    );
+    const isPlaying =
+      isCurrentEpisode && (state === 'playing' || state === 'buffering');
 
     const play = usePlayer(selectPlay);
     const resume = usePlayer(selectResume);
     const setPlayerState = usePlayer(selectSetPlayerState);
 
     const children = icon ? PlayButtonIconContent : PlayButtonContent;
-    const className = `${props.className || ''} ${icon ? styles.withIcon : ''}`.trim();
+    const className =
+      `${props.className || ''} ${icon ? styles.withIcon : ''}`.trim();
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
@@ -63,7 +67,10 @@ export const PlayButton = memo(
 
 PlayButton.displayName = 'PlayButton';
 
-const PlayButtonContent = (props: { isCurrentEpisode: boolean; isPlaying: boolean }) => {
+const PlayButtonContent = (props: {
+  isCurrentEpisode: boolean;
+  isPlaying: boolean;
+}) => {
   const { isCurrentEpisode, isPlaying } = props;
   return isCurrentEpisode ? (isPlaying ? 'Pause' : 'Resume') : 'Play';
 };
@@ -75,11 +82,16 @@ const PlayButtonIconContent = ({
   isCurrentEpisode: boolean;
   isPlaying: boolean;
 }) => {
-  return <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={30} />;
+  return (
+    <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={30} />
+  );
 };
 
-const selectIsCurrentEpisode = (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
-  getCurrentEpisode(playerState)?.guid === episode.guid && playerState.state !== 'idle';
+const selectIsCurrentEpisode =
+  (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
+    getCurrentEpisode(playerState)?.guid === episode.guid &&
+    playerState.state !== 'idle';
 const selectPlay = (playerState: IPlayerState) => playerState.playEpisode;
 const selectResume = (playerState: IPlayerState) => playerState.resumeEpisode;
-const selectSetPlayerState = (playerState: IPlayerState) => playerState.setPlayerState;
+const selectSetPlayerState = (playerState: IPlayerState) =>
+  playerState.setPlayerState;

@@ -2,7 +2,8 @@ import { Resend } from 'resend';
 import { sql } from '../db';
 import { generateId } from './session';
 
-const FROM_EMAIL = process.env.EMAIL_FROM || 'Podcst <noreply@updates.podcst.app>';
+const FROM_EMAIL =
+  process.env.EMAIL_FROM || 'Podcst <noreply@updates.podcst.app>';
 
 let resend: Resend | null = null;
 function getResend(): Resend {
@@ -20,7 +21,9 @@ function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export async function sendVerificationCode(email: string): Promise<{ id: string }> {
+export async function sendVerificationCode(
+  email: string,
+): Promise<{ id: string }> {
   const code = generateCode();
   const id = generateId();
   const expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000);
@@ -56,7 +59,10 @@ export async function sendVerificationCode(email: string): Promise<{ id: string 
   return { id };
 }
 
-export async function verifyCode(email: string, code: string): Promise<boolean> {
+export async function verifyCode(
+  email: string,
+  code: string,
+): Promise<boolean> {
   const [verification] = await sql`
     SELECT id FROM email_verifications
     WHERE email = ${email}

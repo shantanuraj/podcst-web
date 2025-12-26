@@ -19,13 +19,22 @@ function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
-  const month = pub.toLocaleDateString('default', { month: 'short' }).toUpperCase();
+  const month = pub
+    .toLocaleDateString('default', { month: 'short' })
+    .toUpperCase();
   const minutes = Math.floor((duration || 0) / 60);
 
   return (
-    <SpaLink href={getEpisodeHref(episode, podcast)} className={styles.container}>
+    <SpaLink
+      href={getEpisodeHref(episode, podcast)}
+      className={styles.container}
+    >
       <div className={styles.artwork}>
-        <ProxiedImage loading="lazy" src={episodeArt || cover || undefined} alt="" />
+        <ProxiedImage
+          loading="lazy"
+          src={episodeArt || cover || undefined}
+          alt=""
+        />
       </div>
       <div className={styles.meta}>
         <div className={styles.date}>{month}</div>

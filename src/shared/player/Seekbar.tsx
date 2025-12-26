@@ -50,7 +50,10 @@ export const Seekbar: React.FC<{
         (seekPosition) => {
           requestAnimationFrame(() => {
             if (!seekbarRef.current) return;
-            seekbarRef.current.style.width = getSeekWidth(seekPosition, durationRef.current);
+            seekbarRef.current.style.width = getSeekWidth(
+              seekPosition,
+              durationRef.current,
+            );
           });
         },
         { fireImmediately: true },
@@ -74,7 +77,11 @@ export const Seekbar: React.FC<{
 
   return (
     <button className={styles.seekbar} onClick={seekHandler}>
-      <div className={styles.progress} data-buffering={state === 'buffering'} ref={seekbarRef} />
+      <div
+        className={styles.progress}
+        data-buffering={state === 'buffering'}
+        ref={seekbarRef}
+      />
     </button>
   );
 };

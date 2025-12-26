@@ -4,7 +4,10 @@ import { ITUNES_API } from '@/data/constants';
 
 const TOP_PODCASTS_CACHE_HOURS = 1;
 
-export async function getTopPodcasts(limit: number, locale: string): Promise<IPodcast[]> {
+export async function getTopPodcasts(
+  limit: number,
+  locale: string,
+): Promise<IPodcast[]> {
   const cached = await getTopFromDb(limit, locale);
   if (cached.length > 0) {
     return cached;
@@ -18,8 +21,13 @@ export async function getTopPodcasts(limit: number, locale: string): Promise<IPo
   return podcasts;
 }
 
-async function getTopFromDb(limit: number, locale: string): Promise<IPodcast[]> {
-  const cutoff = new Date(Date.now() - TOP_PODCASTS_CACHE_HOURS * 60 * 60 * 1000);
+async function getTopFromDb(
+  limit: number,
+  locale: string,
+): Promise<IPodcast[]> {
+  const cutoff = new Date(
+    Date.now() - TOP_PODCASTS_CACHE_HOURS * 60 * 60 * 1000,
+  );
 
   const rows = await sql`
     SELECT
@@ -60,7 +68,10 @@ async function getTopFromDb(limit: number, locale: string): Promise<IPodcast[]> 
   }));
 }
 
-async function fetchTopFromItunes(limit: number, locale: string): Promise<IPodcast[]> {
+async function fetchTopFromItunes(
+  limit: number,
+  locale: string,
+): Promise<IPodcast[]> {
   try {
     const feedUrl = `${ITUNES_API}/${locale}/rss/toppodcasts/limit=${limit}/explicit=true/json`;
     const feedRes = await fetch(feedUrl);

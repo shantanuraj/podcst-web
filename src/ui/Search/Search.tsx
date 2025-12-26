@@ -50,7 +50,13 @@ export function Search() {
     [],
   );
 
-  const { isOpen, getMenuProps, getInputProps, highlightedIndex, getItemProps } = useCombobox({
+  const {
+    isOpen,
+    getMenuProps,
+    getInputProps,
+    highlightedIndex,
+    getItemProps,
+  } = useCombobox({
     items: searchResults,
     onInputValueChange,
     itemToString: serealizeSearchResult,
@@ -85,7 +91,9 @@ export function Search() {
   );
 }
 
-const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({ podcast }) => {
+const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({
+  podcast,
+}) => {
   return (
     <Link href={getSearchResultHref(podcast)} className={styles.searchItem}>
       <ProxiedImage

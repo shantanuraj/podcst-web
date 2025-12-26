@@ -34,7 +34,12 @@ export const get = async <T>(
     const json = JSON.parse(text);
     return json as T;
   } catch (e) {
-    console.error('Parse exception', `Response: ${text}.`, url, response.status);
+    console.error(
+      'Parse exception',
+      `Response: ${text}.`,
+      url,
+      response.status,
+    );
     throw e;
   }
 };

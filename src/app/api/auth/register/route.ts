@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRegistrationOptions, verifyRegistration } from '@/server/auth/passkey';
+import {
+  getRegistrationOptions,
+  verifyRegistration,
+} from '@/server/auth/passkey';
 import { createSession } from '@/server/auth/session';
 
 export async function POST(request: NextRequest) {

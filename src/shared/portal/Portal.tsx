@@ -17,5 +17,7 @@ export const Portal = ({ id, children }: Props) => {
     rootElemRef.current = document.getElementById(id);
   }, [id]);
 
-  return mounted && rootElemRef.current ? createPortal(children, rootElemRef.current) : null;
+  return mounted && rootElemRef.current
+    ? createPortal(children, rootElemRef.current)
+    : null;
 };

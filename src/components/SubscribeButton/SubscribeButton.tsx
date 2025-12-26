@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { isSubscribed, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import {
+  isSubscribed,
+  useSubscriptions,
+} from '@/shared/subscriptions/useSubscriptions';
 import { useSession } from '@/shared/auth/useAuth';
 import {
   useServerSubscriptions,
@@ -15,13 +18,18 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
   const { data: user } = useSession();
   const { data: serverSubs } = useServerSubscriptions();
   const { mutate: serverSubscribe, isPending: isSubscribing } = useSubscribe();
-  const { mutate: serverUnsubscribe, isPending: isUnsubscribing } = useUnsubscribe();
+  const { mutate: serverUnsubscribe, isPending: isUnsubscribing } =
+    useUnsubscribe();
 
   const feed = info.feed;
   const podcastId = info.id;
-  const isLocalSubscribed = useSubscriptions(useCallback(isSubscribed(feed), [feed]));
+  const isLocalSubscribed = useSubscriptions(
+    useCallback(isSubscribed(feed), [feed]),
+  );
   const addSubscription = useSubscriptions((state) => state.addSubscription);
-  const removeSubscription = useSubscriptions((state) => state.removeSubscription);
+  const removeSubscription = useSubscriptions(
+    (state) => state.removeSubscription,
+  );
 
   const isServerSubscribed = useMemo(
     () => serverSubs?.some((sub) => sub.id === podcastId) ?? false,
@@ -29,7 +37,9 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
   );
 
   const canUseServer = user && podcastId;
-  const isSubscribedToFeed = canUseServer ? isServerSubscribed : isLocalSubscribed;
+  const isSubscribedToFeed = canUseServer
+    ? isServerSubscribed
+    : isLocalSubscribed;
   const isPending = isSubscribing || isUnsubscribing;
 
   const onSubscribeClick = useCallback(() => {

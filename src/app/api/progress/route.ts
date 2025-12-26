@@ -22,7 +22,10 @@ export async function PUT(request: NextRequest) {
   const { episodeId, position, completed } = body;
 
   if (typeof episodeId !== 'number' || typeof position !== 'number') {
-    return NextResponse.json({ error: 'episodeId and position required' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'episodeId and position required' },
+      { status: 400 },
+    );
   }
 
   const success = await saveProgress(

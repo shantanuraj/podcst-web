@@ -1,6 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-import { type KeyboardShortcuts, useKeydown } from '@/shared/keyboard/useKeydown';
+import {
+  type KeyboardShortcuts,
+  useKeydown,
+} from '@/shared/keyboard/useKeydown';
 import styles from './Player.module.css';
 import { getRate, getSetRate, usePlayer } from './usePlayer';
 

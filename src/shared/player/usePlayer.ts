@@ -27,7 +27,9 @@ export interface IPlayerState extends IPlaybackControls {
   setIsChromecastEnabled: (isChromecastEnabled: boolean) => void;
 
   chromecastState: cast.framework.CastState | undefined;
-  setChromecastState: (chromecastState: cast.framework.CastState | undefined) => void;
+  setChromecastState: (
+    chromecastState: cast.framework.CastState | undefined,
+  ) => void;
 
   playOnChromecast: () => void;
 
@@ -56,7 +58,8 @@ export const usePlayer = create<IPlayerState>()(
         remotePlayer: undefined,
         remotePlayerController: undefined,
 
-        queueEpisode: (episode) => set((prevState) => ({ queue: prevState.queue.concat(episode) })),
+        queueEpisode: (episode) =>
+          set((prevState) => ({ queue: prevState.queue.concat(episode) })),
 
         restoreEpisode: (episode, seekPosition) =>
           set((prevState) => {
@@ -114,7 +117,9 @@ export const usePlayer = create<IPlayerState>()(
           set((prevState) => {
             const queue =
               state === 'idle' && !prevState.isChromecastConnecting
-                ? prevState.queue.filter((_, index) => index !== prevState.currentTrackIndex)
+                ? prevState.queue.filter(
+                    (_, index) => index !== prevState.currentTrackIndex,
+                  )
                 : prevState.queue;
             return {
               state,
@@ -131,7 +136,9 @@ export const usePlayer = create<IPlayerState>()(
             if (prevState.state === 'playing') {
               return { state: 'paused' };
             }
-            return { state: prevState.audioInitialised ? 'playing' : 'buffering' };
+            return {
+              state: prevState.audioInitialised ? 'playing' : 'buffering',
+            };
           });
         },
 
@@ -182,10 +189,14 @@ export const usePlayer = create<IPlayerState>()(
               ? `${currentEpisode.podcastTitle} – ${currentEpisode.author}`
               : currentEpisode.podcastTitle || currentEpisode.author || '';
           if (currentEpisode.published) {
-            metadata.releaseDate = new Date(currentEpisode.published).toISOString();
+            metadata.releaseDate = new Date(
+              currentEpisode.published,
+            ).toISOString();
           }
           metadata.images = [
-            new chrome.cast.Image(currentEpisode.episodeArt || currentEpisode.cover),
+            new chrome.cast.Image(
+              currentEpisode.episodeArt || currentEpisode.cover,
+            ),
           ];
           mediaInfo.metadata = metadata;
           const request = new chrome.cast.media.LoadRequest(mediaInfo);
@@ -195,7 +206,8 @@ export const usePlayer = create<IPlayerState>()(
             set({ isChromecastConnecting: true });
             await session.loadMedia(request);
             const remotePlayer = new cast.framework.RemotePlayer();
-            const remotePlayerController = new cast.framework.RemotePlayerController(remotePlayer);
+            const remotePlayerController =
+              new cast.framework.RemotePlayerController(remotePlayer);
 
             // Unload native audio element
             AudioUtils.stop();
@@ -232,13 +244,15 @@ export const usePlayer = create<IPlayerState>()(
           // Sync local audio seek to Chromecast
           const currentEpisode = getCurrentEpisode(get());
           const seekPosition = getSeekPosition(get());
-          if (currentEpisode) AudioUtils.loadAtSeek(currentEpisode, seekPosition);
+          if (currentEpisode)
+            AudioUtils.loadAtSeek(currentEpisode, seekPosition);
         },
 
         skipToNextEpisode: () =>
           set((prevState) => ({
             state: 'buffering',
-            currentTrackIndex: (prevState.currentTrackIndex + 1) % prevState.queue.length,
+            currentTrackIndex:
+              (prevState.currentTrackIndex + 1) % prevState.queue.length,
           })),
 
         skipToPreviousEpisode: () =>
@@ -252,7 +266,10 @@ export const usePlayer = create<IPlayerState>()(
 
         seekBackward: () => {
           const { duration, seekPosition, seekTo } = get();
-          const newSeekPosition = seekUtils.seekBackward(seekPosition, duration);
+          const newSeekPosition = seekUtils.seekBackward(
+            seekPosition,
+            duration,
+          );
           seekTo(newSeekPosition);
         },
 
@@ -340,7 +357,8 @@ export const usePlayer = create<IPlayerState>()(
         seekOrStartAt(episode, seekPosition) {
           const playerState = get();
           const isCurrentEpisode =
-            getCurrentEpisode(playerState)?.guid === episode.guid && playerState.state !== 'idle';
+            getCurrentEpisode(playerState)?.guid === episode.guid &&
+            playerState.state !== 'idle';
           if (isCurrentEpisode) {
             return playerState.seekTo(seekPosition);
           }
@@ -363,7 +381,9 @@ usePlayer.subscribe((currentState, previousState) => {
       ? getAdaptedPlaybackState(currentState.remotePlayer.playerState)
       : null;
     const applyStateCastEffects =
-      remoteState && remoteState !== 'buffering' && remoteState !== currentState.state;
+      remoteState &&
+      remoteState !== 'buffering' &&
+      remoteState !== currentState.state;
     if (applyStateCastEffects) {
       currentState.remotePlayerController?.playOrPause();
     }
@@ -374,7 +394,11 @@ usePlayer.subscribe((currentState, previousState) => {
       (previousState.state === 'playing' || previousState.state === 'paused')
     ) {
       currentState.playOnChromecast();
-    } else if (currentEpisode && !previousEpisode && currentState.state === 'buffering') {
+    } else if (
+      currentEpisode &&
+      !previousEpisode &&
+      currentState.state === 'buffering'
+    ) {
       currentState.playOnChromecast();
     }
   } else if (applyStateAudioEffects) {
@@ -390,7 +414,8 @@ usePlayer.subscribe((currentState, previousState) => {
           });
           updatePlaybackHandlers(currentState);
         }
-        if (currentEpisode) AudioUtils.play(currentEpisode, true, currentState.seekPosition);
+        if (currentEpisode)
+          AudioUtils.play(currentEpisode, true, currentState.seekPosition);
         break;
       case 'paused':
         AudioUtils.pause();
@@ -412,11 +437,14 @@ usePlayer.subscribe((currentState, previousState) => {
 
 export const getPlaybackState = (state: IPlayerState) => state.state;
 export const getSetPlayerState = (state: IPlayerState) => state.setPlayerState;
-export const getCurrentEpisode = (state: IPlayerState): IEpisodeInfo | undefined =>
-  state.queue[state.currentTrackIndex];
-export const getIsPlayerOpen = (state: IPlayerState) => getCurrentEpisode(state) !== undefined;
+export const getCurrentEpisode = (
+  state: IPlayerState,
+): IEpisodeInfo | undefined => state.queue[state.currentTrackIndex];
+export const getIsPlayerOpen = (state: IPlayerState) =>
+  getCurrentEpisode(state) !== undefined;
 export const getSeekPosition = (state: IPlayerState) => state.seekPosition;
-export const getSetSeekPosition = (state: IPlayerState) => state.setSeekPosition;
+export const getSetSeekPosition = (state: IPlayerState) =>
+  state.setSeekPosition;
 export const getSeekBackward = (state: IPlayerState) => state.seekBackward;
 export const getSeekForward = (state: IPlayerState) => state.seekForward;
 export const getSeekTo = (state: IPlayerState) => state.seekTo;
@@ -425,17 +453,25 @@ export const getRate = (state: IPlayerState) => state.rate;
 export const getSetRate = (state: IPlayerState) => state.setRate;
 export const getSetDuration = (state: IPlayerState) => state.setDuration;
 export const getMute = (state: IPlayerState) => state.mute;
-export const getIsAirplayEnabled = (state: IPlayerState) => state.isAirplayEnabled;
-export const getIsChromecastEnabled = (state: IPlayerState) => state.isChromecastEnabled;
-export const getSetIsChromecastEnabled = (state: IPlayerState) => state.setIsChromecastEnabled;
-export const getChromecastState = (state: IPlayerState) => state.chromecastState;
-export const getSetChromecastState = (state: IPlayerState) => state.setChromecastState;
-export const getPlayOnChromecast = (state: IPlayerState) => state.playOnChromecast;
+export const getIsAirplayEnabled = (state: IPlayerState) =>
+  state.isAirplayEnabled;
+export const getIsChromecastEnabled = (state: IPlayerState) =>
+  state.isChromecastEnabled;
+export const getSetIsChromecastEnabled = (state: IPlayerState) =>
+  state.setIsChromecastEnabled;
+export const getChromecastState = (state: IPlayerState) =>
+  state.chromecastState;
+export const getSetChromecastState = (state: IPlayerState) =>
+  state.setChromecastState;
+export const getPlayOnChromecast = (state: IPlayerState) =>
+  state.playOnChromecast;
 export const getRemotePlayer = (state: IPlayerState) => state.remotePlayer;
-export const getRemotePlayerController = (state: IPlayerState) => state.remotePlayerController;
+export const getRemotePlayerController = (state: IPlayerState) =>
+  state.remotePlayerController;
 export const getIsChromecastConnected = (state: IPlayerState) =>
   isChromecastConnected(state.chromecastState);
-export const getSyncSeekAndPause = (state: IPlayerState) => state.syncSeekAndPause;
+export const getSyncSeekAndPause = (state: IPlayerState) =>
+  state.syncSeekAndPause;
 export const getQueueEpisode = (state: IPlayerState) => state.queueEpisode;
 export const getEpisodesQueue = (state: IPlayerState) => state.queue;
 export const getSeekOrStartAt = (state: IPlayerState) => state.seekOrStartAt;

@@ -7,7 +7,10 @@ export function getPodcastHref(podcast: RenderablePodcast): string {
   return `/episodes/${encodeURIComponent(podcast.feed)}`;
 }
 
-export function getEpisodeHref(episode: IEpisodeInfo, podcast?: RenderablePodcast): string {
+export function getEpisodeHref(
+  episode: IEpisodeInfo,
+  podcast?: RenderablePodcast,
+): string {
   const podcastId = podcast?.id ?? episode.podcastId;
   if (podcastId && episode.id) {
     return `/episodes/${podcastId}/${episode.id}`;

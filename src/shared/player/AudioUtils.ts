@@ -35,7 +35,8 @@ export const getInitialVolume = () => getValue('volume', defaultVolume);
 export default class AudioUtils {
   private static playbackInstance: Howl | null;
   private static playbackId: number | undefined = undefined;
-  private static airplayAvailabilityListener: AirplayAvailabilityCallback | null = null;
+  private static airplayAvailabilityListener: AirplayAvailabilityCallback | null =
+    null;
   private static volume: number = defaultVolume;
 
   private static getAudioElement(): HTMLAudioElement | null {
@@ -45,10 +46,14 @@ export default class AudioUtils {
       if (node instanceof HTMLAudioElement) {
         return node;
       }
-      console.error('AudioUtils.getAudioElement Howler node not a regular element');
+      console.error(
+        'AudioUtils.getAudioElement Howler node not a regular element',
+      );
       return null;
     } catch (_err) {
-      console.error('AudioUtils.getAudioElement cannot extract audio element from howler');
+      console.error(
+        'AudioUtils.getAudioElement cannot extract audio element from howler',
+      );
       return null;
     }
   }
@@ -59,7 +64,9 @@ export default class AudioUtils {
     AudioUtils.airplayAvailabilityListener?.(e.availability === 'available');
   }
 
-  private static addAirplayAvailabilityListener(listener: AirplayAvailabilityCallback) {
+  private static addAirplayAvailabilityListener(
+    listener: AirplayAvailabilityCallback,
+  ) {
     AudioUtils.airplayAvailabilityListener = listener;
     const audioElement = AudioUtils.getAudioElement();
     audioElement?.addEventListener(
@@ -79,7 +86,8 @@ export default class AudioUtils {
   }
 
   public static showAirplaySelector() {
-    const audioElement = AudioUtils.getAudioElement() as AirplayAudioElement | null;
+    const audioElement =
+      AudioUtils.getAudioElement() as AirplayAudioElement | null;
     audioElement?.webkitShowPlaybackTargetPicker();
   }
 
@@ -96,7 +104,11 @@ export default class AudioUtils {
     AudioUtils.volume = getInitialVolume();
   }
 
-  public static play(episode: IEpisode, start: boolean = true, seekPosition: number = 0) {
+  public static play(
+    episode: IEpisode,
+    start: boolean = true,
+    seekPosition: number = 0,
+  ) {
     AudioUtils.stop();
     AudioUtils.playbackId = undefined;
     AudioUtils.playbackInstance = new Howl({
@@ -105,7 +117,9 @@ export default class AudioUtils {
       html5: true,
       onload() {
         AudioUtils.callbacks.setPlaybackStarted();
-        AudioUtils.callbacks.duration(AudioUtils.playbackInstance?.duration() || 0);
+        AudioUtils.callbacks.duration(
+          AudioUtils.playbackInstance?.duration() || 0,
+        );
         updatePlaybackState({
           duration: AudioUtils.playbackInstance?.duration() || 0,
           position: (AudioUtils.playbackInstance?.seek() as number) || 0,
@@ -115,7 +129,9 @@ export default class AudioUtils {
           'timeupdate',
           AudioUtils.seekPositionListener,
         );
-        AudioUtils.addAirplayAvailabilityListener(AudioUtils.callbacks.setIsAirplayEnabled);
+        AudioUtils.addAirplayAvailabilityListener(
+          AudioUtils.callbacks.setIsAirplayEnabled,
+        );
       },
       onplay(playbackId) {
         AudioUtils.playbackId = playbackId;
@@ -174,11 +190,16 @@ export default class AudioUtils {
    */
   public static setVolume(volume: number) {
     AudioUtils.volume = volume;
-    AudioUtils.playbackInstance?.volume(volume / 100, AudioUtils.playbackId || 0);
+    AudioUtils.playbackInstance?.volume(
+      volume / 100,
+      AudioUtils.playbackId || 0,
+    );
   }
 
   private static seekPositionListener() {
-    AudioUtils.callbacks.seekUpdate(AudioUtils.playbackInstance?.seek() as number);
+    AudioUtils.callbacks.seekUpdate(
+      AudioUtils.playbackInstance?.seek() as number,
+    );
   }
 
   public static setRate(rate: number) {
@@ -221,5 +242,6 @@ export const seekUtils = {
     return seekUtils.seekBy(currentPosition, -SEEK_DELTA, duration);
   },
   onSeekSuccess: () => {}, // noop
-  onSeekError: (error: chrome.cast.Error) => console.error('Error seeking', error),
+  onSeekError: (error: chrome.cast.Error) =>
+    console.error('Error seeking', error),
 };

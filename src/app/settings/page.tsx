@@ -27,12 +27,18 @@ const SettingsPage = () => {
               description: 'Download your library as an OPML file',
             },
           ].map((item) => (
-            <Link key={item.href} href={item.href} className={`group ${styles.linkItem}`}>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`group ${styles.linkItem}`}
+            >
               <div>
                 <h2 className="text-lg font-medium group-hover:text-accent transition-colors">
                   {item.label}
                 </h2>
-                <p className="text-sm text-ink-secondary mt-1">{item.description}</p>
+                <p className="text-sm text-ink-secondary mt-1">
+                  {item.description}
+                </p>
               </div>
               <div className="text-ink-tertiary group-hover:text-accent transition-colors">
                 <svg

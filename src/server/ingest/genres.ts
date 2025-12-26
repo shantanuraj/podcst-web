@@ -80,7 +80,9 @@ async function ingestGenres() {
     }
   }
 
-  console.log(`Ingestion complete. Success: ${successCount}, Failed: ${failCount}`);
+  console.log(
+    `Ingestion complete. Success: ${successCount}, Failed: ${failCount}`,
+  );
   await sql.end();
 }
 

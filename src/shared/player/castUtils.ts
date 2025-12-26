@@ -7,7 +7,9 @@ export const getAdaptedPlaybackState = (
   return remoteState.toLowerCase() as PlayerState;
 };
 
-export const isChromecastConnected = (castState: cast.framework.CastState | undefined): boolean => {
+export const isChromecastConnected = (
+  castState: cast.framework.CastState | undefined,
+): boolean => {
   if (!('cast' in window)) return false;
   return castState === cast.framework.CastState.CONNECTED;
 };

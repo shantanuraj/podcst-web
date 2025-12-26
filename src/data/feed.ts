@@ -5,7 +5,9 @@ import type { IEpisodeListing, IPodcastEpisodesInfo } from '@/types';
 import { get } from './api';
 import { patchEpisodesResponse } from './episodes';
 
-const fetchFeed = async (feedUrl: string): Promise<IPodcastEpisodesInfo | null> => {
+const fetchFeed = async (
+  feedUrl: string,
+): Promise<IPodcastEpisodesInfo | null> => {
   const res = await get<IEpisodeListing | null>(`/feed`, { url: feedUrl });
   const patched = patchEpisodesResponse(feedUrl)(res);
   if (patched) useSubscriptions.getState().syncSubscription(feedUrl, patched);
@@ -24,13 +26,20 @@ export const useFeed = (feedUrl: string | null) => {
 
 export const feedQueryKey = (feedUrl: string) => ['feed', feedUrl];
 
-const fetchPodcast = async (podcastId: number): Promise<IPodcastEpisodesInfo | null> => {
-  const res = await get<IPodcastEpisodesInfo | null>(`/feed`, { id: String(podcastId) });
+const fetchPodcast = async (
+  podcastId: number,
+): Promise<IPodcastEpisodesInfo | null> => {
+  const res = await get<IPodcastEpisodesInfo | null>(`/feed`, {
+    id: String(podcastId),
+  });
   if (res) useSubscriptions.getState().syncSubscription(res.feed, res);
   return res;
 };
 
-export const usePodcast = (podcastId: number, initialData?: IPodcastEpisodesInfo | null) => {
+export const usePodcast = (
+  podcastId: number,
+  initialData?: IPodcastEpisodesInfo | null,
+) => {
   return useQuery({
     queryKey: ['podcast', podcastId],
     queryFn: () => fetchPodcast(podcastId),

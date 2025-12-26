@@ -13,7 +13,10 @@ import {
 } from '@/shared/theme/useTheme';
 import type { ThemeMode } from '@/types';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
-import { type SubscriptionsState, useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
+import {
+  type SubscriptionsState,
+  useSubscriptions,
+} from '@/shared/subscriptions/useSubscriptions';
 import {
   useServerSubscriptions,
   useSyncToCloud,
@@ -48,7 +51,9 @@ export default function ProfilePage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Account</h2>
           <div className={styles.accountCard}>
-            <div className={styles.avatar}>{user.email.charAt(0).toUpperCase()}</div>
+            <div className={styles.avatar}>
+              {user.email.charAt(0).toUpperCase()}
+            </div>
             <div className={styles.accountInfo}>
               <span className={styles.email}>{user.email}</span>
               {user.name && <span className={styles.name}>{user.name}</span>}
@@ -112,7 +117,11 @@ function ThemeSelector() {
   return (
     <form onChange={handleChange} className={styles.themeGrid}>
       {themes.map((item) => (
-        <ThemeOption key={`${item.scheme}/${item.theme}`} {...item} currentTheme={currentTheme} />
+        <ThemeOption
+          key={`${item.scheme}/${item.theme}`}
+          {...item}
+          currentTheme={currentTheme}
+        />
       ))}
     </form>
   );
@@ -128,7 +137,11 @@ function ThemeOption({ currentTheme, scheme, theme }: ThemeOptionProps) {
   const isSelected = config === currentTheme;
 
   return (
-    <label htmlFor={id} className={styles.themeOption} data-selected={isSelected}>
+    <label
+      htmlFor={id}
+      className={styles.themeOption}
+      data-selected={isSelected}
+    >
       <input
         type="radio"
         id={id}
@@ -139,7 +152,8 @@ function ThemeOption({ currentTheme, scheme, theme }: ThemeOptionProps) {
         className="sr-only"
       />
       <span className={styles.themeLabel}>
-        {scheme.charAt(0).toUpperCase() + scheme.slice(1)} {theme === 'dark' ? 'Dark' : 'Light'}
+        {scheme.charAt(0).toUpperCase() + scheme.slice(1)}{' '}
+        {theme === 'dark' ? 'Dark' : 'Light'}
       </span>
     </label>
   );
@@ -162,8 +176,13 @@ function ShortcutsList() {
 
 function SyncSubscriptions() {
   const localSubs = useSubscriptions((state: SubscriptionsState) => state.subs);
-  const clearSubs = useSubscriptions((state: SubscriptionsState) => state.addSubscriptions);
-  const localFeedUrls = React.useMemo(() => Object.keys(localSubs), [localSubs]);
+  const clearSubs = useSubscriptions(
+    (state: SubscriptionsState) => state.addSubscriptions,
+  );
+  const localFeedUrls = React.useMemo(
+    () => Object.keys(localSubs),
+    [localSubs],
+  );
 
   const syncToCloud = useSyncToCloud();
 
@@ -179,10 +198,15 @@ function SyncSubscriptions() {
       <h2 className={styles.sectionTitle}>Subscriptions</h2>
       <div className={styles.syncSection}>
         <p className={styles.syncDescription}>
-          You have {localFeedUrls.length} {localFeedUrls.length === 1 ? 'podcast' : 'podcasts'}{' '}
-          saved on this device. Import them to your account to sync across all your devices.
+          You have {localFeedUrls.length}{' '}
+          {localFeedUrls.length === 1 ? 'podcast' : 'podcasts'} saved on this
+          device. Import them to your account to sync across all your devices.
         </p>
-        <button onClick={handleSync} disabled={syncToCloud.isPending} className={styles.syncButton}>
+        <button
+          onClick={handleSync}
+          disabled={syncToCloud.isPending}
+          className={styles.syncButton}
+        >
           {syncToCloud.isPending ? 'Importing...' : 'Import from Device'}
         </button>
       </div>

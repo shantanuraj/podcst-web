@@ -11,7 +11,10 @@ interface ImportButtonProps {
   className?: string;
 }
 
-export function ImportButton({ onImport: onImportProp, className }: ImportButtonProps) {
+export function ImportButton({
+  onImport: onImportProp,
+  className,
+}: ImportButtonProps) {
   const onImport = React.useMemo(
     () =>
       onFileImport(async (file) => {
@@ -33,7 +36,13 @@ export function ImportButton({ onImport: onImportProp, className }: ImportButton
 
   return (
     <Button className={`${styles.button} ${className || ''}`}>
-      <input id="opml-import" accept=".xml, .opml" name="file" type="file" onChange={onImport} />
+      <input
+        id="opml-import"
+        accept=".xml, .opml"
+        name="file"
+        type="file"
+        onChange={onImport}
+      />
       <label htmlFor="opml-import">Upload OPML file</label>
     </Button>
   );
@@ -58,7 +67,9 @@ const onFileImport = (cb: (file: string | null | ArrayBuffer) => void) => {
 export const opmltoJSON = (file: string): IOPMLJson => {
   const parser = new DOMParser();
   const xml = parser.parseFromString(file, 'text/xml');
-  const feeds = Array.from(xml.querySelectorAll('outline[type="rss"]')) as Element[];
+  const feeds = Array.from(
+    xml.querySelectorAll('outline[type="rss"]'),
+  ) as Element[];
   return {
     feeds: feeds.map(adaptFeed),
   };
