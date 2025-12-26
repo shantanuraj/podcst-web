@@ -144,6 +144,7 @@ async function syncBatch(
   sql: postgres.Sql,
   batch: PodcastIndexRow[],
   authorCache: Map<string, number>,
+  isFirstSync: boolean,
 ): Promise<{ inserted: number; updated: number; skipped: number }> {
   let inserted = 0;
   let updated = 0;
@@ -162,47 +163,56 @@ async function syncBatch(
         ? new Date(row.newestItemPubdate * 1000)
         : null;
 
-      const [existing] = await sql`
-        SELECT id, podcast_index_id FROM podcasts
-        WHERE feed_url = ${row.url}
-           OR (itunes_id = ${itunesId}::INTEGER AND ${itunesId}::INTEGER IS NOT NULL)
-           OR podcast_index_id = ${row.id}
-        LIMIT 1
-      `;
-
-      if (existing) {
-        await sql`
-          UPDATE podcasts SET
-            podcast_index_id = ${row.id},
-            itunes_id = COALESCE(${itunesId}::INTEGER, itunes_id),
-            feed_url = ${row.url},
-            title = ${row.title},
-            author_id = ${authorId},
-            description = COALESCE(${row.description || null}::TEXT, description),
-            cover = CASE WHEN ${row.imageUrl || ''} != '' AND ${row.imageUrl || ''} != 'https://podcst.app/placeholder.png' THEN ${row.imageUrl} ELSE cover END,
-            website_url = COALESCE(${row.link || null}::TEXT, website_url),
-            explicit = ${row.explicit === 1},
-            episode_count = GREATEST(${row.episodeCount || 0}, episode_count),
-            last_published = GREATEST(${lastPublished}::TIMESTAMPTZ, last_published),
-            is_active = ${row.dead !== 1},
-            language = COALESCE(${row.language || null}::VARCHAR(10), language),
-            popularity_score = ${row.popularityScore}::INTEGER,
-            priority = ${row.priority}::INTEGER,
-            update_frequency = ${row.updateFrequency}::INTEGER,
-            updated_at = now()
-          WHERE id = ${existing.id}
+      if (isFirstSync) {
+        const [existing] = await sql`
+          SELECT id FROM podcasts
+          WHERE feed_url = ${row.url}
+             OR (itunes_id = ${itunesId}::INTEGER AND ${itunesId}::INTEGER IS NOT NULL)
+             OR podcast_index_id = ${row.id}
+          LIMIT 1
         `;
-        logAction({
-          timestamp: new Date().toISOString(),
-          action: 'updated',
-          itunes_id: itunesId,
-          name: row.title,
-          podcast_index_id: row.id,
-          feed_url: row.url,
-        });
-        updated++;
+
+        if (existing) {
+          await sql`
+            UPDATE podcasts SET
+              podcast_index_id = ${row.id},
+              itunes_id = COALESCE(${itunesId}::INTEGER, itunes_id),
+              feed_url = ${row.url},
+              title = ${row.title},
+              author_id = ${authorId},
+              description = COALESCE(${row.description || null}::TEXT, description),
+              cover = CASE WHEN ${row.imageUrl || ''} != '' AND ${row.imageUrl || ''} != 'https://podcst.app/placeholder.png' THEN ${row.imageUrl} ELSE cover END,
+              website_url = COALESCE(${row.link || null}::TEXT, website_url),
+              explicit = ${row.explicit === 1},
+              episode_count = GREATEST(${row.episodeCount || 0}, episode_count),
+              last_published = GREATEST(${lastPublished}::TIMESTAMPTZ, last_published),
+              is_active = ${row.dead !== 1},
+              language = COALESCE(${row.language || null}::VARCHAR(10), language),
+              popularity_score = ${row.popularityScore}::INTEGER,
+              priority = ${row.priority}::INTEGER,
+              update_frequency = ${row.updateFrequency}::INTEGER,
+              updated_at = now()
+            WHERE id = ${existing.id}
+          `;
+          updated++;
+        } else {
+          await sql`
+            INSERT INTO podcasts (
+              podcast_index_id, itunes_id, feed_url, title, author_id, description,
+              cover, website_url, explicit, episode_count, last_published,
+              is_active, language, popularity_score, priority, update_frequency, updated_at
+            ) VALUES (
+              ${row.id}, ${itunesId}::INTEGER, ${row.url}, ${row.title}, ${authorId},
+              ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
+              ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
+              ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
+              ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency}::INTEGER, now()
+            )
+          `;
+          inserted++;
+        }
       } else {
-        await sql`
+        const [result] = await sql`
           INSERT INTO podcasts (
             podcast_index_id, itunes_id, feed_url, title, author_id, description,
             cover, website_url, explicit, episode_count, last_published,
@@ -214,16 +224,29 @@ async function syncBatch(
             ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
             ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency}::INTEGER, now()
           )
+          ON CONFLICT (podcast_index_id) DO UPDATE SET
+            itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),
+            title = EXCLUDED.title,
+            author_id = EXCLUDED.author_id,
+            description = COALESCE(EXCLUDED.description, podcasts.description),
+            cover = CASE WHEN EXCLUDED.cover != 'https://podcst.app/placeholder.png' THEN EXCLUDED.cover ELSE podcasts.cover END,
+            website_url = COALESCE(EXCLUDED.website_url, podcasts.website_url),
+            explicit = EXCLUDED.explicit,
+            episode_count = GREATEST(EXCLUDED.episode_count, podcasts.episode_count),
+            last_published = GREATEST(EXCLUDED.last_published, podcasts.last_published),
+            is_active = EXCLUDED.is_active,
+            language = COALESCE(EXCLUDED.language, podcasts.language),
+            popularity_score = EXCLUDED.popularity_score,
+            priority = EXCLUDED.priority,
+            update_frequency = EXCLUDED.update_frequency,
+            updated_at = now()
+          RETURNING (xmax = 0) AS is_insert
         `;
-        logAction({
-          timestamp: new Date().toISOString(),
-          action: 'inserted',
-          itunes_id: itunesId,
-          name: row.title,
-          podcast_index_id: row.id,
-          feed_url: row.url,
-        });
-        inserted++;
+        if (result?.is_insert) {
+          inserted++;
+        } else {
+          updated++;
+        }
       }
     } catch (err) {
       logAction({
@@ -261,7 +284,8 @@ async function sync(): Promise<void> {
   });
 
   const lastSync = await getLastSyncTime(sql);
-  console.log(lastSync ? `Last sync: ${lastSync.toISOString()}` : 'First sync');
+  const isFirstSync = !lastSync;
+  console.log(isFirstSync ? 'First sync (slow path)' : `Incremental sync since ${lastSync.toISOString()}`);
 
   const lastSyncUnix = lastSync ? Math.floor(lastSync.getTime() / 1000) : 0;
 
@@ -303,7 +327,7 @@ async function sync(): Promise<void> {
     const batch = selectQuery.all({ $lastSync: lastSyncUnix, $limit: BATCH_SIZE, $offset: offset });
     if (batch.length === 0) break;
 
-    const { inserted, updated, skipped } = await syncBatch(sql, batch, authorCache);
+    const { inserted, updated, skipped } = await syncBatch(sql, batch, authorCache, isFirstSync);
     totalInserted += inserted;
     totalUpdated += updated;
     totalSkipped += skipped;
