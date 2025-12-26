@@ -163,6 +163,13 @@ async function storeTopPodcasts(podcasts: IPodcast[], locale: string) {
       }
     }
 
+    if (!podcast?.id) {
+      console.warn(
+        `Failed to store podcast for top list: ${p.title} (${p.feed})`,
+      );
+      continue;
+    }
+
     await sql`
       INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
       VALUES (${locale}, 0, ${i + 1}, ${podcast.id}, now())
