@@ -21,7 +21,8 @@ export async function searchPodcasts(
       a.name as author
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
-    WHERE p.is_active = true
+    WHERE p.itunes_id IS NOT NULL
+      AND p.is_active = true
       AND to_tsvector('english', p.title || ' ' || COALESCE(p.description, ''))
           @@ to_tsquery('english', ${searchQuery})
     ORDER BY p.popularity_score DESC NULLS LAST
