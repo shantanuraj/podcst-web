@@ -35,6 +35,12 @@ CREATE TABLE podcasts (
   popularity_score INTEGER,
   priority INTEGER,
   update_frequency INTEGER,
+  last_polled_at TIMESTAMPTZ,
+  next_poll_at TIMESTAMPTZ,
+  poll_failures INTEGER DEFAULT 0,
+  feed_etag TEXT,
+  feed_last_modified TEXT,
+  feed_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -140,12 +146,22 @@ CREATE TABLE transcripts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE poll_metrics (
+  id SERIAL PRIMARY KEY,
+  metric_name TEXT NOT NULL,
+  metric_value INTEGER NOT NULL DEFAULT 0,
+  recorded_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE INDEX idx_podcasts_feed_url ON podcasts(feed_url);
 CREATE INDEX idx_podcasts_itunes_id ON podcasts(itunes_id);
 CREATE INDEX idx_podcasts_podcast_index_id ON podcasts(podcast_index_id);
 CREATE INDEX idx_podcasts_updated ON podcasts(updated_at);
 CREATE INDEX idx_podcasts_is_active ON podcasts(is_active) WHERE is_active = true;
 CREATE INDEX idx_podcasts_popularity ON podcasts(popularity_score DESC NULLS LAST);
+CREATE INDEX idx_podcasts_next_poll ON podcasts(next_poll_at ASC NULLS FIRST) WHERE is_active = true;
+CREATE INDEX idx_podcasts_poll_priority ON podcasts(priority DESC NULLS LAST, popularity_score DESC NULLS LAST) WHERE is_active = true;
+CREATE INDEX idx_podcasts_last_published ON podcasts(last_published DESC NULLS LAST) WHERE is_active = true;
 CREATE INDEX idx_podcasts_search ON podcasts USING gin(to_tsvector('english', title || ' ' || COALESCE(description, '')));
 CREATE INDEX idx_episodes_podcast ON episodes(podcast_id);
 CREATE INDEX idx_episodes_published ON episodes(published DESC);
@@ -157,3 +173,4 @@ CREATE INDEX idx_playback_user ON playback_progress(user_id);
 CREATE INDEX idx_playback_updated ON playback_progress(updated_at);
 CREATE INDEX idx_top_podcasts_country_genre ON top_podcasts(country_id, genre_id);
 CREATE INDEX idx_transcripts_search ON transcripts USING gin(to_tsvector('english', content));
+CREATE INDEX idx_poll_metrics_name_time ON poll_metrics(metric_name, recorded_at DESC);

@@ -239,20 +239,11 @@ export async function getPodcastById(
 
   if (!podcast) return null;
 
-  let episodes = await sql`
+  const episodes = await sql`
     SELECT * FROM episodes
     WHERE podcast_id = ${podcast.id}
     ORDER BY published DESC
   `;
-
-  if (episodes.length === 0 && podcast.feed_url) {
-    await refreshPodcast(podcast.id);
-    episodes = await sql`
-      SELECT * FROM episodes
-      WHERE podcast_id = ${podcast.id}
-      ORDER BY published DESC
-    `;
-  }
 
   return {
     id: podcast.id,
