@@ -26,12 +26,11 @@ async function searchByTerm(
   term: string,
   locale: string,
 ): Promise<IPodcastSearchResult[]> {
-  const [dbResults, itunesResults] = await Promise.all([
-    searchPodcasts(term, 20).catch(() => [] as IPodcastSearchResult[]),
-    searchFromItunes(term, locale).catch(() => [] as IPodcastSearchResult[]),
-  ]);
+  const itunesResults = await searchFromItunes(term, locale).catch(
+    () => [] as IPodcastSearchResult[],
+  );
 
-  return mergeResults(dbResults, itunesResults);
+  return itunesResults;
 }
 
 function mergeResults(
