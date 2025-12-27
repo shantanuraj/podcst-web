@@ -30,6 +30,12 @@ const DEFAULT_TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
 
 const BATCH_SIZE = 1000;
 
+const normalizeItunesId = (id: number | string | null | undefined): number | null => {
+  if (id === null || id === undefined || id === '' || id === 0) return null;
+  const num = typeof id === 'string' ? parseInt(id, 10) : id;
+  return isNaN(num) || num === 0 ? null : num;
+};
+
 const localPath = process.argv[2];
 
 interface PodcastIndexRow {
@@ -39,7 +45,7 @@ interface PodcastIndexRow {
   lastUpdate: number | null;
   link: string;
   dead: number;
-  itunesId: number | null;
+  itunesId: number | string | null;
   itunesAuthor: string;
   explicit: number;
   imageUrl: string;
@@ -160,7 +166,7 @@ async function syncBatch(
   let skipped = 0;
 
   for (const row of batch) {
-    const itunesId = row.itunesId || null;
+    const itunesId = normalizeItunesId(row.itunesId);
     try {
       const authorName = row.itunesAuthor || 'Unknown';
       let authorId = authorCache.get(authorName);

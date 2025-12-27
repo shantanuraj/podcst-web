@@ -12,14 +12,6 @@ const DEFAULT_TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
 
 const BATCH_SIZE = 1000;
 
-const normalizeItunesId = (
-  id: number | string | null | undefined,
-): number | null => {
-  if (id === null || id === undefined || id === '' || id === 0) return null;
-  const num = typeof id === 'string' ? parseInt(id, 10) : id;
-  return isNaN(num) || num === 0 ? null : num;
-};
-
 const localPath = process.argv[2];
 
 interface PodcastIndexRow {
@@ -29,7 +21,6 @@ interface PodcastIndexRow {
   lastUpdate: number | null;
   link: string;
   dead: number;
-  itunesId: number | string | null;
   itunesAuthor: string;
   explicit: number;
   imageUrl: string;
@@ -120,13 +111,11 @@ async function syncBatch(
   sql: postgres.Sql,
   batch: PodcastIndexRow[],
   authorCache: Map<string, number>,
-): Promise<{ inserted: number; updated: number; skipped: number }> {
+): Promise<{ inserted: number; skipped: number }> {
   let inserted = 0;
-  let updated = 0;
   let skipped = 0;
 
   for (const row of batch) {
-    const itunesId = normalizeItunesId(row.itunesId);
     try {
       const authorName = row.itunesAuthor || 'Unknown';
       let authorId = authorCache.get(authorName);
@@ -138,41 +127,20 @@ async function syncBatch(
         ? new Date(row.newestItemPubdate * 1000)
         : null;
 
-      const [result] = await sql`
+      await sql`
         INSERT INTO podcasts (
-          podcast_index_id, itunes_id, feed_url, title, author_id, description,
+          podcast_index_id, feed_url, title, author_id, description,
           cover, website_url, explicit, episode_count, last_published,
-          is_active, language, popularity_score, priority, update_frequency, updated_at
+          is_active, language, popularity_score, priority, update_frequency
         ) VALUES (
-          ${row.id}, ${itunesId}::INTEGER, ${row.url}, ${row.title}, ${authorId},
+          ${row.id}, ${row.url}, ${row.title}, ${authorId},
           ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
           ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
           ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
-          ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER, now()
+          ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER
         )
-        ON CONFLICT (podcast_index_id) DO UPDATE SET
-          itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),
-          title = EXCLUDED.title,
-          author_id = EXCLUDED.author_id,
-          description = COALESCE(EXCLUDED.description, podcasts.description),
-          cover = CASE WHEN EXCLUDED.cover != 'https://podcst.app/placeholder.png' THEN EXCLUDED.cover ELSE podcasts.cover END,
-          website_url = COALESCE(EXCLUDED.website_url, podcasts.website_url),
-          explicit = EXCLUDED.explicit,
-          episode_count = GREATEST(EXCLUDED.episode_count, podcasts.episode_count),
-          last_published = GREATEST(EXCLUDED.last_published, podcasts.last_published),
-          is_active = EXCLUDED.is_active,
-          language = COALESCE(EXCLUDED.language, podcasts.language),
-          popularity_score = EXCLUDED.popularity_score,
-          priority = EXCLUDED.priority,
-          update_frequency = EXCLUDED.update_frequency,
-          updated_at = now()
-        RETURNING (xmax = 0) AS is_insert
       `;
-      if (result?.is_insert) {
-        inserted++;
-      } else {
-        updated++;
-      }
+      inserted++;
     } catch (err) {
       console.error(
         `Skipped ${row.id} (${row.title}): ${err instanceof Error ? err.message : String(err)}`,
@@ -181,7 +149,7 @@ async function syncBatch(
     }
   }
 
-  return { inserted, updated, skipped };
+  return { inserted, skipped };
 }
 
 async function patch(): Promise<void> {
@@ -221,7 +189,7 @@ async function patch(): Promise<void> {
     { $limit: number; $offset: number }
   >(`
     SELECT
-      id, url, title, lastUpdate, link, dead, itunesId, itunesAuthor,
+      id, url, title, lastUpdate, link, dead, itunesAuthor,
       explicit, imageUrl, newestItemPubdate, language, episodeCount,
       popularityScore, priority, updateFrequency, description
     FROM podcasts
@@ -233,7 +201,6 @@ async function patch(): Promise<void> {
   const authorCache = new Map<string, number>();
   let processed = 0;
   let totalInserted = 0;
-  let totalUpdated = 0;
   let totalSkipped = 0;
   let offset = 0;
   const startTime = Date.now();
@@ -245,13 +212,8 @@ async function patch(): Promise<void> {
     });
     if (batch.length === 0) break;
 
-    const { inserted, updated, skipped } = await syncBatch(
-      sql,
-      batch,
-      authorCache,
-    );
+    const { inserted, skipped } = await syncBatch(sql, batch, authorCache);
     totalInserted += inserted;
-    totalUpdated += updated;
     totalSkipped += skipped;
     processed += batch.length;
     offset += BATCH_SIZE;
@@ -268,7 +230,6 @@ async function patch(): Promise<void> {
 
   console.log(`\nPatch complete:`);
   console.log(`  Inserted: ${totalInserted.toLocaleString()}`);
-  console.log(`  Updated: ${totalUpdated.toLocaleString()}`);
   console.log(`  Skipped: ${totalSkipped.toLocaleString()}`);
 
   sqlite.close();
