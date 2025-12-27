@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/ui/icons/svg/Icon';
+import { LocaleSwitcher } from '@/ui/LocaleSwitcher';
 import { Search } from '@/ui/Search/Search';
 import { useSession } from '@/shared/auth/useAuth';
 
@@ -46,6 +47,7 @@ export function SiteHeader() {
         </nav>
         <div className={styles.actions}>
           <Search />
+          <LocaleSwitcher />
           {user ? (
             <Link
               href="/profile"

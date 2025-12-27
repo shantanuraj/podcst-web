@@ -11,6 +11,7 @@ import Caret from './Caret';
 import ChromecastConnectedIcon from './ChromecastConnectedIcon';
 import ChromecastIcon from './ChromecastIcon';
 import DayIcon from './DayIcon';
+import GlobeIcon from './GlobeIcon';
 import InfoIcon from './InfoIcon';
 import MenuIcon from './MenuIcon';
 import MuteIcon from './MuteIcon';
@@ -31,6 +32,7 @@ export type IconType =
   | 'chromecast'
   | 'chromecast-connected'
   | 'external-link'
+  | 'globe'
   | 'play'
   | 'pause'
   | 'settings'
@@ -59,6 +61,7 @@ const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
   airplay: AirplayIcon,
   chromecast: ChromecastIcon,
   'chromecast-connected': ChromecastConnectedIcon,
+  globe: GlobeIcon,
   play: PlayIcon,
   pause: PauseIcon,
   settings: SettingsIcon,
