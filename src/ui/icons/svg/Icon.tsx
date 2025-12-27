@@ -90,10 +90,10 @@ export const Icon = ({ icon, color, size = 36, ...props }: IconProps) => {
 
   return (
     <IconContent
-      {...props}
       height={dimen}
       width={dimen}
-      fill={color || undefined}
+      {...(color ? { fill: color } : {})}
+      {...props}
     />
   );
 };
