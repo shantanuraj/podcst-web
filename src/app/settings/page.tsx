@@ -100,7 +100,7 @@ export default function SettingsPage() {
               rel="noopener"
               className={styles.authorLink}
             >
-              Shantanu Raj
+              {t('common.author')}
             </Link>
           </div>
         </footer>

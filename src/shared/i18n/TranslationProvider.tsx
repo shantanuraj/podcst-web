@@ -8,6 +8,12 @@ import {
   type ReactNode,
 } from 'react';
 import { en, type Messages, type Language, defaultLanguage } from '@/messages';
+import { messages as sv } from '@/messages/sv';
+import { messages as nl } from '@/messages/nl';
+import { messages as es } from '@/messages/es';
+import { messages as fr } from '@/messages/fr';
+import { messages as ko } from '@/messages/ko';
+import { messages as hi } from '@/messages/hi';
 
 const LANGUAGE_COOKIE = 'NEXT_UI_LANG';
 
@@ -40,7 +46,7 @@ function getStoredLanguage(): Language {
   if (typeof document === 'undefined') return defaultLanguage;
   const match = document.cookie.match(new RegExp(`${LANGUAGE_COOKIE}=([^;]+)`));
   const lang = match?.[1];
-  if (lang && ['en', 'nl', 'fr', 'sv', 'ko', 'es'].includes(lang)) {
+  if (lang && ['en', 'nl', 'fr', 'sv', 'ko', 'es', 'hi'].includes(lang)) {
     return lang as Language;
   }
   return defaultLanguage;
@@ -60,11 +66,12 @@ const TranslationContext = createContext<TranslationContextValue>({
 
 const messagesByLanguage: Record<Language, Messages> = {
   en,
-  nl: en,
-  fr: en,
-  sv: en,
-  ko: en,
-  es: en,
+  nl,
+  fr,
+  sv,
+  ko,
+  es,
+  hi,
 };
 
 export function TranslationProvider({ children }: { children: ReactNode }) {

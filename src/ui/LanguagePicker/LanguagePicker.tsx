@@ -6,7 +6,7 @@ import styles from './LanguagePicker.module.css';
 
 const LANGUAGE_COOKIE = 'NEXT_UI_LANG';
 
-const languages: Language[] = ['en', 'nl', 'fr', 'sv', 'ko', 'es'];
+const languages: Language[] = ['en', 'nl', 'fr', 'sv', 'ko', 'es', 'hi'];
 
 function getStoredLanguage(): Language {
   if (typeof document === 'undefined') return 'en';

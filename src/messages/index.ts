@@ -3,7 +3,7 @@ import { messages as en, type Messages } from './en';
 export type { Messages };
 export { en };
 
-export type Language = 'en' | 'nl' | 'fr' | 'sv' | 'ko' | 'es';
+export type Language = 'en' | 'nl' | 'fr' | 'sv' | 'ko' | 'es' | 'hi';
 
 export const defaultLanguage: Language = 'en';
 
@@ -17,4 +17,5 @@ export const languageNames: Record<
   sv: { native: 'Svenska', english: 'Swedish' },
   ko: { native: '한국어', english: 'Korean' },
   es: { native: 'Español', english: 'Spanish' },
+  hi: { native: 'हिन्दी', english: 'Hindi' },
 };
