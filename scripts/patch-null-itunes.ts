@@ -10,7 +10,7 @@ const PODCAST_INDEX_URL =
 const TEMP_DIR = join(process.cwd(), '.tmp');
 const DEFAULT_TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
 
-const BATCH_SIZE = 1000;
+const BATCH_SIZE = 4000;
 
 const localPath = process.argv[2];
 
@@ -93,18 +93,48 @@ function formatDuration(ms: number): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
-async function ensureAuthor(sql: postgres.Sql, name: string): Promise<number> {
-  const [existing] = await sql`
-    SELECT id FROM authors WHERE name = ${name}
-  `;
-  if (existing) return existing.id;
+async function loadAuthorCache(
+  sql: postgres.Sql,
+): Promise<Map<string, number>> {
+  console.log('Loading author cache...');
+  const rows = await sql`SELECT id, name FROM authors`;
+  const cache = new Map<string, number>();
+  for (const row of rows) {
+    cache.set(row.name, row.id);
+  }
+  console.log(`Loaded ${cache.size.toLocaleString()} authors`);
+  return cache;
+}
 
-  const [created] = await sql`
-    INSERT INTO authors (name) VALUES (${name})
-    ON CONFLICT (itunes_id) DO UPDATE SET name = EXCLUDED.name
-    RETURNING id
+async function ensureAuthors(
+  sql: postgres.Sql,
+  names: string[],
+  cache: Map<string, number>,
+): Promise<void> {
+  const newNames = names.filter((n) => !cache.has(n));
+  if (newNames.length === 0) return;
+
+  const unique = [...new Set(newNames)];
+  const inserted = await sql`
+    INSERT INTO authors (name)
+    SELECT * FROM unnest(${unique}::text[])
+    ON CONFLICT (name) DO NOTHING
+    RETURNING id, name
   `;
-  return created.id;
+
+  for (const row of inserted) {
+    cache.set(row.name, row.id);
+  }
+
+  const stillMissing = unique.filter((n) => !cache.has(n));
+  if (stillMissing.length > 0) {
+    const existing = await sql`
+      SELECT id, name FROM authors WHERE name = ANY(${stillMissing}::text[])
+    `;
+    for (const row of existing) {
+      cache.set(row.name, row.id);
+    }
+  }
 }
 
 async function syncBatch(
@@ -112,42 +142,61 @@ async function syncBatch(
   batch: PodcastIndexRow[],
   authorCache: Map<string, number>,
 ): Promise<{ inserted: number; skipped: number }> {
-  let inserted = 0;
-  let skipped = 0;
+  const authorNames = batch.map((r) => r.itunesAuthor || 'Unknown');
+  await ensureAuthors(sql, authorNames, authorCache);
 
-  for (const row of batch) {
-    try {
-      const authorName = row.itunesAuthor || 'Unknown';
-      let authorId = authorCache.get(authorName);
-      if (!authorId) {
-        authorId = await ensureAuthor(sql, authorName);
-        authorCache.set(authorName, authorId);
-      }
-      const lastPublished = row.newestItemPubdate
-        ? new Date(row.newestItemPubdate * 1000)
-        : null;
+  const values = batch.map((row) => {
+    const authorName = row.itunesAuthor || 'Unknown';
+    const authorId = authorCache.get(authorName)!;
+    const lastPublished = row.newestItemPubdate
+      ? new Date(row.newestItemPubdate * 1000)
+      : null;
 
-      await sql`
-        INSERT INTO podcasts (
-          podcast_index_id, feed_url, title, author_id, description,
-          cover, website_url, explicit, episode_count, last_published,
-          is_active, language, popularity_score, priority, update_frequency
-        ) VALUES (
-          ${row.id}, ${row.url}, ${row.title}, ${authorId},
-          ${row.description || null}::TEXT, ${row.imageUrl || 'https://podcst.app/placeholder.png'},
-          ${row.link || null}::TEXT, ${row.explicit === 1}, ${row.episodeCount || 0},
-          ${lastPublished}::TIMESTAMPTZ, ${row.dead !== 1}, ${row.language || null}::VARCHAR(10),
-          ${row.popularityScore}::INTEGER, ${row.priority}::INTEGER, ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER
-        )
-      `;
-      inserted++;
-    } catch (err) {
-      console.error(
-        `Skipped ${row.id} (${row.title}): ${err instanceof Error ? err.message : String(err)}`,
-      );
-      skipped++;
-    }
-  }
+    return {
+      podcast_index_id: row.id,
+      feed_url: row.url,
+      title: row.title,
+      author_id: authorId,
+      description: row.description || null,
+      cover: row.imageUrl || 'https://podcst.app/placeholder.png',
+      website_url: row.link || null,
+      explicit: row.explicit === 1,
+      episode_count: row.episodeCount || 0,
+      last_published: lastPublished,
+      is_active: row.dead !== 1,
+      language: row.language || null,
+      popularity_score: row.popularityScore,
+      priority: row.priority,
+      update_frequency: row.updateFrequency
+        ? row.updateFrequency * 86400
+        : null,
+    };
+  });
+
+  const result = await sql`
+    INSERT INTO podcasts ${sql(
+      values,
+      'podcast_index_id',
+      'feed_url',
+      'title',
+      'author_id',
+      'description',
+      'cover',
+      'website_url',
+      'explicit',
+      'episode_count',
+      'last_published',
+      'is_active',
+      'language',
+      'popularity_score',
+      'priority',
+      'update_frequency',
+    )}
+    ON CONFLICT (feed_url) DO NOTHING
+  `;
+
+  const inserted = result.count;
+  const skipped = batch.length - inserted;
 
   return { inserted, skipped };
 }
@@ -168,13 +217,15 @@ async function patch(): Promise<void> {
     idle_timeout: 20,
   });
 
+  const authorCache = await loadAuthorCache(sql);
+
   const countQuery = sqlite.query<{ count: number }, []>(`
     SELECT COUNT(*) as count FROM podcasts
     WHERE itunesId IS NULL
   `);
   const { count: totalCount } = countQuery.get()!;
   console.log(
-    `Found ${totalCount.toLocaleString()} podcasts with null/empty/0 itunesId`,
+    `Found ${totalCount.toLocaleString()} podcasts with null itunesId`,
   );
 
   if (totalCount === 0) {
@@ -198,7 +249,6 @@ async function patch(): Promise<void> {
     LIMIT $limit OFFSET $offset
   `);
 
-  const authorCache = new Map<string, number>();
   let processed = 0;
   let totalInserted = 0;
   let totalSkipped = 0;
@@ -223,8 +273,9 @@ async function patch(): Promise<void> {
     const rate = processed / elapsed;
     const remaining = (totalCount - processed) / rate;
     const eta = formatDuration(remaining);
+    const ratePerSec = (rate * 1000).toFixed(0);
     console.log(
-      `Progress: ${processed.toLocaleString()}/${totalCount.toLocaleString()} (${percent}%) - ETA: ${eta}`,
+      `Progress: ${processed.toLocaleString()}/${totalCount.toLocaleString()} (${percent}%) [${ratePerSec}/s] - ETA: ${eta}`,
     );
   }
 
