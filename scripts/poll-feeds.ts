@@ -15,6 +15,9 @@ const IDLE_SLEEP_MS = 60_000;
 
 const DAEMON_MODE = process.argv.includes('--daemon');
 
+const sanitize = (str: string | null | undefined): string | null =>
+  str ? str.replace(/\x00/g, '') : null;
+
 interface PodcastRow {
   id: number;
   feed_url: string;
@@ -116,10 +119,10 @@ async function pollPodcast(
 
   await sql`
     UPDATE podcasts SET
-      title = ${feed.title},
-      description = ${feed.description || null}::TEXT,
-      cover = ${feed.cover || podcast.feed_url},
-      website_url = ${feed.link || null}::TEXT,
+      title = ${sanitize(feed.title)},
+      description = ${sanitize(feed.description)}::TEXT,
+      cover = ${sanitize(feed.cover) || podcast.feed_url},
+      website_url = ${sanitize(feed.link)}::TEXT,
       explicit = ${feed.explicit},
       last_published = ${lastPublished}::TIMESTAMPTZ,
       episode_count = ${feed.episodes.length},
@@ -142,15 +145,15 @@ async function pollPodcast(
         episode_art, file_url, file_length, file_type
       ) VALUES (
         ${podcast.id},
-        ${ep.guid},
-        ${ep.title},
-        ${ep.summary || null}::TEXT,
+        ${sanitize(ep.guid)},
+        ${sanitize(ep.title)},
+        ${sanitize(ep.summary)}::TEXT,
         ${published},
         ${duration}::INTEGER,
-        ${ep.episodeArt || null}::TEXT,
-        ${ep.file.url},
+        ${sanitize(ep.episodeArt)}::TEXT,
+        ${sanitize(ep.file.url)},
         ${ep.file.length},
-        ${ep.file.type}
+        ${sanitize(ep.file.type)}
       )
       ON CONFLICT (podcast_id, guid) DO UPDATE SET
         title = EXCLUDED.title,
