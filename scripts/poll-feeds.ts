@@ -6,11 +6,14 @@ import { adaptFeed } from '../src/app/api/feed/parser';
 import type { IEpisodeListing } from '../src/types';
 
 const BATCH_SIZE = 500;
-const CONCURRENCY = 5;
+const CONCURRENCY = 10;
 const DEFAULT_UPDATE_FREQUENCY = 86400;
 const MAX_FAILURES = 5;
 const BACKOFF_BASE = 3600;
 const STALE_THRESHOLD_DAYS = 180;
+const IDLE_SLEEP_MS = 60_000;
+
+const DAEMON_MODE = process.argv.includes('--daemon');
 
 interface PodcastRow {
   id: number;
@@ -175,14 +178,7 @@ async function recordMetrics(
   }
 }
 
-async function main() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL required');
-  }
-
-  const sql = postgres(connectionString, { max: 20, idle_timeout: 20 });
-
+async function processBatch(sql: postgres.Sql): Promise<number> {
   const podcasts = await sql<PodcastRow[]>`
     SELECT id, feed_url, title, update_frequency, poll_failures,
            feed_etag, feed_last_modified, feed_hash
@@ -201,9 +197,9 @@ async function main() {
     LIMIT ${BATCH_SIZE}
   `;
 
-  console.log(
-    `Found ${podcasts.length} podcasts to poll (concurrency: ${CONCURRENCY})`,
-  );
+  if (podcasts.length === 0) {
+    return 0;
+  }
 
   const startTime = Date.now();
   let updated = 0;
@@ -264,13 +260,8 @@ async function main() {
     await Promise.all(batch.map(processPodcast));
   }
 
-  console.log('');
-
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  const finalRate = (
-    podcasts.length /
-    ((Date.now() - startTime) / 1000)
-  ).toFixed(1);
+  const finalRate = (podcasts.length / ((Date.now() - startTime) / 1000)).toFixed(1);
 
   await recordMetrics(sql, {
     feeds_updated: updated,
@@ -278,10 +269,36 @@ async function main() {
     feeds_failed: failed,
   });
 
-  console.log(
-    `\nDone in ${totalTime}s (${finalRate}/s): ${updated} updated, ${unchanged} unchanged, ${failed} failed`,
-  );
-  await sql.end();
+  console.log(`\n✓ ${totalTime}s (${finalRate}/s): ${updated} updated, ${unchanged} unchanged, ${failed} failed`);
+
+  return podcasts.length;
+}
+
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL required');
+  }
+
+  const sql = postgres(connectionString, { max: 20, idle_timeout: 20 });
+
+  if (DAEMON_MODE) {
+    console.log(`Daemon mode: polling continuously (batch=${BATCH_SIZE}, concurrency=${CONCURRENCY})`);
+    while (true) {
+      const count = await processBatch(sql);
+      if (count === 0) {
+        process.stdout.write(`[${new Date().toISOString()}] No podcasts due, sleeping ${IDLE_SLEEP_MS / 1000}s...`);
+        await Bun.sleep(IDLE_SLEEP_MS);
+        console.log('');
+      }
+    }
+  } else {
+    const count = await processBatch(sql);
+    if (count === 0) {
+      console.log('No podcasts due for polling');
+    }
+    await sql.end();
+  }
 }
 
 main().catch((err) => {
