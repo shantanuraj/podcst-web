@@ -361,7 +361,7 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
     const link =
       typeof linkRaw === 'object'
         ? linkRaw?.$?.href || linkRaw?._ || ''
-        : linkRaw ?? '';
+        : (linkRaw ?? '');
 
     return {
       title: title.toString().trim(),

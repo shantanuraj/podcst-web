@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import {
   type KeyboardShortcuts,
@@ -47,6 +48,7 @@ function resetRate() {
 }
 
 export const Player = () => {
+  const { t } = useTranslation();
   const currentEpisode = usePlayer(getCurrentEpisode);
   const open = usePlayer(getIsPlayerOpen);
 
@@ -76,18 +78,21 @@ export const Player = () => {
             </div>
             <Duration />
             <div className={styles.controls}>
-              <button onClick={seekBackward} aria-label="Seek backward">
+              <button onClick={seekBackward} aria-label={t('player.seekBack')}>
                 <Icon icon="seek-back" size={20} />
               </button>
               <PlayButton />
-              <button onClick={seekForward} aria-label="Seek forward">
+              <button
+                onClick={seekForward}
+                aria-label={t('player.seekForward')}
+              >
                 <Icon icon="seek-forward" size={20} />
               </button>
             </div>
             <PlaybackRate />
             <div className={styles.desktopOnly}>
               <VolumeControls />
-              <Link href="/queue" aria-label="View queue">
+              <Link href="/queue" aria-label={t('player.queue')}>
                 <Icon icon="queue-list" size={20} />
               </Link>
               <Airplay />
@@ -101,12 +106,13 @@ export const Player = () => {
 };
 
 function PlayButton() {
+  const { t } = useTranslation();
   const state = usePlayer(getPlaybackState);
   return (
     <button
       onClick={togglePlayback}
       className={styles.playButton}
-      aria-label={state === 'playing' ? 'Pause' : 'Play'}
+      aria-label={state === 'playing' ? t('player.pause') : t('player.play')}
     >
       <Icon icon={state === 'playing' ? 'pause' : 'play'} size={24} />
     </button>

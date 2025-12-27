@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { ImportButton } from '@/components/ImportButton/ImportButton';
+import { useTranslation } from '@/shared/i18n';
 import {
   getInit,
   type SubscriptionsState,
@@ -21,10 +22,8 @@ import styles from './Subscriptions.module.css';
 
 type Tab = 'subscriptions' | 'new';
 
-/**
- * @deprecated Use /profile/subscriptions instead
- */
 const LibraryPage: NextPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>('subscriptions');
 
   const init = useSubscriptions(getInit);
@@ -54,10 +53,9 @@ const LibraryPage: NextPage = () => {
             <path d="M19 11a7 7 0 0 1-7 7m0 0a7 7 0 0 1-7-7m7 7v4m0 0h-3m3 0h3M12 4a7 7 0 0 0-7 7m14 0a7 7 0 0 0-7-7" />
           </svg>
         </div>
-        <h1 className={styles.emptyTitle}>Your Library is Empty</h1>
+        <h1 className={styles.emptyTitle}>{t('settings.emptyLibrary')}</h1>
         <p className={styles.emptyText}>
-          Subscribe to podcasts to build your personal library, or import your
-          existing subscriptions from another app.
+          {t('settings.emptyLibraryDescription')}
         </p>
         <div className={styles.emptyActions}>
           <ImportButton
@@ -65,7 +63,7 @@ const LibraryPage: NextPage = () => {
             className={styles.importButton}
           />
           <Link href="/feed/top" className={styles.browseLink}>
-            Browse popular podcasts
+            {t('settings.browsePopularPodcasts')}
           </Link>
         </div>
       </div>
@@ -83,7 +81,7 @@ const LibraryPage: NextPage = () => {
             data-active={activeTab === 'subscriptions'}
             onClick={() => setActiveTab('subscriptions')}
           >
-            Subscriptions
+            {t('library.subscriptions')}
           </button>
           <button
             type="button"
@@ -91,13 +89,13 @@ const LibraryPage: NextPage = () => {
             data-active={activeTab === 'new'}
             onClick={() => setActiveTab('new')}
           >
-            New Releases
+            {t('feed.newReleases')}
           </button>
         </nav>
       </header>
       {activeTab === 'subscriptions' && (
         <>
-          <ItemListSchema items={podcasts} title="Subscriptions" />
+          <ItemListSchema items={podcasts} title={t('library.subscriptions')} />
           <PodcastsGrid podcasts={podcasts} />
         </>
       )}

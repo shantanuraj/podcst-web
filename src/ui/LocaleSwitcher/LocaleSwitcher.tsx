@@ -3,27 +3,11 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { i18n, type Locale } from '@/i18.conf';
+import { useTranslation } from '@/shared/i18n';
 import { Icon } from '@/ui/icons/svg/Icon';
 import styles from './LocaleSwitcher.module.css';
 
 const LOCALE_COOKIE = 'NEXT_LOCALE';
-
-const localeNames: Record<Locale, string> = {
-  us: 'United States',
-  nl: 'Netherlands',
-  ca: 'Canada',
-  kr: 'South Korea',
-  my: 'Malaysia',
-  in: 'India',
-  mx: 'Mexico',
-  fr: 'France',
-  se: 'Sweden',
-  no: 'Norway',
-};
-
-const sortedLocales = [...i18n.locales].sort((a, b) =>
-  localeNames[a].localeCompare(localeNames[b]),
-);
 
 function getCurrentLocale(pathname: string): Locale {
   for (const locale of i18n.locales) {
@@ -34,7 +18,11 @@ function getCurrentLocale(pathname: string): Locale {
   return i18n.defaultLocale;
 }
 
-function getNewPath(pathname: string, currentLocale: Locale, newLocale: Locale): string {
+function getNewPath(
+  pathname: string,
+  currentLocale: Locale,
+  newLocale: Locale,
+): string {
   if (pathname.startsWith(`/${currentLocale}/`)) {
     return pathname.replace(`/${currentLocale}/`, `/${newLocale}/`);
   }
@@ -47,10 +35,15 @@ function getNewPath(pathname: string, currentLocale: Locale, newLocale: Locale):
 export function LocaleSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const currentLocale = getCurrentLocale(pathname);
+
+  const sortedLocales = [...i18n.locales].sort((a, b) =>
+    t(`regions.${a}` as const).localeCompare(t(`regions.${b}` as const)),
+  );
 
   const handleLocaleChange = useCallback(
     (newLocale: Locale) => {
@@ -64,7 +57,10 @@ export function LocaleSwitcher() {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -86,7 +82,7 @@ export function LocaleSwitcher() {
         type="button"
         className={styles.trigger}
         onClick={() => setIsOpen(!isOpen)}
-        aria-label={`Change region (current: ${localeNames[currentLocale]})`}
+        aria-label={`Change region (current: ${t(`regions.${currentLocale}` as const)})`}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
@@ -96,7 +92,11 @@ export function LocaleSwitcher() {
       {isOpen && (
         <ul className={styles.menu} role="listbox">
           {sortedLocales.map((locale) => (
-            <li key={locale} role="option" aria-selected={locale === currentLocale}>
+            <li
+              key={locale}
+              role="option"
+              aria-selected={locale === currentLocale}
+            >
               <button
                 type="button"
                 className={styles.option}
@@ -104,7 +104,9 @@ export function LocaleSwitcher() {
                 onClick={() => handleLocaleChange(locale)}
               >
                 <span className={styles.code}>{locale.toUpperCase()}</span>
-                <span className={styles.name}>{localeNames[locale]}</span>
+                <span className={styles.name}>
+                  {t(`regions.${locale}` as const)}
+                </span>
               </button>
             </li>
           ))}
@@ -113,4 +115,3 @@ export function LocaleSwitcher() {
     </div>
   );
 }
-

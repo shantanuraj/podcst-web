@@ -8,7 +8,10 @@ const LOCALE_COOKIE = 'NEXT_LOCALE';
 
 function getLocale(request: NextRequest): string {
   const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
-  if (cookieLocale && locales.includes(cookieLocale as typeof locales[number])) {
+  if (
+    cookieLocale &&
+    locales.includes(cookieLocale as (typeof locales)[number])
+  ) {
     return cookieLocale;
   }
 

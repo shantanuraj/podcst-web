@@ -1,20 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { type Language, languageNames } from '@/messages';
 import styles from './LanguagePicker.module.css';
 
 const LANGUAGE_COOKIE = 'NEXT_UI_LANG';
 
-type Language = 'en' | 'nl' | 'fr' | 'sv' | 'ko' | 'es';
-
-const languages: { code: Language; name: string; native: string }[] = [
-  { code: 'en', name: 'English', native: 'English' },
-  { code: 'nl', name: 'Dutch', native: 'Nederlands' },
-  { code: 'fr', name: 'French', native: 'Français' },
-  { code: 'sv', name: 'Swedish', native: 'Svenska' },
-  { code: 'ko', name: 'Korean', native: '한국어' },
-  { code: 'es', name: 'Spanish', native: 'Español' },
-];
+const languages: Language[] = ['en', 'nl', 'fr', 'sv', 'ko', 'es'];
 
 function getStoredLanguage(): Language {
   if (typeof document === 'undefined') return 'en';
@@ -38,27 +30,27 @@ export function LanguagePicker() {
   return (
     <div className={styles.grid}>
       {languages.map((lang) => {
-        const isSelected = lang.code === currentLanguage;
+        const isSelected = lang === currentLanguage;
+        const names = languageNames[lang];
         return (
           <label
-            key={lang.code}
+            key={lang}
             className={styles.option}
             data-selected={isSelected}
           >
             <input
               type="radio"
               name="language"
-              value={lang.code}
+              value={lang}
               checked={isSelected}
               onChange={handleChange}
               className="sr-only"
             />
-            <span className={styles.native}>{lang.native}</span>
-            <span className={styles.name}>{lang.name}</span>
+            <span className={styles.native}>{names.native}</span>
+            <span className={styles.name}>{names.english}</span>
           </label>
         );
       })}
     </div>
   );
 }
-

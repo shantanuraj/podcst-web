@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/shared/i18n';
 import {
   useSession,
   useLogin,
@@ -18,6 +19,7 @@ type Mode = 'email' | 'code' | 'passkey';
 
 export default function AuthPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data: user, isLoading } = useSession();
   const login = useLogin();
   const register = useRegister();
@@ -80,12 +82,12 @@ export default function AuthPage() {
       <main className={styles.container}>
         <div className={styles.card}>
           <h1 className={styles.title}>
-            {mode === 'passkey' ? 'Create Passkey' : 'Enter Code'}
+            {mode === 'passkey' ? 'Create Passkey' : t('auth.enterCode')}
           </h1>
           <p className={styles.subtitle}>
             {mode === 'passkey'
               ? 'Creating your passkey...'
-              : `We sent a code to ${email}`}
+              : t('auth.verifySubtitle', { email })}
           </p>
 
           {mode === 'code' && (
@@ -100,7 +102,7 @@ export default function AuthPage() {
                   setCode(e.target.value.replace(/\D/g, ''));
                   setError(null);
                 }}
-                placeholder="000000"
+                placeholder={t('auth.codePlaceholder')}
                 required
                 autoFocus
                 disabled={isPending}
@@ -115,7 +117,7 @@ export default function AuthPage() {
                 disabled={isPending || code.length !== 6}
                 className={styles.button}
               >
-                {isPending ? 'Verifying...' : 'Verify'}
+                {isPending ? t('auth.verifying') : t('auth.verify')}
               </button>
             </form>
           )}
@@ -139,7 +141,7 @@ export default function AuthPage() {
             }}
             className={styles.link}
           >
-            Use a different email
+            {t('auth.useADifferentEmail')}
           </button>
         </div>
       </main>
@@ -149,10 +151,8 @@ export default function AuthPage() {
   return (
     <main className={styles.container}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Sign In</h1>
-        <p className={styles.subtitle}>
-          Use your email to continue with a passkey
-        </p>
+        <h1 className={styles.title}>{t('auth.title')}</h1>
+        <p className={styles.subtitle}>{t('auth.subtitle')}</p>
 
         <form onSubmit={handleEmailSubmit} className={styles.form}>
           <input
@@ -162,7 +162,7 @@ export default function AuthPage() {
               setEmail(e.target.value);
               setError(null);
             }}
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             required
             autoFocus
             disabled={isPending}
@@ -172,7 +172,7 @@ export default function AuthPage() {
           {error && <p className={styles.error}>{error}</p>}
 
           <button type="submit" disabled={isPending} className={styles.button}>
-            {isPending ? 'Continue...' : 'Continue'}
+            {isPending ? t('auth.continuing') : t('auth.continue')}
           </button>
         </form>
       </div>

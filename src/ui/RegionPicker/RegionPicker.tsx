@@ -3,26 +3,10 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { i18n, type Locale } from '@/i18.conf';
+import { useTranslation } from '@/shared/i18n';
 import styles from './RegionPicker.module.css';
 
 const LOCALE_COOKIE = 'NEXT_LOCALE';
-
-const localeNames: Record<Locale, string> = {
-  us: 'United States',
-  nl: 'Netherlands',
-  ca: 'Canada',
-  kr: 'South Korea',
-  my: 'Malaysia',
-  in: 'India',
-  mx: 'Mexico',
-  fr: 'France',
-  se: 'Sweden',
-  no: 'Norway',
-};
-
-const sortedLocales = [...i18n.locales].sort((a, b) =>
-  localeNames[a].localeCompare(localeNames[b]),
-);
 
 function getCurrentLocale(pathname: string): Locale {
   for (const locale of i18n.locales) {
@@ -36,7 +20,12 @@ function getCurrentLocale(pathname: string): Locale {
 export function RegionPicker() {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useTranslation();
   const currentLocale = getCurrentLocale(pathname);
+
+  const sortedLocales = [...i18n.locales].sort((a, b) =>
+    t(`regions.${a}` as const).localeCompare(t(`regions.${b}` as const)),
+  );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,11 +60,12 @@ export function RegionPicker() {
               className="sr-only"
             />
             <span className={styles.code}>{locale.toUpperCase()}</span>
-            <span className={styles.name}>{localeNames[locale]}</span>
+            <span className={styles.name}>
+              {t(`regions.${locale}` as const)}
+            </span>
           </label>
         );
       })}
     </div>
   );
 }
-

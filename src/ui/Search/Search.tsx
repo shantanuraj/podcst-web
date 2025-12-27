@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { useSearch } from '@/data/search';
+import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { useKeydown } from '@/shared/keyboard/useKeydown';
 import type { IPodcastSearchResult } from '@/types';
@@ -23,6 +24,7 @@ function getSearchResultHref(result: IPodcastSearchResult): string {
 
 export function Search() {
   const router = useRouter();
+  const { t } = useTranslation();
   const onSelectionChange = React.useCallback(
     (changes: UseComboboxStateChange<IPodcastSearchResult>) => {
       if (!changes.selectedItem) return;
@@ -36,7 +38,6 @@ export function Search() {
 
   const searchRef = React.useRef<HTMLInputElement>(null);
   const focusSearchShortcut = React.useCallback(() => {
-    // Schedule focus on next frame to avoid entering the shortcut into the input
     requestAnimationFrame(() => {
       searchRef.current?.focus();
     });
@@ -70,9 +71,9 @@ export function Search() {
       {isFetching && <LoadBar />}
       <input
         {...getInputProps({ ref: searchRef })}
-        aria-label="Search podcasts"
+        aria-label={t('search.label')}
         type="text"
-        placeholder="Search podcasts..."
+        placeholder={t('search.placeholder')}
       />
       <ul {...getMenuProps()} className={styles.results}>
         {isOpen &&

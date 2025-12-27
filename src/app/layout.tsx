@@ -1,6 +1,7 @@
 import Script from 'next/script';
 
 import { CastManager } from '@/components/CastManager/CastManager';
+import { TranslationProvider } from '@/shared/i18n';
 import { Player } from '@/shared/player/Player';
 import { QueryProvider } from '@/shared/query/QueryProvider';
 import { Toast } from '@/shared/toast/Toast';
@@ -68,13 +69,15 @@ export default function App({ children }: { children: React.ReactNode }) {
       <body>
         <WebSiteSchema />
         <QueryProvider>
-          <Init />
-          <ThemeListener />
-          <SiteHeader />
-          <main className={styles.main}>{children}</main>
-          <Player />
-          <Toast />
-          <CastManager />
+          <TranslationProvider>
+            <Init />
+            <ThemeListener />
+            <SiteHeader />
+            <main className={styles.main}>{children}</main>
+            <Player />
+            <Toast />
+            <CastManager />
+          </TranslationProvider>
         </QueryProvider>
         <Script id="castsetup">
           {`window['__onGCastApiAvailable'] = function(isAvailable) {

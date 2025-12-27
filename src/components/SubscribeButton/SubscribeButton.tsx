@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import {
   isSubscribed,
   useSubscriptions,
@@ -15,6 +16,7 @@ import { Button } from '@/ui/Button';
 import type { PodcastInfoProps } from '@/ui/PodcastInfo/PodcastInfo';
 
 export function SubscribeButton({ info }: PodcastInfoProps) {
+  const { t } = useTranslation();
   const { data: user } = useSession();
   const { data: serverSubs } = useServerSubscriptions();
   const { mutate: serverSubscribe, isPending: isSubscribing } = useSubscribe();
@@ -76,7 +78,7 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
       disabled={isPending}
       suppressHydrationWarning
     >
-      {isSubscribedToFeed ? 'Unsubscribe' : 'Subscribe'}
+      {isSubscribedToFeed ? t('podcast.unsubscribe') : t('podcast.subscribe')}
     </Button>
   );
 }
