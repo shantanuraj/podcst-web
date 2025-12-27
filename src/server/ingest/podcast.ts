@@ -29,7 +29,11 @@ export async function ingestPodcast(
   }
 
   const { data, etag, lastModified, hash } = result;
-  const podcast = await storePodcast(feedUrl, data, { etag, lastModified, hash });
+  const podcast = await storePodcast(feedUrl, data, {
+    etag,
+    lastModified,
+    hash,
+  });
   if (!podcast) {
     return null;
   }
@@ -116,7 +120,11 @@ interface FeedMeta {
   hash: string;
 }
 
-async function storePodcast(feedUrl: string, data: IEpisodeListing, meta: FeedMeta) {
+async function storePodcast(
+  feedUrl: string,
+  data: IEpisodeListing,
+  meta: FeedMeta,
+) {
   const authorName = data.author || 'Unknown';
 
   let [author] = await sql`

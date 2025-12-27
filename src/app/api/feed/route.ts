@@ -52,10 +52,7 @@ export async function GET(request: NextRequest) {
 
   const podcast = await getPodcastByFeedUrl(feedUrl);
   if (!podcast) {
-    return NextResponse.json(
-      { message: 'podcast not found' },
-      { status: 404 },
-    );
+    return NextResponse.json({ message: 'podcast not found' }, { status: 404 });
   }
 
   cache.saveFeed(feedUrl, podcast);
