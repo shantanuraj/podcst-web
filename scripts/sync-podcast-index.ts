@@ -1,7 +1,13 @@
 #!/usr/bin/env bun
 
 import { Database } from 'bun:sqlite';
-import { unlinkSync, existsSync, mkdirSync, appendFileSync, writeFileSync } from 'fs';
+import {
+  unlinkSync,
+  existsSync,
+  mkdirSync,
+  appendFileSync,
+  writeFileSync,
+} from 'fs';
 import { join, dirname } from 'path';
 import postgres from 'postgres';
 
@@ -17,7 +23,8 @@ interface LogEntry {
 
 let logFilePath: string;
 
-const PODCAST_INDEX_URL = 'https://public.podcastindex.org/podcastindex_feeds.db.tgz';
+const PODCAST_INDEX_URL =
+  'https://public.podcastindex.org/podcastindex_feeds.db.tgz';
 const TEMP_DIR = join(process.cwd(), '.tmp');
 const DEFAULT_TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
 
@@ -73,7 +80,9 @@ async function downloadAndExtract(): Promise<string> {
 
     const buffer = await response.arrayBuffer();
     await Bun.write(tgzPath, buffer);
-    console.log(`Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
+    console.log(
+      `Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`,
+    );
   }
 
   console.log('Extracting...');
@@ -285,7 +294,11 @@ async function sync(): Promise<void> {
 
   const lastSync = await getLastSyncTime(sql);
   const isFirstSync = !lastSync;
-  console.log(isFirstSync ? 'First sync (slow path)' : `Incremental sync since ${lastSync.toISOString()}`);
+  console.log(
+    isFirstSync
+      ? 'First sync (slow path)'
+      : `Incremental sync since ${lastSync.toISOString()}`,
+  );
 
   const lastSyncUnix = lastSync ? Math.floor(lastSync.getTime() / 1000) : 0;
 
@@ -304,7 +317,10 @@ async function sync(): Promise<void> {
     return;
   }
 
-  const selectQuery = sqlite.query<PodcastIndexRow, { $lastSync: number; $limit: number; $offset: number }>(`
+  const selectQuery = sqlite.query<
+    PodcastIndexRow,
+    { $lastSync: number; $limit: number; $offset: number }
+  >(`
     SELECT
       id, url, title, lastUpdate, link, dead, itunesId, itunesAuthor,
       explicit, imageUrl, newestItemPubdate, language, episodeCount,
@@ -324,10 +340,19 @@ async function sync(): Promise<void> {
   const startTime = Date.now();
 
   while (processed < totalCount) {
-    const batch = selectQuery.all({ $lastSync: lastSyncUnix, $limit: BATCH_SIZE, $offset: offset });
+    const batch = selectQuery.all({
+      $lastSync: lastSyncUnix,
+      $limit: BATCH_SIZE,
+      $offset: offset,
+    });
     if (batch.length === 0) break;
 
-    const { inserted, updated, skipped } = await syncBatch(sql, batch, authorCache, isFirstSync);
+    const { inserted, updated, skipped } = await syncBatch(
+      sql,
+      batch,
+      authorCache,
+      isFirstSync,
+    );
     totalInserted += inserted;
     totalUpdated += updated;
     totalSkipped += skipped;
@@ -339,7 +364,9 @@ async function sync(): Promise<void> {
     const rate = processed / elapsed; // items per ms
     const remaining = (totalCount - processed) / rate;
     const eta = formatDuration(remaining);
-    console.log(`Progress: ${processed.toLocaleString()}/${totalCount.toLocaleString()} (${percent}%) - ETA: ${eta}`);
+    console.log(
+      `Progress: ${processed.toLocaleString()}/${totalCount.toLocaleString()} (${percent}%) - ETA: ${eta}`,
+    );
   }
 
   console.log(`\nSync complete:`);
