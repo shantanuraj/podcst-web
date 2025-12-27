@@ -1,4 +1,4 @@
-import type { RenderablePodcast, IPodcastEpisodesInfo } from '@/types';
+import type { IPodcastEpisodesInfo, RenderablePodcast } from '@/types';
 import { Schema } from './Schema';
 
 interface ItemListSchemaProps {

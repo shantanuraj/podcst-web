@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslation } from '@/shared/i18n';
+import { useState } from 'react';
 import {
-  useSession,
   useLogin,
   useRegister,
   useSendCode,
+  useSession,
   useVerifyCode,
 } from '@/shared/auth/useAuth';
+import { useTranslation } from '@/shared/i18n';
 
 import styles from './Auth.module.css';
 
@@ -104,6 +104,7 @@ export default function AuthPage() {
                 }}
                 placeholder={t('auth.codePlaceholder')}
                 required
+                // biome-ignore lint/a11y/noAutofocus: This is intentional
                 autoFocus
                 disabled={isPending}
                 className={styles.input}
@@ -164,6 +165,7 @@ export default function AuthPage() {
             }}
             placeholder={t('auth.emailPlaceholder')}
             required
+            // biome-ignore lint/a11y/noAutofocus: This is intentional
             autoFocus
             disabled={isPending}
             className={styles.input}

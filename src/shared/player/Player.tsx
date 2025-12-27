@@ -7,24 +7,23 @@ import {
   type KeyboardShortcuts,
   useKeydown,
 } from '@/shared/keyboard/useKeydown';
-import { Icon } from '@/ui/icons/svg/Icon';
 import { ProxiedImage } from '@/ui/Image';
-
+import { Icon } from '@/ui/icons/svg/Icon';
+import { getEpisodeHref } from '../links';
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';
 import { Duration } from './Duration';
 import { PlaybackRate } from './PlaybackRate';
 import styles from './Player.module.css';
 import { Seekbar } from './Seekbar';
+import { usePlaybackSync } from './usePlaybackSync';
 import {
   getCurrentEpisode,
   getIsPlayerOpen,
   getPlaybackState,
   usePlayer,
 } from './usePlayer';
-import { usePlaybackSync } from './usePlaybackSync';
 import { VolumeControls } from './VolumeControls';
-import { getEpisodeHref } from '../links';
 
 const {
   togglePlayback,

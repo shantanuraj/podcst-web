@@ -2,18 +2,18 @@
 
 import {
   createContext,
+  type ReactNode,
   useContext,
   useEffect,
   useState,
-  type ReactNode,
 } from 'react';
-import { en, type Messages, type Language, defaultLanguage } from '@/messages';
-import { messages as sv } from '@/messages/sv';
-import { messages as nl } from '@/messages/nl';
+import { defaultLanguage, en, type Language, type Messages } from '@/messages';
 import { messages as es } from '@/messages/es';
 import { messages as fr } from '@/messages/fr';
-import { messages as ko } from '@/messages/ko';
 import { messages as hi } from '@/messages/hi';
+import { messages as ko } from '@/messages/ko';
+import { messages as nl } from '@/messages/nl';
+import { messages as sv } from '@/messages/sv';
 
 const LANGUAGE_COOKIE = 'NEXT_UI_LANG';
 

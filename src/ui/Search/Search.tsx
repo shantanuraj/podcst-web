@@ -10,8 +10,8 @@ import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { useKeydown } from '@/shared/keyboard/useKeydown';
 import type { IPodcastSearchResult } from '@/types';
-import { LoadBar } from '@/ui/LoadBar';
 import { ProxiedImage } from '@/ui/Image';
+import { LoadBar } from '@/ui/LoadBar';
 
 import styles from './Search.module.css';
 

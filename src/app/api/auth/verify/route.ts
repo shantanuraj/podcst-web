@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { sendVerificationCode, verifyCode } from '@/server/auth/email';
 
 export async function POST(request: NextRequest) {

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   if (id) {
     const podcastId = parseInt(id, 10);
-    if (isNaN(podcastId)) {
+    if (Number.isNaN(podcastId)) {
       return NextResponse.json(
         { message: 'parameter `id` must be a number' },
         { status: 400 },

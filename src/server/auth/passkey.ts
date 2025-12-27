@@ -1,12 +1,12 @@
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/server';
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
-} from '@simplewebauthn/server';
-import type {
-  AuthenticationResponseJSON,
-  RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { sql } from '../db';
 import { generateId } from './session';

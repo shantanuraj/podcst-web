@@ -1,17 +1,17 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from '@/shared/i18n';
-import {
-  isSubscribed,
-  useSubscriptions,
-} from '@/shared/subscriptions/useSubscriptions';
 import { useSession } from '@/shared/auth/useAuth';
+import { useTranslation } from '@/shared/i18n';
 import {
   useServerSubscriptions,
   useSubscribe,
   useUnsubscribe,
 } from '@/shared/subscriptions/useServerSubscriptions';
+import {
+  isSubscribed,
+  useSubscriptions,
+} from '@/shared/subscriptions/useSubscriptions';
 import { Button } from '@/ui/Button';
 import type { PodcastInfoProps } from '@/ui/PodcastInfo/PodcastInfo';
 

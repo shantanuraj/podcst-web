@@ -1,7 +1,7 @@
 import type {
+  IEpisodeInfo,
   IEpisodeListing,
   IPodcastEpisodesInfo,
-  IEpisodeInfo,
 } from '@/types';
 
 export function patchFeedResponse(

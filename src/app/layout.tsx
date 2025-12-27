@@ -4,14 +4,14 @@ import { CastManager } from '@/components/CastManager/CastManager';
 import { TranslationProvider } from '@/shared/i18n';
 import { Player } from '@/shared/player/Player';
 import { QueryProvider } from '@/shared/query/QueryProvider';
+import { ThemeListener } from '@/shared/theme/ThemeListener';
 import { Toast } from '@/shared/toast/Toast';
 import { Init } from './Init';
-import { ThemeListener } from '@/shared/theme/ThemeListener';
 
 import '@/styles/global.css';
 import type { Metadata, Viewport } from 'next';
-import { SiteHeader } from '@/ui/SiteHeader';
 import { WebSiteSchema } from '@/components/Schema';
+import { SiteHeader } from '@/ui/SiteHeader';
 import styles from './PodcstApp.module.css';
 
 export const metadata: Metadata = {

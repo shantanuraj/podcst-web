@@ -4,8 +4,8 @@ import { stripHost } from '@/shared/link/strip-host';
 import type { IPodcastEpisodesInfo } from '@/types';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
-import { Icon } from '@/ui/icons/svg/Icon';
 import { ProxiedImage } from '@/ui/Image';
+import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './PodcastInfo.module.css';
 

@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import styles from './NotFound.module.css';
 
 export const metadata: Metadata = {

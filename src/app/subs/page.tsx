@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { ImportButton } from '@/components/ImportButton/ImportButton';
+import { ItemListSchema } from '@/components/Schema';
 import { useTranslation } from '@/shared/i18n';
 import {
   getInit,
@@ -16,7 +17,6 @@ import type { IEpisodeInfo } from '@/types';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { LoadBar } from '@/ui/LoadBar';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
-import { ItemListSchema } from '@/components/Schema';
 
 import styles from './Subscriptions.module.css';
 

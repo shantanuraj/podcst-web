@@ -1,6 +1,6 @@
 'use client';
 
-import { type ImgHTMLAttributes, useRef, useCallback } from 'react';
+import { type ImgHTMLAttributes, useCallback, useRef } from 'react';
 import { IMAGE_PROXY_URL } from '@/data/constants';
 
 interface ProxiedImageProps extends ImgHTMLAttributes<HTMLImageElement> {

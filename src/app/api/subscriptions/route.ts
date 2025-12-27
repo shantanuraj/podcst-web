@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
 import {
-  getSubscriptions,
   addSubscription,
+  getSubscriptions,
   importSubscriptions,
   removeSubscription,
 } from '@/server/subscriptions';

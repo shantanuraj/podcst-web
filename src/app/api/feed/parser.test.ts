@@ -1,6 +1,6 @@
-import { expect, test, describe } from 'bun:test';
-import { adaptFeed } from './parser';
+import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+import { adaptFeed } from './parser';
 
 const fixture = (name: string) =>
   readFileSync(`src/app/api/feed/__fixtures__/${name}`, 'utf-8');

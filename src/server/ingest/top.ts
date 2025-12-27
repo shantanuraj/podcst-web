@@ -1,5 +1,5 @@
-import { sql } from '../db';
 import type { IPodcast } from '@/types';
+import { sql } from '../db';
 
 export async function getTopPodcasts(
   limit: number,

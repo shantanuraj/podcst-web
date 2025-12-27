@@ -1,14 +1,13 @@
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { ItemListSchema } from '@/components/Schema';
 import { getSession } from '@/server/auth/session';
 import { getSubscriptions } from '@/server/subscriptions';
-import { PodcastsGrid } from '@/ui/PodcastsGrid';
-import { EpisodesList } from '@/ui/EpisodesList';
-import { ItemListSchema } from '@/components/Schema';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
-
-import { SubscriptionsTabs } from './SubscriptionsTabs';
+import { EpisodesList } from '@/ui/EpisodesList';
+import { PodcastsGrid } from '@/ui/PodcastsGrid';
 import styles from './Subscriptions.module.css';
+import { SubscriptionsTabs } from './SubscriptionsTabs';
 
 export const dynamic = 'force-dynamic';
 
