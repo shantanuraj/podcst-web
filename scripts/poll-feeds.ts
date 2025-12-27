@@ -3,7 +3,6 @@
 import postgres from 'postgres';
 import { createHash } from 'crypto';
 import { adaptFeed } from '../src/app/api/feed/parser';
-import type { IEpisodeListing } from '../src/types';
 
 const BATCH_SIZE = 500;
 const CONCURRENCY = 10;
@@ -21,7 +20,8 @@ const sanitize = (str: string | null | undefined): string | null =>
 
 const getPollInterval = (updateFrequency: number | null): number => {
   if (!updateFrequency) return DEFAULT_UPDATE_FREQUENCY;
-  const seconds = updateFrequency < 86400 ? updateFrequency * 86400 : updateFrequency;
+  const seconds =
+    updateFrequency < 86400 ? updateFrequency * 86400 : updateFrequency;
   return Math.max(seconds, MIN_UPDATE_FREQUENCY);
 };
 
@@ -124,7 +124,8 @@ async function pollPodcast(
 
   const lastPublished = feed.published ? new Date(feed.published) : null;
 
-  await sql`
+  try {
+    await sql`
     UPDATE podcasts SET
       title = ${sanitize(feed.title)},
       description = ${sanitize(feed.description)}::TEXT,
@@ -139,6 +140,10 @@ async function pollPodcast(
       updated_at = now()
     WHERE id = ${podcast.id}
   `;
+  } catch (err) {
+    console.warn(`Failed to update podcast metadata: ${podcast.id}`, err);
+    return 'error';
+  }
 
   for (const ep of feed.episodes) {
     if (!ep.guid || !ep.file.url) continue;
@@ -271,7 +276,10 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
   }
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  const finalRate = (podcasts.length / ((Date.now() - startTime) / 1000)).toFixed(1);
+  const finalRate = (
+    podcasts.length /
+    ((Date.now() - startTime) / 1000)
+  ).toFixed(1);
 
   await recordMetrics(sql, {
     feeds_updated: updated,
@@ -279,7 +287,9 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
     feeds_failed: failed,
   });
 
-  console.log(`\n✓ ${totalTime}s (${finalRate}/s): ${updated} updated, ${unchanged} unchanged, ${failed} failed`);
+  console.log(
+    `\n✓ ${totalTime}s (${finalRate}/s): ${updated} updated, ${unchanged} unchanged, ${failed} failed`,
+  );
 
   return podcasts.length;
 }
@@ -293,11 +303,15 @@ async function main() {
   const sql = postgres(connectionString, { max: 20, idle_timeout: 20 });
 
   if (DAEMON_MODE) {
-    console.log(`Daemon mode: polling continuously (batch=${BATCH_SIZE}, concurrency=${CONCURRENCY})`);
+    console.log(
+      `Daemon mode: polling continuously (batch=${BATCH_SIZE}, concurrency=${CONCURRENCY})`,
+    );
     while (true) {
       const count = await processBatch(sql);
       if (count === 0) {
-        process.stdout.write(`[${new Date().toISOString()}] No podcasts due, sleeping ${IDLE_SLEEP_MS / 1000}s...`);
+        process.stdout.write(
+          `[${new Date().toISOString()}] No podcasts due, sleeping ${IDLE_SLEEP_MS / 1000}s...`,
+        );
         await Bun.sleep(IDLE_SLEEP_MS);
         console.log('');
       }
