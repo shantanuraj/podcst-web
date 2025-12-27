@@ -14,7 +14,8 @@ const redis = new Redis({
 
 // Helper functions
 function generateSlug(length = 6) {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const chars =
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -75,7 +76,10 @@ function parseEpisodeUrl(url: string) {
 }
 
 // Main function
-async function generateShortUrl(episodeUrl: string, customSlug: string | null = null) {
+async function generateShortUrl(
+  episodeUrl: string,
+  customSlug: string | null = null,
+) {
   try {
     // Parse the episode URL
     const { feed: feedUrl, guid } = parseEpisodeUrl(episodeUrl);
@@ -108,8 +112,8 @@ async function generateShortUrl(episodeUrl: string, customSlug: string | null = 
     console.log(`\n✅ Short URL created: ${shortUrl}`);
 
     return shortUrl;
-  } catch (error: Error | any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', (error as any).message);
     process.exit(1);
   } finally {
     redis.disconnect();
@@ -120,11 +124,15 @@ async function generateShortUrl(episodeUrl: string, customSlug: string | null = 
 function printUsage() {
   console.log('📎 Short URL Generator for Podcst Episodes\n');
   console.log('Usage:');
-  console.log('  node scripts/generate-short-url.js <episode-url> [custom-slug]');
+  console.log(
+    '  node scripts/generate-short-url.js <episode-url> [custom-slug]',
+  );
   console.log('');
   console.log('Arguments:');
   console.log('  episode-url    Full episode URL from podcst.app');
-  console.log('  custom-slug    Optional custom slug (default: random 6 chars)');
+  console.log(
+    '  custom-slug    Optional custom slug (default: random 6 chars)',
+  );
   console.log('');
   console.log('Examples:');
   console.log('  # Generate random short URL');
@@ -161,7 +169,11 @@ if (!episodeUrl) {
 }
 
 // Validate environment variables
-if (!process.env.KV_REDIS_HOST || !process.env.KV_REDIS_PASS || !process.env.KV_REDIS_PORT) {
+if (
+  !process.env.KV_REDIS_HOST ||
+  !process.env.KV_REDIS_PASS ||
+  !process.env.KV_REDIS_PORT
+) {
   console.error('❌ Error: Missing Redis environment variables');
   console.error('Required: KV_REDIS_HOST, KV_REDIS_PASS, KV_REDIS_PORT');
   process.exit(1);
