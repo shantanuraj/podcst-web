@@ -9,27 +9,27 @@ import styles from './LocaleSwitcher.module.css';
 
 const LOCALE_COOKIE = 'NEXT_LOCALE';
 
-function getCurrentLocale(pathname: string): Locale {
+function getLocaleFromPath(pathname: string): Locale | null {
   for (const locale of i18n.locales) {
     if (pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`) {
       return locale;
     }
   }
-  return i18n.defaultLocale;
+  return null;
 }
 
-function getNewPath(
-  pathname: string,
-  currentLocale: Locale,
-  newLocale: Locale,
-): string {
-  if (pathname.startsWith(`/${currentLocale}/`)) {
-    return pathname.replace(`/${currentLocale}/`, `/${newLocale}/`);
+function getLocaleFromCookie(): Locale | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp(`${LOCALE_COOKIE}=([^;]+)`));
+  const value = match?.[1];
+  if (value && i18n.locales.includes(value as Locale)) {
+    return value as Locale;
   }
-  if (pathname === `/${currentLocale}`) {
-    return `/${newLocale}`;
-  }
-  return `/${newLocale}${pathname}`;
+  return null;
+}
+
+function getCurrentLocale(pathname: string): Locale {
+  return getLocaleFromPath(pathname) ?? getLocaleFromCookie() ?? i18n.defaultLocale;
 }
 
 export function LocaleSwitcher() {
@@ -37,9 +37,23 @@ export function LocaleSwitcher() {
   const router = useRouter();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [locale, setLocale] = useState<Locale>(i18n.defaultLocale);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const currentLocale = getCurrentLocale(pathname);
+  useEffect(() => {
+    const detected = getCurrentLocale(pathname);
+    setLocale(detected);
+    document.cookie = `${LOCALE_COOKIE}=${detected};path=/;max-age=31536000`;
+  }, [pathname]);
+
+  useEffect(() => {
+    function onLocaleChange() {
+      const cookieLocale = getLocaleFromCookie();
+      if (cookieLocale) setLocale(cookieLocale);
+    }
+    window.addEventListener('locale-change', onLocaleChange);
+    return () => window.removeEventListener('locale-change', onLocaleChange);
+  }, []);
 
   const sortedLocales = [...i18n.locales].sort((a, b) =>
     t(`regions.${a}` as const).localeCompare(t(`regions.${b}` as const)),
@@ -48,11 +62,17 @@ export function LocaleSwitcher() {
   const handleLocaleChange = useCallback(
     (newLocale: Locale) => {
       document.cookie = `${LOCALE_COOKIE}=${newLocale};path=/;max-age=31536000`;
-      const newPath = getNewPath(pathname, currentLocale, newLocale);
-      router.push(newPath);
+      setLocale(newLocale);
       setIsOpen(false);
+      const pathLocale = getLocaleFromPath(pathname);
+      if (pathLocale) {
+        const newPath = pathname.replace(`/${pathLocale}/`, `/${newLocale}/`);
+        router.push(newPath);
+      } else {
+        window.dispatchEvent(new Event('locale-change'));
+      }
     },
-    [pathname, currentLocale, router],
+    [pathname, router],
   );
 
   useEffect(() => {
@@ -82,30 +102,26 @@ export function LocaleSwitcher() {
         type="button"
         className={styles.trigger}
         onClick={() => setIsOpen(!isOpen)}
-        aria-label={`Change region (current: ${t(`regions.${currentLocale}` as const)})`}
+        aria-label={`Change region (current: ${t(`regions.${locale}` as const)})`}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
         <Icon icon="globe" size={20} />
-        <span className={styles.label}>{currentLocale.toUpperCase()}</span>
+        <span className={styles.label}>{locale.toUpperCase()}</span>
       </button>
       {isOpen && (
         <ul className={styles.menu} role="listbox">
-          {sortedLocales.map((locale) => (
-            <li
-              key={locale}
-              role="option"
-              aria-selected={locale === currentLocale}
-            >
+          {sortedLocales.map((l) => (
+            <li key={l} role="option" aria-selected={l === locale}>
               <button
                 type="button"
                 className={styles.option}
-                data-active={locale === currentLocale}
-                onClick={() => handleLocaleChange(locale)}
+                data-active={l === locale}
+                onClick={() => handleLocaleChange(l)}
               >
-                <span className={styles.code}>{locale.toUpperCase()}</span>
+                <span className={styles.code}>{l.toUpperCase()}</span>
                 <span className={styles.name}>
-                  {t(`regions.${locale}` as const)}
+                  {t(`regions.${l}` as const)}
                 </span>
               </button>
             </li>
