@@ -63,7 +63,9 @@ async function fetchTopFromItunes(locale: string) {
   const lookupUrl = `${ITUNES_API}/lookup?id=${topIds.join(',')}`;
   const lookupRes = await fetch(lookupUrl);
   if (!lookupRes.ok) {
-    console.error(`Failed to lookup podcasts for ${locale}: ${lookupRes.status}`);
+    console.error(
+      `Failed to lookup podcasts for ${locale}: ${lookupRes.status}`,
+    );
     return [];
   }
 
@@ -223,7 +225,11 @@ async function main() {
     }
 
     console.log(`[${locale}] Found ${podcasts.length} podcasts, storing...`);
-    const { stored, newPodcasts } = await storeTopPodcasts(sql, podcasts, locale);
+    const { stored, newPodcasts } = await storeTopPodcasts(
+      sql,
+      podcasts,
+      locale,
+    );
     console.log(`[${locale}] Stored ${stored} podcasts (${newPodcasts} new)`);
 
     totalStored += stored;
@@ -237,7 +243,9 @@ async function main() {
     `;
   }
 
-  console.log(`\nDone: ${totalStored} total, ${totalNew} new podcasts discovered`);
+  console.log(
+    `\nDone: ${totalStored} total, ${totalNew} new podcasts discovered`,
+  );
   await sql.end();
 }
 

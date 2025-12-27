@@ -31,7 +31,10 @@ interface FetchResult {
   hash?: string;
 }
 
-async function fetchFeed(url: string, podcast: PodcastRow): Promise<FetchResult> {
+async function fetchFeed(
+  url: string,
+  podcast: PodcastRow,
+): Promise<FetchResult> {
   try {
     const headers: Record<string, string> = { 'User-Agent': 'Podcst/1.0' };
     if (podcast.feed_etag) {
@@ -75,7 +78,10 @@ async function fetchFeed(url: string, podcast: PodcastRow): Promise<FetchResult>
 
 type PollResult = 'updated' | 'not_modified' | 'error';
 
-async function pollPodcast(sql: postgres.Sql, podcast: PodcastRow): Promise<PollResult> {
+async function pollPodcast(
+  sql: postgres.Sql,
+  podcast: PodcastRow,
+): Promise<PollResult> {
   const result = await fetchFeed(podcast.feed_url, podcast);
 
   if (result.status === 'error') {
@@ -195,7 +201,9 @@ async function main() {
     LIMIT ${BATCH_SIZE}
   `;
 
-  console.log(`Found ${podcasts.length} podcasts to poll (concurrency: ${CONCURRENCY})`);
+  console.log(
+    `Found ${podcasts.length} podcasts to poll (concurrency: ${CONCURRENCY})`,
+  );
 
   const startTime = Date.now();
   let updated = 0;
@@ -246,7 +254,9 @@ async function main() {
     processed++;
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     const rate = (processed / ((Date.now() - startTime) / 1000)).toFixed(1);
-    process.stdout.write(`\r[${processed}/${podcasts.length}] [${elapsed}s ${rate}/s] ✓${updated} ○${unchanged} ✗${failed}`);
+    process.stdout.write(
+      `\r[${processed}/${podcasts.length}] [${elapsed}s ${rate}/s] ✓${updated} ○${unchanged} ✗${failed}`,
+    );
   }
 
   for (let i = 0; i < podcasts.length; i += CONCURRENCY) {
@@ -257,7 +267,10 @@ async function main() {
   console.log('');
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  const finalRate = (podcasts.length / ((Date.now() - startTime) / 1000)).toFixed(1);
+  const finalRate = (
+    podcasts.length /
+    ((Date.now() - startTime) / 1000)
+  ).toFixed(1);
 
   await recordMetrics(sql, {
     feeds_updated: updated,
@@ -265,7 +278,9 @@ async function main() {
     feeds_failed: failed,
   });
 
-  console.log(`\nDone in ${totalTime}s (${finalRate}/s): ${updated} updated, ${unchanged} unchanged, ${failed} failed`);
+  console.log(
+    `\nDone in ${totalTime}s (${finalRate}/s): ${updated} updated, ${unchanged} unchanged, ${failed} failed`,
+  );
   await sql.end();
 }
 
