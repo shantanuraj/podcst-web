@@ -8,6 +8,7 @@ import type { IEpisodeListing } from '../src/types';
 const BATCH_SIZE = 500;
 const CONCURRENCY = 10;
 const DEFAULT_UPDATE_FREQUENCY = 86400;
+const MIN_UPDATE_FREQUENCY = 3600;
 const MAX_FAILURES = 5;
 const BACKOFF_BASE = 3600;
 const STALE_THRESHOLD_DAYS = 180;
@@ -17,6 +18,12 @@ const DAEMON_MODE = process.argv.includes('--daemon');
 
 const sanitize = (str: string | null | undefined): string | null =>
   str ? str.replace(/\x00/g, '') : null;
+
+const getPollInterval = (updateFrequency: number | null): number => {
+  if (!updateFrequency) return DEFAULT_UPDATE_FREQUENCY;
+  const seconds = updateFrequency < 86400 ? updateFrequency * 86400 : updateFrequency;
+  return Math.max(seconds, MIN_UPDATE_FREQUENCY);
+};
 
 interface PodcastRow {
   id: number;
@@ -98,7 +105,7 @@ async function pollPodcast(
     await sql`
       UPDATE podcasts SET
         last_polled_at = now(),
-        next_poll_at = now() + interval '1 second' * ${podcast.update_frequency || DEFAULT_UPDATE_FREQUENCY},
+        next_poll_at = now() + interval '1 second' * ${getPollInterval(podcast.update_frequency)},
         poll_failures = 0
       WHERE id = ${podcast.id}
     `;
@@ -214,7 +221,7 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
     const result = await pollPodcast(sql, podcast);
 
     if (result === 'updated') {
-      const interval = podcast.update_frequency || DEFAULT_UPDATE_FREQUENCY;
+      const interval = getPollInterval(podcast.update_frequency);
       await sql`
         UPDATE podcasts SET
           last_polled_at = now(),
