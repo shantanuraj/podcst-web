@@ -4,23 +4,25 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { i18n } from './i18.conf';
 
 const locales = i18n.locales;
+const LOCALE_COOKIE = 'NEXT_LOCALE';
 
-function getLocale(request: NextRequest): string | undefined {
-  // Negotiator expects plain object so we need to transform headers
+function getLocale(request: NextRequest): string {
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
+  if (cookieLocale && locales.includes(cookieLocale as typeof locales[number])) {
+    return cookieLocale;
+  }
+
   const negotiatorHeaders: Record<string, string> = {};
   request.headers.forEach((value, key) => {
     negotiatorHeaders[key] = value;
   });
 
-  // Use negotiator and intl-localematcher to get best locale
   const languages = new Negotiator({ headers: negotiatorHeaders }).languages(
     // @ts-expect-error: Readonly array is not assignable to mutable array
     locales,
   );
 
-  const locale = matchLocale(languages, locales, i18n.defaultLocale);
-
-  return locale;
+  return matchLocale(languages, locales, i18n.defaultLocale);
 }
 
 export default function proxy(request: NextRequest) {
