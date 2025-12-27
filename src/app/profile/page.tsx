@@ -1,10 +1,19 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React from 'react';
+import { useLogout, useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
-import { useSession, useLogout } from '@/shared/auth/useAuth';
+import { shortcuts } from '@/shared/keyboard/shortcuts';
+import {
+  useServerSubscriptions,
+  useSyncToCloud,
+} from '@/shared/subscriptions/useServerSubscriptions';
+import {
+  type SubscriptionsState,
+  useSubscriptions,
+} from '@/shared/subscriptions/useSubscriptions';
 import {
   type IThemeInfo,
   type Scheme,
@@ -13,15 +22,6 @@ import {
   useTheme,
 } from '@/shared/theme/useTheme';
 import type { ThemeMode } from '@/types';
-import { shortcuts } from '@/shared/keyboard/shortcuts';
-import {
-  type SubscriptionsState,
-  useSubscriptions,
-} from '@/shared/subscriptions/useSubscriptions';
-import {
-  useServerSubscriptions,
-  useSyncToCloud,
-} from '@/shared/subscriptions/useServerSubscriptions';
 import { LanguagePicker } from '@/ui/LanguagePicker';
 import { RegionPicker } from '@/ui/RegionPicker';
 

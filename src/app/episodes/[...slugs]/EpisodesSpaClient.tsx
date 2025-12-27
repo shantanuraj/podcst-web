@@ -2,14 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
-
+import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 import { usePodcast } from '@/data/feed';
 import type { IPodcastEpisodesInfo } from '@/types';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { Loading } from '@/ui/Loading';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
-import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 
 interface EpisodesSpaClientProps {
   podcastId: number;

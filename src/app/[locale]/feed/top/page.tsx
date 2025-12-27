@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { top } from '@/app/api/top/top';
-import { PodcastsGrid } from '@/ui/PodcastsGrid';
 import { ItemListSchema } from '@/components/Schema';
+import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 export const metadata: Metadata = {
   title: 'Top Podcasts',

@@ -1,11 +1,11 @@
+import { getPodcastHref } from '@/shared/links';
 import { SpaLink } from '@/shared/spa';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
-import { Icon } from '@/ui/icons/svg/Icon';
-import { getPodcastHref } from '@/shared/links';
 import { ProxiedImage } from '@/ui/Image';
+import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';

@@ -1,5 +1,5 @@
-import { join } from 'path';
 import { readFileSync } from 'fs';
+import { join } from 'path';
 import { sql } from '../db';
 
 /**
@@ -60,7 +60,7 @@ async function ingestGenres() {
     const id = parseInt(idStr);
     const parentId = parentIdStr ? parseInt(parentIdStr) : null;
 
-    if (isNaN(id)) {
+    if (Number.isNaN(id)) {
       console.warn(`Skipping invalid line: ${line}`);
       continue;
     }

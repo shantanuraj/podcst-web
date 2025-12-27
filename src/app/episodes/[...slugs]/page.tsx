@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import {
-  getPodcastById,
   getPodcastByFeedUrl,
+  getPodcastById,
   ingestPodcast,
 } from '@/server/ingest/podcast';
+import type { IPodcastEpisodesInfo } from '@/types';
 import { EpisodesSpaClient } from './EpisodesSpaClient';
 
 function isNumeric(str: string): boolean {
@@ -46,7 +47,7 @@ export async function generateMetadata(props: {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
 
-  let info;
+  let info: IPodcastEpisodesInfo | null = null;
   if (parsed.type === 'id') {
     info = await getPodcastById(parsed.podcastId);
   } else {

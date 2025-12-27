@@ -1,5 +1,5 @@
 export {
+  type TranslationKey,
   TranslationProvider,
   useTranslation,
-  type TranslationKey,
 } from './TranslationProvider';

@@ -1,12 +1,12 @@
-import { sql } from '../db';
-import { adaptFeed } from '@/app/api/feed/parser';
 import { createHash } from 'crypto';
+import { adaptFeed } from '@/app/api/feed/parser';
 import type {
   IEpisode,
+  IEpisodeInfo,
   IEpisodeListing,
   IPodcastEpisodesInfo,
-  IEpisodeInfo,
 } from '@/types';
+import { sql } from '../db';
 
 interface FeedFetchResult {
   data: IEpisodeListing;

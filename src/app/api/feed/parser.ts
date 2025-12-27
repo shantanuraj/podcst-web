@@ -15,7 +15,7 @@ const readFile = (file: any): IFileInfo => {
   return {
     url: file.url || '',
     type: file.type || '',
-    length: isNaN(length) ? 0 : length,
+    length: Number.isNaN(length) ? 0 : length,
   };
 };
 
@@ -31,7 +31,7 @@ const readDate = (ctx: any): number | null => {
   if (!dateStr) return null;
 
   const date = new Date(dateStr);
-  return isNaN(date.getTime()) ? null : date.getTime();
+  return Number.isNaN(date.getTime()) ? null : date.getTime();
 };
 
 /**
@@ -77,11 +77,11 @@ const readDuration = (ctx: any): number | null => {
 
   if (data.indexOf(':') === -1) {
     const parsed = parseInt(data, 10);
-    return isNaN(parsed) ? null : parsed;
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
   const parts = data.split(':').map((e) => parseInt(e.trim(), 10));
-  if (parts.some(isNaN)) {
+  if (parts.some(Number.isNaN)) {
     return null;
   }
 

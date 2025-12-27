@@ -1,10 +1,9 @@
 import { memo } from 'react';
-
+import { getEpisodeHref } from '@/shared/links';
 import { SpaLink } from '@/shared/spa';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
-import { getEpisodeHref } from '@/shared/links';
 import { ProxiedImage } from '@/ui/Image';
 
 import styles from './EpisodeItem.module.css';

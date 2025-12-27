@@ -1,5 +1,5 @@
-import { sql } from './db';
 import type { IPodcastSearchResult } from '@/types';
+import { sql } from './db';
 
 export async function searchPodcasts(
   term: string,

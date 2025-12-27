@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { i18n, type Locale } from '@/i18.conf';
 import { useTranslation } from '@/shared/i18n';
 import { Icon } from '@/ui/icons/svg/Icon';

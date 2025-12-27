@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { PodcastsGrid } from '@/ui/PodcastsGrid';
-import { EpisodesList } from '@/ui/EpisodesList';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import { EpisodesList } from '@/ui/EpisodesList';
+import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';
 

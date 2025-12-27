@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import type { RenderablePodcast } from '@/types';
 import { getPodcastHref } from '@/shared/links';
+import type { RenderablePodcast } from '@/types';
 import { ProxiedImage } from '@/ui/Image';
 
 import styles from './PodcastTile.module.css';

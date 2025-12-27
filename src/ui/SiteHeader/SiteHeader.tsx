@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { LocaleSwitcher } from '@/ui/LocaleSwitcher';
 import { Search } from '@/ui/Search/Search';
-import { useSession } from '@/shared/auth/useAuth';
 
 import styles from './SiteHeader.module.css';
 

@@ -1,12 +1,12 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSession } from '@/shared/auth/useAuth';
+import type { IEpisodeInfo } from '@/types';
 import {
-  usePlayer,
   getCurrentEpisode,
   getPlaybackState,
   getSeekPosition,
+  usePlayer,
 } from './usePlayer';
-import type { IEpisodeInfo } from '@/types';
 
 const SYNC_INTERVAL_MS = 30_000;
 const COMPLETION_THRESHOLD = 0.95;
