@@ -3,6 +3,7 @@ export const messages = {
     appName: 'Podcst',
     version: 'Version',
     madeBy: 'Made by',
+    author: 'Shantanu Raj',
     loading: 'Loading...',
     error: 'Something went wrong',
   },
@@ -61,7 +62,7 @@ export const messages = {
     exportLibrary: 'Export Library',
     exportLibraryDescription:
       'Download your library as an OPML file. You can use this file to import your podcasts into other applications',
-    exportLibrayCta: 'Download OPML File',
+    exportLibraryCta: 'Download OPML File',
     exportLibraryCount:
       '{count} {count, plural, one {podcast} other {podcasts}} in your library',
   },
@@ -142,6 +143,7 @@ export const messages = {
     sv: 'Swedish',
     ko: 'Korean',
     es: 'Spanish',
+    hi: 'Hindi',
   },
 
   shortcuts: {
@@ -178,6 +180,6 @@ export const messages = {
     notFoundDescription: "The page you're looking for doesn't exist",
     goHome: 'Go home',
   },
-} as const;
+};
 
 export type Messages = typeof messages;

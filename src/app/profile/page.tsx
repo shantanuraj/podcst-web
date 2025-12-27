@@ -112,7 +112,7 @@ export default function ProfilePage() {
               rel="noopener"
               className={styles.authorLink}
             >
-              Shantanu Raj
+              {t('common.author')}
             </Link>
           </div>
         </footer>

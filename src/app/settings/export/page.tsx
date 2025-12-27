@@ -85,7 +85,7 @@ export default function SettingsExportPage() {
               onClick={exportSubscriptions}
               className="px-8 py-4 text-base font-medium bg-ink text-surface border border-ink hover:bg-ink-secondary transition-all"
             >
-              {t('settings.exportLibrayCta')}
+              {t('settings.exportLibraryCta')}
             </Button>
             <p className="text-xs text-ink-tertiary">
               {t('settings.exportLibraryCount', { count: subs.length })}
