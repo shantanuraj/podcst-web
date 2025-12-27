@@ -193,9 +193,9 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
         OR last_published > now() - interval '1 day' * ${STALE_THRESHOLD_DAYS}
       )
     ORDER BY
-      CASE WHEN next_poll_at IS NULL THEN 0 ELSE 1 END,
       priority DESC NULLS LAST,
       popularity_score DESC NULLS LAST,
+      CASE WHEN next_poll_at IS NULL THEN 0 ELSE 1 END,
       last_polled_at ASC NULLS FIRST
     LIMIT ${BATCH_SIZE}
   `;
