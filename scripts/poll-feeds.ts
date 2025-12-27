@@ -134,7 +134,7 @@ async function pollPodcast(
   `;
 
   for (const ep of feed.episodes) {
-    if (!ep.guid) continue;
+    if (!ep.guid || !ep.file.url) continue;
 
     const published = ep.published ? new Date(ep.published) : new Date();
     const duration = ep.duration ? Math.floor(ep.duration) : null;
