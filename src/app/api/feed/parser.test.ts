@@ -66,4 +66,20 @@ describe('adaptFeed', () => {
     expect(result.link).toBe('https://example.com/podcast');
     expect(typeof result.link).toBe('string');
   });
+
+  test('parsing ChristianWorldMedia feed (snapshot)', async () => {
+    const xml = fixture('christianworldmedia.xml');
+    const result = await adaptFeed(xml);
+
+    expect(result).not.toBeNull();
+    if (!result) return;
+
+    // Basic sanity checks
+    expect(result.title).toBe('Maranatha Sacramento RCOG Podcast');
+    expect(result.author).toBe('Maranatha Sacramento RCOG');
+    expect(result.episodes.length).toBeGreaterThan(0);
+
+    // Snapshot the full result for regression testing
+    expect(result).toMatchSnapshot();
+  });
 });
