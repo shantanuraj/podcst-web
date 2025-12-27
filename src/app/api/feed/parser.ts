@@ -289,7 +289,9 @@ const adaptEpisode = (
     (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) ||
     'Untitled Episode';
 
-  if (!guid && (!title || title === 'Untitled Episode')) {
+  // Filter out episodes missing GUID or title (matching Apple Podcasts behavior)
+  const finalTitle = title.toString().trim();
+  if (!guid || !finalTitle || finalTitle === 'Untitled Episode') {
     return null;
   }
 
@@ -297,7 +299,7 @@ const adaptEpisode = (
 
   return {
     guid,
-    title: title.toString().trim(),
+    title: finalTitle,
     summary: readSummary(item),
     published: readDate(item),
     cover: readCover(item, link) || fallbackCover,
