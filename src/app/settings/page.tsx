@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { LanguagePicker } from '@/ui/LanguagePicker';
+import { RegionPicker } from '@/ui/RegionPicker';
 import styles from './Settings.module.css';
 
 const SettingsPage = () => {
@@ -8,6 +10,22 @@ const SettingsPage = () => {
         <header className={styles.header}>
           <h1 className={styles.title}>Settings</h1>
         </header>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Language</h2>
+          <p className={styles.sectionDescription}>
+            Interface language
+          </p>
+          <LanguagePicker />
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Region</h2>
+          <p className={styles.sectionDescription}>
+            Top podcast charts region
+          </p>
+          <RegionPicker />
+        </section>
 
         <nav className={styles.nav}>
           {[

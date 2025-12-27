@@ -21,6 +21,8 @@ import {
   useServerSubscriptions,
   useSyncToCloud,
 } from '@/shared/subscriptions/useServerSubscriptions';
+import { LanguagePicker } from '@/ui/LanguagePicker';
+import { RegionPicker } from '@/ui/RegionPicker';
 
 import styles from './Profile.module.css';
 
@@ -62,6 +64,16 @@ export default function ProfilePage() {
               Sign out
             </button>
           </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Language</h2>
+          <LanguagePicker />
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Region</h2>
+          <RegionPicker />
         </section>
 
         <section className={styles.section}>
