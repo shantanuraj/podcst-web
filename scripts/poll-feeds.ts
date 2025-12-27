@@ -175,7 +175,7 @@ async function main() {
     throw new Error('DATABASE_URL required');
   }
 
-  const sql = postgres(connectionString, { max: 5, idle_timeout: 20 });
+  const sql = postgres(connectionString, { max: 20, idle_timeout: 20 });
 
   const podcasts = await sql<PodcastRow[]>`
     SELECT id, feed_url, title, update_frequency, poll_failures,
