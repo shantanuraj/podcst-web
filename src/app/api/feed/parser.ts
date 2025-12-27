@@ -357,9 +357,15 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
       (typeof titleRaw === 'object' ? titleRaw._ : titleRaw) ||
       'Unknown Podcast';
 
+    const linkRaw = channel.link?.[0];
+    const link =
+      typeof linkRaw === 'object'
+        ? linkRaw?.$?.href || linkRaw?._ || ''
+        : linkRaw ?? '';
+
     return {
       title: title.toString().trim(),
-      link: channel.link?.[0] ?? '',
+      link: typeof link === 'string' ? link : '',
       published: readDate(channel),
       description: readDescription(channel),
       author: author.toString().trim(),

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Atom Link Test Podcast</title>
+    <atom:link href="https://example.com/feed.xml" rel="self" type="application/rss+xml"/>
+    <link href="https://example.com/podcast" rel="alternate" type="text/html"/>
+    <description>A test podcast with Atom-style link elements</description>
+    <itunes:author>Test Author</itunes:author>
+    <itunes:image href="https://example.com/cover.jpg"/>
+    <itunes:explicit>false</itunes:explicit>
+    <item>
+      <title>Test Episode</title>
+      <guid>test-episode-1</guid>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+      <enclosure url="https://example.com/episode1.mp3" length="12345678" type="audio/mpeg"/>
+      <itunes:duration>30:00</itunes:duration>
+      <description>Test episode description</description>
+    </item>
+  </channel>
+</rss>
