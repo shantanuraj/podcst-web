@@ -1,14 +1,14 @@
-import { expect, test } from 'bun:test';
+import { expect, test, describe } from 'bun:test';
 import { adaptFeed } from './parser';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+
+const fixture = (name: string) =>
+  readFileSync(`src/app/api/feed/__fixtures__/${name}`, 'utf-8');
+
+describe('adaptFeed', () => {
 
 test('parsing DutchPod101 feed', async () => {
-  const xmlPath = join(
-    process.cwd(),
-    'src/app/api/feed/__fixtures__/dutchpod.xml',
-  );
-  const xml = readFileSync(xmlPath, 'utf-8');
+  const xml = fixture('dutchpod.xml');
   const result = await adaptFeed(xml);
 
   expect(result).not.toBeNull();
@@ -18,7 +18,7 @@ test('parsing DutchPod101 feed', async () => {
   expect(result.title).toBe('Learn Dutch | DutchPod101.com');
   expect(result.author).toBe('DutchPod101.com');
   expect(result.cover).toBe(
-    encodeURIComponent('https://www.dutchpod101.com/images/itunes_logo.jpg'),
+    'https://assets.podcst.app/?p=https%3A%2F%2Fwww.dutchpod101.com%2Fimages%2Fitunes_logo.jpg',
   );
   expect(result.description).toContain('Learn Dutch with Free Podcasts');
   expect(result.link).toBe('https://www.dutchpod101.com');
@@ -54,4 +54,18 @@ test('parsing DutchPod101 feed', async () => {
   expect(audioEpisode.showNotes).toContain(
     'Go to DutchPod101.com to get your FREE Lifetime Account!',
   );
+});
+
+test('extracts href from Atom-style link elements', async () => {
+  const xml = fixture('atom-link.xml');
+  const result = await adaptFeed(xml);
+
+  expect(result).not.toBeNull();
+  if (!result) return;
+
+  expect(result.title).toBe('Atom Link Test Podcast');
+  expect(result.link).toBe('https://example.com/podcast');
+  expect(typeof result.link).toBe('string');
+});
+
 });
