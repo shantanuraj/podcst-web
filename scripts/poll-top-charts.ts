@@ -4,7 +4,20 @@ import postgres from 'postgres';
 
 const ITUNES_API = 'https://itunes.apple.com';
 const TOP_LIMIT = 100;
-const DEFAULT_LOCALES = ['us', 'gb', 'ca', 'au', 'de', 'fr', 'nl', 'in', 'kr', 'jp', 'br', 'mx'];
+const DEFAULT_LOCALES = [
+  'us',
+  'gb',
+  'ca',
+  'au',
+  'de',
+  'fr',
+  'nl',
+  'in',
+  'kr',
+  'jp',
+  'br',
+  'mx',
+];
 
 interface iTunesFeedEntry {
   id: { attributes: { 'im:id': string } };
@@ -164,6 +177,24 @@ async function storeTopPodcasts(
   return { stored, newPodcasts };
 }
 
+const excludedLocales = [
+  'bi',
+  'cu',
+  'dj',
+  'gi',
+  'gq',
+  'ht',
+  'ki',
+  'km',
+  'kp',
+  'ls',
+  'sd',
+  'tg',
+  'tl',
+  'tv',
+  'vi',
+];
+
 async function main() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -173,10 +204,9 @@ async function main() {
   const sql = postgres(connectionString, { max: 5 });
 
   const dbCountries = await sql<{ id: string }[]>`SELECT id FROM countries`;
-  const locales =
-    dbCountries.length > 0
-      ? dbCountries.map((c) => c.id)
-      : DEFAULT_LOCALES;
+  const locales = (
+    dbCountries.length > 0 ? dbCountries.map((c) => c.id) : DEFAULT_LOCALES
+  ).filter((loc) => !excludedLocales.includes(loc));
 
   console.log(`Polling top charts for ${locales.length} locales...`);
 
