@@ -19,6 +19,7 @@ export const messages = {
   search: {
     placeholder: 'Search podcasts...',
     noResults: 'No podcasts found',
+    label: 'Search podcasts',
   },
 
   auth: {
@@ -30,7 +31,8 @@ export const messages = {
     useADifferentEmail: 'Use a different email',
     verifyTitle: 'Verify your email',
     verifySubtitle: 'We sent a code to {email}',
-    codePlaceholder: 'Enter 6-digit code',
+    codePlaceholder: '000000',
+    enterCode: 'Enter Code',
     verify: 'Verify',
     verifying: 'Verifying...',
     resendCode: 'Resend code',
@@ -43,20 +45,25 @@ export const messages = {
     language: 'Language',
     languageDescription: 'Interface language',
     region: 'Region',
-    regionDescription: 'Top podcast charts region',
+    regionDescription: 'Choose your region for top podcast charts',
     theme: 'Theme',
     themeDescription: 'Customize the appearance of Podcst',
     shortcuts: 'Keyboard Shortcuts',
     shortcutsDescription: 'View and manage shortcuts',
-    export: 'Export Subscriptions',
+    export: 'Export',
     exportDescription: 'Download your library as an OPML file',
+    exportDescriptionLong:
+      'Download your subscriptions as an OPML file to import into other apps.',
     emptyLibrary: 'Your Library is Empty',
-    emptyLibraryDescription: 'Subscribe to podcasts to build your personal library, or import your existing subscriptions from another app.',
+    emptyLibraryDescription:
+      'Subscribe to podcasts to build your personal library, or import your existing subscriptions from another app.',
     browsePopularPodcasts: 'Browse popular podcasts',
     exportLibrary: 'Export Library',
-    exportLibraryDescription: 'Download your library as an OPML file. You can use this file to import your podcasts into other applications',
+    exportLibraryDescription:
+      'Download your library as an OPML file. You can use this file to import your podcasts into other applications',
     exportLibrayCta: 'Download OPML File',
-    exportLibraryCount: '{count} {count, plural, one {podcast} other {podcasts}} in your library',
+    exportLibraryCount:
+      '{count} {count, plural, one {podcast} other {podcasts}} in your library',
   },
 
   profile: {
@@ -74,12 +81,12 @@ export const messages = {
     nowPlaying: 'Now Playing',
     play: 'Play',
     pause: 'Pause',
-    seekBack: 'Seek back 10 seconds',
-    seekForward: 'Seek forward 10 seconds',
+    seekBack: 'Seek backward',
+    seekForward: 'Seek forward',
     speed: 'Playback speed',
     mute: 'Mute',
     unmute: 'Unmute',
-    queue: 'Queue',
+    queue: 'View queue',
     airplay: 'AirPlay',
     chromecast: 'Cast',
   },
@@ -162,7 +169,7 @@ export const messages = {
   themes: {
     autumnLight: 'Autumn Light',
     autumnDark: 'Autumn Dark',
-    lightBlurb: 'Clean and bright apperance',
+    lightBlurb: 'Clean and bright appearance',
     darkBlurb: 'Optimized for low-light environments',
   },
 

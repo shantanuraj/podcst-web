@@ -1,50 +1,57 @@
+'use client';
+
 import Link from 'next/link';
+import { useTranslation } from '@/shared/i18n';
 import { LanguagePicker } from '@/ui/LanguagePicker';
 import { RegionPicker } from '@/ui/RegionPicker';
 import styles from './Settings.module.css';
 
-const SettingsPage = () => {
+export default function SettingsPage() {
+  const { t } = useTranslation();
+
+  const navItems = [
+    {
+      href: '/settings/theme',
+      labelKey: 'settings.theme' as const,
+      descriptionKey: 'settings.themeDescription' as const,
+    },
+    {
+      href: '/settings/shortcuts',
+      labelKey: 'settings.shortcuts' as const,
+      descriptionKey: 'settings.shortcutsDescription' as const,
+    },
+    {
+      href: '/settings/export',
+      labelKey: 'settings.export' as const,
+      descriptionKey: 'settings.exportDescription' as const,
+    },
+  ];
+
   return (
     <div className={styles.container}>
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1 className={styles.title}>Settings</h1>
+          <h1 className={styles.title}>{t('settings.title')}</h1>
         </header>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Language</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.language')}</h2>
           <p className={styles.sectionDescription}>
-            Interface language
+            {t('settings.languageDescription')}
           </p>
           <LanguagePicker />
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Region</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.region')}</h2>
           <p className={styles.sectionDescription}>
-            Top podcast charts region
+            {t('settings.regionDescription')}
           </p>
           <RegionPicker />
         </section>
 
         <nav className={styles.nav}>
-          {[
-            {
-              href: '/settings/theme',
-              label: 'Theme',
-              description: 'Customize the appearance of Podcst',
-            },
-            {
-              href: '/settings/shortcuts',
-              label: 'Keyboard Shortcuts',
-              description: 'View and manage shortcuts',
-            },
-            {
-              href: '/settings/export',
-              label: 'Export Subscriptions',
-              description: 'Download your library as an OPML file',
-            },
-          ].map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -52,10 +59,10 @@ const SettingsPage = () => {
             >
               <div>
                 <h2 className="text-lg font-medium group-hover:text-accent transition-colors">
-                  {item.label}
+                  {t(item.labelKey)}
                 </h2>
                 <p className="text-sm text-ink-secondary mt-1">
-                  {item.description}
+                  {t(item.descriptionKey)}
                 </p>
               </div>
               <div className="text-ink-tertiary group-hover:text-accent transition-colors">
@@ -78,11 +85,15 @@ const SettingsPage = () => {
 
         <footer className={styles.footer}>
           <div className={styles.footerRow}>
-            <span>Version {process.env.appVersion}</span>
-            <span>© {new Date().getFullYear()} Podcst</span>
+            <span>
+              {t('common.version')} {process.env.appVersion}
+            </span>
+            <span>
+              © {new Date().getFullYear()} {t('common.appName')}
+            </span>
           </div>
           <div className={styles.author}>
-            <span>Made by</span>
+            <span>{t('common.madeBy')}</span>
             <Link
               href="https://sraj.me/"
               target="_blank"
@@ -96,6 +107,4 @@ const SettingsPage = () => {
       </div>
     </div>
   );
-};
-
-export default SettingsPage;
+}

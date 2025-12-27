@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslation } from '@/shared/i18n';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { LocaleSwitcher } from '@/ui/LocaleSwitcher';
 import { Search } from '@/ui/Search/Search';
@@ -12,6 +13,7 @@ import styles from './SiteHeader.module.css';
 export function SiteHeader() {
   const pathname = usePathname();
   const { data: user } = useSession();
+  const { t } = useTranslation();
 
   const libraryHref = user ? '/profile/subscriptions' : '/subs';
   const isLibraryActive =
@@ -23,7 +25,7 @@ export function SiteHeader() {
     <header className={styles.header}>
       <div className={styles.container}>
         <Link href="/feed/top" className={styles.wordmark}>
-          Podcst
+          {t('common.appName')}
         </Link>
         <nav className={styles.nav}>
           <Link
@@ -35,14 +37,14 @@ export function SiteHeader() {
               pathname.startsWith('/episodes/')
             }
           >
-            Discover
+            {t('nav.discover')}
           </Link>
           <Link
             href={libraryHref}
             className={styles.navLink}
             data-active={isLibraryActive}
           >
-            Library
+            {t('nav.library')}
           </Link>
         </nav>
         <div className={styles.actions}>
@@ -61,12 +63,12 @@ export function SiteHeader() {
               <Link
                 href="/settings"
                 className={styles.iconLink}
-                title="Settings"
+                title={t('nav.settings')}
               >
                 <Icon icon="settings" size={20} />
               </Link>
               <Link href="/auth" className={styles.authLink}>
-                Sign in
+                {t('nav.signIn')}
               </Link>
             </>
           )}

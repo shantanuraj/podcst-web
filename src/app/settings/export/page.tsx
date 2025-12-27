@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslation } from '@/shared/i18n';
 import {
   type SubscriptionsState,
   useSubscriptions,
@@ -9,6 +10,7 @@ import { Button } from '@/ui/Button';
 import styles from '../Settings.module.css';
 
 export default function SettingsExportPage() {
+  const { t } = useTranslation();
   const subsMap = useSubscriptions((state: SubscriptionsState) => state.subs);
   const subs = React.useMemo(
     () =>
@@ -19,7 +21,6 @@ export default function SettingsExportPage() {
     [subsMap],
   );
 
-  // Generates the OPML format XML file from subscriptions.
   const exportSubscriptions = React.useCallback(() => {
     const doc = document.implementation.createDocument('', '', null);
 
@@ -61,7 +62,7 @@ export default function SettingsExportPage() {
     <div className={styles.container}>
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1 className={styles.title}>Export Library</h1>
+          <h1 className={styles.title}>{t('settings.exportLibrary')}</h1>
         </header>
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <div className="w-16 h-16 mb-6 text-ink-tertiary">
@@ -77,19 +78,17 @@ export default function SettingsExportPage() {
             </svg>
           </div>
           <p className="text-base text-ink-secondary max-w-[40ch] mb-8 leading-relaxed">
-            Download your subscriptions as an OPML file. You can use this file
-            to import your podcasts into other applications.
+            {t('settings.exportLibraryDescription')}
           </p>
           <div className="flex flex-col items-center gap-4">
             <Button
               onClick={exportSubscriptions}
               className="px-8 py-4 text-base font-medium bg-ink text-surface border border-ink hover:bg-ink-secondary transition-all"
             >
-              Download OPML File
+              {t('settings.exportLibrayCta')}
             </Button>
             <p className="text-xs text-ink-tertiary">
-              {subs.length} {subs.length === 1 ? 'podcast' : 'podcasts'} in your
-              library
+              {t('settings.exportLibraryCount', { count: subs.length })}
             </p>
           </div>
         </div>

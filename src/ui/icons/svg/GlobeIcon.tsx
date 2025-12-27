@@ -22,4 +22,3 @@ function GlobeIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export default GlobeIcon;
-

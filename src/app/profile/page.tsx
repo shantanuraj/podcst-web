@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import React from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { useSession, useLogout } from '@/shared/auth/useAuth';
 import {
   type IThemeInfo,
@@ -28,6 +29,7 @@ import styles from './Profile.module.css';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data: user, isLoading } = useSession();
   const logout = useLogout();
 
@@ -47,11 +49,11 @@ export default function ProfilePage() {
     <div className={styles.container}>
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1 className={styles.title}>Profile</h1>
+          <h1 className={styles.title}>{t('profile.title')}</h1>
         </header>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Account</h2>
+          <h2 className={styles.sectionTitle}>{t('profile.account')}</h2>
           <div className={styles.accountCard}>
             <div className={styles.avatar}>
               {user.email.charAt(0).toUpperCase()}
@@ -61,45 +63,49 @@ export default function ProfilePage() {
               {user.name && <span className={styles.name}>{user.name}</span>}
             </div>
             <button onClick={handleSignOut} className={styles.signOutButton}>
-              Sign out
+              {t('nav.signOut')}
             </button>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Language</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.language')}</h2>
           <LanguagePicker />
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Region</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.region')}</h2>
           <RegionPicker />
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Theme</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.theme')}</h2>
           <ThemeSelector />
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Keyboard Shortcuts</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.shortcuts')}</h2>
           <ShortcutsList />
         </section>
 
         <SyncSubscriptions />
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Export</h2>
+          <h2 className={styles.sectionTitle}>{t('settings.export')}</h2>
           <ExportSubscriptions />
         </section>
 
         <footer className={styles.footer}>
           <div className={styles.footerRow}>
-            <span>Version {process.env.appVersion}</span>
-            <span>© {new Date().getFullYear()} Podcst</span>
+            <span>
+              {t('common.version')} {process.env.appVersion}
+            </span>
+            <span>
+              © {new Date().getFullYear()} {t('common.appName')}
+            </span>
           </div>
           <div className={styles.author}>
-            <span>Made by</span>
+            <span>{t('common.madeBy')}</span>
             <Link
               href="https://sraj.me/"
               target="_blank"
@@ -172,14 +178,35 @@ function ThemeOption({ currentTheme, scheme, theme }: ThemeOptionProps) {
 }
 
 function ShortcutsList() {
-  const appShortcuts = Object.values(shortcuts);
+  const { t } = useTranslation();
+  const shortcutKeys: Record<string, keyof typeof shortcuts> = {
+    'shortcuts.home': 'home',
+    'shortcuts.subscriptions': 'subscriptions',
+    'shortcuts.recents': 'recents',
+    'shortcuts.settings': 'settings',
+    'shortcuts.search': 'search',
+    'shortcuts.toggleTheme': 'theme',
+    'shortcuts.previousTheme': 'previousTheme',
+    'shortcuts.showEpisodeInfo': 'info',
+    'shortcuts.queue': 'queue',
+    'shortcuts.playPause': 'togglePlayback',
+    'shortcuts.seekBack': 'seekBack',
+    'shortcuts.seekAhead': 'seekAhead',
+    'shortcuts.seekToPercent': 'seekTo',
+    'shortcuts.nextEpisode': 'nextEpisode',
+    'shortcuts.previousEpisode': 'previousEpisode',
+    'shortcuts.increaseSpeed': 'bumpRate',
+    'shortcuts.decreaseSpeed': 'decreaseRate',
+    'shortcuts.toggleMute': 'mute',
+    'shortcuts.showShortcuts': 'shortcuts',
+  };
 
   return (
     <div className={styles.shortcutsList}>
-      {appShortcuts.map((shortcut) => (
-        <div key={shortcut.title} className={styles.shortcutRow}>
-          <span>{shortcut.title}</span>
-          <kbd className={styles.kbd}>{shortcut.displayKey}</kbd>
+      {Object.entries(shortcutKeys).map(([messageKey, shortcutKey]) => (
+        <div key={shortcutKey} className={styles.shortcutRow}>
+          <span>{t(messageKey as keyof typeof t)}</span>
+          <kbd className={styles.kbd}>{shortcuts[shortcutKey].displayKey}</kbd>
         </div>
       ))}
     </div>
@@ -187,6 +214,7 @@ function ShortcutsList() {
 }
 
 function SyncSubscriptions() {
+  const { t } = useTranslation();
   const localSubs = useSubscriptions((state: SubscriptionsState) => state.subs);
   const clearSubs = useSubscriptions(
     (state: SubscriptionsState) => state.addSubscriptions,
@@ -207,19 +235,19 @@ function SyncSubscriptions() {
 
   return (
     <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>Subscriptions</h2>
+      <h2 className={styles.sectionTitle}>{t('profile.subscriptions')}</h2>
       <div className={styles.syncSection}>
         <p className={styles.syncDescription}>
-          You have {localFeedUrls.length}{' '}
-          {localFeedUrls.length === 1 ? 'podcast' : 'podcasts'} saved on this
-          device. Import them to your account to sync across all your devices.
+          {t('profile.syncDescription', { count: localFeedUrls.length })}
         </p>
         <button
           onClick={handleSync}
           disabled={syncToCloud.isPending}
           className={styles.syncButton}
         >
-          {syncToCloud.isPending ? 'Importing...' : 'Import from Device'}
+          {syncToCloud.isPending
+            ? t('profile.importing')
+            : t('profile.importFromDevice')}
         </button>
       </div>
     </section>
@@ -227,6 +255,7 @@ function SyncSubscriptions() {
 }
 
 function ExportSubscriptions() {
+  const { t } = useTranslation();
   const { data: serverSubs } = useServerSubscriptions();
 
   const subs = React.useMemo(
@@ -278,10 +307,10 @@ function ExportSubscriptions() {
   return (
     <div className={styles.exportSection}>
       <p className={styles.exportDescription}>
-        Download your subscriptions as an OPML file to import into other apps.
+        {t('settings.exportDescriptionLong')}
       </p>
       <button onClick={exportOPML} className={styles.exportButton}>
-        Download OPML
+        {t('profile.downloadOPML')}
       </button>
       <span className={styles.exportCount}>
         {subs.length} {subs.length === 1 ? 'podcast' : 'podcasts'}
