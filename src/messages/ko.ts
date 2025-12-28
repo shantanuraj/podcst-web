@@ -27,7 +27,7 @@ export const messages: Messages = {
 
   auth: {
     title: '로그인',
-    subtitle: '이메일을 입력하여 패스키로 계속하세요',
+    subtitle: '이메일을 입력하여 계속하세요',
     emailPlaceholder: 'you@example.com',
     continue: '계속하기',
     continuing: '계속하는 중...',
@@ -41,6 +41,7 @@ export const messages: Messages = {
     resendCode: '코드 다시 보내기',
     resending: '다시 보내는 중...',
     codeSent: '새 코드가 전송되었습니다!',
+    createPasskey: '대신 패스키 사용하기',
   },
 
   settings: {

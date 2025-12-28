@@ -27,7 +27,7 @@ export const messages: Messages = {
 
   auth: {
     title: 'साइन इन',
-    subtitle: 'पासकी के साथ जारी रखने के लिए अपना ईमेल उपयोग करें',
+    subtitle: 'जारी रखने के लिए अपना ईमेल उपयोग करें',
     emailPlaceholder: 'you@example.com',
     continue: 'जारी रखें',
     continuing: 'जारी है...',
@@ -41,6 +41,7 @@ export const messages: Messages = {
     resendCode: 'कोड दोबारा भेजें',
     resending: 'दोबारा भेजा जा रहा है...',
     codeSent: 'नया कोड भेज दिया गया है!',
+    createPasskey: 'इसके बजाय पासकी का उपयोग करें',
   },
 
   settings: {

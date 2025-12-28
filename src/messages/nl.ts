@@ -27,7 +27,7 @@ export const messages: Messages = {
 
   auth: {
     title: 'Inloggen',
-    subtitle: 'Gebruik je e-mailadres om verder te gaan met een passkey',
+    subtitle: 'Gebruik je e-mailadres om verder te gaan',
     emailPlaceholder: 'jouw@voorbeeld.nl',
     continue: 'Doorgaan',
     continuing: 'Doorgaan...',
@@ -41,6 +41,7 @@ export const messages: Messages = {
     resendCode: 'Code opnieuw versturen',
     resending: 'Opnieuw versturen...',
     codeSent: 'Nieuwe code verzonden!',
+    createPasskey: 'Gebruik in plaats daarvan een passkey',
   },
 
   settings: {

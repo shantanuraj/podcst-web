@@ -27,7 +27,7 @@ export const messages: Messages = {
 
   auth: {
     title: 'Iniciar Sesión',
-    subtitle: 'Usa tu correo para continuar con una llave de acceso (passkey)',
+    subtitle: 'Usa tu correo para continuar',
     emailPlaceholder: 'tu@ejemplo.com',
     continue: 'Continuar',
     continuing: 'Continuando...',
@@ -41,6 +41,7 @@ export const messages: Messages = {
     resendCode: 'Reenviar código',
     resending: 'Reenviando...',
     codeSent: '¡Nuevo código enviado!',
+    createPasskey: 'Usar llave de acceso en su lugar',
   },
 
   settings: {

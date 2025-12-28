@@ -27,8 +27,7 @@ export const messages: Messages = {
 
   auth: {
     title: 'Connexion',
-    subtitle:
-      'Utilisez votre email pour continuer avec une clé d’accès (passkey)',
+    subtitle: 'Utilisez votre email pour continuer',
     emailPlaceholder: 'vous@exemple.fr',
     continue: 'Continuer',
     continuing: 'Continuer...',
@@ -42,6 +41,7 @@ export const messages: Messages = {
     resendCode: 'Renvoyer le code',
     resending: 'Renvoi...',
     codeSent: 'Nouveau code envoyé !',
+    createPasskey: 'Utiliser une clé d’accès à la place',
   },
 
   settings: {

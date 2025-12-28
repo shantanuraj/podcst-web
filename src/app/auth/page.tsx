@@ -3,11 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
+  useEmailLogin,
   useLogin,
   useRegister,
   useSendCode,
   useSession,
-  useVerifyCode,
 } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 
@@ -24,7 +24,7 @@ export default function AuthPage() {
   const login = useLogin();
   const register = useRegister();
   const sendCode = useSendCode();
-  const verifyCode = useVerifyCode();
+  const emailLogin = useEmailLogin();
 
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -62,12 +62,22 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      await verifyCode.mutateAsync({ email, code });
-      setMode('passkey');
-      await register.mutateAsync(email);
+      await emailLogin.mutateAsync({ email, code });
       router.push(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed');
+    }
+  };
+
+  const handleCreatePasskey = async () => {
+    setError(null);
+    setMode('passkey');
+
+    try {
+      await register.mutateAsync(email);
+      router.push(redirectTo);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create passkey');
     }
   };
 
@@ -75,7 +85,7 @@ export default function AuthPage() {
     login.isPending ||
     register.isPending ||
     sendCode.isPending ||
-    verifyCode.isPending;
+    emailLogin.isPending;
 
   if (mode === 'code' || mode === 'passkey') {
     return (
@@ -119,6 +129,15 @@ export default function AuthPage() {
                 className={styles.button}
               >
                 {isPending ? t('auth.verifying') : t('auth.verify')}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCreatePasskey}
+                disabled={isPending || code.length !== 6}
+                className={styles.link}
+              >
+                {t('auth.createPasskey')}
               </button>
             </form>
           )}
