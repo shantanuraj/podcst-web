@@ -16,9 +16,6 @@ import { LoadBar } from '@/ui/LoadBar';
 import styles from './Search.module.css';
 
 function getSearchResultHref(result: IPodcastSearchResult): string {
-  if (result.id) {
-    return `/episodes/${result.id}`;
-  }
   return `/episodes/${encodeURIComponent(result.feed)}`;
 }
 
