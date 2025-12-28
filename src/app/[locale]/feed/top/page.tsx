@@ -3,15 +3,29 @@ import { top } from '@/app/api/top/top';
 import { ItemListSchema } from '@/components/Schema';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
-export const metadata: Metadata = {
-  title: 'Top Podcasts',
+type PageProps = {
+  params: Promise<{ locale: string }>;
 };
 
-export default async function Page(props: {
-  params: Promise<{ locale: string }>;
-}) {
-  const params = await props.params;
-  const podcasts = await top(100, params.locale);
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { locale } = await params;
+  const url = `/${locale}/feed/top`;
+  return {
+    title: 'Top Podcasts',
+    openGraph: {
+      url,
+    },
+    alternates: {
+      canonical: url,
+    },
+  };
+}
+
+export default async function Page(props: PageProps) {
+  const { locale } = await props.params;
+  const podcasts = await top(100, locale);
   return (
     <>
       <ItemListSchema items={podcasts} title="Top Podcasts" />

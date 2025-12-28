@@ -65,12 +65,19 @@ export async function generateMetadata(props: {
     const episode = await getEpisodeById(parsed.episodeId);
     if (episode) {
       const podcast = await getPodcastInfoById(parsed.podcastId);
+      const url = `/episodes/${parsed.podcastId}/${parsed.episodeId}`;
       return {
         title: episode.title,
         description:
           episode.summary ||
           `Listen to ${episode.title} from ${podcast?.title || 'podcast'}`,
-        openGraph: { images: podcast?.cover || episode.cover },
+        openGraph: {
+          url,
+          images: podcast?.cover || episode.cover,
+        },
+        alternates: {
+          canonical: url,
+        },
       };
     }
   }
@@ -78,10 +85,17 @@ export async function generateMetadata(props: {
   if (parsed.type === 'id') {
     const podcast = await getPodcastInfoById(parsed.podcastId);
     if (podcast) {
+      const url = `/episodes/${parsed.podcastId}`;
       return {
         title: podcast.title,
         description: podcast.description,
-        openGraph: { images: podcast.cover },
+        openGraph: {
+          url,
+          images: podcast.cover,
+        },
+        alternates: {
+          canonical: url,
+        },
       };
     }
     return {};
@@ -97,19 +111,33 @@ export async function generateMetadata(props: {
   if (parsed.guid) {
     const episode = info.episodes.find((ep) => ep.guid === parsed.guid);
     if (episode) {
+      const url = info.id ? `/episodes/${info.id}/${episode.id}` : undefined;
       return {
         title: episode.title,
         description:
           episode.summary || `Listen to ${episode.title} from ${info.title}`,
-        openGraph: { images: info.cover },
+        openGraph: {
+          url,
+          images: info.cover,
+        },
+        alternates: {
+          canonical: url,
+        },
       };
     }
   }
 
+  const url = info.id ? `/episodes/${info.id}` : undefined;
   return {
     title: info.title,
     description: info.description,
-    openGraph: { images: info.cover },
+    openGraph: {
+      url,
+      images: info.cover,
+    },
+    alternates: {
+      canonical: url,
+    },
   };
 }
 
