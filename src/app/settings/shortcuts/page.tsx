@@ -1,8 +1,16 @@
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import styles from '../Settings.module.css';
 
-export const metadata = {
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
   title: 'Shortcuts',
+  openGraph: {
+    url: '/settings/shortcuts',
+  },
+  alternates: {
+    canonical: '/settings/shortcuts',
+  },
 };
 
 export default function SettingsShortcutsPage() {

@@ -25,6 +25,9 @@ export const metadata: Metadata = {
     name: 'Shantanu Raj',
     url: 'https://sraj.me/',
   },
+  alternates: {
+    canonical: '/',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
