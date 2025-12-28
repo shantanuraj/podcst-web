@@ -27,7 +27,7 @@ export const messages: Messages = {
 
   auth: {
     title: 'Logga in',
-    subtitle: 'Använd din e-post för att fortsätta med en nyckel (passkey)',
+    subtitle: 'Använd din e-post för att fortsätta',
     emailPlaceholder: 'dig@exempel.se',
     continue: 'Fortsätt',
     continuing: 'Fortsätter...',
@@ -41,6 +41,7 @@ export const messages: Messages = {
     resendCode: 'Skicka kod igen',
     resending: 'Skickar igen...',
     codeSent: 'Ny kod skickad!',
+    createPasskey: 'Använd nyckel istället',
   },
 
   settings: {
