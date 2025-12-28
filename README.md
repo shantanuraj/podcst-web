@@ -13,10 +13,9 @@ Another major focus is on accessibility, with full keyboard navigation support.
 ## Features
 
 - User accounts with passkey authentication
-- Cross-device subscription syncing
-- Playback progress sync across devices
+- Cross-device subscription and playback sync
 - Podcast search and discovery
-- Top podcasts feed
+- Top podcasts by region
 - Chromecast and AirPlay support
 - Private feed support
 - Media session integration
@@ -24,14 +23,28 @@ Another major focus is on accessibility, with full keyboard navigation support.
 
 ## Architecture
 
-- **Frontend**: Next.js 16 with App Router, React 19, TypeScript 5.8
+- **Frontend**: Next.js with App Router, React 19, TypeScript
 - **State Management**: Zustand for client state
 - **Data Fetching**: TanStack Query
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (content + user data)
 - **Caching**: Redis + IndexedDB + LocalStorage
 - **Audio**: Howler.js
 - **Styling**: Tailwind CSS 4 + CSS Modules
 - **Code Quality**: Biome for formatting and linting
+
+### Data Flow
+
+```
+Background Jobs (cron):
+├── poll-top-charts.ts  → iTunes API → top_podcasts table
+├── poll-feeds.ts       → RSS feeds → episodes table
+└── sync-podcast-index  → Podcast Index dump → podcasts table
+
+API Routes (database-first):
+├── /api/top           → PostgreSQL → top podcasts
+├── /api/feed          → PostgreSQL → podcast + episodes
+└── /api/search        → PostgreSQL + iTunes fallback
+```
 
 ### Branching Model
 
@@ -43,6 +56,7 @@ Simple branch-and-merge workflow:
 
 ## Prerequisites
 
+- [Bun](https://bun.sh/) - JavaScript runtime (for scripts)
 - [Node](https://nodejs.org/) - LTS version
 - [yarn](https://yarnpkg.com/) - package manager
 - [PostgreSQL](https://www.postgresql.org/) - database
@@ -63,7 +77,9 @@ Set up environment variables (create `.env.local`):
 ```bash
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
-NEXTAUTH_SECRET=...
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_RP_ORIGIN=http://localhost:3000
+RESEND_API_KEY=...  # optional, for email verification
 ```
 
 Run database migrations:
@@ -89,8 +105,17 @@ yarn start               # Start production server
 yarn format              # Format code with Biome
 yarn lint                # Lint code with Biome
 yarn db:migrate          # Run database migrations
-yarn sync:podcast-index  # Sync podcast index
-yarn short-url           # Generate short URL
+```
+
+### Background Jobs
+
+These scripts run as background jobs to keep content fresh:
+
+```bash
+bun scripts/poll-top-charts.ts     # Sync iTunes top charts + poll missing episodes
+bun scripts/poll-feeds.ts          # Poll RSS feeds (single batch)
+bun scripts/poll-feeds.ts --daemon # Poll RSS feeds continuously
+bun scripts/sync-podcast-index.ts  # Sync from Podcast Index database dump
 ```
 
 ### Building for Production
