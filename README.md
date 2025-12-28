@@ -13,10 +13,9 @@ Another major focus is on accessibility, with full keyboard navigation support.
 ## Features
 
 - User accounts with passkey authentication
-- Cross-device subscription syncing
-- Playback progress sync across devices
+- Cross-device subscription and playback sync
 - Podcast search and discovery
-- Top podcasts feed
+- Top podcasts by region
 - Chromecast and AirPlay support
 - Private feed support
 - Media session integration
