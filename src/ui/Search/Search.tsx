@@ -33,8 +33,15 @@ export function Search() {
     [router],
   );
   const [inputTerm, setTerm] = React.useState('');
-  const term = React.useDeferredValue(inputTerm);
-  const { data: searchResults = emptyResult, isFetching } = useSearch(term);
+  const [debouncedTerm, setDebouncedTerm] = React.useState('');
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedTerm(inputTerm), 300);
+    return () => clearTimeout(timer);
+  }, [inputTerm]);
+
+  const { data: searchResults = emptyResult, isFetching } =
+    useSearch(debouncedTerm);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
   const focusSearchShortcut = React.useCallback(() => {
