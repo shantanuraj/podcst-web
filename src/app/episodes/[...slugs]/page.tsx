@@ -13,6 +13,8 @@ import {
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
+import { EmptyEpisodesRefresh } from './EmptyEpisodesRefresh';
+import { EpisodesNotFound } from './EpisodesNotFound';
 
 function isNumeric(str: string): boolean {
   return /^\d+$/.test(str);
@@ -125,8 +127,8 @@ export default async function Page(props: {
         getPodcastInfoById(parsed.podcastId),
       ]);
 
-      if (!episode || !podcast) {
-        return <div>Episode not found</div>;
+      if (!episode || !podcast || episode.podcastId !== parsed.podcastId) {
+        return <EpisodesNotFound type="episode" />;
       }
 
       const url = `${baseUrl}/episodes/${parsed.podcastId}/${parsed.episodeId}`;
@@ -150,7 +152,17 @@ export default async function Page(props: {
     ]);
 
     if (!podcast) {
-      return <div>Podcast not found</div>;
+      return <EpisodesNotFound type="podcast" />;
+    }
+
+    if (initialEpisodes.episodes.length === 0) {
+      const infoData = { ...podcast, episodes: [] };
+      return (
+        <>
+          <PodcastInfo info={infoData} />
+          <EmptyEpisodesRefresh podcastId={parsed.podcastId} />
+        </>
+      );
     }
 
     const url = `${baseUrl}/episodes/${parsed.podcastId}`;
@@ -177,7 +189,7 @@ export default async function Page(props: {
   }
 
   if (!info || !info.id) {
-    return <div>Podcast not found</div>;
+    return <EpisodesNotFound type="podcast" />;
   }
 
   let episodeId: number | null = null;
