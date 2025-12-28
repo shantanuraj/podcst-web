@@ -113,6 +113,11 @@ async function storeTopPodcasts(
     ON CONFLICT (id) DO NOTHING
   `;
 
+  await sql`
+    DELETE FROM top_podcasts
+    WHERE country_id = ${locale} AND genre_id = 0
+  `;
+
   let stored = 0;
   let newPodcasts = 0;
 
@@ -128,7 +133,9 @@ async function storeTopPodcasts(
     }
 
     let [podcast] = await sql`
-      SELECT id FROM podcasts WHERE feed_url = ${p.feed} LIMIT 1
+      SELECT id FROM podcasts
+      WHERE itunes_id = ${p.itunesId} OR feed_url = ${p.feed}
+      LIMIT 1
     `;
 
     const isNew = !podcast;
