@@ -10,6 +10,14 @@
   background-color: var(--color-surface);
 }
 
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex: 1;
+  min-width: 0;
+}
+
 .artwork {
   flex-shrink: 0;
   width: 64px;

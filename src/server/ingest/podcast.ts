@@ -4,7 +4,9 @@ import type {
   IEpisode,
   IEpisodeInfo,
   IEpisodeListing,
+  IPaginatedEpisodes,
   IPodcastEpisodesInfo,
+  IPodcastInfo,
 } from '@/types';
 import { sql } from '../db';
 
@@ -377,4 +379,271 @@ export async function getEpisodeById(
       type: row.file_type || 'audio/mpeg',
     },
   };
+}
+
+/**
+ * Get podcast info only (no episodes) - for metadata and headers
+ */
+export async function getPodcastInfoById(
+  id: number,
+): Promise<IPodcastInfo | null> {
+  const [podcast] = await sql`
+    SELECT p.*, a.name as author_name
+    FROM podcasts p
+    JOIN authors a ON a.id = p.author_id
+    WHERE p.id = ${id}
+  `;
+
+  if (!podcast) return null;
+
+  return {
+    id: podcast.id,
+    feed: podcast.feed_url,
+    title: podcast.title,
+    author: podcast.author_name,
+    cover: podcast.cover,
+    description: podcast.description || '',
+    link: podcast.website_url,
+    published: podcast.last_published?.getTime() || null,
+    explicit: podcast.explicit,
+    keywords: [],
+    episodeCount: podcast.episode_count || 0,
+  };
+}
+
+export type SortField = 'published' | 'title' | 'duration';
+export type SortDirection = 'asc' | 'desc';
+
+interface GetEpisodesOptions {
+  podcastId: number;
+  limit?: number;
+  cursor?: number;
+  search?: string;
+  sortBy?: SortField;
+  sortDir?: SortDirection;
+}
+
+/**
+ * Get paginated episodes with optional search
+ */
+export async function getEpisodesPaginated(
+  options: GetEpisodesOptions,
+): Promise<IPaginatedEpisodes> {
+  const {
+    podcastId,
+    limit = 20,
+    cursor,
+    search,
+    sortBy = 'published',
+    sortDir = 'desc',
+  } = options;
+
+  // Get podcast info for building episode response
+  const [podcast] = await sql`
+    SELECT p.*, a.name as author_name
+    FROM podcasts p
+    JOIN authors a ON a.id = p.author_id
+    WHERE p.id = ${podcastId}
+  `;
+
+  if (!podcast) {
+    return { episodes: [], total: 0, hasMore: false };
+  }
+
+  // Build query based on options
+  let episodes: Array<Record<string, unknown>>;
+  let countResult: Array<{ count: string }>;
+
+  if (search) {
+    // Full-text search using PostgreSQL
+    const searchPattern = `%${search}%`;
+
+    // Get total count for search
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM episodes
+      WHERE podcast_id = ${podcastId}
+        AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+    `;
+
+    // Get paginated search results
+    if (sortBy === 'published') {
+      if (sortDir === 'desc') {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+          ORDER BY published DESC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      } else {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+          ORDER BY published ASC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      }
+    } else if (sortBy === 'title') {
+      if (sortDir === 'asc') {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+          ORDER BY title ASC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      } else {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+          ORDER BY title DESC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      }
+    } else {
+      // duration
+      if (sortDir === 'asc') {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+          ORDER BY duration ASC NULLS LAST
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      } else {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+          ORDER BY duration DESC NULLS LAST
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      }
+    }
+  } else {
+    // No search - just paginate
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM episodes WHERE podcast_id = ${podcastId}
+    `;
+
+    if (sortBy === 'published') {
+      if (sortDir === 'desc') {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+          ORDER BY published DESC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      } else {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+          ORDER BY published ASC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      }
+    } else if (sortBy === 'title') {
+      if (sortDir === 'asc') {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+          ORDER BY title ASC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      } else {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+          ORDER BY title DESC
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      }
+    } else {
+      // duration
+      if (sortDir === 'asc') {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+          ORDER BY duration ASC NULLS LAST
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      } else {
+        episodes = await sql`
+          SELECT * FROM episodes
+          WHERE podcast_id = ${podcastId}
+          ORDER BY duration DESC NULLS LAST
+          LIMIT ${limit + 1}
+          ${cursor ? sql`OFFSET ${cursor}` : sql``}
+        `;
+      }
+    }
+  }
+
+  const total = parseInt(countResult[0]?.count || '0', 10);
+  const hasMore = episodes.length > limit;
+
+  // Remove the extra item we fetched to check for more
+  if (hasMore) {
+    episodes.pop();
+  }
+
+  const nextCursor = hasMore ? (cursor || 0) + limit : undefined;
+
+  return {
+    episodes: episodes.map(
+      (ep): IEpisodeInfo => ({
+        id: ep.id as number,
+        podcastId: podcast.id,
+        feed: podcast.feed_url,
+        podcastTitle: podcast.title,
+        guid: ep.guid as string,
+        title: ep.title as string,
+        summary: ep.summary as string | null,
+        showNotes: (ep.summary as string) || '',
+        published: (ep.published as Date)?.getTime() || null,
+        duration: ep.duration as number | null,
+        cover: podcast.cover,
+        episodeArt: ep.episode_art as string | null,
+        explicit: podcast.explicit,
+        link: null,
+        author: podcast.author_name,
+        file: {
+          url: ep.file_url as string,
+          length: Number(ep.file_length) || 0,
+          type: (ep.file_type as string) || 'audio/mpeg',
+        },
+      }),
+    ),
+    total,
+    hasMore,
+    nextCursor,
+  };
+}
+
+/**
+ * Get episode by ID with podcast info (for single episode view)
+ */
+export async function getEpisodeWithPodcast(
+  episodeId: number,
+): Promise<{ episode: IEpisodeInfo; podcast: IPodcastInfo } | null> {
+  const episode = await getEpisodeById(episodeId);
+  if (!episode || !episode.podcastId) return null;
+
+  const podcast = await getPodcastInfoById(episode.podcastId);
+  if (!podcast) return null;
+
+  return { episode, podcast };
 }

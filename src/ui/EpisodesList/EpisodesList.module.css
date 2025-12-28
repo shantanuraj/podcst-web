@@ -85,6 +85,30 @@
   width: 100%;
 }
 
+.loading,
+.error {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.error {
+  color: var(--color-error, #dc2626);
+}
+
+.loadMore {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-ink-tertiary);
+  font-size: var(--text-sm);
+  min-height: 60px;
+}
+
 @media (max-width: 640px) {
   .header {
     padding: var(--space-4);

@@ -29,7 +29,9 @@ function getLocaleFromCookie(): Locale | null {
 }
 
 function getCurrentLocale(pathname: string): Locale {
-  return getLocaleFromPath(pathname) ?? getLocaleFromCookie() ?? i18n.defaultLocale;
+  return (
+    getLocaleFromPath(pathname) ?? getLocaleFromCookie() ?? i18n.defaultLocale
+  );
 }
 
 export function LocaleSwitcher() {

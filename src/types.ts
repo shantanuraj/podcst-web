@@ -206,6 +206,33 @@ export interface IPodcastEpisodesInfo extends IEpisodeListing {
 export type RenderablePodcast = IPodcast | IPodcastEpisodesInfo;
 
 /**
+ * Podcast info without episodes (for metadata, header display)
+ */
+export interface IPodcastInfo {
+  id: number;
+  feed: string;
+  title: string;
+  author: string;
+  cover: string;
+  description: string;
+  link: string | null;
+  published: number | null;
+  explicit: boolean;
+  keywords: string[];
+  episodeCount: number;
+}
+
+/**
+ * Paginated episodes response
+ */
+export interface IPaginatedEpisodes {
+  episodes: IEpisodeInfo[];
+  total: number;
+  hasMore: boolean;
+  nextCursor?: number;
+}
+
+/**
  * Podcasts Search result interface
  */
 export interface IPodcastSearchResult {

@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 import {
+  getEpisodeById,
+  getEpisodesPaginated,
   getPodcastByFeedUrl,
-  getPodcastById,
+  getPodcastInfoById,
   ingestPodcast,
 } from '@/server/ingest/podcast';
-import type { IPodcastEpisodesInfo } from '@/types';
-import { EpisodesSpaClient } from './EpisodesSpaClient';
+import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
+import { PaginatedEpisodesList } from '@/ui/EpisodesList';
+import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
 
 function isNumeric(str: string): boolean {
   return /^\d+$/.test(str);
@@ -41,35 +46,53 @@ function buildCleanUrl(podcastId: number, episodeId?: number | null): string {
   return `/episodes/${podcastId}`;
 }
 
+async function getBaseUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get('host') || 'www.podcst.app';
+  const proto = h.get('x-forwarded-proto') || 'https';
+  return `${proto}://${host}`;
+}
+
 export async function generateMetadata(props: {
   params: Promise<{ slugs: string[] }>;
 }): Promise<Partial<Metadata>> {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
 
-  let info: IPodcastEpisodesInfo | null = null;
-  if (parsed.type === 'id') {
-    info = await getPodcastById(parsed.podcastId);
-  } else {
-    info = await getPodcastByFeedUrl(parsed.feedUrl);
-    if (!info) {
-      info = await ingestPodcast(parsed.feedUrl);
+  if (parsed.type === 'id' && parsed.episodeId) {
+    const episode = await getEpisodeById(parsed.episodeId);
+    if (episode) {
+      const podcast = await getPodcastInfoById(parsed.podcastId);
+      return {
+        title: episode.title,
+        description:
+          episode.summary ||
+          `Listen to ${episode.title} from ${podcast?.title || 'podcast'}`,
+        openGraph: { images: podcast?.cover || episode.cover },
+      };
     }
+  }
+
+  if (parsed.type === 'id') {
+    const podcast = await getPodcastInfoById(parsed.podcastId);
+    if (podcast) {
+      return {
+        title: podcast.title,
+        description: podcast.description,
+        openGraph: { images: podcast.cover },
+      };
+    }
+    return {};
+  }
+
+  let info = await getPodcastByFeedUrl(parsed.feedUrl);
+  if (!info) {
+    info = await ingestPodcast(parsed.feedUrl);
   }
 
   if (!info) return {};
 
-  if (parsed.type === 'id' && parsed.episodeId) {
-    const episode = info.episodes.find((ep) => ep.id === parsed.episodeId);
-    if (episode) {
-      return {
-        title: episode.title,
-        description:
-          episode.summary || `Listen to ${episode.title} from ${info.title}`,
-        openGraph: { images: info.cover },
-      };
-    }
-  } else if (parsed.type === 'legacy' && parsed.guid) {
+  if (parsed.guid) {
     const episode = info.episodes.find((ep) => ep.guid === parsed.guid);
     if (episode) {
       return {
@@ -93,20 +116,58 @@ export default async function Page(props: {
 }) {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
+  const baseUrl = await getBaseUrl();
 
   if (parsed.type === 'id') {
-    const info = await getPodcastById(parsed.podcastId);
-    if (!info) {
+    if (parsed.episodeId) {
+      const [episode, podcast] = await Promise.all([
+        getEpisodeById(parsed.episodeId),
+        getPodcastInfoById(parsed.podcastId),
+      ]);
+
+      if (!episode || !podcast) {
+        return <div>Episode not found</div>;
+      }
+
+      const url = `${baseUrl}/episodes/${parsed.podcastId}/${parsed.episodeId}`;
+      const podcastData = { ...podcast, episodes: [episode] };
+
+      return (
+        <>
+          <PodcastEpisodeSchema
+            podcast={podcastData}
+            episode={episode}
+            url={url}
+          />
+          <EpisodeInfo podcast={podcastData} episode={episode} />
+        </>
+      );
+    }
+
+    const [podcast, initialEpisodes] = await Promise.all([
+      getPodcastInfoById(parsed.podcastId),
+      getEpisodesPaginated({ podcastId: parsed.podcastId, limit: 20 }),
+    ]);
+
+    if (!podcast) {
       return <div>Podcast not found</div>;
     }
 
-    const initialEpisodeId = parsed.episodeId;
+    const url = `${baseUrl}/episodes/${parsed.podcastId}`;
+    const schemaData = { ...podcast, episodes: initialEpisodes.episodes };
+    const infoData = { ...podcast, episodes: [] };
+
     return (
-      <EpisodesSpaClient
-        podcastId={parsed.podcastId}
-        initialEpisodeId={initialEpisodeId}
-        initialData={info}
-      />
+      <>
+        <PodcastSeriesSchema podcast={schemaData} url={url} />
+        <PaginatedEpisodesList
+          podcastId={parsed.podcastId}
+          podcast={podcast}
+          initialData={initialEpisodes}
+        >
+          <PodcastInfo info={infoData} />
+        </PaginatedEpisodesList>
+      </>
     );
   }
 
