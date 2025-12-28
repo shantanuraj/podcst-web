@@ -1,5 +1,5 @@
+import Link from 'next/link';
 import { getPodcastHref } from '@/shared/links';
-import { SpaLink } from '@/shared/spa';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
@@ -42,7 +42,7 @@ export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             )}
           </h1>
           <p className={styles.podcast}>
-            <SpaLink href={getPodcastHref(podcast)}>{podcast.title}</SpaLink>
+            <Link href={getPodcastHref(podcast)}>{podcast.title}</Link>
             {podcast.link && (
               <ExternalLink href={podcast.link}>
                 <Icon icon="external-link" size={14} />

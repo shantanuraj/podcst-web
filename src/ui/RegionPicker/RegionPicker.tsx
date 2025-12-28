@@ -28,14 +28,18 @@ function getLocaleFromCookie(): Locale | null {
 }
 
 function getCurrentLocale(pathname: string): Locale {
-  return getLocaleFromPath(pathname) ?? getLocaleFromCookie() ?? i18n.defaultLocale;
+  return (
+    getLocaleFromPath(pathname) ?? getLocaleFromCookie() ?? i18n.defaultLocale
+  );
 }
 
 export function RegionPicker() {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useTranslation();
-  const [currentLocale, setCurrentLocale] = useState<Locale>(i18n.defaultLocale);
+  const [currentLocale, setCurrentLocale] = useState<Locale>(
+    i18n.defaultLocale,
+  );
 
   useEffect(() => {
     const detected = getCurrentLocale(pathname);
