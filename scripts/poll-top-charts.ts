@@ -1,22 +1,24 @@
 #!/usr/bin/env bun
 
 import postgres from 'postgres';
+import { createHash } from 'crypto';
+import { adaptFeed } from '../src/app/api/feed/parser';
 
 const ITUNES_API = 'https://itunes.apple.com';
 const TOP_LIMIT = 100;
+const POLL_CONCURRENCY = 10;
+const EPISODES_ONLY = process.argv.includes('--episodes-only');
 const DEFAULT_LOCALES = [
-  'us',
-  'gb',
   'ca',
-  'au',
-  'de',
   'fr',
-  'nl',
   'in',
   'kr',
-  'jp',
-  'br',
   'mx',
+  'my',
+  'nl',
+  'no',
+  'se',
+  'us',
 ];
 
 interface iTunesFeedEntry {
@@ -179,23 +181,144 @@ async function storeTopPodcasts(
   return { stored, newPodcasts };
 }
 
-const excludedLocales = [
-  'bi',
-  'cu',
-  'dj',
-  'gi',
-  'gq',
-  'ht',
-  'ki',
-  'km',
-  'kp',
-  'ls',
-  'sd',
-  'tg',
-  'tl',
-  'tv',
-  'vi',
-];
+const sanitize = (str: string | null | undefined): string | null =>
+  str ? str.replace(/\x00/g, '') : null;
+
+interface PodcastForPoll {
+  id: number;
+  feed_url: string;
+  title: string;
+}
+
+async function pollFeed(
+  sql: postgres.Sql,
+  podcast: PodcastForPoll,
+): Promise<boolean> {
+  try {
+    const res = await fetch(podcast.feed_url, {
+      headers: { 'User-Agent': 'Podcst/1.0' },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) return false;
+
+    const body = await res.text();
+    const hash = createHash('sha256').update(body).digest('hex');
+
+    const feed = await adaptFeed(body);
+    if (!feed) return false;
+
+    const lastPublished = feed.published ? new Date(feed.published) : null;
+
+    await sql`
+      UPDATE podcasts SET
+        title = ${sanitize(feed.title)},
+        description = ${sanitize(feed.description)}::TEXT,
+        cover = ${sanitize(feed.cover) || podcast.feed_url},
+        website_url = ${sanitize(feed.link)}::TEXT,
+        explicit = ${feed.explicit},
+        last_published = ${lastPublished}::TIMESTAMPTZ,
+        episode_count = ${feed.episodes.length},
+        feed_etag = ${res.headers.get('etag')}::TEXT,
+        feed_last_modified = ${res.headers.get('last-modified')}::TEXT,
+        feed_hash = ${hash}::TEXT,
+        last_polled_at = now(),
+        next_poll_at = now() + interval '1 day',
+        poll_failures = 0,
+        updated_at = now()
+      WHERE id = ${podcast.id}
+    `;
+
+    for (const ep of feed.episodes) {
+      if (!ep.guid || !ep.file.url) continue;
+
+      const published = ep.published ? new Date(ep.published) : new Date();
+      const duration = ep.duration ? Math.floor(ep.duration) : null;
+
+      await sql`
+        INSERT INTO episodes (
+          podcast_id, guid, title, summary, published, duration,
+          episode_art, file_url, file_length, file_type
+        ) VALUES (
+          ${podcast.id},
+          ${sanitize(ep.guid)},
+          ${sanitize(ep.title)},
+          ${sanitize(ep.summary)}::TEXT,
+          ${published},
+          ${duration}::INTEGER,
+          ${sanitize(ep.episodeArt)}::TEXT,
+          ${sanitize(ep.file.url)},
+          ${ep.file.length},
+          ${sanitize(ep.file.type)}
+        )
+        ON CONFLICT (podcast_id, guid) DO UPDATE SET
+          title = EXCLUDED.title,
+          summary = EXCLUDED.summary,
+          duration = EXCLUDED.duration,
+          episode_art = EXCLUDED.episode_art,
+          file_url = EXCLUDED.file_url
+      `;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function pollMissingEpisodes(
+  sql: postgres.Sql,
+  locales: string[],
+): Promise<void> {
+  const podcasts = await sql<PodcastForPoll[]>`
+    SELECT DISTINCT p.id, p.feed_url, p.title
+    FROM top_podcasts tp
+    JOIN podcasts p ON tp.podcast_id = p.id
+    LEFT JOIN episodes e ON p.id = e.podcast_id
+    WHERE tp.country_id = ANY(${locales}::text[])
+    GROUP BY p.id, p.feed_url, p.title
+    HAVING COUNT(e.id) = 0
+    ORDER BY p.id
+  `;
+
+  if (podcasts.length === 0) {
+    console.log('\nAll top podcasts have episodes');
+    return;
+  }
+
+  console.log(`\nPolling ${podcasts.length} top podcasts with no episodes...`);
+
+  const startTime = Date.now();
+  let updated = 0;
+  let failed = 0;
+  let processed = 0;
+
+  for (let i = 0; i < podcasts.length; i += POLL_CONCURRENCY) {
+    const batch = podcasts.slice(i, i + POLL_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (podcast) => {
+        const ok = await pollFeed(sql, podcast);
+        if (ok) {
+          updated++;
+        } else {
+          console.log(`\n✗ [${podcast.id}] ${podcast.title}`);
+          failed++;
+        }
+        processed++;
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const rate = (processed / ((Date.now() - startTime) / 1000)).toFixed(1);
+        process.stdout.write(
+          `\r[${processed}/${podcasts.length}] [${elapsed}s ${rate}/s] ✓${updated} ✗${failed}`,
+        );
+      }),
+    );
+  }
+
+  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(
+    `\nEpisode poll: ${updated} updated, ${failed} failed in ${totalTime}s`,
+  );
+}
 
 async function main() {
   const connectionString = process.env.DATABASE_URL;
@@ -203,49 +326,51 @@ async function main() {
     throw new Error('DATABASE_URL required');
   }
 
-  const sql = postgres(connectionString, { max: 5 });
+  const sql = postgres(connectionString, { max: 20, idle_timeout: 20 });
 
-  const dbCountries = await sql<{ id: string }[]>`SELECT id FROM countries`;
-  const locales = (
-    dbCountries.length > 0 ? dbCountries.map((c) => c.id) : DEFAULT_LOCALES
-  ).filter((loc) => !excludedLocales.includes(loc));
+  const locales = DEFAULT_LOCALES;
 
-  console.log(`Polling top charts for ${locales.length} locales...`);
+  if (!EPISODES_ONLY) {
+    console.log(`Polling top charts for ${locales.length} locales...`);
 
-  let totalStored = 0;
-  let totalNew = 0;
+    let totalStored = 0;
+    let totalNew = 0;
 
-  for (const locale of locales) {
-    console.log(`\n[${locale}] Fetching top ${TOP_LIMIT} podcasts...`);
+    for (const locale of locales) {
+      console.log(`\n[${locale}] Fetching top ${TOP_LIMIT} podcasts...`);
 
-    const podcasts = await fetchTopFromItunes(locale);
-    if (podcasts.length === 0) {
-      console.log(`[${locale}] No podcasts found`);
-      continue;
+      const podcasts = await fetchTopFromItunes(locale);
+      if (podcasts.length === 0) {
+        console.log(`[${locale}] No podcasts found`);
+        continue;
+      }
+
+      console.log(`[${locale}] Found ${podcasts.length} podcasts, storing...`);
+      const { stored, newPodcasts } = await storeTopPodcasts(
+        sql,
+        podcasts,
+        locale,
+      );
+      console.log(`[${locale}] Stored ${stored} podcasts (${newPodcasts} new)`);
+
+      totalStored += stored;
+      totalNew += newPodcasts;
     }
 
-    console.log(`[${locale}] Found ${podcasts.length} podcasts, storing...`);
-    const { stored, newPodcasts } = await storeTopPodcasts(
-      sql,
-      podcasts,
-      locale,
+    if (totalNew > 0) {
+      await sql`
+        INSERT INTO poll_metrics (metric_name, metric_value)
+        VALUES ('top_charts_new_podcasts', ${totalNew})
+      `;
+    }
+
+    console.log(
+      `\nCharts: ${totalStored} total, ${totalNew} new podcasts discovered`,
     );
-    console.log(`[${locale}] Stored ${stored} podcasts (${newPodcasts} new)`);
-
-    totalStored += stored;
-    totalNew += newPodcasts;
   }
 
-  if (totalNew > 0) {
-    await sql`
-      INSERT INTO poll_metrics (metric_name, metric_value)
-      VALUES ('top_charts_new_podcasts', ${totalNew})
-    `;
-  }
+  await pollMissingEpisodes(sql, locales);
 
-  console.log(
-    `\nDone: ${totalStored} total, ${totalNew} new podcasts discovered`,
-  );
   await sql.end();
 }
 
