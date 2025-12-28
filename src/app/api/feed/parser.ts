@@ -31,7 +31,10 @@ const readDate = (ctx: any): number | null => {
   if (!dateStr) return null;
 
   const date = new Date(dateStr);
-  return Number.isNaN(date.getTime()) ? null : date.getTime();
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  if (year < 1900 || year > 2100) return null;
+  return date.getTime();
 };
 
 /**
