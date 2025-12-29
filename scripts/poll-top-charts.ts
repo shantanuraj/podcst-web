@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import postgres from 'postgres';
 import { createHash } from 'crypto';
+import postgres from 'postgres';
 import { adaptFeed } from '../src/app/api/feed/parser';
 
 const ITUNES_API = 'https://itunes.apple.com';

@@ -2,7 +2,7 @@
 
 import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import postgres from 'postgres';
 
 const PODCAST_INDEX_URL =

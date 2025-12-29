@@ -7,11 +7,10 @@ import {
   type EpisodeSortField,
   useEpisodesInfinite,
 } from '@/data/feed';
+import { useTranslation } from '@/shared/i18n';
 import type { IEpisodeInfo, IPaginatedEpisodes, IPodcastInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
-
 import styles from './EpisodesList.module.css';
-import { useTranslation } from '@/shared/i18n';
 
 interface PaginatedEpisodesListProps {
   className?: string;

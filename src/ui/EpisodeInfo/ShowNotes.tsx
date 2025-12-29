@@ -1,8 +1,8 @@
 'use server';
 
 import { cache } from 'react';
-import { linkifyText } from '@/shared/link/linkify-text';
 import { translations } from '@/shared/i18n/server';
+import { linkifyText } from '@/shared/link/linkify-text';
 import type { IEpisodeInfo } from '@/types';
 
 import styles from './EpisodeInfo.module.css';
@@ -17,7 +17,10 @@ const linkifyNotes = cache((notes: string) => {
   return { __html: linkifyText(notes) };
 });
 
-export const ShowNotes = async ({ className = '', episode }: IShowNotesProps) => {
+export const ShowNotes = async ({
+  className = '',
+  episode,
+}: IShowNotesProps) => {
   const { t } = await translations();
   const showNotes = linkifyNotes(episode.showNotes);
   return (

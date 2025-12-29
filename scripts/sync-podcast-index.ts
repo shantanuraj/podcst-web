@@ -2,13 +2,13 @@
 
 import { Database } from 'bun:sqlite';
 import {
-  unlinkSync,
+  appendFileSync,
   existsSync,
   mkdirSync,
-  appendFileSync,
+  unlinkSync,
   writeFileSync,
 } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import postgres from 'postgres';
 
 interface LogEntry {
