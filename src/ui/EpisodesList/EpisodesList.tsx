@@ -115,7 +115,7 @@ export function EpisodesList({
               <EpisodeListItem
                 key={episode.guid || `${index}-${episode.title}`}
                 episode={episode}
-                podcast={podcast}
+                podcastId={podcast?.id}
                 index={index}
                 start={start}
               />
@@ -129,7 +129,7 @@ export function EpisodesList({
               <EpisodeListItem
                 key={episode.guid || `${index}-${episode.title}`}
                 episode={episode}
-                podcast={podcast}
+                podcastId={podcast?.id}
                 index={index}
               />
             );
@@ -142,14 +142,14 @@ export function EpisodesList({
 
 interface EpisodeListItemProps {
   episode: IEpisodeInfo;
-  podcast?: IPodcastEpisodesInfo;
+  podcastId?: number;
   index: number;
   start?: number;
 }
 
 function EpisodeListItem({
   episode,
-  podcast,
+  podcastId,
   index: _index,
   start,
 }: EpisodeListItemProps) {
@@ -165,7 +165,7 @@ function EpisodeListItem({
           : undefined
       }
     >
-      <EpisodeItem episode={episode} podcast={podcast} />
+      <EpisodeItem episode={episode} podcastId={podcastId} />
     </li>
   );
 }

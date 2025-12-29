@@ -1,6 +1,8 @@
 import type { IEpisodeInfo, RenderablePodcast } from '@/types';
 
-export function getPodcastHref(podcast: RenderablePodcast): string {
+export function getPodcastHref(
+  podcast: Pick<RenderablePodcast, 'id' | 'feed'>,
+): string {
   if (podcast.id) {
     return `/episodes/${podcast.id}`;
   }
@@ -9,11 +11,11 @@ export function getPodcastHref(podcast: RenderablePodcast): string {
 
 export function getEpisodeHref(
   episode: IEpisodeInfo,
-  podcast?: RenderablePodcast,
+  podcastId?: number,
 ): string {
-  const podcastId = podcast?.id ?? episode.podcastId;
-  if (podcastId && episode.id) {
-    return `/episodes/${podcastId}/${episode.id}`;
+  const episodePodcastId = podcastId ?? episode.podcastId;
+  if (episodePodcastId && episode.id) {
+    return `/episodes/${episodePodcastId}/${episode.id}`;
   }
   return `/episodes/${encodeURIComponent(episode.feed)}/${encodeURIComponent(episode.guid)}`;
 }
