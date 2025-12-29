@@ -14,8 +14,8 @@ jobs:
       - run: |
           flyctl console --dockerfile Dockerfile.builder \
             -C "/srv/deploy.sh" \
-            --env=FLY_API_TOKEN=$FLY_API_TOKEN \
-            --vm-cpukind shared \
+            --env "FLY_API_TOKEN=${FLY_API_TOKEN}" \
+            --vm-cpu-kind shared \
             --vm-memory 1024 \
             --vm-cpus 1
         env:
