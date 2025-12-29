@@ -43,9 +43,8 @@ export function getMessagesForLanguage(language: Language): Messages {
 function resolvePluralForm(count: number, formsStr: string): string {
   const formPattern = /(zero|one|two|few|many|other|=\d+)\s*\{([^{}]*)\}/g;
   const forms: Record<string, string> = {};
-  let match: RegExpExecArray | null;
 
-  while ((match = formPattern.exec(formsStr)) !== null) {
+  for (const match of formsStr.matchAll(formPattern)) {
     forms[match[1]] = match[2];
   }
 
