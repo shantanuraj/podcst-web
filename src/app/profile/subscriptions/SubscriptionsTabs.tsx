@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { EpisodesList } from '@/ui/EpisodesList';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
-
 import styles from './Subscriptions.module.css';
-import { useTranslation } from '@/shared/i18n';
 
 type Tab = 'subscriptions' | 'new';
 

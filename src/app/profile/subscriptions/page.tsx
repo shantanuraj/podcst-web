@@ -3,12 +3,10 @@ import { redirect } from 'next/navigation';
 import { ItemListSchema } from '@/components/Schema';
 import { getSession } from '@/server/auth/session';
 import { getSubscriptions } from '@/server/subscriptions';
+import { translations } from '@/shared/i18n/server';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
-import { EpisodesList } from '@/ui/EpisodesList';
-import { PodcastsGrid } from '@/ui/PodcastsGrid';
 import styles from './Subscriptions.module.css';
 import { SubscriptionsTabs } from './SubscriptionsTabs';
-import { translations } from '@/shared/i18n/server';
 
 export const dynamic = 'force-dynamic';
 

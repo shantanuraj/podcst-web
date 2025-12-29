@@ -10,7 +10,6 @@ import {
 import { defaultLanguage, en, type Language, type Messages } from '@/messages';
 import {
   getMessagesForLanguage,
-  getNestedValue,
   isValidLanguage,
   LANGUAGE_COOKIE,
   type TranslationKey,
@@ -61,16 +60,9 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   ): string => {
     let value = translateKey(messages, key, params);
 
+    // Fallback to English if translation not found for non-English languages
     if (value === key && language !== 'en') {
-      value = getNestedValue(en, key);
-      if (params) {
-        for (const [paramKey, paramValue] of Object.entries(params)) {
-          value = value.replace(
-            new RegExp(`\\{${paramKey}\\}`, 'g'),
-            String(paramValue),
-          );
-        }
-      }
+      value = translateKey(en, key, params);
     }
 
     return value;
