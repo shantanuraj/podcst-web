@@ -184,7 +184,7 @@ export function PaginatedEpisodesList({
           <EpisodeListItem
             key={episode.id || episode.guid || `${index}-${episode.title}`}
             episode={episode}
-            podcast={podcast}
+            podcastId={podcast.id}
             index={index}
           />
         ))}
@@ -203,21 +203,14 @@ export function PaginatedEpisodesList({
 
 interface EpisodeListItemProps {
   episode: IEpisodeInfo;
-  podcast: IPodcastInfo;
+  podcastId?: number;
   index: number;
 }
 
-function EpisodeListItem({ episode, podcast }: EpisodeListItemProps) {
-  // Adapt IPodcastInfo to what EpisodeItem expects
-  const podcastData = {
-    ...podcast,
-    episodes: [],
-    feed: podcast.feed,
-  };
-
+function EpisodeListItem({ episode, podcastId }: EpisodeListItemProps) {
   return (
     <li>
-      <EpisodeItem episode={episode} podcast={podcastData} />
+      <EpisodeItem episode={episode} podcastId={podcastId} />
     </li>
   );
 }

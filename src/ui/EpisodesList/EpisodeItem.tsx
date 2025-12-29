@@ -5,7 +5,7 @@ import { memo } from 'react';
 import { localeForLanguage } from '@/messages';
 import { useTranslation } from '@/shared/i18n';
 import { getEpisodeHref } from '@/shared/links';
-import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import type { IEpisodeInfo, IPodcastInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
 import { ProxiedImage } from '@/ui/Image';
@@ -14,10 +14,10 @@ import styles from './EpisodeItem.module.css';
 
 type EpisodeItemProps = {
   episode: IEpisodeInfo;
-  podcast?: IPodcastEpisodesInfo;
+  podcastId?: number;
 };
 
-function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
+function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {
   const { cover, episodeArt, title, published, duration } = episode;
   const { language } = useTranslation();
   const locale = localeForLanguage[language];
@@ -31,7 +31,7 @@ function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
 
   return (
     <div className={styles.container}>
-      <Link href={getEpisodeHref(episode, podcast)} className={styles.link}>
+      <Link href={getEpisodeHref(episode, podcastId)} className={styles.link}>
         <div className={styles.artwork}>
           <ProxiedImage
             loading="lazy"
