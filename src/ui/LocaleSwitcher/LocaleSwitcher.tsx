@@ -112,13 +112,14 @@ export function LocaleSwitcher() {
         <span className={styles.label}>{locale.toUpperCase()}</span>
       </button>
       {isOpen && (
-        <ul className={styles.menu} role="listbox">
+        <ul className={styles.menu}>
           {sortedLocales.map((l) => (
-            <li key={l} role="option" aria-selected={l === locale}>
+            <li key={l}>
               <button
                 type="button"
                 className={styles.option}
                 data-active={l === locale}
+                aria-pressed={l === locale}
                 onClick={() => handleLocaleChange(l)}
               >
                 <span className={styles.code}>{l.toUpperCase()}</span>
