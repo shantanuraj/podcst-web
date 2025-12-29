@@ -40,7 +40,7 @@ export async function ingestPodcast(
     return null;
   }
 
-  await storeEpisodes(podcast.id, feedUrl, data.episodes);
+  await storeEpisodes(podcast.id, data.episodes);
 
   return getPodcastByFeedUrl(feedUrl);
 }
@@ -84,7 +84,7 @@ export async function refreshPodcast(
     WHERE id = ${existing.id}
   `;
 
-  await storeEpisodes(existing.id, feedUrl, data.episodes);
+  await storeEpisodes(existing.id, data.episodes);
 
   return getPodcastByFeedUrl(feedUrl);
 }
@@ -184,11 +184,7 @@ async function storePodcast(
   return podcast;
 }
 
-async function storeEpisodes(
-  podcastId: number,
-  feedUrl: string,
-  episodes: IEpisode[],
-) {
+async function storeEpisodes(podcastId: number, episodes: IEpisode[]) {
   if (episodes.length === 0) return;
 
   for (const ep of episodes) {
