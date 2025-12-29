@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, memo } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { Button, type ButtonProps } from './Button';
 
 interface ShareButtonProps extends ButtonProps {
@@ -20,13 +21,14 @@ const share = ({ text, title }: ShareButtonProps, url: string) => {
 export const ShareButton = memo(
   forwardRef<HTMLButtonElement, ShareButtonProps>(
     function ShareButton(props, ref) {
+      const { t } = useTranslation();
       return (
         <Button
           {...(props as ButtonProps)}
           ref={ref}
           onClick={() => share(props, '')}
         >
-          Share
+          {t('podcast.share')}
         </Button>
       );
     },

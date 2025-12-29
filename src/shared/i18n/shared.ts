@@ -49,10 +49,13 @@ function resolvePluralForm(count: number, formsStr: string): string {
     forms[match[1]] = match[2];
   }
 
-  if (forms[`=${count}`] !== undefined) return forms[`=${count}`];
-  if (count === 1 && forms.one !== undefined) return forms.one;
-  if (count === 0 && forms.zero !== undefined) return forms.zero;
-  return forms.other ?? '';
+  let form: string;
+  if (forms[`=${count}`] !== undefined) form = forms[`=${count}`];
+  else if (count === 1 && forms.one !== undefined) form = forms.one;
+  else if (count === 0 && forms.zero !== undefined) form = forms.zero;
+  else form = forms.other ?? '';
+
+  return form.replace(/#/g, String(count));
 }
 
 function resolveArgument(

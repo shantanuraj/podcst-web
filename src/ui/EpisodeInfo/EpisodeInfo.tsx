@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { localeForLanguage } from '@/messages';
+import { translations } from '@/shared/i18n/server';
 import { getPodcastHref } from '@/shared/links';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
@@ -15,12 +17,14 @@ type EpisodeInfoProps = {
   episode: IEpisodeInfo;
 };
 
-export function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
+export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
   const { author, cover, episodeArt, published, summary, title } = episode;
+  const { language } = await translations();
+  const locale = localeForLanguage[language];
   const showArt = episodeArt || cover;
   const shareTitle = `${podcast.title} - ${title}`;
   const releaseDate = published
-    ? new Date(published).toLocaleDateString('en-US', {
+    ? new Date(published).toLocaleDateString(locale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

@@ -21,6 +21,7 @@ export const messages: Messages = {
 
   search: {
     placeholder: 'Zoek podcasts...',
+    episodesPlaceholder: 'Zoek afleveringen...',
     noResults: 'Geen podcasts gevonden',
     label: 'Zoek podcasts',
   },
@@ -85,6 +86,7 @@ export const messages: Messages = {
     nowPlaying: 'Nu spelend',
     play: 'Afspelen',
     pause: 'Pauzeren',
+    resume: 'Hervatten',
     seekBack: 'Terugspoelen',
     seekForward: 'Vooruitspoelen',
     speed: 'Afspeelsnelheid',
@@ -104,7 +106,22 @@ export const messages: Messages = {
     playEpisode: 'Aflevering afspelen',
     addToQueue: 'Toevoegen aan wachtrij',
     share: 'Delen',
-    episodeCount: '{count} afleveringen',
+    episodeCount: '{count, plural, one {# aflevering} other {# afleveringen}}',
+    episodeSearchCount:
+      '{count} van {total} {total, plural, one {aflevering} other {afleveringen}}',
+    sort: 'Sorteer:',
+    sortOptions: {
+      releaseDesc: 'Releasedatum (Nieuw → Oud)',
+      releaseAsc: 'Releasedatum (Oud → Nieuw)',
+      titleAsc: 'Titel (A → Z)',
+      titleDesc: 'Titel (Z → A)',
+      lengthAsc: 'Duur (Kort → Lang)',
+      lengthDesc: 'Duur (Lang → Kort)',
+    },
+    loadingEpisodes: 'Afleveringen laden...',
+    loadError: 'Laden van afleveringen mislukt',
+    loadingMore: 'Meer laden...',
+    allLoaded: 'Alle afleveringen geladen',
   },
 
   library: {

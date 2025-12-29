@@ -35,3 +35,13 @@ export const languageNames: Record<
   es: { native: 'Español', english: 'Spanish' },
   hi: { native: 'हिन्दी', english: 'Hindi' },
 };
+
+export const localeForLanguage: Record<Language, Intl.LocalesArgument> = {
+  en: 'en-US',
+  nl: 'nl-NL',
+  fr: 'fr-FR',
+  sv: 'sv-SE',
+  ko: 'ko-KR',
+  es: 'es-MX',
+  hi: 'hi-IN',
+};

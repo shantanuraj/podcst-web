@@ -21,6 +21,7 @@ export const messages: Messages = {
 
   search: {
     placeholder: 'पॉडकास्ट खोजें...',
+    episodesPlaceholder: 'एपिसोड खोजें...',
     noResults: 'कोई पॉडकास्ट नहीं मिला',
     label: 'पॉडकास्ट खोजें',
   },
@@ -85,6 +86,7 @@ export const messages: Messages = {
     nowPlaying: 'अभी चल रहा है',
     play: 'चलाएं',
     pause: 'रोकें',
+    resume: 'जारी रखें',
     seekBack: 'पीछे ले जाएं',
     seekForward: 'आगे ले जाएं',
     speed: 'प्लेबैक गति',
@@ -104,7 +106,22 @@ export const messages: Messages = {
     playEpisode: 'एपिसोड चलाएं',
     addToQueue: 'कतार में जोड़ें',
     share: 'शेयर',
-    episodeCount: '{count} एपिसोड',
+    episodeCount: '{count, plural, one {# एपिसोड} other {# एपिसोड}}',
+    episodeSearchCount:
+      '{total} में से {count} {total, plural, one {एपिसोड} other {एपिसोड}}',
+    sort: 'क्रम:',
+    sortOptions: {
+      releaseDesc: 'रिलीज़ की तारीख (नया → पुराना)',
+      releaseAsc: 'रिलीज़ की तारीख (पुराना → नया)',
+      titleAsc: 'शीर्षक (A → Z)',
+      titleDesc: 'शीर्षक (Z → A)',
+      lengthAsc: 'अवधि (छोटा → लंबा)',
+      lengthDesc: 'अवधि (लंबा → छोटा)',
+    },
+    loadingEpisodes: 'एपिसोड लोड हो रहे हैं...',
+    loadError: 'एपिसोड लोड करने में विफल',
+    loadingMore: 'और लोड हो रहा है...',
+    allLoaded: 'सभी एपिसोड लोड हो गए',
   },
 
   library: {

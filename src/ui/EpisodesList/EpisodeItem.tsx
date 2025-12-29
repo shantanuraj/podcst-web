@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { memo } from 'react';
+import { localeForLanguage } from '@/messages';
+import { useTranslation } from '@/shared/i18n';
 import { getEpisodeHref } from '@/shared/links';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
@@ -15,11 +19,13 @@ type EpisodeItemProps = {
 
 function EpisodeItem({ episode, podcast }: EpisodeItemProps) {
   const { cover, episodeArt, title, published, duration } = episode;
+  const { language } = useTranslation();
+  const locale = localeForLanguage[language];
 
   const pub = new Date(published || Date.now());
   const day = pub.getDate();
   const month = pub
-    .toLocaleDateString('default', { month: 'short' })
+    .toLocaleDateString(locale, { month: 'short' })
     .toUpperCase();
   const minutes = Math.floor((duration || 0) / 60);
 

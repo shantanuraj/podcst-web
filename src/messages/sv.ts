@@ -21,6 +21,7 @@ export const messages: Messages = {
 
   search: {
     placeholder: 'Sök poddar...',
+    episodesPlaceholder: 'Sök avsnitt...',
     noResults: 'Inga poddar hittades',
     label: 'Sök poddar',
   },
@@ -85,6 +86,7 @@ export const messages: Messages = {
     nowPlaying: 'Spelas nu',
     play: 'Spela',
     pause: 'Pausa',
+    resume: 'Återuppta',
     seekBack: 'Spola bakåt',
     seekForward: 'Spola framåt',
     speed: 'Uppspelningshastighet',
@@ -104,7 +106,22 @@ export const messages: Messages = {
     playEpisode: 'Spela avsnitt',
     addToQueue: 'Lägg i kö',
     share: 'Dela',
-    episodeCount: '{count} avsnitt',
+    episodeCount: '{count, plural, one {# avsnitt} other {# avsnitt}}',
+    episodeSearchCount:
+      '{count} av {total} {total, plural, one {avsnitt} other {avsnitt}}',
+    sort: 'Sortera:',
+    sortOptions: {
+      releaseDesc: 'Publiceringsdatum (Ny → Gammal)',
+      releaseAsc: 'Publiceringsdatum (Gammal → Ny)',
+      titleAsc: 'Titel (A → Ö)',
+      titleDesc: 'Titel (Ö → A)',
+      lengthAsc: 'Längd (Kort → Lång)',
+      lengthDesc: 'Längd (Lång → Kort)',
+    },
+    loadingEpisodes: 'Laddar avsnitt...',
+    loadError: 'Misslyckades med att ladda avsnitt',
+    loadingMore: 'Laddar fler...',
+    allLoaded: 'Alla avsnitt laddade',
   },
 
   library: {

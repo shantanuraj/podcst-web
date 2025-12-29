@@ -8,6 +8,7 @@ import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
 import { useEpisodesFilter } from './useEpisodesFilter';
+import { useTranslation } from '@/shared/i18n';
 
 interface EpisodesListProps {
   className?: string;
@@ -24,36 +25,14 @@ type SortPreference =
   | 'lengthAsc'
   | 'lengthDesc';
 
-const sortOptionsMap: Record<
-  SortPreference,
-  { value: SortPreference; title: string }
-> = {
-  releaseDesc: {
-    title: 'Release date (New → Old)',
-    value: 'releaseDesc',
-  },
-  releaseAsc: {
-    title: 'Release date (Old → New)',
-    value: 'releaseAsc',
-  },
-  titleAsc: {
-    title: 'Title (A → Z)',
-    value: 'titleAsc',
-  },
-  titleDesc: {
-    title: 'Title (Z → A)',
-    value: 'titleDesc',
-  },
-  lengthAsc: {
-    title: 'Duration (Short → Long)',
-    value: 'lengthAsc',
-  },
-  lengthDesc: {
-    title: 'Duration (Long → Short)',
-    value: 'lengthDesc',
-  },
-};
-const sortOptions = Object.values(sortOptionsMap);
+const sortOptions: SortPreference[] = [
+  'releaseDesc',
+  'releaseAsc',
+  'titleAsc',
+  'titleDesc',
+  'lengthAsc',
+  'lengthDesc',
+];
 
 export function EpisodesList({
   className = '',
@@ -62,9 +41,8 @@ export function EpisodesList({
   podcast,
 }: EpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [sortPreference, setSortPreference] = useState<SortPreference>(
-    sortOptionsMap.releaseDesc.value,
-  );
+  const [sortPreference, setSortPreference] =
+    useState<SortPreference>('releaseDesc');
   const [query, setQuery] = useState('');
   const onSortChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -80,6 +58,7 @@ export function EpisodesList({
   );
 
   const filteredEpisodes = useEpisodesFilter(episodes, sortPreference, query);
+  const { t } = useTranslation();
 
   const virtualizer = useVirtualizer({
     count: filteredEpisodes.length || 0,
@@ -98,17 +77,27 @@ export function EpisodesList({
       {children}
       <div className={styles.header}>
         <div className={styles.count}>
-          {episodes.length} {episodes.length !== 1 ? 'episodes' : 'episode'}
+          {query
+            ? t('podcast.episodeSearchCount', {
+                count: filteredEpisodes.length,
+                total: episodes.length,
+              })
+            : t('podcast.episodeCount', {
+                count: episodes.length,
+              })}
         </div>
         <div className={styles.search}>
-          <input onChange={onQueryChange} placeholder="Search episodes" />
+          <input
+            onChange={onQueryChange}
+            placeholder={t('search.episodesPlaceholder')}
+          />
         </div>
         <div className={styles.sort}>
-          <span>Sort:</span>
-          <select onChange={onSortChange}>
-            {sortOptions.map(({ title, value }) => (
+          <span>{t('podcast.sort')}</span>
+          <select onChange={onSortChange} value={sortPreference}>
+            {sortOptions.map((value) => (
               <option key={value} value={value}>
-                {title}
+                {t(`podcast.sortOptions.${value}` as any)}
               </option>
             ))}
           </select>
