@@ -1,7 +1,6 @@
+import type { Metadata } from 'next';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import styles from '../Settings.module.css';
-
-import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Shortcuts',

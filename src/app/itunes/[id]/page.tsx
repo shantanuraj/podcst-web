@@ -1,5 +1,5 @@
-import { getPodcastIdByItunesId } from '@/server/ingest/podcast';
 import { redirect } from 'next/navigation';
+import { getPodcastIdByItunesId } from '@/server/ingest/podcast';
 
 export default async function Profile({
   params,

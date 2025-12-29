@@ -8,46 +8,21 @@ import {
   useState,
 } from 'react';
 import { defaultLanguage, en, type Language, type Messages } from '@/messages';
-import { messages as es } from '@/messages/es';
-import { messages as fr } from '@/messages/fr';
-import { messages as hi } from '@/messages/hi';
-import { messages as ko } from '@/messages/ko';
-import { messages as nl } from '@/messages/nl';
-import { messages as sv } from '@/messages/sv';
-
-const LANGUAGE_COOKIE = 'NEXT_UI_LANG';
-
-type NestedKeyOf<T> = T extends object
-  ? {
-      [K in keyof T]: K extends string
-        ? T[K] extends object
-          ? `${K}.${NestedKeyOf<T[K]>}`
-          : K
-        : never;
-    }[keyof T]
-  : never;
-
-export type TranslationKey = NestedKeyOf<Messages>;
-
-function getNestedValue(obj: Messages, path: string): string {
-  const keys = path.split('.');
-  let result: unknown = obj;
-  for (const key of keys) {
-    if (result && typeof result === 'object' && key in result) {
-      result = (result as Record<string, unknown>)[key];
-    } else {
-      return path;
-    }
-  }
-  return typeof result === 'string' ? result : path;
-}
+import {
+  getMessagesForLanguage,
+  getNestedValue,
+  isValidLanguage,
+  LANGUAGE_COOKIE,
+  type TranslationKey,
+  translateKey,
+} from './shared';
 
 function getStoredLanguage(): Language {
   if (typeof document === 'undefined') return defaultLanguage;
   const match = document.cookie.match(new RegExp(`${LANGUAGE_COOKIE}=([^;]+)`));
   const lang = match?.[1];
-  if (lang && ['en', 'nl', 'fr', 'sv', 'ko', 'es', 'hi'].includes(lang)) {
-    return lang as Language;
+  if (lang && isValidLanguage(lang)) {
+    return lang;
   }
   return defaultLanguage;
 }
@@ -64,16 +39,6 @@ const TranslationContext = createContext<TranslationContextValue>({
   messages: en,
 });
 
-const messagesByLanguage: Record<Language, Messages> = {
-  en,
-  nl,
-  fr,
-  sv,
-  ko,
-  es,
-  hi,
-};
-
 export function TranslationProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(defaultLanguage);
 
@@ -88,24 +53,23 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  const messages = messagesByLanguage[language];
+  const messages = getMessagesForLanguage(language);
 
   const t = (
     key: TranslationKey,
     params?: Record<string, string | number>,
   ): string => {
-    let value = getNestedValue(messages, key);
+    let value = translateKey(messages, key, params);
 
     if (value === key && language !== 'en') {
       value = getNestedValue(en, key);
-    }
-
-    if (params) {
-      for (const [paramKey, paramValue] of Object.entries(params)) {
-        value = value.replace(
-          new RegExp(`\\{${paramKey}\\}`, 'g'),
-          String(paramValue),
-        );
+      if (params) {
+        for (const [paramKey, paramValue] of Object.entries(params)) {
+          value = value.replace(
+            new RegExp(`\\{${paramKey}\\}`, 'g'),
+            String(paramValue),
+          );
+        }
       }
     }
 

@@ -8,6 +8,7 @@ import { EpisodesList } from '@/ui/EpisodesList';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 import styles from './Subscriptions.module.css';
 import { SubscriptionsTabs } from './SubscriptionsTabs';
+import { translations } from '@/shared/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export default async function ProfileSubscriptionsPage() {
     redirect('/auth');
   }
 
+  const { t } = await translations();
   const podcasts = await getSubscriptions(session.userId);
 
   if (!podcasts.length) {
@@ -28,7 +30,7 @@ export default async function ProfileSubscriptionsPage() {
 
   return (
     <>
-      <ItemListSchema items={podcasts} title="Subscriptions" />
+      <ItemListSchema items={podcasts} title={t('profile.subscriptions')} />
       <SubscriptionsTabs podcasts={podcasts} episodes={episodes} />
     </>
   );
