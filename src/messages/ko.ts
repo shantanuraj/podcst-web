@@ -21,6 +21,7 @@ export const messages: Messages = {
 
   search: {
     placeholder: '팟캐스트 검색...',
+    episodesPlaceholder: '에피소드 검색...',
     noResults: '검색 결과가 없습니다',
     label: '팟캐스트 검색',
   },
@@ -84,6 +85,7 @@ export const messages: Messages = {
     nowPlaying: '현재 재생 중',
     play: '재생',
     pause: '일시정지',
+    resume: '재개',
     seekBack: '뒤로 이동',
     seekForward: '앞으로 이동',
     speed: '재생 속도',
@@ -103,7 +105,21 @@ export const messages: Messages = {
     playEpisode: '에피소드 재생',
     addToQueue: '대기열에 추가',
     share: '공유하기',
-    episodeCount: '에피소드 {count}개',
+    episodeCount: '{count, plural, other {#개의 에피소드}}',
+    episodeSearchCount: '{total}개 중 {count}개의 에피소드',
+    sort: '정렬:',
+    sortOptions: {
+      releaseDesc: '출시일 (최신순)',
+      releaseAsc: '출시일 (오래된순)',
+      titleAsc: '제목 (가나다순)',
+      titleDesc: '제목 (ㅎ-ㄱ순)',
+      lengthAsc: '길이 (짧은순)',
+      lengthDesc: '길이 (긴순)',
+    },
+    loadingEpisodes: '에피소드 로딩 중...',
+    loadError: '에피소드 로드 실패',
+    loadingMore: '더 불러오는 중...',
+    allLoaded: '모든 에피소드를 불러왔습니다',
   },
 
   library: {

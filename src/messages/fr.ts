@@ -21,6 +21,7 @@ export const messages: Messages = {
 
   search: {
     placeholder: 'Rechercher des podcasts...',
+    episodesPlaceholder: 'Rechercher des épisodes...',
     noResults: 'Aucun podcast trouvé',
     label: 'Rechercher des podcasts',
   },
@@ -86,6 +87,7 @@ export const messages: Messages = {
     nowPlaying: 'Lecture en cours',
     play: 'Lire',
     pause: 'Pause',
+    resume: 'Reprendre',
     seekBack: 'Retour arrière',
     seekForward: 'Avancer',
     speed: 'Vitesse de lecture',
@@ -105,7 +107,22 @@ export const messages: Messages = {
     playEpisode: 'Lire l’épisode',
     addToQueue: 'Ajouter à la file d’attente',
     share: 'Partager',
-    episodeCount: '{count} épisodes',
+    episodeCount: '{count, plural, one {# épisode} other {# épisodes}}',
+    episodeSearchCount:
+      '{count} sur {total} {total, plural, one {épisode} other {épisodes}}',
+    sort: 'Trier :',
+    sortOptions: {
+      releaseDesc: 'Date de sortie (Récent → Ancien)',
+      releaseAsc: 'Date de sortie (Ancien → Récent)',
+      titleAsc: 'Titre (A → Z)',
+      titleDesc: 'Titre (Z → A)',
+      lengthAsc: 'Durée (Court → Long)',
+      lengthDesc: 'Durée (Long → Court)',
+    },
+    loadingEpisodes: 'Chargement des épisodes...',
+    loadError: 'Échec du chargement des épisodes',
+    loadingMore: 'Chargement de la suite...',
+    allLoaded: 'Tous les épisodes sont chargés',
   },
 
   library: {

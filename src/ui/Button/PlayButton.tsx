@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, memo, useCallback } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import {
   getCurrentEpisode,
   getPlaybackState,
@@ -71,8 +72,9 @@ const PlayButtonContent = (props: {
   isCurrentEpisode: boolean;
   isPlaying: boolean;
 }) => {
+  const { t } = useTranslation();
   const { isCurrentEpisode, isPlaying } = props;
-  return isCurrentEpisode ? (isPlaying ? 'Pause' : 'Resume') : 'Play';
+  return isCurrentEpisode ? (isPlaying ? t('player.pause') : t('player.resume')) : t('player.play');
 };
 
 const PlayButtonIconContent = ({

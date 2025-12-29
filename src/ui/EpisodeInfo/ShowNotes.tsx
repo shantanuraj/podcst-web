@@ -1,7 +1,8 @@
-'use client';
+'use server';
 
-import React from 'react';
+import { cache } from 'react';
 import { linkifyText } from '@/shared/link/linkify-text';
+import { translations } from '@/shared/i18n/server';
 import type { IEpisodeInfo } from '@/types';
 
 import styles from './EpisodeInfo.module.css';
@@ -12,13 +13,16 @@ interface IShowNotesProps {
   episode: IEpisodeInfo;
 }
 
-export const ShowNotes = ({ className = '', episode }: IShowNotesProps) => {
-  const showNotes = React.useMemo(() => {
-    return { __html: linkifyText(episode.showNotes) };
-  }, [episode.showNotes]);
+const linkifyNotes = cache((notes: string) => {
+  return { __html: linkifyText(notes) };
+});
+
+export const ShowNotes = async ({ className = '', episode }: IShowNotesProps) => {
+  const { t } = await translations();
+  const showNotes = linkifyNotes(episode.showNotes);
   return (
     <div id="show-notes" className={`${styles.showNotes} ${className}`}>
-      <h3>Show Notes</h3>
+      <h3>{t('podcast.showNotes')}</h3>
       <div dangerouslySetInnerHTML={showNotes} />
       <ShowNotesHandler id="show-notes" episode={episode} />
     </div>

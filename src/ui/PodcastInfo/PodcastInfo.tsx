@@ -1,4 +1,6 @@
 import { SubscribeButton } from '@/components/SubscribeButton/SubscribeButton';
+import { localeForLanguage } from '@/messages';
+import { translations } from '@/shared/i18n/server';
 import { linkifyText } from '@/shared/link/linkify-text';
 import { stripHost } from '@/shared/link/strip-host';
 import type { IPodcastEpisodesInfo } from '@/types';
@@ -13,11 +15,13 @@ export interface PodcastInfoProps {
   info: IPodcastEpisodesInfo;
 }
 
-export function PodcastInfo({ info }: PodcastInfoProps) {
+export async function PodcastInfo({ info }: PodcastInfoProps) {
   const { title, author, cover, link, description } = info;
+  const { language } = await translations();
+  const locale = localeForLanguage[language];
   const lastPublishedDate = info.episodes?.[0]?.published || info.published;
   const lastPublished = lastPublishedDate
-    ? new Date(lastPublishedDate).toLocaleDateString('en-US', {
+    ? new Date(lastPublishedDate).toLocaleDateString(locale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

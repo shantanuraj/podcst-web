@@ -11,6 +11,7 @@ import type { IEpisodeInfo, IPaginatedEpisodes, IPodcastInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 
 import styles from './EpisodesList.module.css';
+import { useTranslation } from '@/shared/i18n';
 
 interface PaginatedEpisodesListProps {
   className?: string;
@@ -28,36 +29,14 @@ type SortPreference =
   | 'lengthAsc'
   | 'lengthDesc';
 
-const sortOptionsMap: Record<
-  SortPreference,
-  { value: SortPreference; title: string }
-> = {
-  releaseDesc: {
-    title: 'Release date (New → Old)',
-    value: 'releaseDesc',
-  },
-  releaseAsc: {
-    title: 'Release date (Old → New)',
-    value: 'releaseAsc',
-  },
-  titleAsc: {
-    title: 'Title (A → Z)',
-    value: 'titleAsc',
-  },
-  titleDesc: {
-    title: 'Title (Z → A)',
-    value: 'titleDesc',
-  },
-  lengthAsc: {
-    title: 'Duration (Short → Long)',
-    value: 'lengthAsc',
-  },
-  lengthDesc: {
-    title: 'Duration (Long → Short)',
-    value: 'lengthDesc',
-  },
-};
-const sortOptions = Object.values(sortOptionsMap);
+const sortOptions: SortPreference[] = [
+  'releaseDesc',
+  'releaseAsc',
+  'titleAsc',
+  'titleDesc',
+  'lengthAsc',
+  'lengthDesc',
+];
 
 function mapSortPreference(pref: SortPreference): {
   sortBy: EpisodeSortField;
@@ -88,9 +67,8 @@ export function PaginatedEpisodesList({
 }: PaginatedEpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const [sortPreference, setSortPreference] = useState<SortPreference>(
-    sortOptionsMap.releaseDesc.value,
-  );
+  const [sortPreference, setSortPreference] =
+    useState<SortPreference>('releaseDesc');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -160,36 +138,35 @@ export function PaginatedEpisodesList({
     data?.pages.flatMap((page) => page.episodes) ?? initialData?.episodes ?? [];
   const totalCount = data?.pages[0]?.total ?? initialData?.total ?? 0;
 
+  const { t } = useTranslation();
+
   return (
     <div className={`${styles.container} ${className}`} ref={containerRef}>
       {children}
       <div className={styles.header}>
         <div className={styles.count}>
-          {debouncedSearch ? (
-            <>
-              {allEpisodes.length} of {podcast.episodeCount}{' '}
-              {podcast.episodeCount !== 1 ? 'episodes' : 'episode'}
-            </>
-          ) : (
-            <>
-              {podcast.episodeCount}{' '}
-              {podcast.episodeCount !== 1 ? 'episodes' : 'episode'}
-            </>
-          )}
+          {debouncedSearch
+            ? t('podcast.episodeSearchCount', {
+                count: allEpisodes.length,
+                total: podcast.episodeCount,
+              })
+            : t('podcast.episodeCount', {
+                count: podcast.episodeCount,
+              })}
         </div>
         <div className={styles.search}>
           <input
             onChange={onSearchChange}
             value={searchQuery}
-            placeholder="Search episodes"
+            placeholder={t('search.episodesPlaceholder')}
           />
         </div>
         <div className={styles.sort}>
-          <span>Sort:</span>
+          <span>{t('podcast.sort')}</span>
           <select onChange={onSortChange} value={sortPreference}>
-            {sortOptions.map(({ title, value }) => (
+            {sortOptions.map((value) => (
               <option key={value} value={value}>
-                {title}
+                {t(`podcast.sortOptions.${value}` as any)}
               </option>
             ))}
           </select>
@@ -197,10 +174,10 @@ export function PaginatedEpisodesList({
       </div>
 
       {isLoading && !initialData && (
-        <div className={styles.loading}>Loading episodes...</div>
+        <div className={styles.loading}>{t('podcast.loadingEpisodes')}</div>
       )}
 
-      {isError && <div className={styles.error}>Failed to load episodes</div>}
+      {isError && <div className={styles.error}>{t('podcast.loadError')}</div>}
 
       <ul className={styles.list}>
         {allEpisodes.map((episode, index) => (
@@ -215,9 +192,9 @@ export function PaginatedEpisodesList({
 
       {/* Load more trigger */}
       <div ref={loadMoreRef} className={styles.loadMore}>
-        {isFetchingNextPage && <span>Loading more...</span>}
+        {isFetchingNextPage && <span>{t('podcast.loadingMore')}</span>}
         {!hasNextPage && allEpisodes.length > 0 && totalCount > 20 && (
-          <span>All episodes loaded</span>
+          <span>{t('podcast.allLoaded')}</span>
         )}
       </div>
     </div>
