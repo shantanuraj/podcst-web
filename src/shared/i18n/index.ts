@@ -1,5 +1,2 @@
-export {
-  type TranslationKey,
-  TranslationProvider,
-  useTranslation,
-} from './TranslationProvider';
+export type { TranslationKey } from './shared';
+export { TranslationProvider, useTranslation } from './TranslationProvider';

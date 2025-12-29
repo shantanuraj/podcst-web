@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { top } from '@/app/api/top/top';
+import { en } from '@/messages';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 export const metadata: Metadata = {
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 
 export default async function Page() {
   const podcasts = await top(100);
-  return <PodcastsGrid podcasts={podcasts} title="Trending" />;
+  return <PodcastsGrid podcasts={podcasts} title={en.feed.trending} />;
 }

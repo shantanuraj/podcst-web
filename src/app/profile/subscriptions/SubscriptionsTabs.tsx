@@ -6,6 +6,7 @@ import { EpisodesList } from '@/ui/EpisodesList';
 import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';
+import { useTranslation } from '@/shared/i18n';
 
 type Tab = 'subscriptions' | 'new';
 
@@ -16,6 +17,7 @@ interface Props {
 
 export function SubscriptionsTabs({ podcasts, episodes }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('subscriptions');
+  const { t } = useTranslation();
 
   return (
     <>
@@ -27,7 +29,7 @@ export function SubscriptionsTabs({ podcasts, episodes }: Props) {
             data-active={activeTab === 'subscriptions'}
             onClick={() => setActiveTab('subscriptions')}
           >
-            Subscriptions
+            {t('profile.subscriptions')}
           </button>
           <button
             type="button"
@@ -35,7 +37,7 @@ export function SubscriptionsTabs({ podcasts, episodes }: Props) {
             data-active={activeTab === 'new'}
             onClick={() => setActiveTab('new')}
           >
-            New Releases
+            {t('feed.newReleases')}
           </button>
         </nav>
       </header>
