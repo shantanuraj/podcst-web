@@ -13,14 +13,15 @@
     ]
   },
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "db:migrate": "bun scripts/migrate.ts",
+    "dev": "next dev",
     "format": "biome format --write src",
     "lint": "biome check src",
     "short-url": "bun scripts/generate-short-url.ts",
-    "db:migrate": "bun scripts/migrate.ts",
-    "sync:podcast-index": "bun scripts/sync-podcast-index.ts"
+    "start": "next start",
+    "sync:podcast-index": "bun scripts/sync-podcast-index.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "0.7.2",
