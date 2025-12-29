@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import postgres from 'postgres';
 import { createHash } from 'crypto';
+import postgres from 'postgres';
 import { adaptFeed } from '../src/app/api/feed/parser';
 
 const BATCH_SIZE = 500;
@@ -239,7 +239,7 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
       unchanged++;
     } else {
       const failures = podcast.poll_failures + 1;
-      const backoff = Math.min(BACKOFF_BASE * Math.pow(2, failures), 604800);
+      const backoff = Math.min(BACKOFF_BASE * 2 ** failures, 604800);
 
       if (failures >= MAX_FAILURES) {
         await sql`

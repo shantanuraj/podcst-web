@@ -62,7 +62,7 @@ async function saveShortUrl(slug: string, shortUrl: object) {
 // Parse episode URL
 function parseEpisodeUrl(url: string) {
   // Expected format: https://podcst.app/episode/[feed]/[guid]
-  const match = url.match(/\/episode\/([^\/]+)\/([^\/]+)/);
+  const match = url.match(/\/episode\/([^/]+)\/([^/]+)/);
   if (!match) {
     throw new Error(
       'Invalid episode URL format. Expected: https://podcst.app/episode/[feed]/[guid]',

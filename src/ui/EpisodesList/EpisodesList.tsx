@@ -3,12 +3,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import { useCallback, useRef, useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
-
 import styles from './EpisodesList.module.css';
 import { useEpisodesFilter } from './useEpisodesFilter';
-import { useTranslation } from '@/shared/i18n';
 
 interface EpisodesListProps {
   className?: string;

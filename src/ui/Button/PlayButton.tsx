@@ -74,7 +74,11 @@ const PlayButtonContent = (props: {
 }) => {
   const { t } = useTranslation();
   const { isCurrentEpisode, isPlaying } = props;
-  return isCurrentEpisode ? (isPlaying ? t('player.pause') : t('player.resume')) : t('player.play');
+  return isCurrentEpisode
+    ? isPlaying
+      ? t('player.pause')
+      : t('player.resume')
+    : t('player.play');
 };
 
 const PlayButtonIconContent = ({
