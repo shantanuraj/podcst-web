@@ -117,6 +117,33 @@ export async function verifyRegistration(
   return { verified: true };
 }
 
+export async function checkUserPasskeys(
+  email: string,
+): Promise<{ exists: boolean; hasPasskey: boolean; userId?: string }> {
+  const [user] = await sql`SELECT id FROM users WHERE email = ${email}`;
+  if (!user) {
+    return { exists: false, hasPasskey: false };
+  }
+
+  const passkeys = await sql`
+    SELECT 1 FROM passkeys WHERE user_id = ${user.id} LIMIT 1
+  `;
+
+  return { exists: true, hasPasskey: passkeys.length > 0, userId: user.id };
+}
+
+export async function getDiscoverableAuthOptions(visitorId: string) {
+  const options = await generateAuthenticationOptions({
+    rpID: RP_ID,
+    allowCredentials: [],
+    userVerification: 'preferred',
+  });
+
+  setChallenge(visitorId, options.challenge);
+
+  return { options };
+}
+
 export async function getAuthenticationOptions(
   email: string,
   visitorId: string,
@@ -148,20 +175,44 @@ export async function getAuthenticationOptions(
 }
 
 export async function verifyAuthentication(
-  userId: string,
   visitorId: string,
   response: AuthenticationResponseJSON,
+  userId?: string,
 ) {
   const expectedChallenge = getChallenge(visitorId);
   if (!expectedChallenge) {
     throw new Error('Challenge expired or not found');
   }
 
-  const [passkey] = await sql`
-    SELECT id, credential_id, public_key, counter
-    FROM passkeys
-    WHERE user_id = ${userId} AND credential_id = ${response.id}
-  `;
+  type Passkey = {
+    id: string;
+    user_id: string;
+    credential_id: string;
+    public_key: Uint8Array<ArrayBuffer>;
+    counter: number;
+  };
+
+  let passkey: Passkey | null = null;
+  let resolvedUserId = userId;
+
+  if (userId) {
+    const [row] = await sql`
+      SELECT id, user_id, credential_id, public_key, counter
+      FROM passkeys
+      WHERE user_id = ${userId} AND credential_id = ${response.id}
+    `;
+    passkey = (row as Passkey) ?? null;
+  } else {
+    const [row] = await sql`
+      SELECT id, user_id, credential_id, public_key, counter
+      FROM passkeys
+      WHERE credential_id = ${response.id}
+    `;
+    passkey = (row as Passkey) ?? null;
+    if (passkey) {
+      resolvedUserId = passkey.user_id;
+    }
+  }
 
   if (!passkey) {
     throw new Error('Passkey not found');
@@ -191,5 +242,5 @@ export async function verifyAuthentication(
 
   challenges.delete(visitorId);
 
-  return { verified: true, userId };
+  return { verified: true, userId: resolvedUserId };
 }
