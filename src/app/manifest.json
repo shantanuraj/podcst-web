@@ -1,35 +1,102 @@
 {
-  "short_name": "Podcst",
+  "id": "/",
   "name": "Podcst",
+  "short_name": "Podcst",
+  "description": "A beautiful podcast player for the web. Subscribe, listen, and sync your progress across devices.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/feed/top",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "theme_color": "#1c1b1a",
+  "background_color": "#1c1b1a",
+  "categories": ["entertainment", "music", "news"],
   "icons": [
     {
-      "src": "https://www.podcst.app/icons/launcher-72.png",
+      "src": "/icons/launcher-48.png",
       "type": "image/png",
-      "sizes": "72x72"
+      "sizes": "48x48",
+      "purpose": "any"
     },
     {
-      "src": "https://www.podcst.app/icons/launcher-96.png",
+      "src": "/icons/launcher-72.png",
       "type": "image/png",
-      "sizes": "96x96"
+      "sizes": "72x72",
+      "purpose": "any"
     },
     {
-      "src": "https://www.podcst.app/icons/launcher-144.png",
+      "src": "/icons/launcher-96.png",
       "type": "image/png",
-      "sizes": "144x144"
+      "sizes": "96x96",
+      "purpose": "any"
     },
     {
-      "src": "https://www.podcst.app/icons/launcher-192.png",
+      "src": "/icons/launcher-144.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "144x144",
+      "purpose": "any"
     },
     {
-      "src": "https://www.podcst.app/icons/launcher-512.png",
+      "src": "/icons/launcher-192.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/launcher-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
     }
   ],
-  "background_color": "#212121",
-  "theme_color": "#212121",
-  "display": "standalone",
-  "start_url": "/feed/top"
+  "shortcuts": [
+    {
+      "name": "Search Podcasts",
+      "short_name": "Search",
+      "url": "/?search=true",
+      "icons": [
+        {
+          "src": "/icons/launcher-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Your Library",
+      "short_name": "Library",
+      "url": "/subs",
+      "icons": [
+        {
+          "src": "/icons/launcher-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Queue",
+      "short_name": "Queue",
+      "url": "/queue",
+      "icons": [
+        {
+          "src": "/icons/launcher-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }
