@@ -39,7 +39,14 @@ export async function getSession() {
   if (!sessionId) return null;
 
   const [session] = await sql`
-    SELECT s.id, s.user_id, s.expires_at, u.email, u.name, u.image
+    SELECT
+      s.id,
+      s.user_id,
+      s.expires_at,
+      u.email,
+      u.name,
+      u.image,
+      EXISTS(SELECT 1 FROM passkeys p WHERE p.user_id = u.id) as has_passkey
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.id = ${sessionId} AND s.expires_at > now()
@@ -53,6 +60,7 @@ export async function getSession() {
     email: session.email,
     name: session.name,
     image: session.image,
+    hasPasskey: session.has_passkey,
   };
 }
 

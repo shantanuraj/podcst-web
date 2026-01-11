@@ -52,7 +52,7 @@ export default function AuthPage() {
 
   if (isLoading) return null;
 
-  if (user) {
+  if (user && mode !== 'passkey-setup') {
     router.replace(redirectTo);
     return null;
   }
@@ -123,7 +123,11 @@ export default function AuthPage() {
 
     try {
       await emailLogin.mutateAsync({ email, code });
-      setMode('passkey-setup');
+      if (mode === 'signup-code') {
+        setMode('passkey-setup');
+      } else {
+        router.push(redirectTo);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed');
     }
