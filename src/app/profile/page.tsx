@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React from 'react';
-import { useLogout, useSession } from '@/shared/auth/useAuth';
+import React, { useState } from 'react';
+import { useLogout, useRegister, useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import {
@@ -66,6 +66,7 @@ export default function ProfilePage() {
               {t('nav.signOut')}
             </button>
           </div>
+          {!user.hasPasskey && <PasskeySetup email={user.email} />}
         </section>
 
         <section className={styles.section}>
@@ -315,6 +316,37 @@ function ExportSubscriptions() {
       <span className={styles.exportCount}>
         {subs.length} {subs.length === 1 ? 'podcast' : 'podcasts'}
       </span>
+    </div>
+  );
+}
+
+function PasskeySetup({ email }: { email: string }) {
+  const { t } = useTranslation();
+  const register = useRegister();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSetup = async () => {
+    setError(null);
+    try {
+      await register.mutateAsync(email);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Setup failed');
+    }
+  };
+
+  return (
+    <div className={styles.passkeySetup}>
+      <p className={styles.passkeyDescription}>
+        {t('auth.setupPasskeySubtitle')}
+      </p>
+      {error && <p className={styles.passkeyError}>{error}</p>}
+      <button
+        onClick={handleSetup}
+        disabled={register.isPending}
+        className={styles.passkeyButton}
+      >
+        {register.isPending ? t('auth.settingUp') : t('auth.setupPasskey')}
+      </button>
     </div>
   );
 }
