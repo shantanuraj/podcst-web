@@ -1,0 +1,20 @@
+[Unit]
+Description=Podcst feed poller daemon
+After=network.target network-online.target postgresql.service
+Requires=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/opt/podcst/.env
+ExecStart=/usr/local/bin/bun run /opt/podcst/scripts/poll-feeds.ts --daemon
+WorkingDirectory=/opt/podcst
+Restart=always
+RestartSec=10
+User=svc-podcst
+Group=svc-podcst
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=podcst-poller
+
+[Install]
+WantedBy=multi-user.target
