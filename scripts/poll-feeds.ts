@@ -159,7 +159,7 @@ async function pollPodcast(
         ${podcast.id},
         ${sanitize(ep.guid)},
         ${sanitize(ep.title)},
-        ${sanitize(ep.summary)}::TEXT,
+        ${sanitize(ep.showNotes)}::TEXT,
         ${published},
         ${duration}::INTEGER,
         ${sanitize(ep.episodeArt)}::TEXT,
