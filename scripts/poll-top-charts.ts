@@ -3,6 +3,7 @@
 import { createHash } from 'crypto';
 import postgres from 'postgres';
 import { adaptFeed } from '../src/app/api/feed/parser';
+import { sanitize, upsertEpisodes } from '../src/server/ingest/episodes';
 
 const ITUNES_API = 'https://itunes.apple.com';
 const TOP_LIMIT = 100;
@@ -96,6 +97,19 @@ interface StoreResult {
   newPodcasts: number;
 }
 
+async function markDueForPolling(
+  sql: postgres.Sql,
+  podcastId: number,
+): Promise<void> {
+  await sql`
+    INSERT INTO feed_poll_state (podcast_id, next_poll_at, failures)
+    VALUES (${podcastId}, now(), 0)
+    ON CONFLICT (podcast_id) DO UPDATE SET
+      next_poll_at = now(),
+      failures = 0
+  `;
+}
+
 async function storeTopPodcasts(
   sql: postgres.Sql,
   podcasts: Awaited<ReturnType<typeof fetchTopFromItunes>>,
@@ -144,10 +158,10 @@ async function storeTopPodcasts(
       try {
         [podcast] = await sql`
           INSERT INTO podcasts (
-            itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count, next_poll_at
+            itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
           ) VALUES (
             ${p.itunesId}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
-            ${p.explicit}, ${p.count}, now()
+            ${p.explicit}, ${p.count}
           )
           ON CONFLICT (feed_url) DO UPDATE SET
             itunes_id = COALESCE(EXCLUDED.itunes_id, podcasts.itunes_id),
@@ -156,7 +170,6 @@ async function storeTopPodcasts(
             thumbnail = EXCLUDED.thumbnail,
             explicit = EXCLUDED.explicit,
             episode_count = GREATEST(EXCLUDED.episode_count, podcasts.episode_count),
-            next_poll_at = now(),
             updated_at = now()
           RETURNING id
         `;
@@ -166,13 +179,11 @@ async function storeTopPodcasts(
           SELECT id FROM podcasts WHERE feed_url = ${p.feed} LIMIT 1
         `;
       }
-    } else {
-      await sql`
-        UPDATE podcasts SET next_poll_at = now() WHERE id = ${podcast.id}
-      `;
     }
 
     if (!podcast?.id) continue;
+
+    await markDueForPolling(sql, podcast.id);
 
     await sql`
       INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
@@ -187,9 +198,6 @@ async function storeTopPodcasts(
 
   return { stored, newPodcasts };
 }
-
-const sanitize = (str: string | null | undefined): string | null =>
-  str ? str.replace(/\x00/g, '') : null;
 
 interface PodcastForPoll {
   id: number;
@@ -216,56 +224,44 @@ async function pollFeed(
     if (!feed) return false;
 
     const lastPublished = feed.published ? new Date(feed.published) : null;
+    const cover = sanitize(feed.cover) || podcast.feed_url;
 
     await sql`
       UPDATE podcasts SET
         title = ${sanitize(feed.title)},
         description = ${sanitize(feed.description)}::TEXT,
-        cover = ${sanitize(feed.cover) || podcast.feed_url},
+        cover = ${cover},
         website_url = ${sanitize(feed.link)}::TEXT,
         explicit = ${feed.explicit},
         last_published = ${lastPublished}::TIMESTAMPTZ,
         episode_count = ${feed.episodes.length},
-        feed_etag = ${res.headers.get('etag')}::TEXT,
-        feed_last_modified = ${res.headers.get('last-modified')}::TEXT,
-        feed_hash = ${hash}::TEXT,
-        last_polled_at = now(),
-        next_poll_at = now() + interval '1 day',
-        poll_failures = 0,
         updated_at = now()
       WHERE id = ${podcast.id}
     `;
 
-    for (const ep of feed.episodes) {
-      if (!ep.guid || !ep.file.url) continue;
+    await upsertEpisodes(sql, podcast.id, cover, feed.episodes);
 
-      const published = ep.published ? new Date(ep.published) : new Date();
-      const duration = ep.duration ? Math.floor(ep.duration) : null;
-
-      await sql`
-        INSERT INTO episodes (
-          podcast_id, guid, title, summary, published, duration,
-          episode_art, file_url, file_length, file_type
-        ) VALUES (
-          ${podcast.id},
-          ${sanitize(ep.guid)},
-          ${sanitize(ep.title)},
-          ${sanitize(ep.showNotes)}::TEXT,
-          ${published},
-          ${duration}::INTEGER,
-          ${sanitize(ep.episodeArt)}::TEXT,
-          ${sanitize(ep.file.url)},
-          ${ep.file.length},
-          ${sanitize(ep.file.type)}
-        )
-        ON CONFLICT (podcast_id, guid) DO UPDATE SET
-          title = EXCLUDED.title,
-          summary = EXCLUDED.summary,
-          duration = EXCLUDED.duration,
-          episode_art = EXCLUDED.episode_art,
-          file_url = EXCLUDED.file_url
-      `;
-    }
+    await sql`
+      INSERT INTO feed_poll_state (
+        podcast_id, etag, last_modified, hash,
+        last_polled_at, next_poll_at, failures
+      ) VALUES (
+        ${podcast.id},
+        ${res.headers.get('etag')},
+        ${res.headers.get('last-modified')},
+        ${hash},
+        now(),
+        now() + interval '1 day',
+        0
+      )
+      ON CONFLICT (podcast_id) DO UPDATE SET
+        etag = EXCLUDED.etag,
+        last_modified = EXCLUDED.last_modified,
+        hash = EXCLUDED.hash,
+        last_polled_at = now(),
+        next_poll_at = now() + interval '1 day',
+        failures = 0
+    `;
 
     return true;
   } catch {

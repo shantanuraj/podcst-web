@@ -3,6 +3,7 @@
 import { createHash } from 'crypto';
 import postgres from 'postgres';
 import { adaptFeed } from '../src/app/api/feed/parser';
+import { sanitize, upsertEpisodes } from '../src/server/ingest/episodes';
 
 const BATCH_SIZE = 500;
 const CONCURRENCY = 10;
@@ -14,9 +15,6 @@ const STALE_THRESHOLD_DAYS = 180;
 const IDLE_SLEEP_MS = 60_000;
 
 const DAEMON_MODE = process.argv.includes('--daemon');
-
-const sanitize = (str: string | null | undefined): string | null =>
-  str ? str.replace(/\x00/g, '') : null;
 
 const getPollInterval = (updateFrequency: number | null): number => {
   if (!updateFrequency) return DEFAULT_UPDATE_FREQUENCY;
@@ -30,10 +28,10 @@ interface PodcastRow {
   feed_url: string;
   title: string;
   update_frequency: number | null;
-  poll_failures: number;
-  feed_etag: string | null;
-  feed_last_modified: string | null;
-  feed_hash: string | null;
+  failures: number;
+  etag: string | null;
+  last_modified: string | null;
+  hash: string | null;
 }
 
 interface FetchResult {
@@ -50,11 +48,11 @@ async function fetchFeed(
 ): Promise<FetchResult> {
   try {
     const headers: Record<string, string> = { 'User-Agent': 'Podcst/1.0' };
-    if (podcast.feed_etag) {
-      headers['If-None-Match'] = podcast.feed_etag;
+    if (podcast.etag) {
+      headers['If-None-Match'] = podcast.etag;
     }
-    if (podcast.feed_last_modified) {
-      headers['If-Modified-Since'] = podcast.feed_last_modified;
+    if (podcast.last_modified) {
+      headers['If-Modified-Since'] = podcast.last_modified;
     }
 
     const res = await fetch(url, {
@@ -73,7 +71,7 @@ async function fetchFeed(
     const body = await res.text();
     const hash = createHash('sha256').update(body).digest('hex');
 
-    if (podcast.feed_hash && podcast.feed_hash === hash) {
+    if (podcast.hash && podcast.hash === hash) {
       return { status: 'not_modified', hash };
     }
 
@@ -101,95 +99,58 @@ async function pollPodcast(
     return 'error';
   }
 
+  const interval = getPollInterval(podcast.update_frequency);
+
   if (result.status === 'not_modified') {
     await sql`
-      UPDATE podcasts SET
+      UPDATE feed_poll_state SET
         last_polled_at = now(),
-        next_poll_at = now() + interval '1 second' * ${getPollInterval(podcast.update_frequency)},
-        poll_failures = 0
-      WHERE id = ${podcast.id}
+        next_poll_at = now() + interval '1 second' * ${interval},
+        failures = 0
+      WHERE podcast_id = ${podcast.id}
     `;
     return 'not_modified';
   }
 
-  let feed;
-  try {
-    feed = await adaptFeed(result.body!);
-  } catch {
-    return 'error';
-  }
+  if (!result.body) return 'error';
+  const feed = await adaptFeed(result.body).catch(() => null);
   if (!feed) {
     return 'error';
   }
 
   const lastPublished = feed.published ? new Date(feed.published) : null;
+  const cover = sanitize(feed.cover) || podcast.feed_url;
 
   try {
     await sql`
-    UPDATE podcasts SET
-      title = ${sanitize(feed.title)},
-      description = ${sanitize(feed.description)}::TEXT,
-      cover = ${sanitize(feed.cover) || podcast.feed_url},
-      website_url = ${sanitize(feed.link)}::TEXT,
-      explicit = ${feed.explicit},
-      last_published = ${lastPublished}::TIMESTAMPTZ,
-      episode_count = ${feed.episodes.length},
-      feed_etag = ${result.etag || null}::TEXT,
-      feed_last_modified = ${result.lastModified || null}::TEXT,
-      feed_hash = ${result.hash || null}::TEXT,
-      updated_at = now()
-    WHERE id = ${podcast.id}
-  `;
+      UPDATE podcasts SET
+        title = ${sanitize(feed.title)},
+        description = ${sanitize(feed.description)}::TEXT,
+        cover = ${cover},
+        website_url = ${sanitize(feed.link)}::TEXT,
+        explicit = ${feed.explicit},
+        last_published = ${lastPublished}::TIMESTAMPTZ,
+        episode_count = ${feed.episodes.length},
+        updated_at = now()
+      WHERE id = ${podcast.id}
+    `;
   } catch (err) {
     console.warn(`Failed to update podcast metadata: ${podcast.id}`, err);
     return 'error';
   }
 
-  for (const ep of feed.episodes) {
-    if (!ep.guid || !ep.file.url) continue;
+  await upsertEpisodes(sql, podcast.id, cover, feed.episodes);
 
-    const published = ep.published ? new Date(ep.published) : new Date();
-    const duration = ep.duration ? Math.floor(ep.duration) : null;
-    const guid = sanitize(ep.guid);
-    const title = sanitize(ep.title);
-    const summary = sanitize(ep.showNotes);
-    const art = sanitize(ep.episodeArt);
-    const fileUrl = sanitize(ep.file.url);
-    const fileType = sanitize(ep.file.type);
-
-    await sql`
-      WITH updated AS (
-        UPDATE episodes SET
-          title = ${title},
-          summary = ${summary}::TEXT,
-          duration = ${duration}::INTEGER,
-          episode_art = ${art}::TEXT,
-          file_url = ${fileUrl}
-        WHERE podcast_id = ${podcast.id} AND guid = ${guid}
-          AND (title, summary, duration, episode_art, file_url) IS DISTINCT FROM
-              (${title}, ${summary}::TEXT, ${duration}::INTEGER, ${art}::TEXT, ${fileUrl})
-        RETURNING 1
-      )
-      INSERT INTO episodes (
-        podcast_id, guid, title, summary, published, duration,
-        episode_art, file_url, file_length, file_type
-      )
-      SELECT
-        ${podcast.id},
-        ${guid},
-        ${title},
-        ${summary}::TEXT,
-        ${published},
-        ${duration}::INTEGER,
-        ${art}::TEXT,
-        ${fileUrl},
-        ${ep.file.length},
-        ${fileType}
-      WHERE NOT EXISTS (
-        SELECT 1 FROM episodes WHERE podcast_id = ${podcast.id} AND guid = ${guid}
-      )
-    `;
-  }
+  await sql`
+    UPDATE feed_poll_state SET
+      etag = ${result.etag || null}::TEXT,
+      last_modified = ${result.lastModified || null}::TEXT,
+      hash = ${result.hash || null}::TEXT,
+      last_polled_at = now(),
+      next_poll_at = now() + interval '1 second' * ${interval},
+      failures = 0
+    WHERE podcast_id = ${podcast.id}
+  `;
 
   return 'updated';
 }
@@ -210,20 +171,21 @@ async function recordMetrics(
 
 async function processBatch(sql: postgres.Sql): Promise<number> {
   const podcasts = await sql<PodcastRow[]>`
-    SELECT id, feed_url, title, update_frequency, poll_failures,
-           feed_etag, feed_last_modified, feed_hash
-    FROM podcasts
-    WHERE is_active = true
-      AND (next_poll_at <= now() OR next_poll_at IS NULL)
+    SELECT p.id, p.feed_url, p.title, p.update_frequency,
+           s.failures, s.etag, s.last_modified, s.hash
+    FROM podcasts p
+    JOIN feed_poll_state s ON s.podcast_id = p.id
+    WHERE p.is_active = true
+      AND (s.next_poll_at <= now() OR s.next_poll_at IS NULL)
       AND (
-        last_published IS NULL
-        OR last_published > now() - interval '1 day' * ${STALE_THRESHOLD_DAYS}
+        p.last_published IS NULL
+        OR p.last_published > now() - interval '1 day' * ${STALE_THRESHOLD_DAYS}
       )
     ORDER BY
-      priority DESC NULLS LAST,
-      popularity_score DESC NULLS LAST,
-      CASE WHEN next_poll_at IS NULL THEN 0 ELSE 1 END,
-      last_polled_at ASC NULLS FIRST
+      p.priority DESC NULLS LAST,
+      p.popularity_score DESC NULLS LAST,
+      CASE WHEN s.next_poll_at IS NULL THEN 0 ELSE 1 END,
+      s.last_polled_at ASC NULLS FIRST
     LIMIT ${BATCH_SIZE}
   `;
 
@@ -241,37 +203,31 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
     const result = await pollPodcast(sql, podcast);
 
     if (result === 'updated') {
-      const interval = getPollInterval(podcast.update_frequency);
-      await sql`
-        UPDATE podcasts SET
-          last_polled_at = now(),
-          next_poll_at = now() + interval '1 second' * ${interval},
-          poll_failures = 0
-        WHERE id = ${podcast.id}
-      `;
       updated++;
     } else if (result === 'not_modified') {
       unchanged++;
     } else {
-      const failures = podcast.poll_failures + 1;
+      const failures = podcast.failures + 1;
       const backoff = Math.min(BACKOFF_BASE * 2 ** failures, 604800);
 
       if (failures >= MAX_FAILURES) {
         await sql`
-          UPDATE podcasts SET
-            is_active = false,
-            poll_failures = ${failures},
+          UPDATE podcasts SET is_active = false WHERE id = ${podcast.id}
+        `;
+        await sql`
+          UPDATE feed_poll_state SET
+            failures = ${failures},
             last_polled_at = now()
-          WHERE id = ${podcast.id}
+          WHERE podcast_id = ${podcast.id}
         `;
         console.log(`\n[${podcast.id}] deactivated: ${podcast.feed_url}`);
       } else {
         await sql`
-          UPDATE podcasts SET
-            poll_failures = ${failures},
+          UPDATE feed_poll_state SET
+            failures = ${failures},
             next_poll_at = now() + interval '1 second' * ${backoff},
             last_polled_at = now()
-          WHERE id = ${podcast.id}
+          WHERE podcast_id = ${podcast.id}
         `;
       }
       failed++;
