@@ -1,7 +1,6 @@
 import { createHash } from 'crypto';
 import { adaptFeed } from '@/app/api/feed/parser';
 import type {
-  IEpisode,
   IEpisodeInfo,
   IEpisodeListing,
   IPaginatedEpisodes,
@@ -9,6 +8,7 @@ import type {
   IPodcastInfo,
 } from '@/types';
 import { sql } from '../db';
+import { upsertEpisodes } from './episodes';
 
 interface FeedFetchResult {
   data: IEpisodeListing;
@@ -40,7 +40,7 @@ export async function ingestPodcast(
     return null;
   }
 
-  await storeEpisodes(podcast.id, data.episodes);
+  await upsertEpisodes(sql, podcast.id, data.cover, data.episodes);
 
   return getPodcastByFeedUrl(feedUrl);
 }
@@ -63,7 +63,7 @@ export async function refreshPodcast(
   }
 
   const { data, etag, lastModified, hash } = result;
-  const updateFrequency = existing.update_frequency || 86400;
+  const interval = existing.update_frequency || 86400;
 
   await sql`
     UPDATE podcasts SET
@@ -74,17 +74,13 @@ export async function refreshPodcast(
       explicit = ${data.explicit},
       episode_count = ${data.episodes.length},
       last_published = ${data.published ? new Date(data.published) : null},
-      last_polled_at = now(),
-      next_poll_at = now() + interval '1 second' * ${updateFrequency},
-      poll_failures = 0,
-      feed_etag = ${etag},
-      feed_last_modified = ${lastModified},
-      feed_hash = ${hash},
       updated_at = now()
     WHERE id = ${existing.id}
   `;
 
-  await storeEpisodes(existing.id, data.episodes);
+  await upsertEpisodes(sql, existing.id, data.cover, data.episodes);
+
+  await savePollState(existing.id, { etag, lastModified, hash }, interval);
 
   return getPodcastByFeedUrl(feedUrl);
 }
@@ -122,6 +118,29 @@ interface FeedMeta {
   hash: string;
 }
 
+async function savePollState(
+  podcastId: number,
+  meta: FeedMeta,
+  intervalSeconds: number,
+): Promise<void> {
+  await sql`
+    INSERT INTO feed_poll_state (
+      podcast_id, etag, last_modified, hash,
+      last_polled_at, next_poll_at, failures
+    ) VALUES (
+      ${podcastId}, ${meta.etag}, ${meta.lastModified}, ${meta.hash},
+      now(), now() + interval '1 second' * ${intervalSeconds}, 0
+    )
+    ON CONFLICT (podcast_id) DO UPDATE SET
+      etag = EXCLUDED.etag,
+      last_modified = EXCLUDED.last_modified,
+      hash = EXCLUDED.hash,
+      last_polled_at = now(),
+      next_poll_at = EXCLUDED.next_poll_at,
+      failures = 0
+  `;
+}
+
 async function storePodcast(
   feedUrl: string,
   data: IEpisodeListing,
@@ -143,9 +162,7 @@ async function storePodcast(
   const [podcast] = await sql`
     INSERT INTO podcasts (
       feed_url, title, author_id, description, cover, website_url,
-      explicit, episode_count, last_published,
-      last_polled_at, next_poll_at, poll_failures,
-      feed_etag, feed_last_modified, feed_hash
+      explicit, episode_count, last_published
     ) VALUES (
       ${feedUrl},
       ${data.title},
@@ -155,13 +172,7 @@ async function storePodcast(
       ${data.link},
       ${data.explicit},
       ${data.episodes.length},
-      ${data.published ? new Date(data.published) : null},
-      now(),
-      now() + interval '1 day',
-      0,
-      ${meta.etag},
-      ${meta.lastModified},
-      ${meta.hash}
+      ${data.published ? new Date(data.published) : null}
     )
     ON CONFLICT (feed_url) DO UPDATE SET
       title = EXCLUDED.title,
@@ -171,58 +182,13 @@ async function storePodcast(
       explicit = EXCLUDED.explicit,
       episode_count = EXCLUDED.episode_count,
       last_published = EXCLUDED.last_published,
-      last_polled_at = now(),
-      next_poll_at = now() + interval '1 day',
-      poll_failures = 0,
-      feed_etag = EXCLUDED.feed_etag,
-      feed_last_modified = EXCLUDED.feed_last_modified,
-      feed_hash = EXCLUDED.feed_hash,
       updated_at = now()
     RETURNING id
   `;
 
+  await savePollState(podcast.id, meta, 86400);
+
   return podcast;
-}
-
-async function storeEpisodes(podcastId: number, episodes: IEpisode[]) {
-  if (episodes.length === 0) return;
-
-  for (const ep of episodes) {
-    if (!ep.guid) continue;
-
-    const published = ep.published ? new Date(ep.published) : new Date();
-    const duration = ep.duration ? Math.floor(ep.duration) : null;
-
-    await sql`
-      INSERT INTO episodes (
-        podcast_id, guid, title, summary, published, duration,
-        episode_art, file_url, file_length, file_type
-      ) VALUES (
-        ${podcastId},
-        ${ep.guid},
-        ${ep.title},
-        ${ep.showNotes || ep.summary},
-        ${published},
-        ${duration},
-        ${ep.episodeArt},
-        ${ep.file.url},
-        ${ep.file.length},
-        ${ep.file.type}
-      )
-      ON CONFLICT (podcast_id, guid) DO UPDATE SET
-        title = EXCLUDED.title,
-        summary = EXCLUDED.summary,
-        duration = EXCLUDED.duration,
-        episode_art = EXCLUDED.episode_art,
-        file_url = EXCLUDED.file_url
-    `;
-  }
-
-  await sql`
-    UPDATE podcasts SET episode_count = (
-      SELECT COUNT(*) FROM episodes WHERE podcast_id = ${podcastId}
-    ) WHERE id = ${podcastId}
-  `;
 }
 
 export async function getPodcastByFeedUrl(
@@ -377,9 +343,6 @@ export async function getEpisodeById(
   };
 }
 
-/**
- * Get podcast info only (no episodes) - for metadata and headers
- */
 export async function getPodcastInfoById(
   id: number,
 ): Promise<IPodcastInfo | null> {
@@ -419,9 +382,6 @@ interface GetEpisodesOptions {
   sortDir?: SortDirection;
 }
 
-/**
- * Get paginated episodes with optional search
- */
 export async function getEpisodesPaginated(
   options: GetEpisodesOptions,
 ): Promise<IPaginatedEpisodes> {
@@ -434,7 +394,6 @@ export async function getEpisodesPaginated(
     sortDir = 'desc',
   } = options;
 
-  // Get podcast info for building episode response
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
@@ -446,22 +405,18 @@ export async function getEpisodesPaginated(
     return { episodes: [], total: 0, hasMore: false };
   }
 
-  // Build query based on options
   let episodes: Array<Record<string, unknown>>;
   let countResult: Array<{ count: string }>;
 
   if (search) {
-    // Full-text search using PostgreSQL
     const searchPattern = `%${search}%`;
 
-    // Get total count for search
     countResult = await sql`
       SELECT COUNT(*)::text as count FROM episodes
       WHERE podcast_id = ${podcastId}
         AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
     `;
 
-    // Get paginated search results
     if (sortBy === 'published') {
       if (sortDir === 'desc') {
         episodes = await sql`
@@ -503,7 +458,6 @@ export async function getEpisodesPaginated(
         `;
       }
     } else {
-      // duration
       if (sortDir === 'asc') {
         episodes = await sql`
           SELECT * FROM episodes
@@ -525,7 +479,6 @@ export async function getEpisodesPaginated(
       }
     }
   } else {
-    // No search - just paginate
     countResult = await sql`
       SELECT COUNT(*)::text as count FROM episodes WHERE podcast_id = ${podcastId}
     `;
@@ -567,7 +520,6 @@ export async function getEpisodesPaginated(
         `;
       }
     } else {
-      // duration
       if (sortDir === 'asc') {
         episodes = await sql`
           SELECT * FROM episodes
@@ -591,7 +543,6 @@ export async function getEpisodesPaginated(
   const total = parseInt(countResult[0]?.count || '0', 10);
   const hasMore = episodes.length > limit;
 
-  // Remove the extra item we fetched to check for more
   if (hasMore) {
     episodes.pop();
   }
@@ -629,9 +580,6 @@ export async function getEpisodesPaginated(
   };
 }
 
-/**
- * Get episode by ID with podcast info (for single episode view)
- */
 export async function getEpisodeWithPodcast(
   episodeId: number,
 ): Promise<{ episode: IEpisodeInfo; podcast: IPodcastInfo } | null> {
@@ -644,9 +592,6 @@ export async function getEpisodeWithPodcast(
   return { episode, podcast };
 }
 
-/**
- * Get podcast id for itunes_id
- */
 export async function getPodcastIdByItunesId(
   itunesId: string,
 ): Promise<number | null> {

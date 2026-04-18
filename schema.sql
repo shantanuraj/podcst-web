@@ -17,7 +17,7 @@ CREATE TABLE countries (
 );
 
 CREATE TABLE podcasts (
-  id SERIAL PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   podcast_index_id INTEGER UNIQUE,
   itunes_id INTEGER UNIQUE,
   feed_url TEXT UNIQUE NOT NULL,
@@ -35,18 +35,22 @@ CREATE TABLE podcasts (
   popularity_score INTEGER,
   priority INTEGER,
   update_frequency INTEGER,
-  last_polled_at TIMESTAMPTZ,
-  next_poll_at TIMESTAMPTZ,
-  poll_failures INTEGER DEFAULT 0,
-  feed_etag TEXT,
-  feed_last_modified TEXT,
-  feed_hash TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE feed_poll_state (
+  podcast_id BIGINT PRIMARY KEY REFERENCES podcasts(id) ON DELETE CASCADE,
+  etag TEXT,
+  last_modified TEXT,
+  hash TEXT,
+  last_polled_at TIMESTAMPTZ,
+  next_poll_at TIMESTAMPTZ DEFAULT now(),
+  failures INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE podcasts_genres (
-  podcast_id INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+  podcast_id BIGINT NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
   genre_id INTEGER NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
   PRIMARY KEY (podcast_id, genre_id)
 );
@@ -55,14 +59,14 @@ CREATE TABLE top_podcasts (
   country_id VARCHAR(2) NOT NULL REFERENCES countries(id),
   genre_id INTEGER NOT NULL REFERENCES genres(id),
   rank INTEGER NOT NULL,
-  podcast_id INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+  podcast_id BIGINT NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
   fetched_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (country_id, genre_id, rank)
 );
 
 CREATE TABLE episodes (
-  id SERIAL PRIMARY KEY,
-  podcast_id INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+  id BIGSERIAL PRIMARY KEY,
+  podcast_id BIGINT NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
   guid TEXT NOT NULL,
   title TEXT NOT NULL,
   summary TEXT,
@@ -124,14 +128,14 @@ CREATE INDEX idx_email_verifications_expires ON email_verifications(expires_at);
 
 CREATE TABLE subscriptions (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  podcast_id INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+  podcast_id BIGINT NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
   subscribed_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (user_id, podcast_id)
 );
 
 CREATE TABLE playback_progress (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  episode_id BIGINT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
   completed BOOLEAN NOT NULL DEFAULT false,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -139,7 +143,7 @@ CREATE TABLE playback_progress (
 );
 
 CREATE TABLE transcripts (
-  episode_id INTEGER PRIMARY KEY REFERENCES episodes(id) ON DELETE CASCADE,
+  episode_id BIGINT PRIMARY KEY REFERENCES episodes(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   segments JSONB,
   source TEXT NOT NULL,
@@ -159,10 +163,10 @@ CREATE INDEX idx_podcasts_podcast_index_id ON podcasts(podcast_index_id);
 CREATE INDEX idx_podcasts_updated ON podcasts(updated_at);
 CREATE INDEX idx_podcasts_is_active ON podcasts(is_active) WHERE is_active = true;
 CREATE INDEX idx_podcasts_popularity ON podcasts(popularity_score DESC NULLS LAST);
-CREATE INDEX idx_podcasts_next_poll ON podcasts(next_poll_at ASC NULLS FIRST) WHERE is_active = true;
 CREATE INDEX idx_podcasts_poll_priority ON podcasts(priority DESC NULLS LAST, popularity_score DESC NULLS LAST) WHERE is_active = true;
 CREATE INDEX idx_podcasts_last_published ON podcasts(last_published DESC NULLS LAST) WHERE is_active = true;
 CREATE INDEX idx_podcasts_search ON podcasts USING gin(to_tsvector('english', title || ' ' || COALESCE(description, '')));
+CREATE INDEX idx_feed_poll_state_due ON feed_poll_state(next_poll_at ASC NULLS FIRST) WHERE failures < 5;
 CREATE INDEX idx_episodes_podcast ON episodes(podcast_id);
 CREATE INDEX idx_episodes_published ON episodes(published DESC);
 CREATE INDEX idx_sessions_user ON sessions(user_id);
