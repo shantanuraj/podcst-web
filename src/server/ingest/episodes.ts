@@ -19,29 +19,30 @@ interface EpisodeRow {
 const buildRows = (
   episodes: IEpisode[],
   podcastCover: string | null,
-): EpisodeRow[] =>
-  episodes.flatMap((ep) => {
+): EpisodeRow[] => {
+  const byGuid = new Map<string, EpisodeRow>();
+  for (const ep of episodes) {
     const guid = sanitize(ep.guid);
     const fileUrl = sanitize(ep.file?.url);
-    if (!guid || !fileUrl) return [];
+    if (!guid || !fileUrl) continue;
     const art = sanitize(ep.episodeArt);
-    return [
-      {
-        guid,
-        title: sanitize(ep.title) ?? '',
-        summary: sanitize(ep.showNotes),
-        published: (ep.published
-          ? new Date(ep.published)
-          : new Date()
-        ).toISOString(),
-        duration: ep.duration ? Math.floor(ep.duration) : null,
-        episode_art: art && art !== podcastCover ? art : null,
-        file_url: fileUrl,
-        file_length: ep.file.length ?? null,
-        file_type: sanitize(ep.file.type),
-      },
-    ];
-  });
+    byGuid.set(guid, {
+      guid,
+      title: sanitize(ep.title) ?? '',
+      summary: sanitize(ep.showNotes),
+      published: (ep.published
+        ? new Date(ep.published)
+        : new Date()
+      ).toISOString(),
+      duration: ep.duration ? Math.floor(ep.duration) : null,
+      episode_art: art && art !== podcastCover ? art : null,
+      file_url: fileUrl,
+      file_length: ep.file.length ?? null,
+      file_type: sanitize(ep.file.type),
+    });
+  }
+  return [...byGuid.values()];
+};
 
 export async function upsertEpisodes(
   sql: postgres.Sql,
@@ -52,8 +53,6 @@ export async function upsertEpisodes(
   const rows = buildRows(episodes, podcastCover);
   if (rows.length === 0) return;
 
-  const payload = JSON.stringify(rows);
-
   await sql`
     UPDATE episodes e SET
       title = d.title,
@@ -61,7 +60,7 @@ export async function upsertEpisodes(
       duration = d.duration,
       episode_art = d.episode_art,
       file_url = d.file_url
-    FROM jsonb_to_recordset(${payload}::jsonb) AS d(
+    FROM jsonb_to_recordset(${sql.json(rows as unknown as postgres.JSONValue)}::jsonb) AS d(
       guid text, title text, summary text, duration int,
       episode_art text, file_url text
     )
@@ -77,7 +76,7 @@ export async function upsertEpisodes(
     )
     SELECT ${podcastId}, d.guid, d.title, d.summary, d.published, d.duration,
            d.episode_art, d.file_url, d.file_length, d.file_type
-    FROM jsonb_to_recordset(${payload}::jsonb) AS d(
+    FROM jsonb_to_recordset(${sql.json(rows as unknown as postgres.JSONValue)}::jsonb) AS d(
       guid text, title text, summary text, published timestamptz, duration int,
       episode_art text, file_url text, file_length bigint, file_type text
     )
