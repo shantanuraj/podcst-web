@@ -150,29 +150,44 @@ async function pollPodcast(
 
     const published = ep.published ? new Date(ep.published) : new Date();
     const duration = ep.duration ? Math.floor(ep.duration) : null;
+    const guid = sanitize(ep.guid);
+    const title = sanitize(ep.title);
+    const summary = sanitize(ep.showNotes);
+    const art = sanitize(ep.episodeArt);
+    const fileUrl = sanitize(ep.file.url);
+    const fileType = sanitize(ep.file.type);
 
     await sql`
+      WITH updated AS (
+        UPDATE episodes SET
+          title = ${title},
+          summary = ${summary}::TEXT,
+          duration = ${duration}::INTEGER,
+          episode_art = ${art}::TEXT,
+          file_url = ${fileUrl}
+        WHERE podcast_id = ${podcast.id} AND guid = ${guid}
+          AND (title, summary, duration, episode_art, file_url) IS DISTINCT FROM
+              (${title}, ${summary}::TEXT, ${duration}::INTEGER, ${art}::TEXT, ${fileUrl})
+        RETURNING 1
+      )
       INSERT INTO episodes (
         podcast_id, guid, title, summary, published, duration,
         episode_art, file_url, file_length, file_type
-      ) VALUES (
+      )
+      SELECT
         ${podcast.id},
-        ${sanitize(ep.guid)},
-        ${sanitize(ep.title)},
-        ${sanitize(ep.showNotes)}::TEXT,
+        ${guid},
+        ${title},
+        ${summary}::TEXT,
         ${published},
         ${duration}::INTEGER,
-        ${sanitize(ep.episodeArt)}::TEXT,
-        ${sanitize(ep.file.url)},
+        ${art}::TEXT,
+        ${fileUrl},
         ${ep.file.length},
-        ${sanitize(ep.file.type)}
+        ${fileType}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM episodes WHERE podcast_id = ${podcast.id} AND guid = ${guid}
       )
-      ON CONFLICT (podcast_id, guid) DO UPDATE SET
-        title = EXCLUDED.title,
-        summary = EXCLUDED.summary,
-        duration = EXCLUDED.duration,
-        episode_art = EXCLUDED.episode_art,
-        file_url = EXCLUDED.file_url
     `;
   }
 
