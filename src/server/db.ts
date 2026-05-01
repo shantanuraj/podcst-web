@@ -10,4 +10,12 @@ export const sql = postgres(connectionString, {
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
+  types: {
+    bigint: {
+      to: 20,
+      from: [20],
+      serialize: (n: number) => n.toString(),
+      parse: (s: string) => Number(s),
+    },
+  },
 });
