@@ -139,18 +139,23 @@ async function pollPodcast(
     return 'error';
   }
 
-  await upsertEpisodes(sql, podcast.id, cover, feed.episodes);
+  try {
+    await upsertEpisodes(sql, podcast.id, cover, feed.episodes);
 
-  await sql`
-    UPDATE feed_poll_state SET
-      etag = ${result.etag || null}::TEXT,
-      last_modified = ${result.lastModified || null}::TEXT,
-      hash = ${result.hash || null}::TEXT,
-      last_polled_at = now(),
-      next_poll_at = now() + interval '1 second' * ${interval},
-      failures = 0
-    WHERE podcast_id = ${podcast.id}
-  `;
+    await sql`
+      UPDATE feed_poll_state SET
+        etag = ${result.etag || null}::TEXT,
+        last_modified = ${result.lastModified || null}::TEXT,
+        hash = ${result.hash || null}::TEXT,
+        last_polled_at = now(),
+        next_poll_at = now() + interval '1 second' * ${interval},
+        failures = 0
+      WHERE podcast_id = ${podcast.id}
+    `;
+  } catch (err) {
+    console.warn(`Failed to upsert episodes: ${podcast.id}`, err);
+    return 'error';
+  }
 
   return 'updated';
 }
