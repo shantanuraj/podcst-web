@@ -34,7 +34,10 @@ const buildRows = (
         ? new Date(ep.published)
         : new Date()
       ).toISOString(),
-      duration: ep.duration ? Math.floor(ep.duration) : null,
+      duration:
+        ep.duration && ep.duration > 0 && ep.duration <= 2147483647
+          ? Math.floor(ep.duration)
+          : null,
       episode_art: art && art !== podcastCover ? art : null,
       file_url: fileUrl,
       file_length: ep.file.length ?? null,
