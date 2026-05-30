@@ -12,7 +12,7 @@ export async function touchAccess(podcastId: number): Promise<void> {
   `;
 }
 
-export async function ensureContent(podcastId: number, feedUrl: string): Promise<void> {
+export async function ensureContent(podcastId: number): Promise<void> {
   const { sql } = await import('../db');
   const [{ identity_count, content_count }] = await sql`
     SELECT
