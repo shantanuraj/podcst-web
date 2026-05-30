@@ -16,7 +16,7 @@ interface EpisodeRow {
   file_type: string | null;
 }
 
-const buildRows = (
+export const buildRows = (
   episodes: IEpisode[],
   podcastCover: string | null,
 ): EpisodeRow[] => {
@@ -57,35 +57,37 @@ export async function upsertEpisodes(
   if (rows.length === 0) return;
 
   await sql`
-    UPDATE episodes e SET
-      title = d.title,
-      summary = d.summary,
-      duration = d.duration,
-      episode_art = d.episode_art,
-      file_url = d.file_url
-    FROM jsonb_to_recordset(${sql.json(rows as unknown as postgres.JSONValue)}::jsonb) AS d(
-      guid text, title text, summary text, duration int,
-      episode_art text, file_url text
-    )
-    WHERE e.podcast_id = ${podcastId} AND e.guid = d.guid
-      AND (e.title, e.summary, e.duration, e.episode_art, e.file_url)
-          IS DISTINCT FROM (d.title, d.summary, d.duration, d.episode_art, d.file_url)
+    INSERT INTO episodes (podcast_id, guid, published)
+    SELECT ${podcastId}, d.guid, d.published
+    FROM jsonb_to_recordset(${sql.json(rows as unknown as postgres.JSONValue)}::jsonb)
+         AS d(guid text, published timestamptz)
+    ON CONFLICT (podcast_id, guid) DO NOTHING
   `;
 
   await sql`
-    INSERT INTO episodes (
-      podcast_id, guid, title, summary, published, duration,
-      episode_art, file_url, file_length, file_type
+    INSERT INTO episode_content (
+      episode_id, title, summary, duration, episode_art, file_url, file_length, file_type
     )
-    SELECT ${podcastId}, d.guid, d.title, d.summary, d.published, d.duration,
-           d.episode_art, d.file_url, d.file_length, d.file_type
+    SELECT e.id, d.title, d.summary, d.duration, d.episode_art, d.file_url, d.file_length, d.file_type
     FROM jsonb_to_recordset(${sql.json(rows as unknown as postgres.JSONValue)}::jsonb) AS d(
-      guid text, title text, summary text, published timestamptz, duration int,
+      guid text, title text, summary text, duration int,
       episode_art text, file_url text, file_length bigint, file_type text
     )
-    WHERE NOT EXISTS (
-      SELECT 1 FROM episodes e
-      WHERE e.podcast_id = ${podcastId} AND e.guid = d.guid
-    )
+    JOIN episodes e ON e.podcast_id = ${podcastId} AND e.guid = d.guid
+    ON CONFLICT (episode_id) DO UPDATE SET
+      title = EXCLUDED.title,
+      summary = EXCLUDED.summary,
+      duration = EXCLUDED.duration,
+      episode_art = EXCLUDED.episode_art,
+      file_url = EXCLUDED.file_url,
+      file_length = EXCLUDED.file_length,
+      file_type = EXCLUDED.file_type
+    WHERE (episode_content.title, episode_content.summary, episode_content.duration,
+           episode_content.episode_art, episode_content.file_url,
+           episode_content.file_length, episode_content.file_type)
+      IS DISTINCT FROM
+          (EXCLUDED.title, EXCLUDED.summary, EXCLUDED.duration,
+           EXCLUDED.episode_art, EXCLUDED.file_url,
+           EXCLUDED.file_length, EXCLUDED.file_type)
   `;
 }
