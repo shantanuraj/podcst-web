@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly Podcst tier recompute
+
+[Timer]
+OnCalendar=*-*-* *:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
