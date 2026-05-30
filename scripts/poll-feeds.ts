@@ -181,6 +181,7 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
     FROM podcasts p
     JOIN feed_poll_state s ON s.podcast_id = p.id
     WHERE p.is_active = true
+      AND p.is_essential = true
       AND (s.next_poll_at <= now() OR s.next_poll_at IS NULL)
       AND (
         p.last_published IS NULL
