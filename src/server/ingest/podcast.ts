@@ -8,6 +8,7 @@ import type {
   IPodcastInfo,
 } from '@/types';
 import { sql } from '../db';
+import { ensureContent, touchAccess } from './episode-read';
 import { upsertEpisodes } from './episodes';
 
 interface FeedFetchResult {
@@ -205,10 +206,17 @@ export async function getPodcastByFeedUrl(
     return null;
   }
 
+  await touchAccess(podcast.id);
+  await ensureContent(podcast.id);
+
   const episodes = await sql`
-    SELECT * FROM episodes
-    WHERE podcast_id = ${podcast.id}
-    ORDER BY published DESC
+    SELECT e.id, e.guid, e.published,
+           c.title, c.summary, c.duration, c.episode_art,
+           c.file_url, c.file_length, c.file_type
+    FROM episodes e
+    LEFT JOIN episode_content c ON c.episode_id = e.id
+    WHERE e.podcast_id = ${podcast.id}
+    ORDER BY e.published DESC
   `;
 
   return {
@@ -261,10 +269,17 @@ export async function getPodcastById(
 
   if (!podcast) return null;
 
+  await touchAccess(podcast.id);
+  await ensureContent(podcast.id);
+
   const episodes = await sql`
-    SELECT * FROM episodes
-    WHERE podcast_id = ${podcast.id}
-    ORDER BY published DESC
+    SELECT e.id, e.guid, e.published,
+           c.title, c.summary, c.duration, c.episode_art,
+           c.file_url, c.file_length, c.file_type
+    FROM episodes e
+    LEFT JOIN episode_content c ON c.episode_id = e.id
+    WHERE e.podcast_id = ${podcast.id}
+    ORDER BY e.published DESC
   `;
 
   return {
@@ -309,15 +324,24 @@ export async function getEpisodeById(
   episodeId: number,
 ): Promise<IEpisodeInfo | null> {
   const [row] = await sql`
-    SELECT e.*, p.id as podcast_id, p.feed_url, p.title as podcast_title, p.cover as podcast_cover,
+    SELECT e.id, e.guid, e.published, e.podcast_id,
+           c.title, c.summary, c.duration, c.episode_art,
+           c.file_url, c.file_length, c.file_type,
+           p.feed_url, p.title as podcast_title, p.cover as podcast_cover,
            p.explicit as podcast_explicit, a.name as author_name
     FROM episodes e
     JOIN podcasts p ON p.id = e.podcast_id
     JOIN authors a ON a.id = p.author_id
+    LEFT JOIN episode_content c ON c.episode_id = e.id
     WHERE e.id = ${episodeId}
   `;
 
   if (!row) return null;
+
+  if (row.file_url == null) {
+    await ensureContent(row.podcast_id as number);
+    return getEpisodeById(episodeId);
+  }
 
   return {
     id: row.id,
@@ -405,6 +429,9 @@ export async function getEpisodesPaginated(
     return { episodes: [], total: 0, hasMore: false };
   }
 
+  await touchAccess(podcastId);
+  await ensureContent(podcastId);
+
   let episodes: Array<Record<string, unknown>>;
   let countResult: Array<{ count: string }>;
 
@@ -412,27 +439,36 @@ export async function getEpisodesPaginated(
     const searchPattern = `%${search}%`;
 
     countResult = await sql`
-      SELECT COUNT(*)::text as count FROM episodes
-      WHERE podcast_id = ${podcastId}
-        AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
+      SELECT COUNT(*)::text as count FROM episodes e
+      LEFT JOIN episode_content c ON c.episode_id = e.id
+      WHERE e.podcast_id = ${podcastId}
+        AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
     `;
 
     if (sortBy === 'published') {
       if (sortDir === 'desc') {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-          ORDER BY published DESC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+            AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
+          ORDER BY e.published DESC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
       } else {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-          ORDER BY published ASC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+            AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
+          ORDER BY e.published ASC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
@@ -440,19 +476,27 @@ export async function getEpisodesPaginated(
     } else if (sortBy === 'title') {
       if (sortDir === 'asc') {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-          ORDER BY title ASC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+            AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
+          ORDER BY c.title ASC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
       } else {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-          ORDER BY title DESC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+            AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
+          ORDER BY c.title DESC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
@@ -460,19 +504,27 @@ export async function getEpisodesPaginated(
     } else {
       if (sortDir === 'asc') {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-          ORDER BY duration ASC NULLS LAST
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+            AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
+          ORDER BY c.duration ASC NULLS LAST
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
       } else {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-            AND (title ILIKE ${searchPattern} OR summary ILIKE ${searchPattern})
-          ORDER BY duration DESC NULLS LAST
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+            AND (c.title ILIKE ${searchPattern} OR c.summary ILIKE ${searchPattern})
+          ORDER BY c.duration DESC NULLS LAST
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
@@ -486,17 +538,25 @@ export async function getEpisodesPaginated(
     if (sortBy === 'published') {
       if (sortDir === 'desc') {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-          ORDER BY published DESC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+          ORDER BY e.published DESC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
       } else {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-          ORDER BY published ASC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+          ORDER BY e.published ASC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
@@ -504,17 +564,25 @@ export async function getEpisodesPaginated(
     } else if (sortBy === 'title') {
       if (sortDir === 'asc') {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-          ORDER BY title ASC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+          ORDER BY c.title ASC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
       } else {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-          ORDER BY title DESC
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+          ORDER BY c.title DESC
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
@@ -522,17 +590,25 @@ export async function getEpisodesPaginated(
     } else {
       if (sortDir === 'asc') {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-          ORDER BY duration ASC NULLS LAST
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+          ORDER BY c.duration ASC NULLS LAST
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
       } else {
         episodes = await sql`
-          SELECT * FROM episodes
-          WHERE podcast_id = ${podcastId}
-          ORDER BY duration DESC NULLS LAST
+          SELECT e.id, e.guid, e.published,
+                 c.title, c.summary, c.duration, c.episode_art,
+                 c.file_url, c.file_length, c.file_type
+          FROM episodes e
+          LEFT JOIN episode_content c ON c.episode_id = e.id
+          WHERE e.podcast_id = ${podcastId}
+          ORDER BY c.duration DESC NULLS LAST
           LIMIT ${limit + 1}
           ${cursor ? sql`OFFSET ${cursor}` : sql``}
         `;
