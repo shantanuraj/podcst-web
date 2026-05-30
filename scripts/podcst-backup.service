@@ -1,0 +1,10 @@
+[Unit]
+Description=Podcst user-data encrypted backup to S3
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shantanu
+Group=shantanu
+ExecStart=/home/shantanu/src/shantanuraj/podcst-web/scripts/podcst-backup.sh
