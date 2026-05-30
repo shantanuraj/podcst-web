@@ -1,0 +1,10 @@
+[Unit]
+Description=Podcst id-map snapshot (podcasts + episodes identity) to S3
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=svc-podcst
+Group=svc-podcst
+ExecStart=/opt/podcst/scripts/podcst-identity-backup.sh
