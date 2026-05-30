@@ -26,18 +26,11 @@ export async function getSubscriptions(
 
   for (const row of rows) {
     const episodes = await sql`
-      SELECT
-        e.id,
-        e.guid,
-        e.title,
-        e.summary,
-        e.published,
-        e.duration,
-        e.episode_art,
-        e.file_url,
-        e.file_length,
-        e.file_type
+      SELECT e.id, e.guid, e.published,
+             c.title, c.summary, c.duration, c.episode_art,
+             c.file_url, c.file_length, c.file_type
       FROM episodes e
+      LEFT JOIN episode_content c ON c.episode_id = e.id
       WHERE e.podcast_id = ${row.id}
       ORDER BY e.published DESC
       LIMIT 2
