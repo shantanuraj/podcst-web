@@ -1,0 +1,12 @@
+[Unit]
+Description=Podcst tier recompute (is_essential)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shantanu
+Group=shantanu
+EnvironmentFile=/home/shantanu/src/shantanuraj/podcst-web/.env.local
+ExecStart=/home/shantanu/.bun/bin/bun run /home/shantanu/src/shantanuraj/podcst-web/scripts/refresh-tiers.ts
+WorkingDirectory=/home/shantanu/src/shantanuraj/podcst-web
