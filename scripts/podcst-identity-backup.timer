@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Podcst id-map snapshot
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00 UTC
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target
