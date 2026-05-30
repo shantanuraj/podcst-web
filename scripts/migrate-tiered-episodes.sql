@@ -28,21 +28,21 @@ ALTER TABLE episodes_identity ADD CONSTRAINT episodes_podcast_id_guid_key UNIQUE
 CREATE INDEX idx_episodes_podcast ON episodes_identity(podcast_id);
 CREATE INDEX idx_episodes_published ON episodes_identity(published DESC);
 
-DO $$
-DECLARE old_n bigint; new_n bigint; old_max bigint; new_max bigint;
-BEGIN
-  SELECT count(*), max(id) INTO old_n, old_max FROM episodes;
-  SELECT count(*), max(id) INTO new_n, new_max FROM episodes_identity;
-  IF old_n <> new_n OR old_max <> new_max THEN
-    RAISE EXCEPTION 'identity parity failed: old(%,%) new(%,%)', old_n, old_max, new_n, new_max;
-  END IF;
-END $$;
-
 BEGIN;
   ALTER TABLE playback_progress DROP CONSTRAINT playback_progress_episode_id_fkey;
   ALTER TABLE transcripts DROP CONSTRAINT transcripts_episode_id_fkey;
+  ALTER TABLE episode_content DROP CONSTRAINT IF EXISTS episode_content_episode_id_fkey;
   ALTER TABLE episodes RENAME TO episodes_old;
   ALTER TABLE episodes_identity RENAME TO episodes;
+
+  DO $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM episodes_old o WHERE NOT EXISTS (
+                 SELECT 1 FROM episodes n WHERE n.id = o.id)) THEN
+      RAISE EXCEPTION 'identity parity failed: some episodes_old.id missing from new episodes';
+    END IF;
+  END $$;
+
   ALTER SEQUENCE episodes_id_seq OWNED BY episodes.id;
   ALTER TABLE episodes ALTER COLUMN id SET DEFAULT nextval('episodes_id_seq');
   SELECT setval('episodes_id_seq', (SELECT max(id) FROM episodes));

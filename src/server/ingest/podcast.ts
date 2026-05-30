@@ -323,7 +323,7 @@ export async function getPodcastById(
 export async function getEpisodeById(
   episodeId: number,
 ): Promise<IEpisodeInfo | null> {
-  const [row] = await sql`
+  const query = () => sql`
     SELECT e.id, e.guid, e.published, e.podcast_id,
            c.title, c.summary, c.duration, c.episode_art,
            c.file_url, c.file_length, c.file_type,
@@ -336,11 +336,13 @@ export async function getEpisodeById(
     WHERE e.id = ${episodeId}
   `;
 
+  let [row] = await query();
   if (!row) return null;
 
   if (row.file_url == null) {
     await ensureContent(row.podcast_id as number);
-    return getEpisodeById(episodeId);
+    [row] = await query();
+    if (!row) return null;
   }
 
   return {
@@ -360,7 +362,7 @@ export async function getEpisodeById(
     link: null,
     author: row.author_name,
     file: {
-      url: row.file_url,
+      url: row.file_url ?? '',
       length: Number(row.file_length) || 0,
       type: row.file_type || 'audio/mpeg',
     },
