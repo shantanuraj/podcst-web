@@ -5,7 +5,7 @@ Requires=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=/home/shantanu/src/shantanuraj/podcst-web/.env
+EnvironmentFile=/home/shantanu/src/shantanuraj/podcst-web/.env.local
 ExecStart=/home/shantanu/.bun/bin/bun run /home/shantanu/src/shantanuraj/podcst-web/scripts/poll-feeds.ts --daemon
 WorkingDirectory=/home/shantanu/src/shantanuraj/podcst-web
 Restart=always
