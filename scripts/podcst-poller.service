@@ -5,7 +5,7 @@ Requires=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=/opt/podcst/.env
+EnvironmentFile=/opt/podcst/.env.local
 ExecStart=/usr/local/bin/bun run /opt/podcst/scripts/poll-feeds.ts --daemon
 WorkingDirectory=/opt/podcst
 Restart=always

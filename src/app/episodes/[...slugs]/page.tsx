@@ -34,11 +34,9 @@ function parseSlugs(slugs: string[]): ParsedSlugs {
     return { type: 'id', podcastId, episodeId };
   }
 
-  return {
-    type: 'legacy',
-    feedUrl: decodeURIComponent(first),
-    guid: slugs[1] ? decodeURIComponent(slugs[1]) : null,
-  };
+  const joined = slugs.join('/');
+  const feedUrl = joined.includes('://') ? joined : decodeURIComponent(joined);
+  return { type: 'legacy', feedUrl, guid: null };
 }
 
 function buildCleanUrl(podcastId: number, episodeId?: number | null): string {
@@ -211,9 +209,23 @@ export default async function Page(props: {
     );
   }
 
-  let info = await getPodcastByFeedUrl(parsed.feedUrl);
+  let feedUrl = parsed.feedUrl;
+  let guid = parsed.guid;
+  let info = await getPodcastByFeedUrl(feedUrl);
   if (!info) {
-    info = await ingestPodcast(parsed.feedUrl);
+    const idx = feedUrl.lastIndexOf('/');
+    if (idx > 'https://'.length) {
+      const altFeed = feedUrl.slice(0, idx);
+      const alt = await getPodcastByFeedUrl(altFeed);
+      if (alt) {
+        info = alt;
+        guid = feedUrl.slice(idx + 1);
+        feedUrl = altFeed;
+      }
+    }
+  }
+  if (!info) {
+    info = await ingestPodcast(feedUrl);
   }
 
   if (!info || !info.id) {
@@ -221,8 +233,8 @@ export default async function Page(props: {
   }
 
   let episodeId: number | null = null;
-  if (parsed.guid) {
-    const episode = info.episodes.find((ep) => ep.guid === parsed.guid);
+  if (guid) {
+    const episode = info.episodes.find((ep) => ep.guid === guid);
     episodeId = episode?.id ?? null;
   }
 

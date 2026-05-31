@@ -89,6 +89,9 @@ export async function refreshPodcast(
 async function fetchAndParseFeed(
   feedUrl: string,
 ): Promise<FeedFetchResult | null> {
+  if (!/^https?:\/\//i.test(feedUrl)) {
+    return null;
+  }
   try {
     const res = await fetch(feedUrl, {
       headers: { 'User-Agent': 'Podcst/1.0' },
