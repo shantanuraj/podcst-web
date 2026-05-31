@@ -14,14 +14,14 @@ export async function getCurrentProgress(
       pp.position,
       e.id as episode_id,
       e.guid,
-      e.title,
-      e.summary,
+      c.title,
+      c.summary,
       e.published,
-      e.duration,
-      e.episode_art,
-      e.file_url,
-      e.file_length,
-      e.file_type,
+      c.duration,
+      c.episode_art,
+      c.file_url,
+      c.file_length,
+      c.file_type,
       p.id as podcast_id,
       p.feed_url,
       p.title as podcast_title,
@@ -32,6 +32,7 @@ export async function getCurrentProgress(
     JOIN episodes e ON e.id = pp.episode_id
     JOIN podcasts p ON p.id = e.podcast_id
     JOIN authors a ON a.id = p.author_id
+    LEFT JOIN episode_content c ON c.episode_id = e.id
     WHERE pp.user_id = ${userId}
       AND pp.completed = false
     ORDER BY pp.updated_at DESC
