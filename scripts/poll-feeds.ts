@@ -277,7 +277,7 @@ async function main() {
     throw new Error('DATABASE_URL required');
   }
 
-  const sql = postgres(connectionString, { max: 20, idle_timeout: 20 });
+  const sql = postgres(connectionString, { max: 20, idle_timeout: 20, ...(process.env.PGHOST && { host: process.env.PGHOST }) });
 
   if (DAEMON_MODE) {
     console.log(
