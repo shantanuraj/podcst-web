@@ -7,6 +7,7 @@ import {
   KEY_TOP_PODCASTS,
 } from '@/data/constants';
 import type { IEpisodeListing, IPodcast, IShortUrl } from '@/types';
+import { mtls } from '@/server/mtls';
 
 /**
  * Redis cached entity with timestamp
@@ -61,6 +62,7 @@ const redis = new Redis({
   host: process.env.KV_REDIS_HOST,
   password: process.env.KV_REDIS_PASS,
   port: parseInt(process.env.KV_REDIS_PORT || '0', 10),
+  tls: mtls,
 });
 
 /**
