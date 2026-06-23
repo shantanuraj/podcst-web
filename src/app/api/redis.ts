@@ -6,8 +6,8 @@ import {
   KEY_SHORT_URL,
   KEY_TOP_PODCASTS,
 } from '@/data/constants';
-import type { IEpisodeListing, IPodcast, IShortUrl } from '@/types';
 import { mtls } from '@/server/mtls';
+import type { IEpisodeListing, IPodcast, IShortUrl } from '@/types';
 
 /**
  * Redis cached entity with timestamp

@@ -33,7 +33,7 @@ async function slugExists(slug: string) {
 }
 
 async function generateUniqueSlug(length = 6) {
-  let slug;
+  let slug: string;
   let attempts = 0;
   const maxAttempts = 10;
 
@@ -88,7 +88,7 @@ async function generateShortUrl(
     console.log(`Feed URL: ${feedUrl}`);
 
     // Generate or use custom slug
-    let slug;
+    let slug: string;
     if (customSlug) {
       if (await slugExists(customSlug)) {
         throw new Error(`Slug "${customSlug}" already exists`);
