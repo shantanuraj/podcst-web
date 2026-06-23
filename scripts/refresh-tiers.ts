@@ -7,6 +7,8 @@ const changed = await recomputeEssential();
 console.log(`is_essential updated for ${changed} podcasts`);
 
 const evicted = await evictWarm(WARM_CAP_BYTES);
-console.log(`warm eviction removed ${evicted} content rows (cap ${WARM_CAP_BYTES} bytes)`);
+console.log(
+  `warm eviction removed ${evicted} content rows (cap ${WARM_CAP_BYTES} bytes)`,
+);
 
 await sql.end();
