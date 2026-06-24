@@ -1,20 +1,28 @@
 [Unit]
 Description=Podcst feed poller daemon
-After=network.target network-online.target postgresql.service
-Requires=network-online.target
+After=network.target postgresql.service
 
 [Service]
-Type=simple
-EnvironmentFile=/opt/podcst/.env.local
-ExecStart=/usr/local/bin/bun run /opt/podcst/scripts/poll-feeds.ts --daemon
-WorkingDirectory=/opt/podcst
-Restart=always
-RestartSec=10
 User=svc-podcst
 Group=svc-podcst
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=podcst-poller
-
+Environment=HOME=/var/lib/podcst
+Environment=DATABASE_URL=postgres://podcst_app@localhost/podcst
+Environment=PGHOST=/var/run/postgresql
+WorkingDirectory=/opt/podcst
+ExecStart=/usr/local/bin/bun run scripts/poll-feeds.ts --daemon
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/opt/podcst
+ReadWritePaths=/var/lib/podcst
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
 [Install]
 WantedBy=multi-user.target
