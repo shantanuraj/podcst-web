@@ -1,12 +1,29 @@
 [Unit]
-Description=Podcst tier recompute (is_essential)
+Description=Podcst tier recompute (is_essential + warm eviction)
 After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=shantanu
-Group=shantanu
-EnvironmentFile=/home/shantanu/src/shantanuraj/podcst-web/.env.local
-ExecStart=/home/shantanu/.bun/bin/bun run /home/shantanu/src/shantanuraj/podcst-web/scripts/refresh-tiers.ts
+User=svc-podcst
+Group=svc-podcst
+Environment=HOME=/var/lib/podcst
+Environment=DATABASE_URL=postgres://podcst_app@localhost/podcst
+Environment=PGHOST=/var/run/postgresql
 WorkingDirectory=/home/shantanu/src/shantanuraj/podcst-web
+ExecStart=/usr/local/bin/bun run scripts/refresh-tiers.ts
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/shantanu/src/shantanuraj/podcst-web
+ReadWritePaths=/var/lib/podcst
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=podcst-tiers
