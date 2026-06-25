@@ -58,12 +58,49 @@ const parse = <T>(val: string) => JSON.parse(val) as CachedEntity<T>;
  */
 const stringify = <T>(val: CachedEntity<T>) => JSON.stringify(val);
 
-const redis = new Redis({
-  host: process.env.KV_REDIS_HOST,
-  password: process.env.KV_REDIS_PASS,
-  port: parseInt(process.env.KV_REDIS_PORT || '0', 10),
-  tls: mtls,
-});
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+
+const readEnv = (...keys: string[]) => {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value) return value;
+  }
+};
+
+const parsePort = (value?: string) => {
+  if (!value) return undefined;
+  const port = Number.parseInt(value, 10);
+  return Number.isFinite(port) ? port : undefined;
+};
+
+const redisHost = isVercel
+  ? process.env.KV_REDIS_HOST
+  : readEnv('REDIS_HOST', 'KV_REDIS_HOST');
+const redisUrl = isVercel
+  ? readEnv('KV_REDIS_URL', 'REDIS_URL')
+  : redisHost
+    ? undefined
+    : process.env.REDIS_URL;
+
+const redisOptions = {
+  ...(mtls && { tls: mtls }),
+};
+
+const redis = redisUrl
+  ? new Redis(redisUrl, redisOptions)
+  : new Redis({
+      ...redisOptions,
+      host: redisHost,
+      password: isVercel
+        ? process.env.KV_REDIS_PASS
+        : readEnv('REDIS_PASSWORD', 'REDIS_PASS', 'KV_REDIS_PASS'),
+      port:
+        parsePort(
+          isVercel
+            ? process.env.KV_REDIS_PORT
+            : readEnv('REDIS_PORT', 'KV_REDIS_PORT'),
+        ) ?? 6379,
+    });
 
 /**
  * Save key, value pair to redis
