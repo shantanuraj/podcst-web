@@ -75,8 +75,18 @@ yarn
 Set up environment variables (create `.env.local`):
 
 ```bash
+# Vercel-style connection URLs are supported.
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
+
+# Non-Vercel hosts can use host-based settings instead.
+PG_HOST=/var/run/postgresql
+PG_USER=podcst_app
+PG_DATABASE=podcst
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=...
+
 WEBAUTHN_RP_ID=localhost
 WEBAUTHN_RP_ORIGIN=http://localhost:3000
 RESEND_API_KEY=...  # optional, for email verification
