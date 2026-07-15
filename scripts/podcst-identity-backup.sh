@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE=/home/shantanu/src/shantanuraj/podcst-web/.env.local
 RECIPIENT=age1tnn4pdkahghl3ldkj8hjp2rnlszv9r0ckzr6wxq6exn80d7x8usq5pv0p0
 BUCKET=podcst-user-data-backups
 PROFILE=sixth-backup
@@ -11,7 +10,7 @@ AGE=/usr/bin/age
 AWS=/usr/local/bin/aws
 RETAIN_DAYS=90
 
-DATABASE_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"')
+DATABASE_URL="postgres://podcst_app@/podcst?host=/var/run/postgresql"
 TS=$(date -u +%Y-%m-%dT%H%M%SZ)
 RETAIN_UNTIL=$(date -u -d "+${RETAIN_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
 
