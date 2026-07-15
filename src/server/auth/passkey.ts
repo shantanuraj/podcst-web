@@ -13,53 +13,66 @@ import { generateId } from './session';
 
 const RP_NAME = 'Podcst';
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
-const ORIGIN = process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000';
+const ORIGIN =
+  process.env.WEBAUTHN_RP_ORIGIN ||
+  process.env.WEBAUTHN_ORIGIN ||
+  'http://localhost:3000';
+
+type ChallengeType = 'registration' | 'authentication';
 
 type Challenge = {
   visitorId: string;
   challenge: string;
+  type: ChallengeType;
+  userId?: string;
   expiresAt: Date;
 };
 
 const challenges = new Map<string, Challenge>();
 
-function setChallenge(visitorId: string, challenge: string): void {
+function setChallenge(
+  visitorId: string,
+  challenge: string,
+  type: ChallengeType,
+  userId?: string,
+): void {
   challenges.set(visitorId, {
     visitorId,
     challenge,
+    type,
+    userId,
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   });
 }
 
-function getChallenge(visitorId: string): string | null {
+function popChallenge(
+  visitorId: string,
+  type: ChallengeType,
+): Challenge | null {
   const data = challenges.get(visitorId);
-  if (!data || data.expiresAt < new Date()) {
-    challenges.delete(visitorId);
+  challenges.delete(visitorId);
+
+  if (!data || data.type !== type || data.expiresAt < new Date()) {
     return null;
   }
-  return data.challenge;
+
+  return data;
 }
 
-export async function getRegistrationOptions(email: string, visitorId: string) {
-  let [user] = await sql`SELECT id FROM users WHERE email = ${email}`;
-
-  if (!user) {
-    const userId = generateId();
-    [user] = await sql`
-      INSERT INTO users (id, email) VALUES (${userId}, ${email})
-      RETURNING id
-    `;
-  }
-
+export async function getRegistrationOptions(
+  userId: string,
+  email: string,
+  visitorId: string,
+) {
   const existingPasskeys = await sql`
-    SELECT credential_id FROM passkeys WHERE user_id = ${user.id}
+    SELECT credential_id FROM passkeys WHERE user_id = ${userId}
   `;
 
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
     userID: new Uint8Array(
-      new TextEncoder().encode(user.id).buffer,
+      new TextEncoder().encode(userId).buffer,
     ) as Uint8Array<ArrayBuffer>,
     userName: email,
     attestationType: 'none',
@@ -72,24 +85,28 @@ export async function getRegistrationOptions(email: string, visitorId: string) {
     },
   });
 
-  setChallenge(visitorId, options.challenge);
+  setChallenge(visitorId, options.challenge, 'registration', userId);
 
-  return { options, userId: user.id };
+  return { options };
 }
 
 export async function verifyRegistration(
-  userId: string,
+  expectedUserId: string,
   visitorId: string,
   response: RegistrationResponseJSON,
 ) {
-  const expectedChallenge = getChallenge(visitorId);
-  if (!expectedChallenge) {
+  const challenge = popChallenge(visitorId, 'registration');
+  if (!challenge) {
     throw new Error('Challenge expired or not found');
+  }
+
+  if (challenge.userId !== expectedUserId) {
+    throw new Error('Challenge does not match current user');
   }
 
   const verification = await verifyRegistrationResponse({
     response,
-    expectedChallenge,
+    expectedChallenge: challenge.challenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
   });
@@ -98,21 +115,18 @@ export async function verifyRegistration(
     throw new Error('Registration verification failed');
   }
 
-  const { credential, credentialDeviceType, credentialBackedUp } =
-    verification.registrationInfo;
+  const { credential } = verification.registrationInfo;
 
   await sql`
     INSERT INTO passkeys (id, user_id, credential_id, public_key, counter)
     VALUES (
       ${generateId()},
-      ${userId},
+      ${challenge.userId},
       ${credential.id},
       ${Buffer.from(credential.publicKey)},
       ${credential.counter}
     )
   `;
-
-  challenges.delete(visitorId);
 
   return { verified: true };
 }
@@ -139,7 +153,7 @@ export async function getDiscoverableAuthOptions(visitorId: string) {
     userVerification: 'preferred',
   });
 
-  setChallenge(visitorId, options.challenge);
+  setChallenge(visitorId, options.challenge, 'authentication');
 
   return { options };
 }
@@ -169,7 +183,7 @@ export async function getAuthenticationOptions(
     userVerification: 'preferred',
   });
 
-  setChallenge(visitorId, options.challenge);
+  setChallenge(visitorId, options.challenge, 'authentication', user.id);
 
   return { options, userId: user.id };
 }
@@ -179,9 +193,13 @@ export async function verifyAuthentication(
   response: AuthenticationResponseJSON,
   userId?: string,
 ) {
-  const expectedChallenge = getChallenge(visitorId);
-  if (!expectedChallenge) {
+  const challenge = popChallenge(visitorId, 'authentication');
+  if (!challenge) {
     throw new Error('Challenge expired or not found');
+  }
+
+  if (challenge.userId && userId && challenge.userId !== userId) {
+    throw new Error('Challenge does not match requested user');
   }
 
   type Passkey = {
@@ -193,13 +211,14 @@ export async function verifyAuthentication(
   };
 
   let passkey: Passkey | null = null;
-  let resolvedUserId = userId;
+  const challengeUserId = challenge.userId ?? userId;
+  let resolvedUserId = challengeUserId;
 
-  if (userId) {
+  if (challengeUserId) {
     const [row] = await sql`
       SELECT id, user_id, credential_id, public_key, counter
       FROM passkeys
-      WHERE user_id = ${userId} AND credential_id = ${response.id}
+      WHERE user_id = ${challengeUserId} AND credential_id = ${response.id}
     `;
     passkey = (row as Passkey) ?? null;
   } else {
@@ -220,7 +239,7 @@ export async function verifyAuthentication(
 
   const verification = await verifyAuthenticationResponse({
     response,
-    expectedChallenge,
+    expectedChallenge: challenge.challenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
     credential: {
@@ -239,8 +258,6 @@ export async function verifyAuthentication(
     SET counter = ${verification.authenticationInfo.newCounter}
     WHERE id = ${passkey.id}
   `;
-
-  challenges.delete(visitorId);
 
   return { verified: true, userId: resolvedUserId };
 }

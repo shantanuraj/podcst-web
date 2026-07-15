@@ -110,7 +110,7 @@ export function useRegister() {
         body: JSON.stringify({ email, visitorId }),
       });
 
-      const { options, userId, error } = await optionsRes.json();
+      const { options, error } = await optionsRes.json();
       if (error) throw new Error(error);
 
       const credential = await startRegistration({ optionsJSON: options });
@@ -118,7 +118,7 @@ export function useRegister() {
       const verifyRes = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: credential, userId, visitorId }),
+        body: JSON.stringify({ response: credential, visitorId }),
       });
 
       const result = await verifyRes.json();
