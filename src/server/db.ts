@@ -36,6 +36,10 @@ const createSql = () => {
   const pgHost = readEnv('PG_HOST', 'PGHOST');
 
   if (!isVercel && pgHost) {
+    const socketConnectionString = process.env.DATABASE_URL;
+    if (socketConnectionString) {
+      return postgres(socketConnectionString, { ...commonOptions, host: pgHost });
+    }
     return postgres({
       ...commonOptions,
       host: pgHost,
