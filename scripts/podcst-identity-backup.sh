@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE=/opt/podcst/.env.local
 RECIPIENT="${BACKUP_RECIPIENT:?Set BACKUP_RECIPIENT}"
 BUCKET="${BACKUP_BUCKET:?Set BACKUP_BUCKET}"
 PROFILE="${AWS_PROFILE:?Set AWS_PROFILE}"
