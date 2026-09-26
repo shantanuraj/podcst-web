@@ -14,7 +14,13 @@ struct RootView: View {
     @State private var initialTabConfigured = false
 
     var body: some View {
-        playerTabs
+        Group {
+            if initialTabConfigured {
+                playerTabs
+            } else {
+                StartupView()
+            }
+        }
             .tint(PodcstPalette.accent)
             .background(PodcstPalette.paper)
             .sheet(isPresented: $showingNowPlaying) {
@@ -69,6 +75,22 @@ struct RootView: View {
         if library.podcasts.contains(where: { !$0.episodes.isEmpty }) {
             selectedTab = .library
         }
+    }
+}
+
+private struct StartupView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "waveform")
+                .font(.system(size: 36, weight: .light))
+                .foregroundStyle(PodcstPalette.accent)
+            ProgressView()
+                .tint(PodcstPalette.accent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(PodcstPalette.paper)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading your library")
     }
 }
 
