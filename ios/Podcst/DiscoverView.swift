@@ -5,7 +5,6 @@ struct DiscoverView: View {
     @State private var topPodcasts: [Podcast] = []
     @State private var searchResults: [Podcast] = []
     @State private var searchText = ""
-    @State private var isSearching = false
     @State private var error: String?
     @State private var region = "us"
 
@@ -33,18 +32,27 @@ struct DiscoverView: View {
             .podcstPage()
             .navigationTitle("Discover")
             .searchable(text: $searchText, prompt: "Search podcasts")
-            .onChange(of: searchText) { _, term in
-                Task { await search(term) }
+            .task(id: searchText) {
+                do {
+                    try await Task.sleep(for: .milliseconds(300))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                await search(searchText)
             }
             .refreshable { await loadTop() }
             .task { await loadTop() }
             .navigationDestination(for: Podcast.self) { podcast in
                 PodcastDetailView(podcast: podcast)
             }
+            .navigationDestination(for: Episode.self) { episode in
+                EpisodeDetailView(episode: episode)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
-                        ForEach(["us", "nl", "fr", "in", "se"], id: \.self) { code in
+                        ForEach(["us", "nl", "ca", "kr", "my", "in", "mx", "fr", "se", "no"], id: \.self) { code in
                             Button(code.uppercased()) {
                                 region = code
                                 Task { await loadTop() }
@@ -69,14 +77,17 @@ struct DiscoverView: View {
     }
 
     private func search(_ term: String) async {
-        guard !term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             searchResults = []
             return
         }
-        isSearching = true
-        defer { isSearching = false }
         do {
-            searchResults = try await api.search(term: term, locale: region).map {
+            if let url = URL(string: trimmed), ["http", "https"].contains(url.scheme?.lowercased()) {
+                searchResults = [try await api.podcast(feed: trimmed)]
+                return
+            }
+            searchResults = try await api.search(term: trimmed, locale: region).map {
                 Podcast(id: $0.id, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.thumbnail, thumbnail: $0.thumbnail)
             }
         } catch {

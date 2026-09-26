@@ -159,7 +159,9 @@ public final class APIClient {
     }
 
     private func persistCookie(from response: HTTPURLResponse) {
-        guard let fields = response.allHeaderFields as? [String: String], let value = fields.first(where: { $0.key.caseInsensitiveCompare("Set-Cookie") == .orderedSame })?.value else { return }
+        guard let value = response.allHeaderFields.first(where: { key, _ in
+            String(describing: key).caseInsensitiveCompare("Set-Cookie") == .orderedSame
+        }).map({ String(describing: $0.value) }) else { return }
         guard let pair = value.split(separator: ";", maxSplits: 1).first, pair.starts(with: "session=") else { return }
         let cookie = String(pair.dropFirst("session=".count))
         sessionCookie = cookie
@@ -270,7 +272,7 @@ private struct RawEpisode: Decodable {
     enum CodingKeys: String, CodingKey { case id, podcastId, guid, feed, podcastTitle, title, summary, published, cover, explicit, duration, link, episodeArt, showNotes, author, file }
 }
 
-private struct RawFile: Decodable { var url: String; var length: Int64?; var type: String? }
+private struct RawFile: Decodable { var url: String?; var length: Int64?; var type: String? }
 
 private struct BoolOrString: Decodable {
     var value: Bool
