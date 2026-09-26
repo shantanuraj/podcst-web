@@ -2,6 +2,7 @@ import AVFoundation
 import MediaPlayer
 import Observation
 import Foundation
+import UIKit
 
 public enum PlaybackState: String, Codable, Sendable, Equatable {
     case idle
@@ -56,6 +57,15 @@ public final class PlaybackController {
     @ObservationIgnored private var wasPlayingBeforeInterruption = false
     @ObservationIgnored private var nextProgressPosition: TimeInterval = 30
     @ObservationIgnored private var remoteTargets: [Any] = []
+    @ObservationIgnored private var artworkTask: Task<Void, Never>?
+    @ObservationIgnored private var artworkKey: String?
+    @ObservationIgnored private var artworkImage: UIImage?
+    @ObservationIgnored private static let artworkCache: NSCache<NSURL, UIImage> = {
+        let cache = NSCache<NSURL, UIImage>()
+        cache.countLimit = 60
+        cache.totalCostLimit = 16 * 1024 * 1024
+        return cache
+    }()
 
     private struct PersistedState: Codable {
         var queue: [Episode]
@@ -527,8 +537,18 @@ public final class PlaybackController {
 
     private func updateNowPlayingInfo() {
         guard let episode = currentEpisode else {
+            artworkTask?.cancel()
+            artworkTask = nil
+            artworkKey = nil
+            artworkImage = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
+        }
+        let key = artworkKey(for: episode)
+        if artworkKey != key {
+            artworkKey = key
+            artworkImage = nil
+            requestArtwork(for: episode, key: key)
         }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: episode.title,
@@ -538,7 +558,52 @@ public final class PlaybackController {
         if let podcastTitle = episode.podcastTitle { info[MPMediaItemPropertyAlbumTitle] = podcastTitle }
         if let author = episode.author { info[MPMediaItemPropertyArtist] = author }
         if effectiveDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = effectiveDuration }
+        if let artworkImage {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artworkImage.size) { _ in artworkImage }
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func artworkKey(for episode: Episode) -> String {
+        [episode.identity, episode.episodeArt ?? "", episode.cover].joined(separator: "\u{001F}")
+    }
+
+    private func requestArtwork(for episode: Episode, key: String) {
+        artworkTask?.cancel()
+        let urls = [episode.episodeArt, episode.cover]
+            .compactMap { $0 }
+            .compactMap(URL.init(string:))
+            .reduce(into: [URL]()) { urls, url in
+                if !urls.contains(url) { urls.append(url) }
+            }
+        guard !urls.isEmpty else { return }
+        let identity = episode.identity
+        artworkTask = Task { [weak self] in
+            guard let self else { return }
+            for url in urls {
+                guard !Task.isCancelled else { return }
+                if let image = await self.loadArtwork(from: url) {
+                    guard !Task.isCancelled,
+                          self.artworkKey == key,
+                          self.currentEpisode?.identity == identity else { return }
+                    self.artworkImage = image
+                    self.updateNowPlayingInfo()
+                    return
+                }
+            }
+        }
+    }
+
+    private func loadArtwork(from url: URL) async -> UIImage? {
+        if let cached = Self.artworkCache.object(forKey: url as NSURL) { return cached }
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              !Task.isCancelled,
+              let httpResponse = response as? HTTPURLResponse,
+              200..<300 ~= httpResponse.statusCode,
+              let image = UIImage(data: data) else { return nil }
+        let cost = max(1, Int(image.size.width * image.scale * image.size.height * image.scale * 4))
+        Self.artworkCache.setObject(image, forKey: url as NSURL, cost: cost)
+        return image
     }
 
     private func persist() {
