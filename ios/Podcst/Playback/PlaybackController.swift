@@ -4,6 +4,12 @@ import Observation
 import Foundation
 import UIKit
 
+private func makeNowPlayingArtwork(data: Data, size: CGSize) -> MPMediaItemArtwork {
+    MPMediaItemArtwork(boundsSize: size) { _ in
+        UIImage(data: data) ?? UIImage()
+    }
+}
+
 public enum PlaybackState: String, Codable, Sendable, Equatable {
     case idle
     case loading
@@ -59,7 +65,7 @@ public final class PlaybackController {
     @ObservationIgnored private var remoteTargets: [Any] = []
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
     @ObservationIgnored private var artworkKey: String?
-    @ObservationIgnored private var artworkImage: UIImage?
+    @ObservationIgnored private var nowPlayingArtwork: MPMediaItemArtwork?
     @ObservationIgnored private static let artworkCache: NSCache<NSURL, UIImage> = {
         let cache = NSCache<NSURL, UIImage>()
         cache.countLimit = 60
@@ -334,6 +340,15 @@ public final class PlaybackController {
             shouldPlay = false
             return
         }
+        if autoPlay {
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                state = .failed
+                shouldPlay = false
+                return
+            }
+        }
         shouldPlay = autoPlay
         state = .loading
         let token = UUID()
@@ -474,7 +489,6 @@ public final class PlaybackController {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playback, mode: .spokenAudio, options: [.allowAirPlay, .allowBluetoothA2DP])
-            try session.setActive(true)
         } catch {
             state = .failed
         }
@@ -540,14 +554,14 @@ public final class PlaybackController {
             artworkTask?.cancel()
             artworkTask = nil
             artworkKey = nil
-            artworkImage = nil
+            nowPlayingArtwork = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
         }
         let key = artworkKey(for: episode)
         if artworkKey != key {
             artworkKey = key
-            artworkImage = nil
+            nowPlayingArtwork = nil
             requestArtwork(for: episode, key: key)
         }
         var info: [String: Any] = [
@@ -558,9 +572,7 @@ public final class PlaybackController {
         if let podcastTitle = episode.podcastTitle { info[MPMediaItemPropertyAlbumTitle] = podcastTitle }
         if let author = episode.author { info[MPMediaItemPropertyArtist] = author }
         if effectiveDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = effectiveDuration }
-        if let artworkImage {
-            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artworkImage.size) { _ in artworkImage }
-        }
+        if let nowPlayingArtwork { info[MPMediaItemPropertyArtwork] = nowPlayingArtwork }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
@@ -586,7 +598,8 @@ public final class PlaybackController {
                     guard !Task.isCancelled,
                           self.artworkKey == key,
                           self.currentEpisode?.identity == identity else { return }
-                    self.artworkImage = image
+                    guard let data = image.jpegData(compressionQuality: 0.9) else { return }
+                    self.nowPlayingArtwork = makeNowPlayingArtwork(data: data, size: image.size)
                     self.updateNowPlayingInfo()
                     return
                 }
