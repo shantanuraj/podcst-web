@@ -136,6 +136,17 @@ yarn build
 
 This creates an optimized production build in the `.next` folder.
 
+### iOS Client
+
+The native client is in `ios/Podcst.xcodeproj` and targets iOS 18 or later. Open the project in Xcode or build it from the repository root:
+
+```bash
+xcodebuild -project ios/Podcst.xcodeproj -scheme Podcst -sdk iphonesimulator build
+xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platform=iOS Simulator,name=iPhone 16' test
+```
+
+The client uses the web API for discovery, feed indexing, subscriptions, authentication and playback progress. An HTTP(S) feed URL entered in Discover is indexed through `/api/feed`, including private feeds whose access token is part of the URL.
+
 ## Deployment
 
 The app is deployed on both Vercel and Fly.io, with plans to consolidate on Fly.io.
