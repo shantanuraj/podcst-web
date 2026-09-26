@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { adaptFeed } from '@/app/api/feed/parser';
 import type {
   IEpisodeInfo,
@@ -97,7 +97,9 @@ async function fetchAndParseFeed(
       headers: { 'User-Agent': 'Podcst/1.0' },
     });
     if (!res.ok) {
-      console.error(`Failed to fetch feed: ${feedUrl} - ${res.status}`);
+      console.error(
+        `Failed to fetch feed: ${redactFeedUrl(feedUrl)} - ${res.status}`,
+      );
       return null;
     }
     const xml = await res.text();
@@ -111,8 +113,20 @@ async function fetchAndParseFeed(
       hash: createHash('sha256').update(xml).digest('hex'),
     };
   } catch (err) {
-    console.error(`Error fetching feed ${feedUrl}:`, err);
+    console.error(`Error fetching feed ${redactFeedUrl(feedUrl)}:`, err);
     return null;
+  }
+}
+
+function redactFeedUrl(feedUrl: string): string {
+  try {
+    const url = new URL(feedUrl);
+    url.username = '';
+    url.password = '';
+    url.search = '';
+    return url.toString();
+  } catch {
+    return 'feed URL';
   }
 }
 

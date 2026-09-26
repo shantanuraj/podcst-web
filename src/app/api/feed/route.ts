@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { cache, isCached } from '@/app/api/redis';
-import { getPodcastByFeedUrl, getPodcastById } from '@/server/ingest/podcast';
+import {
+  getPodcastByFeedUrl,
+  getPodcastById,
+  ingestPodcast,
+} from '@/server/ingest/podcast';
 import { patchFeedResponse } from './patch';
 
 export async function GET(request: NextRequest) {
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const feedUrl = decodeURIComponent(url);
+  const feedUrl = url;
   try {
     new URL(feedUrl);
   } catch {
@@ -50,7 +54,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(patchFeedResponse(feedUrl, redisData.entity));
   }
 
-  const podcast = await getPodcastByFeedUrl(feedUrl);
+  const podcast =
+    (await getPodcastByFeedUrl(feedUrl)) || (await ingestPodcast(feedUrl));
   if (!podcast) {
     return NextResponse.json({ message: 'podcast not found' }, { status: 404 });
   }
