@@ -6,7 +6,7 @@ struct DiscoverView: View {
     @State private var searchResults: [Podcast] = []
     @State private var searchText = ""
     @State private var error: String?
-    @State private var region = "us"
+    @AppStorage("region") private var region = "us"
 
     var body: some View {
         NavigationStack {
@@ -50,19 +50,6 @@ struct DiscoverView: View {
                 EpisodeDetailView(episode: episode)
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        ForEach(["us", "nl", "ca", "kr", "my", "in", "mx", "fr", "se", "no"], id: \.self) { code in
-                            Button(code.uppercased()) {
-                                region = code
-                                Task { await loadTop() }
-                            }
-                        }
-                    } label: {
-                        Label(region.uppercased(), systemImage: "globe")
-                    }
-                    .accessibilityLabel("Region: \(region.uppercased())")
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     AccountToolbarItem()
                 }
