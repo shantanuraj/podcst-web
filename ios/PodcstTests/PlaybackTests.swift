@@ -53,6 +53,13 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(controller.currentEpisode?.guid, "same")
     }
 
+    func testShowNotesTimestampParsingSupportsMinuteAndHourFormats() {
+        XCTAssertEqual(ShowNotesParser.seconds(from: "3:33"), 213)
+        XCTAssertEqual(ShowNotesParser.seconds(from: "00:05:00"), 300)
+        XCTAssertEqual(ShowNotesParser.seconds(from: "2:36:47"), 9407)
+        XCTAssertNil(ShowNotesParser.seconds(from: "2:75"))
+    }
+
     private func episode(guid: String) -> Episode {
         Episode(guid: guid, feed: "https://example.com/feed.xml", title: guid, file: EpisodeFile(url: "https://example.com/\(guid).mp3"))
     }
