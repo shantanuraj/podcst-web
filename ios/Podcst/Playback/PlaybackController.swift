@@ -12,7 +12,7 @@ public enum PlaybackState: String, Codable, Sendable, Equatable {
     case failed
 }
 
-public struct PlaybackUpdate: Sendable {
+public struct PlaybackUpdate: Codable, Hashable, Sendable {
     public let episode: Episode
     public let position: TimeInterval
     public let completed: Bool
@@ -116,6 +116,20 @@ public final class PlaybackController {
         duration = episode.duration ?? 0
         persist()
         replaceCurrentItem(startingAt: currentTime, autoPlay: true)
+    }
+
+    public func restore(_ episode: Episode, at position: TimeInterval) {
+        if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
+            currentIndex = existingIndex
+            queue[existingIndex] = episode
+        } else {
+            queue.append(episode)
+            currentIndex = queue.index(before: queue.endIndex)
+        }
+        currentTime = max(0, position)
+        duration = episode.duration ?? 0
+        persist()
+        replaceCurrentItem(startingAt: currentTime, autoPlay: false)
     }
 
     public func toggle() {
@@ -342,7 +356,7 @@ public final class PlaybackController {
         case .readyToPlay:
             let itemDuration = item.duration.safeSeconds(default: 0)
             if itemDuration > 0 { duration = itemDuration }
-            if autoPlay {
+            if autoPlay && shouldPlay {
                 player.playImmediately(atRate: Float(rate))
                 state = .playing
             } else {

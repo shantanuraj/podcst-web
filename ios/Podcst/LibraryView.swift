@@ -40,6 +40,9 @@ struct LibraryView: View {
             .navigationDestination(for: Podcast.self) { podcast in
                 PodcastDetailView(podcast: podcast)
             }
+            .navigationDestination(for: Episode.self) { episode in
+                EpisodeDetailView(episode: episode)
+            }
             .sheet(isPresented: $showingLogin) { LoginView() }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -191,23 +194,28 @@ struct EpisodeRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ArtworkView(url: episode.artworkURL, size: 58)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(episode.title)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(2)
-                HStack(spacing: 8) {
-                    if let published = episode.published {
-                        Text(published, format: .dateTime.month(.abbreviated).day())
-                    }
-                    if let duration = episode.duration, duration > 0 {
-                        Text(Duration.seconds(duration))
+            NavigationLink(value: episode) {
+                HStack(spacing: 12) {
+                    ArtworkView(url: episode.artworkURL, size: 58)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(episode.title)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(2)
+                        HStack(spacing: 8) {
+                            if let published = episode.published {
+                                Text(published, format: .dateTime.month(.abbreviated).day())
+                            }
+                            if let duration = episode.duration, duration > 0 {
+                                Text(Duration.seconds(duration))
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(PodcstPalette.tertiary)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(PodcstPalette.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer(minLength: 4)
+            .buttonStyle(.plain)
             Button {
                 playback.play(episode)
             } label: {
@@ -229,6 +237,65 @@ struct EpisodeRow: View {
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Divider().overlay(PodcstPalette.rule) }
+    }
+}
+
+struct EpisodeDetailView: View {
+    @Environment(PlaybackController.self) private var playback
+    let episode: Episode
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                ArtworkView(url: episode.artworkURL, size: 260)
+                    .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(episode.title)
+                        .font(.system(.title, design: .serif))
+                    if let podcastTitle = episode.podcastTitle {
+                        Text(podcastTitle)
+                            .foregroundStyle(PodcstPalette.secondary)
+                    }
+                    HStack(spacing: 10) {
+                        if let published = episode.published {
+                            Text(published, format: .dateTime.year().month(.abbreviated).day())
+                        }
+                        if let duration = episode.duration, duration > 0 {
+                            Text(Duration.seconds(duration))
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(PodcstPalette.tertiary)
+                }
+                HStack(spacing: 12) {
+                    Button {
+                        playback.play(episode)
+                    } label: {
+                        Label("Play", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PodcstPalette.accent)
+                    Button("Play next") {
+                        playback.enqueue(episode, next: true)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                if !episode.showNotes.isEmpty {
+                    Text(episode.showNotes.strippingHTML)
+                        .font(.body)
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .textSelection(.enabled)
+                }
+                if let link = episode.link, let url = URL(string: link) {
+                    Link("Open episode website", destination: url)
+                        .foregroundStyle(PodcstPalette.accent)
+                }
+            }
+            .padding(20)
+        }
+        .podcstPage()
+        .navigationTitle("Episode")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

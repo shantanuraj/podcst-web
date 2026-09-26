@@ -59,36 +59,39 @@ struct NowPlayingBar: View {
     @Binding var showingDetail: Bool
 
     var body: some View {
-        Button {
-            showingDetail = true
-        } label: {
-            HStack(spacing: 12) {
-                ArtworkView(url: playback.currentEpisode?.artworkURL, size: 46)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(playback.currentEpisode?.title ?? "")
-                        .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
-                    Text(playback.currentEpisode?.podcastTitle ?? "Podcst")
-                        .font(.caption)
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .lineLimit(1)
+        HStack(spacing: 12) {
+            Button {
+                showingDetail = true
+            } label: {
+                HStack(spacing: 12) {
+                    ArtworkView(url: playback.currentEpisode?.artworkURL, size: 46)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(playback.currentEpisode?.title ?? "")
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        Text(playback.currentEpisode?.podcastTitle ?? "Podcst")
+                            .font(.caption)
+                            .foregroundStyle(PodcstPalette.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Spacer(minLength: 4)
-                Button {
-                    playback.toggle()
-                } label: {
-                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 34, height: 34)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .buttonStyle(.plain)
+            Button {
+                playback.toggle()
+            } label: {
+                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
     }
 }
 
