@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Refresh test podcast</title>
+    <link>https://example.com/podcast</link>
+    <description>A test feed</description>
+    <itunes:author>Test author</itunes:author>
+    <itunes:image href="https://example.com/cover.jpg" />
+    <item>
+      <guid>episode-six</guid>
+      <title>NoSleep Podcast - S25E06</title>
+      <pubDate>Sat, 26 Sep 2026 14:00:00 +0000</pubDate>
+      <description>Episode six</description>
+      <enclosure url="https://example.com/episode-six.mp3" length="1000" type="audio/mpeg" />
+    </item>
+  </channel>
+</rss>

@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-import { adaptFeed } from '@/app/api/feed/parser';
 import type {
   IEpisodeInfo,
   IEpisodeListing,
@@ -10,38 +8,28 @@ import type {
 import { sql } from '../db';
 import { ensureContent, touchAccess } from './episode-read';
 import { upsertEpisodes } from './episodes';
-
-interface FeedFetchResult {
-  data: IEpisodeListing;
-  etag: string | null;
-  lastModified: string | null;
-  hash: string;
-}
+import { fetchFeed, refreshFeed, savePollState } from './feed-refresh';
+import { getPollInterval } from './feed-schedule';
 
 export async function ingestPodcast(
   feedUrl: string,
 ): Promise<IPodcastEpisodesInfo | null> {
   const existing = await getPodcastByFeedUrl(feedUrl);
-  if (existing && existing.episodes.length > 0) {
-    return existing;
+  if (existing?.id) {
+    return existing.episodes.length > 0
+      ? existing
+      : refreshPodcast(existing.id);
   }
 
-  const result = await fetchAndParseFeed(feedUrl);
-  if (!result) {
-    return null;
-  }
+  const result = await fetchFeed(feedUrl).catch(() => null);
+  if (result?.status !== 'updated') return null;
 
-  const { data, etag, lastModified, hash } = result;
-  const podcast = await storePodcast(feedUrl, data, {
-    etag,
-    lastModified,
-    hash,
-  });
-  if (!podcast) {
-    return null;
-  }
+  const { data } = result;
+  const podcast = await storePodcast(feedUrl, data);
+  if (!podcast) return null;
 
   await upsertEpisodes(sql, podcast.id, data.cover, data.episodes);
+  await savePollState(sql, podcast.id, result, getPollInterval(null));
 
   return getPodcastByFeedUrl(feedUrl);
 }
@@ -49,121 +37,12 @@ export async function ingestPodcast(
 export async function refreshPodcast(
   podcastId: number,
 ): Promise<IPodcastEpisodesInfo | null> {
-  const [existing] = await sql`
-    SELECT id, feed_url, update_frequency FROM podcasts WHERE id = ${podcastId}
-  `;
-
-  if (!existing) {
-    return null;
-  }
-
-  const feedUrl = existing.feed_url;
-  const result = await fetchAndParseFeed(feedUrl);
-  if (!result) {
-    return null;
-  }
-
-  const { data, etag, lastModified, hash } = result;
-  const interval = existing.update_frequency || 86400;
-
-  await sql`
-    UPDATE podcasts SET
-      title = ${data.title},
-      description = ${data.description},
-      cover = ${data.cover},
-      website_url = ${data.link},
-      explicit = ${data.explicit},
-      episode_count = ${data.episodes.length},
-      last_published = ${data.published ? new Date(data.published) : null},
-      updated_at = now()
-    WHERE id = ${existing.id}
-  `;
-
-  await upsertEpisodes(sql, existing.id, data.cover, data.episodes);
-
-  await savePollState(existing.id, { etag, lastModified, hash }, interval);
-
-  return getPodcastByFeedUrl(feedUrl);
+  const result = await refreshFeed(sql, podcastId);
+  if (result === 'not_found' || result === 'error') return null;
+  return getPodcastById(podcastId);
 }
 
-async function fetchAndParseFeed(
-  feedUrl: string,
-): Promise<FeedFetchResult | null> {
-  if (!/^https?:\/\//i.test(feedUrl)) {
-    return null;
-  }
-  try {
-    const res = await fetch(feedUrl, {
-      headers: { 'User-Agent': 'Podcst/1.0' },
-    });
-    if (!res.ok) {
-      console.error(
-        `Failed to fetch feed: ${redactFeedUrl(feedUrl)} - ${res.status}`,
-      );
-      return null;
-    }
-    const xml = await res.text();
-    const data = await adaptFeed(xml);
-    if (!data) return null;
-
-    return {
-      data,
-      etag: res.headers.get('etag'),
-      lastModified: res.headers.get('last-modified'),
-      hash: createHash('sha256').update(xml).digest('hex'),
-    };
-  } catch (err) {
-    console.error(`Error fetching feed ${redactFeedUrl(feedUrl)}:`, err);
-    return null;
-  }
-}
-
-function redactFeedUrl(feedUrl: string): string {
-  try {
-    const url = new URL(feedUrl);
-    url.username = '';
-    url.password = '';
-    url.search = '';
-    return url.toString();
-  } catch {
-    return 'feed URL';
-  }
-}
-
-interface FeedMeta {
-  etag: string | null;
-  lastModified: string | null;
-  hash: string;
-}
-
-async function savePollState(
-  podcastId: number,
-  meta: FeedMeta,
-  intervalSeconds: number,
-): Promise<void> {
-  await sql`
-    INSERT INTO feed_poll_state (
-      podcast_id, etag, last_modified, hash,
-      last_polled_at, next_poll_at, failures
-    ) VALUES (
-      ${podcastId}, ${meta.etag}, ${meta.lastModified}, ${meta.hash},
-      now(), now() + interval '1 second' * ${intervalSeconds}, 0
-    )
-    ON CONFLICT (podcast_id) DO UPDATE SET
-      etag = EXCLUDED.etag,
-      last_modified = EXCLUDED.last_modified,
-      hash = EXCLUDED.hash,
-      last_polled_at = now(),
-      next_poll_at = EXCLUDED.next_poll_at,
-      failures = 0
-  `;
-}
-
-async function storePodcast(
-  feedUrl: string,
-  data: IEpisodeListing,
-  meta: FeedMeta,
-) {
+async function storePodcast(feedUrl: string, data: IEpisodeListing) {
   const authorName = data.author || 'Unknown';
 
   let [author] = await sql`
@@ -203,8 +82,6 @@ async function storePodcast(
       updated_at = now()
     RETURNING id
   `;
-
-  await savePollState(podcast.id, meta, 86400);
 
   return podcast;
 }

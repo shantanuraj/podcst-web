@@ -1,12 +1,16 @@
-export const ESSENTIAL_IDS_SQL = `
+export const FOLLOWED_IDS_SQL = `
   SELECT podcast_id AS id FROM subscriptions
-  UNION
-  SELECT podcast_id AS id FROM top_podcasts
   UNION
   SELECT e.podcast_id AS id
   FROM playback_progress pp
   JOIN episodes e ON e.id = pp.episode_id
   WHERE pp.updated_at > now() - interval '90 days'
+`;
+
+export const ESSENTIAL_IDS_SQL = `
+  ${FOLLOWED_IDS_SQL}
+  UNION
+  SELECT podcast_id AS id FROM top_podcasts
 `;
 
 export async function recomputeEssential(): Promise<number> {

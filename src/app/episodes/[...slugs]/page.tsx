@@ -13,8 +13,8 @@ import {
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
-import { EmptyEpisodesRefresh } from './EmptyEpisodesRefresh';
 import { EpisodesNotFound } from './EpisodesNotFound';
+import { FeedRefresh } from './FeedRefresh';
 
 function isNumeric(str: string): boolean {
   return /^\d+$/.test(str);
@@ -162,6 +162,7 @@ export default async function Page(props: {
 
       return (
         <>
+          <FeedRefresh podcastId={parsed.podcastId} />
           <PodcastEpisodeSchema
             podcast={podcastData}
             episode={episode}
@@ -185,8 +186,8 @@ export default async function Page(props: {
       const infoData = { ...podcast, episodes: [] };
       return (
         <>
+          <FeedRefresh podcastId={parsed.podcastId} empty />
           <PodcastInfo info={infoData} />
-          <EmptyEpisodesRefresh podcastId={parsed.podcastId} />
         </>
       );
     }
@@ -197,6 +198,7 @@ export default async function Page(props: {
 
     return (
       <>
+        <FeedRefresh podcastId={parsed.podcastId} />
         <PodcastSeriesSchema podcast={schemaData} url={url} />
         <PaginatedEpisodesList
           podcastId={parsed.podcastId}
