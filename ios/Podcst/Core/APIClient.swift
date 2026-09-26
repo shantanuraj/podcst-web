@@ -2,6 +2,7 @@ import AuthenticationServices
 import Foundation
 import Observation
 import Security
+import UIKit
 
 @MainActor
 @Observable
@@ -76,11 +77,70 @@ public final class APIClient {
     }
 
     public func signInWithPasskey(email: String? = nil) async throws -> User? {
-        throw APIError(statusCode: 501, message: "Passkey sign-in is not configured for this client")
+        let normalizedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let start: RawPasskeyLogin = try await post(
+            path: "/api/auth/login",
+            body: PasskeyLoginBody(
+                email: normalizedEmail?.isEmpty == true ? nil : normalizedEmail,
+                visitorId: visitorId,
+                discoverable: normalizedEmail?.isEmpty != false
+            )
+        )
+        guard let options = start.options else {
+            if start.exists == false {
+                throw APIError(statusCode: 404, message: "No account found for this email")
+            }
+            if start.hasPasskey == false {
+                throw APIError(statusCode: 400, message: "No passkey is registered for this account")
+            }
+            throw APIError(statusCode: 400, message: "Passkey sign-in is unavailable")
+        }
+        let assertion = try await authorizePasskey(options: options)
+        let result: RawPasskeyResult = try await post(
+            path: "/api/auth/login",
+            body: PasskeyLoginVerification(
+                response: assertion,
+                userId: start.userId,
+                visitorId: visitorId
+            )
+        )
+        guard result.verified else {
+            throw APIError(statusCode: 400, message: "Passkey verification failed")
+        }
+        return try await sessionUser()
     }
 
     public func registerPasskey() async throws {
         throw APIError(statusCode: 501, message: "Passkey registration is not configured for this client")
+    }
+
+    private var authorizationCoordinator: PasskeyAuthorizationCoordinator?
+
+    private func authorizePasskey(options: RawPasskeyOptions) async throws -> PasskeyAssertion {
+        guard let challenge = Data(base64URL: options.challenge) else {
+            throw APIError(statusCode: 400, message: "Invalid passkey challenge")
+        }
+        guard let relyingPartyIdentifier = options.rpId, !relyingPartyIdentifier.isEmpty else {
+            throw APIError(statusCode: 400, message: "Passkey relying party is not configured")
+        }
+        let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: relyingPartyIdentifier)
+        let request = provider.createCredentialAssertionRequest(challenge: challenge)
+        if let credentials = options.allowCredentials {
+            request.allowedCredentials = credentials.compactMap { descriptor in
+                guard let credentialID = Data(base64URL: descriptor.id) else { return nil }
+                return ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: credentialID)
+            }
+        }
+        defer { authorizationCoordinator = nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            let coordinator = PasskeyAuthorizationCoordinator(continuation: continuation)
+            authorizationCoordinator = coordinator
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = coordinator
+            controller.presentationContextProvider = coordinator
+            coordinator.controller = controller
+            controller.performRequests()
+        }
     }
 
     public func signOut() async throws {
@@ -219,10 +279,33 @@ public struct KeychainStore: Sendable {
 
 private struct EmptyBody: Encodable {}
 private struct ProgressBody: Encodable { var episodeId: Int; var position: Int; var completed: Bool }
+private struct PasskeyLoginBody: Encodable {
+    var email: String?
+    var visitorId: String
+    var discoverable: Bool
+}
+private struct PasskeyLoginVerification: Encodable {
+    var response: PasskeyAssertion
+    var userId: String?
+    var visitorId: String
+}
 private struct RawError: Decodable { var message: String? }
 private struct RawSuccess: Decodable { var success: Bool }
 private struct RawSent: Decodable { var sent: Bool }
 private struct RawVerified: Decodable { var verified: Bool }
+private struct RawPasskeyResult: Decodable { var verified: Bool }
+private struct RawPasskeyLogin: Decodable {
+    var exists: Bool?
+    var hasPasskey: Bool?
+    var options: RawPasskeyOptions?
+    var userId: String?
+}
+private struct RawPasskeyOptions: Decodable {
+    var challenge: String
+    var rpId: String?
+    var allowCredentials: [RawPasskeyDescriptor]?
+}
+private struct RawPasskeyDescriptor: Decodable { var id: String }
 private struct RawSession: Decodable { var user: RawUser? }
 private struct RawUser: Decodable { var id: String; var email: String; var name: String?; var image: String?; var hasPasskey: Bool }
 private struct RawSearchResult: Decodable { var id: Int?; var author: String; var feed: String; var thumbnail: String; var title: String }
@@ -281,5 +364,73 @@ private struct BoolOrString: Decodable {
         if let bool = try? c.decode(Bool.self) { value = bool; return }
         let string = try c.decode(String.self)
         value = string == "explicit"
+    }
+}
+
+private struct PasskeyAssertion: Encodable, Sendable {
+    var id: String
+    var rawId: String
+    var response: PasskeyAssertionResponse
+    var type = "public-key"
+}
+
+private struct PasskeyAssertionResponse: Encodable, Sendable {
+    var clientDataJSON: String
+    var authenticatorData: String
+    var signature: String
+    var userHandle: String?
+}
+
+@MainActor
+private final class PasskeyAuthorizationCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    let continuation: CheckedContinuation<PasskeyAssertion, Error>
+    var controller: ASAuthorizationController?
+
+    init(continuation: CheckedContinuation<PasskeyAssertion, Error>) {
+        self.continuation = continuation
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow) ?? UIWindow()
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion else {
+            continuation.resume(throwing: APIError(statusCode: 400, message: "Unsupported passkey credential"))
+            return
+        }
+        continuation.resume(returning: PasskeyAssertion(
+            id: credential.credentialID.base64URL,
+            rawId: credential.credentialID.base64URL,
+            response: PasskeyAssertionResponse(
+                clientDataJSON: credential.rawClientDataJSON.base64URL,
+                authenticatorData: credential.rawAuthenticatorData.base64URL,
+                signature: credential.signature.base64URL,
+                userHandle: credential.userID.isEmpty ? nil : credential.userID.base64URL
+            )
+        ))
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        if let authorizationError = error as? ASAuthorizationError, authorizationError.code == .canceled {
+            continuation.resume(throwing: APIError(statusCode: 499, message: "Passkey sign-in was canceled"))
+        } else {
+            continuation.resume(throwing: error)
+        }
+    }
+}
+
+private extension Data {
+    init?(base64URL value: String) {
+        var encoded = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        encoded += String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+        self.init(base64Encoded: encoded)
+    }
+
+    var base64URL: String {
+        base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
 }

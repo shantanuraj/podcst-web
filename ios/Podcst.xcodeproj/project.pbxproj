@@ -48,6 +48,7 @@
 		E95984C2429031F651BE7C6F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F372CC719A9355C7B57516AF /* PodcstApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcstApp.swift; sourceTree = "<group>"; };
 		F754A39CE6B3C70CF8228342 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F9D6E69B6BD7D99E5E6B4C1A /* Podcst.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Podcst.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,6 +83,7 @@
 				D93CD43E71868DB1B23962D7 /* QueueView.swift */,
 				115A9B040A2E64A464D8C75F /* RootView.swift */,
 				F754A39CE6B3C70CF8228342 /* SettingsView.swift */,
+				F9D6E69B6BD7D99E5E6B4C1A /* Podcst.entitlements */,
 				E95984C2429031F651BE7C6F /* Theme.swift */,
 			);
 			path = Podcst;
@@ -265,6 +267,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Podcst/Podcst.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
@@ -326,6 +329,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Podcst/Podcst.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
