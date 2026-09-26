@@ -13,7 +13,13 @@ public final class APIClient {
     private let session: URLSession
     private let visitorId: String
     private var sessionCookie: String?
+    private var currentUserID: String?
     private let keychain: KeychainStore
+    private let feedCache = FeedCache(storageURL: FeedCache.defaultStorageURL())
+    private let topCache = PodcastSnapshotCache(namespace: "top", lifetime: 3600)
+    private let subscriptionCache = PodcastSnapshotCache(namespace: "subscriptions", lifetime: 86400)
+    private var topRequests: [String: Task<[Podcast], Error>] = [:]
+    private var subscriptionRequest: Task<[Podcast], Error>?
 
     public init(baseURL: URL = APIClient.productionBaseURL, session: URLSession = .shared, keychain: KeychainStore = KeychainStore()) {
         self.baseURL = baseURL
@@ -24,8 +30,35 @@ public final class APIClient {
     }
 
     public func top(locale: String = "us", limit: Int = 30) async throws -> [Podcast] {
-        let rows: [RawPodcast] = try await get(path: "/api/top", query: [URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "locale", value: locale)])
-        return rows.map { mapPodcast($0) }
+        let key = "\(locale.lowercased())-\(limit)"
+        if let snapshot = topCache.load(key) {
+            guard snapshot.isStale else { return snapshot.value }
+            do { return try await refreshTop(locale: locale, limit: limit, key: key) }
+            catch { return snapshot.value }
+        }
+        return try await refreshTop(locale: locale, limit: limit, key: key)
+    }
+
+    public func cachedTop(locale: String = "us", limit: Int = 30) -> [Podcast]? {
+        topCache.load("\(locale.lowercased())-\(limit)")?.value
+    }
+
+    public func refreshTop(locale: String = "us", limit: Int = 30) async throws -> [Podcast] {
+        try await refreshTop(locale: locale, limit: limit, key: "\(locale.lowercased())-\(limit)")
+    }
+
+    private func refreshTop(locale: String, limit: Int, key: String) async throws -> [Podcast] {
+        if let request = topRequests[key] { return try await request.value }
+        let request = Task { @MainActor [weak self] in
+            guard let self else { throw APIError(statusCode: 0, message: "API client unavailable") }
+            defer { self.topRequests[key] = nil }
+            let rows: [RawPodcast] = try await self.get(path: "/api/top", query: [URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "locale", value: locale)])
+            let podcasts = rows.map { self.mapPodcast($0) }
+            self.topCache.store(podcasts, key: key)
+            return podcasts
+        }
+        topRequests[key] = request
+        return try await request.value
     }
 
     public func search(term: String, locale: String = "us") async throws -> [SearchResult] {
@@ -33,14 +66,22 @@ public final class APIClient {
         return rows.map { SearchResult(id: $0.id, author: $0.author, feed: $0.feed, thumbnail: $0.thumbnail, title: $0.title) }
     }
 
+    public func cachedPodcast(id: Int? = nil, feed: String) -> Podcast? {
+        feedCache.cached(id: id, feed: feed)
+    }
+
     public func podcast(feed: String) async throws -> Podcast {
-        let raw: RawPodcast = try await get(path: "/api/feed", query: [URLQueryItem(name: "url", value: feed)])
-        return mapPodcast(raw, feedFallback: feed)
+        try await feedCache.load(.feed(feed)) {
+            let raw: RawPodcast = try await self.get(path: "/api/feed", query: [URLQueryItem(name: "url", value: feed)])
+            return self.mapPodcast(raw, feedFallback: feed)
+        }
     }
 
     public func podcast(id: Int) async throws -> Podcast {
-        let raw: RawPodcast = try await get(path: "/api/feed", query: [URLQueryItem(name: "id", value: String(id))])
-        return mapPodcast(raw)
+        try await feedCache.load(.id(id)) {
+            let raw: RawPodcast = try await self.get(path: "/api/feed", query: [URLQueryItem(name: "id", value: String(id))])
+            return self.mapPodcast(raw)
+        }
     }
 
     public func podcastInfo(id: Int) async throws -> Podcast {
@@ -57,13 +98,19 @@ public final class APIClient {
     }
 
     public func refresh(podcastID: Int) async throws -> Podcast {
-        let raw: RawPodcast = try await post(path: "/api/feed/refresh", body: ["podcastId": podcastID])
-        return mapPodcast(raw)
+        try await feedCache.load(.id(podcastID), refreshing: true) {
+            let raw: RawPodcast = try await self.post(path: "/api/feed/refresh", body: ["podcastId": podcastID])
+            return self.mapPodcast(raw)
+        }
     }
 
     public func sessionUser() async throws -> User? {
         let raw: RawSession = try await get(path: "/api/auth/session")
-        guard let user = raw.user else { return nil }
+        guard let user = raw.user else {
+            currentUserID = nil
+            return nil
+        }
+        currentUserID = user.id
         return User(id: user.id, email: user.email, name: user.name, image: user.image, hasPasskey: user.hasPasskey)
     }
 
@@ -73,7 +120,9 @@ public final class APIClient {
 
     public func signIn(email: String, code: String) async throws -> User? {
         let _: RawVerified = try await post(path: "/api/auth/email-login", body: ["email": email, "code": code])
-        return try await sessionUser()
+        let user = try await sessionUser()
+        feedCache.clear()
+        return user
     }
 
     public func signInWithPasskey(email: String? = nil) async throws -> User? {
@@ -107,7 +156,9 @@ public final class APIClient {
         guard result.verified else {
             throw APIError(statusCode: 400, message: "Passkey verification failed")
         }
-        return try await sessionUser()
+        let user = try await sessionUser()
+        feedCache.clear()
+        return user
     }
 
     public func registerPasskey() async throws {
@@ -146,24 +197,72 @@ public final class APIClient {
     public func signOut() async throws {
         let _: RawSuccess = try await post(path: "/api/auth/logout", body: EmptyBody())
         sessionCookie = nil
+        currentUserID = nil
         keychain.delete()
+        feedCache.clear()
+        subscriptionCache.removeAll()
     }
 
     public func subscriptions() async throws -> [Podcast] {
+        guard let currentUserID else {
+            return try await fetchSubscriptions()
+        }
+        let key = currentUserID
+        if let snapshot = subscriptionCache.load(key) {
+            feedCache.markSubscribed(snapshot.value)
+            guard snapshot.isStale else { return snapshot.value }
+            do { return try await refreshSubscriptions(key: key) }
+            catch { return snapshot.value }
+        }
+        return try await refreshSubscriptions(key: key)
+    }
+
+    public func cachedSubscriptions() -> [Podcast]? {
+        guard let currentUserID else { return nil }
+        return subscriptionCache.load(currentUserID)?.value
+    }
+
+    public func refreshSubscriptions() async throws -> [Podcast] {
+        guard let currentUserID else { return try await fetchSubscriptions() }
+        return try await refreshSubscriptions(key: currentUserID)
+    }
+
+    private func fetchSubscriptions() async throws -> [Podcast] {
         let rows: [RawPodcast] = try await get(path: "/api/subscriptions")
-        return rows.map { mapPodcast($0) }
+        let podcasts = rows.map { mapPodcast($0) }
+        feedCache.markSubscribed(podcasts)
+        return podcasts
+    }
+
+    private func refreshSubscriptions(key: String) async throws -> [Podcast] {
+        if let request = subscriptionRequest { return try await request.value }
+        let request = Task { @MainActor [weak self] in
+            guard let self else { throw APIError(statusCode: 0, message: "API client unavailable") }
+            defer { self.subscriptionRequest = nil }
+            let podcasts = try await self.fetchSubscriptions()
+            self.subscriptionCache.store(podcasts, key: key)
+            return podcasts
+        }
+        subscriptionRequest = request
+        return try await request.value
     }
 
     public func subscribe(podcastID: Int) async throws {
         let _: RawSuccess = try await post(path: "/api/subscriptions", body: ["podcastId": podcastID])
+        feedCache.markSubscribed(id: podcastID)
+        if let currentUserID { subscriptionCache.remove(currentUserID) }
     }
 
     public func unsubscribe(podcastID: Int) async throws {
         let _: RawSuccess = try await delete(path: "/api/subscriptions", query: [URLQueryItem(name: "podcastId", value: String(podcastID))])
+        feedCache.removeSubscription(id: podcastID)
+        if let currentUserID { subscriptionCache.remove(currentUserID) }
     }
 
     public func importSubscriptions(feeds: [String]) async throws -> SubscriptionImportResult {
-        try await post(path: "/api/subscriptions", body: ["feedUrls": feeds])
+        let result: SubscriptionImportResult = try await post(path: "/api/subscriptions", body: ["feedUrls": feeds])
+        if let currentUserID { subscriptionCache.remove(currentUserID) }
+        return result
     }
 
     public func currentProgress() async throws -> PlaybackProgress? {
@@ -234,13 +333,285 @@ public final class APIClient {
     }
 
     private func mapPodcast(_ raw: RawPodcast, feedFallback: String? = nil) -> Podcast {
-        let feed = raw.feed ?? feedFallback ?? ""
+        let feed = raw.feed ?? raw.feedUrl ?? feedFallback ?? ""
+        feedCache.identify(id: raw.id, feed: feed)
         return Podcast(id: raw.id, feed: feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.thumbnail ?? raw.cover, description: raw.description ?? "", link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords ?? [], episodeCount: raw.episodeCount ?? raw.count ?? raw.episodes?.count ?? 0, episodes: raw.episodes?.map { mapEpisode($0, podcastId: raw.id, feedFallback: feed, coverFallback: raw.cover, titleFallback: raw.title) } ?? [])
     }
 
     private func mapEpisode(_ raw: RawEpisode, podcastId: Int? = nil, feedFallback: String? = nil, coverFallback: String? = nil, titleFallback: String? = nil) -> Episode {
         Episode(id: raw.id, podcastId: raw.podcastId ?? podcastId, guid: raw.guid, feed: raw.feed ?? feedFallback ?? "", podcastTitle: raw.podcastTitle ?? titleFallback, title: raw.title, summary: raw.summary, published: date(raw.published), cover: raw.cover ?? coverFallback ?? "", explicit: raw.explicit, duration: raw.duration, link: raw.link, episodeArt: raw.episodeArt, showNotes: raw.showNotes ?? raw.summary ?? "", author: raw.author, file: EpisodeFile(url: raw.file?.url ?? "", length: raw.file?.length ?? 0, type: raw.file?.type ?? "audio/mpeg"))
     }
+}
+
+@MainActor
+@Observable
+final class FeedCache {
+    enum Key: Hashable {
+        case id(Int)
+        case feed(String)
+    }
+
+    private struct Entry {
+        var podcast: Podcast
+        var expires: Date
+        var lastAccess: Date
+        var persistent: Bool
+        var complete: Bool
+    }
+
+    private struct Pending {
+        var sequence: Int
+        var refreshing: Bool
+        var task: Task<Podcast, Error>
+    }
+
+    private struct StoredEntry: Codable {
+        var id: Int?
+        var feed: String
+        var podcast: Podcast
+        var expires: Date
+        var lastAccess: Date
+        var complete: Bool
+    }
+
+    private var entries: [Key: Entry] = [:]
+    private var feedIDs: [String: Int] = [:]
+    private var persistentIDs: Set<Int> = []
+    @ObservationIgnored private var pending: [Key: Pending] = [:]
+    @ObservationIgnored private var sequence = 0
+    private let lifetime: TimeInterval
+    private let persistentLifetime: TimeInterval
+    private let capacity: Int
+    private let now: () -> Date
+    private let storageURL: URL?
+
+    init(lifetime: TimeInterval = 300, persistentLifetime: TimeInterval = 7 * 24 * 60 * 60, capacity: Int = 40, now: @escaping () -> Date = Date.init, storageURL: URL? = nil) {
+        self.lifetime = lifetime
+        self.persistentLifetime = persistentLifetime
+        self.capacity = max(1, capacity)
+        self.now = now
+        self.storageURL = storageURL
+        restore()
+    }
+
+    static func defaultStorageURL() -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("Podcst", isDirectory: true).appendingPathComponent("feed-cache.json")
+    }
+
+    func cached(id: Int?, feed: String) -> Podcast? {
+        if let id, let podcast = entries[key(.id(id))]?.podcast {
+            return podcast
+        }
+        return entries[key(.feed(feed))]?.podcast
+    }
+
+    func clear() {
+        pending.values.forEach { $0.task.cancel() }
+        pending.removeAll(keepingCapacity: false)
+        entries.removeAll(keepingCapacity: false)
+        feedIDs.removeAll(keepingCapacity: false)
+        persistentIDs.removeAll(keepingCapacity: false)
+        if let storageURL { try? FileManager.default.removeItem(at: storageURL) }
+    }
+
+    func markSubscribed(_ podcasts: [Podcast]) {
+        for podcast in podcasts {
+            markSubscribed(podcast)
+        }
+        persist()
+    }
+
+    func markSubscribed(id: Int) {
+        persistentIDs.insert(id)
+        if var entry = entries[.id(id)] {
+            entry.persistent = true
+            entry.expires = max(entry.expires, now().addingTimeInterval(persistentLifetime))
+            entries[.id(id)] = entry
+        }
+        persist()
+    }
+
+    func removeSubscription(id: Int) {
+        persistentIDs.remove(id)
+        if var entry = entries[.id(id)] {
+            entry.persistent = false
+            entry.expires = now().addingTimeInterval(lifetime)
+            entries[.id(id)] = entry
+        }
+        persist()
+    }
+
+    func identify(id: Int?, feed: String) {
+        guard let id, !feed.isEmpty else { return }
+        feedIDs[feed] = id
+        let original = Key.feed(feed)
+        let resolved = Key.id(id)
+        if let entry = entries.removeValue(forKey: original), entry.expires > (entries[resolved]?.expires ?? .distantPast) {
+            entries[resolved] = entry
+        }
+    }
+
+    func load(_ requestedKey: Key, refreshing: Bool = false, fetch: @escaping @MainActor () async throws -> Podcast) async throws -> Podcast {
+        let resolved = key(requestedKey)
+        if !refreshing, var entry = entries[resolved] {
+            let usable = entry.expires > now() && (!entry.persistent || entry.complete)
+            if usable {
+                entry.lastAccess = now()
+                entries[resolved] = entry
+                return entry.podcast
+            }
+        }
+        if let request = pending[resolved], !refreshing || request.refreshing {
+            return try await request.task.value
+        }
+        sequence += 1
+        let requestSequence = sequence
+        let task = Task { try await fetch() }
+        pending[resolved] = Pending(sequence: requestSequence, refreshing: refreshing, task: task)
+        do {
+            let podcast = try await task.value
+            identify(id: podcast.id, feed: podcast.feed)
+            let destination = key(requestedKey)
+            if pending[resolved]?.sequence == requestSequence {
+                let date = now()
+                let persistent = entries[resolved]?.persistent ?? podcast.id.map { persistentIDs.contains($0) } ?? false
+                entries[destination] = Entry(
+                    podcast: podcast,
+                    expires: date.addingTimeInterval(persistent ? persistentLifetime : lifetime),
+                    lastAccess: date,
+                    persistent: persistent,
+                    complete: true
+                )
+                pending[resolved] = nil
+                evictIfNeeded()
+                persist()
+            }
+            return podcast
+        } catch {
+            if pending[resolved]?.sequence == requestSequence {
+                pending[resolved] = nil
+            }
+            if !refreshing, let stale = entries[resolved]?.podcast {
+                return stale
+            }
+            throw error
+        }
+    }
+
+    private func markSubscribed(_ podcast: Podcast) {
+        guard let id = podcast.id else { return }
+        persistentIDs.insert(id)
+        identify(id: id, feed: podcast.feed)
+        let key = Key.id(id)
+        if var entry = entries[key] {
+            entry.persistent = true
+            entry.expires = max(entry.expires, now().addingTimeInterval(persistentLifetime))
+            if !entry.complete { entry.podcast = podcast }
+            entries[key] = entry
+        } else {
+            let date = now()
+            entries[key] = Entry(podcast: podcast, expires: date.addingTimeInterval(persistentLifetime), lastAccess: date, persistent: true, complete: false)
+        }
+    }
+
+    private func key(_ requested: Key) -> Key {
+        if case .feed(let feed) = requested, let id = feedIDs[feed] {
+            return .id(id)
+        }
+        return requested
+    }
+
+    private func evictIfNeeded() {
+        while entries.count > capacity {
+            guard let oldest = entries.filter({ !$0.value.persistent }).min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key else { return }
+            entries[oldest] = nil
+        }
+    }
+
+    private func restore() {
+        guard let storageURL, let data = try? Data(contentsOf: storageURL), let stored = try? JSONDecoder().decode([StoredEntry].self, from: data) else { return }
+        for item in stored {
+            let key: Key
+            if let id = item.id {
+                key = .id(id)
+                persistentIDs.insert(id)
+                feedIDs[item.feed] = id
+            } else {
+                key = .feed(item.feed)
+            }
+            entries[key] = Entry(podcast: item.podcast, expires: item.expires, lastAccess: item.lastAccess, persistent: true, complete: item.complete)
+        }
+        evictIfNeeded()
+    }
+
+    private func persist() {
+        guard let storageURL else { return }
+        let stored = entries.compactMap { key, entry -> StoredEntry? in
+            guard entry.persistent else { return nil }
+            let id: Int?
+            let feed: String
+            switch key {
+            case .id(let value):
+                id = value
+                feed = entry.podcast.feed
+            case .feed(let value):
+                id = nil
+                feed = value
+            }
+            return StoredEntry(id: id, feed: feed, podcast: entry.podcast, expires: entry.expires, lastAccess: entry.lastAccess, complete: entry.complete)
+        }
+        guard let data = try? JSONEncoder().encode(stored) else { return }
+        do {
+            try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: storageURL, options: [.atomic])
+        } catch {
+            return
+        }
+    }
+}
+
+@MainActor
+final class PodcastSnapshotCache {
+    struct Snapshot {
+        let value: [Podcast]
+        let isStale: Bool
+    }
+
+    private struct Stored: Codable {
+        var value: [Podcast]
+        var storedAt: Date
+    }
+
+    private let namespace: String
+    private let lifetime: TimeInterval
+    private let defaults: UserDefaults
+
+    init(namespace: String, lifetime: TimeInterval, defaults: UserDefaults = .standard) {
+        self.namespace = namespace
+        self.lifetime = lifetime
+        self.defaults = defaults
+    }
+
+    func load(_ key: String) -> Snapshot? {
+        guard let data = defaults.data(forKey: storageKey(key)), let stored = try? JSONDecoder().decode(Stored.self, from: data) else { return nil }
+        return Snapshot(value: stored.value, isStale: Date().timeIntervalSince(stored.storedAt) >= lifetime)
+    }
+
+    func store(_ value: [Podcast], key: String) {
+        guard let data = try? JSONEncoder().encode(Stored(value: value, storedAt: Date())) else { return }
+        defaults.set(data, forKey: storageKey(key))
+    }
+
+    func remove(_ key: String) {
+        defaults.removeObject(forKey: storageKey(key))
+    }
+
+    func removeAll() {
+        defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix(namespace + ".") }.forEach(defaults.removeObject(forKey:))
+    }
+
+    private func storageKey(_ key: String) -> String { namespace + "." + key }
 }
 
 public struct KeychainStore: Sendable {

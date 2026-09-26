@@ -35,7 +35,7 @@ struct LibraryView: View {
             }
             .podcstPage()
             .navigationTitle("Library")
-            .refreshable { await library.load() }
+            .refreshable { await library.load(forceRefresh: true) }
             .task { await library.load() }
             .navigationDestination(for: Podcast.self) { podcast in
                 PodcastDetailView(podcast: podcast)
@@ -146,8 +146,10 @@ struct PodcastDetailView: View {
     }
 
     private func loadDetails() async {
-        guard detail == nil else { return }
-        isLoading = true
+        if detail == nil {
+            detail = api.cachedPodcast(id: podcast.id, feed: podcast.feed)
+        }
+        isLoading = detail == nil
         defer { isLoading = false }
         do {
             if let id = podcast.id {

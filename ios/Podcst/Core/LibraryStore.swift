@@ -29,12 +29,13 @@ public final class LibraryStore {
         podcasts.contains { $0.identity == podcast.identity }
     }
 
-    public func load() async {
+    public func load(forceRefresh: Bool = false) async {
         isLoading = true
         defer { isLoading = false }
         do {
             if session.user != nil {
-                podcasts = try await api.subscriptions()
+                if let cached = api.cachedSubscriptions() { podcasts = cached }
+                podcasts = try await (forceRefresh ? api.refreshSubscriptions() : api.subscriptions())
                 progress = try? await api.currentProgress()
             } else {
                 podcasts = loadGuest()
