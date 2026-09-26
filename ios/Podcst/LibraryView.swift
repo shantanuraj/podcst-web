@@ -285,16 +285,7 @@ struct EpisodeDetailView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-                if !episode.showNotes.isEmpty {
-                    Text(episode.showNotes.strippingHTML)
-                        .font(.body)
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .textSelection(.enabled)
-                }
-                if let link = episode.link, let url = URL(string: link) {
-                    Link("Open episode website", destination: url)
-                        .foregroundStyle(PodcstPalette.accent)
-                }
+                ShowNotesContent(episode: episode)
             }
             .padding(20)
         }
@@ -317,5 +308,14 @@ enum Duration {
         let minutes = Int(value / 60)
         if minutes < 60 { return "\(minutes) min" }
         return "\(minutes / 60) hr \(minutes % 60) min"
+    }
+
+    static func clock(_ value: Double) -> String {
+        let total = max(0, Int(value.rounded(.down)))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 }

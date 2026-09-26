@@ -17,7 +17,7 @@ struct RootView: View {
             .background(PodcstPalette.paper)
             .sheet(isPresented: $showingNowPlaying) {
                 NowPlayingView()
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.large, .medium])
                     .presentationDragIndicator(.visible)
             }
             .preferredColorScheme(.dark)
