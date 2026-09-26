@@ -8,8 +8,10 @@ enum AppTab: Hashable {
 
 struct RootView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(LibraryStore.self) private var library
     @State private var selectedTab: AppTab = .discover
     @State private var showingNowPlaying = false
+    @State private var initialTabConfigured = false
 
     var body: some View {
         playerTabs
@@ -23,6 +25,8 @@ struct RootView: View {
             .preferredColorScheme(.dark)
             .toolbarBackground(PodcstPalette.paper, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .task { configureInitialTab() }
+            .onChange(of: library.hasLoaded) { _, _ in configureInitialTab() }
     }
 
     @ViewBuilder
@@ -56,6 +60,14 @@ struct RootView: View {
                 QueueView()
                     .modifier(PlayerInset(showingDetail: $showingNowPlaying))
             }
+        }
+    }
+
+    private func configureInitialTab() {
+        guard !initialTabConfigured, library.hasLoaded else { return }
+        initialTabConfigured = true
+        if library.podcasts.contains(where: { !$0.episodes.isEmpty }) {
+            selectedTab = .library
         }
     }
 }

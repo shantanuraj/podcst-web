@@ -6,6 +6,7 @@ import Observation
 public final class LibraryStore {
     public private(set) var podcasts: [Podcast] = []
     public private(set) var isLoading = false
+    public private(set) var hasLoaded = false
     public private(set) var error: String?
     public private(set) var progress: PlaybackProgress?
 
@@ -31,7 +32,10 @@ public final class LibraryStore {
 
     public func load(forceRefresh: Bool = false) async {
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
         do {
             if session.user != nil {
                 if let cached = api.cachedSubscriptions() { podcasts = cached }
