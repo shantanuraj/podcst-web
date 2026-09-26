@@ -1,9 +1,7 @@
 #!/usr/bin/env bun
 
-import { createHash } from 'crypto';
 import postgres from 'postgres';
-import { adaptFeed } from '../src/app/api/feed/parser';
-import { sanitize, upsertEpisodes } from '../src/server/ingest/episodes';
+import { refreshFeed } from '../src/server/ingest/feed-refresh';
 
 const ITUNES_API = 'https://itunes.apple.com';
 const TOP_LIMIT = 100;
@@ -104,9 +102,7 @@ async function markDueForPolling(
   await sql`
     INSERT INTO feed_poll_state (podcast_id, next_poll_at, failures)
     VALUES (${podcastId}, now(), 0)
-    ON CONFLICT (podcast_id) DO UPDATE SET
-      next_poll_at = now(),
-      failures = 0
+    ON CONFLICT (podcast_id) DO NOTHING
   `;
 }
 
@@ -209,64 +205,8 @@ async function pollFeed(
   sql: postgres.Sql,
   podcast: PodcastForPoll,
 ): Promise<boolean> {
-  try {
-    const res = await fetch(podcast.feed_url, {
-      headers: { 'User-Agent': 'Podcst/1.0' },
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!res.ok) return false;
-
-    const body = await res.text();
-    const hash = createHash('sha256').update(body).digest('hex');
-
-    const feed = await adaptFeed(body);
-    if (!feed) return false;
-
-    const lastPublished = feed.published ? new Date(feed.published) : null;
-    const cover = sanitize(feed.cover) || podcast.feed_url;
-
-    await sql`
-      UPDATE podcasts SET
-        title = ${sanitize(feed.title)},
-        description = ${sanitize(feed.description)}::TEXT,
-        cover = ${cover},
-        website_url = ${sanitize(feed.link)}::TEXT,
-        explicit = ${feed.explicit},
-        last_published = ${lastPublished}::TIMESTAMPTZ,
-        episode_count = ${feed.episodes.length},
-        updated_at = now()
-      WHERE id = ${podcast.id}
-    `;
-
-    await upsertEpisodes(sql, podcast.id, cover, feed.episodes);
-
-    await sql`
-      INSERT INTO feed_poll_state (
-        podcast_id, etag, last_modified, hash,
-        last_polled_at, next_poll_at, failures
-      ) VALUES (
-        ${podcast.id},
-        ${res.headers.get('etag')},
-        ${res.headers.get('last-modified')},
-        ${hash},
-        now(),
-        now() + interval '1 day',
-        0
-      )
-      ON CONFLICT (podcast_id) DO UPDATE SET
-        etag = EXCLUDED.etag,
-        last_modified = EXCLUDED.last_modified,
-        hash = EXCLUDED.hash,
-        last_polled_at = now(),
-        next_poll_at = now() + interval '1 day',
-        failures = 0
-    `;
-
-    return true;
-  } catch {
-    return false;
-  }
+  const result = await refreshFeed(sql, podcast.id, 'rebuild');
+  return result === 'updated';
 }
 
 async function pollMissingEpisodes(

@@ -26,7 +26,7 @@ export async function ensureContent(podcastId: number): Promise<void> {
   if (
     needsRebuild({ identityCount: identity_count, contentCount: content_count })
   ) {
-    const { refreshPodcast } = await import('./podcast');
-    await refreshPodcast(podcastId);
+    const { refreshFeed } = await import('./feed-refresh');
+    await refreshFeed(sql, podcastId, 'rebuild');
   }
 }

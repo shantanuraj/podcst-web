@@ -122,6 +122,17 @@ yarn lint                # Lint code with Biome
 yarn db:migrate          # Run database migrations
 ```
 
+### Tests
+
+```bash
+yarn test
+TEST_DATABASE_URL=postgres://localhost/podcst_test yarn test
+```
+
+PostgreSQL refresh integration tests run when `TEST_DATABASE_URL` is set. They
+create and remove an isolated schema; the database user needs schema-creation
+privileges. Use a local test database, not production.
+
 ### Background Jobs
 
 These scripts run as background jobs to keep content fresh:
@@ -132,6 +143,15 @@ bun scripts/poll-feeds.ts          # Poll RSS feeds (single batch)
 bun scripts/poll-feeds.ts --daemon # Poll RSS feeds continuously
 bun scripts/sync-podcast-index.ts  # Sync from Podcast Index database dump
 ```
+
+Subscribed feeds and feeds played in the last 90 days are polled hourly. Other
+eligible feeds use `podcasts.update_frequency` in seconds, defaulting to one day.
+Opening a feed checks for updates in the background if its last check was at
+least 15 minutes ago. All refresh paths share database locking and failure
+backoff.
+
+Refresh changes require both a web deployment and a restart of
+`podcst-poller.service` after updating its checkout. No schema migration is needed.
 
 ### Building for Production
 

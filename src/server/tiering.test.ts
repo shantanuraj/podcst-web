@@ -1,5 +1,12 @@
 import { expect, test } from 'bun:test';
-import { ESSENTIAL_IDS_SQL } from './tiering';
+import { ESSENTIAL_IDS_SQL, FOLLOWED_IDS_SQL } from './tiering';
+
+test('followed feeds include subscriptions and recent plays but not charts', () => {
+  expect(FOLLOWED_IDS_SQL).toContain('FROM subscriptions');
+  expect(FOLLOWED_IDS_SQL).toContain('FROM playback_progress');
+  expect(FOLLOWED_IDS_SQL).toContain("interval '90 days'");
+  expect(FOLLOWED_IDS_SQL).not.toContain('top_podcasts');
+});
 
 test('essential query references the three signals and nothing else', () => {
   const q = ESSENTIAL_IDS_SQL.toLowerCase();
