@@ -14,7 +14,7 @@ struct DiscoverView: View {
                 LazyVStack(alignment: .leading, spacing: 28) {
                     if let error {
                         ErrorRow(message: error) {
-                            await loadTop()
+                            await loadTop(forceRefresh: true)
                         }
                     }
                     if !searchText.isEmpty {
@@ -41,8 +41,8 @@ struct DiscoverView: View {
                 guard !Task.isCancelled else { return }
                 await search(searchText)
             }
-            .refreshable { await loadTop() }
-            .task { await loadTop() }
+            .refreshable { await loadTop(forceRefresh: true) }
+            .task(id: region) { await loadTop() }
             .navigationDestination(for: Podcast.self) { podcast in
                 PodcastDetailView(podcast: podcast)
             }
@@ -57,9 +57,12 @@ struct DiscoverView: View {
         }
     }
 
-    private func loadTop() async {
+    private func loadTop(forceRefresh: Bool = false) async {
+        if let cached = api.cachedTop(locale: region, limit: 30) {
+            topPodcasts = cached
+        }
         do {
-            topPodcasts = try await api.top(locale: region, limit: 30)
+            topPodcasts = try await (forceRefresh ? api.refreshTop(locale: region, limit: 30) : api.top(locale: region, limit: 30))
             error = nil
         } catch {
             self.error = "Top podcasts are unavailable right now."
@@ -87,36 +90,62 @@ struct DiscoverView: View {
 }
 
 struct PodcastGrid: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .headline) private var minimumCardWidth = 148
     let podcasts: [Podcast]
 
+    private var columns: [GridItem] {
+        [GridItem(
+            dynamicTypeSize.isAccessibilitySize ? .flexible() : .adaptive(minimum: minimumCardWidth),
+            spacing: 18,
+            alignment: .top
+        )]
+    }
+
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 24) {
-            ForEach(podcasts) { podcast in
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 26) {
+            ForEach(podcasts, id: \.identity) { podcast in
                 NavigationLink(value: podcast) {
                     PodcastCard(podcast: podcast)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("\(podcast.title), \(podcast.author)")
             }
         }
     }
 }
 
 struct PodcastCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let podcast: Podcast
+
+    @ViewBuilder
+    private var title: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            Text(podcast.title)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text(podcast.title)
+                .font(.headline)
+                .lineLimit(2, reservesSpace: true)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            ArtworkView(url: podcast.artworkURL, size: 160)
-                .frame(maxWidth: .infinity)
-                .aspectRatio(1, contentMode: .fit)
-            Text(podcast.title)
-                .font(.headline)
-                .lineLimit(2)
+            ArtworkView(url: podcast.artworkURL)
+            title
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             Text(podcast.author)
                 .font(.subheadline)
                 .foregroundStyle(PodcstPalette.secondary)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .multilineTextAlignment(.leading)
     }
 }
 
