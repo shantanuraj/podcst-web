@@ -36,5 +36,3 @@ yarn-error.log*
 *.tsbuildinfo
 .env*.local
 .env*
-
-ios/build/
