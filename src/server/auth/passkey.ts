@@ -17,6 +17,13 @@ const ORIGIN =
   process.env.WEBAUTHN_RP_ORIGIN ||
   process.env.WEBAUTHN_ORIGIN ||
   'http://localhost:3000';
+const ORIGINS = Array.from(
+  new Set([
+    ORIGIN,
+    process.env.WEBAUTHN_NATIVE_ORIGIN ||
+      (RP_ID === 'localhost' ? 'http://localhost' : `https://${RP_ID}`),
+  ]),
+);
 
 type ChallengeType = 'registration' | 'authentication';
 
@@ -107,7 +114,7 @@ export async function verifyRegistration(
   const verification = await verifyRegistrationResponse({
     response,
     expectedChallenge: challenge.challenge,
-    expectedOrigin: ORIGIN,
+    expectedOrigin: ORIGINS,
     expectedRPID: RP_ID,
   });
 
@@ -240,7 +247,7 @@ export async function verifyAuthentication(
   const verification = await verifyAuthenticationResponse({
     response,
     expectedChallenge: challenge.challenge,
-    expectedOrigin: ORIGIN,
+    expectedOrigin: ORIGINS,
     expectedRPID: RP_ID,
     credential: {
       id: passkey.credential_id,

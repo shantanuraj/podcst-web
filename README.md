@@ -92,6 +92,11 @@ WEBAUTHN_RP_ORIGIN=http://localhost:3000
 RESEND_API_KEY=...  # optional, for email verification
 ```
 
+For production, use `WEBAUTHN_RP_ID=podcst.app` and
+`WEBAUTHN_RP_ORIGIN=https://www.podcst.app`. The native iOS client uses the
+same relying-party ID through the `webcredentials:podcst.app` associated
+domain.
+
 Run database migrations:
 
 ```bash
