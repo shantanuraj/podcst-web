@@ -121,6 +121,8 @@ public final class APIClient {
     public func signIn(email: String, code: String) async throws -> User? {
         let _: RawVerified = try await post(path: "/api/auth/email-login", body: ["email": email, "code": code])
         let user = try await sessionUser()
+        subscriptionRequest?.cancel()
+        subscriptionRequest = nil
         feedCache.clear()
         return user
     }
@@ -157,6 +159,8 @@ public final class APIClient {
             throw APIError(statusCode: 400, message: "Passkey verification failed")
         }
         let user = try await sessionUser()
+        subscriptionRequest?.cancel()
+        subscriptionRequest = nil
         feedCache.clear()
         return user
     }
@@ -199,6 +203,8 @@ public final class APIClient {
         sessionCookie = nil
         currentUserID = nil
         keychain.delete()
+        subscriptionRequest?.cancel()
+        subscriptionRequest = nil
         feedCache.clear()
         subscriptionCache.removeAll()
     }
