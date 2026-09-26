@@ -6,144 +6,379 @@
 	objectVersion = 56;
 	objects = {
 
-		7B593FE8762E76C85CC81150 /* 3C2869B1B1D5A358576E332C in Sources */ = {isa = PBXBuildFile; fileRef = 3C2869B1B1D5A358576E332C; };
-		A9F95465554040AFD6737C4A /* 60117ACA4B7F8539E828D834 in Sources */ = {isa = PBXBuildFile; fileRef = 60117ACA4B7F8539E828D834; };
-		8DAEA6A3A34B7B9C8E55EB45 /* E2A357A35D6089D818A2411D in Sources */ = {isa = PBXBuildFile; fileRef = E2A357A35D6089D818A2411D; };
-		6A9AFF4B84ECC8BBB1F90668 /* 77C4331C2AF45370D4B5CB18 in Sources */ = {isa = PBXBuildFile; fileRef = 77C4331C2AF45370D4B5CB18; };
-		D85A7146F885996C903E05C6 /* B941FFDDBFA04FFC50847F9C in Sources */ = {isa = PBXBuildFile; fileRef = B941FFDDBFA04FFC50847F9C; };
-		0CFBEBF3E82F8CAFDD299718 /* B56A8841AF99B2422E9F26A5 in Sources */ = {isa = PBXBuildFile; fileRef = B56A8841AF99B2422E9F26A5; };
-		E835B2CD5F887821EE8FFC7F /* 30B7386D236ECEA70A9B7EB8 in Sources */ = {isa = PBXBuildFile; fileRef = 30B7386D236ECEA70A9B7EB8; };
-		D7D4261645E1200A88D5E7EF /* F372CC719A9355C7B57516AF in Sources */ = {isa = PBXBuildFile; fileRef = F372CC719A9355C7B57516AF; };
-		366C052B27F2FECD258853EB /* D93CD43E71868DB1B23962D7 in Sources */ = {isa = PBXBuildFile; fileRef = D93CD43E71868DB1B23962D7; };
-		D07D33E6EB9F55B36B8D3605 /* 115A9B040A2E64A464D8C75F in Sources */ = {isa = PBXBuildFile; fileRef = 115A9B040A2E64A464D8C75F; };
-		EF8431AC2777E551414F7BB6 /* F754A39CE6B3C70CF8228342 in Sources */ = {isa = PBXBuildFile; fileRef = F754A39CE6B3C70CF8228342; };
-		A74D0AEC5B22145C18B557DE /* E95984C2429031F651BE7C6F in Sources */ = {isa = PBXBuildFile; fileRef = E95984C2429031F651BE7C6F; };
-		6F68F06B673CE6B12194ED83 /* 20A41063775FC41C3DF79D8A in Sources */ = {isa = PBXBuildFile; fileRef = 20A41063775FC41C3DF79D8A; };
+/* Begin PBXBuildFile section */
+		0CFBEBF3E82F8CAFDD299718 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56A8841AF99B2422E9F26A5 /* LibraryView.swift */; };
+		366C052B27F2FECD258853EB /* QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93CD43E71868DB1B23962D7 /* QueueView.swift */; };
+		6A9AFF4B84ECC8BBB1F90668 /* Core/SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */; };
+		6F68F06B673CE6B12194ED83 /* PlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A41063775FC41C3DF79D8A /* PlaybackTests.swift */; };
+		7B593FE8762E76C85CC81150 /* Core/APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2869B1B1D5A358576E332C /* Core/APIClient.swift */; };
+		8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A357A35D6089D818A2411D /* Core/Models.swift */; };
+		A74D0AEC5B22145C18B557DE /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E95984C2429031F651BE7C6F /* Theme.swift */; };
+		A9F95465554040AFD6737C4A /* Core/LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */; };
+		D07D33E6EB9F55B36B8D3605 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115A9B040A2E64A464D8C75F /* RootView.swift */; };
+		D7D4261645E1200A88D5E7EF /* PodcstApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F372CC719A9355C7B57516AF /* PodcstApp.swift */; };
+		D85A7146F885996C903E05C6 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */; };
+		E835B2CD5F887821EE8FFC7F /* Playback/PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */; };
+		EF8431AC2777E551414F7BB6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F754A39CE6B3C70CF8228342 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
 
-		3C2869B1B1D5A358576E332C /* Core/APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/APIClient.swift"; sourceTree = "<group>"; };
-		60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/LibraryStore.swift"; sourceTree = "<group>"; };
-		E2A357A35D6089D818A2411D /* Core/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Models.swift"; sourceTree = "<group>"; };
-		77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/SessionStore.swift"; sourceTree = "<group>"; };
-		B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DiscoverView.swift"; sourceTree = "<group>"; };
-		B56A8841AF99B2422E9F26A5 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LibraryView.swift"; sourceTree = "<group>"; };
-		30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/PlaybackController.swift"; sourceTree = "<group>"; };
-		F372CC719A9355C7B57516AF /* PodcstApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PodcstApp.swift"; sourceTree = "<group>"; };
-		D93CD43E71868DB1B23962D7 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QueueView.swift"; sourceTree = "<group>"; };
-		115A9B040A2E64A464D8C75F /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootView.swift"; sourceTree = "<group>"; };
-		F754A39CE6B3C70CF8228342 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
-		E95984C2429031F651BE7C6F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme.swift"; sourceTree = "<group>"; };
-		20A41063775FC41C3DF79D8A /* PlaybackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaybackTests.swift"; sourceTree = "<group>"; };
+/* Begin PBXContainerItemProxy section */
+		C0A1B2C3D4E5F60718293A4B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F75109BEB4DD8800DA6B45F8;
+			remoteInfo = Podcst;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		115A9B040A2E64A464D8C75F /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		20A41063775FC41C3DF79D8A /* PlaybackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTests.swift; sourceTree = "<group>"; };
+		30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/PlaybackController.swift; sourceTree = "<group>"; };
+		3C2869B1B1D5A358576E332C /* Core/APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/APIClient.swift; sourceTree = "<group>"; };
 		4E783A9E10D2A8ABA38CD11C /* Podcst.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Podcst.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/LibraryStore.swift; sourceTree = "<group>"; };
 		6C7CCDEB3609F1FAA874E941 /* PodcstTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PodcstTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/SessionStore.swift; sourceTree = "<group>"; };
+		B56A8841AF99B2422E9F26A5 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
+		D93CD43E71868DB1B23962D7 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueView.swift; sourceTree = "<group>"; };
+		E2A357A35D6089D818A2411D /* Core/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Models.swift; sourceTree = "<group>"; };
+		E95984C2429031F651BE7C6F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F372CC719A9355C7B57516AF /* PodcstApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcstApp.swift; sourceTree = "<group>"; };
+		F754A39CE6B3C70CF8228342 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
 
-		3C3B0F03DC089F93B8457928 /* Podcst */ = {isa = PBXGroup; children = (3C2869B1B1D5A358576E332C /* Core/APIClient.swift */, 60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */, E2A357A35D6089D818A2411D /* Core/Models.swift */, 77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */, B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */, B56A8841AF99B2422E9F26A5 /* LibraryView.swift */, 30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */, F372CC719A9355C7B57516AF /* PodcstApp.swift */, D93CD43E71868DB1B23962D7 /* QueueView.swift */, 115A9B040A2E64A464D8C75F /* RootView.swift */, F754A39CE6B3C70CF8228342 /* SettingsView.swift */, E95984C2429031F651BE7C6F /* Theme.swift */); path = Podcst; sourceTree = "<group>"; };
-		A619C04D8A87AB070162A099 /* PodcstTests */ = {isa = PBXGroup; children = (20A41063775FC41C3DF79D8A /* PlaybackTests.swift */); path = PodcstTests; sourceTree = "<group>"; };
-		615B463D1028E4E24B674CF7 /* Products */ = {isa = PBXGroup; children = (4E783A9E10D2A8ABA38CD11C /* Podcst.app */, 6C7CCDEB3609F1FAA874E941 /* PodcstTests.xctest */); name = Products; sourceTree = "<group>"; };
-		870B3294C0CBD48AF6BBCC1B = {isa = PBXGroup; children = (3C3B0F03DC089F93B8457928 /* Podcst */, A619C04D8A87AB070162A099 /* PodcstTests */, 615B463D1028E4E24B674CF7 /* Products */); sourceTree = "<group>"; };
+/* Begin PBXFrameworksBuildPhase section */
+		2B5BE8CDD554117262CDACC9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		326A678791C89F5FAABDFBFA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
-		92D7B756AF3AA5E88F7FDB23 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (7B593FE8762E76C85CC81150 /* 3C2869B1B1D5A358576E332C in Sources */, A9F95465554040AFD6737C4A /* 60117ACA4B7F8539E828D834 in Sources */, 8DAEA6A3A34B7B9C8E55EB45 /* E2A357A35D6089D818A2411D in Sources */, 6A9AFF4B84ECC8BBB1F90668 /* 77C4331C2AF45370D4B5CB18 in Sources */, D85A7146F885996C903E05C6 /* B941FFDDBFA04FFC50847F9C in Sources */, 0CFBEBF3E82F8CAFDD299718 /* B56A8841AF99B2422E9F26A5 in Sources */, E835B2CD5F887821EE8FFC7F /* 30B7386D236ECEA70A9B7EB8 in Sources */, D7D4261645E1200A88D5E7EF /* F372CC719A9355C7B57516AF in Sources */, 366C052B27F2FECD258853EB /* D93CD43E71868DB1B23962D7 in Sources */, D07D33E6EB9F55B36B8D3605 /* 115A9B040A2E64A464D8C75F in Sources */, EF8431AC2777E551414F7BB6 /* F754A39CE6B3C70CF8228342 in Sources */, A74D0AEC5B22145C18B557DE /* E95984C2429031F651BE7C6F in Sources */); runOnlyForDeploymentPostprocessing = 0; };
-		78A10A681B05EBFA9A1352B2 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (6F68F06B673CE6B12194ED83 /* 20A41063775FC41C3DF79D8A in Sources */); runOnlyForDeploymentPostprocessing = 0; };
-		326A678791C89F5FAABDFBFA /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		2B5BE8CDD554117262CDACC9 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* Begin PBXGroup section */
+		3C3B0F03DC089F93B8457928 /* Podcst */ = {
+			isa = PBXGroup;
+			children = (
+				3C2869B1B1D5A358576E332C /* Core/APIClient.swift */,
+				60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */,
+				E2A357A35D6089D818A2411D /* Core/Models.swift */,
+				77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */,
+				B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */,
+				B56A8841AF99B2422E9F26A5 /* LibraryView.swift */,
+				30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */,
+				F372CC719A9355C7B57516AF /* PodcstApp.swift */,
+				D93CD43E71868DB1B23962D7 /* QueueView.swift */,
+				115A9B040A2E64A464D8C75F /* RootView.swift */,
+				F754A39CE6B3C70CF8228342 /* SettingsView.swift */,
+				E95984C2429031F651BE7C6F /* Theme.swift */,
+			);
+			path = Podcst;
+			sourceTree = "<group>";
+		};
+		615B463D1028E4E24B674CF7 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4E783A9E10D2A8ABA38CD11C /* Podcst.app */,
+				6C7CCDEB3609F1FAA874E941 /* PodcstTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		870B3294C0CBD48AF6BBCC1B = {
+			isa = PBXGroup;
+			children = (
+				3C3B0F03DC089F93B8457928 /* Podcst */,
+				A619C04D8A87AB070162A099 /* PodcstTests */,
+				615B463D1028E4E24B674CF7 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A619C04D8A87AB070162A099 /* PodcstTests */ = {
+			isa = PBXGroup;
+			children = (
+				20A41063775FC41C3DF79D8A /* PlaybackTests.swift */,
+			);
+			path = PodcstTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
 
-		C0A1B2C3D4E5F60718293A4B /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = 98F54143AB4E86B28C3AFEE0; proxyType = 1; remoteGlobalIDString = F75109BEB4DD8800DA6B45F8; remoteInfo = Podcst; };
-		E8C3F0C7A6B8F1D4E2AA2F31 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = F75109BEB4DD8800DA6B45F8; targetProxy = C0A1B2C3D4E5F60718293A4B; };
+/* Begin PBXNativeTarget section */
+		C062A5A4A7F4F37DD90F54CB /* PodcstTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9B99CF4B19272F3EA96013AF /* Build configuration list for PBXNativeTarget "PodcstTests" */;
+			buildPhases = (
+				78A10A681B05EBFA9A1352B2 /* Sources */,
+				2B5BE8CDD554117262CDACC9 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E8C3F0C7A6B8F1D4E2AA2F31 /* PBXTargetDependency */,
+			);
+			name = PodcstTests;
+			productName = PodcstTests;
+			productReference = 6C7CCDEB3609F1FAA874E941 /* PodcstTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F75109BEB4DD8800DA6B45F8 /* Podcst */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9B6672C266C16D03628B29C8 /* Build configuration list for PBXNativeTarget "Podcst" */;
+			buildPhases = (
+				92D7B756AF3AA5E88F7FDB23 /* Sources */,
+				326A678791C89F5FAABDFBFA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Podcst;
+			productName = Podcst;
+			productReference = 4E783A9E10D2A8ABA38CD11C /* Podcst.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
 
-		F75109BEB4DD8800DA6B45F8 /* Podcst */ = {isa = PBXNativeTarget; buildConfigurationList = 9B6672C266C16D03628B29C8; buildPhases = (92D7B756AF3AA5E88F7FDB23, 326A678791C89F5FAABDFBFA); buildRules = (); dependencies = (); name = Podcst; productName = Podcst; productReference = 4E783A9E10D2A8ABA38CD11C; productType = "com.apple.product-type.application"; };
-		C062A5A4A7F4F37DD90F54CB /* PodcstTests */ = {isa = PBXNativeTarget; buildConfigurationList = 9B99CF4B19272F3EA96013AF; buildPhases = (78A10A681B05EBFA9A1352B2, 2B5BE8CDD554117262CDACC9); buildRules = (); dependencies = (E8C3F0C7A6B8F1D4E2AA2F31 /* PBXTargetDependency */); name = PodcstTests; productName = PodcstTests; productReference = 6C7CCDEB3609F1FAA874E941; productType = "com.apple.product-type.bundle.unit-test"; };
-		98F54143AB4E86B28C3AFEE0 /* Project object */ = {isa = PBXProject; attributes = {LastUpgradeCheck = 2700; ORGANIZATIONNAME = Podcst; TargetAttributes = { F75109BEB4DD8800DA6B45F8 = {CreatedOnToolsVersion = 27.0;}; C062A5A4A7F4F37DD90F54CB = {CreatedOnToolsVersion = 27.0; TestTargetID = F75109BEB4DD8800DA6B45F8;}; }; }; buildConfigurationList = 3ECEDC1D48F60586160C9438; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = 870B3294C0CBD48AF6BBCC1B; productRefGroup = 615B463D1028E4E24B674CF7; projectDirPath = ""; projectRoot = ""; targets = (F75109BEB4DD8800DA6B45F8, C062A5A4A7F4F37DD90F54CB); };
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 2700;
+				ORGANIZATIONNAME = Podcst;
+				TargetAttributes = {
+					C062A5A4A7F4F37DD90F54CB = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = F75109BEB4DD8800DA6B45F8;
+					};
+					F75109BEB4DD8800DA6B45F8 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = 3ECEDC1D48F60586160C9438 /* Build configuration list for PBXProject "Podcst" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 870B3294C0CBD48AF6BBCC1B;
+			productRefGroup = 615B463D1028E4E24B674CF7 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F75109BEB4DD8800DA6B45F8 /* Podcst */,
+				C062A5A4A7F4F37DD90F54CB /* PodcstTests */,
+			);
+		};
+/* End PBXProject section */
 
-		D12546C7310DEE778E55E187 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			CLANG_ENABLE_MODULES = YES;
-			SWIFT_VERSION = 6.0;
-		}; name = Debug; };
-		AA23A758EC6A71B7321371F8 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {
-			CLANG_ENABLE_MODULES = YES;
-			SWIFT_VERSION = 6.0;
-		}; name = Release; };
-		F8A000F6C06CBAF02E297063 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			ALWAYS_SEARCH_USER_PATHS = NO;
-			CLANG_ENABLE_MODULES = YES;
-			CODE_SIGNING_ALLOWED = NO;
-			CODE_SIGNING_REQUIRED = NO;
-			CURRENT_PROJECT_VERSION = 1;
-			DEBUG_INFORMATION_FORMAT = dwarf;
-			GCC_C_LANGUAGE_STANDARD = gnu17;
-			GCC_NO_COMMON_BLOCKS = YES;
-			IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-			LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-			PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios;
-			SDKROOT = iphoneos;
-			SWIFT_VERSION = 6.0;
-			TARGETED_DEVICE_FAMILY = "1,2";
-			INFOPLIST_FILE = Podcst/Info.plist;
-			PRODUCT_NAME = Podcst;
-			DEFINES_MODULE = YES;
-			ENABLE_TESTABILITY = YES;
-		}; name = Debug; };
-		B2DB900C1DBD2C369C18C79F /* Release */ = {isa = XCBuildConfiguration; buildSettings = {
-			ALWAYS_SEARCH_USER_PATHS = NO;
-			CLANG_ENABLE_MODULES = YES;
-			CODE_SIGNING_ALLOWED = NO;
-			CODE_SIGNING_REQUIRED = NO;
-			CURRENT_PROJECT_VERSION = 1;
-			DEBUG_INFORMATION_FORMAT = dwarf;
-			GCC_C_LANGUAGE_STANDARD = gnu17;
-			GCC_NO_COMMON_BLOCKS = YES;
-			IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-			LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-			PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios;
-			SDKROOT = iphoneos;
-			SWIFT_VERSION = 6.0;
-			TARGETED_DEVICE_FAMILY = "1,2";
-			INFOPLIST_FILE = Podcst/Info.plist;
-			PRODUCT_NAME = Podcst;
-			DEFINES_MODULE = YES;
-		}; name = Release; };
-		C9F0D88F895259AE7E99C579 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {
-			ALWAYS_SEARCH_USER_PATHS = NO;
-			CLANG_ENABLE_MODULES = YES;
-			CODE_SIGNING_ALLOWED = NO;
-			CODE_SIGNING_REQUIRED = NO;
-			CURRENT_PROJECT_VERSION = 1;
-			DEBUG_INFORMATION_FORMAT = dwarf;
-			GCC_C_LANGUAGE_STANDARD = gnu17;
-			GCC_NO_COMMON_BLOCKS = YES;
-			IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-			LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-			PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios.tests;
-			SDKROOT = iphoneos;
-			SWIFT_VERSION = 6.0;
-			TARGETED_DEVICE_FAMILY = "1,2";
-			INFOPLIST_FILE = PodcstTests/Info.plist;
-			PRODUCT_NAME = PodcstTests;
-			TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Podcst.app/Podcst";
-			BUNDLE_LOADER = "$(TEST_HOST)";
-		}; name = Debug; };
-		9B624F4150330A230A5C6095 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {
-			ALWAYS_SEARCH_USER_PATHS = NO;
-			CLANG_ENABLE_MODULES = YES;
-			CODE_SIGNING_ALLOWED = NO;
-			CODE_SIGNING_REQUIRED = NO;
-			CURRENT_PROJECT_VERSION = 1;
-			DEBUG_INFORMATION_FORMAT = dwarf;
-			GCC_C_LANGUAGE_STANDARD = gnu17;
-			GCC_NO_COMMON_BLOCKS = YES;
-			IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-			LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-			PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios.tests;
-			SDKROOT = iphoneos;
-			SWIFT_VERSION = 6.0;
-			TARGETED_DEVICE_FAMILY = "1,2";
-			INFOPLIST_FILE = PodcstTests/Info.plist;
-			PRODUCT_NAME = PodcstTests;
-			TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Podcst.app/Podcst";
-			BUNDLE_LOADER = "$(TEST_HOST)";
-		}; name = Release; };
+/* Begin PBXSourcesBuildPhase section */
+		78A10A681B05EBFA9A1352B2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F68F06B673CE6B12194ED83 /* PlaybackTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		92D7B756AF3AA5E88F7FDB23 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7B593FE8762E76C85CC81150 /* Core/APIClient.swift in Sources */,
+				A9F95465554040AFD6737C4A /* Core/LibraryStore.swift in Sources */,
+				8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */,
+				6A9AFF4B84ECC8BBB1F90668 /* Core/SessionStore.swift in Sources */,
+				D85A7146F885996C903E05C6 /* DiscoverView.swift in Sources */,
+				0CFBEBF3E82F8CAFDD299718 /* LibraryView.swift in Sources */,
+				E835B2CD5F887821EE8FFC7F /* Playback/PlaybackController.swift in Sources */,
+				D7D4261645E1200A88D5E7EF /* PodcstApp.swift in Sources */,
+				366C052B27F2FECD258853EB /* QueueView.swift in Sources */,
+				D07D33E6EB9F55B36B8D3605 /* RootView.swift in Sources */,
+				EF8431AC2777E551414F7BB6 /* SettingsView.swift in Sources */,
+				A74D0AEC5B22145C18B557DE /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
 
-		3ECEDC1D48F60586160C9438 = {isa = XCConfigurationList; buildConfigurations = (D12546C7310DEE778E55E187, AA23A758EC6A71B7321371F8); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		9B6672C266C16D03628B29C8 = {isa = XCConfigurationList; buildConfigurations = (F8A000F6C06CBAF02E297063, B2DB900C1DBD2C369C18C79F); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		9B99CF4B19272F3EA96013AF = {isa = XCConfigurationList; buildConfigurations = (C9F0D88F895259AE7E99C579, 9B624F4150330A230A5C6095); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* Begin PBXTargetDependency section */
+		E8C3F0C7A6B8F1D4E2AA2F31 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F75109BEB4DD8800DA6B45F8 /* Podcst */;
+			targetProxy = C0A1B2C3D4E5F60718293A4B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		9B624F4150330A230A5C6095 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = PodcstTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios.tests;
+				PRODUCT_NAME = PodcstTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Podcst.app/Podcst";
+			};
+			name = Release;
+		};
+		AA23A758EC6A71B7321371F8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DBD4H768ZS;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		B2DB900C1DBD2C369C18C79F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEFINES_MODULE = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = Podcst/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Podcst - Listen to your favorite podcasts anywhere";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.news";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios;
+				PRODUCT_NAME = Podcst;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C9F0D88F895259AE7E99C579 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = PodcstTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios.tests;
+				PRODUCT_NAME = PodcstTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Podcst.app/Podcst";
+			};
+			name = Debug;
+		};
+		D12546C7310DEE778E55E187 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = DBD4H768ZS;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		F8A000F6C06CBAF02E297063 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEFINES_MODULE = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = Podcst/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Podcst - Listen to your favorite podcasts anywhere";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.news";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios;
+				PRODUCT_NAME = Podcst;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3ECEDC1D48F60586160C9438 /* Build configuration list for PBXProject "Podcst" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D12546C7310DEE778E55E187 /* Debug */,
+				AA23A758EC6A71B7321371F8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9B6672C266C16D03628B29C8 /* Build configuration list for PBXNativeTarget "Podcst" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F8A000F6C06CBAF02E297063 /* Debug */,
+				B2DB900C1DBD2C369C18C79F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9B99CF4B19272F3EA96013AF /* Build configuration list for PBXNativeTarget "PodcstTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C9F0D88F895259AE7E99C579 /* Debug */,
+				9B624F4150330A230A5C6095 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
 	};
 	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
 }
