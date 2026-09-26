@@ -51,6 +51,9 @@ struct LibraryView: View {
                             .foregroundStyle(PodcstPalette.accent)
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    AccountToolbarItem()
+                }
             }
         }
     }

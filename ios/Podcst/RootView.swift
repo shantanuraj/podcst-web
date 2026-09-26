@@ -10,7 +10,6 @@ struct RootView: View {
     @Environment(PlaybackController.self) private var playback
     @State private var selectedTab: AppTab = .discover
     @State private var showingNowPlaying = false
-    @State private var showingSettings = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -38,18 +37,24 @@ struct RootView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .preferredColorScheme(.dark)
+        .toolbarBackground(PodcstPalette.paper, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+}
+
+struct AccountToolbarItem: View {
+    @State private var showingSettings = false
+
+    var body: some View {
+        Button {
+            showingSettings = true
+        } label: {
+            Image(systemName: "person.crop.circle")
+        }
+        .accessibilityLabel("Account and settings")
         .sheet(isPresented: $showingSettings) {
             SettingsView()
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingSettings = true
-                } label: {
-                    Image(systemName: "person.crop.circle")
-                }
-                .accessibilityLabel("Account and settings")
-            }
         }
     }
 }

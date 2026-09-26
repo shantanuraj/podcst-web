@@ -34,6 +34,11 @@ struct QueueView: View {
             }
             .podcstPage()
             .navigationTitle("Queue")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    AccountToolbarItem()
+                }
+            }
         }
     }
 }

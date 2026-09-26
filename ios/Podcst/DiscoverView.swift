@@ -63,6 +63,9 @@ struct DiscoverView: View {
                     }
                     .accessibilityLabel("Region: \(region.uppercased())")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    AccountToolbarItem()
+                }
             }
         }
     }
