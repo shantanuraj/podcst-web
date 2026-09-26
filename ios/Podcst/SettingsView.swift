@@ -37,6 +37,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Discovery") {
+                    Picker("Region", selection: $region) {
+                        ForEach(DiscoveryRegion.allCases) { option in
+                            Text(option.name).tag(option.rawValue)
+                        }
+                    }
+                }
+
                 Section("Library") {
                     ShareLink(item: opml) {
                         Label("Export subscriptions", systemImage: "square.and.arrow.up")
@@ -65,6 +73,7 @@ struct SettingsView: View {
     }
 
     @State private var showingLogin = false
+    @AppStorage("region") private var region = "us"
 
     private var opml: String {
         let rows = library.podcasts.map {
@@ -73,6 +82,36 @@ struct SettingsView: View {
             return "<outline text=\"\(title)\" xmlUrl=\"\(feed)\" type=\"rss\"/>"
         }.joined()
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?><opml version=\"1.0\"><head><title>Podcst Subscriptions</title></head><body>\(rows)</body></opml>"
+    }
+}
+
+enum DiscoveryRegion: String, CaseIterable, Identifiable {
+    case us
+    case nl
+    case ca
+    case kr
+    case my
+    case `in`
+    case mx
+    case fr
+    case se
+    case no
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .us: "United States"
+        case .nl: "Netherlands"
+        case .ca: "Canada"
+        case .kr: "South Korea"
+        case .my: "Malaysia"
+        case .in: "India"
+        case .mx: "Mexico"
+        case .fr: "France"
+        case .se: "Sweden"
+        case .no: "Norway"
+        }
     }
 }
 
