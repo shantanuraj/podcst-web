@@ -31,6 +31,8 @@
 		E835B2CD5F887821EE8FFC7F /* Playback/PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */; };
 		EF8431AC2777E551414F7BB6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F754A39CE6B3C70CF8228342 /* SettingsView.swift */; };
 		F693358E0569879CCE89CB31 /* Fonts/InstrumentSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 193AA15CFD5F283A14F3D79A /* Fonts/InstrumentSerif-Regular.ttf */; };
+		A01000000000000000000002 = {isa = PBXBuildFile; fileRef = A01000000000000000000001; };
+		A01000000000000000000004 = {isa = PBXBuildFile; fileRef = A01000000000000000000003; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +73,8 @@
 		F372CC719A9355C7B57516AF /* PodcstApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcstApp.swift; sourceTree = "<group>"; };
 		F754A39CE6B3C70CF8228342 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F9D6E69B6BD7D99E5E6B4C1A /* Podcst.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Podcst.entitlements; sourceTree = "<group>"; };
+		A01000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/PlaybackTransport.swift; sourceTree = "<group>"; };
+		A01000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/AVPlayerTransport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +105,8 @@
 				77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */,
 				B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */,
 				B56A8841AF99B2422E9F26A5 /* LibraryView.swift */,
+				A01000000000000000000001,
+				A01000000000000000000003,
 				30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */,
 				F372CC719A9355C7B57516AF /* PodcstApp.swift */,
 				D93CD43E71868DB1B23962D7 /* QueueView.swift */,
@@ -256,6 +262,8 @@
 				6A9AFF4B84ECC8BBB1F90668 /* Core/SessionStore.swift in Sources */,
 				D85A7146F885996C903E05C6 /* DiscoverView.swift in Sources */,
 				0CFBEBF3E82F8CAFDD299718 /* LibraryView.swift in Sources */,
+				A01000000000000000000002,
+				A01000000000000000000004,
 				E835B2CD5F887821EE8FFC7F /* Playback/PlaybackController.swift in Sources */,
 				D7D4261645E1200A88D5E7EF /* PodcstApp.swift in Sources */,
 				366C052B27F2FECD258853EB /* QueueView.swift in Sources */,
