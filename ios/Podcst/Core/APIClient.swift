@@ -86,7 +86,8 @@ public final class APIClient {
 
     public func detail(of podcast: Podcast) async throws -> Podcast {
         if let id = podcast.id {
-            return try await feedCache.load(.id(id)) {
+            let refresh = podcast.episodes.count <= 2 || podcast.episodes.count < podcast.episodeCount
+            return try await feedCache.load(.id(id), refreshing: refresh) {
                 async let info = self.podcastInfo(id: id)
                 async let catalogue = self.allEpisodes(podcastID: id)
                 let (infoResult, catalogueResult) = try await (info, catalogue)

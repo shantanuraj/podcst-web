@@ -31,8 +31,8 @@ final class FeedCacheTests: XCTestCase {
         ] as [String: Any]
         DetailURLProtocol.responses = [
             "/api/feed/info": try JSONSerialization.data(withJSONObject: info),
-            "/api/feed/episodes?limit=200&podcastId=9001&sortBy=published&sortDir=desc": try JSONSerialization.data(withJSONObject: firstPage),
-            "/api/feed/episodes?cursor=200&limit=200&podcastId=9001&sortBy=published&sortDir=desc": try JSONSerialization.data(withJSONObject: secondPage),
+            "/api/feed/episodes": try JSONSerialization.data(withJSONObject: firstPage),
+            "/api/feed/episodes?cursor=200": try JSONSerialization.data(withJSONObject: secondPage),
         ]
         defer { DetailURLProtocol.reset() }
 
@@ -148,7 +148,7 @@ private final class DetailURLProtocol: URLProtocol {
             return
         }
         Self.requests.append(request)
-        let key = url.path + (url.query.map { "?\($0)" } ?? "")
+        let key = url.path + (url.query?.contains("cursor=200") == true ? "?cursor=200" : "")
         guard let data = Self.responses[key] else {
             client?.urlProtocol(self, didFailWithError: APIError(statusCode: 404, message: "Missing fixture"))
             return
