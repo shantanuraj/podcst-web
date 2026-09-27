@@ -2,6 +2,8 @@
 
 All physical-device results are **pending**. The first supported routes to check are the iPhone speaker and Bluetooth headphones. AirPlay is **unverified**. Passing a simulator test or building the app does not complete these checks.
 
+The candidate has one known numerical gap: Apple TimePitch transient displacement reached 18.782 ms against the original 10 ms target; the position discrepancy is not cumulative drift. Conservative device buffering also makes the ≤300 ms effect-response target unverified, particularly for low-rate audio at 0.5×. Record these measurements without assuming the simulator bounds apply to hardware.
+
 This worksheet follows the [audio experience plan](audio-experience-plan.md). Start with the hands-on checks; the longer profiling runs are release gates, not prerequisites for trying the player.
 
 ## Test setup
@@ -10,7 +12,7 @@ This worksheet follows the [audio experience plan](audio-experience-plan.md). St
 | --- | --- |
 | Date and tester | Pending |
 | iPhone model and iOS version | Pending |
-| App build / commit | Pending |
+| App build / commit | Candidate `7f0ea9c`; record the exact device build tested |
 | Bluetooth headphones and firmware, if known | Pending |
 | Public speech episode | Pending |
 | Private-feed episode, using a local label only | Pending |
@@ -105,6 +107,9 @@ Run a downloaded file for **60 minutes at each supported speed**, with both effe
 Record owned audio/mapping storage separately from total process memory. The initial owned-storage budget is **8 MiB** for supported mono/stereo audio up to 48 kHz, excluding codec internals. Verify that paused and stopped playback does not leave the audio graph doing unnecessary work. Device memory measurements supplement the six-hour synthetic processing gate in the implementation plan.
 
 ### Power: matched 30-minute runs
+
+The development-only Audio Lab can run both transports. Use the **Podcst Audio Lab** scheme with `-LocalAudioHarness`; add `-AudioLabReference` to its launch arguments for AVPlayer, and remove that additional argument for the native path. Open the same local file in each run. The Audio control exposes effects on the native path; the reference reports them unavailable. Ordinary app launches always use production routing. Profile equivalent optimized builds and verify that scheme/build settings match; neither comparison establishes release performance if build settings differ.
+
 
 Compare the native player with both effects enabled against an AVPlayer reference using the same downloaded file, route, device volume, playback speed, display state, and network conditions. Alternate the order and repeat matched pairs; compare medians. Use at least three pairs for each reported condition. Record charging state, thermal state, and the profiling tool so results can be repeated. Battery percentage alone is insufficient for this comparison.
 
