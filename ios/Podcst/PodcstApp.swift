@@ -6,6 +6,7 @@ struct PodcstApp: App {
     @State private var session: SessionStore
     @State private var library: LibraryStore
     @State private var playback: PlaybackController
+    @State private var media: MediaStore
     #if DEBUG
     @State private var localAudio: LocalAudioTransport?
     #endif
@@ -15,23 +16,41 @@ struct PodcstApp: App {
         _api = State(initialValue: api)
         let session = SessionStore(api: api)
         _session = State(initialValue: session)
-        _library = State(initialValue: LibraryStore(api: api, session: session))
+        let library = LibraryStore(api: api, session: session)
+        _library = State(initialValue: library)
+        let media = MediaStore(accountID: session.user?.id)
+        _media = State(initialValue: media)
+        let routing = RoutingAudioTransport(media: media)
+        let playback: PlaybackController
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-LocalAudioHarness") {
-            let transport = LocalAudioTransport()
-            _localAudio = State(initialValue: transport)
-            _playback = State(initialValue: PlaybackController(
+            let local = LocalAudioTransport()
+            let reference = ProcessInfo.processInfo.arguments.contains("-AudioLabReference")
+            let transport: any PlaybackTransport = reference ? AVPlayerTransport() : local
+            _localAudio = State(initialValue: local)
+            playback = PlaybackController(
                 transport: transport,
                 persistenceURL: FileManager.default.temporaryDirectory.appendingPathComponent("audio-lab-\(UUID().uuidString).json"),
                 integratesWithSystem: true
-            ))
+            )
         } else {
             _localAudio = State(initialValue: nil)
-            _playback = State(initialValue: PlaybackController())
+            playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: true)
         }
         #else
-        _playback = State(initialValue: PlaybackController())
+        playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: true)
         #endif
+        _playback = State(initialValue: playback)
+        session.prepareAccountChange = { [weak library, weak playback] accountID in
+            playback?.beginAccountChange()
+            await library?.resetProgressSync()
+            await routing.releaseMedia()
+            do { try await media.switchAccount(to: accountID) }
+            catch { if media.accountID != accountID { throw error } }
+            playback?.switchAccount(to: accountID)
+            playback?.onProgress = { [weak library] update in library?.saveProgress(update) }
+        }
+        playback.onProgress = { [weak library] update in library?.saveProgress(update) }
         PodcstAppearance.configure()
     }
 
@@ -56,23 +75,9 @@ struct PodcstApp: App {
             .environment(library)
             .environment(playback)
             .environment(api)
+            .environment(media)
             .task {
                 await session.restore()
-                await library.load()
-                await playback.restore()
-                playback.onProgress = { update in
-                    guard let id = update.episode.id else { return }
-                    Task { @MainActor in
-                        await library.saveProgress(
-                            episodeID: id,
-                            position: update.position,
-                            completed: update.completed,
-                        )
-                    }
-                }
-                if let progress = library.progress {
-                    playback.restore(progress.episode, at: progress.position)
-                }
             }
     }
 }

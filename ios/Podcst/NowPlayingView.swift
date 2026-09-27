@@ -55,6 +55,7 @@ struct NowPlayingView: View {
         }
         .foregroundStyle(PodcstPalette.ink)
         .presentationBackground(PodcstPalette.paper)
+        .downloadAlerts()
         .animation(.snappy(duration: 0.3), value: panel)
         .onChange(of: panels) { _, available in
             if let panel, !available.contains(panel) { self.panel = available.first }
@@ -114,7 +115,7 @@ private struct FullPlayer: View {
             Transport()
                 .padding(.top, 14)
             HStack(spacing: 6) {
-                SpeedChip()
+                AudioControlsButton()
                 Spacer()
                 AirPlayButton()
                     .frame(width: 44, height: 44)
@@ -364,6 +365,7 @@ private struct EpisodeMenu: View {
 
     var body: some View {
         Menu {
+            DownloadMenuActions(episode: episode)
             Button("Show notes", systemImage: "doc.text", action: showNotes)
             Button("Episode page", systemImage: "info.circle") { router.open(.episode(episode)) }
             Button("Go to podcast", systemImage: "square.stack") { router.open(.podcast(episode.podcast)) }
@@ -506,7 +508,7 @@ private struct PlayPauseButton: View {
                 if playback.state == .loading {
                     ProgressView().tint(PodcstPalette.paper)
                 } else {
-                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: playback.isPlaybackRequested ? "pause.fill" : "play.fill")
                         .font(.system(size: diameter * 0.42, weight: .bold))
                         .foregroundStyle(PodcstPalette.paper)
                 }
@@ -514,30 +516,7 @@ private struct PlayPauseButton: View {
             .frame(width: diameter, height: diameter)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
-    }
-}
-
-private struct SpeedChip: View {
-    @Environment(PlaybackController.self) private var playback
-
-    var body: some View {
-        Menu {
-            Picker("Playback speed", selection: Binding { playback.rate } set: { playback.setRate($0) }) {
-                ForEach(PlaybackController.supportedRates, id: \.self) { rate in
-                    Text("\(rate, specifier: "%g")×").tag(rate)
-                }
-            }
-        } label: {
-            Text(playback.isDoubleSpeedHeld ? "2×" : "\(playback.rate, specifier: "%g")×")
-                .font(.sans(.footnote).weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(playback.isDoubleSpeedHeld ? PodcstPalette.accent : PodcstPalette.ink)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(PodcstPalette.ink.opacity(0.1), in: Capsule())
-        }
-        .accessibilityLabel("Playback speed, \(playback.rate, specifier: "%g") times")
+        .accessibilityLabel(playback.isPlaybackRequested ? "Pause" : "Play")
     }
 }
 

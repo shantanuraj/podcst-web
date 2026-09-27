@@ -9,9 +9,28 @@ struct LocalAudioConfiguration: Sendable {
     }
 
     var output: Output = .device
-    var blockFrames: AVAudioFrameCount = 2048
-    var bufferCount: Int = 8
+    var blockFrames: AVAudioFrameCount = 1024
+    var bufferCount: Int = 16
     var limiterEnabled = true
+    var processingBlockDuration: TimeInterval? = 256 / 48_000
+    var bufferedDuration: TimeInterval? = 0.4
+
+    func validate() throws {
+        guard (1...8192).contains(blockFrames), (2...16).contains(bufferCount),
+              processingBlockDuration.map({ $0.isFinite && $0 > 0 && $0 <= 1 }) ?? true,
+              bufferedDuration.map({ $0.isFinite && $0 > 0 && $0 <= 2 }) ?? true else { throw LocalAudioError.invalidConfiguration }
+    }
+
+    func processingFrames(at sampleRate: Double) -> AVAudioFrameCount {
+        guard let processingBlockDuration else { return blockFrames }
+        return min(blockFrames, AVAudioFrameCount(max(1, floor(sampleRate * processingBlockDuration))))
+    }
+
+    func bufferedFrames(at sampleRate: Double) -> UInt32 {
+        let frames = blockFrames * UInt32(bufferCount)
+        guard let bufferedDuration else { return frames }
+        return max(frames, UInt32(ceil(sampleRate * bufferedDuration)))
+    }
 }
 
 struct LocalAudioDiagnostics: Sendable {
@@ -19,7 +38,7 @@ struct LocalAudioDiagnostics: Sendable {
     let outputSampleRate: Double
     let sourceFrameCount: AVAudioFramePosition
     let decodedThroughFrame: AVAudioFramePosition
-    let playerFrame: AVAudioFramePosition
+    let consumedFrame: AVAudioFramePosition
     let renderedFrames: UInt64
     let limiterLatencyFrames: UInt32
     let scheduledBuffers: Int
@@ -37,25 +56,28 @@ final class LocalAudioTransport: PlaybackTransport {
     var onUpdate: (@MainActor (PlaybackTransportUpdate) -> Void)?
     var hasSource: Bool { sourceURL != nil }
     var position: TimeInterval {
-        guard let graph, let info, resolveOutputOrigin(in: graph) else { return heldPosition }
-        let audible = max(0, Double(graph.limiter.renderedFrameCount) - outputOrigin - latencyFrames(in: graph))
-        let source = Double(info.startFrame) / info.sampleRate + audible / graph.format.sampleRate * rate
-        return min(info.duration, max(heldPosition, min(source, Double(decodedThroughFrame) / info.sampleRate)))
+        guard playing, let graph, let info else { return heldPosition }
+        let content = presentedContentFrame(in: graph)
+        let source = sourceFrame(at: content) / info.sampleRate
+        let active = graph.branches[Int(graph.handoff.activeInput)]
+        let scheduled = min(Double(starvationFrame ?? decodedThroughFrame), sourceFrame(at: Double(active.cursor))) / info.sampleRate
+        let mapped = max(heldPosition, min(source, scheduled))
+        return info.durationIsEstimated ? mapped : min(info.duration, mapped)
     }
 
     var diagnostics: LocalAudioDiagnostics {
-        let frames = info == nil ? 0 : UInt64(configuration.blockFrames) * UInt64(configuration.bufferCount)
+        let frames = info.map { UInt64(configuration.bufferedFrames(at: $0.sampleRate)) } ?? 0
         return LocalAudioDiagnostics(
             sourceSampleRate: info?.sampleRate ?? 0,
             outputSampleRate: graph?.format.sampleRate ?? 0,
             sourceFrameCount: info?.frameCount ?? 0,
             decodedThroughFrame: decodedThroughFrame,
-            playerFrame: graph.map { playerFrame(in: $0) } ?? 0,
+            consumedFrame: graph.map { consumedFrame(in: $0) } ?? 0,
             renderedFrames: graph?.limiter.renderedFrameCount ?? 0,
             limiterLatencyFrames: graph?.limiter.latencyFrames ?? 0,
-            scheduledBuffers: occupiedSlots.count,
+            scheduledBuffers: graph?.branches.reduce(0) { $0 + Int(($1.source.availableFrames + configuration.blockFrames - 1) / configuration.blockFrames) } ?? 0,
             bufferCapacityFrames: frames,
-            allocatedBytes: frames * UInt64(info?.channels ?? 0) * 4 + (graph?.limiter.allocatedBytes ?? 0),
+            allocatedBytes: workerAllocatedBytes + UInt64(sourceSpans.count * MemoryLayout<AudioSourceSpan>.stride) + (graph?.allocatedBytes ?? 0) + (replay?.allocatedBytes ?? 0),
             underruns: underruns,
             isReady: ready,
             isPlaying: playing,
@@ -65,7 +87,7 @@ final class LocalAudioTransport: PlaybackTransport {
     }
 
     private let configuration: LocalAudioConfiguration
-    private let decoder: LocalAudioDecoder
+    private let decoder: AudioProcessingDecoder
     private var sourceURL: URL?
     private var graph: LocalAudioGraph?
     private var info: LocalAudioFileInfo?
@@ -75,10 +97,15 @@ final class LocalAudioTransport: PlaybackTransport {
     private var fillTask: Task<Void, Never>?
     private var ticker: Task<Void, Never>?
     private var observers: LocalAudioObservers?
-    private var occupiedSlots: Set<Int> = []
+    private var replay: AudioReplayWindow?
+    private var transition: AudioRateTransition?
     private var decodedThroughFrame: AVAudioFramePosition = 0
-    private var paddingRemaining: AVAudioFramePosition = 0
-    private var completionOutputFrame: Double?
+    private var scheduledContentFrames: Int64 = 0
+    private var sourceSpans: [AudioSourceSpan] = []
+    private var effectBoundaries: [AppliedAudioEffects] = []
+    private var presentedEffects: AppliedAudioEffects?
+    private var effectsRevision: UInt64 = 0
+    private var workerAllocatedBytes: UInt64 = 0
     private var decoderEnded = false
     private var draining = false
     private var drainedAtOutputFrame: Double?
@@ -89,17 +116,20 @@ final class LocalAudioTransport: PlaybackTransport {
     private var wantsPlayback = false
     private var reachedEnd = false
     private var heldPosition: TimeInterval = 0
-    private var outputOrigin: Double = 0
     private var rate: Double = 1
+    private var effects = AudioEffects()
     private var underruns = 0
-    private var scheduledStartHostTime: UInt64?
-    private var needsReprime = false
-    private var bufferWaiters: [CheckedContinuation<Void, Never>] = []
+    private var hasStarted = false
     private var failure: LocalAudioError?
 
-    init(configuration: LocalAudioConfiguration = LocalAudioConfiguration()) {
+    init(configuration: LocalAudioConfiguration = LocalAudioConfiguration(), sourceDecoder: (any PCMDecoder)? = nil) {
         self.configuration = configuration
-        decoder = LocalAudioDecoder(blockFrames: configuration.blockFrames, bufferCount: configuration.bufferCount)
+        decoder = AudioProcessingDecoder(
+            source: sourceDecoder ?? LocalAudioDecoder(blockFrames: configuration.blockFrames, bufferCount: 2),
+            blockFrames: configuration.blockFrames,
+            bufferCount: configuration.bufferCount,
+            outputBlockDuration: configuration.processingBlockDuration
+        )
     }
 
     deinit {
@@ -115,22 +145,17 @@ final class LocalAudioTransport: PlaybackTransport {
         }
     }
 
-    func load(url: URL, at position: TimeInterval, generation: UUID) {
+    func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
         stop()
         self.generation = generation
-        sourceURL = url
+        sourceURL = source.url
         prepare(at: position)
     }
 
     func play(atRate rate: Double) {
         guard hasSource, !reachedEnd, rate.isFinite, (0.5...2).contains(rate) else { return }
         wantsPlayback = true
-        if abs(self.rate - rate) > 0.0001 {
-            let sourcePosition = position
-            self.rate = rate
-            prepare(at: sourcePosition)
-            return
-        }
+        setRate(rate)
         startPlayback()
     }
 
@@ -147,9 +172,29 @@ final class LocalAudioTransport: PlaybackTransport {
 
     func setRate(_ rate: Double) {
         guard rate.isFinite, (0.5...2).contains(rate), abs(self.rate - rate) > 0.0001 else { return }
-        let sourcePosition = position
         self.rate = rate
-        if hasSource { prepare(at: sourcePosition) }
+        guard let graph else { return }
+        if !hasStarted {
+            graph.branches[0].rate = rate
+            graph.branches[0].pitch.rate = Float(rate)
+            graph.branches[0].pitch.bypass = abs(rate - 1) < 0.0001
+        } else {
+            beginRateTransition()
+        }
+    }
+
+    func setEffects(_ effects: AudioEffects) {
+        guard self.effects != effects else { return }
+        self.effects = effects
+        effectsRevision &+= 1
+        let revision = effectsRevision
+        let token = graphGeneration
+        emit(.effects(.preparing))
+        Task { [weak self] in
+            guard let self else { return }
+            do { try await self.decoder.configure(effects, revision: revision) }
+            catch { self.fail(.cannotDecode, token: token) }
+        }
     }
 
     func stop() {
@@ -162,6 +207,10 @@ final class LocalAudioTransport: PlaybackTransport {
         tearDownGraph()
         sourceURL = nil
         info = nil
+        workerAllocatedBytes = 0
+        sourceSpans.removeAll(keepingCapacity: false)
+        effectBoundaries.removeAll(keepingCapacity: false)
+        presentedEffects = nil
         underruns = 0
         heldPosition = 0
         ready = false
@@ -187,13 +236,13 @@ final class LocalAudioTransport: PlaybackTransport {
     func waitForDecodedBuffers() async throws {
         let token = graphGeneration
         while graphGeneration == token {
+            requestFill(token: token)
             await fillTask?.value
             if let failure { throw failure }
-            guard let graph, let info else { throw LocalAudioError.notReady }
-            let queued = decodedThroughFrame - info.startFrame - playerFrame(in: graph)
-            let reserve = AVAudioFramePosition(configuration.blockFrames) * AVAudioFramePosition(max(1, configuration.bufferCount / 2))
-            if decoderEnded || starvationFrame != nil || queued >= reserve { return }
-            await withCheckedContinuation { bufferWaiters.append($0) }
+            guard graph != nil else { throw LocalAudioError.notReady }
+            fillBranches(token: token)
+            advanceRateTransition()
+            if decoderEnded || starvationFrame != nil || (replay?.end ?? 0) >= requiredContentEnd() { return }
         }
         throw LocalAudioError.cancelled
     }
@@ -229,6 +278,11 @@ final class LocalAudioTransport: PlaybackTransport {
         let token = graphGeneration
         tearDownGraph()
         heldPosition = position.isFinite ? max(0, position) : 0
+        scheduledContentFrames = 0
+        sourceSpans.removeAll(keepingCapacity: true)
+        effectBoundaries.removeAll(keepingCapacity: true)
+        presentedEffects = nil
+        workerAllocatedBytes = 0
         ready = false
         reachedEnd = false
         failure = nil
@@ -237,17 +291,18 @@ final class LocalAudioTransport: PlaybackTransport {
         drainedAtOutputFrame = nil
         starvationFrame = nil
         starvationRecoveryOutputFrame = nil
-        paddingRemaining = 0
-        completionOutputFrame = nil
-        outputOrigin = 0
-        scheduledStartHostTime = nil
-        needsReprime = false
+        transition = nil
+        hasStarted = false
         emit(.playback(isPlaying: false))
         guard graphGeneration == token, let sourceURL else { return }
         preparation = Task { [weak self] in
             guard let self else { return }
             await self.decoder.close(generation: oldGeneration)
             do {
+                guard self.graphGeneration == token, !Task.isCancelled else { return }
+                try self.configuration.validate()
+                try await self.decoder.configure(self.effects, revision: self.effectsRevision)
+                guard self.graphGeneration == token, !Task.isCancelled else { return }
                 let info = try await self.decoder.open(url: sourceURL, at: self.heldPosition, generation: token)
                 guard self.graphGeneration == token, !Task.isCancelled else { return }
                 self.info = info
@@ -256,6 +311,7 @@ final class LocalAudioTransport: PlaybackTransport {
                 let graph = try await LocalAudioGraph.make(info: info, configuration: self.configuration, rate: self.rate)
                 guard self.graphGeneration == token, !Task.isCancelled else { graph.stop(); return }
                 self.graph = graph
+                self.replay = AudioReplayWindow(channels: Int(info.channels), capacity: max(Int(info.sampleRate * 1.5), Int(self.configuration.blockFrames) * self.configuration.bufferCount * 4))
                 self.configureObservers(graph: graph, token: token)
                 self.requestFill(token: token)
                 await self.fillTask?.value
@@ -264,11 +320,11 @@ final class LocalAudioTransport: PlaybackTransport {
                 self.preparation = nil
                 self.emit(.seeked(self.heldPosition))
                 guard self.graphGeneration == token else { return }
-                self.emit(.ready(duration: info.duration))
+                self.emit(.ready(duration: self.info?.durationIsEstimated == true ? 0 : self.info?.duration ?? info.duration))
                 guard self.graphGeneration == token else { return }
                 if self.wantsPlayback { self.startPlayback() }
             } catch {
-                self.fail(error as? LocalAudioError ?? .cannotCreateGraph, token: token)
+                self.fail([MediaFailure.unsupportedMedia, .requiresCompleteFile].contains(error as? MediaFailure ?? .invalidResponse) ? .unsupportedFormat : error as? LocalAudioError ?? .cannotCreateGraph, token: token)
             }
         }
     }
@@ -279,80 +335,208 @@ final class LocalAudioTransport: PlaybackTransport {
             guard let self else { return }
             do {
                 while !Task.isCancelled, self.graphGeneration == token,
-                      self.starvationFrame == nil,
-                      let slot = (0..<self.configuration.bufferCount).first(where: { !self.occupiedSlots.contains($0) }) {
-                    if self.decoderEnded {
-                        guard self.paddingRemaining > 0 else { break }
-                        let frames = AVAudioFrameCount(min(AVAudioFramePosition(self.configuration.blockFrames), self.paddingRemaining))
-                        let lease = try await self.decoder.silence(slot: slot, frames: frames, generation: token)
-                        guard self.graphGeneration == token, !Task.isCancelled else { return }
-                        self.paddingRemaining -= AVAudioFramePosition(frames)
-                        self.schedule(lease, token: token)
-                    } else {
-                        let block = try await self.decoder.read(slot: slot, generation: token)
-                        guard self.graphGeneration == token, !Task.isCancelled else { return }
-                        if self.detectStarvation() {
-                            await self.decoder.release(slot: slot, generation: token)
-                            break
-                        }
-                        self.decodedThroughFrame = block.sourceStart + AVAudioFramePosition(block.lease.buffer.frameLength)
-                        if block.endOfFile { self.beginEndPadding() }
-                        if block.lease.buffer.frameLength > 0 {
-                            self.schedule(block.lease, token: token)
-                        } else {
-                            await self.decoder.release(slot: slot, generation: token)
-                        }
+                      self.starvationFrame == nil, !self.decoderEnded,
+                      let replay = self.replay, replay.end < self.requiredContentEnd() {
+                    let block = try await self.decoder.read(slot: 0, generation: token)
+                    guard self.graphGeneration == token, !Task.isCancelled else { return }
+                    if self.detectStarvation() {
+                        await self.decoder.release(slot: 0, generation: token)
+                        break
                     }
+                    self.discardPresentedSpans()
+                    try replay.append(block.lease.buffer)
+                    self.append(block)
+                    self.workerAllocatedBytes = block.allocatedBytes
+                    if let end = block.fileEndFrame, let info = self.info, info.durationIsEstimated {
+                        self.info = LocalAudioFileInfo(sampleRate: info.sampleRate, channels: info.channels, frameCount: end, startFrame: info.startFrame)
+                        self.emit(.duration(Double(end) / info.sampleRate))
+                        guard self.graphGeneration == token else { return }
+                    }
+                    self.decoderEnded = block.endOfFile
+                    await self.decoder.release(slot: 0, generation: token)
+                    guard self.graphGeneration == token, !Task.isCancelled else { return }
+                    self.fillBranches(token: token)
                 }
                 guard self.graphGeneration == token else { return }
                 self.fillTask = nil
-                self.signalBufferChange()
+                self.fillBranches(token: token)
+                self.advanceRateTransition()
                 if self.ready, self.wantsPlayback, !self.playing { self.startPlayback() }
             } catch {
-                self.fail(error as? LocalAudioError ?? .cannotDecode, token: token)
+                self.fail([MediaFailure.unsupportedMedia, .requiresCompleteFile].contains(error as? MediaFailure ?? .invalidResponse) ? .unsupportedFormat : error as? LocalAudioError ?? .cannotDecode, token: token)
             }
         }
     }
 
-    private func beginEndPadding() {
-        guard !decoderEnded, let info, let graph else { return }
-        decoderEnded = true
-        paddingRemaining = AVAudioFramePosition(ceil(info.sampleRate * rate * 0.25))
-        let sourceFrames = Double(decodedThroughFrame - info.startFrame + paddingRemaining)
-        completionOutputFrame = ceil(sourceFrames / info.sampleRate / rate * graph.format.sampleRate) + Double(graph.limiter.latencyFrames)
+    private func requiredContentEnd() -> Int64 {
+        guard let graph, let info else { return 0 }
+        var target = presentedContentFrame(in: graph)
+        let active = graph.branches[Int(graph.handoff.activeInput)]
+        target += Double(bufferReserve(for: active, in: graph, info: info))
+        target = max(target, Double(active.origin + consumedFrame(in: active) + pullReserve(for: active, in: graph, info: info)))
+        if let transition {
+            let incoming = graph.branches[transition.incoming]
+            let gate = Double(graph.handoff.renderedFrameCount)
+            let current = incoming.content(at: max(gate, transition.fadeFrame + Double(transition.fadeFrames)), sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate)
+            target = max(target, current + Double(bufferReserve(for: incoming, in: graph, info: info)), Double(incoming.origin + consumedFrame(in: incoming) + pullReserve(for: incoming, in: graph, info: info)))
+        }
+        return Int64(ceil(max(0, target)))
     }
 
-    private func schedule(_ lease: LocalAudioBufferLease, token: UUID) {
-        guard let graph else { return }
-        occupiedSlots.insert(lease.slot)
-        signalBufferChange()
-        graph.player.scheduleBuffer(lease.buffer, completionCallbackType: .dataConsumed) { [weak self, lease] _ in
-            Task { @MainActor [weak self, lease] in
-                guard let self, self.graphGeneration == token else { return }
-                await self.decoder.release(slot: lease.slot, generation: token)
-                guard self.graphGeneration == token else { return }
-                self.occupiedSlots.remove(lease.slot)
-                self.requestFill(token: token)
+    private func pullReserve(for branch: LocalAudioBranch, in graph: LocalAudioGraph, info: LocalAudioFileInfo) -> Int64 {
+        let outputFrames: Double
+        switch configuration.output {
+        case .device: outputFrames = Double(graph.limiter.maximumFramesToRender)
+        case .offline(_, _, let maximumFrames): outputFrames = Double(maximumFrames)
+        }
+        let inputFrames = (2048 / graph.pitchFormat.sampleRate + outputFrames / graph.format.sampleRate * branch.rate) * info.sampleRate
+        return min(Int64(configuration.bufferedFrames(at: info.sampleRate)), Int64(ceil(inputFrames)))
+    }
+
+    private func bufferReserve(for branch: LocalAudioBranch, in graph: LocalAudioGraph, info: LocalAudioFileInfo) -> Int64 {
+        let quantum = Double(graph.handoff.maximumFramesToRender)
+        let inputFrames = (2048 * (1 + branch.rate) + quantum * branch.rate) / graph.pitchFormat.sampleRate * info.sampleRate
+        let desired = max(inputFrames, info.sampleRate * branch.rate * 0.16)
+        return min(Int64(configuration.bufferedFrames(at: info.sampleRate)), Int64(ceil(desired)))
+    }
+
+    private func fillBranches(token: UUID) {
+        guard graphGeneration == token, let graph, let replay, let info, starvationFrame == nil else { return }
+        let active = Int(graph.handoff.activeInput)
+        for index in graph.branches.indices where index == active || transition?.incoming == index {
+            let branch = graph.branches[index]
+            while branch.source.freeFrames > 0 {
+                let end = replay.end + (decoderEnded ? Int64(ceil(info.sampleRate * branch.rate * 0.25)) : 0)
+                guard branch.cursor < end else { break }
+                let frames = Int(min(Int64(branch.scratch.frameCapacity), end - branch.cursor, Int64(branch.source.freeFrames)))
+                do { try replay.copy(from: branch.cursor, frames: frames, into: branch.scratch, padding: decoderEnded) }
+                catch { fail(.cannotRender, token: token); return }
+                guard branch.source.enqueueBuffer(branch.scratch) else { fail(.cannotRender, token: token); return }
+                branch.cursor += Int64(frames)
             }
         }
+    }
+
+    private func append(_ block: ProcessedAudioBlock) {
+        for span in block.spans {
+            let next = AudioSourceSpan(sourceStart: span.sourceStart, outputStart: scheduledContentFrames + span.outputStart, frameCount: span.frameCount)
+            if let last = sourceSpans.last, last.sourceStart + last.frameCount == next.sourceStart,
+               last.outputStart + last.frameCount == next.outputStart {
+                sourceSpans[sourceSpans.count - 1].frameCount += next.frameCount
+            } else { sourceSpans.append(next) }
+            decodedThroughFrame = next.sourceStart + next.frameCount
+        }
+        scheduledContentFrames += Int64(block.lease.buffer.frameLength)
+        if block.applied.revision != (effectBoundaries.last ?? presentedEffects)?.revision {
+            effectBoundaries.append(block.applied)
+        }
+    }
+
+    private func sourceFrame(at outputFrame: Double) -> Double {
+        guard let span = sourceSpans.last(where: { Double($0.outputStart) <= outputFrame }) else {
+            return Double(info?.startFrame ?? 0)
+        }
+        return Double(span.sourceStart) + min(Double(span.frameCount), max(0, outputFrame - Double(span.outputStart)))
+    }
+
+    private func publishEffects() {
+        guard let info else { return }
+        let token = graphGeneration
+        let sourceFrame = heldPosition * info.sampleRate
+        while let boundary = effectBoundaries.first, Double(boundary.sourceFrame) <= sourceFrame {
+            presentedEffects = boundary
+            effectBoundaries.removeFirst()
+            emit(.effects(.active(boundary.effects)))
+            guard graphGeneration == token else { return }
+        }
+    }
+
+    private func discardPresentedSpans() {
+        guard let graph, let info, let replay else { return }
+        let earliest = max(0, Int64(presentedContentFrame(in: graph) - info.sampleRate * 0.5))
+        replay.discard(before: earliest)
+        while sourceSpans.count > 1, sourceSpans[1].outputStart <= replay.start {
+            sourceSpans.removeFirst()
+        }
+    }
+
+    private func beginRateTransition() {
+        guard ready, hasStarted, transition == nil, !draining, starvationFrame == nil,
+              let graph, let info else { return }
+        let active = Int(graph.handoff.activeInput)
+        let old = graph.branches[active]
+        guard abs(old.rate - rate) > 0.0001 else { return }
+        let incoming = 1 - active
+        let prime = Double(graph.handoff.renderedFrameCount) + Double(max(1024, graph.handoff.maximumFramesToRender))
+        let fade = prime + ceil(graph.pitchFormat.sampleRate * 0.125)
+        let content = old.content(at: fade, sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate)
+        let origin = Int64((content - (fade - prime) / graph.pitchFormat.sampleRate * info.sampleRate * rate).rounded())
+        guard origin >= (replay?.start ?? 0) || origin < 0 && (replay?.start ?? 0) == 0 else { return }
+        let branch = graph.branches[incoming]
+        branch.reset(rate: rate, origin: origin, startFrame: prime)
+        transition = AudioRateTransition(outgoing: active, incoming: incoming, previous: old.clock, next: branch.clock, fadeFrame: fade, fadeFrames: max(2, UInt32(graph.pitchFormat.sampleRate * 0.008)))
+        fillBranches(token: graphGeneration)
+        requestFill(token: graphGeneration)
+    }
+
+    private func advanceRateTransition() {
+        guard let graph, let info else { return }
+        guard var change = transition else { beginRateTransition(); return }
+        let incoming = graph.branches[change.incoming]
+        if !change.scheduled {
+            if Double(graph.handoff.renderedFrameCount) >= incoming.startFrame - Double(graph.handoff.maximumFramesToRender) / 2 {
+                incoming.retire()
+                transition = nil
+                beginRateTransition()
+                return
+            }
+            let minimum = bufferReserve(for: incoming, in: graph, info: info)
+            let coverage = incoming.content(at: change.fadeFrame + Double(change.fadeFrames), sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate) + Double(minimum)
+            guard decoderEnded || incoming.cursor - incoming.origin >= minimum && Double(replay?.end ?? 0) >= coverage else { return }
+            guard graph.handoff.scheduleTransition(toInput: UInt32(change.incoming), primeFrame: UInt64(incoming.startFrame), fadeFrame: UInt64(change.fadeFrame), fadeFrames: change.fadeFrames) else {
+                incoming.retire()
+                transition = nil
+                beginRateTransition()
+                return
+            }
+            change.scheduled = true
+            transition = change
+        }
+        guard !graph.handoff.transitionPending, Int(graph.handoff.activeInput) == change.incoming else { return }
+        graph.branches[change.outgoing].retire()
+        if audibleGateFrame(in: graph) >= change.fadeFrame + Double(change.fadeFrames) {
+            transition = nil
+            beginRateTransition()
+        }
+    }
+
+    private func audibleGateFrame(in graph: LocalAudioGraph) -> Double {
+        max(0, Double(graph.limiter.renderedFrameCount) - latencyFrames(in: graph)) / graph.format.sampleRate * graph.pitchFormat.sampleRate
+    }
+
+    private func presentedContentFrame(in graph: LocalAudioGraph) -> Double {
+        guard let info else { return 0 }
+        let frame = audibleGateFrame(in: graph)
+        if let transition, transition.scheduled {
+            let old = transition.previous.content(at: frame, sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate)
+            let new = transition.next.content(at: frame, sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate)
+            let weight = min(1, max(0, (frame - transition.fadeFrame) / Double(transition.fadeFrames - 1)))
+            return max(0, old * (1 - weight) + new * weight)
+        }
+        return max(0, graph.branches[Int(graph.handoff.activeInput)].content(at: frame, sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate))
     }
 
     private func startPlayback() {
         guard ready, wantsPlayback, !playing, !reachedEnd, let graph else { return }
-        if needsReprime {
-            prepare(at: heldPosition)
-            return
-        }
         let token = graphGeneration
         do {
-            try graph.engine.start()
-            if graph.offline {
-                graph.player.play()
-            } else {
-                let host = mach_absolute_time() + AVAudioTime.hostTime(forSeconds: 0.05)
-                scheduledStartHostTime = host
-                graph.player.play(at: AVAudioTime(hostTime: host))
+            if !hasStarted {
+                graph.branches[0].rate = rate
+                graph.branches[0].pitch.rate = Float(rate)
+                graph.branches[0].pitch.bypass = abs(rate - 1) < 0.0001
             }
+            try graph.engine.start()
+            hasStarted = true
             playing = true
             emit(.playback(isPlaying: true))
             guard graphGeneration == token, playing, wantsPlayback else { return }
@@ -363,10 +547,8 @@ final class LocalAudioTransport: PlaybackTransport {
     }
 
     private func pauseGraph() {
-        if playing { needsReprime = true }
-        heldPosition = position
-        graph?.player.pause()
         graph?.engine.pause()
+        heldPosition = position
         playing = false
         ticker?.cancel()
         ticker = nil
@@ -381,9 +563,9 @@ final class LocalAudioTransport: PlaybackTransport {
         observers = nil
         graph?.stop()
         graph = nil
-        occupiedSlots.removeAll(keepingCapacity: true)
+        replay = nil
+        transition = nil
         playing = false
-        signalBufferChange()
     }
 
     private func startTicker() {
@@ -391,7 +573,7 @@ final class LocalAudioTransport: PlaybackTransport {
         let token = graphGeneration
         ticker = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .milliseconds(20))
                 guard let self, self.graphGeneration == token, !Task.isCancelled else { return }
                 self.publishPosition()
             }
@@ -401,14 +583,18 @@ final class LocalAudioTransport: PlaybackTransport {
     private func publishPosition() {
         guard let graph else { return }
         let token = graphGeneration
-        if graph.limiter.renderFailureCount > 0 {
+        if graph.limiter.renderFailureCount > 0 || graph.handoff.renderFailureCount > 0 || graph.branches.contains(where: { $0.source.renderFailureCount > 0 }) {
             fail(.cannotRender, token: token)
             return
         }
-        guard resolveOutputOrigin(in: graph) else { return }
         _ = detectStarvation()
         guard graphGeneration == token else { return }
         heldPosition = position
+        publishEffects()
+        guard graphGeneration == token else { return }
+        discardPresentedSpans()
+        advanceRateTransition()
+        requestFill(token: token)
         emit(.position(heldPosition))
         guard graphGeneration == token else { return }
         if let starvationRecoveryOutputFrame,
@@ -422,12 +608,14 @@ final class LocalAudioTransport: PlaybackTransport {
 
     private func detectStarvation() -> Bool {
         if starvationFrame != nil { return true }
-        guard playing, !decoderEnded, let graph, let info,
-              playerFrame(in: graph) > decodedThroughFrame - info.startFrame else { return false }
-        starvationFrame = decodedThroughFrame
+        guard playing, let graph, let info else { return false }
+        let active = graph.branches[Int(graph.handoff.activeInput)]
+        guard !decoderEnded || active.cursor < scheduledContentFrames else { return false }
+        guard active.source.underrunFrameCount > 0 else { return false }
+        starvationFrame = Int64(sourceFrame(at: Double(active.cursor)))
         underruns += 1
-        let contentSeconds = Double(decodedThroughFrame - info.startFrame) / info.sampleRate / rate
-        starvationRecoveryOutputFrame = outputOrigin + (contentSeconds + 0.25) * graph.format.sampleRate + Double(graph.limiter.latencyFrames)
+        let end = active.startFrame + Double(active.cursor - active.origin) / info.sampleRate / active.rate * graph.pitchFormat.sampleRate
+        starvationRecoveryOutputFrame = (end / graph.pitchFormat.sampleRate + 0.25) * graph.format.sampleRate + Double(graph.limiter.latencyFrames)
         emit(.playback(isPlaying: false))
         return true
     }
@@ -437,9 +625,12 @@ final class LocalAudioTransport: PlaybackTransport {
     }
 
     private func advanceDrain() {
-        guard let graph, decoderEnded, paddingRemaining == 0, let completionOutputFrame else { return }
+        guard let graph, let info, decoderEnded, transition == nil else { return }
+        let branch = graph.branches[Int(graph.handoff.activeInput)]
+        let end = branch.startFrame / graph.pitchFormat.sampleRate + Double(scheduledContentFrames - branch.origin) / info.sampleRate / branch.rate + 0.25
+        let completion = end * graph.format.sampleRate + Double(graph.limiter.latencyFrames)
         let rendered = Double(graph.limiter.renderedFrameCount)
-        if !draining, rendered >= completionOutputFrame + outputOrigin {
+        if !draining, rendered >= completion {
             draining = true
             graph.limiter.beginDraining()
         }
@@ -455,7 +646,6 @@ final class LocalAudioTransport: PlaybackTransport {
         guard graphGeneration == token, !reachedEnd, decoderEnded else { return }
         reachedEnd = true
         heldPosition = info?.duration ?? heldPosition
-        graph?.player.pause()
         graph?.engine.pause()
         playing = false
         ticker?.cancel()
@@ -478,28 +668,18 @@ final class LocalAudioTransport: PlaybackTransport {
         emit(.failed)
     }
 
-    private func signalBufferChange() {
-        let waiters = bufferWaiters
-        bufferWaiters.removeAll(keepingCapacity: true)
-        for waiter in waiters { waiter.resume() }
-    }
-
-    private func resolveOutputOrigin(in graph: LocalAudioGraph) -> Bool {
-        guard let scheduledStartHostTime else { return true }
-        let first = graph.limiter.firstRenderHostTime
-        guard first > 0 else { return false }
-        outputOrigin = Double(graph.limiter.firstRenderHostFrameOffset) + AVAudioTime.seconds(forHostTime: scheduledStartHostTime - min(first, scheduledStartHostTime)) * graph.format.sampleRate
-        return true
-    }
 
     private func latencyFrames(in graph: LocalAudioGraph) -> Double {
         Double(graph.limiter.latencyFrames) + graph.limiterNode.outputPresentationLatency * graph.format.sampleRate
     }
 
-    private func playerFrame(in graph: LocalAudioGraph) -> AVAudioFramePosition {
-        guard let time = graph.player.lastRenderTime, time.isSampleTimeValid,
-              let playerTime = graph.player.playerTime(forNodeTime: time), playerTime.isSampleTimeValid else { return 0 }
-        return playerTime.sampleTime
+    private func consumedFrame(in graph: LocalAudioGraph) -> AVAudioFramePosition {
+        let branch = graph.branches[Int(graph.handoff.activeInput)]
+        return branch.origin + consumedFrame(in: branch)
+    }
+
+    private func consumedFrame(in branch: LocalAudioBranch) -> AVAudioFramePosition {
+        Int64(branch.source.consumedFrameCount)
     }
 
     private func configureObservers(graph: LocalAudioGraph, token: UUID) {
@@ -529,23 +709,137 @@ final class LocalAudioTransport: PlaybackTransport {
     }
 }
 
+private struct AudioRateClock {
+    let origin: Int64
+    let startFrame: Double
+    let rate: Double
+
+    func content(at frame: Double, sourceRate: Double, graphRate: Double) -> Double {
+        Double(origin) + max(0, frame - startFrame) / graphRate * sourceRate * rate
+    }
+}
+
+private struct AudioRateTransition {
+    let outgoing: Int
+    let incoming: Int
+    let previous: AudioRateClock
+    let next: AudioRateClock
+    let fadeFrame: Double
+    let fadeFrames: UInt32
+    var scheduled = false
+}
+
+@MainActor
+private final class AudioReplayWindow {
+    let channels: Int
+    let capacity: Int
+    private var samples: [[Float]]
+    private(set) var start: Int64 = 0
+    private(set) var end: Int64 = 0
+    var allocatedBytes: UInt64 { UInt64(channels * capacity * MemoryLayout<Float>.stride) }
+
+    init(channels: Int, capacity: Int) {
+        self.channels = channels
+        self.capacity = capacity
+        samples = Array(repeating: [Float](repeating: 0, count: capacity), count: channels)
+    }
+
+    func append(_ buffer: AVAudioPCMBuffer) throws {
+        let frames = Int(buffer.frameLength)
+        guard end - start + Int64(frames) <= capacity, let data = buffer.floatChannelData else { throw LocalAudioError.cannotDecode }
+        for channel in 0..<channels {
+            for frame in 0..<frames { samples[channel][Int((end + Int64(frame)) % Int64(capacity))] = data[channel][frame] }
+        }
+        end += Int64(frames)
+    }
+
+    func copy(from first: Int64, frames: Int, into buffer: AVAudioPCMBuffer, padding: Bool) throws {
+        guard frames <= buffer.frameCapacity, let output = buffer.floatChannelData,
+              first >= start || first < 0 && start == 0,
+              first + Int64(frames) <= end || padding else { throw LocalAudioError.cannotRender }
+        for channel in 0..<channels {
+            for frame in 0..<frames {
+                let position = first + Int64(frame)
+                output[channel][frame] = position < 0 || position >= end ? 0 : samples[channel][Int(position % Int64(capacity))]
+            }
+        }
+        buffer.frameLength = AVAudioFrameCount(frames)
+    }
+
+    func discard(before frame: Int64) {
+        start = min(end, max(start, frame))
+    }
+}
+
+@MainActor
+private final class LocalAudioBranch {
+    let sourceNode: AVAudioUnit
+    let source: PodcstPCMSourceAudioUnit
+    let conversion = AVAudioMixerNode()
+    let pitch = AVAudioUnitTimePitch()
+    let scratch: AVAudioPCMBuffer
+    var origin: Int64 = 0
+    var cursor: Int64 = 0
+    var startFrame: Double = 0
+    var rate: Double
+    var clock: AudioRateClock { AudioRateClock(origin: origin, startFrame: startFrame, rate: rate) }
+    var allocatedBytes: UInt64 { source.allocatedBytes + UInt64(scratch.frameCapacity) * UInt64(scratch.format.channelCount) * 4 }
+
+    init(node: AVAudioUnit, format: AVAudioFormat, configuration: LocalAudioConfiguration, rate: Double) throws {
+        guard let source = node.auAudioUnit as? PodcstPCMSourceAudioUnit,
+              let scratch = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: configuration.processingFrames(at: format.sampleRate)) else { throw LocalAudioError.cannotCreateGraph }
+        try source.configureCapacityFrames(configuration.bufferedFrames(at: format.sampleRate))
+        self.sourceNode = node
+        self.source = source
+        self.scratch = scratch
+        self.rate = rate
+        pitch.rate = Float(rate)
+        pitch.bypass = abs(rate - 1) < 0.0001
+    }
+
+    func reset(rate: Double, origin: Int64, startFrame: Double) {
+        retire()
+        conversion.reset()
+        pitch.reset()
+        self.rate = rate
+        self.origin = origin
+        self.cursor = origin
+        self.startFrame = startFrame
+        pitch.rate = Float(rate)
+        pitch.bypass = abs(rate - 1) < 0.0001
+    }
+
+    func retire() {
+        source.reset()
+    }
+
+    func content(at frame: Double, sourceRate: Double, graphRate: Double) -> Double {
+        clock.content(at: frame, sourceRate: sourceRate, graphRate: graphRate)
+    }
+}
+
 @MainActor
 private final class LocalAudioGraph {
     let engine: AVAudioEngine
-    let player: AVAudioPlayerNode
-    let pitch: AVAudioUnitTimePitch
+    let branches: [LocalAudioBranch]
+    let handoffNode: AVAudioUnit
+    let handoff: PodcstHandoffAudioUnit
     let limiterNode: AVAudioUnit
     let limiter: PodcstLimiterAudioUnit
     let format: AVAudioFormat
+    let pitchFormat: AVAudioFormat
     let offline: Bool
+    var allocatedBytes: UInt64 { branches.reduce(limiter.allocatedBytes + handoff.allocatedBytes) { $0 + $1.allocatedBytes } }
 
-    private init(engine: AVAudioEngine, player: AVAudioPlayerNode, pitch: AVAudioUnitTimePitch, limiterNode: AVAudioUnit, limiter: PodcstLimiterAudioUnit, format: AVAudioFormat, offline: Bool) {
+    private init(engine: AVAudioEngine, branches: [LocalAudioBranch], handoffNode: AVAudioUnit, handoff: PodcstHandoffAudioUnit, limiterNode: AVAudioUnit, limiter: PodcstLimiterAudioUnit, format: AVAudioFormat, pitchFormat: AVAudioFormat, offline: Bool) {
         self.engine = engine
-        self.player = player
-        self.pitch = pitch
+        self.branches = branches
+        self.handoffNode = handoffNode
+        self.handoff = handoff
         self.limiterNode = limiterNode
         self.limiter = limiter
         self.format = format
+        self.pitchFormat = pitchFormat
         self.offline = offline
     }
 
@@ -556,7 +850,8 @@ private final class LocalAudioGraph {
         switch configuration.output {
         case .device:
             let hardware = engine.outputNode.inputFormat(forBus: 0)
-            guard hardware.sampleRate.isFinite, hardware.sampleRate.rounded() == hardware.sampleRate, (8_000...192_000).contains(hardware.sampleRate), hardware.channelCount > 0, let output = AVAudioFormat(standardFormatWithSampleRate: hardware.sampleRate, channels: min(2, hardware.channelCount)), output.channelCount > 0 else { throw LocalAudioError.unsupportedFormat }
+            guard hardware.sampleRate.isFinite, hardware.sampleRate.rounded() == hardware.sampleRate, (8_000...192_000).contains(hardware.sampleRate), hardware.channelCount > 0,
+                  let output = AVAudioFormat(standardFormatWithSampleRate: hardware.sampleRate, channels: min(2, hardware.channelCount)) else { throw LocalAudioError.unsupportedFormat }
             format = output
             offline = false
         case .offline(let sampleRate, let channels, let maximumFrames):
@@ -567,35 +862,51 @@ private final class LocalAudioGraph {
             offline = true
         }
         PodcstLimiterAudioUnit.register()
-        let limiterNode: AVAudioUnit = try await withCheckedThrowingContinuation { continuation in
-            AVAudioUnit.instantiate(with: PodcstLimiterAudioUnit.componentDescription(), options: []) { node, error in
-                if let node { continuation.resume(returning: node) }
-                else { continuation.resume(throwing: error ?? LocalAudioError.cannotCreateGraph) }
-            }
-        }
+        PodcstHandoffAudioUnit.register()
+        PodcstPCMSourceAudioUnit.register()
+        let limiterNode = try await instantiate(PodcstLimiterAudioUnit.componentDescription())
+        let handoffNode = try await instantiate(PodcstHandoffAudioUnit.componentDescription())
         guard let limiter = limiterNode.auAudioUnit as? PodcstLimiterAudioUnit,
-              let sourceFormat = AVAudioFormat(standardFormatWithSampleRate: info.sampleRate, channels: info.channels) else { throw LocalAudioError.cannotCreateGraph }
+              let handoff = handoffNode.auAudioUnit as? PodcstHandoffAudioUnit,
+              let sourceFormat = AVAudioFormat(standardFormatWithSampleRate: info.sampleRate, channels: info.channels),
+              let pitchFormat = AVAudioFormat(standardFormatWithSampleRate: max(48_000, info.sampleRate, format.sampleRate), channels: format.channelCount) else { throw LocalAudioError.cannotCreateGraph }
         try limiter.configureLimiterEnabled(configuration.limiterEnabled)
-        let player = AVAudioPlayerNode()
-        let pitch = AVAudioUnitTimePitch()
-        pitch.rate = Float(rate)
-        pitch.bypass = abs(rate - 1) < 0.0001
-        engine.attach(player)
-        engine.attach(pitch)
+        var branches: [LocalAudioBranch] = []
+        for _ in 0..<2 {
+            let node = try await instantiate(PodcstPCMSourceAudioUnit.componentDescription())
+            branches.append(try LocalAudioBranch(node: node, format: sourceFormat, configuration: configuration, rate: rate))
+        }
         engine.attach(limiterNode)
-        engine.connect(player, to: pitch, format: sourceFormat)
-        engine.connect(pitch, to: engine.mainMixerNode, format: sourceFormat)
+        engine.attach(handoffNode)
+        for (index, branch) in branches.enumerated() {
+            engine.attach(branch.sourceNode)
+            engine.attach(branch.conversion)
+            engine.attach(branch.pitch)
+            engine.connect(branch.sourceNode, to: branch.conversion, format: sourceFormat)
+            engine.connect(branch.conversion, to: branch.pitch, format: pitchFormat)
+            engine.connect(branch.pitch, to: handoffNode, fromBus: 0, toBus: AVAudioNodeBus(index), format: pitchFormat)
+        }
+        engine.connect(handoffNode, to: engine.mainMixerNode, format: pitchFormat)
         engine.disconnectNodeOutput(engine.mainMixerNode)
         engine.connect(engine.mainMixerNode, to: limiterNode, format: format)
         engine.connect(limiterNode, to: engine.outputNode, format: format)
         engine.mainMixerNode.outputVolume = 1
         engine.prepare()
-        return LocalAudioGraph(engine: engine, player: player, pitch: pitch, limiterNode: limiterNode, limiter: limiter, format: format, offline: offline)
+        return LocalAudioGraph(engine: engine, branches: branches, handoffNode: handoffNode, handoff: handoff, limiterNode: limiterNode, limiter: limiter, format: format, pitchFormat: pitchFormat, offline: offline)
+    }
+
+    private static func instantiate(_ description: AudioComponentDescription) async throws -> AVAudioUnit {
+        try await withCheckedThrowingContinuation { continuation in
+            AVAudioUnit.instantiate(with: description, options: []) { node, error in
+                if let node { continuation.resume(returning: node) }
+                else { continuation.resume(throwing: error ?? LocalAudioError.cannotCreateGraph) }
+            }
+        }
     }
 
     func stop() {
         engine.stop()
-        player.stop()
+        for branch in branches { branch.retire() }
     }
 }
 

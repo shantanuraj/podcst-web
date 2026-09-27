@@ -5,12 +5,12 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
-    @Environment(PlaybackController.self) private var playback
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Appearance.key) private var appearance = Appearance.system
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
     @State private var showingLogin = false
     @State private var importing = false
+    @State private var showingAudio = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
@@ -34,7 +34,10 @@ struct SettingsView: View {
                             }
                         }
                         Button("Sign out") {
-                            Task { await session.signOut(); dismiss() }
+                            Task {
+                                await session.signOut()
+                                dismiss()
+                            }
                         }
                     } header: {
                         Text("Account").eyebrow()
@@ -57,11 +60,7 @@ struct SettingsView: View {
                             Text(option.name).tag(option.rawValue)
                         }
                     }
-                    Picker("Default speed", selection: Binding { playback.rate } set: { playback.setRate($0) }) {
-                        ForEach(PlaybackController.supportedRates, id: \.self) { rate in
-                            Text("\(rate, specifier: "%g")×").tag(rate)
-                        }
-                    }
+                    Button("Audio defaults") { showingAudio = true }
                 } header: {
                     Text("Listening").eyebrow()
                 }
@@ -98,6 +97,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showingLogin) { LoginView() }
+            .sheet(isPresented: $showingAudio) { AudioSettingsView(defaultsOnly: true) }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "opml") ?? .xml, .xml, .plainText]) { result in
                 guard case .success(let url) = result else { return }
                 let scoped = url.startAccessingSecurityScopedResource()

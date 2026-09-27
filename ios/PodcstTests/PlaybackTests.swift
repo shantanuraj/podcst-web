@@ -4,6 +4,72 @@ import XCTest
 
 @MainActor
 final class PlaybackTests: XCTestCase {
+    func testPlaybackStateBelongsToItsAccountAndSwitchingClearsIt() {
+        let url = temporaryURL()
+        let transport = FakePlaybackTransport()
+        let first = PlaybackController(transport: transport, persistenceURL: url, accountID: "first")
+        first.play(episode(guid: "private"), at: 30)
+        let sameAccount = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: url, accountID: "first")
+        XCTAssertEqual(sameAccount.currentEpisode?.guid, "private")
+        let otherAccount = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: url, accountID: "second")
+        XCTAssertNil(otherAccount.currentEpisode)
+        first.switchAccount(to: "second")
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertTrue(first.queue.isEmpty)
+        XCTAssertEqual(first.state, .idle)
+        XCTAssertNil(PlaybackController(transport: FakePlaybackTransport(), persistenceURL: url, accountID: "first").currentEpisode)
+    }
+
+    func testToggleCancelsPlayIntentWhileLoadingAndBuffering() {
+        let transport = FakePlaybackTransport()
+        let controller = PlaybackController(transport: transport, persistenceURL: temporaryURL())
+        controller.play(episode(guid: "pending"))
+        XCTAssertEqual(controller.state, .loading)
+        XCTAssertTrue(controller.isPlaybackRequested)
+        controller.toggle()
+        XCTAssertFalse(controller.isPlaybackRequested)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertTrue(transport.playedRates.isEmpty)
+        controller.resume()
+        XCTAssertTrue(controller.isPlaying)
+        transport.emit(.playback(isPlaying: false))
+        XCTAssertEqual(controller.state, .loading)
+        controller.toggle()
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertEqual(transport.playedRates.count, 1)
+    }
+
+    func testAccountRetirementRejectsPlayRequestsUntilScopeChanges() {
+        let transport = FakePlaybackTransport()
+        let controller = PlaybackController(transport: transport, persistenceURL: temporaryURL(), accountID: "first")
+        controller.play(episode(guid: "private"))
+        controller.beginAccountChange()
+        controller.resume()
+        controller.next()
+        controller.play(episode(guid: "replacement"))
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        controller.switchAccount(to: "second")
+        XCTAssertTrue(controller.queue.isEmpty)
+        controller.play(episode(guid: "new-account"))
+        XCTAssertTrue(transport.hasSource)
+    }
+
+    func testForwardSeekIsNotClampedByAnInaccurateFeedDuration() {
+        let transport = FakePlaybackTransport()
+        let controller = PlaybackController(transport: transport, persistenceURL: temporaryURL())
+        var item = episode(guid: "long-recording")
+        item.duration = 10
+        controller.play(item)
+        transport.becomeReady(duration: 0)
+        transport.advance(to: 20)
+        controller.skipForward()
+        XCTAssertEqual(transport.position, 50)
+        XCTAssertEqual(controller.currentTime, 50)
+    }
+
     func testQueueMoveKeepsCurrentEpisodeIdentity() {
         let controller = makeController(persistenceURL: temporaryURL())
         let first = episode(guid: "first")
@@ -343,7 +409,7 @@ final class PlaybackTests: XCTestCase {
         controller.setRate(1.3)
 
         XCTAssertEqual(controller.rate, 1.25)
-        XCTAssertEqual(transport.changedRates, [1.25, 2, 1.25])
+        XCTAssertEqual(transport.changedRates, [1, 1.25, 2, 1.25])
     }
 
     private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil) -> PlaybackController {
@@ -387,7 +453,7 @@ private final class FakePlaybackTransport: PlaybackTransport {
     private var isPlaying = false
     private var duration: TimeInterval = 0
 
-    func load(url: URL, at position: TimeInterval, generation: UUID) {
+    func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
         self.position = position
         self.generation = generation
         hasSource = true
@@ -429,6 +495,10 @@ private final class FakePlaybackTransport: PlaybackTransport {
 
     func setRate(_ rate: Double) {
         changedRates.append(rate)
+    }
+
+    func setEffects(_ effects: AudioEffects) {
+        emit(.effects(.active(effects)))
     }
 
     func stop() {

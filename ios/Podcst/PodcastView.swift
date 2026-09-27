@@ -236,14 +236,15 @@ struct EpisodeRow: View {
             Button {
                 if isCurrent { playback.toggle() } else { playback.play(episode) }
             } label: {
-                RoundIcon(systemName: isCurrent && playback.isPlaying ? "pause.fill" : "play.fill")
+                RoundIcon(systemName: isCurrent && playback.isPlaybackRequested ? "pause.fill" : "play.fill")
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isCurrent && playback.isPlaying ? "Pause \(episode.title)" : "Play \(episode.title)")
+            .accessibilityLabel(isCurrent && playback.isPlaybackRequested ? "Pause \(episode.title)" : "Play \(episode.title)")
         }
         .padding(.vertical, 12)
         .hairline()
         .contextMenu {
+            DownloadMenuActions(episode: episode)
             Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") { playback.enqueue(episode, next: true) }
             Button("Add to queue", systemImage: "text.append") { playback.enqueue(episode) }
         }
@@ -277,6 +278,7 @@ struct EpisodeDetailView: View {
                 .padding(.top, 6)
                 HStack(spacing: 10) {
                     EpisodePlayButton(episode: episode)
+                    DownloadButton(episode: episode, compact: true)
                     let queued = playback.queue.contains { $0.identity == episode.identity }
                     Button {
                         playback.enqueue(episode, next: true)
@@ -316,7 +318,7 @@ private struct EpisodePlayButton: View {
 
     var body: some View {
         let position = playback.position(of: episode)
-        let playing = position != nil && playback.isPlaying
+        let playing = position != nil && playback.isPlaybackRequested
         let fraction = position.map { _ in playback.progress } ?? 0
         Button {
             if position != nil { playback.toggle() } else { playback.play(episode) }

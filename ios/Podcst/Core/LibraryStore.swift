@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Observation
 
 @MainActor
@@ -14,12 +15,16 @@ public final class LibraryStore {
     private let session: SessionStore
     private let defaults: UserDefaults
     private let guestKey = "guest.library.podcasts"
+    @ObservationIgnored private var progressWriter: PlaybackProgressWriter?
+    @ObservationIgnored private var progressAccountID: String?
 
     public init(api: APIClient, session: SessionStore, defaults: UserDefaults = .standard) {
         self.api = api
         self.session = session
         self.defaults = defaults
-        podcasts = loadGuest()
+        let cached = session.user == nil ? nil : api.cachedSubscriptions()
+        podcasts = session.user == nil ? loadGuest() : cached ?? []
+        hasLoaded = cached != nil || !api.hasSession
     }
 
     public var newReleases: [Episode] {
@@ -31,22 +36,33 @@ public final class LibraryStore {
     }
 
     public func load(forceRefresh: Bool = false) async {
+        guard !session.isLoading else { return }
+        let accountID = session.user?.id
         isLoading = true
         defer {
-            isLoading = false
-            hasLoaded = true
+            if session.user?.id == accountID {
+                isLoading = false
+                hasLoaded = true
+            }
         }
         do {
-            if session.user != nil {
+            if let accountID {
+                await writer(for: accountID).flush()
+                guard session.user?.id == accountID, !Task.isCancelled else { return }
                 if let cached = api.cachedSubscriptions() { podcasts = cached }
-                podcasts = try await (forceRefresh ? api.refreshSubscriptions() : api.subscriptions())
-                progress = try? await api.currentProgress()
+                let subscriptions = try await (forceRefresh ? api.refreshSubscriptions() : api.subscriptions())
+                guard session.user?.id == accountID, !Task.isCancelled else { return }
+                podcasts = subscriptions
+                let latest = try? await api.currentProgress()
+                guard session.user?.id == accountID, !Task.isCancelled else { return }
+                progress = latest
             } else {
                 podcasts = loadGuest()
                 progress = nil
             }
             error = nil
         } catch let failure {
+            guard session.user?.id == accountID, !Task.isCancelled else { return }
             error = failure.localizedDescription
         }
     }
@@ -88,15 +104,41 @@ public final class LibraryStore {
         }
     }
 
-    public func saveProgress(episodeID: Int, position: Double, completed: Bool) async {
-        guard session.user != nil else { return }
-        do {
-            try await api.saveProgress(episodeID: episodeID, position: position, completed: completed)
-            if completed { progress = nil }
-            error = nil
-        } catch let failure {
-            error = failure.localizedDescription
+    public func saveProgress(_ update: PlaybackUpdate) {
+        guard let accountID = session.user?.id, let episodeID = update.episode.id else { return }
+        writer(for: accountID).submit(.init(episodeID: episodeID, position: update.position, completed: update.completed))
+    }
+
+    private func writer(for accountID: String) -> PlaybackProgressWriter {
+        if progressAccountID == accountID, let progressWriter { return progressWriter }
+        let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Podcst/Progress", isDirectory: true)
+        let writer = PlaybackProgressWriter(storageURL: directory.appendingPathComponent(key + ".json")) { [weak self] value in
+            guard let self, self.session.user?.id == accountID, self.api.accountID == accountID else { throw CancellationError() }
+            do {
+                try await self.api.saveProgress(episodeID: value.episodeID, position: value.position, completed: value.completed)
+                guard self.session.user?.id == accountID, !Task.isCancelled else { return }
+                if value.completed { self.progress = nil }
+                self.error = nil
+            } catch {
+                guard self.session.user?.id == accountID, !Task.isCancelled else { return }
+                self.error = error.localizedDescription
+                throw error
+            }
         }
+        progressAccountID = accountID
+        progressWriter = writer
+        return writer
+    }
+
+    public func resetProgressSync() async {
+        let writer = progressWriter
+        progressWriter = nil
+        progressAccountID = nil
+        await writer?.reset()
+        podcasts = []
+        progress = nil
     }
 
     public func importFeeds(_ feeds: [String]) async {

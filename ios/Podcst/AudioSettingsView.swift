@@ -77,7 +77,8 @@ struct AudioSettingsView: View {
                 } footer: {
                     if usesDefaults {
                         Text(defaultsDescription)
-                    } else if let statusDescription {
+                    }
+                    if let statusDescription {
                         Text(statusDescription)
                     }
                 }
@@ -114,9 +115,13 @@ struct AudioSettingsView: View {
     }
 
     private var statusDescription: String? {
-        guard let feed else { return nil }
-        guard playback.currentEpisode?.feed == feed else {
-            return "These settings apply the next time you play this podcast."
+        if usesDefaults {
+            guard let current = playback.currentEpisode, !preferences.hasOverride(for: current.feed) else { return nil }
+        } else {
+            guard let feed else { return nil }
+            guard playback.currentEpisode?.feed == feed else {
+                return "These settings apply the next time you play this podcast."
+            }
         }
         guard playback.requestedEffects.enabled else { return nil }
         switch playback.audioEffectState {
