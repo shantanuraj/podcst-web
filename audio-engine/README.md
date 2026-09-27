@@ -227,6 +227,40 @@ After deliberately changing the ABI, regenerate it with:
 PODCST_UPDATE_HEADER=1 cargo test --manifest-path audio-engine/Cargo.toml --test header
 ```
 
+### Apple packaging and linking
+
+On macOS, install Xcode with the iOS SDK and select it with `xcode-select`.
+Install Rust using rustup, then add the three Apple targets:
+
+```sh
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+audio-engine/scripts/build-apple.sh
+audio-engine/scripts/test-native.sh --apple
+```
+
+The build produces `audio-engine/target/apple/PodcstAudioEngine.xcframework`
+with device arm64 and simulator arm64/x86_64 static-library slices, a C header
+and the `PodcstAudioEngine` Swift module. Deployment starts at iOS 18. Generated
+binaries remain under ignored `target/`. Run with `RUSTUP_TOOLCHAIN=stable` to
+select stable explicitly; the scripts use the active rustup toolchain otherwise.
+The app retains its existing AVPlayer transport and does not yet link the native
+framework. The local-file backend will consume this package in M1.5.
+
+`test-native.sh` runs C ABI/layout and Swift import/processing checks on the Mac.
+With `--apple`, it also links the Swift checks against every packaged architecture;
+cross-linking does not execute a device binary. Run the simulator executable on
+a booted simulator by supplying its identifier:
+
+```sh
+xcrun simctl spawn <simulator-id> "$PWD/audio-engine/target/native-tests/swift-simulator-$(uname -m)"
+```
+
+`.github/workflows/audio.yml` runs Rust tests, strict Clippy, Apple packaging,
+C/Swift checks, the packaged Swift executable on iOS Simulator and the app's
+playback tests. Its Apple runner needs an available iPhone simulator with iOS 18
+or later. Local builds need the same SDKs, targets and command-line tools; no
+prebuilt binary is downloaded or checked in.
+
 ### Deliberately unresolved: streaming condensation
 
 Offline edits still retain 250 ms, trim at most 1,500 ms per guarded pause,
