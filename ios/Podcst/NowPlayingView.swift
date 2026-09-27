@@ -367,7 +367,7 @@ private struct EpisodeMenu: View {
             Button("Show notes", systemImage: "doc.text", action: showNotes)
             Button("Episode page", systemImage: "info.circle") { router.open(.episode(episode)) }
             Button("Go to podcast", systemImage: "square.stack") { router.open(.podcast(episode.podcast)) }
-            if let url = URL(string: episode.link ?? episode.file.url) {
+            if let url = episode.shareURL {
                 ShareLink(item: url)
             }
         } label: {

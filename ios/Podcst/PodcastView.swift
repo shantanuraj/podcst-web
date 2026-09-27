@@ -76,7 +76,7 @@ struct PodcastDetailView: View {
                     }
                     .buttonStyle(PodcstButtonStyle(kind: .surface, height: 44))
                     .disabled(content.episodes.isEmpty)
-                    if let url = URL(string: content.link ?? content.feed) {
+                    if let url = content.shareURL {
                         ShareLink(item: url) {
                             Image(systemName: "square.and.arrow.up")
                                 .frame(width: 20)
@@ -301,7 +301,7 @@ struct EpisodeDetailView: View {
         .podcstPage()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let url = URL(string: episode.link ?? episode.file.url) {
+            if let url = episode.shareURL {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: url)
                 }
