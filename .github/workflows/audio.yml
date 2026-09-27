@@ -23,15 +23,13 @@ jobs:
   apple:
     runs-on: macos-26
     timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal --target aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
       - run: audio-engine/scripts/build-apple.sh
-        env:
-          RUSTUP_TOOLCHAIN: stable
       - run: audio-engine/scripts/test-native.sh --apple
-        env:
-          RUSTUP_TOOLCHAIN: stable
       - name: Select an available iPhone simulator
         run: |
           python3 - <<'PY'

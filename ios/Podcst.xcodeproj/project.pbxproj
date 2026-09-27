@@ -21,6 +21,14 @@
 		8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A357A35D6089D818A2411D /* Core/Models.swift */; };
 		909BCC4BDD2762528AB96152 /* Core/ShowNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 260F9B201B85D962396DD359 /* Core/ShowNotes.swift */; };
 		980DE9686E8D84937EE46ECA /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929F53E424189EAB89F33BA4 /* NowPlayingView.swift */; };
+		A01000000000000000000002 /* Playback/PlaybackTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000001 /* Playback/PlaybackTransport.swift */; };
+		A01000000000000000000004 /* Playback/AVPlayerTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000003 /* Playback/AVPlayerTransport.swift */; };
+		A01500000000000000000012 /* Playback/Native/PodcstLimiterAudioUnit.mm in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000002 /* Playback/Native/PodcstLimiterAudioUnit.mm */; };
+		A01500000000000000000014 /* Playback/LocalAudioDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000004 /* Playback/LocalAudioDecoder.swift */; };
+		A01500000000000000000015 /* Playback/LocalAudioTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000005 /* Playback/LocalAudioTransport.swift */; };
+		A01500000000000000000016 /* Playback/LocalAudioHarnessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000006 /* Playback/LocalAudioHarnessView.swift */; };
+		A01500000000000000000017 /* LocalAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000007 /* LocalAudioTests.swift */; };
+		A01500000000000000000018 /* NativeRenderTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = A01500000000000000000008 /* NativeRenderTests.mm */; };
 		A3E541D0B85A4C6F9D3E7B21 /* FeedCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8D72E4C0F614A5C9E2F1D36 /* FeedCacheTests.swift */; };
 		A74D0AEC5B22145C18B557DE /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E95984C2429031F651BE7C6F /* Theme.swift */; };
 		A9F95465554040AFD6737C4A /* Core/LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */; };
@@ -31,8 +39,6 @@
 		E835B2CD5F887821EE8FFC7F /* Playback/PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */; };
 		EF8431AC2777E551414F7BB6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F754A39CE6B3C70CF8228342 /* SettingsView.swift */; };
 		F693358E0569879CCE89CB31 /* Fonts/InstrumentSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 193AA15CFD5F283A14F3D79A /* Fonts/InstrumentSerif-Regular.ttf */; };
-		A01000000000000000000002 = {isa = PBXBuildFile; fileRef = A01000000000000000000001; };
-		A01000000000000000000004 = {isa = PBXBuildFile; fileRef = A01000000000000000000003; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +68,16 @@
 		77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/SessionStore.swift; sourceTree = "<group>"; };
 		929F53E424189EAB89F33BA4 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
 		9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A01000000000000000000001 /* Playback/PlaybackTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/PlaybackTransport.swift; sourceTree = "<group>"; };
+		A01000000000000000000003 /* Playback/AVPlayerTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/AVPlayerTransport.swift; sourceTree = "<group>"; };
+		A01500000000000000000001 /* Playback/Native/PodcstLimiterAudioUnit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Playback/Native/PodcstLimiterAudioUnit.h; sourceTree = "<group>"; };
+		A01500000000000000000002 /* Playback/Native/PodcstLimiterAudioUnit.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = Playback/Native/PodcstLimiterAudioUnit.mm; sourceTree = "<group>"; };
+		A01500000000000000000003 /* Playback/Native/PodcstAudio-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Playback/Native/PodcstAudio-Bridging-Header.h"; sourceTree = "<group>"; };
+		A01500000000000000000004 /* Playback/LocalAudioDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/LocalAudioDecoder.swift; sourceTree = "<group>"; };
+		A01500000000000000000005 /* Playback/LocalAudioTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/LocalAudioTransport.swift; sourceTree = "<group>"; };
+		A01500000000000000000006 /* Playback/LocalAudioHarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/LocalAudioHarnessView.swift; sourceTree = "<group>"; };
+		A01500000000000000000007 /* LocalAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAudioTests.swift; sourceTree = "<group>"; };
+		A01500000000000000000008 /* NativeRenderTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRenderTests.mm; sourceTree = "<group>"; };
 		B56A8841AF99B2422E9F26A5 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		B8D72E4C0F614A5C9E2F1D36 /* FeedCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedCacheTests.swift; sourceTree = "<group>"; };
 		B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
@@ -73,8 +89,6 @@
 		F372CC719A9355C7B57516AF /* PodcstApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcstApp.swift; sourceTree = "<group>"; };
 		F754A39CE6B3C70CF8228342 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F9D6E69B6BD7D99E5E6B4C1A /* Podcst.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Podcst.entitlements; sourceTree = "<group>"; };
-		A01000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/PlaybackTransport.swift; sourceTree = "<group>"; };
-		A01000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/AVPlayerTransport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,6 +112,12 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				A01500000000000000000006 /* Playback/LocalAudioHarnessView.swift */,
+				A01500000000000000000005 /* Playback/LocalAudioTransport.swift */,
+				A01500000000000000000004 /* Playback/LocalAudioDecoder.swift */,
+				A01500000000000000000003 /* Playback/Native/PodcstAudio-Bridging-Header.h */,
+				A01500000000000000000002 /* Playback/Native/PodcstLimiterAudioUnit.mm */,
+				A01500000000000000000001 /* Playback/Native/PodcstLimiterAudioUnit.h */,
 				9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */,
 				3C2869B1B1D5A358576E332C /* Core/APIClient.swift */,
 				60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */,
@@ -105,8 +125,8 @@
 				77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */,
 				B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */,
 				B56A8841AF99B2422E9F26A5 /* LibraryView.swift */,
-				A01000000000000000000001,
-				A01000000000000000000003,
+				A01000000000000000000001 /* Playback/PlaybackTransport.swift */,
+				A01000000000000000000003 /* Playback/AVPlayerTransport.swift */,
 				30B7386D236ECEA70A9B7EB8 /* Playback/PlaybackController.swift */,
 				F372CC719A9355C7B57516AF /* PodcstApp.swift */,
 				D93CD43E71868DB1B23962D7 /* QueueView.swift */,
@@ -148,6 +168,8 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				A01500000000000000000008 /* NativeRenderTests.mm */,
+				A01500000000000000000007 /* LocalAudioTests.swift */,
 				B8D72E4C0F614A5C9E2F1D36 /* FeedCacheTests.swift */,
 				20A41063775FC41C3DF79D8A /* PlaybackTests.swift */,
 			);
@@ -178,6 +200,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9B6672C266C16D03628B29C8 /* Build configuration list for PBXNativeTarget "Podcst" */;
 			buildPhases = (
+				A01500000000000000000040 /* Build native audio */,
 				92D7B756AF3AA5E88F7FDB23 /* Sources */,
 				326A678791C89F5FAABDFBFA /* Frameworks */,
 				650A1135D1611B9D2FFB37C0 /* Resources */,
@@ -242,11 +265,32 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		A01500000000000000000040 /* Build native audio */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Build native audio";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/libpodcst_audio_engine.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$SRCROOT/../audio-engine/scripts/build-xcode.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		78A10A681B05EBFA9A1352B2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A01500000000000000000018 /* NativeRenderTests.mm in Sources */,
+				A01500000000000000000017 /* LocalAudioTests.swift in Sources */,
 				A3E541D0B85A4C6F9D3E7B21 /* FeedCacheTests.swift in Sources */,
 				6F68F06B673CE6B12194ED83 /* PlaybackTests.swift in Sources */,
 			);
@@ -256,14 +300,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A01500000000000000000016 /* Playback/LocalAudioHarnessView.swift in Sources */,
+				A01500000000000000000015 /* Playback/LocalAudioTransport.swift in Sources */,
+				A01500000000000000000014 /* Playback/LocalAudioDecoder.swift in Sources */,
+				A01500000000000000000012 /* Playback/Native/PodcstLimiterAudioUnit.mm in Sources */,
 				7B593FE8762E76C85CC81150 /* Core/APIClient.swift in Sources */,
 				A9F95465554040AFD6737C4A /* Core/LibraryStore.swift in Sources */,
 				8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */,
 				6A9AFF4B84ECC8BBB1F90668 /* Core/SessionStore.swift in Sources */,
 				D85A7146F885996C903E05C6 /* DiscoverView.swift in Sources */,
 				0CFBEBF3E82F8CAFDD299718 /* LibraryView.swift in Sources */,
-				A01000000000000000000002,
-				A01000000000000000000004,
+				A01000000000000000000002 /* Playback/PlaybackTransport.swift in Sources */,
+				A01000000000000000000004 /* Playback/AVPlayerTransport.swift in Sources */,
 				E835B2CD5F887821EE8FFC7F /* Playback/PlaybackController.swift in Sources */,
 				D7D4261645E1200A88D5E7EF /* PodcstApp.swift in Sources */,
 				366C052B27F2FECD258853EB /* QueueView.swift in Sources */,
@@ -295,11 +343,18 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../audio-engine/include",
+					"$(SRCROOT)/Podcst/Playback/Native",
+				);
 				INFOPLIST_FILE = PodcstTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -330,13 +385,21 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_ENTITLEMENTS = Podcst/Podcst.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../audio-engine/include",
+					"$(SRCROOT)/Podcst/Playback/Native",
+				);
 				INFOPLIST_FILE = Podcst/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Podcst - Listen to your favorite podcasts anywhere";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.news";
@@ -345,9 +408,25 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lpodcst_audio_engine",
+					"-liconv",
+					"-lc++",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios;
 				PRODUCT_NAME = Podcst;
 				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/../audio-engine/include";
+				SWIFT_OBJC_BRIDGING_HEADER = "Podcst/Playback/Native/PodcstAudio-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -358,11 +437,18 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../audio-engine/include",
+					"$(SRCROOT)/Podcst/Playback/Native",
+				);
 				INFOPLIST_FILE = PodcstTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -393,14 +479,22 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_ENTITLEMENTS = Podcst/Podcst.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../audio-engine/include",
+					"$(SRCROOT)/Podcst/Playback/Native",
+				);
 				INFOPLIST_FILE = Podcst/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Podcst - Listen to your favorite podcasts anywhere";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.news";
@@ -409,9 +503,26 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lpodcst_audio_engine",
+					"-liconv",
+					"-lc++",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios;
 				PRODUCT_NAME = Podcst;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/../audio-engine/include";
+				SWIFT_OBJC_BRIDGING_HEADER = "Podcst/Playback/Native/PodcstAudio-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
