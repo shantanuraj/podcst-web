@@ -84,6 +84,11 @@ public final class APIClient {
         }
     }
 
+    public func detail(of podcast: Podcast) async throws -> Podcast {
+        if let id = podcast.id { return try await self.podcast(id: id) }
+        return try await self.podcast(feed: podcast.feed)
+    }
+
     public func podcastInfo(id: Int) async throws -> Podcast {
         let raw: RawPodcastInfo = try await get(path: "/api/feed/info", query: [URLQueryItem(name: "id", value: String(id))])
         return Podcast(id: raw.id, feed: raw.feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.cover, description: raw.description, link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords, episodeCount: raw.episodeCount)

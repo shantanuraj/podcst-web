@@ -40,6 +40,8 @@ public final class PlaybackController {
     public private(set) var duration: TimeInterval
     public private(set) var state: PlaybackState
     public private(set) var rate: Double
+    public private(set) var isDoubleSpeedHeld = false
+    public private(set) var outputName: String?
     public var onProgress: ((PlaybackUpdate) -> Void)?
 
     public var currentEpisode: Episode? {
@@ -49,8 +51,36 @@ public final class PlaybackController {
 
     public var isPlaying: Bool { state == .playing }
 
+    public var upNext: [Episode] {
+        guard queue.indices.contains(currentIndex) else { return queue }
+        return Array(queue[(currentIndex + 1)...] + queue[..<currentIndex])
+    }
+
+    public var remaining: TimeInterval { max(0, duration - currentTime) }
+
+    public var progress: Double { duration > 0 ? min(1, currentTime / duration) : 0 }
+
+    public var chapters: [Chapter] {
+        guard let episode = currentEpisode else { return [] }
+        if let assetChapters, assetChapters.identity == episode.identity, !assetChapters.chapters.isEmpty {
+            return assetChapters.chapters
+        }
+        if let parsedChapters, parsedChapters.identity == episode.identity { return parsedChapters.chapters }
+        let chapters = ShowNotesParser.chapters(ShowNotesParser.notes(of: episode))
+        parsedChapters = (episode.identity, chapters)
+        return chapters
+    }
+
+    public var currentChapterIndex: Int? { chapters.index(at: currentTime) }
+
+    public func position(of episode: Episode) -> TimeInterval? {
+        episode.identity == currentEpisode?.identity ? currentTime : nil
+    }
+
     public static let supportedRates: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
+    private var assetChapters: (identity: String, chapters: [Chapter])?
+    @ObservationIgnored private var parsedChapters: (identity: String, chapters: [Chapter])?
     @ObservationIgnored private let player: AVPlayer
     @ObservationIgnored private let storageURL: URL
     @ObservationIgnored private var itemStatusObservation: NSKeyValueObservation?
@@ -66,12 +96,6 @@ public final class PlaybackController {
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
     @ObservationIgnored private var artworkKey: String?
     @ObservationIgnored private var nowPlayingArtwork: MPMediaItemArtwork?
-    @ObservationIgnored private static let artworkCache: NSCache<NSURL, UIImage> = {
-        let cache = NSCache<NSURL, UIImage>()
-        cache.countLimit = 60
-        cache.totalCostLimit = 16 * 1024 * 1024
-        return cache
-    }()
 
     private struct PersistedState: Codable {
         var queue: [Episode]
@@ -93,6 +117,7 @@ public final class PlaybackController {
         configureAudioSession()
         configurePlayerObservers()
         configureRemoteCommands()
+        updateOutputName()
         updateNowPlayingInfo()
     }
 
@@ -109,6 +134,7 @@ public final class PlaybackController {
         configureAudioSession()
         configurePlayerObservers()
         configureRemoteCommands()
+        updateOutputName()
         updateNowPlayingInfo()
     }
 
@@ -182,7 +208,7 @@ public final class PlaybackController {
             replaceCurrentItem(startingAt: currentTime, autoPlay: true)
             return
         }
-        player.playImmediately(atRate: Float(rate))
+        player.playImmediately(atRate: Float(effectiveRate))
         state = .playing
         updateNowPlayingInfo()
     }
@@ -216,17 +242,45 @@ public final class PlaybackController {
     }
 
     public func skipForward() {
-        skip(by: 10)
+        skip(by: 30)
+    }
+
+    public func previousChapter() {
+        guard let index = currentChapterIndex else { return previous() }
+        let chapter = chapters[index]
+        if currentTime - chapter.start > 3 || index == 0 {
+            seek(to: chapter.start)
+        } else {
+            seek(to: chapters[index - 1].start)
+        }
+    }
+
+    public func nextChapter() {
+        let chapters = chapters
+        guard let next = chapters.first(where: { $0.start > currentTime + 0.5 }) else { return self.next() }
+        seek(to: next.start)
+    }
+
+    public func holdDoubleSpeed(_ held: Bool) {
+        guard isDoubleSpeedHeld != held else { return }
+        isDoubleSpeedHeld = held
+        applyRate()
     }
 
     public func setRate(_ newRate: Double) {
         guard Self.supportedRates.contains(where: { abs($0 - newRate) < 0.0001 }) else { return }
         rate = newRate
-        player.defaultRate = Float(newRate)
-        if state == .playing {
-            player.rate = Float(newRate)
-        }
         persist()
+        applyRate()
+    }
+
+    private var effectiveRate: Double { isDoubleSpeedHeld ? 2 : rate }
+
+    private func applyRate() {
+        player.defaultRate = Float(effectiveRate)
+        if state == .playing {
+            player.rate = Float(effectiveRate)
+        }
         updateNowPlayingInfo()
     }
 
@@ -296,6 +350,22 @@ public final class PlaybackController {
         updateNowPlayingInfo()
     }
 
+    public func removeUpNext(atOffsets offsets: IndexSet) {
+        rotateToCurrent()
+        remove(atOffsets: IndexSet(offsets.map { $0 + 1 }))
+    }
+
+    public func moveUpNext(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        rotateToCurrent()
+        move(fromOffsets: IndexSet(offsets.map { $0 + 1 }), toOffset: destination + 1)
+    }
+
+    private func rotateToCurrent() {
+        guard queue.indices.contains(currentIndex), currentIndex > 0 else { return }
+        queue = Array(queue[currentIndex...] + queue[..<currentIndex])
+        currentIndex = 0
+    }
+
     public func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
         guard let source = offsets.first, offsets.count == 1, queue.indices.contains(source) else { return }
         let oldCurrentIndex = currentIndex
@@ -356,8 +426,10 @@ public final class PlaybackController {
         itemStatusObservation?.invalidate()
         itemStatusObservation = nil
         player.pause()
-        let item = AVPlayerItem(url: url)
+        let asset = AVURLAsset(url: url)
+        let item = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: item)
+        loadChapters(from: asset, identity: episode.identity, token: token)
         let clampedPosition = max(0, position)
         currentTime = clampedPosition
         if let episodeDuration = episode.duration, episodeDuration > 0 {
@@ -382,7 +454,7 @@ public final class PlaybackController {
             let itemDuration = item.duration.safeSeconds(default: 0)
             if itemDuration > 0 { duration = itemDuration }
             if autoPlay && shouldPlay {
-                player.playImmediately(atRate: Float(rate))
+                player.playImmediately(atRate: Float(effectiveRate))
                 state = .playing
             } else {
                 state = .paused
@@ -428,6 +500,7 @@ public final class PlaybackController {
         routeChangeObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: AVAudioSession.sharedInstance(), queue: .main) { [weak self] notification in
             let reasonRaw = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue
             Task { @MainActor [weak self] in
+                self?.updateOutputName()
                 self?.handleRouteChange(reasonRaw: reasonRaw)
             }
         }
@@ -509,6 +582,31 @@ public final class PlaybackController {
         }
     }
 
+    private func updateOutputName() {
+        outputName = AVAudioSession.sharedInstance().currentRoute.outputs
+            .first { [.airPlay, .HDMI, .carAudio].contains($0.portType) }?
+            .portName
+    }
+
+    private func loadChapters(from asset: AVURLAsset, identity: String, token: UUID) {
+        Task { [weak self] in
+            let chapters = await Self.chapters(in: asset)
+            guard let self, self.generation == token else { return }
+            self.assetChapters = (identity, chapters)
+        }
+    }
+
+    private nonisolated static func chapters(in asset: AVURLAsset) async -> [Chapter] {
+        guard let groups = try? await asset.loadChapterMetadataGroups(bestMatchingPreferredLanguages: Locale.preferredLanguages) else { return [] }
+        var chapters: [Chapter] = []
+        for group in groups {
+            let title = try? await AVMetadataItem.metadataItems(from: group.items, filteredByIdentifier: .commonIdentifierTitle).first?.load(.stringValue)
+            let start = group.timeRange.start.safeSeconds
+            chapters.append(Chapter(title: title ?? "Chapter \(chapters.count + 1)", start: start))
+        }
+        return chapters.count >= 2 ? chapters : []
+    }
+
     private func handleRouteChange(reasonRaw: UInt?) {
         guard let reasonRaw, let reason = AVAudioSession.RouteChangeReason(rawValue: reasonRaw) else { return }
         if reason == .oldDeviceUnavailable, state == .playing { pause() }
@@ -566,7 +664,7 @@ public final class PlaybackController {
         }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: episode.title,
-            MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? rate : 0,
+            MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? effectiveRate : 0,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime
         ]
         if let podcastTitle = episode.podcastTitle { info[MPMediaItemPropertyAlbumTitle] = podcastTitle }
@@ -594,7 +692,7 @@ public final class PlaybackController {
             guard let self else { return }
             for url in urls {
                 guard !Task.isCancelled else { return }
-                if let image = await self.loadArtwork(from: url) {
+                if let image = await ArtworkStore.shared.image(url) {
                     guard !Task.isCancelled,
                           self.artworkKey == key,
                           self.currentEpisode?.identity == identity else { return }
@@ -605,18 +703,6 @@ public final class PlaybackController {
                 }
             }
         }
-    }
-
-    private func loadArtwork(from url: URL) async -> UIImage? {
-        if let cached = Self.artworkCache.object(forKey: url as NSURL) { return cached }
-        guard let (data, response) = try? await URLSession.shared.data(from: url),
-              !Task.isCancelled,
-              let httpResponse = response as? HTTPURLResponse,
-              200..<300 ~= httpResponse.statusCode,
-              let image = UIImage(data: data) else { return nil }
-        let cost = max(1, Int(image.size.width * image.scale * image.size.height * image.scale * 4))
-        Self.artworkCache.setObject(image, forKey: url as NSURL, cost: cost)
-        return image
     }
 
     private func persist() {
