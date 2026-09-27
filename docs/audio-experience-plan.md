@@ -1,6 +1,6 @@
 # Podcst audio experience
 
-Status: planned. Baseline: `31ae363` and `ac54242`, reviewed 27 September 2026.
+Status: milestone 1 in progress; M1.1 complete. Baseline: `31ae363` and `ac54242`, reviewed 27 September 2026. Milestone 2 remains planned.
 
 This is the implementation and acceptance plan for native Volume Boost and Trim Silence on iOS 18 and later. Update the work ledger when a change lands. Record measured evidence before marking a gate complete; a successful build is not evidence of sound quality or device reliability.
 
@@ -28,7 +28,7 @@ Out of scope: an AVPlayer-tap effects implementation, new codecs written in Rust
 | Component | Existing capability | Work required |
 | --- | --- | --- |
 | `audio-engine/src/analysis.rs` | Bounded loudness measurement and fixed/adaptive silence classification; reset, seek, finish. | A causal level controller, reusable frame decisions, and measured processing cost. Closed-pause events alone cannot drive bounded live editing. |
-| `audio-engine/src/processing.rs` | Fixed gain, lookahead limiter, offline pause editing and timeline mapping. | Caller-owned output, allocation-free render processing, online pause editing, smooth configuration changes, and streaming timeline spans. The limiter currently allocates per PCM frame. |
+| `audio-engine/src/processing.rs` | Fixed gain, preallocated lookahead limiter storage, offline pause editing and timeline mapping. | Bounded caller-owned output, render integration, online pause editing, smooth configuration changes, and streaming timeline spans. The current caller output vector can still grow. |
 | `audio-engine/Cargo.toml` | Rust library and reference CLI. | A narrow C ABI, reproducible static-library/XCFramework packaging and native tests. |
 | `ios/Podcst/Playback/PlaybackController.swift` | Queue, AVPlayer transport, persistence, sessions, chapters, Now Playing, remote commands. | Separate transport from application policy; inject transport into tests; fix progress cadence across backward seeks. |
 | `ios/Podcst/NowPlayingView.swift` | Speed and route controls, chapters, notes and queue. | One accessible audio-controls sheet, clear settings scope and actual effect availability. |
@@ -117,7 +117,7 @@ Each row is an independently reviewable work package, normally one or a few atom
 
 | ID | Work package | Depends on | Status / evidence |
 | --- | --- | --- | --- |
-| M1.1 | Remove limiter per-frame heap allocations; preserve existing numerical output, latency, reset and tail behavior. Add allocation and chunk-boundary regressions. | Baseline | Planned |
+| M1.1 | Remove limiter per-frame heap allocations; preserve existing numerical output, latency, reset and tail behavior. Add allocation and chunk-boundary regressions. | Baseline | Complete — `4bfdc2c`; evidence below |
 | M1.2 | Introduce bounded caller-owned processing/drain contracts, then C ABI, ownership/error tests and deterministic native/reference equivalence. | M1.1 | Planned |
 | M1.3 | Package the XCFramework and native module; add a reproducible build command, clean-checkout linking tests and Rust/native CI checks. | M1.2 | Planned |
 | M1.4 | Extract a small injectable transport from PlaybackController while keeping AVPlayer behavior; move queue/progress tests to a deterministic fake transport and clock. | Baseline | Planned |
@@ -196,6 +196,14 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platf
 ```
 
 Native Rust build/ABI and rendered-audio test commands are added with M1.2–M1.3. Use an installed iOS 18 simulator plus a current simulator, and physical hardware for route/energy checks. The inspected development machine has Xcode 27 and the required Rust iOS targets installed; those tools must not become an undocumented clean-checkout prerequisite.
+
+### M1.1 evidence, 27 September 2026
+
+- Commit `4bfdc2c` replaces per-frame limiter allocations with preallocated interleaved storage and removes the finish-padding allocation. Arithmetic/layout overflow is rejected before allocation.
+- All 30 Rust tests passed: 15 unit, 12 existing regression and 3 new limiter-storage tests. The expanded allocation/overflow cases were then rerun successfully. `cargo clippy --manifest-path audio-engine/Cargo.toml --all-targets -- -D warnings` passed.
+- `audio-engine/tests/limiter_storage.rs` counts allocation, reallocation and deallocation around process/start/reset/seek/finish with reserved caller output, including pending-data discard, wraparound, descending peaks, 0/0.001/5 ms lookahead, mono/stereo and 44.1/48 kHz. All measured counts are zero.
+- Frozen pre-change sample checkpoints pass within 0.0000002; full-block and irregular-chunk outputs match exactly. A separate development comparison of all 8,274 captured pre-change samples was bit-identical. The checkpoints remain checked in; temporary full-output captures are not release artifacts.
+- An independent subagent and the integrating agent reviewed buffer bounds, sample order, finish behavior and test instrumentation. M1.1 does not establish native render safety, device sound quality or battery performance. Explicit configuration limits and the bounded C output contract remain M1.2 work; the iOS app has not switched transports.
 
 ## Design references
 
