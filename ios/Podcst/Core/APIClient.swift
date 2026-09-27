@@ -85,7 +85,28 @@ public final class APIClient {
     }
 
     public func detail(of podcast: Podcast) async throws -> Podcast {
-        if let id = podcast.id { return try await self.podcast(id: id) }
+        if let id = podcast.id {
+            return try await feedCache.load(.id(id)) {
+                async let info = self.podcastInfo(id: id)
+                async let catalogue = self.allEpisodes(podcastID: id)
+                let (infoResult, catalogueResult) = try await (info, catalogue)
+                return Podcast(
+                    id: infoResult.id,
+                    feed: infoResult.feed,
+                    title: infoResult.title,
+                    author: infoResult.author,
+                    cover: infoResult.cover,
+                    thumbnail: infoResult.cover,
+                    description: infoResult.description,
+                    link: infoResult.link,
+                    published: infoResult.published,
+                    explicit: infoResult.explicit,
+                    keywords: infoResult.keywords,
+                    episodeCount: max(infoResult.episodeCount, catalogueResult.total),
+                    episodes: catalogueResult.episodes
+                )
+            }
+        }
         return try await self.podcast(feed: podcast.feed)
     }
 
@@ -100,6 +121,20 @@ public final class APIClient {
         if let search, !search.isEmpty { query.append(URLQueryItem(name: "search", value: search)) }
         let raw: RawEpisodePage = try await get(path: "/api/feed/episodes", query: query)
         return EpisodePage(episodes: raw.episodes.map { mapEpisode($0, podcastId: podcastID) }, total: raw.total, hasMore: raw.hasMore, nextCursor: raw.nextCursor)
+    }
+
+    private func allEpisodes(podcastID: Int) async throws -> (episodes: [Episode], total: Int) {
+        var cursor: Int?
+        var collected: [Episode] = []
+        var total = 0
+        repeat {
+            let page = try await episodes(podcastID: podcastID, cursor: cursor, limit: 200)
+            collected.append(contentsOf: page.episodes)
+            total = max(total, page.total)
+            guard page.hasMore, let nextCursor = page.nextCursor, nextCursor != cursor else { break }
+            cursor = nextCursor
+        } while true
+        return (collected, total)
     }
 
     public func refresh(podcastID: Int) async throws -> Podcast {
