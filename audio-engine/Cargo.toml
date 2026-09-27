@@ -1,0 +1,18 @@
+[package]
+name = "podcst-audio-engine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "podcst_audio_engine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "audio-engine"
+path = "src/bin/audio-engine.rs"
+
+[profile.release]
+debug = true
+lto = "thin"
+codegen-units = 1
