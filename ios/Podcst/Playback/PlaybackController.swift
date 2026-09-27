@@ -123,7 +123,8 @@ public final class PlaybackController {
         transport.onUpdate = { [weak self] update in self?.handleTransport(update) }
         if integratesWithSystem {
             systemObservers = SystemPlaybackObservers()
-            configureAudioSession()
+            do { try configureAudioSession() }
+            catch { transition(to: .failed) }
             configureSystemObservers()
             configureRemoteCommands()
             updateOutputName()
@@ -542,6 +543,7 @@ public final class PlaybackController {
     private func activateAudioSession() -> Bool {
         guard integratesWithSystem else { return true }
         do {
+            try configureAudioSession()
             try AVAudioSession.sharedInstance().setActive(true)
             return true
         } catch {
@@ -550,13 +552,8 @@ public final class PlaybackController {
         }
     }
 
-    private func configureAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.allowAirPlay, .allowBluetoothA2DP])
-        } catch {
-            transition(to: .failed)
-        }
+    private func configureAudioSession() throws {
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.allowAirPlay, .allowBluetoothA2DP])
     }
 
     func handleInterruption(typeRaw: UInt?, optionsRaw: UInt?) {
