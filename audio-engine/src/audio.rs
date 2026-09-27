@@ -15,6 +15,7 @@ pub enum AudioError {
     NonFiniteSample { index: usize },
     InvalidWav(String),
     UnsupportedWav(String),
+    InvalidProcessor(String),
     Io(String),
 }
 
@@ -32,6 +33,7 @@ impl fmt::Display for AudioError {
             Self::NonFiniteSample { index } => write!(formatter, "sample {index} is not finite"),
             Self::InvalidWav(message) => write!(formatter, "invalid WAV: {message}"),
             Self::UnsupportedWav(message) => write!(formatter, "unsupported WAV: {message}"),
+            Self::InvalidProcessor(message) => write!(formatter, "invalid processor: {message}"),
             Self::Io(message) => write!(formatter, "I/O error: {message}"),
         }
     }
