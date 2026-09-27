@@ -7,6 +7,7 @@ struct PodcastDetailView: View {
     let podcast: Podcast
     @State private var detail: Podcast?
     @State private var isLoading = false
+    @State private var detailError = false
     @State private var filter = ""
     @State private var newestFirst = true
     @State private var expanded = false
@@ -98,18 +99,29 @@ struct PodcastDetailView: View {
                         .accessibilityHint(expanded ? "Collapse description" : "Expand description")
                 }
                 SectionHeader("Episodes") {
-                    Menu {
-                        Picker("Order", selection: $newestFirst) {
-                            Text("Newest first").tag(true)
-                            Text("Oldest first").tag(false)
+                    HStack(spacing: 10) {
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
                         }
-                    } label: {
-                        Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
-                            .font(.sans(.footnote))
-                            .foregroundStyle(PodcstPalette.tertiary)
+                        Menu {
+                            Picker("Order", selection: $newestFirst) {
+                                Text("Newest first").tag(true)
+                                Text("Oldest first").tag(false)
+                            }
+                        } label: {
+                            Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
+                                .font(.sans(.footnote))
+                                .foregroundStyle(PodcstPalette.tertiary)
+                        }
                     }
                 }
                 .padding(.top, 20)
+                if detailError {
+                    ErrorRow(message: "Couldn't load the full catalogue.") {
+                        await loadDetails()
+                    }
+                }
                 if content.episodes.count > 10 {
                     TextField("Filter episodes", text: $filter)
                         .modifier(FieldChrome())
@@ -142,12 +154,16 @@ struct PodcastDetailView: View {
     }
 
     private func loadDetails() async {
-        if detail == nil {
-            detail = api.cachedPodcast(id: podcast.id, feed: podcast.feed)
-        }
-        isLoading = detail == nil
+        detail = detail ?? api.cachedPodcast(id: podcast.id, feed: podcast.feed)
+        let source = detail ?? podcast
+        isLoading = source.episodes.count <= 2 || source.episodes.count < source.episodeCount
+        detailError = false
         defer { isLoading = false }
-        detail = (try? await api.detail(of: podcast)) ?? detail ?? podcast
+        do {
+            detail = try await api.detail(of: source)
+        } catch {
+            detailError = true
+        }
     }
 }
 
