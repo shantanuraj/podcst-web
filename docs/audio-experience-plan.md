@@ -1,6 +1,6 @@
 # Podcst audio experience
 
-Status: milestone 1 in progress; M1.1–M1.4 complete. Next: M1.5, the reusable local-file backend. Baseline: `31ae363` and `ac54242`, reviewed 27 September 2026. Milestone 2 remains planned.
+Status: milestone 1 in progress; M1.1–M1.5 complete. Next: M1.6, rendered-output, corpus and physical-device validation. Baseline: `31ae363` and `ac54242`, reviewed 27 September 2026. Milestone 2 remains planned.
 
 This is the implementation and acceptance plan for native Volume Boost and Trim Silence on iOS 18 and later. Update the work ledger when a change lands. Record measured evidence before marking a gate complete; a successful build is not evidence of sound quality or device reliability.
 
@@ -29,8 +29,8 @@ Out of scope: an AVPlayer-tap effects implementation, new codecs written in Rust
 | --- | --- | --- |
 | `audio-engine/src/analysis.rs` | Bounded loudness measurement and fixed/adaptive silence classification; reset, seek, finish. | A causal level controller, reusable frame decisions, and measured processing cost. Closed-pause events alone cannot drive bounded live editing. |
 | `audio-engine/src/processing.rs` | Fixed gain and lookahead limiter with bounded caller-owned output; offline pause editing and timeline mapping. | Render integration, online pause editing, smooth configuration changes, and streaming timeline spans. |
-| `audio-engine/src/ffi.rs` | Bounded C ABI, mechanically checked header, Apple static-library/XCFramework packaging and native tests. | Integrate the local backend and final render adapter; validate actual rendered audio. |
-| `ios/Podcst/Playback/PlaybackController.swift` | Queue, persistence, sessions, chapters, Now Playing and remote commands; injected transport and monotonic progress cadence. | Add the local transport; serialize/coalesce network progress writes in M2.4. |
+| `audio-engine/src/ffi.rs` | Bounded C ABI, mechanically checked header, Apple packaging and a final render Audio Unit used by the local backend. | Validate final graph peaks and physical output; add causal leveling and online pause editing in M2. |
+| `ios/Podcst/Playback/PlaybackController.swift` | Queue, persistence, sessions, chapters, Now Playing and remote commands; injected AVPlayer/local transports and monotonic progress cadence. | Validate local transport on physical routes; serialize/coalesce network progress writes in M2.4. |
 | `ios/Podcst/NowPlayingView.swift` | Speed and route controls, chapters, notes and queue. | One accessible audio-controls sheet, clear settings scope and actual effect availability. |
 | Native storage | Feed/artwork caching and playback state. | Compressed media storage, download lifecycle, range fetching, media identity and eviction. Feed caching is not an audio cache. |
 
@@ -50,7 +50,7 @@ flowchart TD
     Player --> Speed[Pitch-preserving speed]
     Speed --> Limiter[Final render-safe limiter]
     Limiter --> Output[Audio output]
-    Player --> Clock[Rendered position mapped to source time]
+    Limiter --> Clock[Rendered position mapped to source time]
     Clock --> Controller
 ```
 
@@ -75,7 +75,9 @@ Memory limits, latency, supported formats and effect capabilities are explicit. 
 
 ### Execution and buffering
 
-Use one serial decode/processing owner and bounded producer/consumer storage. Decoding pauses at the high-water mark. Budget already-processed and scheduled audio against the setting-application target; a long queue cannot provide immediate changes unless retained source PCM can be reprocessed safely. Rendering never waits for the worker. Empty output is an underrun/buffering condition, never end of episode; output silence without advancing the source clock, then recover from the same source position. Starvation must not call Rust finish, discard lookahead, or reset the processor; drain only after verified EOF.
+Use one serial decode/processing owner and bounded producer/consumer storage. Decoding pauses at the high-water mark. Budget already-processed and scheduled audio against the setting-application target; a long queue cannot provide immediate changes unless retained source PCM can be reprocessed safely. Rendering never waits for the worker. Empty output is an underrun/buffering condition, never end of episode; output silence without advancing the source clock, then recover from the same source position. Starvation must not call Rust finish or discard pending real audio. Drain only after verified EOF; a recovery rebuild must let pending audio pass before retiring its processor.
+
+M1.5 recovers starvation by allowing the current graph's pending audio to pass, then rebuilding at the last scheduled source boundary. It never calls Rust finish on starvation. This uses the same provisional 250 ms TimePitch tail allowance as EOF; M1.6 must validate this recovery across the format/rate corpus before it becomes the production policy.
 
 Each load, seek, stop and graph rebuild changes a generation token. Every scheduled buffer, completion, worker result and pending seek belongs to a generation. Discard obsolete work. A stopped buffer's completion callback cannot finish an episode. Completion requires confirmed decoder EOF, drained editor/limiter tails, and the final audio actually played for the active generation.
 
@@ -84,6 +86,8 @@ Each load, seek, stop and graph rebuild changes a generation token. Every schedu
 Keep three meanings separate: original source frames, emitted content frames, and device/render time. Use 64-bit frame counters. Attach half-open source spans to retained output blocks, merge adjacent spans and discard already-played mapping history. No episode-length PCM or edit list is needed for forward playback.
 
 Position comes from the rendered clock and its source mapping, not the decoder head, last scheduled buffer or wall clock multiplied by the current rate. Verify AVAudioPlayerNode clock behavior under live speed changes and downstream latency before relying on it.
+
+M1.5 uses the final Audio Unit's rendered-frame counter, adjusted for limiter latency and downstream presentation latency. Each graph has one constant rate and source origin. Measured TimePitch read-ahead and live rate-transition errors rule out its input player clock as the presented position. Rate changes and pause/resume rebuild at that position; seamless transitions remain a production-promotion requirement.
 
 Seeking uses original episode time, flushes old queued output and processing state, and establishes a new source origin. Decode pre-roll where required; never render it. A direct seek into a previously trimmed interval reopens the source at the requested position and warms up processing conservatively. Mapping an already-committed edit boundary advances to its next retained source frame. Do not maintain a global edited-file timeline for seeking.
 
@@ -121,7 +125,7 @@ Each row is an independently reviewable work package, normally one or a few atom
 | M1.2 | Introduce bounded caller-owned processing/drain contracts, then C ABI, ownership/error tests and deterministic native/reference equivalence. | M1.1 | Complete — `b95d992`; evidence below |
 | M1.3 | Package the XCFramework and native module; add a reproducible build command, clean-checkout linking tests and Rust/native CI checks. | M1.2 | Complete — `8a2f920`; evidence below |
 | M1.4 | Extract a small injectable transport from PlaybackController while keeping AVPlayer behavior; move queue/progress tests to a deterministic fake transport and clock. | Baseline | Complete — `7f2104f`; evidence below |
-| M1.5 | Implement the reusable local backend: chunked Apple decode, processed-buffer scheduling, accurate source clock, seek generations, speed and final limiter placement. Expose it through a development-only local-file harness. | M1.3, M1.4 | Planned |
+| M1.5 | Implement the reusable local backend: chunked Apple decode, processed-buffer scheduling, accurate source clock, seek generations, speed and final limiter placement. Expose it through a development-only local-file harness. | M1.3, M1.4 | Complete — `6de64aa`, `59d1c30`; evidence and transition limits below |
 | M1.6 | Validate local MP3/M4A/PCM, rendered-output equivalence at 1x, final peaks at every speed, tail/seek/rate/stop stress, interruptions/routes and bounded memory. Record the device baseline. | M1.5 | Planned |
 | M2.1 | Implement causal loudness control and smooth bypass. Tune against quiet/loud speakers, noise, music and already-mastered material. | M1.6 | Planned |
 | M2.2 | Implement frame decisions, bounded online pause editing and source spans; cover long-pause cap, speech edges, warm-up, toggles, seeks and chunk invariance. | M1.6 | Planned |
@@ -195,7 +199,7 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme Podcst -destination 'generic/pl
 xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' -derivedDataPath /tmp/podcst-audio-tests CODE_SIGNING_ALLOWED=NO test
 ```
 
-Native build, ABI and packaged linking commands are documented in [the audio-engine README](../audio-engine/README.md#apple-packaging-and-linking). Rendered-audio tests arrive with M1.5–M1.6. Use an installed iOS 18 simulator plus a current simulator, and physical hardware for route/energy checks. The build scripts validate required tools and Rust targets; generated binaries stay out of Git.
+Native build, ABI and packaged linking commands are documented in [the audio-engine README](../audio-engine/README.md#apple-packaging-and-linking). The [Audio Lab instructions](../audio-engine/README.md#local-ios-audio-lab) describe the development scheme and rendered-output tests. Use an installed iOS 18 simulator plus a current simulator, and physical hardware for route/energy checks. The build scripts validate required tools and Rust targets; generated binaries stay out of Git.
 
 ### M1.1 evidence, 27 September 2026
 
@@ -213,6 +217,16 @@ Native build, ABI and packaged linking commands are documented in [the audio-eng
 - `7f2104f` extracts `PlaybackTransport` and `AVPlayerTransport` while leaving ordinary playback on AVPlayer. The controller retains queue/session/system integration. Every load and seek carries a generation; stale readiness, seek, position, failure and completion events are rejected. Periodic progress uses monotonic elapsed playing time, excluding buffering and pauses, and explicit outgoing/seek saves use original source time.
 - The app suite passes all 25 tests on iOS 18.0 (iPhone 16) and iOS 26.1 (iPhone 17 Pro): 21 playback/parser tests and four feed-cache tests. Deterministic transport/clock tests cover backward seeks, stale callbacks, one completion, outgoing progress, rates, interruption intent, repeated Play, disconnects while loading/buffering, and shutdown. Independent review found the repeated-Play and buffered-disconnect bugs; both were fixed with regressions before the final runs.
 - No local AVAudioEngine backend or release effects UI ships in these packages. The bridge currently provides fixed gain and limiting, not the causal leveling or pause editor planned for milestone 2. Render-adapter priming, final graph peaks, sound quality, physical-device routes, interruptions, sustained playback and battery gates remain unverified. Network progress requests are still concurrent; serialization/coalescing remains an explicit M2.4 requirement, separate from the corrected controller cadence.
+
+### M1.5 evidence, 27 September 2026
+
+- `6de64aa` adds the final Rust limiter Audio Unit. Render storage and the Rust handle are allocated before rendering; the callback uses raw buffers and lock-free atomics. Optimized callback code was inspected for Objective-C/ARC, allocation, locks and dispatch. Two native test methods cover 24 mono/stereo, 44.1/48 kHz, bypass/limiter and empty/short/long-stream combinations with irregular render sizes, exact Rust-reference output, startup silence, draining, reset, invalid buffers and pull failures.
+- `59d1c30` adds `LocalAudioTransport` and a serial AVAudioFile decoder with eight reusable 2,048-frame PCM buffers. The graph is player → TimePitch → sample-rate/channel conversion → final limiter → output. Buffer leases and graph generations reject retired work. Confirmed EOF flushes TimePitch before draining the limiter and waiting for downstream presentation; underruns preserve source position and recover at the scheduled boundary. The development-only Audio Lab injects this backend into the existing controller. Ordinary playback remains AVPlayer.
+- All 38 app tests pass on iOS 26.1 (iPhone 17 Pro): 25 existing tests, 11 local decoder/graph tests and two native render tests. The 11 local tests also pass on iOS 18.0 (iPhone 16). They cover generated PCM/AAC, bounded reuse and memory, source-frame seeks, 1× sample preservation, a nine-frame limiter tail, every supported speed, pause/resume, rapid seeks, callback reentrancy and forced starvation/recovery. Known-EOF reads return an empty block without asking AVAudioFile to read past its end.
+- The device Release build succeeds with Xcode 27 and the Rust library built for device arm64. A live iOS 18 simulator Audio Lab launch with a generated local WAV showed advancing source time, a fixed eight-buffer pool and approximately 200 KiB of explicitly owned audio storage. This was a functional smoke test, not a listening or physical-device measurement. Xcode builds the active Rust architecture into Derived Data; no generated media or binaries are committed.
+- At 48 kHz, a TimePitch probe measured 3,584 frames of input-clock read-ahead at 1×. Constant-rate marker tests pass within 20 ms of source time across 0.5×–2×. Live rate changes in the probe caused approximately 58–79 ms errors, so the development graph now rebuilds at its presented source position for speed changes and resume. The brief buffering is deliberate and remains unsuitable as the final production interaction.
+- TimePitch reported zero latency/tail time despite measured output tails of roughly 105 ms in the 48 kHz probe and 76 ms at 8 kHz. The backend therefore schedules 250 ms of output-equivalent silence at EOF. This is a measured provisional allowance, not a guaranteed Apple bound. M1.6 must cover sample-rate conversion, final oversampled peaks, MP3 and varied compressed fixtures, long files, seek/stop/rate stress and tail preservation across the full format/rate matrix.
+- Independent agents implemented the render unit, backend and graph tests, then reviewed lifetime, clock and integration behavior. Review found decoder cleanup, callback reentrancy and generation issues; these were fixed before the final targeted run. Physical headphones, Bluetooth/AirPlay, background/interruption/reset behavior, long-session memory and underruns, listening quality and energy remain unverified. Milestone 1 as a whole is not complete; Volume Boost and Trim Silence remain milestone 2 work.
 
 ## Design references
 

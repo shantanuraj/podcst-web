@@ -243,8 +243,11 @@ with device arm64 and simulator arm64/x86_64 static-library slices, a C header
 and the `PodcstAudioEngine` Swift module. Deployment starts at iOS 18. Generated
 binaries remain under ignored `target/`. Run with `RUSTUP_TOOLCHAIN=stable` to
 select stable explicitly; the scripts use the active rustup toolchain otherwise.
-The app retains its existing AVPlayer transport and does not yet link the native
-framework. The local-file backend will consume this package in M1.5.
+The Xcode app target links the same Rust static library through
+`scripts/build-xcode.sh`, which builds only the active destination architectures
+into Derived Data. It uses the same committed header and module. The XCFramework
+remains the standalone distribution artifact; normal podcast playback still
+uses AVPlayer while the local-file harness exercises native rendering.
 
 `test-native.sh` runs C ABI/layout and Swift import/processing checks on the Mac.
 With `--apple`, it also links the Swift checks against every packaged architecture;
@@ -260,6 +263,54 @@ C/Swift checks, the packaged Swift executable on iOS Simulator and the app's
 playback tests. Its Apple runner needs an available iPhone simulator with iOS 18
 or later. Local builds need the same SDKs, targets and command-line tools; no
 prebuilt binary is downloaded or checked in.
+
+### Local iOS Audio Lab
+
+Open `ios/Podcst.xcodeproj`, select the **Podcst Audio Lab** scheme and run on an
+iPhone or simulator. Choose **Open audio file** to select a local audio file.
+The launch argument `-LocalAudioHarness` selects this debug-only entry point;
+normal launches use the web-backed app. The lab injects `LocalAudioTransport`
+into the existing `PlaybackController`, so queue policy, seeking, speed, audio
+sessions, interruptions and Now Playing use the shared controller.
+
+The decoder reads bounded planar Float32 blocks using AVAudioFile on a serial
+actor. Eight 2,048-frame buffers are reused only after the player consumes them.
+The graph is player → TimePitch → sample-rate/channel conversion → Rust limiter
+→ output. Its final Audio Unit converts only the current render block to/from
+interleaved PCM; buffers and the Rust handle are allocated before rendering.
+Owned-memory diagnostics count the explicit PCM pool and limiter storage, not
+Core Audio codec/graph internals or total process residency.
+
+Source position comes from the final rendered clock with limiter and output
+presentation latency accounted for. TimePitch's input read-ahead is not the
+heard position. Because changing TimePitch's rate with queued audio produced
+measured source-time errors, each rate change starts a new graph at the presented
+source position. Resume also starts a fresh graph. These transitions can briefly
+buffer; seamless live transitions remain a promotion requirement. TimePitch is
+bypassed at 1× to preserve source samples exactly before limiting.
+
+At EOF, the decoder schedules a bounded 250 ms of output-equivalent silence to
+flush TimePitch, then explicitly drains the Rust limiter and waits for downstream
+presentation. That allowance covers the generated test vectors; it is not an
+Apple-guaranteed tail bound. A scheduling underrun preserves the last scheduled
+source boundary, lets pending real audio pass, and reopens there with a new graph
+generation. It never treats missing input as EOF. All retired worker results and
+callbacks are rejected by generation.
+
+The lab exposes source/output formats, occupied buffers, owned audio memory and
+underrun counts. It keeps the selected document security scope while using the
+file. The temporary local playback state and diagnostics are not synchronized.
+For simulator automation, `-AudioLabFile <local-path>` opens an existing file
+alongside `-LocalAudioHarness`. Do not put private media paths in checked-in
+scheme arguments or scripts.
+
+The shared graph also runs offline in `LocalAudioTests`, including source marker
+timing at every supported speed, generated WAV/AAC input, seek/rate/pause changes,
+bounded pools, forced starvation and reentrant callbacks. `NativeRenderTests`
+compares the final AU directly to Rust across layouts and short-stream drains.
+Physical routes, final oversampled peaks, MP3 corpus coverage, long sessions and
+power measurements remain M1.6 work. Volume Boost and Trim Silence are not yet
+enabled in this development player.
 
 ### Deliberately unresolved: streaming condensation
 

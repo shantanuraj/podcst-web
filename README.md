@@ -182,9 +182,13 @@ This creates an optimized production build in the `.next` folder.
 
 ### iOS Client
 
-The native client is in `ios/Podcst.xcodeproj` and targets iOS 18 or later. Open the project in Xcode or build it from the repository root:
+The native client is in `ios/Podcst.xcodeproj` and targets iOS 18 or later. Install
+Xcode and Rust through rustup, then add the Apple targets. The Xcode build phase
+compiles the native audio library for the selected destination; build artifacts
+stay in Derived Data.
 
 ```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 xcodebuild -project ios/Podcst.xcodeproj -scheme Podcst -sdk iphonesimulator build
 xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
@@ -192,6 +196,13 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platf
 The client uses the web API for discovery, feed indexing, subscriptions, authentication and playback progress. An HTTP(S) feed URL entered in Discover is indexed through `/api/feed`, including private feeds whose access token is part of the URL.
 
 Development of Volume Boost, Trim Silence, and native audio playback follows the [two-milestone audio experience plan](docs/audio-experience-plan.md).
+
+Choose the **Podcst Audio Lab** scheme to run the development player. Open a local
+audio file to exercise the native backend, speed, seeking and lock-screen controls.
+The lab uses a separate temporary playback state and does not sync progress to
+the server. Normal podcast playback still uses AVPlayer. See the
+[local audio harness instructions](audio-engine/README.md#local-ios-audio-lab)
+for its current timing policy and validation limits.
 
 ## Deployment
 
