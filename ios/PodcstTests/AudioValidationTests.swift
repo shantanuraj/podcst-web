@@ -205,6 +205,32 @@ final class AudioValidationTests: XCTestCase {
         XCTAssertEqual(transport.diagnostics.allocatedBytes, 0)
     }
 
+    func testPauseResumePreservesRenderedPCMAtEveryRate() async throws {
+        let url = try pcmFile(sampleRate: 48_000, channels: 2, frames: 96_000) { frame, channel in
+            Float(0.3 * sin(Double(frame) * (channel == 0 ? 0.071 : 0.053)) + 0.1 * sin(Double(frame) * 0.003))
+        }
+        for rate in PlaybackController.supportedRates {
+            var captures: [[[Float]]] = []
+            for pauses in [false, true] {
+                let transport = makeTransport(sampleRate: 48_000, channels: 2)
+                defer { transport.shutdown() }
+                transport.load(source: .url(url), at: 0, generation: UUID())
+                try await transport.waitUntilReady()
+                transport.play(atRate: rate)
+                try await transport.waitUntilReady()
+                captures.append(try await render(transport, sampleRate: 48_000, channels: 2, pauseRate: pauses ? rate : nil))
+                XCTAssertEqual(transport.diagnostics.underruns, 0)
+            }
+            for channel in 0..<2 {
+                let uninterrupted = captures[0][channel]
+                let resumed = captures[1][channel]
+                XCTAssertEqual(uninterrupted.count, resumed.count, "Pause/resume changed duration at \(rate)×")
+                let difference = zip(uninterrupted, resumed).enumerated().first { $0.element.0 != $0.element.1 }
+                XCTAssertNil(difference, "Pause/resume changed rendered audio at \(rate)×, channel \(channel)")
+            }
+        }
+    }
+
     private func record(_ name: String, lines: [String]) {
         let attachment = XCTAttachment(string: lines.joined(separator: "\n"))
         attachment.name = name
@@ -221,11 +247,19 @@ final class AudioValidationTests: XCTestCase {
         return try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1024))
     }
 
-    private func render(_ transport: LocalAudioTransport, sampleRate: Double, channels: AVAudioChannelCount, slice: AVAudioFrameCount = 1024, observe: ((Int) -> Void)? = nil) async throws -> [[Float]] {
+    private func render(_ transport: LocalAudioTransport, sampleRate: Double, channels: AVAudioChannelCount, slice: AVAudioFrameCount = 1024, pauseRate: Double? = nil, observe: ((Int) -> Void)? = nil) async throws -> [[Float]] {
         let buffer = try outputBuffer(sampleRate: sampleRate, channels: channels)
         var output = Array(repeating: [Float](), count: Int(channels))
-        for _ in 0..<2048 {
+        for block in 0..<2048 {
             if transport.diagnostics.reachedEnd { break }
+            if let pauseRate, [17, 33, 65, 129].contains(block) {
+                transport.pause()
+                let position = transport.position
+                await Task.yield()
+                XCTAssertEqual(transport.position, position)
+                transport.play(atRate: pauseRate)
+                try await transport.waitUntilReady()
+            }
             let status = try await transport.renderOffline(frames: slice, into: buffer)
             XCTAssertEqual(status, .success)
             guard status == .success else { throw LocalAudioError.cannotRender }
