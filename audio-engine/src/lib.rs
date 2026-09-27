@@ -1,5 +1,6 @@
 pub mod analysis;
 pub mod audio;
+pub mod ffi;
 pub mod fixtures;
 pub mod processing;
 pub mod wav;
@@ -12,8 +13,8 @@ pub use analysis::{
 };
 pub use audio::{AudioError, PcmAudio};
 pub use processing::{
-    AudioFormat, BoostConfig, GainProcessor, LimiterConfig, LookaheadLimiter, ProcessReport,
-    ProcessedAudio, ProcessingConfig, StreamingProcessor, TimelineMap, TimelineSegment, TrimConfig,
-    TrimEditConfig, TruePeakLimiter, process_audio, process_streaming,
+    AudioFormat, BoostConfig, GainProcessor, LimiterConfig, LookaheadLimiter, PcmProcessor,
+    ProcessReport, ProcessedAudio, ProcessingConfig, StreamingProcessor, TimelineMap,
+    TimelineSegment, TrimConfig, TrimEditConfig, TruePeakLimiter, process_audio, process_streaming,
 };
 pub use wav::{read_wav, write_wav};
