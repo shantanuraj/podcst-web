@@ -3,56 +3,39 @@ import SwiftUI
 struct DiscoverView: View {
     @Environment(APIClient.self) private var api
     @State private var topPodcasts: [Podcast] = []
-    @State private var searchResults: [Podcast] = []
-    @State private var searchText = ""
     @State private var error: String?
-    @AppStorage("region") private var region = "us"
+    @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 28) {
-                    if let error {
-                        ErrorRow(message: error) {
-                            await loadTop(forceRefresh: true)
-                        }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if let error {
+                    ErrorRow(message: error) {
+                        await loadTop(forceRefresh: true)
                     }
-                    if !searchText.isEmpty {
-                        SectionHeader(title: "Search")
-                        PodcastGrid(podcasts: searchResults)
-                    } else {
-                        SectionHeader(title: "Top podcasts", detail: region.uppercased())
-                        PodcastGrid(podcasts: topPodcasts)
-                    }
+                    .padding(.bottom, 18)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 24)
-            }
-            .podcstPage()
-            .navigationTitle("Discover")
-            .searchable(text: $searchText, prompt: "Search podcasts")
-            .task(id: searchText) {
-                do {
-                    try await Task.sleep(for: .milliseconds(300))
-                } catch {
-                    return
+                SectionHeader("Top podcasts") {
+                    Text("\(region) · Today").eyebrow()
                 }
-                guard !Task.isCancelled else { return }
-                await search(searchText)
-            }
-            .refreshable { await loadTop(forceRefresh: true) }
-            .task(id: region) { await loadTop() }
-            .navigationDestination(for: Podcast.self) { podcast in
-                PodcastDetailView(podcast: podcast)
-            }
-            .navigationDestination(for: Episode.self) { episode in
-                EpisodeDetailView(episode: episode)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    AccountToolbarItem()
+                if let first = topPodcasts.first {
+                    FeaturedChartRow(podcast: first)
                 }
+                ForEach(Array(topPodcasts.dropFirst().enumerated()), id: \.element.identity) { offset, podcast in
+                    RankedPodcastRow(rank: offset + 2, podcast: podcast)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .podcstPage()
+        .navigationTitle("Discover")
+        .refreshable { await loadTop(forceRefresh: true) }
+        .task(id: region) { await loadTop() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AccountToolbarItem()
             }
         }
     }
@@ -68,122 +51,133 @@ struct DiscoverView: View {
             self.error = "Top podcasts are unavailable right now."
         }
     }
-
-    private func search(_ term: String) async {
-        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            searchResults = []
-            return
-        }
-        do {
-            if let url = URL(string: trimmed), ["http", "https"].contains(url.scheme?.lowercased()) {
-                searchResults = [try await api.podcast(feed: trimmed)]
-                return
-            }
-            searchResults = try await api.search(term: trimmed, locale: region).map {
-                Podcast(id: $0.id, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.thumbnail, thumbnail: $0.thumbnail)
-            }
-        } catch {
-            searchResults = []
-        }
-    }
 }
 
-struct PodcastGrid: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .headline) private var minimumCardWidth = 148
-    let podcasts: [Podcast]
-
-    private var columns: [GridItem] {
-        [GridItem(
-            dynamicTypeSize.isAccessibilitySize ? .flexible() : .adaptive(minimum: minimumCardWidth),
-            spacing: 18,
-            alignment: .top
-        )]
-    }
-
-    var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 26) {
-            ForEach(podcasts, id: \.identity) { podcast in
-                NavigationLink(value: podcast) {
-                    PodcastCard(podcast: podcast)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(podcast.title), \(podcast.author)")
-            }
-        }
-    }
-}
-
-struct PodcastCard: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+private struct FeaturedChartRow: View {
+    @Environment(APIClient.self) private var api
+    @Environment(PlaybackController.self) private var playback
     let podcast: Podcast
 
-    @ViewBuilder
-    private var title: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            Text(podcast.title)
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
-        } else {
-            Text(podcast.title)
-                .font(.headline)
-                .lineLimit(2, reservesSpace: true)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            ArtworkView(url: podcast.artworkURL)
-            title
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            Text(podcast.author)
-                .font(.subheadline)
-                .foregroundStyle(PodcstPalette.secondary)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .multilineTextAlignment(.leading)
-    }
-}
-
-struct SectionHeader: View {
-    let title: String
-    var detail: String?
-
-    init(title: String, detail: String? = nil) {
-        self.title = title
-        self.detail = detail
-    }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.system(.title2, design: .serif))
-            Spacer()
-            if let detail {
-                Text(detail)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(PodcstPalette.tertiary)
+        NavigationLink(value: Route.podcast(podcast)) {
+            HStack(spacing: 16) {
+                ArtworkView(url: podcast.artworkURL, size: 128)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("No. 1").eyebrow(PodcstPalette.accent)
+                    Text(podcast.title)
+                        .font(.serif(.title2))
+                        .lineLimit(3)
+                    Text(podcast.author)
+                        .font(.sans(.footnote))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        SubscribeCapsule(podcast: podcast)
+                        Button {
+                            Task {
+                                if let latest = try? await api.detail(of: podcast).episodes.first { playback.play(latest) }
+                            }
+                        } label: {
+                            RoundIcon(systemName: "play.fill", diameter: 32)
+                        }
+                        .accessibilityLabel("Play latest episode")
+                    }
+                    .padding(.top, 10)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.vertical, 18)
+            .hairline()
         }
+        .buttonStyle(.plain)
     }
 }
 
-struct ErrorRow: View {
-    let message: String
-    let retry: () async -> Void
+private struct SubscribeCapsule: View {
+    @Environment(LibraryStore.self) private var library
+    let podcast: Podcast
 
     var body: some View {
-        HStack {
-            Text(message).font(.subheadline).foregroundStyle(PodcstPalette.secondary)
-            Spacer()
-            Button("Retry") { Task { await retry() } }
-                .foregroundStyle(PodcstPalette.accent)
+        let subscribed = library.isSubscribed(podcast)
+        Button(subscribed ? "Subscribed" : "Subscribe") {
+            Task { await library.toggleSubscription(podcast) }
         }
-        .padding(14)
-        .background(PodcstPalette.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+        .font(.sans(.footnote).weight(.semibold))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .foregroundStyle(subscribed ? PodcstPalette.ink : .white)
+        .background(subscribed ? Color.clear : PodcstPalette.accent, in: Capsule())
+        .overlay { if subscribed { Capsule().strokeBorder(PodcstPalette.rule) } }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct RankedPodcastRow: View {
+    @Environment(LibraryStore.self) private var library
+    let rank: Int
+    let podcast: Podcast
+
+    var body: some View {
+        let subscribed = library.isSubscribed(podcast)
+        NavigationLink(value: Route.podcast(podcast)) {
+            HStack(spacing: 14) {
+                Text("\(rank)")
+                    .font(.serif(.title2, italic: true))
+                    .foregroundStyle(PodcstPalette.muted)
+                    .frame(minWidth: 26)
+                ArtworkView(url: podcast.artworkURL, size: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(podcast.title)
+                        .font(.serif(.body))
+                        .lineLimit(1)
+                    Text(podcast.author)
+                        .font(.sans(.caption))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    Task { await library.toggleSubscription(podcast) }
+                } label: {
+                    RoundIcon(systemName: subscribed ? "checkmark" : "plus", diameter: 32, tint: subscribed ? PodcstPalette.accent : PodcstPalette.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(subscribed ? "Unsubscribe from \(podcast.title)" : "Subscribe to \(podcast.title)")
+            }
+            .padding(.vertical, 11)
+            .hairline()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Number \(rank), \(podcast.title), \(podcast.author)")
+    }
+}
+
+struct PodcastRow: View {
+    let podcast: Podcast
+
+    var body: some View {
+        NavigationLink(value: Route.podcast(podcast)) {
+            HStack(spacing: 14) {
+                ArtworkView(url: podcast.artworkURL, size: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(podcast.title)
+                        .font(.serif(.body))
+                        .lineLimit(2)
+                    Text(podcast.author)
+                        .font(.sans(.caption))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.sans(.footnote).weight(.semibold))
+                    .foregroundStyle(PodcstPalette.muted)
+            }
+            .padding(.vertical, 11)
+            .hairline()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(podcast.title), \(podcast.author)")
     }
 }

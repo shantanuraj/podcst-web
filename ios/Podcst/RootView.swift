@@ -4,16 +4,43 @@ enum AppTab: Hashable {
     case discover
     case library
     case queue
+    case search
+}
+
+enum Route: Hashable {
+    case podcast(Podcast)
+    case episode(Episode)
+    case releases
+}
+
+@MainActor
+@Observable
+final class Router {
+    var tab: AppTab = .discover
+    var showingPlayer = false
+    private var paths: [AppTab: [Route]] = [:]
+
+    func path(_ tab: AppTab) -> Binding<[Route]> {
+        Binding { self.paths[tab] ?? [] } set: { self.paths[tab] = $0 }
+    }
+
+    func open(_ route: Route) {
+        showingPlayer = false
+        paths[tab, default: []].append(route)
+    }
 }
 
 struct RootView: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(LibraryStore.self) private var library
-    @State private var selectedTab: AppTab = .discover
-    @State private var showingNowPlaying = false
+    @Environment(SessionStore.self) private var session
+    @AppStorage(Appearance.key) private var appearance = Appearance.system
+    @AppStorage("onboarded") private var onboarded = false
+    @State private var router = Router()
     @State private var initialTabConfigured = false
 
     var body: some View {
+        @Bindable var router = router
         Group {
             if initialTabConfigured {
                 playerTabs
@@ -21,30 +48,44 @@ struct RootView: View {
                 StartupView()
             }
         }
-            .tint(PodcstPalette.accent)
-            .background(PodcstPalette.paper)
-            .sheet(isPresented: $showingNowPlaying) {
-                NowPlayingView()
-                    .presentationDetents([.large, .medium])
-                    .presentationDragIndicator(.visible)
-            }
-            .preferredColorScheme(.dark)
-            .toolbarBackground(PodcstPalette.paper, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .task { configureInitialTab() }
-            .onChange(of: library.hasLoaded) { _, _ in configureInitialTab() }
+        .tint(PodcstPalette.accent)
+        .background(PodcstPalette.paper)
+        .environment(router)
+        .sheet(isPresented: $router.showingPlayer) {
+            NowPlayingView()
+                .environment(router)
+                .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: onboarding) {
+            OnboardingView { onboarded = true }
+        }
+        .preferredColorScheme(appearance.colorScheme)
+        .task { configureInitialTab() }
+        .onChange(of: library.hasLoaded) { _, _ in configureInitialTab() }
+        .onChange(of: session.user) { _, user in
+            if user != nil { onboarded = true }
+        }
+        .font(.sans(.body))
+    }
+
+    private var onboarding: Binding<Bool> {
+        Binding {
+            initialTabConfigured && !onboarded && session.user == nil && library.podcasts.isEmpty
+        } set: { presented in
+            if !presented { onboarded = true }
+        }
     }
 
     @ViewBuilder
     private var playerTabs: some View {
         if #available(iOS 26.1, *) {
             tabs.tabViewBottomAccessory(isEnabled: playback.currentEpisode != nil) {
-                NowPlayingBar(showingDetail: $showingNowPlaying)
+                NowPlayingBar()
             }
         } else if #available(iOS 26.0, *) {
             tabs.tabViewBottomAccessory {
                 if playback.currentEpisode != nil {
-                    NowPlayingBar(showingDetail: $showingNowPlaying)
+                    NowPlayingBar()
                 }
             }
         } else {
@@ -53,18 +94,19 @@ struct RootView: View {
     }
 
     private var tabs: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Discover", systemImage: "sparkles", value: .discover) {
-                DiscoverView()
-                    .modifier(PlayerInset(showingDetail: $showingNowPlaying))
+        @Bindable var router = router
+        return TabView(selection: $router.tab) {
+            Tab("Discover", systemImage: "safari", value: .discover) {
+                TabStack(tab: .discover) { DiscoverView() }
             }
-            Tab("Library", systemImage: "books.vertical", value: .library) {
-                LibraryView()
-                    .modifier(PlayerInset(showingDetail: $showingNowPlaying))
+            Tab("Library", systemImage: "square.grid.2x2", value: .library) {
+                TabStack(tab: .library) { LibraryView() }
             }
             Tab("Queue", systemImage: "text.line.first.and.arrowtriangle.forward", value: .queue) {
-                QueueView()
-                    .modifier(PlayerInset(showingDetail: $showingNowPlaying))
+                TabStack(tab: .queue) { QueueView() }
+            }
+            Tab("Search", systemImage: "magnifyingglass", value: .search, role: .search) {
+                TabStack(tab: .search) { SearchView() }
             }
         }
     }
@@ -73,17 +115,37 @@ struct RootView: View {
         guard !initialTabConfigured, library.hasLoaded else { return }
         initialTabConfigured = true
         if library.podcasts.contains(where: { !$0.episodes.isEmpty }) {
-            selectedTab = .library
+            router.tab = .library
         }
+    }
+}
+
+private struct TabStack<Content: View>: View {
+    @Environment(Router.self) private var router
+    let tab: AppTab
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        NavigationStack(path: router.path(tab)) {
+            content
+                .navigationDestination(for: Route.self) { route in
+                    switch route {
+                    case .podcast(let podcast): PodcastDetailView(podcast: podcast)
+                    case .episode(let episode): EpisodeDetailView(episode: episode)
+                    case .releases: ReleasesView()
+                    }
+                }
+        }
+        .modifier(PlayerInset())
     }
 }
 
 private struct StartupView: View {
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "waveform")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(PodcstPalette.accent)
+            Text("Podcst")
+                .font(.custom(Typeface.serifItalic.name, fixedSize: 48))
+                .foregroundStyle(PodcstPalette.ink)
             ProgressView()
                 .tint(PodcstPalette.accent)
         }
@@ -96,7 +158,6 @@ private struct StartupView: View {
 
 private struct PlayerInset: ViewModifier {
     @Environment(PlaybackController.self) private var playback
-    @Binding var showingDetail: Bool
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -104,8 +165,8 @@ private struct PlayerInset: ViewModifier {
         } else {
             content.safeAreaInset(edge: .bottom, spacing: 0) {
                 if playback.currentEpisode != nil {
-                    NowPlayingBar(showingDetail: $showingDetail)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    NowPlayingBar()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                 }
@@ -132,68 +193,80 @@ struct AccountToolbarItem: View {
 
 struct NowPlayingBar: View {
     @Environment(PlaybackController.self) private var playback
-    @Binding var showingDetail: Bool
+    @Environment(Router.self) private var router
+    @State private var dragOffset: CGFloat = 0
+
+    private var subtitle: some View {
+        Group {
+            if playback.state == .loading {
+                Text("Loading…").foregroundStyle(PodcstPalette.secondary)
+            } else if let output = playback.outputName {
+                Label(output, systemImage: "airplayaudio").foregroundStyle(PodcstPalette.accent)
+            } else {
+                Text(playback.currentEpisode?.podcastTitle ?? "Podcst").foregroundStyle(PodcstPalette.secondary)
+            }
+        }
+        .font(.sans(.caption))
+        .labelStyle(.titleAndIcon)
+        .lineLimit(1)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             Button {
-                showingDetail = true
+                router.showingPlayer = true
             } label: {
                 HStack(spacing: 12) {
                     ArtworkView(url: playback.currentEpisode?.artworkURL, size: 40)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(playback.currentEpisode?.title ?? "")
-                            .font(.subheadline.weight(.medium))
+                            .font(.sans(.subheadline).weight(.medium))
                             .lineLimit(1)
-                        Text(playback.currentEpisode?.podcastTitle ?? "Podcst")
-                            .font(.caption)
-                            .foregroundStyle(PodcstPalette.secondary)
-                            .lineLimit(1)
+                        subtitle
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .offset(x: dragOffset)
+                .opacity(1 - min(0.55, abs(dragOffset) / 240))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(playback.currentEpisode?.title ?? ""), \(playback.currentEpisode?.podcastTitle ?? "Podcst")")
             .accessibilityHint("Open Now Playing")
+            .accessibilityAction(named: "Next episode") { playback.next() }
+            .accessibilityAction(named: "Previous episode") { playback.previous() }
+            if playback.isPlaying {
+                Equalizer(active: true)
+            }
             Button {
                 playback.toggle()
             } label: {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.body.weight(.semibold))
+                    .font(.sans(.title3))
                     .frame(minWidth: 44, minHeight: 44)
+                    .opacity(playback.state == .loading ? 0.4 : 1)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
         .padding(.vertical, 6)
-        .accessibilityElement(children: .contain)
-    }
-}
-
-struct ArtworkView: View {
-    let url: URL?
-    var size: CGFloat? = nil
-
-    var body: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        ZStack {
-                            PodcstPalette.surface
-                            Image(systemName: "waveform").foregroundStyle(PodcstPalette.tertiary)
-                        }
-                    }
+        .overlay(alignment: .bottom) {
+            ProgressLine(fraction: playback.progress, loading: playback.state == .loading)
+                .padding(.horizontal, 14)
+        }
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onChanged { value in
+                    guard abs(value.translation.width) > abs(value.translation.height), playback.queue.count > 1 else { return }
+                    dragOffset = value.translation.width
                 }
-            }
-            .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: min(12, (size ?? 160) * 0.16)))
-            .accessibilityHidden(true)
+                .onEnded { _ in
+                    if dragOffset < -70 { playback.next() } else if dragOffset > 70 { playback.previous() }
+                    withAnimation(.snappy) { dragOffset = 0 }
+                }
+        )
+        .accessibilityElement(children: .contain)
     }
 }

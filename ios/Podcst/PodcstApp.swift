@@ -14,6 +14,7 @@ struct PodcstApp: App {
         _session = State(initialValue: session)
         _library = State(initialValue: LibraryStore(api: api, session: session))
         _playback = State(initialValue: PlaybackController())
+        PodcstAppearance.configure()
     }
 
     var body: some Scene {
@@ -23,7 +24,6 @@ struct PodcstApp: App {
                 .environment(library)
                 .environment(playback)
                 .environment(api)
-                .environment(\.podcstTheme, PodcstTheme())
                 .task {
                     await session.restore()
                     await library.load()
