@@ -1,0 +1,57 @@
+name: Native audio
+
+on:
+  push:
+    branches: [main]
+    paths: ['audio-engine/**', 'ios/**', '.github/workflows/audio.yml']
+  pull_request:
+    branches: [main]
+    paths: ['audio-engine/**', 'ios/**', '.github/workflows/audio.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy
+      - run: cargo +stable test --locked --manifest-path audio-engine/Cargo.toml
+      - run: cargo +stable clippy --locked --manifest-path audio-engine/Cargo.toml --all-targets -- -D warnings
+
+  apple:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --target aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - run: audio-engine/scripts/build-apple.sh
+        env:
+          RUSTUP_TOOLCHAIN: stable
+      - run: audio-engine/scripts/test-native.sh --apple
+        env:
+          RUSTUP_TOOLCHAIN: stable
+      - name: Select an available iPhone simulator
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '--json']))['devices']
+          candidates = [(tuple(map(int, runtime.split('iOS-')[1].split('-'))), device['udid'])
+                        for runtime, entries in devices.items() if 'iOS-' in runtime
+                        for device in entries if device['name'].startswith('iPhone')]
+          if not candidates:
+              raise SystemExit('No available iPhone simulator')
+          version, identifier = max(candidates)
+          if version < (18, 0):
+              raise SystemExit('An iOS 18 or later simulator is required')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'PODCST_TEST_DEVICE={identifier}\n')
+          PY
+      - name: Exercise the packaged bridge on iOS
+        run: |
+          xcrun simctl boot "$PODCST_TEST_DEVICE"
+          xcrun simctl bootstatus "$PODCST_TEST_DEVICE" -b
+          xcrun simctl spawn "$PODCST_TEST_DEVICE" "$PWD/audio-engine/target/native-tests/swift-simulator-$(uname -m)"
+      - name: Test playback integration
+        run: xcodebuild test -project ios/Podcst.xcodeproj -scheme PodcstTests -destination "platform=iOS Simulator,id=$PODCST_TEST_DEVICE" -derivedDataPath "$RUNNER_TEMP/podcst-audio-tests" CODE_SIGNING_ALLOWED=NO
