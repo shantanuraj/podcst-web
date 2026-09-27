@@ -1,7 +1,8 @@
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, VecDeque};
 
-use crate::audio::PcmAudio;
+use crate::audio::{AudioError, PcmAudio};
+use crate::processing::{AudioFormat, ensure_active};
 
 const ABSOLUTE_GATE_LUFS: f64 = -70.0;
 const RELATIVE_GATE_LU: f64 = 10.0;
@@ -43,20 +44,63 @@ pub struct AdaptiveSilenceConfig {
     pub min_threshold_dbfs: f64,
     pub max_threshold_dbfs: f64,
     pub min_dynamic_range_db: f64,
+    pub speech_margin_db: f64,
+    pub hysteresis_db: f64,
 }
 
 impl Default for AdaptiveSilenceConfig {
     fn default() -> Self {
         Self {
             frame_ms: 10,
-            min_silence_ms: 300,
-            guard_ms: 20,
+            min_silence_ms: 500,
+            guard_ms: 80,
             noise_floor_percentile: 0.1,
-            threshold_offset_db: 8.0,
-            min_threshold_dbfs: -50.0,
-            max_threshold_dbfs: -35.0,
+            threshold_offset_db: 6.0,
+            min_threshold_dbfs: -90.0,
+            max_threshold_dbfs: -40.0,
             min_dynamic_range_db: 12.0,
+            speech_margin_db: 20.0,
+            hysteresis_db: 3.0,
         }
+    }
+}
+
+impl SilenceConfig {
+    pub fn validate(&self) -> Result<(), AudioError> {
+        if self.frame_ms == 0 || self.min_silence_ms == 0 || !self.threshold_dbfs.is_finite() {
+            return Err(AudioError::InvalidProcessor(
+                "invalid silence configuration".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl AdaptiveSilenceConfig {
+    pub fn validate(&self) -> Result<(), AudioError> {
+        let levels = [
+            self.threshold_offset_db,
+            self.min_threshold_dbfs,
+            self.max_threshold_dbfs,
+            self.min_dynamic_range_db,
+            self.speech_margin_db,
+            self.hysteresis_db,
+        ];
+        if self.frame_ms == 0
+            || self.min_silence_ms == 0
+            || !(0.0..=1.0).contains(&self.noise_floor_percentile)
+            || levels.iter().any(|value| !value.is_finite())
+            || self.min_threshold_dbfs > self.max_threshold_dbfs
+            || self.threshold_offset_db < 0.0
+            || self.min_dynamic_range_db < 0.0
+            || self.speech_margin_db < 0.0
+            || self.hysteresis_db < 0.0
+        {
+            return Err(AudioError::InvalidProcessor(
+                "invalid adaptive silence configuration".to_owned(),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -85,8 +129,9 @@ pub struct AudioMetrics {
     pub silence_segments: Vec<SilenceSegment>,
 }
 
-pub fn analyze(audio: &PcmAudio, config: &AnalysisConfig) -> AudioMetrics {
-    AudioMetrics {
+pub fn analyze(audio: &PcmAudio, config: &AnalysisConfig) -> Result<AudioMetrics, AudioError> {
+    let silence_segments = detect_silence(audio, &config.silence)?;
+    Ok(AudioMetrics {
         sample_rate: audio.sample_rate(),
         channels: audio.channels(),
         frames: audio.frames(),
@@ -95,8 +140,8 @@ pub fn analyze(audio: &PcmAudio, config: &AnalysisConfig) -> AudioMetrics {
         sample_peak_dbfs: db_from_amplitude(sample_peak(audio)),
         oversampled_peak_dbfs: db_from_amplitude(oversampled_peak(audio)),
         integrated_lufs: integrated_lufs(audio),
-        silence_segments: detect_silence(audio, &config.silence),
-    }
+        silence_segments,
+    })
 }
 
 pub fn rms_dbfs(audio: &PcmAudio) -> f64 {
@@ -202,67 +247,61 @@ pub fn integrated_lufs(audio: &PcmAudio) -> f64 {
     }
 }
 
-pub fn detect_silence(audio: &PcmAudio, config: &SilenceConfig) -> Vec<SilenceSegment> {
-    if config.frame_ms == 0 {
-        return Vec::new();
-    }
+pub fn detect_silence(
+    audio: &PcmAudio,
+    config: &SilenceConfig,
+) -> Result<Vec<SilenceSegment>, AudioError> {
+    config.validate()?;
     let (frame_length, levels) = frame_levels(audio, config.frame_ms);
     let mask = levels
         .iter()
         .map(|level| *level <= config.threshold_dbfs)
         .collect::<Vec<_>>();
-    silence_segments_from_mask(
+    Ok(silence_segments_from_mask(
         audio,
         frame_length,
         config.min_silence_ms,
         config.guard_ms,
         &mask,
-    )
+    ))
 }
 
 pub fn detect_adaptive_silence(
     audio: &PcmAudio,
     config: &AdaptiveSilenceConfig,
-) -> Vec<SilenceSegment> {
-    if audio.frames() == 0
-        || config.frame_ms == 0
-        || config.min_silence_ms == 0
-        || !(0.0..=1.0).contains(&config.noise_floor_percentile)
-        || !config.threshold_offset_db.is_finite()
-        || !config.min_threshold_dbfs.is_finite()
-        || !config.max_threshold_dbfs.is_finite()
-        || !config.min_dynamic_range_db.is_finite()
-    {
-        return Vec::new();
-    }
+) -> Result<Vec<SilenceSegment>, AudioError> {
+    config.validate()?;
     let (frame_length, levels) = frame_levels(audio, config.frame_ms);
-    let mut finite_levels = levels
-        .iter()
-        .copied()
-        .filter(|level| level.is_finite())
-        .collect::<Vec<_>>();
-    if finite_levels.is_empty() {
-        return Vec::new();
+    if levels.is_empty() {
+        return Ok(Vec::new());
     }
-    finite_levels.sort_by(f64::total_cmp);
-    let noise_floor = percentile(&finite_levels, config.noise_floor_percentile);
-    let high_level = percentile(&finite_levels, 0.9);
-    if high_level - noise_floor < config.min_dynamic_range_db {
-        return Vec::new();
+    let mut sorted_levels = levels.clone();
+    sorted_levels.sort_by(f64::total_cmp);
+    let noise_floor = percentile(&sorted_levels, config.noise_floor_percentile);
+    let high_level = percentile(&sorted_levels, 0.9);
+    if !high_level.is_finite() || high_level - noise_floor < config.min_dynamic_range_db {
+        return Ok(Vec::new());
     }
+    let speech_ceiling = high_level - config.speech_margin_db;
     let threshold = (noise_floor + config.threshold_offset_db)
-        .clamp(config.min_threshold_dbfs, config.max_threshold_dbfs);
+        .clamp(config.min_threshold_dbfs, config.max_threshold_dbfs)
+        .min(speech_ceiling);
+    let exit_threshold = (threshold + config.hysteresis_db).min(speech_ceiling);
+    let mut silent = false;
     let mask = levels
         .iter()
-        .map(|level| *level <= threshold)
+        .map(|level| {
+            silent = *level <= if silent { exit_threshold } else { threshold };
+            silent
+        })
         .collect::<Vec<_>>();
-    silence_segments_from_mask(
+    Ok(silence_segments_from_mask(
         audio,
         frame_length,
         config.min_silence_ms,
         config.guard_ms,
         &mask,
-    )
+    ))
 }
 
 fn frame_levels(audio: &PcmAudio, frame_ms: u32) -> (usize, Vec<f64>) {
@@ -275,11 +314,17 @@ fn frame_levels(audio: &PcmAudio, frame_ms: u32) -> (usize, Vec<f64>) {
     let mut frame_start = 0;
     while frame_start < audio.frames() {
         let frame_end = (frame_start + frame_length).min(audio.frames());
-        let power = audio.samples()[frame_start * audio.channels()..frame_end * audio.channels()]
-            .iter()
-            .map(|sample| f64::from(*sample) * f64::from(*sample))
-            .sum::<f64>()
-            / ((frame_end - frame_start) * audio.channels()) as f64;
+        let power = (0..audio.channels())
+            .map(|channel| {
+                audio.samples()
+                    [frame_start * audio.channels() + channel..frame_end * audio.channels()]
+                    .iter()
+                    .step_by(audio.channels())
+                    .map(|sample| f64::from(*sample).powi(2))
+                    .sum::<f64>()
+                    / (frame_end - frame_start) as f64
+            })
+            .fold(0.0, f64::max);
         levels.push(db_from_power(power));
         frame_start = frame_end;
     }
@@ -299,9 +344,8 @@ fn silence_segments_from_mask(
     let minimum_samples = u64::from(min_silence_ms)
         .saturating_mul(u64::from(audio.sample_rate()))
         .div_ceil(1_000) as usize;
-    let minimum_frames = minimum_samples.max(1).div_ceil(frame_length);
-    let guard_frames =
-        (u64::from(guard_ms) * u64::from(audio.sample_rate()) / 1_000) as usize / frame_length;
+    let guard_samples =
+        (u64::from(guard_ms) * u64::from(audio.sample_rate())).div_ceil(1_000) as usize;
     let mut segments = Vec::new();
     let mut silent_start = None;
     for (index, is_silent) in mask.iter().copied().enumerate() {
@@ -313,9 +357,8 @@ fn silence_segments_from_mask(
                 &mut segments,
                 start,
                 frame_start,
-                frame_length,
-                minimum_frames,
-                guard_frames,
+                minimum_samples,
+                guard_samples,
                 audio,
             );
         }
@@ -325,9 +368,8 @@ fn silence_segments_from_mask(
             &mut segments,
             start,
             audio.frames(),
-            frame_length,
-            minimum_frames,
-            guard_frames,
+            minimum_samples,
+            guard_samples,
             audio,
         );
     }
@@ -343,19 +385,15 @@ fn append_silence_segment(
     segments: &mut Vec<SilenceSegment>,
     start: usize,
     end: usize,
-    frame_length: usize,
-    minimum_frames: usize,
-    guard_frames: usize,
+    minimum_samples: usize,
+    guard_samples: usize,
     audio: &PcmAudio,
 ) {
-    let frame_count = (end - start).div_ceil(frame_length);
-    if frame_count < minimum_frames {
+    if end - start < minimum_samples {
         return;
     }
-    let guarded_start = (start + guard_frames * frame_length).min(end);
-    let guarded_end = end
-        .saturating_sub(guard_frames * frame_length)
-        .max(guarded_start);
+    let guarded_start = start.saturating_add(guard_samples).min(end);
+    let guarded_end = end.saturating_sub(guard_samples).max(guarded_start);
     if guarded_end <= guarded_start || guarded_start >= audio.frames() {
         return;
     }
@@ -566,9 +604,417 @@ impl Biquad {
     }
 }
 
+const HISTOGRAM_MIN_LUFS: f64 = -160.0;
+const HISTOGRAM_STEP_LU: f64 = 0.1;
+const HISTOGRAM_BINS: usize = 9_602;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StreamingLoudnessMetrics {
+    pub source_start_frame: usize,
+    pub frames: usize,
+    pub loudness_blocks: u64,
+    pub rms_dbfs: f64,
+    pub sample_peak_dbfs: f64,
+    pub integrated_lufs: f64,
+}
+
+pub struct StreamingLoudnessAnalyzer {
+    format: AudioFormat,
+    filters: Vec<KWeightingFilter>,
+    block_length: usize,
+    hop_length: usize,
+    energies: VecDeque<f64>,
+    window_energy: f64,
+    histogram: Vec<(u64, f64)>,
+    positive_blocks: u64,
+    block_energy: f64,
+    blocks: u64,
+    source_start_frame: usize,
+    frames: usize,
+    sample_energy: f64,
+    sample_peak: f32,
+    finished: bool,
+}
+
+impl StreamingLoudnessAnalyzer {
+    pub fn new(format: AudioFormat) -> Result<Self, AudioError> {
+        AudioFormat::new(format.sample_rate, format.channels)?;
+        let block_length =
+            ((f64::from(format.sample_rate) * BLOCK_SECONDS).round() as usize).max(1);
+        Ok(Self {
+            format,
+            filters: (0..format.channels)
+                .map(|_| KWeightingFilter::new(format.sample_rate))
+                .collect(),
+            block_length,
+            hop_length: ((f64::from(format.sample_rate) * HOP_SECONDS).round() as usize).max(1),
+            energies: VecDeque::with_capacity(block_length),
+            window_energy: 0.0,
+            histogram: vec![(0, 0.0); HISTOGRAM_BINS],
+            positive_blocks: 0,
+            block_energy: 0.0,
+            blocks: 0,
+            source_start_frame: 0,
+            frames: 0,
+            sample_energy: 0.0,
+            sample_peak: 0.0,
+            finished: false,
+        })
+    }
+
+    pub fn reset(&mut self) {
+        for filter in &mut self.filters {
+            *filter = KWeightingFilter::new(self.format.sample_rate);
+        }
+        self.energies.clear();
+        self.window_energy = 0.0;
+        self.histogram.fill((0, 0.0));
+        self.positive_blocks = 0;
+        self.block_energy = 0.0;
+        self.blocks = 0;
+        self.source_start_frame = 0;
+        self.frames = 0;
+        self.sample_energy = 0.0;
+        self.sample_peak = 0.0;
+        self.finished = false;
+    }
+
+    pub fn start(&mut self) {
+        self.reset();
+    }
+
+    pub fn seek(&mut self, source_frame: usize) {
+        self.reset();
+        self.source_start_frame = source_frame;
+    }
+
+    pub fn block_frames(&self) -> usize {
+        self.block_length
+    }
+
+    pub fn process(&mut self, input: &[f32]) -> Result<(), AudioError> {
+        ensure_active(self.finished)?;
+        self.format.validate_samples(input)?;
+        for frame in input.chunks_exact(self.format.channels) {
+            let mut energy = 0.0;
+            for (sample, filter) in frame.iter().zip(&mut self.filters) {
+                self.sample_energy += f64::from(*sample).powi(2);
+                self.sample_peak = self.sample_peak.max(sample.abs());
+                energy += filter.process(f64::from(*sample)).powi(2);
+            }
+            if self.energies.len() == self.block_length {
+                self.window_energy -= self.energies.pop_front().unwrap();
+            }
+            self.energies.push_back(energy);
+            self.window_energy += energy;
+            self.frames += 1;
+            if self.frames >= self.block_length
+                && (self.frames - self.block_length) % self.hop_length == 0
+            {
+                self.add_block(self.window_energy.max(0.0) / self.block_length as f64);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn finish(&mut self) -> StreamingLoudnessMetrics {
+        if !self.finished && self.frames > 0 && self.frames < self.block_length {
+            self.add_block(self.window_energy.max(0.0) / self.frames as f64);
+        }
+        self.finished = true;
+        self.metrics()
+    }
+
+    pub fn metrics(&self) -> StreamingLoudnessMetrics {
+        let gate = if self.positive_blocks == 0 {
+            ABSOLUTE_GATE_LUFS
+        } else {
+            (loudness_from_energy(self.block_energy / self.positive_blocks as f64)
+                - RELATIVE_GATE_LU)
+                .max(ABSOLUTE_GATE_LUFS)
+        };
+        let (count, energy) = self
+            .histogram
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| HISTOGRAM_MIN_LUFS + *index as f64 * HISTOGRAM_STEP_LU > gate)
+            .fold((0u64, 0.0), |(count, energy), (_, bin)| {
+                (count + bin.0, energy + bin.1)
+            });
+        StreamingLoudnessMetrics {
+            source_start_frame: self.source_start_frame,
+            frames: self.frames,
+            loudness_blocks: self.blocks,
+            rms_dbfs: if self.frames == 0 {
+                f64::NEG_INFINITY
+            } else {
+                db_from_power(self.sample_energy / self.frames as f64 / self.format.channels as f64)
+            },
+            sample_peak_dbfs: db_from_amplitude(self.sample_peak),
+            integrated_lufs: if count == 0 {
+                f64::NEG_INFINITY
+            } else {
+                loudness_from_energy(energy / count as f64)
+            },
+        }
+    }
+
+    fn add_block(&mut self, energy: f64) {
+        self.blocks += 1;
+        if energy <= 0.0 {
+            return;
+        }
+        self.positive_blocks += 1;
+        self.block_energy += energy;
+        let index = ((loudness_from_energy(energy) - HISTOGRAM_MIN_LUFS) / HISTOGRAM_STEP_LU)
+            .round()
+            .clamp(0.0, (HISTOGRAM_BINS - 1) as f64) as usize;
+        self.histogram[index].0 += 1;
+        self.histogram[index].1 += energy;
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum StreamingSilenceConfig {
+    Fixed(SilenceConfig),
+    Adaptive {
+        silence: AdaptiveSilenceConfig,
+        window_ms: u32,
+    },
+}
+
+impl StreamingSilenceConfig {
+    fn timing(&self) -> (u32, u32, u32) {
+        match self {
+            Self::Fixed(config) => (config.frame_ms, config.min_silence_ms, config.guard_ms),
+            Self::Adaptive { silence, .. } => {
+                (silence.frame_ms, silence.min_silence_ms, silence.guard_ms)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SilenceFrameSegment {
+    pub source_start_frame: usize,
+    pub source_end_frame: usize,
+}
+
+pub struct StreamingSilenceDetector {
+    format: AudioFormat,
+    config: StreamingSilenceConfig,
+    frame_length: usize,
+    minimum_frames: usize,
+    guard_frames: usize,
+    window_length: usize,
+    levels: VecDeque<f64>,
+    sorted_levels: Vec<f64>,
+    channel_energy: Vec<f64>,
+    pending_frames: usize,
+    analyzed_frames: usize,
+    next_frame: usize,
+    silent_start: Option<usize>,
+    silent: bool,
+    finished: bool,
+}
+
+impl StreamingSilenceDetector {
+    pub fn new(format: AudioFormat, config: StreamingSilenceConfig) -> Result<Self, AudioError> {
+        AudioFormat::new(format.sample_rate, format.channels)?;
+        match &config {
+            StreamingSilenceConfig::Fixed(config) => config.validate()?,
+            StreamingSilenceConfig::Adaptive { silence, window_ms } => {
+                silence.validate()?;
+                if *window_ms < silence.frame_ms {
+                    return Err(AudioError::InvalidProcessor(
+                        "adaptive window must contain at least one analysis frame".to_owned(),
+                    ));
+                }
+            }
+        }
+        let (frame_ms, minimum_ms, guard_ms) = config.timing();
+        let frame_length =
+            (u64::from(format.sample_rate) * u64::from(frame_ms) / 1000).max(1) as usize;
+        let window_length = match &config {
+            StreamingSilenceConfig::Fixed(_) => 0,
+            StreamingSilenceConfig::Adaptive { window_ms, .. } => {
+                (u64::from(*window_ms) * u64::from(format.sample_rate))
+                    .div_ceil(1000 * frame_length as u64) as usize
+            }
+        };
+        Ok(Self {
+            format,
+            config,
+            frame_length,
+            minimum_frames: (u64::from(minimum_ms) * u64::from(format.sample_rate)).div_ceil(1000)
+                as usize,
+            guard_frames: (u64::from(guard_ms) * u64::from(format.sample_rate)).div_ceil(1000)
+                as usize,
+            window_length,
+            levels: VecDeque::with_capacity(window_length),
+            sorted_levels: Vec::with_capacity(window_length),
+            channel_energy: vec![0.0; format.channels],
+            pending_frames: 0,
+            analyzed_frames: 0,
+            next_frame: 0,
+            silent_start: None,
+            silent: false,
+            finished: false,
+        })
+    }
+
+    pub fn reset(&mut self) {
+        self.levels.clear();
+        self.sorted_levels.clear();
+        self.channel_energy.fill(0.0);
+        self.pending_frames = 0;
+        self.analyzed_frames = 0;
+        self.next_frame = 0;
+        self.silent_start = None;
+        self.silent = false;
+        self.finished = false;
+    }
+
+    pub fn start(&mut self) {
+        self.reset();
+    }
+
+    pub fn seek(&mut self, source_frame: usize) {
+        self.reset();
+        self.next_frame = source_frame;
+    }
+
+    pub fn frame_length(&self) -> usize {
+        self.frame_length
+    }
+
+    pub fn warm_up_frames(&self) -> usize {
+        self.window_length * self.frame_length
+    }
+
+    pub fn process(
+        &mut self,
+        input: &[f32],
+        mut emit: impl FnMut(SilenceFrameSegment),
+    ) -> Result<(), AudioError> {
+        ensure_active(self.finished)?;
+        self.format.validate_samples(input)?;
+        for frame in input.chunks_exact(self.format.channels) {
+            for (energy, sample) in self.channel_energy.iter_mut().zip(frame) {
+                *energy += f64::from(*sample).powi(2);
+            }
+            self.pending_frames += 1;
+            if self.pending_frames == self.frame_length {
+                self.classify_frame(&mut emit);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn finish(&mut self, mut emit: impl FnMut(SilenceFrameSegment)) {
+        if self.finished {
+            return;
+        }
+        if self.pending_frames > 0 {
+            self.classify_frame(&mut emit);
+        }
+        self.close_silence(self.next_frame, &mut emit);
+        self.finished = true;
+    }
+
+    fn classify_frame(&mut self, emit: &mut impl FnMut(SilenceFrameSegment)) {
+        self.analyzed_frames += self.pending_frames;
+        let level = db_from_power(
+            self.channel_energy.iter().copied().fold(0.0, f64::max) / self.pending_frames as f64,
+        );
+        let silent = match &self.config {
+            StreamingSilenceConfig::Fixed(config) => level <= config.threshold_dbfs,
+            StreamingSilenceConfig::Adaptive {
+                silence: config, ..
+            } => {
+                if self.levels.len() == self.window_length {
+                    self.levels.pop_front();
+                }
+                self.levels.push_back(level);
+                self.sorted_levels.clear();
+                self.sorted_levels.extend(self.levels.iter().copied());
+                self.sorted_levels.sort_by(f64::total_cmp);
+                let noise_floor = percentile(&self.sorted_levels, config.noise_floor_percentile);
+                let high_level = percentile(&self.sorted_levels, 0.9);
+                let speech_ceiling = high_level - config.speech_margin_db;
+                let threshold = (noise_floor + config.threshold_offset_db)
+                    .clamp(config.min_threshold_dbfs, config.max_threshold_dbfs)
+                    .min(speech_ceiling);
+                self.analyzed_frames >= self.window_length * self.frame_length
+                    && high_level.is_finite()
+                    && high_level - noise_floor >= config.min_dynamic_range_db
+                    && level
+                        <= if self.silent {
+                            (threshold + config.hysteresis_db).min(speech_ceiling)
+                        } else {
+                            threshold
+                        }
+            }
+        };
+        if silent {
+            self.silent_start.get_or_insert(self.next_frame);
+        } else {
+            self.close_silence(self.next_frame, emit);
+        }
+        self.silent = silent;
+        self.next_frame += self.pending_frames;
+        self.pending_frames = 0;
+        self.channel_energy.fill(0.0);
+    }
+
+    fn close_silence(&mut self, end: usize, emit: &mut impl FnMut(SilenceFrameSegment)) {
+        if let Some(start) = self.silent_start.take() {
+            let guarded_start = start.saturating_add(self.guard_frames).min(end);
+            let guarded_end = end.saturating_sub(self.guard_frames).max(guarded_start);
+            if end - start >= self.minimum_frames && guarded_end > guarded_start {
+                emit(SilenceFrameSegment {
+                    source_start_frame: guarded_start,
+                    source_end_frame: guarded_end,
+                });
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn streaming_analyzers_keep_fixed_storage_over_long_input() {
+        let format = AudioFormat::new(48_000, 1).unwrap();
+        let mut loudness = StreamingLoudnessAnalyzer::new(format).unwrap();
+        let mut silence = StreamingSilenceDetector::new(
+            format,
+            StreamingSilenceConfig::Adaptive {
+                silence: AdaptiveSilenceConfig::default(),
+                window_ms: 1000,
+            },
+        )
+        .unwrap();
+        let energy_capacity = loudness.energies.capacity();
+        let histogram_capacity = loudness.histogram.capacity();
+        let level_capacity = silence.levels.capacity();
+        let sorted_capacity = silence.sorted_levels.capacity();
+        let chunk = [0.01; 480];
+        for _ in 0..10_000 {
+            loudness.process(&chunk).unwrap();
+            silence.process(&chunk, |_| {}).unwrap();
+            assert!(loudness.energies.len() <= loudness.block_length);
+            assert_eq!(loudness.energies.capacity(), energy_capacity);
+            assert_eq!(loudness.histogram.capacity(), histogram_capacity);
+            assert!(silence.levels.len() <= silence.window_length);
+            assert_eq!(silence.levels.capacity(), level_capacity);
+            assert_eq!(silence.sorted_levels.capacity(), sorted_capacity);
+        }
+        assert_eq!(loudness.finish().frames, 4_800_000);
+        silence.finish(|_| {});
+    }
 
     fn sine(amplitude: f32, frames: usize) -> PcmAudio {
         let samples = (0..frames)
@@ -602,7 +1048,7 @@ mod tests {
             threshold_dbfs: -40.0,
             guard_ms: 0,
         };
-        let segments = detect_silence(&audio, &config);
+        let segments = detect_silence(&audio, &config).unwrap();
         assert_eq!(segments.len(), 1);
         assert!((segments[0].start_seconds - 0.1).abs() < 0.001);
         assert!((segments[0].end_seconds - 0.5).abs() < 0.001);
@@ -633,7 +1079,7 @@ mod tests {
             guard_ms: 0,
             ..AdaptiveSilenceConfig::default()
         };
-        let segments = detect_adaptive_silence(&audio, &config);
+        let segments = detect_adaptive_silence(&audio, &config).unwrap();
         assert_eq!(segments.len(), 2);
         assert!((segments[0].start_seconds - 0.0).abs() < 0.001);
         assert!((segments[0].end_seconds - 0.5).abs() < 0.011);
@@ -644,6 +1090,10 @@ mod tests {
     #[test]
     fn adaptive_detector_does_not_trim_uniform_quiet_audio() {
         let audio = sine(0.01, 48_000 * 2);
-        assert!(detect_adaptive_silence(&audio, &AdaptiveSilenceConfig::default()).is_empty());
+        assert!(
+            detect_adaptive_silence(&audio, &AdaptiveSilenceConfig::default())
+                .unwrap()
+                .is_empty()
+        );
     }
 }

@@ -5,14 +5,15 @@ pub mod processing;
 pub mod wav;
 
 pub use analysis::{
-    AdaptiveSilenceConfig, AnalysisConfig, AudioMetrics, SilenceConfig, SilenceSegment, analyze,
-    detect_adaptive_silence, detect_silence, integrated_lufs, oversampled_peak, rms_dbfs,
-    sample_peak,
+    AdaptiveSilenceConfig, AnalysisConfig, AudioMetrics, SilenceConfig, SilenceFrameSegment,
+    SilenceSegment, StreamingLoudnessAnalyzer, StreamingLoudnessMetrics, StreamingSilenceConfig,
+    StreamingSilenceDetector, analyze, detect_adaptive_silence, detect_silence, integrated_lufs,
+    oversampled_peak, rms_dbfs, sample_peak,
 };
 pub use audio::{AudioError, PcmAudio};
 pub use processing::{
     AudioFormat, BoostConfig, GainProcessor, LimiterConfig, LookaheadLimiter, ProcessReport,
     ProcessedAudio, ProcessingConfig, StreamingProcessor, TimelineMap, TimelineSegment, TrimConfig,
-    TruePeakLimiter, process_audio, process_streaming,
+    TrimEditConfig, TruePeakLimiter, process_audio, process_streaming,
 };
 pub use wav::{read_wav, write_wav};
