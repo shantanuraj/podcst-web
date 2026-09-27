@@ -273,6 +273,37 @@ struct FieldChrome: ViewModifier {
     }
 }
 
+extension View {
+    func screenHeader<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        modifier(ScreenHeader(title: title, trailing: trailing()))
+    }
+}
+
+private struct ScreenHeader<Trailing: View>: ViewModifier {
+    let title: String
+    let trailing: Trailing
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(title)
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack {
+                    Text(title)
+                        .font(.serif(.largeTitle))
+                        .tracking(-0.8)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    trailing
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+                .background(PodcstPalette.paper)
+            }
+    }
+}
+
 struct SectionHeader<Trailing: View>: View {
     let title: String
     let trailing: Trailing

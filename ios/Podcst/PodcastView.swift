@@ -50,7 +50,7 @@ struct PodcastDetailView: View {
                     }
                     .font(.sans(.subheadline))
                     .lineLimit(1)
-                    if let published = content.published {
+                    if let published = ([content.published] + content.episodes.map(\.published)).compactMap({ $0 }).max() {
                         Text("Updated \(published.formatted(.dateTime.year().month(.wide).day()))")
                             .eyebrow()
                     }

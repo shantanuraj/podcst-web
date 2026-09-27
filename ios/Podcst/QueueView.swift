@@ -47,13 +47,11 @@ struct QueueView: View {
             }
         }
         .podcstPage()
-        .navigationTitle("Queue")
-        .toolbar {
+        .screenHeader("Queue") {
             if !playback.upNext.isEmpty {
-                ToolbarItem(placement: .topBarLeading) { EditButton() }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                AccountToolbarItem()
+                EditButton()
+                    .font(.sans(.body).weight(.medium))
+                    .foregroundStyle(PodcstPalette.accent)
             }
         }
     }
