@@ -30,6 +30,7 @@
 		F693358E0569879CCE89CB31 /* Fonts/InstrumentSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 193AA15CFD5F283A14F3D79A /* Fonts/InstrumentSerif-Regular.ttf */; };
 		868D1B2DA0B00B16D87042DD /* Fonts/InstrumentSerif-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7560420A003084CB2158B661 /* Fonts/InstrumentSerif-Italic.ttf */; };
 		C5D57C3090625EEBBCFC79BF /* Fonts/Inter.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2FF58CC5CDAD096FA7DE89F1 /* Fonts/Inter.ttf */; };
+		4A7C2E91D03B58F6A1E4C7B2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 		193AA15CFD5F283A14F3D79A /* Fonts/InstrumentSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/InstrumentSerif-Regular.ttf; sourceTree = "<group>"; };
 		7560420A003084CB2158B661 /* Fonts/InstrumentSerif-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/InstrumentSerif-Italic.ttf; sourceTree = "<group>"; };
 		2FF58CC5CDAD096FA7DE89F1 /* Fonts/Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Inter.ttf; sourceTree = "<group>"; };
+		9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +94,7 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */,
 				3C2869B1B1D5A358576E332C /* Core/APIClient.swift */,
 				60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */,
 				E2A357A35D6089D818A2411D /* Core/Models.swift */,
@@ -227,6 +230,7 @@
 				F693358E0569879CCE89CB31 /* Fonts/InstrumentSerif-Regular.ttf in Resources */,
 				868D1B2DA0B00B16D87042DD /* Fonts/InstrumentSerif-Italic.ttf in Resources */,
 				C5D57C3090625EEBBCFC79BF /* Fonts/Inter.ttf in Resources */,
+				4A7C2E91D03B58F6A1E4C7B2 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -318,6 +322,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Podcst/Podcst.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
@@ -380,6 +385,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Podcst/Podcst.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
