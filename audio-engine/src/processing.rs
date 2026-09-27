@@ -249,7 +249,7 @@ impl PolyphaseTruePeak {
         &self,
         target_frame: usize,
         format: AudioFormat,
-        history: &VecDeque<Vec<f32>>,
+        history: &VecDeque<f32>,
         history_start_frame: usize,
         input_frames: usize,
     ) -> f32 {
@@ -257,6 +257,7 @@ impl PolyphaseTruePeak {
             .sample_at(
                 target_frame as isize,
                 0,
+                format.channels,
                 history,
                 history_start_frame,
                 input_frames,
@@ -267,6 +268,7 @@ impl PolyphaseTruePeak {
                 self.sample_at(
                     target_frame as isize,
                     channel,
+                    format.channels,
                     history,
                     history_start_frame,
                     input_frames,
@@ -281,6 +283,7 @@ impl PolyphaseTruePeak {
                         * f64::from(self.sample_at(
                             frame,
                             channel,
+                            format.channels,
                             history,
                             history_start_frame,
                             input_frames,
@@ -296,7 +299,8 @@ impl PolyphaseTruePeak {
         &self,
         frame: isize,
         channel: usize,
-        history: &VecDeque<Vec<f32>>,
+        channels: usize,
+        history: &VecDeque<f32>,
         history_start_frame: usize,
         input_frames: usize,
     ) -> f32 {
@@ -304,8 +308,7 @@ impl PolyphaseTruePeak {
             return 0.0;
         }
         history
-            .get(frame as usize - history_start_frame)
-            .and_then(|samples| samples.get(channel))
+            .get((frame as usize - history_start_frame) * channels + channel)
             .copied()
             .unwrap_or(0.0)
     }
@@ -317,9 +320,9 @@ pub struct TruePeakLimiter {
     ceiling: f32,
     release_step: f32,
     current_gain: f32,
-    queue: VecDeque<Vec<f32>>,
+    queue: VecDeque<f32>,
     peak_queue: VecDeque<(usize, f32)>,
-    history: VecDeque<Vec<f32>>,
+    history: VecDeque<f32>,
     history_start_frame: usize,
     next_input_frame: usize,
     next_output_frame: usize,
@@ -350,16 +353,34 @@ impl TruePeakLimiter {
         } else {
             1.0 / release_frames as f32
         };
-        let latency_frames = lookahead_frames.max(1) + TRUE_PEAK_RADIUS as usize - 1;
+        let capacity_error =
+            || AudioError::InvalidProcessor("limiter buffer capacity is too large".to_owned());
+        let latency_frames = lookahead_frames
+            .max(1)
+            .checked_add(TRUE_PEAK_RADIUS as usize - 1)
+            .ok_or_else(capacity_error)?;
+        let peak_capacity = latency_frames.checked_add(1).ok_or_else(capacity_error)?;
+        let queue_capacity = peak_capacity
+            .checked_mul(format.channels)
+            .ok_or_else(capacity_error)?;
+        let history_capacity = (TRUE_PEAK_TAPS + 1)
+            .checked_mul(format.channels)
+            .ok_or_else(capacity_error)?;
+        if queue_capacity > isize::MAX as usize / size_of::<f32>()
+            || history_capacity > isize::MAX as usize / size_of::<f32>()
+            || peak_capacity > isize::MAX as usize / size_of::<(usize, f32)>()
+        {
+            return Err(capacity_error());
+        }
         Ok(Self {
             format,
             latency_frames,
             ceiling: 10.0f32.powf((config.ceiling_dbfs / 20.0) as f32),
             release_step,
             current_gain: 1.0,
-            queue: VecDeque::with_capacity(latency_frames + 1),
-            peak_queue: VecDeque::with_capacity(latency_frames + 1),
-            history: VecDeque::with_capacity(TRUE_PEAK_TAPS + 1),
+            queue: VecDeque::with_capacity(queue_capacity),
+            peak_queue: VecDeque::with_capacity(peak_capacity),
+            history: VecDeque::with_capacity(history_capacity),
             history_start_frame: 0,
             next_input_frame: 0,
             next_output_frame: 0,
@@ -368,10 +389,15 @@ impl TruePeakLimiter {
         })
     }
 
-    fn ingest(&mut self, frame: &[f32], retain_for_output: bool) {
-        self.history.push_back(frame.to_vec());
-        if self.history.len() > TRUE_PEAK_TAPS {
-            self.history.pop_front();
+    fn ingest(&mut self, frame: Option<&[f32]>) {
+        match frame {
+            Some(frame) => self.history.extend(frame),
+            None => self
+                .history
+                .extend(std::iter::repeat_n(0.0, self.format.channels)),
+        }
+        if self.history.len() > TRUE_PEAK_TAPS * self.format.channels {
+            self.history.drain(..self.format.channels);
             self.history_start_frame += 1;
         }
         let input_frame = self.next_input_frame;
@@ -394,13 +420,12 @@ impl TruePeakLimiter {
             }
             self.peak_queue.push_back((target_frame, peak));
         }
-        if retain_for_output {
-            self.queue.push_back(frame.to_vec());
+        if let Some(frame) = frame {
+            self.queue.extend(frame);
         }
     }
 
     fn emit_one(&mut self, output: &mut Vec<f32>) {
-        let frame = self.queue.pop_front().expect("limiter queue is not empty");
         while self
             .peak_queue
             .front()
@@ -412,7 +437,13 @@ impl TruePeakLimiter {
             .peak_queue
             .front()
             .map(|(_, peak)| *peak)
-            .unwrap_or_else(|| frame.iter().map(|sample| sample.abs()).fold(0.0, f32::max));
+            .unwrap_or_else(|| {
+                self.queue
+                    .iter()
+                    .take(self.format.channels)
+                    .map(|sample| sample.abs())
+                    .fold(0.0, f32::max)
+            });
         let target_gain = if peak <= 0.0 {
             1.0
         } else {
@@ -423,7 +454,11 @@ impl TruePeakLimiter {
         } else {
             self.current_gain += (target_gain - self.current_gain) * self.release_step.min(1.0);
         }
-        output.extend(frame.into_iter().map(|sample| sample * self.current_gain));
+        output.extend(
+            self.queue
+                .drain(..self.format.channels)
+                .map(|sample| sample * self.current_gain),
+        );
         self.next_output_frame += 1;
     }
 }
@@ -457,8 +492,8 @@ impl StreamingProcessor for TruePeakLimiter {
         let input_frames = self.format.validate_samples(input)?;
         let output_start = output.len() / self.format.channels;
         for frame in input.chunks_exact(self.format.channels) {
-            self.ingest(frame, true);
-            if self.queue.len() > self.latency_frames {
+            self.ingest(Some(frame));
+            if self.queue.len() > self.latency_frames * self.format.channels {
                 self.emit_one(output);
             }
         }
@@ -474,9 +509,8 @@ impl StreamingProcessor for TruePeakLimiter {
         }
         self.finished = true;
         let output_start = output.len() / self.format.channels;
-        let zeros = vec![0.0; self.format.channels];
         for _ in 0..TRUE_PEAK_RADIUS {
-            self.ingest(&zeros, false);
+            self.ingest(None);
         }
         while !self.queue.is_empty() {
             self.emit_one(output);
@@ -831,9 +865,9 @@ mod tests {
             limiter.process(&[sample; 514], &mut output).unwrap();
             emitted += output.len() / 2;
             output.clear();
-            assert!(limiter.queue.len() <= limiter.latency_frames);
+            assert!(limiter.queue.len() <= limiter.latency_frames * format.channels);
             assert!(limiter.peak_queue.len() <= limiter.latency_frames + 1);
-            assert!(limiter.history.len() <= TRUE_PEAK_TAPS);
+            assert!(limiter.history.len() <= TRUE_PEAK_TAPS * format.channels);
         }
         limiter.finish(&mut output).unwrap();
         emitted += output.len() / 2;
