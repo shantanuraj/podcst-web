@@ -459,3 +459,116 @@ fn native_partial_processing_validation_and_drain_do_not_allocate() {
         }
     }
 }
+
+#[test]
+fn speech_processing_configuration_and_drain_never_allocate() {
+    use podcst_audio_engine::speech::{EffectsSettings, SourceSpan, SpeechProcessor};
+    for rate in [8_000, 44_100, 48_000, 192_000] {
+        let mut processor = SpeechProcessor::new(
+            AudioFormat::new(rate, 2).unwrap(),
+            EffectsSettings {
+                boost_enabled: true,
+                trim_enabled: true,
+                revision: 1,
+            },
+        )
+        .unwrap();
+        let mut input = [0.0; 2048];
+        let mut output = [0.0; 514];
+        let mut spans = [SourceSpan::default(); 2];
+        let capacity = processor.allocated_bytes();
+        assert!(capacity < 4 * 1024 * 1024);
+        let allocations = allocations_during(|| {
+            for block in 0..500 {
+                for (frame, samples) in input.chunks_exact_mut(2).enumerate() {
+                    let time = (block * 1024 + frame) as f32 / rate as f32;
+                    let level = if block % 100 < 50 { 0.1 } else { 0.00001 };
+                    samples[0] = level * (time * 300.0 * std::f32::consts::TAU).sin();
+                    samples[1] = samples[0] * 0.5;
+                }
+                if block % 137 == 0 {
+                    processor
+                        .configure(EffectsSettings {
+                            boost_enabled: block % 2 == 0,
+                            trim_enabled: block % 3 == 0,
+                            revision: block as u64,
+                        })
+                        .unwrap();
+                }
+                let mut cursor = 0;
+                while cursor < input.len() {
+                    let report = processor
+                        .process(&input[cursor..], &mut output, &mut spans)
+                        .unwrap();
+                    assert!(report.input_frames > 0 || report.output_frames > 0);
+                    cursor += report.input_frames * 2;
+                    assert_eq!(processor.allocated_bytes(), capacity);
+                }
+            }
+            while !processor.is_finished() {
+                processor.finish(&mut output, &mut spans).unwrap();
+            }
+            processor.reset(42);
+            processor.finish(&mut output, &mut spans).unwrap();
+        });
+        assert_eq!(allocations, (0, 0, 0), "rate {rate}");
+    }
+}
+
+#[test]
+#[ignore = "six hours of original PCM through both causal effects"]
+fn six_hour_speech_processing_keeps_fixed_memory_and_mapping() {
+    use podcst_audio_engine::speech::{EffectsSettings, SourceSpan, SpeechProcessor};
+    let mut processor = SpeechProcessor::new(
+        AudioFormat::new(8_000, 1).unwrap(),
+        EffectsSettings {
+            boost_enabled: true,
+            trim_enabled: true,
+            revision: 1,
+        },
+    )
+    .unwrap();
+    let input: Vec<f32> = (0..8_000)
+        .map(|frame| {
+            let level = if frame < 5_600 { 0.00001 } else { 0.1 };
+            level * (frame as f32 * 317.0 * std::f32::consts::TAU / 8000.0).sin()
+        })
+        .collect();
+    let mut output = [0.0; 8192];
+    let mut spans = [SourceSpan::default(); 4];
+    let capacity = processor.allocated_bytes();
+    let mut last_source = None;
+    let mut removed = 0;
+    let allocations = allocations_during(|| {
+        for second in 0..6 * 60 * 60 {
+            let mut cursor = 0;
+            while cursor < input.len() {
+                let report = processor
+                    .process(&input[cursor..], &mut output, &mut spans)
+                    .unwrap();
+                cursor += report.input_frames;
+                for span in &spans[..report.span_count] {
+                    if let Some(last) = last_source {
+                        assert!(span.source_start_frame > last);
+                        removed += span.source_start_frame - last - 1;
+                    }
+                    last_source = Some(span.source_start_frame + u64::from(span.frame_count) - 1);
+                }
+                assert_eq!(processor.allocated_bytes(), capacity);
+                assert!(processor.pending_frames() <= processor.maximum_buffered_frames());
+            }
+            if second % 3600 == 0 {
+                assert!(last_source.unwrap() <= (second + 1) as u64 * 8000);
+            }
+        }
+        while !processor.is_finished() {
+            let report = processor.finish(&mut output, &mut spans).unwrap();
+            for span in &spans[..report.span_count] {
+                last_source = Some(span.source_start_frame + u64::from(span.frame_count) - 1);
+            }
+        }
+    });
+    assert_eq!(allocations, (0, 0, 0));
+    assert!(removed > 0);
+    assert_eq!(last_source, Some(6 * 60 * 60 * 8000 - 1));
+}

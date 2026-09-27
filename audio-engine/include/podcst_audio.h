@@ -24,6 +24,8 @@
 
 typedef struct PodcstAudioProcessor PodcstAudioProcessor;
 
+typedef struct PodcstEffectsProcessor PodcstEffectsProcessor;
+
 typedef struct PodcstAudioConfig {
   uint32_t sample_rate;
   uint32_t channels;
@@ -44,6 +46,37 @@ typedef struct PodcstAudioInfo {
   uint32_t max_block_frames;
   uint64_t allocated_bytes;
 } PodcstAudioInfo;
+
+typedef struct PodcstEffectsConfig {
+  uint32_t sample_rate;
+  uint32_t channels;
+  uint32_t boost_enabled;
+  uint32_t trim_enabled;
+} PodcstEffectsConfig;
+
+typedef struct PodcstSourceSpan {
+  uint64_t source_start_frame;
+  uint32_t output_start_frame;
+  uint32_t frame_count;
+} PodcstSourceSpan;
+
+typedef struct PodcstEffectsReport {
+  uint32_t consumed_frames;
+  uint32_t emitted_frames;
+  uint32_t span_count;
+} PodcstEffectsReport;
+
+typedef struct PodcstEffectsInfo {
+  uint32_t max_block_frames;
+  uint32_t max_buffered_frames;
+  uint32_t pending_frames;
+  uint32_t boost_enabled;
+  uint32_t trim_enabled;
+  float boost_gain_db;
+  uint64_t allocated_bytes;
+  uint64_t applied_revision;
+  uint64_t applied_source_frame;
+} PodcstEffectsInfo;
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,6 +104,39 @@ uint32_t podcst_audio_reset(struct PodcstAudioProcessor *handle);
 uint32_t podcst_audio_get_info(struct PodcstAudioProcessor *handle, struct PodcstAudioInfo *info);
 
 uint32_t podcst_audio_destroy(struct PodcstAudioProcessor **handle);
+
+uint32_t podcst_effects_config_default(struct PodcstEffectsConfig *config);
+
+uint32_t podcst_effects_create(const struct PodcstEffectsConfig *config,
+                               struct PodcstEffectsProcessor **handle);
+
+uint32_t podcst_effects_configure(struct PodcstEffectsProcessor *handle,
+                                  uint32_t boost_enabled,
+                                  uint32_t trim_enabled,
+                                  uint64_t revision);
+
+uint32_t podcst_effects_process(struct PodcstEffectsProcessor *handle,
+                                const float *input,
+                                uint32_t input_frames,
+                                float *output,
+                                uint32_t output_capacity_frames,
+                                struct PodcstSourceSpan *spans,
+                                uint32_t span_capacity,
+                                struct PodcstEffectsReport *report);
+
+uint32_t podcst_effects_finish(struct PodcstEffectsProcessor *handle,
+                               float *output,
+                               uint32_t output_capacity_frames,
+                               struct PodcstSourceSpan *spans,
+                               uint32_t span_capacity,
+                               struct PodcstEffectsReport *report);
+
+uint32_t podcst_effects_reset(struct PodcstEffectsProcessor *handle, uint64_t source_origin);
+
+uint32_t podcst_effects_get_info(struct PodcstEffectsProcessor *handle,
+                                 struct PodcstEffectsInfo *info);
+
+uint32_t podcst_effects_destroy(struct PodcstEffectsProcessor **handle);
 
 #ifdef __cplusplus
 }
