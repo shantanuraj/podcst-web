@@ -14,14 +14,19 @@ public final class APIClient {
     private let visitorId: String
     private var sessionCookie: String?
     private var currentUserID: String?
-    private let keychain: KeychainStore
+    private var sessionRevision = UUID()
+    var hasSession: Bool { sessionCookie?.isEmpty == false }
+    var accountID: String? { currentUserID }
+
+    func restoreAccount(_ id: String?) { currentUserID = id }
+    private let keychain: any SessionCredentialStore
     private let feedCache = FeedCache(storageURL: FeedCache.defaultStorageURL())
     private let topCache = PodcastSnapshotCache(namespace: "top", lifetime: 3600)
     private let subscriptionCache = PodcastSnapshotCache(namespace: "subscriptions", lifetime: 86400)
     private var topRequests: [String: Task<[Podcast], Error>] = [:]
     private var subscriptionRequest: Task<[Podcast], Error>?
 
-    public init(baseURL: URL = APIClient.productionBaseURL, session: URLSession = .shared, keychain: KeychainStore = KeychainStore()) {
+    public init(baseURL: URL = APIClient.productionBaseURL, session: URLSession = .shared, keychain: any SessionCredentialStore = KeychainStore()) {
         self.baseURL = baseURL
         self.session = session
         self.keychain = keychain
@@ -160,6 +165,7 @@ public final class APIClient {
     }
 
     public func signIn(email: String, code: String) async throws -> User? {
+        beginAuthentication()
         let _: RawVerified = try await post(path: "/api/auth/email-login", body: ["email": email, "code": code])
         let user = try await sessionUser()
         subscriptionRequest?.cancel()
@@ -169,6 +175,7 @@ public final class APIClient {
     }
 
     public func signInWithPasskey(email: String? = nil) async throws -> User? {
+        beginAuthentication()
         let normalizedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines)
         let start: RawPasskeyLogin = try await post(
             path: "/api/auth/login",
@@ -239,8 +246,23 @@ public final class APIClient {
         }
     }
 
-    public func signOut() async throws {
-        let _: RawSuccess = try await post(path: "/api/auth/logout", body: EmptyBody())
+    func beginAuthentication() {
+        sessionRevision = UUID()
+        subscriptionRequest?.cancel()
+        subscriptionRequest = nil
+    }
+
+    public func signOut() async {
+        var request = URLRequest(url: baseURL.appendingPathComponent("/api/auth/logout"))
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = false
+        if let sessionCookie { request.setValue("session=\(sessionCookie)", forHTTPHeaderField: "Cookie") }
+        clearSession()
+        _ = try? await session.data(for: request)
+    }
+
+    func clearSession() {
+        sessionRevision = UUID()
         sessionCookie = nil
         currentUserID = nil
         keychain.delete()
@@ -283,9 +305,10 @@ public final class APIClient {
 
     private func refreshSubscriptions(key: String) async throws -> [Podcast] {
         if let request = subscriptionRequest { return try await request.value }
+        let revision = sessionRevision
         let request = Task { @MainActor [weak self] in
             guard let self else { throw APIError(statusCode: 0, message: "API client unavailable") }
-            defer { self.subscriptionRequest = nil }
+            defer { if self.sessionRevision == revision { self.subscriptionRequest = nil } }
             let podcasts = try await self.fetchSubscriptions()
             self.subscriptionCache.store(podcasts, key: key)
             return podcasts
@@ -344,15 +367,18 @@ public final class APIClient {
         guard let url = components?.url else { throw APIError(statusCode: 0, message: "Invalid API URL") }
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body {
             request.httpBody = try JSONEncoder().encode(body)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
+        let revision = sessionRevision
         let cookie = sessionCookie
         if let cookie { request.setValue("session=\(cookie)", forHTTPHeaderField: "Cookie") }
 
         let (data, response) = try await session.data(for: request)
+        guard revision == sessionRevision else { throw CancellationError() }
         guard let http = response as? HTTPURLResponse else { throw APIError(statusCode: 0, message: "Invalid API response") }
         persistCookie(from: http)
         guard (200..<300).contains(http.statusCode) else {
@@ -661,7 +687,14 @@ final class PodcastSnapshotCache {
     private func storageKey(_ key: String) -> String { namespace + "." + key }
 }
 
-public struct KeychainStore: Sendable {
+@MainActor
+public protocol SessionCredentialStore {
+    func read() -> String?
+    func write(_ value: String)
+    func delete()
+}
+
+public struct KeychainStore: SessionCredentialStore, Sendable {
     private let service: String
     private let account: String
 
