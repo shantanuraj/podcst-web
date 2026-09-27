@@ -5,6 +5,10 @@ regression harness. It contains reference streaming processors for the first
 boost, limiter, and silence-trimming experiments; these are not yet the final
 mobile playback backend.
 
+Native integration follows the [audio experience plan](../docs/audio-experience-plan.md):
+a reusable local iOS player first, followed by production effects and progressive
+playback. The plan owns the work ledger, processing contracts, and release gates.
+
 ## Run the harness
 
 ```sh

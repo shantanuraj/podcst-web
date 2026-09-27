@@ -191,6 +191,8 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platf
 
 The client uses the web API for discovery, feed indexing, subscriptions, authentication and playback progress. An HTTP(S) feed URL entered in Discover is indexed through `/api/feed`, including private feeds whose access token is part of the URL.
 
+Development of Volume Boost, Trim Silence, and native audio playback follows the [two-milestone audio experience plan](docs/audio-experience-plan.md).
+
 ## Deployment
 
 The app is deployed on both Vercel and Fly.io, with plans to consolidate on Fly.io.
