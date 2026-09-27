@@ -35,6 +35,15 @@ cargo run --manifest-path audio-engine/Cargo.toml -- \
   --boost --adaptive-silence --limit --json
 ```
 
+For a short A/B set around a known point in the episode:
+
+```sh
+audio-engine/reference/make-listening-clips.sh "$SOURCE" /tmp/podcst-reference/clips
+```
+
+The script creates original, level-reduced, boost-only, and adaptive-trimmed
+30-second WAV files plus JSON timeline reports. It does not add media to git.
+
 The `-18 dB` copy is useful for checking that normalization restores perceived
 level without merely clipping. With the current default `+12 dB` gain cap it
 will intentionally remain below the `-14 LUFS` target; the `-6 dB` copy is a
@@ -46,6 +55,11 @@ The current experiment reports approximately:
 | ------------- | ---------: | -------------: | ------------------------------------------: |
 | `-6 dB` copy  |    `-26.0` |        `-15.0` |                                 `-1.1 dBFS` |
 | `-18 dB` copy |    `-38.0` |        `-26.0` | not target-tracking because of the gain cap |
+
+The current 30-second clip generated at the script's 300-second offset
+condenses from 30.0 seconds to about 24.6 seconds with the default adaptive
+settings. It retains a portion of each detected pause instead of deleting the
+whole pause and applies an 8 ms boundary fade.
 
 These are listening-test observations. Creating a level variant with FFmpeg
 changes the PCM representation, so use it for relative behavior and listening

@@ -6,7 +6,7 @@ use podcst_audio_engine::fixtures::generate_fixtures;
 use podcst_audio_engine::wav::{read_wav, write_wav};
 use podcst_audio_engine::{
     AdaptiveSilenceConfig, AnalysisConfig, BoostConfig, LimiterConfig, ProcessingConfig,
-    TrimConfig, analyze, process_audio,
+    TrimConfig, TrimEditConfig, analyze, process_audio,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut silence = podcst_audio_engine::SilenceConfig::default();
             let mut adaptive_trim = false;
             let mut adaptive_silence = AdaptiveSilenceConfig::default();
+            let mut trim_edit = TrimEditConfig::default();
             let mut limiter = false;
             let mut limiter_config = LimiterConfig::default();
             let mut json = false;
@@ -111,6 +112,31 @@ fn main() -> Result<(), Box<dyn Error>> {
                             .get(index)
                             .ok_or("missing value for --guard-ms")?
                             .parse()?;
+                        adaptive_silence.guard_ms = silence.guard_ms;
+                        trim = true;
+                    }
+                    "--retain-silence-ms" => {
+                        index += 1;
+                        trim_edit.retain_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --retain-silence-ms")?
+                            .parse()?;
+                        trim = true;
+                    }
+                    "--max-trim-ms" => {
+                        index += 1;
+                        trim_edit.max_trim_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --max-trim-ms")?
+                            .parse()?;
+                        trim = true;
+                    }
+                    "--fade-ms" => {
+                        index += 1;
+                        trim_edit.fade_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --fade-ms")?
+                            .parse()?;
                         trim = true;
                     }
                     "--limit" => limiter = true,
@@ -151,9 +177,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 index += 1;
             }
             let input = read_wav(&input_path)?;
-            let input_metrics = analyze(&input, &AnalysisConfig::default());
+            let input_metrics = analyze(&input, &AnalysisConfig::default())?;
             let mut config = ProcessingConfig {
                 chunk_frames,
+                trim_edit,
                 ..ProcessingConfig::default()
             };
             if boost {
@@ -173,7 +200,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             let processed = process_audio(&input, &config)?;
             write_wav(&output_path, processed.audio())?;
-            let output_metrics = analyze(processed.audio(), &AnalysisConfig::default());
+            let output_metrics = analyze(processed.audio(), &AnalysisConfig::default())?;
             if json {
                 println!(
                     "{{\"input\":{},\"output\":{},\"timeline\":{}}}",
@@ -237,7 +264,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 index += 1;
             }
             let audio = read_wav(&path)?;
-            let metrics = analyze(&audio, &config);
+            let metrics = analyze(&audio, &config)?;
             if json {
                 println!("{}", metrics_json(Path::new(&path), &metrics));
             } else {
@@ -254,7 +281,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  audio-engine generate-fixtures <directory>\n  audio-engine analyze <file.wav> [--json] [--silence-threshold-dbfs <dbfs>] [--min-silence-ms <ms>] [--guard-ms <ms>]\n  audio-engine process <input.wav> <output.wav> [--boost] [--target-lufs <lufs>] [--trim-silence|--adaptive-silence] [--limit] [--json]"
+        "Usage:\n  audio-engine generate-fixtures <directory>\n  audio-engine analyze <file.wav> [--json] [--silence-threshold-dbfs <dbfs>] [--min-silence-ms <ms>] [--guard-ms <ms>]\n  audio-engine process <input.wav> <output.wav> [--boost] [--target-lufs <lufs>] [--trim-silence|--adaptive-silence] [--retain-silence-ms <ms>] [--max-trim-ms <ms>] [--fade-ms <ms>] [--limit] [--json]"
     );
 }
 
