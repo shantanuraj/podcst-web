@@ -5,7 +5,7 @@ import XCTest
 @MainActor
 final class PlaybackTests: XCTestCase {
     func testQueueMoveKeepsCurrentEpisodeIdentity() {
-        let controller = PlaybackController(persistenceURL: temporaryURL())
+        let controller = makeController(persistenceURL: temporaryURL())
         let first = episode(guid: "first")
         let second = episode(guid: "second")
         let third = episode(guid: "third")
@@ -23,7 +23,7 @@ final class PlaybackTests: XCTestCase {
 
     func testRemoveCurrentSelectsRemainingEpisodeAndPersists() {
         let url = temporaryURL()
-        let controller = PlaybackController(persistenceURL: url)
+        let controller = makeController(persistenceURL: url)
         let first = episode(guid: "first")
         let second = episode(guid: "second")
 
@@ -36,13 +36,13 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(controller.currentEpisode?.guid, "second")
         XCTAssertEqual(controller.currentTime, 0)
 
-        let restored = PlaybackController(persistenceURL: url)
+        let restored = makeController(persistenceURL: url)
         XCTAssertEqual(restored.queue.map(\.guid), ["second"])
         XCTAssertEqual(restored.currentEpisode?.guid, "second")
     }
 
     func testEnqueueDoesNotDuplicateCurrentPlaybackWhenPlayingEpisode() {
-        let controller = PlaybackController(persistenceURL: temporaryURL())
+        let controller = makeController(persistenceURL: temporaryURL())
         let item = episode(guid: "same")
 
         controller.play(item)
@@ -74,7 +74,7 @@ final class PlaybackTests: XCTestCase {
     }
 
     func testChapterNavigationFallsBackToEpisodes() {
-        let controller = PlaybackController(persistenceURL: temporaryURL())
+        let controller = makeController(persistenceURL: temporaryURL())
         var chaptered = episode(guid: "chaptered")
         chaptered.showNotes = "00:00 Intro<br>01:00 Middle<br>02:00 End"
         chaptered.duration = 180
@@ -91,7 +91,7 @@ final class PlaybackTests: XCTestCase {
     }
 
     func testUpNextWrapsAfterCurrentAndEditsInThatOrder() {
-        let controller = PlaybackController(persistenceURL: temporaryURL())
+        let controller = makeController(persistenceURL: temporaryURL())
         ["a", "b", "c", "d"].forEach { controller.enqueue(episode(guid: $0)) }
         controller.play(episode(guid: "c"))
 
@@ -116,11 +116,337 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(OPML.feeds(in: "<outline text='x' xmlUrl='https://example.com/feed'/>"), ["https://example.com/feed"])
     }
 
+    func testReadinessHonorsPauseDuringLoading() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        controller.pause()
+        transport.becomeReady(duration: 100)
+
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertTrue(transport.playedRates.isEmpty)
+        XCTAssertEqual(controller.duration, 100)
+    }
+
+    func testProgressUsesElapsedPlaybackTimeAfterBackwardSeek() {
+        let transport = FakePlaybackTransport()
+        let clock = FakePlaybackClock()
+        let controller = makeController(transport: transport, clock: clock)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"), at: 120)
+        transport.becomeReady(duration: 600)
+        controller.setRate(2)
+        clock.advance(by: 30)
+        transport.advance(to: 180)
+        XCTAssertEqual(updates.map(\.position), [180])
+
+        controller.seek(to: 10)
+        transport.finishSeek()
+        XCTAssertEqual(updates.map(\.position), [180, 10])
+        clock.advance(by: 29)
+        transport.advance(to: 68)
+        XCTAssertEqual(updates.count, 2)
+        clock.advance(by: 1)
+        transport.advance(to: 70)
+        XCTAssertEqual(updates.map(\.position), [180, 10, 70])
+    }
+
+    func testProgressExcludesLoadingPauseAndBufferingTime() {
+        let transport = FakePlaybackTransport()
+        let clock = FakePlaybackClock()
+        let controller = makeController(transport: transport, clock: clock)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"))
+        clock.advance(by: 100)
+        transport.becomeReady(duration: 600)
+        clock.advance(by: 10)
+        transport.advance(to: 10)
+        transport.emit(.playback(isPlaying: false))
+        clock.advance(by: 100)
+        transport.advance(to: 10)
+        XCTAssertTrue(updates.isEmpty)
+        transport.emit(.playback(isPlaying: true))
+        clock.advance(by: 20)
+        transport.advance(to: 30)
+        XCTAssertEqual(updates.map(\.position), [30])
+
+        controller.pause()
+        clock.advance(by: 100)
+        controller.resume()
+        clock.advance(by: 29)
+        transport.advance(to: 59)
+        XCTAssertEqual(updates.count, 2)
+        clock.advance(by: 1)
+        transport.advance(to: 60)
+        XCTAssertEqual(updates.map(\.position), [30, 30, 60])
+    }
+
+    func testResumeWhilePlayingPreservesProgressWithoutAnotherTransportEvent() {
+        let transport = FakePlaybackTransport()
+        let clock = FakePlaybackClock()
+        let controller = makeController(transport: transport, clock: clock)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        clock.advance(by: 20)
+        transport.advance(to: 20)
+        controller.resume()
+        controller.resume()
+        clock.advance(by: 10)
+        transport.advance(to: 30)
+
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1])
+        XCTAssertEqual(updates.map(\.position), [30])
+    }
+
+    func testDisconnectWhileLoadingCancelsPlaybackWhenReady() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        controller.handleRouteChange(reasonRaw: 2)
+        transport.becomeReady(duration: 100)
+
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertTrue(transport.playedRates.isEmpty)
+    }
+
+    func testDisconnectWhileBufferingCancelsAutomaticPlayback() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        transport.emit(.playback(isPlaying: false))
+        controller.handleRouteChange(reasonRaw: 2)
+        transport.becomeReady(duration: 100)
+
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testObsoleteEventsCannotOverwriteLatestSeekOrFinishEpisode() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 600)
+        let loadGeneration = transport.generation
+        controller.seek(to: 100)
+        let firstSeekGeneration = transport.generation
+        controller.seek(to: 200)
+        transport.finishSeek()
+        transport.emit(.seeked(100), generation: firstSeekGeneration)
+        transport.emit(.position(20), generation: loadGeneration)
+        transport.emit(.ready(duration: 10), generation: loadGeneration)
+        transport.emit(.ended, generation: firstSeekGeneration)
+        transport.emit(.failed, generation: loadGeneration)
+
+        XCTAssertEqual(controller.currentTime, 200)
+        XCTAssertEqual(controller.currentEpisode?.guid, "first")
+        XCTAssertEqual(controller.duration, 600)
+        XCTAssertEqual(controller.state, .playing)
+    }
+
+    func testSwitchSavesOutgoingEpisodeAndRejectsItsLateEvents() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        transport.advance(to: 27)
+        let oldGeneration = transport.generation
+        controller.play(episode(guid: "second"), at: 9)
+        transport.emit(.position(99), generation: oldGeneration)
+        transport.emit(.ended, generation: oldGeneration)
+
+        XCTAssertEqual(updates.map(\.episode.guid), ["first"])
+        XCTAssertEqual(updates.map(\.position), [27])
+        XCTAssertEqual(controller.currentEpisode?.guid, "second")
+        XCTAssertEqual(controller.currentTime, 9)
+    }
+
+    func testCompletionAdvancesQueueOnceAndRecordsSourceDuration() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"))
+        controller.enqueue(episode(guid: "second"))
+        transport.becomeReady(duration: 100)
+        let firstGeneration = transport.generation
+        transport.emit(.ended)
+        transport.emit(.ended, generation: firstGeneration)
+
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertEqual(updates.first?.position, 100)
+        XCTAssertEqual(updates.first?.completed, true)
+        XCTAssertEqual(controller.queue.map(\.guid), ["second"])
+        XCTAssertEqual(controller.currentTime, 0)
+    }
+
+    func testUserPauseDuringInterruptionCancelsAutomaticResume() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        controller.handleInterruption(typeRaw: 1, optionsRaw: nil)
+        controller.pause()
+        controller.handleInterruption(typeRaw: 0, optionsRaw: 1)
+
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testInterruptionResumesWhenUserIntentIsUnchanged() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        controller.handleInterruption(typeRaw: 1, optionsRaw: nil)
+        controller.handleInterruption(typeRaw: 0, optionsRaw: 1)
+
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1, 1])
+    }
+
+    func testShutdownDetachesEventsAndStopsTransport() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        let pendingUpdate = transport.onUpdate
+        let generation = transport.generation
+        controller.shutdown()
+        pendingUpdate?(PlaybackTransportUpdate(generation: generation, event: .ended))
+        controller.resume()
+        controller.shutdown()
+
+        XCTAssertEqual(controller.state, .idle)
+        XCTAssertEqual(controller.currentEpisode?.guid, "first")
+        XCTAssertNil(transport.onUpdate)
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertEqual(transport.shutdownCount, 1)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testRateChangesAndTemporaryDoubleSpeedPreserveSelectedRate() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        controller.setRate(1.25)
+        controller.holdDoubleSpeed(true)
+        controller.holdDoubleSpeed(false)
+        controller.setRate(1.3)
+
+        XCTAssertEqual(controller.rate, 1.25)
+        XCTAssertEqual(transport.changedRates, [1.25, 2, 1.25])
+    }
+
+    private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil) -> PlaybackController {
+        let url = persistenceURL ?? temporaryURL()
+        let controller = PlaybackController(transport: transport, persistenceURL: url, monotonicTime: { clock.time })
+        addTeardownBlock {
+            await MainActor.run { controller.shutdown() }
+            try? FileManager.default.removeItem(at: url)
+        }
+        return controller
+    }
+
     private func episode(guid: String) -> Episode {
         Episode(guid: guid, feed: "https://example.com/feed.xml", title: guid, file: EpisodeFile(url: "https://example.com/\(guid).mp3"))
     }
 
     private func temporaryURL() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("json")
+    }
+}
+
+@MainActor
+private final class FakePlaybackClock {
+    var time: TimeInterval = 0
+
+    func advance(by interval: TimeInterval) {
+        time += interval
+    }
+}
+
+@MainActor
+private final class FakePlaybackTransport: PlaybackTransport {
+    var onUpdate: (@MainActor (PlaybackTransportUpdate) -> Void)?
+    var hasSource = false
+    var position: TimeInterval = 0
+    var generation = UUID()
+    var playedRates: [Double] = []
+    var changedRates: [Double] = []
+    var shutdownCount = 0
+    private var ready = false
+    private var isPlaying = false
+    private var duration: TimeInterval = 0
+
+    func load(url: URL, at position: TimeInterval, generation: UUID) {
+        self.position = position
+        self.generation = generation
+        hasSource = true
+        ready = false
+    }
+
+    func becomeReady(duration: TimeInterval) {
+        self.duration = duration
+        ready = true
+        emit(.ready(duration: duration))
+    }
+
+    func play(atRate rate: Double) {
+        guard ready else { return }
+        playedRates.append(rate)
+        if !isPlaying { emit(.playback(isPlaying: true)) }
+    }
+
+    func pause() {
+        if isPlaying { emit(.playback(isPlaying: false)) }
+    }
+
+    func seek(to position: TimeInterval, generation: UUID) {
+        self.position = position
+        self.generation = generation
+        ready = false
+        isPlaying = false
+    }
+
+    func finishSeek() {
+        emit(.seeked(position))
+        becomeReady(duration: duration)
+    }
+
+    func advance(to position: TimeInterval) {
+        self.position = position
+        emit(.position(position))
+    }
+
+    func setRate(_ rate: Double) {
+        changedRates.append(rate)
+    }
+
+    func stop() {
+        hasSource = false
+        ready = false
+        isPlaying = false
+    }
+
+    func shutdown() {
+        onUpdate = nil
+        stop()
+        shutdownCount += 1
+    }
+
+    func emit(_ event: PlaybackTransportEvent, generation: UUID? = nil) {
+        if (generation ?? self.generation) == self.generation, case .playback(let isPlaying) = event {
+            self.isPlaying = isPlaying
+        }
+        onUpdate?(PlaybackTransportUpdate(generation: generation ?? self.generation, event: event))
     }
 }
