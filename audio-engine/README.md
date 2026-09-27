@@ -1,9 +1,10 @@
 # Podcst audio engine
 
 This crate is the platform-independent audio-processing core and its
-regression harness. It contains reference streaming processors for the first
-boost, limiter, and silence-trimming experiments; these are not yet the final
-mobile playback backend.
+regression harness. It supplies the bounded speech-effects worker and final
+render limiter used by the native iOS backend, alongside whole-file reference
+tools. The implementation has automated validation; physical listening and
+power release gates remain recorded separately.
 
 Native integration follows the audio experience plan:
 a reusable local iOS player first, followed by production effects and progressive
@@ -167,9 +168,10 @@ count and handles startup latency. It is not a drop-in Audio Unit render callbac
 ### Native C boundary
 
 `include/podcst_audio.h` exposes opaque `PodcstAudioProcessor` handles around the
-same bounded `PcmProcessor` used by Rust callers. Version 1 supports fixed gain
-and an optional limiter; causal Volume Boost and Trim Silence are later work.
-Zero gain with the limiter disabled is an exact identity path.
+same bounded `PcmProcessor` used by Rust callers. This render-facing processor
+provides fixed gain and the final limiter. Zero gain with the limiter disabled
+is an exact identity path. The separate `PodcstEffectsProcessor` provides causal
+Volume Boost and Trim Silence on the decoder worker.
 
 | Configuration | Supported range |
 | --- | --- |
@@ -246,8 +248,9 @@ select stable explicitly; the scripts use the active rustup toolchain otherwise.
 The Xcode app target links the same Rust static library through
 `scripts/build-xcode.sh`, which builds only the active destination architectures
 into Derived Data. It uses the same committed header and module. The XCFramework
-remains the standalone distribution artifact; normal podcast playback still
-uses AVPlayer while the local-file harness exercises native rendering.
+remains the standalone distribution artifact. Normal podcast playback routes
+completed files and supported progressive sources through the native backend;
+AVPlayer handles explicitly unsupported formats and streaming capabilities.
 
 `test-native.sh` runs C ABI/layout and Swift import/processing checks on the Mac.
 With `--apple`, it also links the Swift checks against every packaged architecture;
@@ -262,7 +265,10 @@ xcrun simctl spawn <simulator-id> "$PWD/audio-engine/target/native-tests/swift-s
 C/Swift checks, the packaged Swift executable on iOS Simulator and the app's
 playback tests. Its Apple runner needs an available iPhone simulator with iOS 18
 or later. Local builds need the same SDKs, targets and command-line tools; no
-prebuilt binary is downloaded or checked in.
+prebuilt binary is downloaded or checked in. The iOS test target also needs
+`ffmpeg` (`brew install ffmpeg`) to generate deterministic VBR MP3 and surround
+AAC fixtures in Derived Data. The test build copies them into the test bundle; it is never an app resource
+or a checked-in media file.
 
 ### Local iOS Audio Lab
 
@@ -273,21 +279,23 @@ normal launches use the web-backed app. The lab injects `LocalAudioTransport`
 into the existing `PlaybackController`, so queue policy, seeking, speed, audio
 sessions, interruptions and Now Playing use the shared controller.
 
-The decoder reads bounded planar Float32 blocks using AVAudioFile on a serial
-actor. Eight 2,048-frame buffers are reused only after the player consumes them.
-The graph is player → TimePitch → sample-rate/channel conversion → Rust limiter
-→ output. Its final Audio Unit converts only the current render block to/from
-interleaved PCM; buffers and the Rust handle are allocated before rendering.
-Owned-memory diagnostics count the explicit PCM pool and limiter storage, not
-Core Audio codec/graph internals or total process residency.
+The decoder reads bounded planar Float32 blocks on a worker. The Rust speech
+processor emits retained PCM and original-source spans. Each of two native
+source Audio Units has a preallocated single-producer/single-consumer ring;
+rendering reads raw storage using lock-free counters. There are no Swift or
+Objective-C object operations, locks, allocation, dispatch or I/O in the custom
+render callbacks. The graph is native PCM source → conversion → fixed-rate
+TimePitch → priming/crossfade gate → route conversion → final Rust limiter.
 
-Source position comes from the final rendered clock with limiter and output
-presentation latency accounted for. TimePitch's input read-ahead is not the
-heard position. Because changing TimePitch's rate with queued audio produced
-measured source-time errors, each rate change starts a new graph at the presented
-source position. Resume also starts a fresh graph. These transitions can briefly
-buffer; seamless live transitions remain a promotion requirement. TimePitch is
-bypassed at 1× to preserve source samples exactly before limiting.
+Source position comes from the final rendered clock, the committed rate handoff
+and bounded source spans, with limiter and output presentation latency accounted
+for. A dormant branch primes without being heard, then crosses into the output
+at a scheduled render-frame boundary. The active branch keeps its fixed rate;
+changing a live TimePitch rate is deliberately avoided. Pause/resume pauses the
+engine without resetting its processors. TimePitch is bypassed at 1× to preserve
+source samples exactly before limiting. Owned-memory diagnostics include the
+explicit pools, replay window, mapping and custom Audio Unit storage, excluding
+Apple codec/graph internals; whole-process residency is measured separately.
 
 At EOF, the decoder schedules a bounded 250 ms of output-equivalent silence to
 flush TimePitch, then explicitly drains the Rust limiter and waits for downstream
@@ -297,28 +305,53 @@ source boundary, lets pending real audio pass, and reopens there with a new grap
 generation. It never treats missing input as EOF. All retired worker results and
 callbacks are rejected by generation.
 
-The lab exposes source/output formats, occupied buffers, owned audio memory and
+The lab exposes source/output formats, queued buffers, owned audio memory and
 underrun counts. It keeps the selected document security scope while using the
 file. The temporary local playback state and diagnostics are not synchronized.
 For simulator automation, `-AudioLabFile <local-path>` opens an existing file
 alongside `-LocalAudioHarness`. Do not put private media paths in checked-in
 scheme arguments or scripts.
 
-The shared graph also runs offline in `LocalAudioTests`, including source marker
-timing at every supported speed, generated WAV/AAC input, seek/rate/pause changes,
-bounded pools, forced starvation and reentrant callbacks. `NativeRenderTests`
-compares the final AU directly to Rust across layouts and short-stream drains.
-Physical routes, final oversampled peaks, MP3 corpus coverage, long sessions and
-power measurements remain M1.6 work. Volume Boost and Trim Silence are not yet
-enabled in this development player.
+The shared graph runs offline in `LocalAudioTests`, `AudioValidationTests` and
+`EffectsIntegrationTests`: original-source marker timing, all speed transitions,
+generated PCM/compressed input, seek/pause/EOF races, exact 1× processed samples,
+finite storage and forced starvation. `EffectsPeakTests` warms up both effects
+before measuring final converted output with an independent 16× peak meter.
+`NativeRenderTests` compares the final limiter AU directly with Rust;
+`HandoffRenderTests` exercises raw PCM rings and crossfade publication.
 
-### Deliberately unresolved: streaming condensation
+Add `-AudioLabReference` to the debug lab launch arguments to use AVPlayer with
+the same controller and local file, without effects. Remove it to return to
+native playback and use the Audio control to enable effects. This comparison
+mode exists for the physical validation worksheet;
+it is not a production playback preference. Test source, route, volume, rate and
+optimized build settings must match when comparing power.
 
-Offline edits still retain 250 ms, trim at most 1,500 ms per guarded pause,
-apply 8 ms boundary fades, and run the limiter **after** editing. Source/output
-mapping is unchanged. Exact center-of-pause removal is noncausal for an
-arbitrarily long pause: its end determines which earlier samples must be
-removed. A bounded-memory, bounded-latency editor cannot reproduce this for
-all pause lengths. This milestone therefore does not pretend that streaming
-detection makes condensation streaming. A different long-pause removal or
-bypass policy requires approval before an online editor can be introduced.
+### Causal speech effects
+
+`SpeechProcessor` and the matching `podcst_effects_*` C API process interleaved
+mono/stereo float32 at 8–192 kHz. Input/output blocks are bounded to 8,192 frames;
+callers own output PCM and source-span storage. Process reports partial consumed
+and emitted counts. Zero emitted frames during priming are not EOF. Resubmit
+unconsumed input and repeatedly finish until the processor reports completion.
+
+Original PCM drives loudness and silence classification. Boost targets -14 LUFS
+where the ±12 dB gain limits permit, begins at unity, smooths linked channel gain
+and freezes upward adaptation during uncertain/quiet material. It is followed
+by the final limiter after time stretching and conversion, not used as a peak
+safety substitute.
+
+The online editor waits for 500 ms pause eligibility and retains 205 ms at each
+edge. It removes confirmed excess interior incrementally, caps removal at
+1,500 ms per pause and applies 8 ms boundary fades. Its working PCM is bounded
+to at most 510 ms. Warm-up and uncertain material pass through. This is a causal
+policy rather than the whole-file reference editor’s center cut; it never waits
+for an arbitrarily long pause to end. The cap persists through uncertainty and
+toggles until confident signal returns.
+
+Configuration revisions apply at analysis-frame boundaries. Each retained span
+maps original source frames to offsets in the current output block. The caller
+merges adjacent spans and drops presented history. Reset establishes a new source
+origin and clears measurement/edit history. Allocation regressions cover process,
+configure, reset, query and drain, including a six-hour synthetic stream. Natural
+speech rhythm and perceived gain quality still require the listening review.
