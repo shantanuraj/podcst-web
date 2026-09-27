@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh Podcst top charts every six hours
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00 UTC
+Persistent=true
+Unit=podcst-charts.service
+
+[Install]
+WantedBy=timers.target

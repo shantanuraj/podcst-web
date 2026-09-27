@@ -1,0 +1,30 @@
+[Unit]
+Description=Podcst top-chart refresh
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=svc-podcst
+Group=svc-podcst
+Environment=HOME=/var/lib/podcst
+Environment=DATABASE_URL=postgres://podcst_app@localhost/podcst
+Environment=PGHOST=/var/run/postgresql
+WorkingDirectory=/opt/podcst
+ExecStart=/usr/local/bin/bun run scripts/poll-top-charts.ts
+TimeoutStartSec=30min
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/opt/podcst
+ReadWritePaths=/var/lib/podcst
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=podcst-charts
