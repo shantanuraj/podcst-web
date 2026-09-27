@@ -13,6 +13,13 @@ enum PodcstPalette {
     static let accent = Color(light: 0xC84B31, dark: 0xE06B52)
     static let accentSoft = Color(light: 0xFDF6F4, dark: 0x2E1D1A)
     static let cream = Color(light: 0xF5F3F0, dark: 0x2A2826)
+    static let floating = Color(light: 0xFFFFFF, dark: 0x2C2A28)
+    static let floatingRule = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.07) : UIColor(hex: 0xE8E6E3)
+    })
+    static let floatingShadow = Color(UIColor { traits in
+        UIColor(white: 0, alpha: traits.userInterfaceStyle == .dark ? 0.35 : 0.08)
+    })
 
     static func tint(_ hue: ArtworkHue) -> Color {
         Color(UIColor { traits in

@@ -54,21 +54,19 @@ struct LibraryView: View {
             }
         }
         .podcstPage()
-        .navigationTitle("Library")
+        .screenHeader("Library") {
+            HStack(spacing: 14) {
+                if session.user == nil {
+                    Button("Sign in") { showingLogin = true }
+                        .font(.sans(.body).weight(.medium))
+                        .foregroundStyle(PodcstPalette.accent)
+                }
+                AccountButton()
+            }
+        }
         .refreshable { await library.load(forceRefresh: true) }
         .task { await library.load() }
         .sheet(isPresented: $showingLogin) { LoginView() }
-        .toolbar {
-            if session.user == nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Sign in") { showingLogin = true }
-                        .foregroundStyle(PodcstPalette.accent)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                AccountToolbarItem()
-            }
-        }
     }
 }
 

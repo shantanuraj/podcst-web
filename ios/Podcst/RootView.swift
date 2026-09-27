@@ -31,7 +31,6 @@ final class Router {
 }
 
 struct RootView: View {
-    @Environment(PlaybackController.self) private var playback
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
     @AppStorage(Appearance.key) private var appearance = Appearance.system
@@ -43,7 +42,7 @@ struct RootView: View {
         @Bindable var router = router
         Group {
             if initialTabConfigured {
-                playerTabs
+                tabs
             } else {
                 StartupView()
             }
@@ -73,23 +72,6 @@ struct RootView: View {
             initialTabConfigured && !onboarded && session.user == nil && library.podcasts.isEmpty
         } set: { presented in
             if !presented { onboarded = true }
-        }
-    }
-
-    @ViewBuilder
-    private var playerTabs: some View {
-        if #available(iOS 26.1, *) {
-            tabs.tabViewBottomAccessory(isEnabled: playback.currentEpisode != nil) {
-                NowPlayingBar()
-            }
-        } else if #available(iOS 26.0, *) {
-            tabs.tabViewBottomAccessory {
-                if playback.currentEpisode != nil {
-                    NowPlayingBar()
-                }
-            }
-        } else {
-            tabs
         }
     }
 
@@ -160,30 +142,32 @@ private struct PlayerInset: ViewModifier {
     @Environment(PlaybackController.self) private var playback
 
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-        } else {
-            content.safeAreaInset(edge: .bottom, spacing: 0) {
-                if playback.currentEpisode != nil {
-                    NowPlayingBar()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                }
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            if playback.currentEpisode != nil {
+                NowPlayingBar()
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.snappy, value: playback.currentEpisode == nil)
     }
 }
 
-struct AccountToolbarItem: View {
+struct AccountButton: View {
     @State private var showingSettings = false
 
     var body: some View {
         Button {
             showingSettings = true
         } label: {
-            Image(systemName: "person.crop.circle")
+            Image(systemName: "person")
+                .font(.sans(.subheadline).weight(.semibold))
+                .foregroundStyle(PodcstPalette.secondary)
+                .frame(width: 36, height: 36)
+                .background(PodcstPalette.surface, in: Circle())
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Account and settings")
         .sheet(isPresented: $showingSettings) {
             SettingsView()
@@ -217,7 +201,7 @@ struct NowPlayingBar: View {
                 router.showingPlayer = true
             } label: {
                 HStack(spacing: 12) {
-                    ArtworkView(url: playback.currentEpisode?.artworkURL, size: 40)
+                    ArtworkView(url: playback.currentEpisode?.artworkURL, size: 44)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(playback.currentEpisode?.title ?? "")
                             .font(.sans(.subheadline).weight(.medium))
@@ -241,21 +225,32 @@ struct NowPlayingBar: View {
                 playback.toggle()
             } label: {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.sans(.title3))
+                    .font(.system(size: 22))
                     .frame(minWidth: 44, minHeight: 44)
                     .opacity(playback.state == .loading ? 0.4 : 1)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
+        .padding(.leading, 9)
+        .padding(.trailing, 8)
+        .frame(height: 62)
+        .background {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                PodcstPalette.floating.opacity(0.92)
+            }
+        }
         .overlay(alignment: .bottom) {
             ProgressLine(fraction: playback.progress, loading: playback.state == .loading)
-                .padding(.horizontal, 14)
         }
-        .contentShape(Rectangle())
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(PodcstPalette.floatingRule)
+        }
+        .shadow(color: PodcstPalette.floatingShadow, radius: 12, y: 8)
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .simultaneousGesture(
             DragGesture(minimumDistance: 24)
                 .onChanged { value in

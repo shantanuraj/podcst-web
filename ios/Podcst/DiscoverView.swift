@@ -30,14 +30,9 @@ struct DiscoverView: View {
             .padding(.bottom, 24)
         }
         .podcstPage()
-        .navigationTitle("Discover")
+        .screenHeader("Discover") { AccountButton() }
         .refreshable { await loadTop(forceRefresh: true) }
         .task(id: region) { await loadTop() }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                AccountToolbarItem()
-            }
-        }
     }
 
     private func loadTop(forceRefresh: Bool = false) async {
