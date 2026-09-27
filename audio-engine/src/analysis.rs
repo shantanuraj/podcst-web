@@ -717,6 +717,21 @@ impl StreamingLoudnessAnalyzer {
         Ok(())
     }
 
+    pub fn recent_lufs(&self) -> f64 {
+        if self.energies.is_empty() {
+            f64::NEG_INFINITY
+        } else {
+            loudness_from_energy(self.window_energy.max(0.0) / self.energies.len() as f64)
+        }
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        size_of::<Self>()
+            + self.filters.capacity() * size_of::<KWeightingFilter>()
+            + self.energies.capacity() * size_of::<f64>()
+            + self.histogram.capacity() * size_of::<(u64, f64)>()
+    }
+
     pub fn finish(&mut self) -> StreamingLoudnessMetrics {
         if !self.finished && self.frames > 0 && self.frames < self.block_length {
             self.add_block(self.window_energy.max(0.0) / self.frames as f64);
@@ -798,6 +813,14 @@ impl StreamingSilenceConfig {
 pub struct SilenceFrameSegment {
     pub source_start_frame: usize,
     pub source_end_frame: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SilenceFrameDecision {
+    pub source_start_frame: usize,
+    pub frames: usize,
+    pub silent: bool,
+    pub confident_signal: bool,
 }
 
 pub struct StreamingSilenceDetector {
@@ -895,17 +918,38 @@ impl StreamingSilenceDetector {
     pub fn process(
         &mut self,
         input: &[f32],
-        mut emit: impl FnMut(SilenceFrameSegment),
+        emit: impl FnMut(SilenceFrameSegment),
+    ) -> Result<(), AudioError> {
+        self.process_decisions(input, emit, |_| {})
+    }
+
+    pub fn process_frames(
+        &mut self,
+        input: &[f32],
+        emit: impl FnMut(SilenceFrameDecision),
+    ) -> Result<(), AudioError> {
+        self.process_decisions(input, |_| {}, emit)
+    }
+
+    fn process_decisions(
+        &mut self,
+        input: &[f32],
+        mut emit_segment: impl FnMut(SilenceFrameSegment),
+        mut emit_frame: impl FnMut(SilenceFrameDecision),
     ) -> Result<(), AudioError> {
         ensure_active(self.finished)?;
         self.format.validate_samples(input)?;
+        self.next_frame
+            .checked_add(self.pending_frames)
+            .and_then(|value| value.checked_add(input.len() / self.format.channels))
+            .ok_or(AudioError::BufferSizeOverflow)?;
         for frame in input.chunks_exact(self.format.channels) {
             for (energy, sample) in self.channel_energy.iter_mut().zip(frame) {
                 *energy += f64::from(*sample).powi(2);
             }
             self.pending_frames += 1;
             if self.pending_frames == self.frame_length {
-                self.classify_frame(&mut emit);
+                emit_frame(self.classify_frame(&mut emit_segment));
             }
         }
         Ok(())
@@ -922,13 +966,37 @@ impl StreamingSilenceDetector {
         self.finished = true;
     }
 
-    fn classify_frame(&mut self, emit: &mut impl FnMut(SilenceFrameSegment)) {
+    pub fn finish_frames(&mut self, mut emit: impl FnMut(SilenceFrameDecision)) {
+        if self.finished {
+            return;
+        }
+        if self.pending_frames > 0 {
+            emit(self.classify_frame(&mut |_| {}));
+        }
+        self.close_silence(self.next_frame, &mut |_| {});
+        self.finished = true;
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        size_of::<Self>()
+            + self.levels.capacity() * size_of::<f64>()
+            + self.sorted_levels.capacity() * size_of::<f64>()
+            + self.channel_energy.capacity() * size_of::<f64>()
+    }
+
+    fn classify_frame(
+        &mut self,
+        emit: &mut impl FnMut(SilenceFrameSegment),
+    ) -> SilenceFrameDecision {
         self.analyzed_frames += self.pending_frames;
         let level = db_from_power(
             self.channel_energy.iter().copied().fold(0.0, f64::max) / self.pending_frames as f64,
         );
-        let silent = match &self.config {
-            StreamingSilenceConfig::Fixed(config) => level <= config.threshold_dbfs,
+        let (silent, confident_signal) = match &self.config {
+            StreamingSilenceConfig::Fixed(config) => (
+                level <= config.threshold_dbfs,
+                level > config.threshold_dbfs,
+            ),
             StreamingSilenceConfig::Adaptive {
                 silence: config, ..
             } => {
@@ -938,22 +1006,30 @@ impl StreamingSilenceDetector {
                 self.levels.push_back(level);
                 self.sorted_levels.clear();
                 self.sorted_levels.extend(self.levels.iter().copied());
-                self.sorted_levels.sort_by(f64::total_cmp);
+                self.sorted_levels.sort_unstable_by(f64::total_cmp);
                 let noise_floor = percentile(&self.sorted_levels, config.noise_floor_percentile);
                 let high_level = percentile(&self.sorted_levels, 0.9);
                 let speech_ceiling = high_level - config.speech_margin_db;
                 let threshold = (noise_floor + config.threshold_offset_db)
                     .clamp(config.min_threshold_dbfs, config.max_threshold_dbfs)
                     .min(speech_ceiling);
-                self.analyzed_frames >= self.window_length * self.frame_length
+                let exit_threshold = (threshold + config.hysteresis_db).min(speech_ceiling);
+                let confident = self.analyzed_frames >= self.window_length * self.frame_length
                     && high_level.is_finite()
-                    && high_level - noise_floor >= config.min_dynamic_range_db
-                    && level
-                        <= if self.silent {
-                            (threshold + config.hysteresis_db).min(speech_ceiling)
-                        } else {
-                            threshold
-                        }
+                    && high_level - noise_floor >= config.min_dynamic_range_db;
+                (
+                    confident
+                        && level
+                            <= if self.silent {
+                                exit_threshold
+                            } else {
+                                threshold
+                            },
+                    confident
+                        && level > exit_threshold
+                        && level >= speech_ceiling
+                        && level > config.max_threshold_dbfs,
+                )
             }
         };
         if silent {
@@ -961,10 +1037,17 @@ impl StreamingSilenceDetector {
         } else {
             self.close_silence(self.next_frame, emit);
         }
+        let decision = SilenceFrameDecision {
+            source_start_frame: self.next_frame,
+            frames: self.pending_frames,
+            silent,
+            confident_signal,
+        };
         self.silent = silent;
         self.next_frame += self.pending_frames;
         self.pending_frames = 0;
         self.channel_energy.fill(0.0);
+        decision
     }
 
     fn close_silence(&mut self, end: usize, emit: &mut impl FnMut(SilenceFrameSegment)) {

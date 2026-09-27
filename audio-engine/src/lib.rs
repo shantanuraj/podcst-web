@@ -3,13 +3,14 @@ pub mod audio;
 pub mod ffi;
 pub mod fixtures;
 pub mod processing;
+pub mod speech;
 pub mod wav;
 
 pub use analysis::{
-    AdaptiveSilenceConfig, AnalysisConfig, AudioMetrics, SilenceConfig, SilenceFrameSegment,
-    SilenceSegment, StreamingLoudnessAnalyzer, StreamingLoudnessMetrics, StreamingSilenceConfig,
-    StreamingSilenceDetector, analyze, detect_adaptive_silence, detect_silence, integrated_lufs,
-    oversampled_peak, rms_dbfs, sample_peak,
+    AdaptiveSilenceConfig, AnalysisConfig, AudioMetrics, SilenceConfig, SilenceFrameDecision,
+    SilenceFrameSegment, SilenceSegment, StreamingLoudnessAnalyzer, StreamingLoudnessMetrics,
+    StreamingSilenceConfig, StreamingSilenceDetector, analyze, detect_adaptive_silence,
+    detect_silence, integrated_lufs, oversampled_peak, rms_dbfs, sample_peak,
 };
 pub use audio::{AudioError, PcmAudio};
 pub use processing::{
