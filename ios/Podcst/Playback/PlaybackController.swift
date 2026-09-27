@@ -39,9 +39,12 @@ public final class PlaybackController {
     public private(set) var currentTime: TimeInterval
     public private(set) var duration: TimeInterval
     public private(set) var state: PlaybackState
-    public private(set) var rate: Double
+    let audioPreferences: AudioPreferences
+    public var rate: Double { audioPreferences.options(for: currentEpisode?.feed).speed }
+    var requestedEffects: AudioEffects { audioPreferences.options(for: currentEpisode?.feed).effects }
     public private(set) var isDoubleSpeedHeld = false
     public private(set) var outputName: String?
+    private(set) var audioEffectState: AudioEffectState = .inactive
     public var onProgress: ((PlaybackUpdate) -> Void)?
 
     public var currentEpisode: Episode? {
@@ -50,6 +53,7 @@ public final class PlaybackController {
     }
 
     public var isPlaying: Bool { state == .playing }
+    public var isPlaybackRequested: Bool { shouldPlay }
 
     public var upNext: [Episode] {
         guard queue.indices.contains(currentIndex) else { return queue }
@@ -88,6 +92,7 @@ public final class PlaybackController {
     @ObservationIgnored private var systemObservers: SystemPlaybackObservers?
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var shouldPlay = false
+    @ObservationIgnored private var changingAccount = false
     @ObservationIgnored private var wasPlayingBeforeInterruption = false
     @ObservationIgnored private var playingSince: TimeInterval?
     @ObservationIgnored private var elapsedSinceProgress: TimeInterval = 0
@@ -97,18 +102,17 @@ public final class PlaybackController {
     @ObservationIgnored private var artworkKey: String?
     @ObservationIgnored private var nowPlayingArtwork: MPMediaItemArtwork?
 
+    private var accountID: String?
+
     private struct PersistedState: Codable {
+        var accountID: String?
         var queue: [Episode]
         var currentIndex: Int
         var currentTime: TimeInterval
-        var rate: Double
     }
 
-    public convenience init() {
-        self.init(transport: AVPlayerTransport(), persistenceURL: Self.defaultStorageURL(), integratesWithSystem: true)
-    }
-
-    init(transport: any PlaybackTransport, persistenceURL: URL, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false) {
+    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false) {
+        self.accountID = accountID
         self.transport = transport
         self.storageURL = persistenceURL
         self.monotonicTime = monotonicTime
@@ -118,9 +122,10 @@ public final class PlaybackController {
         self.currentTime = 0
         self.duration = 0
         self.state = .idle
-        self.rate = 1
+        self.audioPreferences = preferences ?? AudioPreferences(storageURL: persistenceURL.appendingPathExtension("audio"))
         loadPersistedState()
         transport.onUpdate = { [weak self] update in self?.handleTransport(update) }
+        audioPreferences.onChange = { [weak self] in self?.applyAudioOptions() }
         if integratesWithSystem {
             systemObservers = SystemPlaybackObservers()
             do { try configureAudioSession() }
@@ -156,13 +161,13 @@ public final class PlaybackController {
     }
 
     public func restore() async {
-        guard !isShutdown, !transport.hasSource, state != .playing else { return }
+        guard !changingAccount, !isShutdown, !transport.hasSource, state != .playing else { return }
         loadPersistedState()
         updateNowPlayingInfo()
     }
 
     public func play(_ episode: Episode, at position: TimeInterval = 0) {
-        guard !isShutdown else { return }
+        guard !changingAccount, !isShutdown else { return }
         saveOutgoingProgress()
         let targetIndex: Int
         if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
@@ -180,7 +185,7 @@ public final class PlaybackController {
     }
 
     public func restore(_ episode: Episode, at position: TimeInterval) {
-        guard !isShutdown else { return }
+        guard !changingAccount, !isShutdown else { return }
         saveOutgoingProgress()
         if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
             currentIndex = existingIndex
@@ -196,14 +201,7 @@ public final class PlaybackController {
     }
 
     public func toggle() {
-        switch state {
-        case .playing:
-            pause()
-        case .paused, .ended, .idle:
-            resume()
-        case .loading, .failed:
-            if currentEpisode != nil { resume() }
-        }
+        if shouldPlay { pause() } else { resume() }
     }
 
     public func pause() {
@@ -219,7 +217,7 @@ public final class PlaybackController {
     }
 
     public func resume() {
-        guard !isShutdown, currentEpisode != nil, state != .playing, activateAudioSession() else { return }
+        guard !changingAccount, !isShutdown, currentEpisode != nil, state != .playing, activateAudioSession() else { return }
         wasPlayingBeforeInterruption = false
         shouldPlay = true
         if !transport.hasSource || state == .ended || state == .failed {
@@ -232,9 +230,8 @@ public final class PlaybackController {
     }
 
     public func seek(to position: TimeInterval) {
-        guard !isShutdown, currentEpisode != nil, position.isFinite else { return }
-        let upperBound = effectiveDuration
-        let clamped = max(0, upperBound > 0 ? min(position, upperBound) : position)
+        guard !changingAccount, !isShutdown, currentEpisode != nil, position.isFinite else { return }
+        let clamped = max(0, position)
         currentTime = clamped
         generation = UUID()
         transition(to: shouldPlay ? .loading : .paused)
@@ -283,9 +280,16 @@ public final class PlaybackController {
 
     public func setRate(_ newRate: Double) {
         guard !isShutdown, Self.supportedRates.contains(where: { abs($0 - newRate) < 0.0001 }) else { return }
-        rate = newRate
-        persist()
+        let feed = currentEpisode?.feed
+        var options = audioPreferences.options(for: feed)
+        options.speed = newRate
+        audioPreferences.set(options, for: feed.flatMap { audioPreferences.hasOverride(for: $0) ? $0 : nil })
+    }
+
+    private func applyAudioOptions() {
+        guard !isShutdown else { return }
         applyRate()
+        transport.setEffects(requestedEffects)
     }
 
     private var effectiveRate: Double { isDoubleSpeedHeld ? 2 : rate }
@@ -296,7 +300,7 @@ public final class PlaybackController {
     }
 
     public func next() {
-        guard !isShutdown, !queue.isEmpty else { return }
+        guard !changingAccount, !isShutdown, !queue.isEmpty else { return }
         saveOutgoingProgress()
         let nextIndex = currentIndex + 1 < queue.count ? currentIndex + 1 : 0
         currentIndex = nextIndex
@@ -307,7 +311,7 @@ public final class PlaybackController {
     }
 
     public func previous() {
-        guard !isShutdown, !queue.isEmpty else { return }
+        guard !changingAccount, !isShutdown, !queue.isEmpty else { return }
         saveOutgoingProgress()
         let previousIndex = currentIndex > 0 ? currentIndex - 1 : queue.count - 1
         currentIndex = previousIndex
@@ -399,6 +403,22 @@ public final class PlaybackController {
         updateNowPlayingInfo()
     }
 
+    func beginAccountChange() {
+        pause()
+        changingAccount = true
+        onProgress = nil
+        stopPlayback()
+    }
+
+    func switchAccount(to id: String?) {
+        defer { changingAccount = false }
+        guard accountID != id else { return }
+        onProgress = nil
+        clear()
+        accountID = id
+        persist()
+    }
+
     public func clear() {
         saveOutgoingProgress()
         stopPlayback()
@@ -428,7 +448,9 @@ public final class PlaybackController {
         duration = episode.duration ?? 0
         elapsedSinceProgress = 0
         let token = generation
-        transport.load(url: url, at: currentTime, generation: token)
+        applyAudioOptions()
+        transport.load(source: .episode(episode), at: currentTime, generation: token)
+        transport.setEffects(requestedEffects)
         if integratesWithSystem {
             loadChapters(from: AVURLAsset(url: url), identity: episode.identity)
         }
@@ -439,6 +461,10 @@ public final class PlaybackController {
     private func handleTransport(_ update: PlaybackTransportUpdate) {
         guard !isShutdown, update.generation == generation, currentEpisode != nil else { return }
         switch update.event {
+        case .effects(let state):
+            audioEffectState = state
+        case .duration(let duration):
+            if duration.isFinite, duration >= 0 { self.duration = duration }
         case .ready(let duration):
             if duration.isFinite, duration > 0 { self.duration = duration }
             if shouldPlay {
@@ -698,11 +724,15 @@ public final class PlaybackController {
     }
 
     private func persist() {
-        let snapshot = PersistedState(queue: queue, currentIndex: currentIndex, currentTime: currentTime, rate: rate)
+        let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex, currentTime: currentTime)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         do {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: storageURL, options: [.atomic])
+            try data.write(to: storageURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            var file = storageURL
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try file.setResourceValues(values)
         } catch {
             return
         }
@@ -710,15 +740,15 @@ public final class PlaybackController {
 
     private func loadPersistedState() {
         guard let data = try? Data(contentsOf: storageURL), let persisted = try? JSONDecoder().decode(PersistedState.self, from: data) else { return }
+        guard persisted.accountID == accountID else { return }
         queue = persisted.queue
         currentIndex = queue.isEmpty ? 0 : min(max(0, persisted.currentIndex), queue.count - 1)
         currentTime = max(0, persisted.currentTime)
-        rate = Self.supportedRates.min { abs($0 - persisted.rate) < abs($1 - persisted.rate) } ?? 1
         duration = currentEpisode?.duration ?? 0
         transition(to: queue.isEmpty ? .idle : .paused)
     }
 
-    private static func defaultStorageURL() -> URL {
+    static func defaultStorageURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("Podcst", isDirectory: true).appendingPathComponent("playback.json")
     }

@@ -17,9 +17,11 @@ final class AVPlayerTransport: PlaybackTransport {
     private var ready = false
     private var seeking = false
 
-    func load(url: URL, at position: TimeInterval, generation: UUID) {
+    func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
         stop()
-        player.replaceCurrentItem(with: AVPlayerItem(url: url))
+        guard let url = source.url else { return }
+        let options = url.isFileURL ? source.contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] } : nil
+        player.replaceCurrentItem(with: AVPlayerItem(asset: AVURLAsset(url: url, options: options)))
         prepare(at: position, generation: generation)
     }
 
@@ -40,6 +42,10 @@ final class AVPlayerTransport: PlaybackTransport {
     func setRate(_ rate: Double) {
         player.defaultRate = Float(rate)
         if player.rate != 0 { player.rate = Float(rate) }
+    }
+
+    func setEffects(_ effects: AudioEffects) {
+        emit(.effects(effects.enabled ? .unavailable("Audio effects are unavailable for this format.") : .inactive))
     }
 
     func stop() {

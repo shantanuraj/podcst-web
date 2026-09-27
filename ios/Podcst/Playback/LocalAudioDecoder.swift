@@ -6,6 +6,7 @@ struct LocalAudioFileInfo: Sendable {
     let channels: AVAudioChannelCount
     let frameCount: AVAudioFramePosition
     let startFrame: AVAudioFramePosition
+    var durationIsEstimated = false
 
     var duration: TimeInterval { Double(frameCount) / sampleRate }
 }
@@ -112,6 +113,10 @@ actor LocalAudioDecoder {
         buffers = []
         leasedSlots.removeAll(keepingCapacity: true)
         self.generation = UUID()
+    }
+
+    func allocatedBytes() -> UInt64 {
+        buffers.reduce(0) { $0 + UInt64($1.frameCapacity) * UInt64($1.format.channelCount) * 4 }
     }
 }
 

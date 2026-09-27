@@ -1,4 +1,3 @@
-import Accelerate
 import AVFoundation
 import Darwin
 import XCTest
@@ -13,8 +12,8 @@ final class AudioValidationTests: XCTestCase {
             return Float(sin(phase) * envelope)
         }
         XCTAssertEqual(samples.map { abs($0) }.max()!, Float(1 / sqrt(2)), accuracy: 0.00001)
-        XCTAssertEqual(oversampledPeak(samples), 1, accuracy: 0.002)
-        XCTAssertEqual(oversampledPeak(Array(repeating: 0, count: 1024)), 0)
+        XCTAssertEqual(AudioOutputMeter.peak(samples), 1, accuracy: 0.002)
+        XCTAssertEqual(AudioOutputMeter.peak(Array(repeating: 0, count: 1024)), 0)
     }
 
     func testFinalGraphCeilingAcrossRatesChannelsAndSampleRateConversion() async throws {
@@ -41,7 +40,7 @@ final class AudioValidationTests: XCTestCase {
                         let output = try await render(transport, sampleRate: outputRate, channels: channels)
                         for channel in output {
                             XCTAssertTrue(channel.allSatisfy(\.isFinite))
-                            let peak = oversampledPeak(channel)
+                            let peak = AudioOutputMeter.peak(channel)
                             let decibels = 20 * log10(max(peak, 0.000001))
                             measurements.append("\(sourceRate),\(outputRate),\(channels),\(rate),\(decibels)")
                             XCTAssertLessThanOrEqual(decibels, -0.8, "\(sourceRate) → \(outputRate), \(channels) channels, \(rate)×: \(decibels) dBTP")
@@ -231,6 +230,205 @@ final class AudioValidationTests: XCTestCase {
         }
     }
 
+    func testLiveRateHandoffsKeepSourceMarkersAndContinuousPlayback() async throws {
+        var measurements: [String] = []
+        for (sourceRate, outputRate) in [(48_000.0, 48_000.0), (44_100.0, 48_000.0), (48_000.0, 44_100.0)] {
+            let markers = (1...15).map { Double($0) / 4 }
+            let markerFrames = Set(markers.map { Int($0 * sourceRate) })
+            let url = try pcmFile(sampleRate: sourceRate, channels: 1, frames: Int(sourceRate * 4)) { frame, _ in
+                markerFrames.contains(frame) ? 0.5 : 0
+            }
+            for oldRate in PlaybackController.supportedRates {
+                for newRate in PlaybackController.supportedRates where oldRate != newRate {
+                    let transport = makeTransport(sampleRate: outputRate, channels: 1)
+                    defer { transport.shutdown() }
+                    var events: [PlaybackTransportEvent] = []
+                    transport.onUpdate = { events.append($0.event) }
+                    transport.load(source: .url(url), at: 0, generation: UUID())
+                    try await transport.waitUntilReady()
+                    transport.play(atRate: oldRate)
+                    let buffer = try outputBuffer(sampleRate: outputRate, channels: 1)
+                    var output: [Float] = []
+                    var clocks = [(frame: 0, source: 0.0)]
+                    var changed = false
+                    var changedAt = 0
+                    for _ in 0..<2048 {
+                        if transport.diagnostics.reachedEnd { break }
+                        if !changed, transport.position >= 0.75 {
+                            changed = true
+                            changedAt = events.count
+                            transport.setRate(newRate)
+                        }
+                        let status = try await transport.renderOffline(frames: 256, into: buffer)
+                        XCTAssertEqual(status, .success)
+                        output.append(contentsOf: UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+                        clocks.append((output.count, transport.position))
+                    }
+                    let context = "\(sourceRate) → \(outputRate), \(oldRate)× → \(newRate)×"
+                    XCTAssertTrue(changed, context)
+                    XCTAssertTrue(transport.diagnostics.reachedEnd, context)
+                    XCTAssertEqual(transport.diagnostics.underruns, 0, context)
+                    XCTAssertFalse(events.dropFirst(changedAt).contains { if case .playback(isPlaying: false) = $0 { true } else { false } }, context)
+                    XCTAssertEqual(events.filter { if case .ended = $0 { true } else { false } }.count, 1, context)
+                    XCTAssertEqual(events.filter { if case .ready = $0 { true } else { false } }.count, 1, context)
+                    var maximumError = 0.0
+                    for marker in markers {
+                        let lowerClock = try XCTUnwrap(clocks.last { $0.source < marker - 0.055 })
+                        let upperClock = try XCTUnwrap(clocks.first { $0.source > marker + 0.055 })
+                        let lower = max(0, lowerClock.frame)
+                        let upper = min(output.count, upperClock.frame)
+                        let peak = try XCTUnwrap((lower..<upper).max { abs(output[$0]) < abs(output[$1]) })
+                        XCTAssertGreaterThan(abs(output[peak]), 0.01, context)
+                        let index = try XCTUnwrap(clocks.indices.dropFirst().first { clocks[$0].frame >= peak })
+                        let previous = clocks[index - 1]
+                        let next = clocks[index]
+                        let observed = previous.source + (next.source - previous.source) * Double(peak - previous.frame) / Double(next.frame - previous.frame)
+                        maximumError = max(maximumError, abs(observed - marker))
+                        XCTAssertEqual(observed, marker, accuracy: 0.020, context)
+                    }
+                    let slopeStart = try XCTUnwrap(clocks.first { $0.source >= 2.5 })
+                    let slopeEnd = try XCTUnwrap(clocks.first { $0.source >= 3.5 })
+                    let observedRate = (slopeEnd.source - slopeStart.source) / (Double(slopeEnd.frame - slopeStart.frame) / outputRate)
+                    XCTAssertEqual(observedRate, newRate, accuracy: 0.001, context)
+                    measurements.append("\(context): \(maximumError * 1000) ms")
+                }
+            }
+        }
+        record("Live speed handoff maximum marker error", lines: measurements)
+    }
+
+    func testLateAndRapidRateChangesPreserveTheFinalMarker() async throws {
+        let url = try pcmFile(sampleRate: 48_000, channels: 1, frames: 48_000) { frame, _ in
+            frame == 47_999 ? 0.5 : 0
+        }
+        for rapid in [false, true] {
+            for rate in PlaybackController.supportedRates {
+                let transport = makeTransport(sampleRate: 48_000, channels: 1)
+                defer { transport.shutdown() }
+                var ended = 0
+                var ready = 0
+                transport.onUpdate = {
+                    if case .ended = $0.event { ended += 1 }
+                    if case .ready = $0.event { ready += 1 }
+                }
+                transport.load(source: .url(url), at: 0, generation: UUID())
+                try await transport.waitUntilReady()
+                transport.play(atRate: 1)
+                let buffer = try outputBuffer(sampleRate: 48_000, channels: 1)
+                var peak: Float = 0
+                var changed = false
+                for block in 0..<1536 {
+                    if transport.diagnostics.reachedEnd { break }
+                    if rapid, transport.position > 0.1, transport.position < 0.8, block % 7 == 0 {
+                        transport.setRate(PlaybackController.supportedRates[block % PlaybackController.supportedRates.count])
+                    }
+                    if !changed, transport.position >= 0.9 {
+                        transport.setRate(rate)
+                        changed = true
+                    }
+                    _ = try await transport.renderOffline(frames: 128, into: buffer)
+                    for frame in 0..<Int(buffer.frameLength) { peak = max(peak, abs(buffer.floatChannelData![0][frame])) }
+                }
+                XCTAssertTrue(changed)
+                XCTAssertGreaterThan(peak, 0.01, "\(rate)×, rapid \(rapid)")
+                XCTAssertEqual(ended, 1)
+                XCTAssertEqual(ready, 1)
+                XCTAssertEqual(transport.position, 1, accuracy: 1 / 48_000)
+                XCTAssertEqual(transport.diagnostics.underruns, 0)
+                XCTAssertLessThan(transport.diagnostics.allocatedBytes, 8 * 1024 * 1024)
+            }
+        }
+    }
+
+    func testSeekDuringPrimingDiscardsOldBranchAudio() async throws {
+        let url = try pcmFile(sampleRate: 48_000, channels: 2, frames: 96_000) { frame, channel in
+            Float(0.25 * sin(Double(frame) * (channel == 0 ? 0.053 : 0.091)))
+        }
+        var captures: [[[Float]]] = []
+        for interrupted in [false, true] {
+            let transport = makeTransport(sampleRate: 48_000, channels: 2)
+            defer { transport.shutdown() }
+            if interrupted {
+                transport.load(source: .url(url), at: 0, generation: UUID())
+                try await transport.waitUntilReady()
+                transport.play(atRate: 1)
+                let buffer = try outputBuffer(sampleRate: 48_000, channels: 2)
+                for _ in 0..<16 { _ = try await transport.renderOffline(frames: 1024, into: buffer) }
+                transport.setRate(0.5)
+                for _ in 0..<4 { _ = try await transport.renderOffline(frames: 256, into: buffer) }
+            } else {
+                transport.load(source: .url(url), at: 0, generation: UUID())
+                try await transport.waitUntilReady()
+            }
+            let generation = UUID()
+            transport.seek(to: 1.25, generation: generation)
+            var received: [UUID] = []
+            transport.onUpdate = { received.append($0.generation) }
+            transport.play(atRate: 1)
+            try await transport.waitUntilReady()
+            captures.append(try await render(transport, sampleRate: 48_000, channels: 2))
+            XCTAssertTrue(received.allSatisfy { $0 == generation })
+            XCTAssertEqual(transport.diagnostics.underruns, 0)
+        }
+        for channel in 0..<2 {
+            XCTAssertEqual(captures[0][channel].count, captures[1][channel].count)
+            XCTAssertNil(zip(captures[0][channel], captures[1][channel]).first { $0 != $1 })
+        }
+    }
+
+    func testSourceRateBudgetsKeepEffectsResponsiveAndFinalPeaksBounded() async throws {
+        var measurements: [String] = []
+        for sourceRate in [8_000.0, 16_000.0, 22_050.0, 32_000.0, 96_000.0, 192_000.0] {
+            for channels: AVAudioChannelCount in [1, 2] {
+                let url = try pcmFile(sampleRate: sourceRate, channels: channels, frames: Int(sourceRate * 3)) { frame, channel in
+                    let time = Double(frame) / sourceRate
+                    let amplitude = time > 1.8 ? 1.7 : 0.25
+                    return Float(amplitude * sin(time * 2 * .pi * min(3_701, sourceRate * 0.23) + Double(channel) * 0.43))
+                }
+                let outputRate = sourceRate < 48_000 ? 48_000.0 : 44_100.0
+                for rate in PlaybackController.supportedRates {
+                    let transport = makeTransport(sampleRate: outputRate, channels: channels)
+                    defer { transport.shutdown() }
+                    transport.setEffects(AudioEffects(volumeBoost: true, trimSilence: true))
+                    transport.load(source: .url(url), at: 0, generation: UUID())
+                    try await transport.waitUntilReady()
+                    transport.play(atRate: rate)
+                    let buffer = try outputBuffer(sampleRate: outputRate, channels: channels)
+                    var output = Array(repeating: [Float](), count: Int(channels))
+                    var requestedAt: UInt64?
+                    var appliedAt: UInt64?
+                    transport.onUpdate = { update in
+                        if case .effects(.active(let effects)) = update.event, effects == AudioEffects() {
+                            appliedAt = transport.diagnostics.renderedFrames
+                        }
+                    }
+                    for block in 0..<4096 {
+                        if transport.diagnostics.reachedEnd { break }
+                        if requestedAt == nil, transport.position >= 0.6 {
+                            requestedAt = transport.diagnostics.renderedFrames
+                            transport.setEffects(AudioEffects())
+                        }
+                        _ = try await transport.renderOffline(frames: [1024, 17, 511, 256, 997][block % 5], into: buffer)
+                        for channel in 0..<Int(channels) {
+                            output[channel].append(contentsOf: UnsafeBufferPointer(start: buffer.floatChannelData![channel], count: Int(buffer.frameLength)))
+                        }
+                    }
+                    let context = "\(sourceRate) Hz, \(channels) channels, \(rate)×"
+                    let delay = Double(try XCTUnwrap(appliedAt) - XCTUnwrap(requestedAt)) / outputRate
+                    XCTAssertLessThanOrEqual(delay, 0.300, context)
+                    XCTAssertTrue(transport.diagnostics.reachedEnd, context)
+                    XCTAssertEqual(transport.position, 3, accuracy: 1 / sourceRate, context)
+                    XCTAssertEqual(transport.diagnostics.underruns, 0, context)
+                    XCTAssertLessThan(transport.diagnostics.allocatedBytes, 8 * 1024 * 1024, context)
+                    let peak = output.map { 20 * log10(max(AudioOutputMeter.peak($0), 0.000001)) }.max()!
+                    XCTAssertLessThanOrEqual(peak, -0.8, context)
+                    measurements.append("\(context): \(delay * 1000) ms, \(peak) dBTP")
+                }
+            }
+        }
+        record("Source-rate effect latency and final peaks", lines: measurements)
+    }
+
     private func record(_ name: String, lines: [String]) {
         let attachment = XCTAttachment(string: lines.joined(separator: "\n"))
         attachment.name = name
@@ -293,30 +491,6 @@ final class AudioValidationTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(suffix)
         addTeardownBlock { try? FileManager.default.removeItem(at: url) }
         return url
-    }
-
-    private func oversampledPeak(_ samples: [Float]) -> Double {
-        let taps = 64
-        let padding = taps / 2
-        let input = Array(repeating: Float(0), count: padding) + samples + Array(repeating: Float(0), count: padding)
-        var output = Array(repeating: Float(0), count: samples.count)
-        var peak = samples.map { abs($0) }.max() ?? 0
-        for phase in 1..<16 {
-            let offset = Double(phase) / 16
-            var filter = (0..<taps).map { index -> Float in
-                let t = Double(index - padding) - offset
-                let sinc = abs(t) < 0.00000001 ? 1 : sin(.pi * t) / (.pi * t)
-                let window = abs(t) >= 32 ? 0 : 0.42 + 0.5 * cos(.pi * t / 32) + 0.08 * cos(2 * .pi * t / 32)
-                return Float(sinc * window)
-            }
-            let normalization = filter.reduce(0, +)
-            for index in filter.indices { filter[index] /= normalization }
-            vDSP_conv(input, 1, filter, 1, &output, 1, vDSP_Length(output.count), vDSP_Length(taps))
-            var phasePeak: Float = 0
-            vDSP_maxmgv(output, 1, &phasePeak, vDSP_Length(output.count))
-            peak = max(peak, phasePeak)
-        }
-        return Double(peak)
     }
 
     private func residentBytes() throws -> UInt64 {

@@ -64,6 +64,34 @@ final class SessionTests: XCTestCase {
         XCTAssertNil(api.accountID)
     }
 
+    func testLibraryWaitsForAccountRestoreWhenOnlyCredentialsRemain() async throws {
+        let fixture = try fixture(status: 200)
+        defer { fixture.api.clearSession(); fixture.cleanUp() }
+        try FileManager.default.removeItem(at: fixture.url)
+        let defaultsName = "LibraryBootstrap-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsName)!
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let session = SessionStore(api: fixture.api, storageURL: fixture.url)
+        let library = LibraryStore(api: fixture.api, session: session, defaults: defaults)
+
+        XCTAssertTrue(fixture.api.hasSession)
+        XCTAssertNil(session.user)
+        XCTAssertTrue(session.isLoading)
+        XCTAssertFalse(library.hasLoaded)
+        await library.load()
+        XCTAssertFalse(library.hasLoaded)
+        XCTAssertTrue(library.podcasts.isEmpty)
+
+        await session.restore()
+        XCTAssertEqual(session.user?.id, "listener")
+        XCTAssertFalse(session.isLoading)
+        XCTAssertFalse(library.hasLoaded)
+        await library.load(forceRefresh: true)
+        XCTAssertTrue(library.hasLoaded)
+        XCTAssertEqual(library.podcasts.map(\.title), ["Restored show"])
+        XCTAssertEqual(library.newReleases.map(\.title), ["Restored episode"])
+    }
+
     func testSharingUsesOnlyDeclaredPublicWebpages() {
         let feed = "https://example.test/private-feed?token=feed-secret"
         let audio = "https://example.test/audio.mp3?token=audio-secret"
@@ -116,6 +144,25 @@ private final class SessionURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         assert(!request.httpShouldHandleCookies)
+        if let url = request.url, url.host == "status-200.example.test" {
+            let payload: String
+            switch url.path {
+            case "/api/auth/session":
+                payload = #"{"user":{"id":"listener","email":"listener@example.test","hasPasskey":false}}"#
+            case "/api/subscriptions":
+                payload = #"[{"id":9021,"feed":"https://example.test/feed","title":"Restored show","author":"Author","cover":"","explicit":false,"episodes":[{"id":9022,"guid":"restored","title":"Restored episode","explicit":false,"file":{"url":"https://example.test/audio.mp3"}}]}]"#
+            case "/api/progress":
+                payload = "null"
+            default:
+                client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable))
+                return
+            }
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(payload.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
         if request.url?.host == "status-999.example.test", request.url?.path == "/api/auth/session" {
             NotificationCenter.default.post(name: Notification.Name("SessionTestRequestStarted"), object: nil)
             return

@@ -56,6 +56,11 @@ struct LibraryView: View {
         .podcstPage()
         .screenHeader("Library") {
             HStack(spacing: 14) {
+                NavigationLink(value: Route.downloads) {
+                    Image(systemName: "arrow.down.circle")
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityLabel("Downloads")
                 if session.user == nil {
                     Button("Sign in") { showingLogin = true }
                         .font(.sans(.body).weight(.medium))
@@ -65,7 +70,6 @@ struct LibraryView: View {
             }
         }
         .refreshable { await library.load(forceRefresh: true) }
-        .task { await library.load() }
         .sheet(isPresented: $showingLogin) { LoginView() }
     }
 }

@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct LocalAudioHarnessView: View {
     @Environment(PlaybackController.self) private var playback
     let transport: LocalAudioTransport
+    private let reference = ProcessInfo.processInfo.arguments.contains("-AudioLabReference")
     @State private var importing = false
     @State private var selectedFile: URL?
     @State private var scopedFile: URL?
@@ -30,7 +31,7 @@ struct LocalAudioHarnessView: View {
                         Text(importError).foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("Development player for local MP3, M4A and WAV files. Uses the native engine and final peak limiter. Files and playback progress stay on this device.")
+                    Text("Development player for local MP3, M4A and WAV files. Files and playback progress stay on this device.")
                 }
 
                 if playback.currentEpisode != nil {
@@ -62,10 +63,10 @@ struct LocalAudioHarnessView: View {
                             }
                             .accessibilityLabel("Back ten seconds")
                             Button { playback.toggle() } label: {
-                                Image(systemName: playback.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                Image(systemName: playback.isPlaybackRequested ? "pause.circle.fill" : "play.circle.fill")
                                     .font(.system(size: 54))
                             }
-                            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+                            .accessibilityLabel(playback.isPlaybackRequested ? "Pause" : "Play")
                             Button { playback.skipForward() } label: {
                                 Image(systemName: "goforward.30")
                             }
@@ -80,37 +81,40 @@ struct LocalAudioHarnessView: View {
                                 Text("\(rate, specifier: "%g")×").tag(rate)
                             }
                         }
+                        AudioControlsButton()
                         LabeledContent("Player", value: playback.state.rawValue.capitalized)
                     } header: {
                         Text("Playback")
                     } footer: {
-                        Text("Speed changes rebuild the development graph at the current position. Brief buffering during this transition is expected.")
+                        Text(reference ? "AVPlayer reference. Effects remain unavailable in this comparison." : "Use the same local passage and route when comparing speed and audio effects.")
                     }
                 }
 
                 Section {
-                    TimelineView(.periodic(from: .now, by: 0.5)) { _ in
-                        let status = transport.diagnostics
-                        VStack(spacing: 12) {
-                            LabeledContent("Source", value: "\(Int(status.sourceSampleRate)) Hz")
-                            LabeledContent("Output", value: "\(Int(status.outputSampleRate)) Hz")
-                            LabeledContent("Queued buffers", value: "\(status.scheduledBuffers)")
-                            LabeledContent("Owned audio memory", value: ByteCountFormatter.string(fromByteCount: Int64(status.allocatedBytes), countStyle: .memory))
-                            LabeledContent("Underruns", value: "\(status.underruns)")
-                            if status.failure != nil {
-                                Text("Playback failed. Try another local MP3, M4A or WAV file.")
-                                    .foregroundStyle(.red)
+                    if !reference {
+                        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+                            let status = transport.diagnostics
+                            VStack(spacing: 12) {
+                                LabeledContent("Source", value: "\(Int(status.sourceSampleRate)) Hz")
+                                LabeledContent("Output", value: "\(Int(status.outputSampleRate)) Hz")
+                                LabeledContent("Queued buffers", value: "\(status.scheduledBuffers)")
+                                LabeledContent("Owned audio memory", value: ByteCountFormatter.string(fromByteCount: Int64(status.allocatedBytes), countStyle: .memory))
+                                LabeledContent("Underruns", value: "\(status.underruns)")
+                                if status.failure != nil {
+                                    Text("Playback failed. Try another local MP3, M4A or WAV file.")
+                                        .foregroundStyle(.red)
+                                }
                             }
+                            .font(.subheadline.monospacedDigit())
                         }
-                        .font(.subheadline.monospacedDigit())
                     }
-                    Text("The peak limiter follows speed processing. Volume Boost and Trim Silence are not enabled in this milestone.")
-                    Text("Test seeking, background playback, headphones and the lock screen here. Device listening and power measurements remain part of M1.6.")
+                    Text(reference ? "Reference playback uses AVPlayer with the same session and controls." : "The peak limiter follows speed processing and sample-rate conversion. Audio settings apply to the native source.")
+                    Text("Keep source, route, volume and speed identical for matched listening and power measurements.")
                 } header: {
                     Text("Audio validation")
                 }
             }
-            .navigationTitle("Audio Lab")
+            .navigationTitle(reference ? "Audio Reference" : "Audio Lab")
             .tint(PodcstPalette.accent)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.audio]) { result in
                 switch result {

@@ -13,7 +13,7 @@ final class LocalAudioTests: XCTestCase {
         transport.onUpdate = { update in
             if case .ended = update.event { completed.append(update.generation) }
         }
-        transport.load(url: url, at: 0, generation: generation)
+        transport.load(source: .url(url), at: 0, generation: generation)
         try await transport.waitUntilReady()
         transport.play(atRate: 1)
         let rendered = try await capture(transport, channels: 2, slices: [1, 31, 257, 1024, 91])
@@ -38,7 +38,7 @@ final class LocalAudioTests: XCTestCase {
         let frames = 9
         let url = try fixture(frames: frames, channels: 2)
         let transport = makeTransport(limiterEnabled: true)
-        transport.load(url: url, at: 0, generation: UUID())
+        transport.load(source: .url(url), at: 0, generation: UUID())
         try await transport.waitUntilReady()
         transport.play(atRate: 1)
         let latency = Int(transport.diagnostics.limiterLatencyFrames)
@@ -63,7 +63,7 @@ final class LocalAudioTests: XCTestCase {
         let url = try fixture(frames: 60_000, channels: 1, signal: { frame, _ in markers.contains(frame) ? 0.5 : 0 })
         for rate in PlaybackController.supportedRates {
             let transport = makeTransport(channels: 1)
-            transport.load(url: url, at: 0, generation: UUID())
+            transport.load(source: .url(url), at: 0, generation: UUID())
             try await transport.waitUntilReady()
             transport.play(atRate: rate)
             let rendered = try await capture(transport, channels: 1, slices: [256])
@@ -94,7 +94,7 @@ final class LocalAudioTests: XCTestCase {
         let buffer = try outputBuffer(channels: 2)
         var updates: [PlaybackTransportUpdate] = []
         transport.onUpdate = { updates.append($0) }
-        transport.load(url: url, at: 0, generation: UUID())
+        transport.load(source: .url(url), at: 0, generation: UUID())
         try await transport.waitUntilReady()
         transport.play(atRate: 1)
         for _ in 0..<4 { _ = try await transport.renderOffline(frames: 1024, into: buffer) }
@@ -139,7 +139,7 @@ final class LocalAudioTests: XCTestCase {
         let url = try fixture(frames: 480_000, channels: 2)
         let transport = makeTransport()
         let buffer = try outputBuffer(channels: 2)
-        transport.load(url: url, at: 0, generation: UUID())
+        transport.load(source: .url(url), at: 0, generation: UUID())
         try await transport.waitUntilReady()
         let allocated = transport.diagnostics.allocatedBytes
         XCTAssertLessThan(allocated, 8 * 1024 * 1024)
@@ -158,7 +158,7 @@ final class LocalAudioTests: XCTestCase {
 
     func testStarvationFreezesSourceTimeAndRecoversWithoutLosingSamples() async throws {
         let url = try fixture(frames: 512, channels: 2)
-        let configuration = LocalAudioConfiguration(output: .offline(sampleRate: 48_000, channels: 2, maximumFrames: 1024), blockFrames: 128, bufferCount: 2, limiterEnabled: false)
+        let configuration = LocalAudioConfiguration(output: .offline(sampleRate: 48_000, channels: 2, maximumFrames: 1024), blockFrames: 128, bufferCount: 2, limiterEnabled: false, processingBlockDuration: nil, bufferedDuration: nil)
         let transport = LocalAudioTransport(configuration: configuration)
         defer { transport.shutdown() }
         let buffer = try outputBuffer(channels: 2)
@@ -171,7 +171,7 @@ final class LocalAudioTests: XCTestCase {
             default: break
             }
         }
-        transport.load(url: url, at: 0, generation: UUID())
+        transport.load(source: .url(url), at: 0, generation: UUID())
         try await transport.waitUntilReady()
         transport.play(atRate: 1)
         let firstStatus = try await transport.renderOffline(frames: 1024, into: buffer, awaitingDecodedBuffers: false)
@@ -220,14 +220,14 @@ final class LocalAudioTests: XCTestCase {
             switch update.event {
             case .position where transport.diagnostics.reachedEnd && !replaced:
                 replaced = true
-                transport.load(url: replacement, at: 0, generation: replacementGeneration)
+                transport.load(source: .url(replacement), at: 0, generation: replacementGeneration)
             case .ended:
                 completions.append(update.generation)
             default:
                 break
             }
         }
-        transport.load(url: first, at: 0, generation: UUID())
+        transport.load(source: .url(first), at: 0, generation: UUID())
         try await transport.waitUntilReady()
         transport.play(atRate: 1)
         for _ in 0..<128 {
@@ -257,14 +257,14 @@ final class LocalAudioTests: XCTestCase {
             switch update.event {
             case .playback(false) where !replaced:
                 replaced = true
-                transport.load(url: replacement, at: 0, generation: replacementGeneration)
+                transport.load(source: .url(replacement), at: 0, generation: replacementGeneration)
             case .ready:
                 readyGenerations.append(update.generation)
             default:
                 break
             }
         }
-        transport.load(url: first, at: 0, generation: UUID())
+        transport.load(source: .url(first), at: 0, generation: UUID())
         for _ in 0..<300 {
             if transport.diagnostics.isReady || transport.diagnostics.failure != nil { break }
             try await Task.sleep(for: .milliseconds(10))
@@ -380,7 +380,7 @@ final class LocalAudioTests: XCTestCase {
     }
 
     private func makeTransport(channels: AVAudioChannelCount = 2, limiterEnabled: Bool = false) -> LocalAudioTransport {
-        let configuration = LocalAudioConfiguration(output: .offline(sampleRate: 48_000, channels: channels, maximumFrames: 1024), blockFrames: 2048, bufferCount: 8, limiterEnabled: limiterEnabled)
+        let configuration = LocalAudioConfiguration(output: .offline(sampleRate: 48_000, channels: channels, maximumFrames: 1024), blockFrames: 2048, bufferCount: 8, limiterEnabled: limiterEnabled, processingBlockDuration: nil, bufferedDuration: nil)
         let transport = LocalAudioTransport(configuration: configuration)
         addTeardownBlock { await MainActor.run { transport.shutdown() } }
         return transport

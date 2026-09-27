@@ -28,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal --target aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - run: command -v ffmpeg || brew install ffmpeg
       - run: audio-engine/scripts/build-apple.sh
       - run: audio-engine/scripts/test-native.sh --apple
       - name: Select an available iPhone simulator

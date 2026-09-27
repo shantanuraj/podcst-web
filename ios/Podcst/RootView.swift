@@ -11,6 +11,7 @@ enum Route: Hashable {
     case podcast(Podcast)
     case episode(Episode)
     case releases
+    case downloads
 }
 
 @MainActor
@@ -24,6 +25,11 @@ final class Router {
         Binding { self.paths[tab] ?? [] } set: { self.paths[tab] = $0 }
     }
 
+    func reset() {
+        showingPlayer = false
+        paths.removeAll()
+    }
+
     func open(_ route: Route) {
         showingPlayer = false
         paths[tab, default: []].append(route)
@@ -33,6 +39,7 @@ final class Router {
 struct RootView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
+    @Environment(PlaybackController.self) private var playback
     @AppStorage(Appearance.key) private var appearance = Appearance.system
     @AppStorage("onboarded") private var onboarded = false
     @State private var router = Router()
@@ -61,9 +68,20 @@ struct RootView: View {
         .preferredColorScheme(appearance.colorScheme)
         .task { configureInitialTab() }
         .onChange(of: library.hasLoaded) { _, _ in configureInitialTab() }
-        .onChange(of: session.user) { _, user in
-            if user != nil { onboarded = true }
+        .onChange(of: session.user?.id) { _, userID in
+            router.reset()
+            if userID != nil { onboarded = true }
         }
+        .task(id: session.isLoading) {
+            guard !session.isLoading else { return }
+            await library.load()
+            guard !Task.isCancelled else { return }
+            await playback.restore()
+            if playback.currentEpisode == nil, let progress = library.progress {
+                playback.restore(progress.episode, at: progress.position)
+            }
+        }
+        .downloadAlerts()
         .font(.sans(.body))
     }
 
@@ -115,6 +133,7 @@ private struct TabStack<Content: View>: View {
                     case .podcast(let podcast): PodcastDetailView(podcast: podcast)
                     case .episode(let episode): EpisodeDetailView(episode: episode)
                     case .releases: ReleasesView()
+                    case .downloads: DownloadsView()
                     }
                 }
         }
@@ -224,13 +243,13 @@ struct NowPlayingBar: View {
             Button {
                 playback.toggle()
             } label: {
-                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: playback.isPlaybackRequested ? "pause.fill" : "play.fill")
                     .font(.system(size: 22))
                     .frame(minWidth: 44, minHeight: 44)
                     .opacity(playback.state == .loading ? 0.4 : 1)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(playback.isPlaybackRequested ? "Pause" : "Play")
         }
         .padding(.leading, 9)
         .padding(.trailing, 8)

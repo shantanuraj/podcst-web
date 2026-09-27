@@ -119,14 +119,14 @@ private struct DownloadRow: View {
                     Button {
                         if isCurrent { playback.toggle() } else { playback.play(episode) }
                     } label: {
-                        Image(systemName: isCurrent && playback.isPlaying ? "pause.fill" : "play.fill")
+                        Image(systemName: isCurrent && playback.isPlaybackRequested ? "pause.fill" : "play.fill")
                             .font(.sans(.body).weight(.semibold))
                             .foregroundStyle(PodcstPalette.accent)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(isCurrent && playback.isPlaying ? "Pause \(episode.title)" : "Play \(episode.title)")
+                    .accessibilityLabel(isCurrent && playback.isPlaybackRequested ? "Pause \(episode.title)" : "Play \(episode.title)")
                 }
             }
         }
