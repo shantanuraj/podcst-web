@@ -47,6 +47,39 @@ fn generated_fixtures_produce_stable_analysis_baselines() {
 }
 
 #[test]
+fn processing_cli_writes_trimmed_and_boosted_output() {
+    let directory = temporary_directory("process-cli");
+    generate_fixtures(&directory).unwrap();
+    let input_path = directory.join("speech-gaps.wav");
+    let output_path = directory.join("speech-gaps-processed.wav");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_audio-engine"))
+        .args([
+            "process",
+            input_path.to_str().unwrap(),
+            output_path.to_str().unwrap(),
+            "--boost",
+            "--adaptive-silence",
+            "--limit",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json = String::from_utf8(output.stdout).unwrap();
+    assert!(json.contains("\"timeline\":{") && json.contains("\"segments\":["));
+    let input = read_wav(&input_path).unwrap();
+    let processed = read_wav(&output_path).unwrap();
+    assert!(processed.duration_seconds() < input.duration_seconds());
+    assert!(
+        analyze(&processed, &AnalysisConfig::default())
+            .integrated_lufs
+            .is_finite()
+    );
+    cleanup(&directory);
+}
+
+#[test]
 fn analysis_json_contract_is_available_from_cli() {
     let directory = temporary_directory("cli");
     generate_fixtures(&directory).unwrap();

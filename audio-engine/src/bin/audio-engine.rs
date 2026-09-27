@@ -3,8 +3,11 @@ use std::error::Error;
 use std::path::Path;
 
 use podcst_audio_engine::fixtures::generate_fixtures;
-use podcst_audio_engine::wav::read_wav;
-use podcst_audio_engine::{AnalysisConfig, analyze};
+use podcst_audio_engine::wav::{read_wav, write_wav};
+use podcst_audio_engine::{
+    AdaptiveSilenceConfig, AnalysisConfig, BoostConfig, LimiterConfig, ProcessingConfig,
+    TrimConfig, analyze, process_audio,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
@@ -16,6 +19,187 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             for path in generate_fixtures(directory)? {
                 println!("{}", path.display());
+            }
+        }
+        Some("process") => {
+            let input_path = args.next().ok_or("missing input WAV path")?;
+            let output_path = args.next().ok_or("missing output WAV path")?;
+            let mut boost = false;
+            let mut target_lufs = BoostConfig::default().target_lufs;
+            let mut trim = false;
+            let mut silence = podcst_audio_engine::SilenceConfig::default();
+            let mut adaptive_trim = false;
+            let mut adaptive_silence = AdaptiveSilenceConfig::default();
+            let mut limiter = false;
+            let mut limiter_config = LimiterConfig::default();
+            let mut json = false;
+            let mut chunk_frames = ProcessingConfig::default().chunk_frames;
+            let remaining = args.collect::<Vec<_>>();
+            let mut index = 0;
+            while index < remaining.len() {
+                match remaining[index].as_str() {
+                    "--boost" => boost = true,
+                    "--target-lufs" => {
+                        index += 1;
+                        target_lufs = remaining
+                            .get(index)
+                            .ok_or("missing value for --target-lufs")?
+                            .parse()?;
+                        boost = true;
+                    }
+                    "--trim-silence" => trim = true,
+                    "--adaptive-silence" => adaptive_trim = true,
+                    "--noise-floor-percentile" => {
+                        index += 1;
+                        adaptive_silence.noise_floor_percentile = remaining
+                            .get(index)
+                            .ok_or("missing value for --noise-floor-percentile")?
+                            .parse()?;
+                        adaptive_trim = true;
+                    }
+                    "--threshold-offset-db" => {
+                        index += 1;
+                        adaptive_silence.threshold_offset_db = remaining
+                            .get(index)
+                            .ok_or("missing value for --threshold-offset-db")?
+                            .parse()?;
+                        adaptive_trim = true;
+                    }
+                    "--min-dynamic-range-db" => {
+                        index += 1;
+                        adaptive_silence.min_dynamic_range_db = remaining
+                            .get(index)
+                            .ok_or("missing value for --min-dynamic-range-db")?
+                            .parse()?;
+                        adaptive_trim = true;
+                    }
+                    "--adaptive-min-threshold-dbfs" => {
+                        index += 1;
+                        adaptive_silence.min_threshold_dbfs = remaining
+                            .get(index)
+                            .ok_or("missing value for --adaptive-min-threshold-dbfs")?
+                            .parse()?;
+                        adaptive_trim = true;
+                    }
+                    "--adaptive-max-threshold-dbfs" => {
+                        index += 1;
+                        adaptive_silence.max_threshold_dbfs = remaining
+                            .get(index)
+                            .ok_or("missing value for --adaptive-max-threshold-dbfs")?
+                            .parse()?;
+                        adaptive_trim = true;
+                    }
+                    "--silence-threshold-dbfs" => {
+                        index += 1;
+                        silence.threshold_dbfs = remaining
+                            .get(index)
+                            .ok_or("missing value for --silence-threshold-dbfs")?
+                            .parse()?;
+                        trim = true;
+                    }
+                    "--min-silence-ms" => {
+                        index += 1;
+                        silence.min_silence_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --min-silence-ms")?
+                            .parse()?;
+                        trim = true;
+                    }
+                    "--guard-ms" => {
+                        index += 1;
+                        silence.guard_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --guard-ms")?
+                            .parse()?;
+                        trim = true;
+                    }
+                    "--limit" => limiter = true,
+                    "--ceiling-dbfs" => {
+                        index += 1;
+                        limiter_config.ceiling_dbfs = remaining
+                            .get(index)
+                            .ok_or("missing value for --ceiling-dbfs")?
+                            .parse()?;
+                        limiter = true;
+                    }
+                    "--lookahead-ms" => {
+                        index += 1;
+                        limiter_config.lookahead_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --lookahead-ms")?
+                            .parse()?;
+                        limiter = true;
+                    }
+                    "--release-ms" => {
+                        index += 1;
+                        limiter_config.release_ms = remaining
+                            .get(index)
+                            .ok_or("missing value for --release-ms")?
+                            .parse()?;
+                        limiter = true;
+                    }
+                    "--chunk-frames" => {
+                        index += 1;
+                        chunk_frames = remaining
+                            .get(index)
+                            .ok_or("missing value for --chunk-frames")?
+                            .parse()?;
+                    }
+                    "--json" => json = true,
+                    option => return Err(format!("unknown option: {option}").into()),
+                }
+                index += 1;
+            }
+            let input = read_wav(&input_path)?;
+            let input_metrics = analyze(&input, &AnalysisConfig::default());
+            let mut config = ProcessingConfig {
+                chunk_frames,
+                ..ProcessingConfig::default()
+            };
+            if boost {
+                config.boost = Some(BoostConfig {
+                    target_lufs,
+                    ..BoostConfig::default()
+                });
+            }
+            if trim {
+                config.trim = Some(TrimConfig { silence });
+            }
+            if adaptive_trim {
+                config.adaptive_trim = Some(adaptive_silence);
+            }
+            if limiter {
+                config.limiter = Some(limiter_config);
+            }
+            let processed = process_audio(&input, &config)?;
+            write_wav(&output_path, processed.audio())?;
+            let output_metrics = analyze(processed.audio(), &AnalysisConfig::default());
+            if json {
+                println!(
+                    "{{\"input\":{},\"output\":{},\"timeline\":{}}}",
+                    metrics_json(Path::new(&input_path), &input_metrics),
+                    metrics_json(Path::new(&output_path), &output_metrics),
+                    timeline_json(processed.timeline())
+                );
+            } else {
+                println!("wrote: {}", output_path);
+                println!("input_duration_seconds: {:.3}", input.duration_seconds());
+                println!(
+                    "output_duration_seconds: {:.3}",
+                    processed.audio().duration_seconds()
+                );
+                println!(
+                    "input_integrated_lufs: {}",
+                    format_number(input_metrics.integrated_lufs)
+                );
+                println!(
+                    "output_integrated_lufs: {}",
+                    format_number(output_metrics.integrated_lufs)
+                );
+                println!(
+                    "timeline_segments: {}",
+                    processed.timeline().segments().len()
+                );
             }
         }
         Some("analyze") => {
@@ -62,7 +246,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         _ => {
             print_usage();
-            return Err("expected generate-fixtures or analyze".into());
+            return Err("expected generate-fixtures, analyze, or process".into());
         }
     }
     Ok(())
@@ -70,7 +254,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  audio-engine generate-fixtures <directory>\n  audio-engine analyze <file.wav> [--json] [--silence-threshold-dbfs <dbfs>] [--min-silence-ms <ms>] [--guard-ms <ms>]"
+        "Usage:\n  audio-engine generate-fixtures <directory>\n  audio-engine analyze <file.wav> [--json] [--silence-threshold-dbfs <dbfs>] [--min-silence-ms <ms>] [--guard-ms <ms>]\n  audio-engine process <input.wav> <output.wav> [--boost] [--target-lufs <lufs>] [--trim-silence|--adaptive-silence] [--limit] [--json]"
     );
 }
 
@@ -127,6 +311,30 @@ fn metrics_json(path: &Path, metrics: &podcst_audio_engine::AudioMetrics) -> Str
         json_number(metrics.sample_peak_dbfs),
         json_number(metrics.oversampled_peak_dbfs),
         json_number(metrics.integrated_lufs),
+        segments
+    )
+}
+
+fn timeline_json(timeline: &podcst_audio_engine::TimelineMap) -> String {
+    let segments = timeline
+        .segments()
+        .iter()
+        .map(|segment| {
+            format!(
+                "{{\"source_start_frame\":{},\"source_end_frame\":{},\"output_start_frame\":{},\"output_end_frame\":{}}}",
+                segment.source_start_frame,
+                segment.source_end_frame,
+                segment.output_start_frame,
+                segment.output_end_frame
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"sample_rate\":{},\"source_frames\":{},\"output_frames\":{},\"segments\":[{}]}}",
+        timeline.sample_rate(),
+        timeline.source_frames(),
+        timeline.output_frames(),
         segments
     )
 }

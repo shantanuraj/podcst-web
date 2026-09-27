@@ -1,8 +1,9 @@
 # Podcst audio engine
 
-This crate is the platform-independent audio-processing core and its first
-regression harness. It intentionally starts with analysis and fixtures before
-implementing playback processing.
+This crate is the platform-independent audio-processing core and its
+regression harness. It contains reference streaming processors for the first
+boost, limiter, and silence-trimming experiments; these are not yet the final
+mobile playback backend.
 
 ## Run the harness
 
@@ -37,7 +38,26 @@ make future detector changes measurable; it is not the final trim algorithm.
 - WAV input supports PCM 8/16/24/32-bit and IEEE float 32/64-bit files.
 - WAV output is 16-bit PCM for portable fixtures.
 
-The next engine step is to add streaming processor interfaces and reference
-implementations for adaptive loudness gain, true-peak limiting, and silence
-condensation. Each should be tested against these metrics before being wired
-into iOS, Android, or WebAssembly playback.
+## Processing experiments
+
+```sh
+cargo run --manifest-path audio-engine/Cargo.toml -- \
+  process input.wav output.wav --boost --adaptive-silence --limit --json
+```
+
+The current reference pipeline:
+
+1. Measures integrated loudness and applies a bounded episode-level gain.
+2. Applies a streaming 4× polyphase true-peak lookahead limiter.
+3. Detects silence against an estimated noise floor and emits a source/output
+   timeline map.
+
+The true-peak path uses a 32-tap, four-phase windowed-sinc filter and a small
+output-gain safety margin for gain-envelope transitions. It still needs
+broader conformance vectors and device listening validation before production
+use. The adaptive detector uses a lower loudness percentile, dynamic-range
+check, hysteresis-free frame grouping, and conservative guards; it should be
+tuned against more speech, music, and noisy recordings.
+
+The X Minus One reference workflow is documented in
+[`reference/README.md`](reference/README.md).
