@@ -62,13 +62,11 @@ pub trait StreamingProcessor {
 
     fn latency_frames(&self) -> usize;
 
-    fn process(
-        &mut self,
-        input: &[f32],
-        output: &mut Vec<f32>,
-    ) -> Result<ProcessReport, AudioError>;
+    fn process(&mut self, input: &[f32], output: &mut [f32]) -> Result<ProcessReport, AudioError>;
 
-    fn finish(&mut self, output: &mut Vec<f32>) -> Result<ProcessReport, AudioError>;
+    fn finish(&mut self, output: &mut [f32]) -> Result<ProcessReport, AudioError>;
+
+    fn is_finished(&self) -> bool;
 }
 
 pub fn process_streaming<P: StreamingProcessor>(
@@ -88,20 +86,33 @@ pub fn process_streaming<P: StreamingProcessor>(
         ));
     }
 
-    let chunk_samples = chunk_frames * format.channels;
+    let chunk_samples = chunk_frames
+        .checked_mul(format.channels)
+        .filter(|samples| *samples <= isize::MAX as usize / size_of::<f32>())
+        .ok_or(AudioError::BufferSizeOverflow)?;
     let mut samples = Vec::with_capacity(audio.samples().len());
+    let mut output = vec![0.0; chunk_samples];
     for input in audio.samples().chunks(chunk_samples) {
-        processor.process(input, &mut samples)?;
+        let mut consumed = 0;
+        while consumed < input.len() {
+            let report = processor.process(&input[consumed..], &mut output)?;
+            consumed += report.input_frames * format.channels;
+            samples.extend_from_slice(&output[..report.output_frames * format.channels]);
+        }
     }
-    processor.finish(&mut samples)?;
+    loop {
+        let report = processor.finish(&mut output)?;
+        samples.extend_from_slice(&output[..report.output_frames * format.channels]);
+        if processor.is_finished() {
+            break;
+        }
+    }
     PcmAudio::new(format.sample_rate, format.channels, samples)
 }
 
 pub(crate) fn ensure_active(finished: bool) -> Result<(), AudioError> {
     if finished {
-        return Err(AudioError::InvalidProcessor(
-            "stream is finished; start, reset, or seek before processing".to_owned(),
-        ));
+        return Err(AudioError::ProcessingFinished);
     }
     Ok(())
 }
@@ -145,22 +156,27 @@ impl StreamingProcessor for GainProcessor {
         0
     }
 
-    fn finish(&mut self, _output: &mut Vec<f32>) -> Result<ProcessReport, AudioError> {
+    fn finish(&mut self, output: &mut [f32]) -> Result<ProcessReport, AudioError> {
+        validate_output(self.format, output)?;
         self.finished = true;
         Ok(ProcessReport::default())
     }
 
-    fn process(
-        &mut self,
-        input: &[f32],
-        output: &mut Vec<f32>,
-    ) -> Result<ProcessReport, AudioError> {
+    fn is_finished(&self) -> bool {
+        self.finished
+    }
+
+    fn process(&mut self, input: &[f32], output: &mut [f32]) -> Result<ProcessReport, AudioError> {
         ensure_active(self.finished)?;
-        let input_frames = self.format.validate_samples(input)?;
-        output.extend(input.iter().map(|sample| *sample * self.gain));
+        let input_frames = validate_gain_input(self.format, input, self.gain)?;
+        let output_frames = validate_output(self.format, output)?;
+        let frames = input_frames.min(output_frames);
+        for (sample, destination) in input.iter().zip(output).take(frames * self.format.channels) {
+            *destination = *sample * self.gain;
+        }
         Ok(ProcessReport {
-            input_frames,
-            output_frames: input_frames,
+            input_frames: frames,
+            output_frames: frames,
         })
     }
 }
@@ -206,6 +222,24 @@ impl Default for LimiterConfig {
             release_ms: 50.0,
         }
     }
+}
+
+fn validate_output(format: AudioFormat, output: &[f32]) -> Result<usize, AudioError> {
+    if output.len() % format.channels != 0 {
+        return Err(AudioError::MisalignedSamples {
+            samples: output.len(),
+            channels: format.channels,
+        });
+    }
+    Ok(output.len() / format.channels)
+}
+
+fn validate_gain_input(format: AudioFormat, input: &[f32], gain: f32) -> Result<usize, AudioError> {
+    let frames = format.validate_samples(input)?;
+    if input.iter().any(|sample| !(*sample * gain).is_finite()) {
+        return Err(AudioError::SampleOverflow);
+    }
+    Ok(frames)
 }
 
 const TRUE_PEAK_TAPS: usize = 32;
@@ -389,9 +423,11 @@ impl TruePeakLimiter {
         })
     }
 
-    fn ingest(&mut self, frame: Option<&[f32]>) {
+    fn ingest(&mut self, frame: Option<&[f32]>, gain: f32) {
         match frame {
-            Some(frame) => self.history.extend(frame),
+            Some(frame) => self
+                .history
+                .extend(frame.iter().map(|sample| sample * gain)),
             None => self
                 .history
                 .extend(std::iter::repeat_n(0.0, self.format.channels)),
@@ -421,11 +457,11 @@ impl TruePeakLimiter {
             self.peak_queue.push_back((target_frame, peak));
         }
         if let Some(frame) = frame {
-            self.queue.extend(frame);
+            self.queue.extend(frame.iter().map(|sample| sample * gain));
         }
     }
 
-    fn emit_one(&mut self, output: &mut Vec<f32>) {
+    fn emit_one(&mut self, output: &mut [f32]) {
         while self
             .peak_queue
             .front()
@@ -454,12 +490,50 @@ impl TruePeakLimiter {
         } else {
             self.current_gain += (target_gain - self.current_gain) * self.release_step.min(1.0);
         }
-        output.extend(
-            self.queue
-                .drain(..self.format.channels)
-                .map(|sample| sample * self.current_gain),
-        );
+        for (sample, destination) in self.queue.drain(..self.format.channels).zip(output) {
+            *destination = sample * self.current_gain;
+        }
         self.next_output_frame += 1;
+    }
+
+    fn process_with_gain(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+        gain: f32,
+    ) -> Result<ProcessReport, AudioError> {
+        ensure_active(self.finished)?;
+        let input_frames = validate_gain_input(self.format, input, gain)?;
+        let output_frames = validate_output(self.format, output)?;
+        self.next_input_frame
+            .checked_add(input_frames)
+            .and_then(|frames| frames.checked_add(TRUE_PEAK_RADIUS as usize))
+            .filter(|frames| *frames <= isize::MAX as usize)
+            .ok_or(AudioError::BufferSizeOverflow)?;
+        let available_frames = self.latency_frames - self.queue.len() / self.format.channels;
+        let consumed_frames = input_frames.min(available_frames.saturating_add(output_frames));
+        let mut emitted_frames = 0;
+        for frame in
+            input[..consumed_frames * self.format.channels].chunks_exact(self.format.channels)
+        {
+            self.ingest(Some(frame), gain);
+            if self.queue.len() > self.latency_frames * self.format.channels {
+                let start = emitted_frames * self.format.channels;
+                self.emit_one(&mut output[start..start + self.format.channels]);
+                emitted_frames += 1;
+            }
+        }
+        Ok(ProcessReport {
+            input_frames: consumed_frames,
+            output_frames: emitted_frames,
+        })
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        size_of::<Self>()
+            + self.queue.capacity() * size_of::<f32>()
+            + self.history.capacity() * size_of::<f32>()
+            + self.peak_queue.capacity() * size_of::<(usize, f32)>()
     }
 }
 
@@ -483,42 +557,111 @@ impl StreamingProcessor for TruePeakLimiter {
         self.latency_frames
     }
 
-    fn process(
-        &mut self,
-        input: &[f32],
-        output: &mut Vec<f32>,
-    ) -> Result<ProcessReport, AudioError> {
-        ensure_active(self.finished)?;
-        let input_frames = self.format.validate_samples(input)?;
-        let output_start = output.len() / self.format.channels;
-        for frame in input.chunks_exact(self.format.channels) {
-            self.ingest(Some(frame));
-            if self.queue.len() > self.latency_frames * self.format.channels {
-                self.emit_one(output);
-            }
-        }
-        Ok(ProcessReport {
-            input_frames,
-            output_frames: output.len() / self.format.channels - output_start,
-        })
+    fn process(&mut self, input: &[f32], output: &mut [f32]) -> Result<ProcessReport, AudioError> {
+        self.process_with_gain(input, output, 1.0)
     }
 
-    fn finish(&mut self, output: &mut Vec<f32>) -> Result<ProcessReport, AudioError> {
-        if self.finished {
-            return Ok(ProcessReport::default());
+    fn finish(&mut self, output: &mut [f32]) -> Result<ProcessReport, AudioError> {
+        let capacity = validate_output(self.format, output)?;
+        if !self.finished {
+            self.finished = true;
+            for _ in 0..TRUE_PEAK_RADIUS {
+                self.ingest(None, 1.0);
+            }
         }
-        self.finished = true;
-        let output_start = output.len() / self.format.channels;
-        for _ in 0..TRUE_PEAK_RADIUS {
-            self.ingest(None);
-        }
-        while !self.queue.is_empty() {
-            self.emit_one(output);
+        let frames = capacity.min(self.queue.len() / self.format.channels);
+        for frame in output[..frames * self.format.channels].chunks_exact_mut(self.format.channels)
+        {
+            self.emit_one(frame);
         }
         Ok(ProcessReport {
             input_frames: 0,
-            output_frames: output.len() / self.format.channels - output_start,
+            output_frames: frames,
         })
+    }
+
+    fn is_finished(&self) -> bool {
+        self.finished && self.queue.is_empty()
+    }
+}
+
+pub struct PcmProcessor {
+    gain: GainProcessor,
+    limiter: Option<TruePeakLimiter>,
+}
+
+impl PcmProcessor {
+    pub fn new(
+        format: AudioFormat,
+        gain_db: f64,
+        limiter: Option<&LimiterConfig>,
+    ) -> Result<Self, AudioError> {
+        if !(8_000..=192_000).contains(&format.sample_rate)
+            || !(1..=2).contains(&format.channels)
+            || !(-24.0..=24.0).contains(&gain_db)
+            || limiter.is_some_and(|config| {
+                !(0.0..=100.0).contains(&config.lookahead_ms)
+                    || !(-24.0..=0.0).contains(&config.ceiling_dbfs)
+                    || !(0.0..=5_000.0).contains(&config.release_ms)
+            })
+        {
+            return Err(AudioError::InvalidProcessor(
+                "unsupported native configuration".to_owned(),
+            ));
+        }
+        Ok(Self {
+            gain: GainProcessor::new(format, gain_db)?,
+            limiter: limiter
+                .map(|config| TruePeakLimiter::new(format, config))
+                .transpose()?,
+        })
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        size_of::<Self>()
+            + self.limiter.as_ref().map_or(0, |limiter| {
+                limiter.allocated_bytes() - size_of::<TruePeakLimiter>()
+            })
+    }
+}
+
+impl StreamingProcessor for PcmProcessor {
+    fn format(&self) -> AudioFormat {
+        self.gain.format()
+    }
+
+    fn reset(&mut self) {
+        self.gain.reset();
+        if let Some(limiter) = &mut self.limiter {
+            limiter.reset();
+        }
+    }
+
+    fn latency_frames(&self) -> usize {
+        self.limiter
+            .as_ref()
+            .map_or(0, StreamingProcessor::latency_frames)
+    }
+
+    fn process(&mut self, input: &[f32], output: &mut [f32]) -> Result<ProcessReport, AudioError> {
+        match &mut self.limiter {
+            Some(limiter) => limiter.process_with_gain(input, output, self.gain.gain),
+            None => self.gain.process(input, output),
+        }
+    }
+
+    fn finish(&mut self, output: &mut [f32]) -> Result<ProcessReport, AudioError> {
+        match &mut self.limiter {
+            Some(limiter) => limiter.finish(output),
+            None => self.gain.finish(output),
+        }
+    }
+
+    fn is_finished(&self) -> bool {
+        match &self.limiter {
+            Some(limiter) => limiter.is_finished(),
+            None => self.gain.is_finished(),
+        }
     }
 }
 
@@ -858,19 +1001,19 @@ mod tests {
     fn limiter_storage_is_bounded_and_finish_preserves_frame_count() {
         let format = AudioFormat::new(48_000, 2).unwrap();
         let mut limiter = TruePeakLimiter::new(format, &LimiterConfig::default()).unwrap();
-        let mut output = Vec::new();
+        let mut output = vec![0.0; 514];
         let mut emitted = 0;
         for index in 0..1000 {
             let sample = if index % 2 == 0 { 1.5 } else { 0.01 };
-            limiter.process(&[sample; 514], &mut output).unwrap();
-            emitted += output.len() / 2;
-            output.clear();
+            emitted += limiter
+                .process(&[sample; 514], &mut output)
+                .unwrap()
+                .output_frames;
             assert!(limiter.queue.len() <= limiter.latency_frames * format.channels);
             assert!(limiter.peak_queue.len() <= limiter.latency_frames + 1);
             assert!(limiter.history.len() <= TRUE_PEAK_TAPS * format.channels);
         }
-        limiter.finish(&mut output).unwrap();
-        emitted += output.len() / 2;
+        emitted += limiter.finish(&mut output).unwrap().output_frames;
         assert_eq!(emitted, 257_000);
     }
 

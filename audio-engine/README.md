@@ -139,18 +139,93 @@ idempotent; processing after finish returns an error until reset/start/seek.
 A pending partial silence-analysis frame is classified at finish, and any
 remaining guarded pause is emitted exactly once.
 
-`StreamingProcessor` now requires `reset()`, `latency_frames()` and `finish()`;
-`start()` and `seek()` reset state. Gain has zero latency. The true-peak limiter
+`StreamingProcessor` takes caller-owned output slices and returns a
+`ProcessReport` with consumed input frames and emitted output frames. A small
+output buffer can accept only part of the input; resubmit the unconsumed suffix.
+Output lengths must be channel-aligned. Validation rejects the whole offered
+input, including nonfinite samples and gain overflow, before changing state or
+output. A zero-capacity output may consume limiter priming frames, then makes
+no progress until output capacity is available.
+
+`reset()`, `start()` and `seek()` clear state. Gain has zero latency. The true-peak limiter
 withholds `max(1, round(lookahead_ms * sample_rate / 1000)) + 15` frames, exposed
 by `latency_frames()`. Finish zero-pads only the peak detector, emits the real
-pending audio without adding output frames, and is idempotent. Reset/seek
+pending audio without adding output frames. Call `finish(output)` repeatedly
+until `is_finished()`; subsequent finish calls produce no frames. Processing
+after the first finish call is rejected until reset, even while a tail remains.
+Reset/seek
 throws away queued audio and restores unity gain/filter history. Processors
 have no absolute source clock: callers establish it on seek and discard old
 queued device output themselves. They preserve frame count and order; latency
 is delivery delay, not a source/output timeline shift. The convenience
 `process_streaming` collects all output and does not implicitly reset state.
-The limiter remains bounded-memory but is not yet allocation-free real-time
-callback code.
+The gain/limiter process, drain and reset paths do not allocate after creation;
+allocation regressions cover success and validation errors. This variable-output
+worker API still needs a render adapter that supplies the exact requested frame
+count and handles startup latency. It is not a drop-in Audio Unit render callback.
+
+### Native C boundary
+
+`include/podcst_audio.h` exposes opaque `PodcstAudioProcessor` handles around the
+same bounded `PcmProcessor` used by Rust callers. Version 1 supports fixed gain
+and an optional limiter; causal Volume Boost and Trim Silence are later work.
+Zero gain with the limiter disabled is an exact identity path.
+
+| Configuration | Supported range |
+| --- | --- |
+| Sample rate | 8,000–192,000 Hz |
+| Channels | Mono or stereo, interleaved float32 |
+| Gain | -24 to +24 dB |
+| Limiter enabled | 0 or 1 |
+| Lookahead | 0–100 ms |
+| Ceiling | -24 to 0 dBFS |
+| Release | 0–5,000 ms |
+| Input/output capacity per call | 0–8,192 frames each |
+
+Initialize the configuration with `podcst_audio_config_default`, edit the desired
+fields and pass an initialized null handle slot to `podcst_audio_create`.
+`podcst_audio_get_info` reports latency, maximum block frames and owned storage
+bytes, including the handle and allocated buffer capacities. The largest allowed
+configuration uses less than 1 MiB; caller buffers and allocator overhead are
+excluded. All configuration fields are validated, including disabled limiter
+parameters. Configuration changes require a new handle on its non-render owner.
+
+`podcst_audio_process` returns `OK` when all offered input is consumed or
+`OUTPUT_FULL` when some input remains. Both are successful operations and write
+the consumed/emitted report. Only the emitted output prefix is valid audio;
+resubmit the unconsumed input suffix with fresh output capacity. Limiter latency
+means input and output counts can differ. Do not call finish on starvation.
+
+`podcst_audio_finish` returns `OUTPUT_FULL` while real audio remains and
+`FINISHED` when the tail has drained; its report may include final audio even
+with `FINISHED`. Repeated finish is harmless. Reset discards pending audio and
+history without allocating. Reset does not preserve a source timeline; the
+caller owns source positions and invalidation of already-scheduled audio.
+Destroy takes the handle slot and clears it; destroying a null handle is harmless.
+
+Use one serial owner per handle, with no concurrent operations, reset or destroy.
+All nonempty pointers must reference live, correctly sized, aligned storage for
+the entire call. Input and output must not overlap each other, the handle or the
+report. Input and output sample storage must already contain initialized float32
+values; output values need not be finite. Null sample pointers are allowed only
+for zero frames. A copied handle becomes invalid when its owner destroys it.
+Numeric pointer checks cannot establish allocation lifetime or protect against
+arbitrary dangling pointers; those are caller preconditions.
+
+`INVALID_ARGUMENT`, `INVALID_CONFIG` and `INVALID_STATE` leave the processor,
+output, report and handle slot unchanged. Panics are caught at the C boundary;
+an internal processing panic returns `INTERNAL_ERROR` and poisons the handle,
+which must then be destroyed. Internal errors do not promise unchanged state or
+output. Abort-level failures such as allocation exhaustion cannot be recovered
+through this status contract. Creation/destruction and configuration happen off
+the render callback.
+
+The pinned cbindgen test checks the committed header against Rust declarations.
+After deliberately changing the ABI, regenerate it with:
+
+```sh
+PODCST_UPDATE_HEADER=1 cargo test --manifest-path audio-engine/Cargo.toml --test header
+```
 
 ### Deliberately unresolved: streaming condensation
 

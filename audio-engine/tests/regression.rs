@@ -336,32 +336,37 @@ fn streaming_processors_flush_once_and_restart_without_old_audio() {
 
     fn check(mut processor: impl StreamingProcessor) {
         let input = streaming_signal(37, 2);
-        let mut expected = Vec::new();
-        let report = processor.process(&input, &mut expected).unwrap();
+        let mut output = [0.0; 2048];
+        let report = processor.process(&input, &mut output).unwrap();
+        let mut expected = output[..report.output_frames * 2].to_vec();
         assert_eq!(report.input_frames, 37);
         assert_eq!(
             report.output_frames,
             37usize.saturating_sub(processor.latency_frames())
         );
-        let tail = processor.finish(&mut expected).unwrap();
+        let tail = processor.finish(&mut output).unwrap();
+        expected.extend_from_slice(&output[..tail.output_frames * 2]);
         assert_eq!(tail.input_frames, 0);
         assert_eq!(report.output_frames + tail.output_frames, 37);
         assert_eq!(expected.len(), input.len());
-        assert_eq!(processor.finish(&mut expected).unwrap().output_frames, 0);
-        assert!(processor.process(&input, &mut expected).is_err());
+        assert!(processor.is_finished());
+        assert_eq!(processor.finish(&mut output).unwrap().output_frames, 0);
+        assert!(processor.process(&input, &mut output).is_err());
         for action in [0, 1, 2] {
             match action {
                 0 => processor.start(),
                 1 => processor.reset(),
                 _ => processor.seek(),
             }
-            processor.process(&[1.5; 2048], &mut Vec::new()).unwrap();
+            processor.process(&[1.5; 2048], &mut output).unwrap();
             processor.seek();
             let mut actual = Vec::new();
             for frame in input.chunks(2) {
-                processor.process(frame, &mut actual).unwrap();
+                let report = processor.process(frame, &mut output).unwrap();
+                actual.extend_from_slice(&output[..report.output_frames * 2]);
             }
-            processor.finish(&mut actual).unwrap();
+            let report = processor.finish(&mut output).unwrap();
+            actual.extend_from_slice(&output[..report.output_frames * 2]);
             assert_eq!(actual, expected);
         }
     }

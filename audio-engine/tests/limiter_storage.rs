@@ -83,7 +83,7 @@ fn limiter_processing_and_lifecycle_do_not_allocate_after_construction() {
                 let descending: Vec<f32> = (0..4099)
                     .flat_map(|frame| std::iter::repeat_n(1.5 - frame as f32 / 4099.0, channels))
                     .collect();
-                let mut output = Vec::with_capacity(samples.len());
+                let mut output = vec![0.0; samples.len()];
                 let counts = allocations_during(|| {
                     for input in [&samples, &descending] {
                         limiter.start();
@@ -91,30 +91,29 @@ fn limiter_processing_and_lifecycle_do_not_allocate_after_construction() {
                             .process(&input[..17 * channels], &mut output)
                             .unwrap();
                         limiter.reset();
-                        output.clear();
+
                         assert_eq!(limiter.finish(&mut output).unwrap().output_frames, 0);
                         limiter.start();
                         limiter
                             .process(&input[..17 * channels], &mut output)
                             .unwrap();
                         limiter.seek();
-                        output.clear();
+
                         assert_eq!(limiter.finish(&mut output).unwrap().output_frames, 0);
                         for chunk_frames in [1, 7, 257, 4099] {
                             limiter.reset();
                             let mut emitted = 0;
                             for chunk in input.chunks(chunk_frames * channels) {
-                                output.clear();
                                 let report = limiter.process(chunk, &mut output).unwrap();
                                 assert_eq!(report.input_frames, chunk.len() / channels);
                                 emitted += report.output_frames;
                             }
-                            output.clear();
+
                             emitted += limiter.finish(&mut output).unwrap().output_frames;
                             assert_eq!(emitted, input.len() / channels);
                             assert_eq!(limiter.finish(&mut output).unwrap().output_frames, 0);
                             limiter.seek();
-                            output.clear();
+
                             assert_eq!(limiter.finish(&mut output).unwrap().output_frames, 0);
                         }
                     }
@@ -326,16 +325,21 @@ fn limiter_matches_preallocation_reference_outputs() {
                 TruePeakLimiter::new(AudioFormat::new(sample_rate, channels).unwrap(), &config)
                     .unwrap();
             let mut output = Vec::with_capacity(samples.len());
+            let mut scratch = vec![0.0; samples.len()];
             let mut cursor = 0;
             for chunk in chunks.iter().cycle() {
                 let end = (cursor + chunk * channels).min(samples.len());
-                limiter.process(&samples[cursor..end], &mut output).unwrap();
+                let report = limiter
+                    .process(&samples[cursor..end], &mut scratch)
+                    .unwrap();
+                output.extend_from_slice(&scratch[..report.output_frames * channels]);
                 cursor = end;
                 if cursor == samples.len() {
                     break;
                 }
             }
-            limiter.finish(&mut output).unwrap();
+            let report = limiter.finish(&mut scratch).unwrap();
+            output.extend_from_slice(&scratch[..report.output_frames * channels]);
             assert_eq!(output.len(), samples.len());
             if whole.is_empty() {
                 whole = output.clone();
@@ -352,6 +356,106 @@ fn limiter_matches_preallocation_reference_outputs() {
                     );
                 }
             }
+        }
+    }
+}
+
+#[test]
+fn native_partial_processing_validation_and_drain_do_not_allocate() {
+    use podcst_audio_engine::ffi::*;
+    for limiter_enabled in [0, 1] {
+        for channels in [1, 2] {
+            let config = PodcstAudioConfig {
+                channels,
+                gain_db: 6.0,
+                limiter_enabled,
+                ..Default::default()
+            };
+            let mut native = std::ptr::null_mut();
+            assert_eq!(
+                unsafe { podcst_audio_create(&config, &mut native) },
+                PODCST_AUDIO_OK
+            );
+            let input = signal(4099, channels as usize);
+            let mut output = [0.0; 4];
+            let mut info = PodcstAudioInfo::default();
+            let mut report = PodcstAudioReport::default();
+            let invalid = [f32::NAN, f32::MAX];
+            let counts = allocations_during(|| unsafe {
+                for _ in 0..3 {
+                    assert_eq!(podcst_audio_get_info(native, &mut info), PODCST_AUDIO_OK);
+                    assert_eq!(podcst_audio_reset(native), PODCST_AUDIO_OK);
+                    assert_eq!(
+                        podcst_audio_process(
+                            native,
+                            invalid.as_ptr(),
+                            1,
+                            output.as_mut_ptr(),
+                            1,
+                            &mut report
+                        ),
+                        PODCST_AUDIO_INVALID_ARGUMENT
+                    );
+                    assert_eq!(
+                        podcst_audio_process(
+                            native,
+                            input.as_ptr(),
+                            8193,
+                            output.as_mut_ptr(),
+                            1,
+                            &mut report
+                        ),
+                        PODCST_AUDIO_INVALID_ARGUMENT
+                    );
+                    let mut cursor = 0;
+                    let mut emitted = 0;
+                    while cursor < 4099 {
+                        let status = podcst_audio_process(
+                            native,
+                            input.as_ptr().add(cursor * channels as usize),
+                            (4099 - cursor) as u32,
+                            output.as_mut_ptr(),
+                            2,
+                            &mut report,
+                        );
+                        assert!(matches!(status, PODCST_AUDIO_OK | PODCST_AUDIO_OUTPUT_FULL));
+                        assert!(report.consumed_frames > 0);
+                        cursor += report.consumed_frames as usize;
+                        emitted += report.emitted_frames as usize;
+                    }
+                    loop {
+                        let status =
+                            podcst_audio_finish(native, output.as_mut_ptr(), 1, &mut report);
+                        emitted += report.emitted_frames as usize;
+                        if status == PODCST_AUDIO_FINISHED {
+                            break;
+                        }
+                        assert_eq!(status, PODCST_AUDIO_OUTPUT_FULL);
+                    }
+                    assert_eq!(emitted, 4099);
+                    assert_eq!(
+                        podcst_audio_process(
+                            native,
+                            input.as_ptr(),
+                            1,
+                            output.as_mut_ptr(),
+                            1,
+                            &mut report
+                        ),
+                        PODCST_AUDIO_INVALID_STATE
+                    );
+                    assert_eq!(
+                        podcst_audio_finish(native, output.as_mut_ptr(), 1, &mut report),
+                        PODCST_AUDIO_FINISHED
+                    );
+                    assert_eq!(report.emitted_frames, 0);
+                }
+            });
+            assert_eq!(counts, (0, 0, 0));
+            assert_eq!(
+                unsafe { podcst_audio_destroy(&mut native) },
+                PODCST_AUDIO_OK
+            );
         }
     }
 }

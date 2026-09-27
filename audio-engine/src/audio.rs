@@ -16,6 +16,9 @@ pub enum AudioError {
     InvalidWav(String),
     UnsupportedWav(String),
     InvalidProcessor(String),
+    ProcessingFinished,
+    BufferSizeOverflow,
+    SampleOverflow,
     Io(String),
 }
 
@@ -34,6 +37,13 @@ impl fmt::Display for AudioError {
             Self::InvalidWav(message) => write!(formatter, "invalid WAV: {message}"),
             Self::UnsupportedWav(message) => write!(formatter, "unsupported WAV: {message}"),
             Self::InvalidProcessor(message) => write!(formatter, "invalid processor: {message}"),
+            Self::ProcessingFinished => {
+                write!(formatter, "stream is finished; reset before processing")
+            }
+            Self::BufferSizeOverflow => {
+                write!(formatter, "buffer or frame count exceeds supported limits")
+            }
+            Self::SampleOverflow => write!(formatter, "gain produces a nonfinite sample"),
             Self::Io(message) => write!(formatter, "I/O error: {message}"),
         }
     }
