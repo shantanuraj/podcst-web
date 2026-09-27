@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:1
 
 FROM flyio/flyctl:latest AS flyio
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 RUN apt-get update; apt-get install -y ca-certificates jq bash
 
