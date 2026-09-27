@@ -52,6 +52,9 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
     public var identity: String { "\(feed)\u{001F}\(guid)" }
     public var audioURL: URL? { URL(string: file.url) }
     public var artworkURL: URL? { URL(string: episodeArt ?? cover) }
+    public var shareURL: URL? {
+        webpageForSharing(link, excluding: [feed, file.url])
+    }
 }
 
 public struct Podcast: Codable, Hashable, Sendable, Identifiable {
@@ -87,6 +90,15 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
 
     public var identity: String { feed }
     public var artworkURL: URL? { URL(string: cover) }
+    public var shareURL: URL? { webpageForSharing(link, excluding: [feed]) }
+}
+
+private func webpageForSharing(_ link: String?, excluding sources: [String]) -> URL? {
+    guard let link, let url = URL(string: link), let scheme = url.scheme,
+          ["https", "http"].contains(scheme.lowercased()),
+          url.host?.isEmpty == false, url.user == nil, url.password == nil,
+          !sources.compactMap(URL.init(string:)).contains(url) else { return nil }
+    return url
 }
 
 public struct EpisodePage: Codable, Hashable, Sendable {

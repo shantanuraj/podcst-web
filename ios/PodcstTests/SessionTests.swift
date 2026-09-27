@@ -64,6 +64,27 @@ final class SessionTests: XCTestCase {
         XCTAssertNil(api.accountID)
     }
 
+    func testSharingUsesOnlyDeclaredPublicWebpages() {
+        let feed = "https://example.test/private-feed?token=feed-secret"
+        let audio = "https://example.test/audio.mp3?token=audio-secret"
+        var episode = Episode(guid: "private", feed: feed, title: "Private episode", file: EpisodeFile(url: audio))
+        var podcast = Podcast(feed: feed, title: "Private podcast")
+        XCTAssertNil(episode.shareURL)
+        XCTAssertNil(podcast.shareURL)
+        for link in [feed, audio, "file:///tmp/audio.mp3", "https://listener:secret@example.test/episode", "/episode"] {
+            episode.link = link
+            XCTAssertNil(episode.shareURL)
+        }
+        for link in [feed, "file:///tmp/feed.xml", "https://listener:secret@example.test/show", "/show"] {
+            podcast.link = link
+            XCTAssertNil(podcast.shareURL)
+        }
+        episode.link = "https://example.test/episode"
+        podcast.link = "https://example.test/show"
+        XCTAssertEqual(episode.shareURL?.absoluteString, episode.link)
+        XCTAssertEqual(podcast.shareURL?.absoluteString, podcast.link)
+    }
+
     private func fixture(status: Int? = nil) throws -> SessionFixture {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
