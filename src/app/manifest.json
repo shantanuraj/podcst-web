@@ -15,46 +15,34 @@
   "categories": ["entertainment", "music", "news"],
   "icons": [
     {
-      "src": "/icons/launcher-48.png",
-      "type": "image/png",
-      "sizes": "48x48",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/launcher-72.png",
-      "type": "image/png",
-      "sizes": "72x72",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/launcher-96.png",
-      "type": "image/png",
-      "sizes": "96x96",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/launcher-144.png",
-      "type": "image/png",
-      "sizes": "144x144",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/launcher-192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/launcher-512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/logo.svg",
+      "src": "/icons/icon.svg",
       "type": "image/svg+xml",
       "sizes": "any",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
@@ -64,8 +52,8 @@
       "url": "/?search=true",
       "icons": [
         {
-          "src": "/icons/launcher-96.png",
-          "sizes": "96x96",
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
           "type": "image/png"
         }
       ]
@@ -76,8 +64,8 @@
       "url": "/subs",
       "icons": [
         {
-          "src": "/icons/launcher-96.png",
-          "sizes": "96x96",
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
           "type": "image/png"
         }
       ]
@@ -88,8 +76,8 @@
       "url": "/queue",
       "icons": [
         {
-          "src": "/icons/launcher-96.png",
-          "sizes": "96x96",
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
           "type": "image/png"
         }
       ]
