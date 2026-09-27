@@ -83,7 +83,7 @@ export async function fetchFeed(
 }
 
 export async function savePollState(
-  sql: postgres.Sql,
+  sql: postgres.ISql,
   podcastId: number,
   meta: FeedMeta,
   intervalSeconds: number,

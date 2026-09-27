@@ -48,7 +48,7 @@ export const buildRows = (
 };
 
 export async function upsertEpisodes(
-  sql: postgres.Sql,
+  sql: postgres.ISql,
   podcastId: number,
   podcastCover: string | null,
   episodes: IEpisode[],

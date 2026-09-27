@@ -19,7 +19,7 @@ CREATE TABLE countries (
 CREATE TABLE podcasts (
   id BIGSERIAL PRIMARY KEY,
   podcast_index_id INTEGER UNIQUE,
-  itunes_id INTEGER UNIQUE,
+  itunes_id BIGINT UNIQUE,
   feed_url TEXT UNIQUE NOT NULL,
   title TEXT NOT NULL,
   author_id INTEGER NOT NULL REFERENCES authors(id),

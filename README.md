@@ -150,8 +150,27 @@ Opening a feed checks for updates in the background if its last check was at
 least 15 minutes ago. All refresh paths share database locking and failure
 backoff.
 
-Refresh changes require both a web deployment and a restart of
-`podcst-poller.service` after updating its checkout. No schema migration is needed.
+Feed-refresh changes require both a web deployment and a restart of
+`podcst-poller.service` after updating its checkout.
+
+Chart imports replace each country atomically, continue after individual country
+failures, and record stored/new/failed counts in `poll_metrics`. Apple IDs use
+`BIGINT`; existing installations must apply `0009-itunes-id-bigint.sql` before
+running the updated importers. This migration rewrites the podcasts table and
+its indexes, so schedule a maintenance window and stop the feed poller first.
+
+On `sixth-1`, install the chart service and six-hour timer:
+
+```bash
+sudo install -m 644 scripts/podcst-charts.service scripts/podcst-charts.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now podcst-charts.timer
+sudo systemctl start podcst-charts.service
+sudo journalctl -u podcst-charts.service
+```
+
+Remove the old `poll-top-job.sh` crontab entry when enabling this timer to avoid
+duplicate runs. Job output and failures are retained in the system journal.
 
 ### Building for Production
 
