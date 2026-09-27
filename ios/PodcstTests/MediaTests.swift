@@ -242,6 +242,118 @@ final class MediaTests: XCTestCase {
         router.shutdown()
     }
 
+    func testRouterReleaseRetiresSupersededPreparationsBeforeAccountSwitch() async throws {
+        let server = try MediaHTTPServer(data: payload(count: 350_000), delay: 2)
+        let url = try await server.start()
+        defer { server.stop() }
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let router = RoutingAudioTransport(media: media)
+        defer { router.shutdown() }
+        router.load(source: .episode(episode(url: url)), at: 0, generation: UUID())
+        try await waitForRequests(server, count: 1)
+        for id in 43...50 {
+            let replacement = Episode(id: id, podcastId: 7, guid: "episode-\(id)", feed: "https://example.test/feed", title: "Replacement", file: EpisodeFile(url: url.absoluteString))
+            router.load(source: .episode(replacement), at: 0, generation: UUID())
+            await Task.yield()
+        }
+        await router.releaseMedia()
+        XCTAssertFalse(router.hasSource)
+        try await media.switchAccount(to: "two")
+        XCTAssertEqual(media.accountID, "two")
+        XCTAssertTrue(media.downloadedEpisodes.isEmpty)
+    }
+
+    func testDownloadedUnsupportedNativeFormatUsesPinnedLocalFallbackOffline() async throws {
+        let fixture = try XCTUnwrap(Bundle(for: MediaTests.self).url(forResource: "fallback-surround", withExtension: "m4a"))
+        let data = try Data(contentsOf: fixture)
+        XCTAssertEqual(try AVAudioFile(forReading: fixture).processingFormat.channelCount, 6)
+        let playable = try await AVURLAsset(url: fixture).load(.isPlayable)
+        XCTAssertTrue(playable)
+        let server = try MediaHTTPServer(data: data, contentType: "audio/mp4")
+        let url = try await server.start()
+        defer { server.stop() }
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let episode = episode(url: url)
+        try await media.download(episode)
+        server.stop()
+        let router = RoutingAudioTransport(media: media)
+        defer { router.shutdown() }
+        var readyDuration: TimeInterval?
+        var failed = false
+        var unavailable = false
+        router.onUpdate = { update in
+            switch update.event {
+            case .ready(let duration): readyDuration = duration
+            case .failed: failed = true
+            case .effects(.unavailable): unavailable = true
+            default: break
+            }
+        }
+        router.setEffects(AudioEffects(volumeBoost: true))
+        router.load(source: .episode(episode), at: 0, generation: UUID())
+        for _ in 0..<500 {
+            if readyDuration != nil || failed { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(failed)
+        XCTAssertEqual(try XCTUnwrap(readyDuration), 1, accuracy: 0.1)
+        XCTAssertTrue(unavailable)
+        do { try await media.remove(episode); XCTFail("The downloaded fallback must retain its playback lease") }
+        catch { XCTAssertEqual(error as? MediaFailure, .pinned) }
+        await router.releaseMedia()
+        try await media.remove(episode)
+        XCTAssertTrue(media.downloadedEpisodes.isEmpty)
+    }
+
+    func testCompletedDownloadPromotesPausedFallbackWithoutLosingSourcePosition() async throws {
+        let server = try MediaHTTPServer(data: mp3Fixture(), mode: .ignoreRange, contentType: "audio/mpeg")
+        let url = try await server.start()
+        defer { server.stop() }
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let router = RoutingAudioTransport(media: media)
+        let preferences = AudioPreferences()
+        let effects = AudioEffects(volumeBoost: true)
+        preferences.set(AudioOptions(effects: effects))
+        let controller = PlaybackController(transport: router, persistenceURL: temporaryDirectory().appendingPathComponent("playback.json"), preferences: preferences)
+        defer { controller.shutdown() }
+        let receive = router.onUpdate
+        var readyCount = 0
+        var unavailable = false
+        router.onUpdate = { update in
+            if case .ready = update.event { readyCount += 1 }
+            if case .effects(.unavailable) = update.event { unavailable = true }
+            receive?(update)
+        }
+        let episode = episode(url: url)
+        controller.restore(episode, at: 3.25)
+        for _ in 0..<500 {
+            if readyCount == 1 || controller.state == .failed { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(readyCount, 1)
+        XCTAssertTrue(unavailable)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertEqual(controller.currentTime, 3.25, accuracy: 0.05)
+        try await media.download(episode)
+        for _ in 0..<500 {
+            if readyCount == 2 || controller.state == .failed { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(readyCount, 2)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertEqual(controller.currentTime, 3.25, accuracy: 0.05)
+        controller.resume()
+        for _ in 0..<500 {
+            if controller.audioEffectState == .active(effects) || controller.state == .failed { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(controller.audioEffectState, .active(effects))
+        XCTAssertEqual(controller.state, .playing)
+        controller.pause()
+        await router.releaseMedia()
+    }
+
     func testAccountSwitchFailsClosedWhenOldDiskCleanupFails() async throws {
         let server = try MediaHTTPServer(data: payload(count: 350_000))
         let url = try await server.start()
