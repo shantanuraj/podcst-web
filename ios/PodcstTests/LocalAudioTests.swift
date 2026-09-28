@@ -105,6 +105,7 @@ final class LocalAudioTests: XCTestCase {
         _ = try await transport.renderOffline(frames: 512, into: buffer)
         XCTAssertEqual(transport.position, heardPosition + 1024.0 / 48_000, accuracy: 0.020)
         transport.pause()
+        try await transport.waitUntilReady()
         let pausedPosition = transport.position
         await Task.yield()
         XCTAssertEqual(transport.position, pausedPosition)

@@ -52,8 +52,8 @@ final class RoutingAudioTransport: PlaybackTransport {
 
     var activeInspectionEpoch: UUID? { (backend as? LocalAudioTransport)?.activeInspectionEpoch }
 
-    func takeOutputInspection() async -> [AudioOutputInspectionPacket] {
-        await (backend as? LocalAudioTransport)?.takeOutputInspection() ?? []
+    func takeOutputInspection(epoch: UUID) async -> [AudioOutputInspectionPacket] {
+        await (backend as? LocalAudioTransport)?.takeOutputInspection(epoch: epoch) ?? []
     }
 
     func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {

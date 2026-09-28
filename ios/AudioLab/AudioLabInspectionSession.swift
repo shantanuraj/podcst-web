@@ -136,8 +136,8 @@ final class AudioLabInspectionSession {
 
     func run(transport: RoutingAudioTransport, playback: PlaybackController) async {
         while !Task.isCancelled, isEnabled {
-            if let signal = transport.inspectionSnapshot() {
-                let packets = transport.takeOutputInspection()
+            if let signal = await transport.inspectionSnapshot() {
+                let packets = await transport.takeOutputInspection(epoch: signal.epoch)
                 let date = Date()
                 let route = AudioLabRoute.current
                 let diagnostics = transport.diagnostics.map(AudioLabDiagnostics.init)
