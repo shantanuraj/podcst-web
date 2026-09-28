@@ -89,6 +89,8 @@ public final class PlaybackController {
     @ObservationIgnored private let storageURL: URL
     @ObservationIgnored private let monotonicTime: @MainActor () -> TimeInterval
     @ObservationIgnored private let integratesWithSystem: Bool
+    @ObservationIgnored private let prepareAudioSession: (@Sendable (Bool) async throws -> Void)?
+    @ObservationIgnored private var audioSessionTask: Task<Void, Never>?
     @ObservationIgnored private var systemObservers: SystemPlaybackObservers?
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var shouldPlay = false
@@ -111,12 +113,13 @@ public final class PlaybackController {
         var currentTime: TimeInterval
     }
 
-    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false) {
+    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil) {
         self.accountID = accountID
         self.transport = transport
         self.storageURL = persistenceURL
         self.monotonicTime = monotonicTime
         self.integratesWithSystem = integratesWithSystem
+        self.prepareAudioSession = prepareAudioSession ?? (integratesWithSystem ? PlaybackAudioSession.prepare : nil)
         self.queue = []
         self.currentIndex = 0
         self.currentTime = 0
@@ -128,8 +131,6 @@ public final class PlaybackController {
         audioPreferences.onChange = { [weak self] in self?.applyAudioOptions() }
         if integratesWithSystem {
             systemObservers = SystemPlaybackObservers()
-            do { try configureAudioSession() }
-            catch { transition(to: .failed) }
             configureSystemObservers()
             configureRemoteCommands()
             updateOutputName()
@@ -138,6 +139,7 @@ public final class PlaybackController {
     }
 
     deinit {
+        audioSessionTask?.cancel()
         artworkTask?.cancel()
         chaptersTask?.cancel()
         let transport = transport
@@ -208,6 +210,7 @@ public final class PlaybackController {
         wasPlayingBeforeInterruption = false
         guard !isShutdown, currentEpisode != nil else { return }
         shouldPlay = false
+        cancelAudioSessionTask()
         transport.pause()
         if transport.hasSource { currentTime = transport.position }
         transition(to: .paused)
@@ -217,7 +220,8 @@ public final class PlaybackController {
     }
 
     public func resume() {
-        guard !changingAccount, !isShutdown, currentEpisode != nil, state != .playing, activateAudioSession() else { return }
+        guard !changingAccount, !isShutdown, currentEpisode != nil, state != .playing else { return }
+        guard !shouldPlay || audioSessionTask == nil else { return }
         wasPlayingBeforeInterruption = false
         shouldPlay = true
         if !transport.hasSource || state == .ended || state == .failed {
@@ -225,7 +229,10 @@ public final class PlaybackController {
             return
         }
         transition(to: .loading)
-        transport.play(atRate: effectiveRate)
+        withPreparedAudioSession(forPlayback: true) { [weak self] in
+            guard let self else { return }
+            self.transport.play(atRate: self.effectiveRate)
+        }
         updateNowPlayingInfo()
     }
 
@@ -441,18 +448,19 @@ public final class PlaybackController {
             transition(to: .failed)
             return
         }
-        if autoPlay, !activateAudioSession() { return }
         shouldPlay = autoPlay
         transition(to: .loading)
         currentTime = position.isFinite ? max(0, position) : 0
         duration = episode.duration ?? 0
         elapsedSinceProgress = 0
-        let token = generation
-        applyAudioOptions()
-        transport.load(source: .episode(episode), at: currentTime, generation: token)
-        transport.setEffects(requestedEffects)
-        if integratesWithSystem {
-            loadChapters(from: AVURLAsset(url: url), identity: episode.identity)
+        withPreparedAudioSession(forPlayback: autoPlay) { [weak self] in
+            guard let self else { return }
+            self.applyAudioOptions()
+            self.transport.load(source: .episode(episode), at: self.currentTime, generation: self.generation)
+            self.transport.setEffects(self.requestedEffects)
+            if self.integratesWithSystem {
+                self.loadChapters(from: AVURLAsset(url: url), identity: episode.identity)
+            }
         }
         persist()
         updateNowPlayingInfo()
@@ -467,9 +475,9 @@ public final class PlaybackController {
             if duration.isFinite, duration >= 0 { self.duration = duration }
         case .ready(let duration):
             if duration.isFinite, duration > 0 { self.duration = duration }
-            if shouldPlay {
+            if shouldPlay, audioSessionTask == nil {
                 transport.play(atRate: effectiveRate)
-            } else {
+            } else if !shouldPlay {
                 transition(to: .paused)
             }
         case .position(let position):
@@ -489,6 +497,7 @@ public final class PlaybackController {
         case .ended:
             finishCurrentEpisode()
         case .failed:
+            cancelAudioSessionTask()
             shouldPlay = false
             transition(to: .failed)
             persist()
@@ -550,6 +559,7 @@ public final class PlaybackController {
     }
 
     private func stopPlayback() {
+        cancelAudioSessionTask()
         shouldPlay = false
         wasPlayingBeforeInterruption = false
         generation = UUID()
@@ -566,20 +576,33 @@ public final class PlaybackController {
         onProgress?(PlaybackUpdate(episode: episode, position: currentTime, completed: completed))
     }
 
-    private func activateAudioSession() -> Bool {
-        guard integratesWithSystem else { return true }
-        do {
-            try configureAudioSession()
-            try AVAudioSession.sharedInstance().setActive(true)
-            return true
-        } catch {
-            transition(to: .failed)
-            return false
+    private func withPreparedAudioSession(forPlayback: Bool, perform action: @escaping @MainActor () -> Void) {
+        cancelAudioSessionTask()
+        guard let prepareAudioSession else {
+            action()
+            return
+        }
+        audioSessionTask = Task { [weak self] in
+            do {
+                try Task.checkCancellation()
+                try await prepareAudioSession(forPlayback)
+                guard !Task.isCancelled, let self, !self.isShutdown, !self.changingAccount else { return }
+                self.audioSessionTask = nil
+                action()
+            } catch {
+                guard !Task.isCancelled, let self, !self.isShutdown, !self.changingAccount else { return }
+                self.audioSessionTask = nil
+                self.shouldPlay = false
+                self.transition(to: .failed)
+                self.persist()
+                self.updateNowPlayingInfo()
+            }
         }
     }
 
-    private func configureAudioSession() throws {
-        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+    private func cancelAudioSessionTask() {
+        audioSessionTask?.cancel()
+        audioSessionTask = nil
     }
 
     func handleInterruption(typeRaw: UInt?, optionsRaw: UInt?) {
@@ -751,6 +774,29 @@ public final class PlaybackController {
     static func defaultStorageURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("Podcst", isDirectory: true).appendingPathComponent("playback.json")
+    }
+}
+
+private enum PlaybackAudioSession {
+    private static let queue = DispatchQueue(label: "app.podcst.audio-session", qos: .userInitiated)
+
+    static func prepare(forPlayback: Bool) async throws {
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            queue.async {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    if session.category != .playback || session.mode != .spokenAudio || !session.categoryOptions.isEmpty {
+                        try session.setCategory(.playback, mode: .spokenAudio)
+                    }
+                    if forPlayback { try session.setActive(true) }
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        try Task.checkCancellation()
     }
 }
 
