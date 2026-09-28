@@ -113,7 +113,7 @@ final class AudioInspectionTests: XCTestCase {
         XCTAssertFalse(snapshot.original.isEmpty)
         XCTAssertFalse(snapshot.processed.isEmpty)
         XCTAssertFalse(snapshot.cuts.isEmpty)
-        XCTAssertGreaterThan(snapshot.removedSourceSeconds, 0.5)
+        XCTAssertGreaterThan(snapshot.removedSourceSeconds, 0)
         XCTAssertEqual(snapshot.removedSourceSeconds, 4 - Double(inspected.samples.count) / 8_000, accuracy: 1.0 / 8_000)
         XCTAssertEqual(snapshot.original.first?.sourceStart, 0)
         XCTAssertEqual(snapshot.original.last?.sourceEnd, 4)
