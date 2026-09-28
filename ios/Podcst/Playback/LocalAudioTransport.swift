@@ -225,11 +225,12 @@ final class LocalAudioTransport: PlaybackTransport {
 
     func takeOutputInspection() -> [AudioOutputInspectionPacket] {
         guard inspectionEnabled, let graph, !outputInspectionScratch.isEmpty else { return [] }
+        let presentedFrame = AudioOutputInspectionPacket.presentedFrame(renderedFrames: graph.limiter.renderedFrameCount, presentationLatency: graph.limiterNode.outputPresentationLatency, sampleRate: graph.format.sampleRate)
         var packets: [AudioOutputInspectionPacket] = []
         for _ in 0..<16 {
             var info = PodcstOutputTelemetryInfo()
             let count = outputInspectionScratch.withUnsafeMutableBufferPointer {
-                graph.limiter.copyTelemetryFrames($0.baseAddress!, capacity: UInt32($0.count / 2), info: &info)
+                graph.limiter.copyTelemetryFrames($0.baseAddress!, capacity: UInt32($0.count / 2), throughOutputFrame: presentedFrame, info: &info)
             }
             guard count > 0 else { break }
             guard info.outputStartFrame >= outputInspectionStartFrame else { continue }
