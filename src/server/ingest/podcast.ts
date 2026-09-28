@@ -1,15 +1,13 @@
 import type {
   IEpisodeInfo,
-  IEpisodeListing,
   IPaginatedEpisodes,
   IPodcastEpisodesInfo,
   IPodcastInfo,
 } from '@/types';
 import { sql } from '../db';
 import { ensureContent, touchAccess } from './episode-read';
-import { upsertEpisodes } from './episodes';
-import { fetchFeed, refreshFeed, savePollState } from './feed-refresh';
-import { getPollInterval } from './feed-schedule';
+import { refreshFeed } from './feed-refresh';
+import { indexPodcast } from './index-podcast';
 
 export async function ingestPodcast(
   feedUrl: string,
@@ -21,17 +19,8 @@ export async function ingestPodcast(
       : refreshPodcast(existing.id);
   }
 
-  const result = await fetchFeed(feedUrl).catch(() => null);
-  if (result?.status !== 'updated') return null;
-
-  const { data } = result;
-  const podcast = await storePodcast(feedUrl, data);
-  if (!podcast) return null;
-
-  await upsertEpisodes(sql, podcast.id, data.cover, data.episodes);
-  await savePollState(sql, podcast.id, result, getPollInterval(null));
-
-  return getPodcastByFeedUrl(feedUrl);
+  const id = await indexPodcast(sql, feedUrl).catch(() => null);
+  return id === null ? null : getPodcastById(id);
 }
 
 export async function refreshPodcast(
@@ -40,50 +29,6 @@ export async function refreshPodcast(
   const result = await refreshFeed(sql, podcastId);
   if (result === 'not_found' || result === 'error') return null;
   return getPodcastById(podcastId);
-}
-
-async function storePodcast(feedUrl: string, data: IEpisodeListing) {
-  const authorName = data.author || 'Unknown';
-
-  let [author] = await sql`
-    SELECT id FROM authors WHERE name = ${authorName} LIMIT 1
-  `;
-
-  if (!author) {
-    [author] = await sql`
-      INSERT INTO authors (name) VALUES (${authorName})
-      RETURNING id
-    `;
-  }
-
-  const [podcast] = await sql`
-    INSERT INTO podcasts (
-      feed_url, title, author_id, description, cover, website_url,
-      explicit, episode_count, last_published
-    ) VALUES (
-      ${feedUrl},
-      ${data.title},
-      ${author.id},
-      ${data.description},
-      ${data.cover},
-      ${data.link},
-      ${data.explicit},
-      ${data.episodes.length},
-      ${data.published ? new Date(data.published) : null}
-    )
-    ON CONFLICT (feed_url) DO UPDATE SET
-      title = EXCLUDED.title,
-      description = EXCLUDED.description,
-      cover = EXCLUDED.cover,
-      website_url = EXCLUDED.website_url,
-      explicit = EXCLUDED.explicit,
-      episode_count = EXCLUDED.episode_count,
-      last_published = EXCLUDED.last_published,
-      updated_at = now()
-    RETURNING id
-  `;
-
-  return podcast;
 }
 
 export async function getPodcastByFeedUrl(

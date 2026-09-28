@@ -1,5 +1,6 @@
 import { adaptResponse } from '@/app/api/adapter';
 import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
+import { sql } from '@/server/db';
 import { searchPodcastsByFeedUrl } from '@/server/search';
 import type { IPodcastSearchResult, iTunes } from '@/types';
 
@@ -11,7 +12,7 @@ export async function search(term: string, locale = DEFAULT_PODCASTS_LOCALE) {
 }
 
 async function searchByUrl(url: string): Promise<IPodcastSearchResult[]> {
-  const dbResult = await searchPodcastsByFeedUrl(url);
+  const dbResult = await searchPodcastsByFeedUrl(sql, url);
   return dbResult ? [dbResult] : [];
 }
 
