@@ -33,6 +33,7 @@ export async function searchPodcasts(
     id: row.id,
     title: row.title,
     feed: row.feed_url,
+    cover: row.cover,
     thumbnail: row.thumbnail || row.cover,
     author: row.author,
   }));
@@ -60,6 +61,7 @@ export async function searchPodcastsByFeedUrl(
     id: row.id,
     title: row.title,
     feed: row.feed_url,
+    cover: row.cover,
     thumbnail: row.thumbnail || row.cover,
     author: row.author,
   };
