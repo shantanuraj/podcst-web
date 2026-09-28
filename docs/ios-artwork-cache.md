@@ -1,6 +1,6 @@
 # Artwork sizing and transport
 
-Implementation and compression measurements from September 28, 2026. The [device baseline](ios-artwork-measurement.md) measured the original iOS loader. Numbers below measure local transformations and production API compression; they are not post-change iPhone traffic or memory measurements.
+Implementation and compression measurements from September 28, 2026. The [device baseline](ios-artwork-measurement.md) measured the original iOS loader. Measurements below distinguish local transformations, live proxy response bodies, production API compression, and simulator cache inspection; they are not post-change iPhone traffic or memory measurements.
 
 ## Server contract
 
@@ -75,7 +75,23 @@ The full iOS 27 suite passed 166 tests after the cache integration. The affected
 
 The updated app was installed without clearing existing simulator data. Discover rows, the mini player, Queue, and the full player displayed artwork after relaunch. A read-only audit after browsing and chart refresh found all 30 current Discover covers, plus the current episode's preferred artwork and podcast-cover fallback. The store contained 33 image files totaling 22,691,205 bytes, with no missing indexed files. The simulator's guest Library had no subscriptions, so that run does not verify a populated Library UI. Library retention is covered by the automated ownership and offline tests.
 
-The saved image headers confirmed that the production proxy still returned oversized JPEG/PNG originals for its sized requests. These disk totals validate retention, not the projected WebP transfer savings. A 140.8-second Immediate-mode Instruments HTTP recording on this simulator produced no task, transaction, or HAR records, including no control API requests. It is inconclusive and cannot support a zero-network claim. Simulated network failures in tests verify offline cache behavior; they are not a claim that airplane-mode playback was exercised. Simulator memory also cannot replace the physical iPhone baseline.
+At the time of the simulator run, saved image headers confirmed that the production proxy still returned oversized JPEG/PNG originals for its sized requests. These disk totals validate retention, not the WebP transfer savings measured after deployment below. A 140.8-second Immediate-mode Instruments HTTP recording on this simulator produced no task, transaction, or HAR records, including no control API requests. It is inconclusive and cannot support a zero-network claim. Simulated network failures in tests verify offline cache behavior; they are not a claim that airplane-mode playback was exercised. Simulator memory also cannot replace the physical iPhone baseline.
+
+## Live proxy verification after deployment
+
+After the user deployed the service, direct requests to `https://assets.podcst.app/` on September 28 confirmed the new contract. The Daily's public cover returned square WebP images with separate ETags:
+
+| Requested width | Actual dimensions | Response-body bytes |
+| --- | --- | ---: |
+| 160 | 160 × 160 | 2,096 |
+| 384 | 384 × 384 | 5,202 |
+| 1024 | 1024 × 1024 | 16,952 |
+
+All 30 public covers from the baseline were requested in the Discover layout's sizes: one at 384 pixels and 29 at 160. Every response was successful WebP with the expected square dimensions. Their live response bodies total **157,568 bytes**, identical to the local transformation result, versus **21,391,431 bytes** for the baseline originals: **99.26% less image content**. Requests were made from the Mac with three concurrent transfers, so this is a production response-body measurement, not native-app traffic or transport overhead.
+
+Successful responses carry `public, max-age=86400, stale-while-revalidate=604800`, ETag, Last-Modified, and `nosniff`. Matching exact and weak/list ETag requests returned **304 with zero body bytes**. Last-Modified is forwarded, but an If-Modified-Since-only request currently returns 200; the native store sends ETag when available. Missing sources, non-HTTP sources, invalid widths, and duplicate widths returned 400 with `no-store`.
+
+Existing native cache entries downloaded before deployment can still contain originals until revalidation; their freshness is capped at seven days. The endpoint verification did not clear the simulator's retained artwork or account data.
 
 ## Deployment and verification
 
@@ -84,4 +100,4 @@ The saved image headers confirmed that the production proxy still returned overs
 3. Deploy `podcst-web` so database search returns `cover`, then release the native client. No database migration is needed for these server changes.
 4. Repeat the physical-device baseline sequence with cold and warm caches, then test offline relaunch. Attribute transfer reductions to live resized responses only after verifying their dimensions. Preserve the original baseline rather than replacing its whole-app memory measurements with theoretical buffer savings.
 
-No production deployment or database mutation was performed as part of this implementation. Local comparison evidence is under `/tmp/podcst-image-audit-20260928/`: `proxy-resize-measurement.json`, `modern-artwork-formats.json`, `api-compression-headers.json`, `api-local-compression.json`, `simulator-artwork-after-ui-safe.json`, and `simulator-http-capture-summary.json`. Only aggregate measurements appear here; private source URLs, account state, and cached private images are excluded.
+The user deployed the proxy; the agent performed read-only live verification. No database mutation was performed. Local comparison evidence is under `/tmp/podcst-image-audit-20260928/`: `proxy-resize-measurement.json`, `modern-artwork-formats.json`, `api-compression-headers.json`, `api-local-compression.json`, `simulator-artwork-after-ui-safe.json`, `simulator-http-capture-summary.json`, `live-proxy-widths.json`, `live-proxy-discover.json`, and `live-proxy-validators-safe.json`. Only aggregate measurements appear here; private source URLs, account state, and cached private images are excluded.
