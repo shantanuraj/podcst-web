@@ -121,6 +121,12 @@ final class LocalAudioTransport: PlaybackTransport {
     private var underruns = 0
     private var hasStarted = false
     private var failure: LocalAudioError?
+    private var inspectionEnabled = false
+    private var inspectionEpoch = UUID()
+    private var inspection: AudioInspectionStore?
+    private var outputInspectionScratch: [Float] = []
+    private var outputInspectionStartFrame: UInt64 = 0
+    private var outputInspectionDroppedBaseline: UInt64 = 0
 
     init(configuration: LocalAudioConfiguration = LocalAudioConfiguration(), sourceDecoder: (any PCMDecoder)? = nil) {
         self.configuration = configuration
@@ -173,6 +179,7 @@ final class LocalAudioTransport: PlaybackTransport {
     func setRate(_ rate: Double) {
         guard rate.isFinite, (0.5...2).contains(rate), abs(self.rate - rate) > 0.0001 else { return }
         self.rate = rate
+        inspection?.record(AudioInspectionEvent(kind: .rate, sourceTime: position, value: rate))
         guard let graph else { return }
         if !hasStarted {
             graph.branches[0].rate = rate
@@ -187,6 +194,7 @@ final class LocalAudioTransport: PlaybackTransport {
         guard self.effects != effects else { return }
         self.effects = effects
         effectsRevision &+= 1
+        inspection?.record(AudioInspectionEvent(kind: .requested, sourceTime: position, revision: effectsRevision, effects: effects))
         let revision = effectsRevision
         let token = graphGeneration
         emit(.effects(.preparing))
@@ -195,6 +203,39 @@ final class LocalAudioTransport: PlaybackTransport {
             do { try await self.decoder.configure(effects, revision: revision) }
             catch { self.fail(.cannotDecode, token: token) }
         }
+    }
+
+    func configureInspection(enabled: Bool) {
+        guard inspectionEnabled != enabled else { return }
+        inspectionEnabled = enabled
+        inspectionEpoch = UUID()
+        inspection = enabled ? info.map { AudioInspectionStore(epoch: inspectionEpoch, sampleRate: $0.sampleRate) } : nil
+        configureOutputInspection()
+        let epoch = enabled ? inspectionEpoch : nil
+        Task { [weak self] in
+            guard let self, self.inspectionEnabled == enabled, !enabled || self.inspectionEpoch == epoch else { return }
+            await self.decoder.configureInspection(epoch: epoch)
+        }
+    }
+
+    func inspectionSnapshot() -> AudioInspectionSnapshot? {
+        let dropped = graph?.limiter.droppedTelemetryFrames ?? outputInspectionDroppedBaseline
+        return inspection?.snapshot(presentedSourceTime: position, outputTelemetryDroppedFrames: dropped >= outputInspectionDroppedBaseline ? dropped - outputInspectionDroppedBaseline : 0)
+    }
+
+    func takeOutputInspection() -> [AudioOutputInspectionPacket] {
+        guard inspectionEnabled, let graph, !outputInspectionScratch.isEmpty else { return [] }
+        var packets: [AudioOutputInspectionPacket] = []
+        for _ in 0..<16 {
+            var info = PodcstOutputTelemetryInfo()
+            let count = outputInspectionScratch.withUnsafeMutableBufferPointer {
+                graph.limiter.copyTelemetryFrames($0.baseAddress!, capacity: UInt32($0.count / 2), info: &info)
+            }
+            guard count > 0 else { break }
+            guard info.outputStartFrame >= outputInspectionStartFrame else { continue }
+            packets.append(AudioOutputInspectionPacket(epoch: inspectionEpoch, interleavedSamples: Array(outputInspectionScratch.prefix(Int(count * info.channels))), outputStartFrame: info.outputStartFrame, channels: Int(info.channels), sampleRate: info.sampleRate, limiterReductionDB: info.limiterReductionDB))
+        }
+        return packets
     }
 
     func stop() {
@@ -216,6 +257,8 @@ final class LocalAudioTransport: PlaybackTransport {
         ready = false
         reachedEnd = false
         failure = nil
+        inspection = nil
+        outputInspectionScratch = []
         Task { await decoder.close(generation: oldGeneration) }
     }
 
@@ -278,6 +321,8 @@ final class LocalAudioTransport: PlaybackTransport {
         let token = graphGeneration
         tearDownGraph()
         heldPosition = position.isFinite ? max(0, position) : 0
+        inspectionEpoch = UUID()
+        inspection = nil
         scheduledContentFrames = 0
         sourceSpans.removeAll(keepingCapacity: true)
         effectBoundaries.removeAll(keepingCapacity: true)
@@ -302,15 +347,21 @@ final class LocalAudioTransport: PlaybackTransport {
                 guard self.graphGeneration == token, !Task.isCancelled else { return }
                 try self.configuration.validate()
                 try await self.decoder.configure(self.effects, revision: self.effectsRevision)
+                await self.decoder.configureInspection(epoch: self.inspectionEnabled ? self.inspectionEpoch : nil)
                 guard self.graphGeneration == token, !Task.isCancelled else { return }
                 let info = try await self.decoder.open(url: sourceURL, at: self.heldPosition, generation: token)
                 guard self.graphGeneration == token, !Task.isCancelled else { return }
                 self.info = info
+                if self.inspectionEnabled {
+                    self.inspection = AudioInspectionStore(epoch: self.inspectionEpoch, sampleRate: info.sampleRate, sourceStart: info.startFrame)
+                    self.inspection?.record(AudioInspectionEvent(kind: .seek, sourceTime: Double(info.startFrame) / info.sampleRate))
+                }
                 self.heldPosition = Double(info.startFrame) / info.sampleRate
                 self.decodedThroughFrame = info.startFrame
                 let graph = try await LocalAudioGraph.make(info: info, configuration: self.configuration, rate: self.rate)
                 guard self.graphGeneration == token, !Task.isCancelled else { graph.stop(); return }
                 self.graph = graph
+                self.configureOutputInspection()
                 self.replay = AudioReplayWindow(channels: Int(info.channels), capacity: max(Int(info.sampleRate * 1.5), Int(self.configuration.blockFrames) * self.configuration.bufferCount * 4))
                 self.configureObservers(graph: graph, token: token)
                 self.requestFill(token: token)
@@ -418,6 +469,9 @@ final class LocalAudioTransport: PlaybackTransport {
     }
 
     private func append(_ block: ProcessedAudioBlock) {
+        if let packet = block.inspection {
+            inspection?.append(packet, spans: block.spans, fileEndFrame: block.fileEndFrame)
+        }
         for span in block.spans {
             let next = AudioSourceSpan(sourceStart: span.sourceStart, outputStart: scheduledContentFrames + span.outputStart, frameCount: span.frameCount)
             if let last = sourceSpans.last, last.sourceStart + last.frameCount == next.sourceStart,
@@ -446,6 +500,7 @@ final class LocalAudioTransport: PlaybackTransport {
         while let boundary = effectBoundaries.first, Double(boundary.sourceFrame) <= sourceFrame {
             presentedEffects = boundary
             effectBoundaries.removeFirst()
+            inspection?.record(AudioInspectionEvent(kind: .presented, sourceTime: Double(boundary.sourceFrame) / info.sampleRate, revision: boundary.revision, effects: boundary.effects))
             emit(.effects(.active(boundary.effects)))
             guard graphGeneration == token else { return }
         }
@@ -538,6 +593,7 @@ final class LocalAudioTransport: PlaybackTransport {
             try graph.engine.start()
             hasStarted = true
             playing = true
+            inspection?.record(AudioInspectionEvent(kind: .started, sourceTime: position))
             emit(.playback(isPlaying: true))
             guard graphGeneration == token, playing, wantsPlayback else { return }
             if !graph.offline { startTicker() }
@@ -550,6 +606,7 @@ final class LocalAudioTransport: PlaybackTransport {
         graph?.engine.pause()
         heldPosition = position
         playing = false
+        inspection?.record(AudioInspectionEvent(kind: .paused, sourceTime: heldPosition))
         ticker?.cancel()
         ticker = nil
         emit(.playback(isPlaying: false))
@@ -590,6 +647,7 @@ final class LocalAudioTransport: PlaybackTransport {
         _ = detectStarvation()
         guard graphGeneration == token else { return }
         heldPosition = position
+        inspection?.advancePresentation(to: heldPosition)
         publishEffects()
         guard graphGeneration == token else { return }
         discardPresentedSpans()
@@ -614,6 +672,7 @@ final class LocalAudioTransport: PlaybackTransport {
         guard active.source.underrunFrameCount > 0 else { return false }
         starvationFrame = Int64(sourceFrame(at: Double(active.cursor)))
         underruns += 1
+        inspection?.record(AudioInspectionEvent(kind: .underrun, sourceTime: Double(starvationFrame ?? 0) / info.sampleRate, value: Double(underruns)))
         let end = active.startFrame + Double(active.cursor - active.origin) / info.sampleRate / active.rate * graph.pitchFormat.sampleRate
         starvationRecoveryOutputFrame = (end / graph.pitchFormat.sampleRate + 0.25) * graph.format.sampleRate + Double(graph.limiter.latencyFrames)
         emit(.playback(isPlaying: false))
@@ -658,6 +717,7 @@ final class LocalAudioTransport: PlaybackTransport {
     private func fail(_ error: LocalAudioError, token: UUID) {
         guard graphGeneration == token, error != .cancelled else { return }
         failure = error
+        inspection?.record(AudioInspectionEvent(kind: .failed, sourceTime: position))
         graphGeneration = UUID()
         preparation?.cancel()
         ready = false
@@ -671,6 +731,14 @@ final class LocalAudioTransport: PlaybackTransport {
 
     private func latencyFrames(in graph: LocalAudioGraph) -> Double {
         Double(graph.limiter.latencyFrames) + graph.limiterNode.outputPresentationLatency * graph.format.sampleRate
+    }
+
+    private func configureOutputInspection() {
+        guard let graph else { return }
+        outputInspectionStartFrame = graph.limiter.renderedFrameCount
+        outputInspectionDroppedBaseline = graph.limiter.droppedTelemetryFrames
+        graph.limiter.telemetryEnabled = inspectionEnabled
+        outputInspectionScratch = inspectionEnabled ? [Float](repeating: 0, count: Int(graph.limiter.maximumFramesToRender) * 2) : []
     }
 
     private func consumedFrame(in graph: LocalAudioGraph) -> AVAudioFramePosition {
