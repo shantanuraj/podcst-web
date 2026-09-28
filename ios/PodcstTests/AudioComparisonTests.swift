@@ -110,7 +110,7 @@ final class AudioComparisonTests: XCTestCase {
             for frame in 0..<Int(buffer.frameLength) {
                 let time = Double(start + frame) / 16_000
                 let phase = 2 * Double.pi * 180 * time
-                let level = time.truncatingRemainder(dividingBy: 1) < 0.4 ? 0.00001 : 0.045
+                let level = time.truncatingRemainder(dividingBy: 3) < 1 ? 0.00001 : 0.045
                 buffer.floatChannelData![0][frame] = Float(level * (sin(phase) + 0.4 * sin(phase * 2) + 0.15 * sin(phase * 4)))
             }
             try file.write(from: buffer)
