@@ -3,13 +3,22 @@ set -euo pipefail
 
 usage() {
     printf '%s\n' \
-        'Usage: yarn ios:install <device-udid>' \
+        'Usage: yarn ios:install [--audio-lab] [device-udid]' \
         'Build, install, and launch Podcst using the Release configuration.' \
         '' \
+        'Use --audio-lab to install Audio Lab instead of Podcst.' \
         'Use IOS_DEVICE_ID to save the UDID; an argument takes precedence.' \
         'Use DEVELOPMENT_TEAM to override the signing team in Xcode.' \
         'Find the UDID with: xcrun devicectl list devices'
 }
+
+scheme=Podcst
+product=Podcst
+if [[ ${1:-} == --audio-lab ]]; then
+    scheme='Podcst Audio Lab'
+    product=AudioLab
+    shift
+fi
 
 if [[ $# -eq 1 && ( $1 == --help || $1 == -h ) ]]; then
     usage
@@ -23,13 +32,12 @@ if [[ $# -gt 1 || -z "$device" || "$device" == -* ]]; then
 fi
 
 ios_dir="$(cd "$(dirname "$0")/.." && pwd)"
-scheme=Podcst
 configuration=Release
 derived_data="$ios_dir/build/device"
 
 build=(
     xcrun xcodebuild
-    -project "$ios_dir/$scheme.xcodeproj"
+    -project "$ios_dir/Podcst.xcodeproj"
     -scheme "$scheme"
     -configuration "$configuration"
     -sdk iphoneos
@@ -46,7 +54,7 @@ fi
 printf 'Building %s (%s) for %s…\n' "$scheme" "$configuration" "$device"
 "${build[@]}" build
 
-app="$derived_data/Build/Products/$configuration-iphoneos/$scheme.app"
+app="$derived_data/Build/Products/$configuration-iphoneos/$product.app"
 bundle_id="$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")"
 
 printf 'Installing %s…\n' "$app"

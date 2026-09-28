@@ -21,11 +21,25 @@ printf '\\n' >> "$MOCK_LOG"
 if [[ $name == plutil ]]; then
     [[ $MOCK_FAIL != plist ]] || exit 23
     [[ -f "\${!#}" ]] || exit 24
-    printf 'app.podcst.fixture\\n'
+    case "\${!#}" in
+        */AudioLab.app/Info.plist) printf 'app.podcst.fixture.audiolab\\n' ;;
+        *) printf 'app.podcst.fixture\\n' ;;
+    esac
 elif [[ $1 == xcodebuild ]]; then
     [[ $MOCK_FAIL != build ]] || exit 23
-    while [[ $1 != -derivedDataPath ]]; do shift; done
-    app="$2/Build/Products/Release-iphoneos/Podcst.app"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -scheme) scheme="$2"; shift ;;
+            -derivedDataPath) derived_data="$2"; shift ;;
+        esac
+        shift
+    done
+    case "$scheme" in
+        Podcst) product=Podcst ;;
+        'Podcst Audio Lab') product=AudioLab ;;
+        *) exit 99 ;;
+    esac
+    app="$derived_data/Build/Products/Release-iphoneos/$product.app"
     mkdir -p "$app"
     touch "$app/Info.plist"
 elif [[ $1 == devicectl && $3 == install ]]; then
@@ -91,119 +105,149 @@ async function fixture() {
 }
 
 describe('iOS Release installation', () => {
-  it('builds Release for the requested phone, installs, and launches without a debugger', async () => {
-    const f = await fixture();
-    const result = await f.run(['test-udid']);
-    const derivedData = join(f.ios, 'build/device');
-    const app = join(derivedData, 'Build/Products/Release-iphoneos/Podcst.app');
-    expect(result.code, result.output).toBe(0);
-    expect(result.commands).toEqual([
-      [
-        'xcrun',
-        'xcodebuild',
-        '-project',
-        join(f.ios, 'Podcst.xcodeproj'),
-        '-scheme',
-        'Podcst',
-        '-configuration',
-        'Release',
-        '-sdk',
-        'iphoneos',
-        '-destination',
-        'platform=iOS,id=test-udid',
-        '-derivedDataPath',
-        derivedData,
-        '-allowProvisioningUpdates',
-        '-allowProvisioningDeviceRegistration',
-        '-quiet',
-        'build',
-      ],
-      [
-        'plutil',
-        '-extract',
-        'CFBundleIdentifier',
-        'raw',
-        '-o',
-        '-',
-        `${app}/Info.plist`,
-      ],
-      [
-        'xcrun',
-        'devicectl',
-        'device',
-        'install',
-        'app',
-        '--device',
-        'test-udid',
-        app,
-      ],
-      [
-        'xcrun',
-        'devicectl',
-        'device',
-        'process',
-        'launch',
-        '--device',
-        'test-udid',
-        '--terminate-existing',
-        'app.podcst.fixture',
-      ],
-    ]);
-  });
-
-  it('accepts a saved device and a signing team override', async () => {
-    const f = await fixture();
-    const result = await f.run([], {
-      IOS_DEVICE_ID: 'saved-udid',
-      DEVELOPMENT_TEAM: 'TESTTEAM',
-    });
-    expect(result.code, result.output).toBe(0);
-    expect(result.commands[0]).toContain('platform=iOS,id=saved-udid');
-    expect(result.commands[0]).toContain('DEVELOPMENT_TEAM=TESTTEAM');
-    expect(result.commands[2]).toContain('saved-udid');
-    expect(result.commands[3]).toContain('saved-udid');
-  });
-
-  it('prefers the explicit device over the saved device', async () => {
-    const f = await fixture();
-    const result = await f.run(['explicit-udid'], {
-      IOS_DEVICE_ID: 'saved-udid',
-    });
-    expect(result.code, result.output).toBe(0);
-    expect(result.commands[0]).toContain('platform=iOS,id=explicit-udid');
-    expect(result.commands[2]).toContain('explicit-udid');
-    expect(result.commands[3]).toContain('explicit-udid');
-  });
-
-  for (const args of [
-    [],
-    ['--unknown'],
-    ['phone', 'Debug'],
-    ['--help'],
-    ['-h'],
+  for (const { args, scheme, product, bundle } of [
+    {
+      args: [],
+      scheme: 'Podcst',
+      product: 'Podcst',
+      bundle: 'app.podcst.fixture',
+    },
+    {
+      args: ['--audio-lab'],
+      scheme: 'Podcst Audio Lab',
+      product: 'AudioLab',
+      bundle: 'app.podcst.fixture.audiolab',
+    },
   ]) {
-    it(`prints usage without invoking Xcode for ${JSON.stringify(args)}`, async () => {
-      const f = await fixture();
-      const result = await f.run(args);
-      expect(result.code).toBe(
-        args[0] === '--help' || args[0] === '-h' ? 0 : 1,
-      );
-      expect(result.output).toContain('Usage: yarn ios:install <device-udid>');
-      expect(result.commands).toEqual([]);
+    describe(scheme, () => {
+      it('builds Release for the requested phone, installs, and launches without a debugger', async () => {
+        const f = await fixture();
+        const result = await f.run([...args, 'test-udid']);
+        const derivedData = join(f.ios, 'build/device');
+        const app = join(
+          derivedData,
+          `Build/Products/Release-iphoneos/${product}.app`,
+        );
+        expect(result.code, result.output).toBe(0);
+        expect(result.commands).toEqual([
+          [
+            'xcrun',
+            'xcodebuild',
+            '-project',
+            join(f.ios, 'Podcst.xcodeproj'),
+            '-scheme',
+            scheme,
+            '-configuration',
+            'Release',
+            '-sdk',
+            'iphoneos',
+            '-destination',
+            'platform=iOS,id=test-udid',
+            '-derivedDataPath',
+            derivedData,
+            '-allowProvisioningUpdates',
+            '-allowProvisioningDeviceRegistration',
+            '-quiet',
+            'build',
+          ],
+          [
+            'plutil',
+            '-extract',
+            'CFBundleIdentifier',
+            'raw',
+            '-o',
+            '-',
+            `${app}/Info.plist`,
+          ],
+          [
+            'xcrun',
+            'devicectl',
+            'device',
+            'install',
+            'app',
+            '--device',
+            'test-udid',
+            app,
+          ],
+          [
+            'xcrun',
+            'devicectl',
+            'device',
+            'process',
+            'launch',
+            '--device',
+            'test-udid',
+            '--terminate-existing',
+            bundle,
+          ],
+        ]);
+      });
+
+      it('accepts a saved device and a signing team override', async () => {
+        const f = await fixture();
+        const result = await f.run(args, {
+          IOS_DEVICE_ID: 'saved-udid',
+          DEVELOPMENT_TEAM: 'TESTTEAM',
+        });
+        expect(result.code, result.output).toBe(0);
+        expect(result.commands[0]).toContain('platform=iOS,id=saved-udid');
+        expect(result.commands[0]).toContain('DEVELOPMENT_TEAM=TESTTEAM');
+        expect(result.commands[2]).toContain('saved-udid');
+        expect(result.commands[3]).toContain('saved-udid');
+      });
+
+      it('prefers the explicit device over the saved device', async () => {
+        const f = await fixture();
+        const result = await f.run([...args, 'explicit-udid'], {
+          IOS_DEVICE_ID: 'saved-udid',
+        });
+        expect(result.code, result.output).toBe(0);
+        expect(result.commands[0]).toContain('platform=iOS,id=explicit-udid');
+        expect(result.commands[2]).toContain('explicit-udid');
+        expect(result.commands[3]).toContain('explicit-udid');
+      });
+
+      for (const [index, stage] of [
+        'build',
+        'plist',
+        'install',
+        'launch',
+      ].entries()) {
+        it(`stops immediately when ${stage} fails`, async () => {
+          const f = await fixture();
+          const result = await f.run([...args, 'test-udid'], {
+            MOCK_FAIL: stage,
+          });
+          expect(result.code).toBe(23);
+          expect(result.commands).toHaveLength(index + 1);
+        });
+      }
     });
   }
 
-  for (const [index, stage] of [
-    'build',
-    'plist',
-    'install',
-    'launch',
-  ].entries()) {
-    it(`stops immediately when ${stage} fails`, async () => {
+  for (const [args, code] of [
+    [[], 1],
+    [['--unknown'], 1],
+    [['phone', 'Debug'], 1],
+    [['--audio-lab'], 1],
+    [['--audio-lab', '--unknown'], 1],
+    [['--audio-lab', 'phone', 'Debug'], 1],
+    [['phone', '--audio-lab'], 1],
+    [['--audio-lab', 'phone', '--help'], 1],
+    [['--audio-lab', '--audio-lab', 'phone'], 1],
+    [['--help'], 0],
+    [['-h'], 0],
+    [['--audio-lab', '--help'], 0],
+    [['--audio-lab', '-h'], 0],
+  ] as const) {
+    it(`prints usage without invoking Xcode for ${JSON.stringify(args)}`, async () => {
       const f = await fixture();
-      const result = await f.run(['test-udid'], { MOCK_FAIL: stage });
-      expect(result.code).toBe(23);
-      expect(result.commands).toHaveLength(index + 1);
+      const result = await f.run([...args]);
+      expect(result.code).toBe(code);
+      expect(result.output).toContain(
+        'Usage: yarn ios:install [--audio-lab] [device-udid]',
+      );
+      expect(result.commands).toEqual([]);
     });
   }
 });
