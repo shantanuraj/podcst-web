@@ -19,6 +19,7 @@
     "dev": "next dev",
     "format": "biome format --write src",
     "icons": "bun scripts/icons.ts",
+    "ios:install": "bash ios/scripts/install-device.sh",
     "lint": "biome check src",
     "short-url": "bun scripts/generate-short-url.ts",
     "start": "next start",

@@ -193,7 +193,32 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme Podcst -sdk iphonesimulator bui
 xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
 
-The client uses the web API for discovery, feed indexing, subscriptions, authentication and playback progress. An HTTP(S) feed URL entered in Discover is indexed through `/api/feed`, including private feeds whose access token is part of the URL.
+#### Install a Release build on your iPhone
+
+If needed, select your team under **Podcst → Signing & Capabilities**, or set
+`DEVELOPMENT_TEAM` when running the script. The app's Associated Domains
+capability requires a team that supports it.
+
+```bash
+xcrun devicectl list devices
+yarn ios:install <device-udid>
+```
+
+Use the physical phone's UDID. You can also run
+`./ios/scripts/install-device.sh <device-udid>` directly, or save
+`IOS_DEVICE_ID` in your shell environment and run `yarn ios:install`.
+
+The script always builds the **Release** configuration for the phone, including
+the release-mode audio engine, then installs and launches it without a
+debugger. Builds are cached in `ios/build/device/`.
+
+This replaces the existing Podcst app with the same bundle ID; Audio Lab is
+unaffected.
+
+The client uses the web API for discovery, feed indexing, subscriptions,
+authentication and playback progress. An HTTP(S) feed URL entered in Discover
+is indexed through `/api/feed`, including private feeds whose access token is
+part of the URL.
 
 Development of Volume Boost, Trim Silence, and native audio playback follows the [two-milestone audio experience plan](docs/audio-experience-plan.md).
 
