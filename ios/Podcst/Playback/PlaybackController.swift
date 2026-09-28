@@ -89,6 +89,8 @@ public final class PlaybackController {
     @ObservationIgnored private let storageURL: URL
     @ObservationIgnored private let monotonicTime: @MainActor () -> TimeInterval
     @ObservationIgnored private let integratesWithSystem: Bool
+    @ObservationIgnored private let nowPlayingInfoSink: (@MainActor ([String: Any]?) -> Void)?
+    @ObservationIgnored private var lastNowPlayingUpdate: TimeInterval?
     @ObservationIgnored private let prepareAudioSession: (@Sendable (Bool) async throws -> Void)?
     @ObservationIgnored private var audioSessionTask: Task<Void, Never>?
     @ObservationIgnored private var systemObservers: SystemPlaybackObservers?
@@ -113,12 +115,19 @@ public final class PlaybackController {
         var currentTime: TimeInterval
     }
 
-    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil) {
+    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil, nowPlayingInfoSink: (@MainActor ([String: Any]?) -> Void)? = nil) {
         self.accountID = accountID
         self.transport = transport
         self.storageURL = persistenceURL
         self.monotonicTime = monotonicTime
         self.integratesWithSystem = integratesWithSystem
+        if let nowPlayingInfoSink {
+            self.nowPlayingInfoSink = nowPlayingInfoSink
+        } else if integratesWithSystem {
+            self.nowPlayingInfoSink = { MPNowPlayingInfoCenter.default().nowPlayingInfo = $0 }
+        } else {
+            self.nowPlayingInfoSink = nil
+        }
         self.prepareAudioSession = prepareAudioSession ?? (integratesWithSystem ? PlaybackAudioSession.prepare : nil)
         self.queue = []
         self.currentIndex = 0
@@ -134,8 +143,8 @@ public final class PlaybackController {
             configureSystemObservers()
             configureRemoteCommands()
             updateOutputName()
-            updateNowPlayingInfo()
         }
+        updateNowPlayingInfo()
     }
 
     deinit {
@@ -159,7 +168,7 @@ public final class PlaybackController {
         artworkTask = nil
         chaptersTask = nil
         onProgress = nil
-        if integratesWithSystem { MPNowPlayingInfoCenter.default().nowPlayingInfo = nil }
+        nowPlayingInfoSink?(nil)
     }
 
     public func restore() async {
@@ -487,6 +496,8 @@ public final class PlaybackController {
                 emitProgress(completed: false)
                 persist()
             }
+            updateNowPlayingInfo(periodic: true)
+            return
         case .playback(let isPlaying):
             transition(to: shouldPlay ? (isPlaying ? .playing : .loading) : .paused)
         case .seeked(let position):
@@ -687,14 +698,17 @@ public final class PlaybackController {
         }))
     }
 
-    private func updateNowPlayingInfo() {
-        guard integratesWithSystem, !isShutdown else { return }
+    private func updateNowPlayingInfo(periodic: Bool = false) {
+        guard let nowPlayingInfoSink, !isShutdown else { return }
+        let now = monotonicTime()
+        if periodic, let lastNowPlayingUpdate, now - lastNowPlayingUpdate < 1 { return }
+        lastNowPlayingUpdate = now
         guard let episode = currentEpisode else {
             artworkTask?.cancel()
             artworkTask = nil
             artworkKey = nil
             nowPlayingArtwork = nil
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            nowPlayingInfoSink(nil)
             return
         }
         let key = artworkKey(for: episode)
@@ -712,7 +726,7 @@ public final class PlaybackController {
         if let author = episode.author { info[MPMediaItemPropertyArtist] = author }
         if effectiveDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = effectiveDuration }
         if let nowPlayingArtwork { info[MPMediaItemPropertyArtwork] = nowPlayingArtwork }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        nowPlayingInfoSink(info)
     }
 
     private func artworkKey(for episode: Episode) -> String {
