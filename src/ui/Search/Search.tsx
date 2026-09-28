@@ -107,7 +107,8 @@ const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({
       <ProxiedImage
         loading="lazy"
         alt={`${podcast.title} by ${podcast.author}`}
-        src={podcast.thumbnail}
+        src={podcast.cover}
+        sizes="56px"
       />
       <div>
         <p className={styles.title}>{podcast.title}</p>
