@@ -1,31 +1,53 @@
 'use client';
 
-import { type ImgHTMLAttributes, useCallback, useRef } from 'react';
-import { IMAGE_PROXY_URL } from '@/data/constants';
+import { type ImgHTMLAttributes, useEffect, useRef, useState } from 'react';
+import { artworkFallback, artworkSources } from '@/shared/artwork';
 
 interface ProxiedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   src?: string;
 }
 
 export function ProxiedImage(props: ProxiedImageProps) {
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  const handleError = useCallback(() => {
-    if (!imgRef.current || !props.src) return;
-    imgRef.current.src = getProxySrc(props.src);
-  }, [props.src, imgRef]);
-
-  return <img {...props} ref={imgRef} onError={handleError} />;
+  return <ArtworkImage key={props.src} {...props} />;
 }
 
-const getProxySrc = (src: string) => {
-  let finalSrc = src;
-  try {
-    const imgProxy = new URL(IMAGE_PROXY_URL);
-    imgProxy.searchParams.set('p', src);
-    finalSrc = imgProxy.toString();
-  } catch (e) {
-    console.error('Error parsing URL', e, src);
-  }
-  return finalSrc;
-};
+function ArtworkImage({
+  src,
+  srcSet,
+  sizes,
+  onError,
+  decoding = 'async',
+  ...props
+}: ProxiedImageProps) {
+  const [failed, setFailed] = useState(false);
+  const image = useRef<HTMLImageElement>(null);
+  const fallback = artworkFallback(src);
+  const sources = artworkSources(failed ? fallback : src, sizes);
+
+  useEffect(() => {
+    const element = image.current;
+    if (
+      fallback &&
+      element?.complete &&
+      element.currentSrc &&
+      element.naturalWidth === 0
+    ) {
+      setFailed(true);
+    }
+  }, [fallback]);
+
+  return (
+    <img
+      {...props}
+      ref={image}
+      decoding={decoding}
+      sizes={sizes}
+      srcSet={sources.srcSet ?? (failed ? undefined : srcSet)}
+      src={sources.src}
+      onError={(event) => {
+        onError?.(event);
+        if (!event.defaultPrevented && !failed && fallback) setFailed(true);
+      }}
+    />
+  );
+}
