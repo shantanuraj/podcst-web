@@ -1,6 +1,6 @@
 # iOS artwork measurements
 
-Measured September 28, 2026; source audited at commit `5362369`. This is a baseline and a proposal for discussion; no image-loading or caching changes were made.
+Measured September 28, 2026; source audited at commit `5362369`. This is a baseline and a proposal for discussion; no image-loading or caching changes were made. Subsequent implementation decisions and transport measurements are recorded in [Artwork sizing and transport](ios-artwork-cache.md).
 
 The current loader reduces decoding to a maximum of 1024 pixels, but downloads the complete source image for every frame size. The existing HTTP cache does reuse images, yet it does not guarantee that library or queue artwork remains available offline. Smaller decoded variants and deliberate disk retention address different problems and should be evaluated separately.
 
