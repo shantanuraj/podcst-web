@@ -128,16 +128,19 @@ private struct TabStack<Content: View>: View {
     var body: some View {
         NavigationStack(path: router.path(tab)) {
             content
+                .modifier(PlayerInset())
                 .navigationDestination(for: Route.self) { route in
-                    switch route {
-                    case .podcast(let podcast): PodcastDetailView(podcast: podcast)
-                    case .episode(let episode): EpisodeDetailView(episode: episode)
-                    case .releases: ReleasesView()
-                    case .downloads: DownloadsView()
+                    Group {
+                        switch route {
+                        case .podcast(let podcast): PodcastDetailView(podcast: podcast)
+                        case .episode(let episode): EpisodeDetailView(episode: episode)
+                        case .releases: ReleasesView()
+                        case .downloads: DownloadsView()
+                        }
                     }
+                    .modifier(PlayerInset())
                 }
         }
-        .modifier(PlayerInset())
     }
 }
 
