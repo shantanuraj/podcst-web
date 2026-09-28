@@ -92,6 +92,145 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(library.newReleases.map(\.title), ["Restored episode"])
     }
 
+    func testGuestLoadFetchesLatestEpisodesForSavedSubscriptions() async throws {
+        let podcasts = (9071...9073).map { (id: Int) in
+            Podcast(id: id, feed: "https://example.test/\(id)", title: "Show \(id)")
+        }
+        let episodes = podcasts.enumerated().map { index, podcast in
+            [release(6 - index, podcast: podcast), release(3 - index, podcast: podcast)]
+        }
+        let fixture = try await guestFixture(podcasts: podcasts)
+        defer { fixture.cleanUp() }
+        var requestedIDs: [Int] = []
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/feed/episodes")
+            XCTAssertEqual(request.request.httpMethod, "GET")
+            let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+            XCTAssertEqual(query.first { $0.name == "limit" }?.value, "2")
+            XCTAssertEqual(query.first { $0.name == "sortBy" }?.value, "published")
+            XCTAssertEqual(query.first { $0.name == "sortDir" }?.value, "desc")
+            let id = try XCTUnwrap(query.first { $0.name == "podcastId" }?.value.flatMap(Int.init))
+            let index = try XCTUnwrap(podcasts.firstIndex { $0.id == id })
+            requestedIDs.append(id)
+            try request.respond(EpisodePage(episodes: episodes[index], total: 100 + index, hasMore: true, nextCursor: 2))
+        }
+
+        XCTAssertTrue(fixture.library.newReleases.isEmpty)
+        await fixture.library.load()
+
+        XCTAssertEqual(Set(requestedIDs), Set(podcasts.compactMap(\.id)))
+        XCTAssertEqual(requestedIDs.count, 3)
+        XCTAssertEqual(fixture.library.newReleases, episodes.flatMap { $0 }.sorted { $0.published! > $1.published! })
+        XCTAssertEqual(fixture.library.podcasts.map(\.episodeCount), [100, 101, 102])
+        XCTAssertNil(fixture.library.error)
+        XCTAssertFalse(fixture.library.isLoading)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        XCTAssertEqual(restored.podcasts, fixture.library.podcasts)
+        XCTAssertEqual(restored.newReleases, fixture.library.newReleases)
+    }
+
+    func testNewReleasesSelectsTwoNewestEpisodesPerShowBeforeGlobalSorting() async throws {
+        var first = Podcast(id: 9081, feed: "https://example.test/first", title: "First show")
+        var second = Podcast(id: 9082, feed: "https://example.test/second", title: "Second show")
+        first.episodes = [1, 4, 7].map { release($0, podcast: first) }
+        second.episodes = [6, 2, 5].map { release($0, podcast: second) }
+        let fixture = try await guestFixture(podcasts: [first, second])
+        defer { fixture.cleanUp() }
+
+        XCTAssertEqual(fixture.library.newReleases.map(\.title), [7, 6, 5, 4].map { "Episode \($0)" })
+        XCTAssertEqual(fixture.library.podcasts, [first, second])
+    }
+
+    func testGuestFeedSubscriptionPersistsBeforeResolvingItsEpisodes() async throws {
+        let original = Podcast(feed: "https://example.test/\(UUID().uuidString)", title: "Search result")
+        var resolved = original
+        resolved.id = 9091
+        resolved.title = "Resolved show"
+        resolved.episodeCount = 3
+        resolved.episodes = [2, 1, 3].map { release($0, podcast: resolved) }
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        let started = expectation(description: "Guest feed resolution started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/feed")
+            XCTAssertEqual(request.request.httpMethod, "GET")
+            let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+            XCTAssertEqual(query.first { $0.name == "url" }?.value, original.feed)
+            pending = request
+            started.fulfill()
+        }
+
+        let subscription = Task { await fixture.library.toggleSubscription(original) }
+        await fulfillment(of: [started], timeout: 2)
+        let saved = try XCTUnwrap(fixture.defaults.data(forKey: "guest.library.podcasts"))
+        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [original])
+        try XCTUnwrap(pending).respond(resolved)
+        await subscription.value
+
+        XCTAssertEqual(fixture.library.podcasts, [resolved])
+        XCTAssertEqual(fixture.library.newReleases.map(\.title), ["Episode 3", "Episode 2"])
+        XCTAssertNil(fixture.library.error)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        XCTAssertEqual(restored.podcasts, [resolved])
+    }
+
+    func testGuestLoadRetainsCachedEpisodesWhenOneShowIsUnavailable() async throws {
+        var unavailable = Podcast(id: 9101, feed: "https://example.test/unavailable-cached", title: "Cached show")
+        unavailable.episodes = [release(1, podcast: unavailable)]
+        let available = Podcast(id: 9102, feed: "https://example.test/available", title: "Available show")
+        let updatedEpisodes = [3, 2].map { release($0, podcast: available) }
+        let fixture = try await guestFixture(podcasts: [unavailable, available])
+        defer { fixture.cleanUp() }
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/feed/episodes")
+            let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+            if query.first(where: { $0.name == "podcastId" })?.value == "9101" {
+                request.fail(URLError(.notConnectedToInternet))
+            } else {
+                try request.respond(EpisodePage(episodes: updatedEpisodes, total: 10, hasMore: true))
+            }
+        }
+
+        await fixture.library.load()
+
+        XCTAssertEqual(fixture.library.podcasts.first, unavailable)
+        XCTAssertEqual(fixture.library.podcasts.last?.episodes, updatedEpisodes)
+        XCTAssertEqual(fixture.library.newReleases.map(\.title), ["Episode 3", "Episode 2", "Episode 1"])
+        XCTAssertNotNil(fixture.library.error)
+        XCTAssertFalse(fixture.library.isLoading)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        XCTAssertEqual(restored.podcasts, fixture.library.podcasts)
+    }
+
+    func testGuestSubscriptionRemainsSavedWhenEpisodeLoadFailsAndRemovalNeedsNoRequest() async throws {
+        let podcast = Podcast(id: 9111, feed: "https://example.test/new-subscription", title: "New subscription")
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        var requests = 0
+        GuestLibraryURLProtocol.handler = { request in
+            requests += 1
+            XCTAssertEqual(request.request.url?.path, "/api/feed/episodes")
+            request.fail(URLError(.notConnectedToInternet))
+        }
+
+        await fixture.library.toggleSubscription(podcast)
+
+        XCTAssertEqual(requests, 1)
+        XCTAssertEqual(fixture.library.podcasts, [podcast])
+        XCTAssertNotNil(fixture.library.error)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        XCTAssertEqual(restored.podcasts, [podcast])
+
+        await fixture.library.toggleSubscription(podcast)
+
+        XCTAssertEqual(requests, 1)
+        XCTAssertTrue(fixture.library.podcasts.isEmpty)
+        XCTAssertNil(fixture.library.error)
+        let removed = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        XCTAssertTrue(removed.podcasts.isEmpty)
+    }
+
     func testGuestRefreshPersistsUpdatedEpisodesAndRetainsUnavailableShows() async throws {
         let unavailable = Podcast(id: 9031, feed: "https://example.test/unavailable", title: "Unavailable show")
         let original = Podcast(id: 9032, feed: "https://example.test/updated", title: "Original show")
@@ -111,8 +250,6 @@ final class SessionTests: XCTestCase {
             }
         }
 
-        await fixture.library.load()
-        XCTAssertEqual(requests, 0)
         await fixture.library.load(forceRefresh: true)
 
         XCTAssertEqual(requests, 2)
@@ -135,7 +272,9 @@ final class SessionTests: XCTestCase {
         let started = expectation(description: "Guest refresh started")
         var pending: GuestLibraryRequest?
         GuestLibraryURLProtocol.handler = { request in
-            if pending == nil {
+            if request.request.url?.path == "/api/feed/episodes" {
+                try request.respond(EpisodePage(episodes: [], total: 0, hasMore: false))
+            } else if pending == nil {
                 pending = request
                 started.fulfill()
             } else {
@@ -209,6 +348,35 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [original])
     }
 
+    func testGuestSubscriptionFailureDoesNotChangeRestoredAccount() async throws {
+        let original = Podcast(id: 9121, feed: "https://example.test/subscription-account-change", title: "Guest subscription")
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        fixture.session.prepareAccountChange = { _ in await fixture.library.resetProgressSync() }
+        let started = expectation(description: "Guest subscription started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            if request.request.url?.path == "/api/auth/session" {
+                try request.respond(["user": User(id: "new-listener", email: "new@example.test")])
+            } else {
+                pending = request
+                started.fulfill()
+            }
+        }
+
+        let subscription = Task { await fixture.library.toggleSubscription(original) }
+        await fulfillment(of: [started], timeout: 2)
+        await fixture.session.restore()
+        try XCTUnwrap(pending).fail(URLError(.notConnectedToInternet))
+        await subscription.value
+
+        XCTAssertEqual(fixture.session.user?.id, "new-listener")
+        XCTAssertTrue(fixture.library.podcasts.isEmpty)
+        XCTAssertNil(fixture.library.error)
+        let saved = try XCTUnwrap(fixture.defaults.data(forKey: "guest.library.podcasts"))
+        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [original])
+    }
+
     func testSharingUsesOnlyDeclaredPublicWebpages() {
         let feed = "https://example.test/private-feed?token=feed-secret"
         let audio = "https://example.test/audio.mp3?token=audio-secret"
@@ -258,6 +426,10 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(removed.urls.isEmpty)
         XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "other", podcasts: [], episodes: [episode]))
         XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [episode], isActive: false))
+    }
+
+    private func release(_ number: Int, podcast: Podcast) -> Episode {
+        Episode(podcastId: podcast.id, guid: "episode-\(number)", feed: podcast.feed, podcastTitle: podcast.title, title: "Episode \(number)", published: Date(timeIntervalSince1970: Double(number) * 86400), file: EpisodeFile(url: "https://example.test/\(number).mp3"))
     }
 
     private func fixture(status: Int? = nil) throws -> SessionFixture {
@@ -339,7 +511,9 @@ private struct GuestLibraryRequest: Sendable {
     let complete: @Sendable (Result<Data, Error>) -> Void
 
     func respond<T: Encodable>(_ value: T) throws {
-        complete(.success(try JSONEncoder().encode(value)))
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        complete(.success(try encoder.encode(value)))
     }
 
     func fail(_ error: Error) {
