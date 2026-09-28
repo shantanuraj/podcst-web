@@ -3,11 +3,24 @@ import Observation
 
 @MainActor
 final class RoutingAudioTransport: PlaybackTransport {
+    enum Backend {
+        case custom
+        case system
+        case systemFallback
+    }
+
     var onUpdate: (@MainActor (PlaybackTransportUpdate) -> Void)?
     var hasSource: Bool { source != nil }
     var position: TimeInterval { backend?.position ?? targetPosition }
+    var diagnostics: LocalAudioDiagnostics? { (backend as? LocalAudioTransport)?.diagnostics }
+    var activeBackend: Backend? {
+        guard let backend else { return nil }
+        if backend is LocalAudioTransport { return .custom }
+        return fallbackReason == nil ? .system : .systemFallback
+    }
 
     private let media: MediaStore
+    private let preferSystemPlayback: Bool
     private var backend: (any PlaybackTransport)?
     private var source: PlaybackSource?
     private var lease: MediaAssetLease?
@@ -22,7 +35,10 @@ final class RoutingAudioTransport: PlaybackTransport {
     private var fallbackReason: String?
     private var needsDownloadForEffects = false
 
-    init(media: MediaStore) { self.media = media }
+    init(media: MediaStore, preferSystemPlayback: Bool = false) {
+        self.media = media
+        self.preferSystemPlayback = preferSystemPlayback
+    }
 
     func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
         guard !releasing else { return }
@@ -32,19 +48,30 @@ final class RoutingAudioTransport: PlaybackTransport {
         targetPosition = position
         let token = session
         preparation = Task { [weak self] in
-            guard let self else { return }
+            guard let self, self.session == token, !Task.isCancelled else { return }
             guard let url = source.url else { self.emit(.failed); return }
             do {
                 if url.isFileURL {
-                    self.installNative(source: source, decoder: nil, token: token)
+                    if self.preferSystemPlayback { self.installSystem(token: token) }
+                    else { self.installNative(source: source, decoder: nil, token: token) }
                 } else if case .episode(let episode) = source {
-                    if url.pathExtension.lowercased() == "m3u8" || episode.file.type.lowercased().contains("mpegurl") {
-                        self.installFallback(reason: "Audio effects are unavailable for live streams.", token: token)
+                    if !self.preferSystemPlayback, url.pathExtension.lowercased() == "m3u8" || episode.file.type.lowercased().contains("mpegurl") {
+                        self.installSystem(reason: "Audio effects are unavailable for live streams.", token: token)
                         return
                     }
                     let lease = try await self.media.pin(episode)
                     guard self.session == token, !Task.isCancelled else { await lease.release(); return }
                     self.lease = lease
+                    if self.preferSystemPlayback {
+                        if let file = lease.completeFileURL {
+                            let snapshot = await lease.byteSource.snapshot()
+                            guard self.session == token, !Task.isCancelled else { return }
+                            self.installSystem(token: token, effectiveSource: .url(file, contentType: snapshot.metadata?.contentType))
+                        } else {
+                            self.installSystem(token: token)
+                        }
+                        return
+                    }
                     if let file = lease.completeFileURL {
                         let metadata = try await lease.byteSource.metadata()
                         guard self.session == token, !Task.isCancelled else { return }
@@ -60,11 +87,11 @@ final class RoutingAudioTransport: PlaybackTransport {
                             let decoder = ProgressiveAudioDecoder(source: lease.byteSource, blockFrames: configuration.blockFrames, bufferCount: 2)
                             self.installNative(source: source, decoder: decoder, token: token)
                         } else {
-                            self.installFallback(reason: "Download this episode to use audio effects. This server does not support reliable streaming with effects.", token: token, needsDownload: true)
+                            self.installSystem(reason: "Download this episode to use audio effects. This server does not support reliable streaming with effects.", token: token, needsDownload: true)
                         }
                     }
                 } else {
-                    self.installFallback(reason: "Download this episode to use audio effects.", token: token)
+                    self.installSystem(reason: self.preferSystemPlayback ? nil : "Download this episode to use audio effects.", token: token)
                 }
             } catch {
                 guard self.session == token, !Task.isCancelled else { return }
@@ -98,9 +125,11 @@ final class RoutingAudioTransport: PlaybackTransport {
 
     func setEffects(_ effects: AudioEffects) {
         self.effects = effects
-        if let fallbackReason {
+        if preferSystemPlayback {
+            if backend != nil { emit(.effects(systemEffectState)) }
+        } else if fallbackReason != nil {
             if resumeEffectsFromDownload() { return }
-            emit(.effects(effects.enabled ? .unavailable(fallbackReason) : .inactive))
+            emit(.effects(systemEffectState))
         } else {
             backend?.setEffects(effects)
             if backend == nil, effects.enabled { emit(.effects(.preparing)) }
@@ -149,7 +178,7 @@ final class RoutingAudioTransport: PlaybackTransport {
             guard let self, let transport, self.backend === transport, self.session == token, update.generation == self.generation else { return }
             if case .failed = update.event, transport.diagnostics.failure == .unsupportedFormat {
                 self.targetPosition = transport.position
-                self.installFallback(reason: "Audio effects are unavailable for this format.", token: token, effectiveSource: source)
+                self.installSystem(reason: "Audio effects are unavailable for this format.", token: token, effectiveSource: source)
                 return
             }
             self.emit(update.event)
@@ -159,7 +188,7 @@ final class RoutingAudioTransport: PlaybackTransport {
         transport.load(source: source, at: targetPosition, generation: generation)
     }
 
-    private func installFallback(reason: String, token: UUID, effectiveSource: PlaybackSource? = nil, needsDownload: Bool = false) {
+    private func installSystem(reason: String? = nil, token: UUID, effectiveSource: PlaybackSource? = nil, needsDownload: Bool = false) {
         guard session == token, let source = effectiveSource ?? source else { return }
         backend?.shutdown()
         let transport = AVPlayerTransport()
@@ -173,10 +202,14 @@ final class RoutingAudioTransport: PlaybackTransport {
         }
         transport.setRate(rate)
         transport.load(source: source, at: targetPosition, generation: generation)
-        emit(.effects(effects.enabled ? .unavailable(reason) : .inactive))
+        emit(.effects(systemEffectState))
         guard session == token else { return }
         if source.url?.isFileURL != true { releaseLease() }
         if needsDownload { observeDownload(token: token) }
+    }
+
+    private var systemEffectState: AudioEffectState {
+        effects.enabled ? .unavailable(fallbackReason ?? "Audio effects are unavailable with AVPlayer.") : .inactive
     }
 
     private func observeDownload(token: UUID) {
