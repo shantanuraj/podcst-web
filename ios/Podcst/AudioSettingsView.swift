@@ -124,20 +124,8 @@ struct AudioSettingsView: View {
             }
         }
         guard playback.requestedEffects.enabled else { return nil }
-        switch playback.audioEffectState {
-        case .inactive, .preparing:
-            return "Your audio settings will apply when playback is ready."
-        case .active(let effects):
-            if effects != playback.requestedEffects { return "Applying your audio settings…" }
-            switch (effects.volumeBoost, effects.trimSilence) {
-            case (true, true): return "Volume Boost and Trim Silence are active."
-            case (true, false): return "Volume Boost is active."
-            case (false, true): return "Trim Silence is active."
-            case (false, false): return nil
-            }
-        case .unavailable(let reason):
-            return reason
-        }
+        guard case .unavailable(let reason) = playback.audioEffectState else { return nil }
+        return reason
     }
 }
 
