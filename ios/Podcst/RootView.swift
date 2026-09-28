@@ -232,6 +232,8 @@ struct NowPlayingBar: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
                 .offset(x: dragOffset)
                 .opacity(1 - min(0.55, abs(dragOffset) / 240))
             }
