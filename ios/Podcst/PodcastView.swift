@@ -119,7 +119,7 @@ struct PodcastDetailView: View {
                 .padding(.top, 20)
                 if detailError {
                     ErrorRow(message: "Couldn't load the full catalogue.") {
-                        await loadDetails()
+                        await loadDetails(forceRefresh: true)
                     }
                 }
                 if content.episodes.count > 10 {
@@ -142,6 +142,7 @@ struct PodcastDetailView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
+        .refreshable { await loadDetails(forceRefresh: true) }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > 250
         } action: { _, visible in
@@ -153,14 +154,14 @@ struct PodcastDetailView: View {
         .task { await loadDetails() }
     }
 
-    private func loadDetails() async {
+    private func loadDetails(forceRefresh: Bool = false) async {
         detail = detail ?? api.cachedPodcast(id: podcast.id, feed: podcast.feed)
         let source = detail ?? podcast
-        isLoading = source.episodes.count <= 2 || source.episodes.count < source.episodeCount
+        isLoading = forceRefresh || source.episodes.count <= 2 || source.episodes.count < source.episodeCount
         detailError = false
         defer { isLoading = false }
         do {
-            detail = try await api.detail(of: source)
+            detail = try await api.detail(of: source, forceRefresh: forceRefresh)
         } catch {
             detailError = true
         }

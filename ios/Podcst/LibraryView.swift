@@ -12,47 +12,52 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        Group {
-            if library.isLoading && library.podcasts.isEmpty {
-                ProgressView().tint(PodcstPalette.accent)
-            } else if library.podcasts.isEmpty {
-                EmptyLibraryView(signedIn: session.user != nil) { showingLogin = true }
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        if !continueAndNew.isEmpty {
-                            SectionHeader("Continue & new") {
-                                NavigationLink("See all", value: Route.releases)
-                                    .font(.sans(.footnote).weight(.medium))
-                                    .foregroundStyle(PodcstPalette.accent)
-                            }
-                            ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
-                                EpisodeRow(episode: episode, lead: .artwork)
-                            }
-                        }
-                        SectionHeader("Subscriptions") {
-                            Text(library.podcasts.count == 1 ? "1 show" : "\(library.podcasts.count) shows")
-                                .font(.sans(.footnote))
-                                .foregroundStyle(PodcstPalette.tertiary)
-                        }
-                        .padding(.top, 22)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
-                            ForEach(library.podcasts, id: \.identity) { podcast in
-                                NavigationLink(value: Route.podcast(podcast)) {
-                                    ArtworkView(url: podcast.artworkURL)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("\(podcast.title), \(podcast.author)")
-                            }
-                        }
-                        .padding(.top, 14)
+        ScrollView {
+            if library.podcasts.isEmpty {
+                Group {
+                    if library.isLoading {
+                        ProgressView().tint(PodcstPalette.accent)
+                    } else {
+                        EmptyLibraryView(signedIn: session.user != nil) { showingLogin = true }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
                 }
+                .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.vertical)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if !continueAndNew.isEmpty {
+                        SectionHeader("Continue & new") {
+                            NavigationLink("See all", value: Route.releases)
+                                .font(.sans(.footnote).weight(.medium))
+                                .foregroundStyle(PodcstPalette.accent)
+                        }
+                        ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
+                            EpisodeRow(episode: episode, lead: .artwork)
+                        }
+                    }
+                    SectionHeader("Subscriptions") {
+                        Text(library.podcasts.count == 1 ? "1 show" : "\(library.podcasts.count) shows")
+                            .font(.sans(.footnote))
+                            .foregroundStyle(PodcstPalette.tertiary)
+                    }
+                    .padding(.top, 22)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
+                        ForEach(library.podcasts, id: \.identity) { podcast in
+                            NavigationLink(value: Route.podcast(podcast)) {
+                                ArtworkView(url: podcast.artworkURL)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(podcast.title), \(podcast.author)")
+                        }
+                    }
+                    .padding(.top, 14)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
         }
+        .refreshable { await library.load(forceRefresh: true) }
         .podcstPage()
         .screenHeader("Library") {
             HStack(spacing: 14) {
@@ -69,7 +74,6 @@ struct LibraryView: View {
                 AccountButton()
             }
         }
-        .refreshable { await library.load(forceRefresh: true) }
         .sheet(isPresented: $showingLogin) { LoginView() }
     }
 }
@@ -87,6 +91,7 @@ struct ReleasesView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
+        .refreshable { await library.load(forceRefresh: true) }
         .podcstPage()
         .navigationTitle("New releases")
     }
