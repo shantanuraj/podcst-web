@@ -29,7 +29,7 @@ typedef struct PodcstOutputTelemetryInfo {
 @property(nonatomic) BOOL telemetryEnabled;
 @property(nonatomic, readonly) uint64_t droppedTelemetryFrames;
 
-- (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity info:(PodcstOutputTelemetryInfo *)info NS_SWIFT_NAME(copyTelemetryFrames(_:capacity:info:));
+- (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity throughOutputFrame:(uint64_t)throughOutputFrame info:(PodcstOutputTelemetryInfo *)info NS_SWIFT_NAME(copyTelemetryFrames(_:capacity:throughOutputFrame:info:));
 
 - (BOOL)configureLimiterEnabled:(BOOL)enabled error:(NSError * _Nullable * _Nullable)error;
 - (void)beginDraining;
