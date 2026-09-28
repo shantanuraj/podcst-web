@@ -276,6 +276,8 @@ Open `ios/Podcst.xcodeproj`, select the **Podcst Audio Lab** scheme and run on a
 iPhone or simulator. Choose **Browse podcasts** for the US top podcasts, search
 by name or RSS feed link, then select a podcast and episode. The episode list also
 supports title filtering. Choose **Open audio file** to select a local audio file.
+Selected podcast episodes offer **Download** and **Play download** for repeatable
+comparisons using the same completed file with either engine.
 The launch argument `-LocalAudioHarness` selects this debug-only entry point;
 normal launches use the web-backed app. The lab uses `RoutingAudioTransport`
 with the existing `PlaybackController`, so streaming, decoding, seeking, speed,

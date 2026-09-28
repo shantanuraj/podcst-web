@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct LocalAudioHarnessView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(MediaStore.self) private var media
     let transport: RoutingAudioTransport
     private let reference = ProcessInfo.processInfo.arguments.contains("-AudioLabReference")
     @State private var importing = false
@@ -55,6 +56,22 @@ struct LocalAudioHarnessView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                        if episode.audioURL?.isFileURL == false {
+                            HStack {
+                                DownloadButton(episode: episode)
+                                if case .available = media.status(for: episode) {
+                                    Spacer()
+                                    Button("Play download") {
+                                        Task { await open(episode) }
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(isOpening)
+                                }
+                            }
+                            Text("Download to compare the same audio without network buffering.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                         Slider(
                             value: Binding(
                                 get: { scrubbing ? scrubPosition : playback.currentTime },
@@ -128,7 +145,7 @@ struct LocalAudioHarnessView: View {
                                 .font(.subheadline.monospacedDigit())
                             }
                             if transport.activeBackend == .systemFallback {
-                                Text("This source uses AVPlayer fallback. Choose another episode or a local file to test the custom engine.")
+                                Text("This source uses AVPlayer fallback. Try downloading it or choose another file to test the custom engine.")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
