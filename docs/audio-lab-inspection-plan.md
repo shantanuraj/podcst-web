@@ -27,3 +27,12 @@ Comparisons use a local or completely downloaded source and a bounded passage wi
 ## Acceptance
 
 Build both apps and run the relevant Rust, native and Swift regression suites. Exercise the inspector with a deterministic local fixture, verify toggle and freeze behavior, audition presets and export a capture. Physical speaker/Bluetooth listening and power measurements remain separate evidence; visual or numerical tests cannot establish listening quality or accessory latency.
+
+## Validation recorded 2026-09-28
+
+- Podcst and Audio Lab simulator builds succeed with Xcode 27.
+- The selected Swift/native regression run passes all 86 tests: inspection, signal metering, comparison, native rendering, playback, local decoding, effects integration, peak safety and validation fixtures. The Rust suite passes 49 tests with one existing ignored test.
+- On the iOS 27 simulator, the built-in signal plays through the custom engine. Effect toggles change the measured envelopes, actual cuts appear, and freeze preserves the selected reading. Four-preset comparison renders, fixed/matched selection, direct preset switching, automatic cycling and dismissal work. A 20-second test passage renders to 14.97 seconds with Trim enabled.
+- A capture saved through the Files picker parses as strict JSON, contains all four comparison results and frozen-window/build/route metadata, and contains no raw PCM, source URL, episode title or personal route name. Histories remain within their configured bounds.
+- A simulator audio-device failure interrupted the first manual attempt. After restarting that simulator and running it without the parallel test simulator, the comparison flow succeeds. This is not evidence about physical-route reliability.
+- Speaker/Bluetooth listening quality, accessory transitions and matched power measurements remain pending physical-device validation.
