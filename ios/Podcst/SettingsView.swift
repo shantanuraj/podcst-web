@@ -90,12 +90,6 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(PodcstPalette.paper)
             .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                }
-            }
             .sheet(isPresented: $showingLogin) { LoginView() }
             .sheet(isPresented: $showingAudio) { AudioSettingsView(defaultsOnly: true) }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "opml") ?? .xml, .xml, .plainText]) { result in
@@ -107,6 +101,7 @@ struct SettingsView: View {
             }
         }
         .tint(PodcstPalette.accent)
+        .presentationDragIndicator(.visible)
     }
 }
 
