@@ -159,7 +159,7 @@ failures, and record stored/new/failed counts in `poll_metrics`. Apple IDs use
 running the updated importers. This migration rewrites the podcasts table and
 its indexes, so schedule a maintenance window and stop the feed poller first.
 
-On `sixth-1`, install the chart service and six-hour timer:
+On the host install the chart service and six-hour timer:
 
 ```bash
 sudo install -m 644 scripts/podcst-charts.service scripts/podcst-charts.timer /etc/systemd/system/
@@ -219,6 +219,25 @@ Deploy using the Fly CLI.
 
 ```bash
 ./scripts/deploy-fly.sh
+```
+
+### Updating image proxy
+
+The image proxy is deployed separately from the web application. Operators can
+update an existing, preconfigured Linux/systemd installation with:
+
+```bash
+bun run deploy:img-proxy
+```
+
+Run on the service host. The updater fetches `origin/main` from the sibling
+`img_proxy` checkout.
+
+```bash
+# Validate dependencies and tests without changing the installed service:
+./scripts/deploy-img-proxy.sh --check
+# Use a different source checkout:
+./scripts/deploy-img-proxy.sh --repo /path/to/img_proxy
 ```
 
 ## Built With
