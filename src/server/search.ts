@@ -1,7 +1,8 @@
+import type postgres from 'postgres';
 import type { IPodcastSearchResult } from '@/types';
-import { sql } from './db';
 
 export async function searchPodcasts(
+  sql: postgres.ISql,
   term: string,
   limit = 20,
 ): Promise<IPodcastSearchResult[]> {
@@ -13,7 +14,7 @@ export async function searchPodcasts(
 
   const rows = await sql`
     SELECT
-      p.id,
+      p.itunes_id AS id,
       p.title,
       p.feed_url,
       p.thumbnail,
@@ -30,7 +31,7 @@ export async function searchPodcasts(
   `;
 
   return rows.map((row) => ({
-    id: row.id,
+    id: Number(row.id),
     title: row.title,
     feed: row.feed_url,
     cover: row.cover,
@@ -40,11 +41,12 @@ export async function searchPodcasts(
 }
 
 export async function searchPodcastsByFeedUrl(
+  sql: postgres.ISql,
   feedUrl: string,
 ): Promise<IPodcastSearchResult | null> {
   const [row] = await sql`
     SELECT
-      p.id,
+      p.itunes_id AS id,
       p.title,
       p.feed_url,
       p.thumbnail,
@@ -58,7 +60,7 @@ export async function searchPodcastsByFeedUrl(
   if (!row) return null;
 
   return {
-    id: row.id,
+    id: row.id === null ? undefined : Number(row.id),
     title: row.title,
     feed: row.feed_url,
     cover: row.cover,
