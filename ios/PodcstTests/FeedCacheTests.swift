@@ -5,19 +5,7 @@ import XCTest
 @MainActor
 final class FeedCacheTests: XCTestCase {
     func testPodcastDetailLoadsEveryEpisodePage() async throws {
-        let info = [
-            "id": 9001,
-            "feed": "https://example.com/feed.xml",
-            "title": "Example",
-            "author": "Author",
-            "cover": "https://example.com/cover.jpg",
-            "description": "Description",
-            "link": NSNull(),
-            "published": NSNull(),
-            "explicit": false,
-            "keywords": [],
-            "episodeCount": 202,
-        ] as [String: Any]
+        let info = Self.podcastPayload(episodeCount: 202)
         let firstPage = [
             "episodes": [Self.episodePayload(id: 1), Self.episodePayload(id: 2)],
             "total": 202,
@@ -45,6 +33,52 @@ final class FeedCacheTests: XCTestCase {
         XCTAssertEqual(detail.episodeCount, 202)
         XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
         XCTAssertEqual(DetailURLProtocol.requests.count, 3)
+    }
+
+    func testSearchResolvesAppleIdentityThroughFeedBeforeLoadingFullCatalogue() async throws {
+        let externalID = 1253186678
+        let searchResult: [String: Any] = [
+            "id": externalID,
+            "feed": "https://example.com/feed.xml",
+            "title": "Example",
+            "author": "Author",
+            "thumbnail": "https://example.com/cover.jpg",
+        ]
+        var preview = Self.podcastPayload(episodeCount: 3)
+        preview["episodes"] = [Self.episodePayload(id: 1), Self.episodePayload(id: 2)]
+        let catalogue: [String: Any] = [
+            "episodes": [Self.episodePayload(id: 1), Self.episodePayload(id: 2), Self.episodePayload(id: 3)],
+            "total": 3,
+            "hasMore": false,
+        ]
+        DetailURLProtocol.responses = [
+            "/api/search": try JSONSerialization.data(withJSONObject: [searchResult]),
+            "/api/feed": try JSONSerialization.data(withJSONObject: preview),
+            "/api/feed/info": try JSONSerialization.data(withJSONObject: Self.podcastPayload(episodeCount: 3)),
+            "/api/feed/episodes": try JSONSerialization.data(withJSONObject: catalogue),
+        ]
+        defer { DetailURLProtocol.reset() }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DetailURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://example.com")!, session: URLSession(configuration: configuration))
+        let results = try await api.search(term: "Example")
+        let podcast = try XCTUnwrap(results.first)
+        XCTAssertNil(podcast.id)
+        XCTAssertEqual(podcast.cover, "https://example.com/cover.jpg")
+
+        let detail = try await api.detail(of: podcast)
+
+        XCTAssertEqual(detail.id, 9001)
+        XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
+        XCTAssertEqual(DetailURLProtocol.requests.count, 4)
+        let feedRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed" })
+        let infoRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/info" })
+        let episodesRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/episodes" })
+        XCTAssertEqual(Self.query("url", in: feedRequest), podcast.feed)
+        XCTAssertEqual(Self.query("id", in: infoRequest), "9001")
+        XCTAssertEqual(Self.query("podcastId", in: episodesRequest), "9001")
+        XCTAssertFalse(DetailURLProtocol.requests.contains { $0.url?.absoluteString.contains(String(externalID)) == true })
     }
 
     func testFreshPodcastResponseIsReusedByFeedAndID() async throws {
@@ -106,6 +140,27 @@ final class FeedCacheTests: XCTestCase {
 
     private func episode(guid: String) -> Episode {
         Episode(guid: guid, feed: "https://example.com/feed.xml", title: guid, file: EpisodeFile(url: "https://example.com/\(guid).mp3"))
+    }
+
+    private static func query(_ name: String, in request: URLRequest) -> String? {
+        request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
+            .queryItems?.first { $0.name == name }?.value
+    }
+
+    private static func podcastPayload(episodeCount: Int) -> [String: Any] {
+        [
+            "id": 9001,
+            "feed": "https://example.com/feed.xml",
+            "title": "Example",
+            "author": "Author",
+            "cover": "https://example.com/cover.jpg",
+            "description": "Description",
+            "link": NSNull(),
+            "published": NSNull(),
+            "explicit": false,
+            "keywords": [],
+            "episodeCount": episodeCount,
+        ]
     }
 
     private static func episodePayload(id: Int) -> [String: Any] {

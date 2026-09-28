@@ -115,24 +115,6 @@ public struct EpisodePage: Codable, Hashable, Sendable {
     }
 }
 
-public struct SearchResult: Codable, Hashable, Sendable, Identifiable {
-    public var id: Int?
-    public var author: String
-    public var feed: String
-    public var thumbnail: String
-    public var title: String
-
-    public init(id: Int? = nil, author: String, feed: String, thumbnail: String, title: String) {
-        self.id = id
-        self.author = author
-        self.feed = feed
-        self.thumbnail = thumbnail
-        self.title = title
-    }
-
-    public var identity: String { feed }
-}
-
 public struct User: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     public var email: String
