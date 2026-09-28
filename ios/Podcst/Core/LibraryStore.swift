@@ -59,6 +59,22 @@ public final class LibraryStore {
             } else {
                 podcasts = loadGuest()
                 progress = nil
+                if forceRefresh {
+                    var refreshError: Error?
+                    for podcast in podcasts {
+                        do {
+                            let updated = try await api.detail(of: podcast, forceRefresh: true)
+                            guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
+                            guard let index = podcasts.firstIndex(of: podcast) else { continue }
+                            podcasts[index] = updated
+                            persistGuest()
+                        } catch {
+                            guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
+                            refreshError = error
+                        }
+                    }
+                    if let refreshError { throw refreshError }
+                }
             }
             error = nil
         } catch let failure {

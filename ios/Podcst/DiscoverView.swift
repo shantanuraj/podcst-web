@@ -29,9 +29,9 @@ struct DiscoverView: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
+        .refreshable { await loadTop(forceRefresh: true) }
         .podcstPage()
         .screenHeader("Discover") { AccountButton() }
-        .refreshable { await loadTop(forceRefresh: true) }
         .task(id: region) { await loadTop() }
         .task(id: topPodcasts.map(\.artworkURL)) {
             let urls = topPodcasts.compactMap(\.artworkURL)

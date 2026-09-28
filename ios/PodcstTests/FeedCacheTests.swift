@@ -24,9 +24,7 @@ final class FeedCacheTests: XCTestCase {
         ]
         defer { DetailURLProtocol.reset() }
 
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [DetailURLProtocol.self]
-        let api = APIClient(baseURL: URL(string: "https://example.com")!, session: URLSession(configuration: configuration))
+        let api = makeAPI()
         let podcast = Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example")
         let detail = try await api.detail(of: podcast)
 
@@ -60,9 +58,7 @@ final class FeedCacheTests: XCTestCase {
         ]
         defer { DetailURLProtocol.reset() }
 
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [DetailURLProtocol.self]
-        let api = APIClient(baseURL: URL(string: "https://example.com")!, session: URLSession(configuration: configuration))
+        let api = makeAPI()
         let results = try await api.search(term: "Example")
         let podcast = try XCTUnwrap(results.first)
         XCTAssertNil(podcast.id)
@@ -80,6 +76,96 @@ final class FeedCacheTests: XCTestCase {
         XCTAssertEqual(Self.query("id", in: infoRequest), "9001")
         XCTAssertEqual(Self.query("podcastId", in: episodesRequest), "9001")
         XCTAssertFalse(DetailURLProtocol.requests.contains { $0.url?.absoluteString.contains(String(externalID)) == true })
+    }
+
+    func testForcedPodcastDetailRefreshesCompleteCachedCatalogue() async throws {
+        DetailURLProtocol.responses = [
+            "/api/feed": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3])),
+            "/api/feed/refresh": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3, 4], title: "Updated")),
+        ]
+        defer { DetailURLProtocol.reset() }
+        let api = makeAPI()
+        let original = try await api.podcast(feed: "https://example.com/feed.xml")
+        let cached = try await api.detail(of: original)
+
+        XCTAssertEqual(cached, original)
+        XCTAssertEqual(DetailURLProtocol.requests.count, 1)
+
+        let refreshed = try await api.detail(of: original, forceRefresh: true)
+
+        XCTAssertEqual(refreshed.title, "Updated")
+        XCTAssertEqual(refreshed.episodes.map(\.id), [1, 2, 3, 4])
+        XCTAssertEqual(api.cachedPodcast(id: 9001, feed: original.feed), refreshed)
+        XCTAssertEqual(api.cachedPodcast(feed: original.feed), refreshed)
+        XCTAssertEqual(DetailURLProtocol.requests.map { $0.url?.path }, ["/api/feed", "/api/feed/refresh"])
+        XCTAssertEqual(DetailURLProtocol.requests.last?.httpMethod, "POST")
+    }
+
+    func testForcedFeedOnlyDetailResolvesIdentityBeforeRefreshing() async throws {
+        DetailURLProtocol.responses = [
+            "/api/feed": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3], id: nil)),
+        ]
+        defer { DetailURLProtocol.reset() }
+        let api = makeAPI()
+        let original = try await api.podcast(feed: "https://example.com/feed.xml")
+        XCTAssertNil(original.id)
+        DetailURLProtocol.responses = [
+            "/api/feed": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3])),
+            "/api/feed/refresh": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3, 4])),
+        ]
+
+        let refreshed = try await api.detail(of: original, forceRefresh: true)
+
+        XCTAssertEqual(refreshed.id, 9001)
+        XCTAssertEqual(refreshed.episodes.map(\.id), [1, 2, 3, 4])
+        XCTAssertEqual(api.cachedPodcast(feed: original.feed), refreshed)
+        XCTAssertEqual(DetailURLProtocol.requests.map { $0.url?.path }, ["/api/feed", "/api/feed", "/api/feed/refresh"])
+        XCTAssertEqual(Self.query("url", in: DetailURLProtocol.requests[1]), original.feed)
+        XCTAssertEqual(DetailURLProtocol.requests.last?.httpMethod, "POST")
+    }
+
+    func testForcedFeedOnlyDetailRefreshesWithoutBackendIdentity() async throws {
+        DetailURLProtocol.responses = [
+            "/api/feed": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3], id: nil)),
+        ]
+        defer { DetailURLProtocol.reset() }
+        let api = makeAPI()
+        let original = try await api.detail(of: Podcast(feed: "https://example.com/feed.xml", title: "Example"))
+        DetailURLProtocol.responses["/api/feed"] = try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3, 4], id: nil, title: "Updated"))
+
+        let refreshed = try await api.detail(of: original, forceRefresh: true)
+
+        XCTAssertNil(refreshed.id)
+        XCTAssertEqual(refreshed.title, "Updated")
+        XCTAssertEqual(refreshed.episodes.map(\.id), [1, 2, 3, 4])
+        XCTAssertEqual(api.cachedPodcast(feed: original.feed), refreshed)
+        XCTAssertEqual(DetailURLProtocol.requests.map { $0.url?.path }, ["/api/feed", "/api/feed"])
+    }
+
+    func testForcedDetailFailuresSurfaceAndPreserveCachedCatalogue() async throws {
+        for id in [9001, nil] as [Int?] {
+            DetailURLProtocol.responses = [
+                "/api/feed": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3], id: id)),
+            ]
+            defer { DetailURLProtocol.reset() }
+            let api = makeAPI()
+            let original = try await api.podcast(feed: "https://example.com/feed.xml", forceRefresh: true)
+            let path = id == nil ? "/api/feed" : "/api/feed/refresh"
+            DetailURLProtocol.responses = [path: Data(#"{"message":"Refresh unavailable"}"#.utf8)]
+            DetailURLProtocol.statuses = [path: 503]
+
+            do {
+                _ = try await api.detail(of: original, forceRefresh: true)
+                XCTFail("Forced refresh must report its failure")
+            } catch {
+                XCTAssertEqual((error as? APIError)?.statusCode, 503)
+            }
+
+            XCTAssertEqual(api.cachedPodcast(feed: original.feed), original)
+            let cached = try await api.detail(of: original)
+            XCTAssertEqual(cached, original)
+            XCTAssertEqual(DetailURLProtocol.requests.count, 2)
+        }
     }
 
     func testFreshPodcastResponseIsReusedByFeedAndID() async throws {
@@ -143,6 +229,12 @@ final class FeedCacheTests: XCTestCase {
         Episode(guid: guid, feed: "https://example.com/feed.xml", title: guid, file: EpisodeFile(url: "https://example.com/\(guid).mp3"))
     }
 
+    private func makeAPI() -> APIClient {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DetailURLProtocol.self]
+        return APIClient(baseURL: URL(string: "https://example.com")!, session: URLSession(configuration: configuration), keychain: FeedTestCredentials())
+    }
+
     private static func query(_ name: String, in request: URLRequest) -> String? {
         request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
             .queryItems?.first { $0.name == name }?.value
@@ -162,6 +254,14 @@ final class FeedCacheTests: XCTestCase {
             "keywords": [],
             "episodeCount": episodeCount,
         ]
+    }
+
+    private static func feedPayload(episodeIDs: [Int], id: Int? = 9001, title: String = "Example") -> [String: Any] {
+        var payload = podcastPayload(episodeCount: episodeIDs.count)
+        payload["id"] = id
+        payload["title"] = title
+        payload["episodes"] = episodeIDs.map(episodePayload)
+        return payload
     }
 
     private static func episodePayload(id: Int) -> [String: Any] {
@@ -190,8 +290,16 @@ final class FeedCacheTests: XCTestCase {
     }
 }
 
+@MainActor
+private final class FeedTestCredentials: SessionCredentialStore {
+    func read() -> String? { nil }
+    func write(_ value: String) {}
+    func delete() {}
+}
+
 private final class DetailURLProtocol: URLProtocol {
     nonisolated(unsafe) static var responses: [String: Data] = [:]
+    nonisolated(unsafe) static var statuses: [String: Int] = [:]
     nonisolated(unsafe) static var requests: [URLRequest] = []
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -209,7 +317,7 @@ private final class DetailURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: APIError(statusCode: 404, message: "Missing fixture"))
             return
         }
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        let response = HTTPURLResponse(url: url, statusCode: Self.statuses[key] ?? 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -219,6 +327,7 @@ private final class DetailURLProtocol: URLProtocol {
 
     static func reset() {
         responses = [:]
+        statuses = [:]
         requests = []
     }
 }

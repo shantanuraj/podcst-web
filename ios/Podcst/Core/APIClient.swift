@@ -75,8 +75,8 @@ public final class APIClient {
         feedCache.cached(id: id, feed: feed)
     }
 
-    public func podcast(feed: String) async throws -> Podcast {
-        try await feedCache.load(.feed(feed)) {
+    public func podcast(feed: String, forceRefresh: Bool = false) async throws -> Podcast {
+        try await feedCache.load(.feed(feed), refreshing: forceRefresh) {
             let raw: RawPodcast = try await self.get(path: "/api/feed", query: [URLQueryItem(name: "url", value: feed)])
             return self.mapPodcast(raw, feedFallback: feed)
         }
@@ -89,8 +89,9 @@ public final class APIClient {
         }
     }
 
-    public func detail(of podcast: Podcast) async throws -> Podcast {
+    public func detail(of podcast: Podcast, forceRefresh: Bool = false) async throws -> Podcast {
         if let id = podcast.id {
+            if forceRefresh { return try await refresh(podcastID: id) }
             let refresh = podcast.episodes.count <= 2 || podcast.episodes.count < podcast.episodeCount
             return try await feedCache.load(.id(id), refreshing: refresh) {
                 async let info = self.podcastInfo(id: id)
@@ -113,9 +114,9 @@ public final class APIClient {
                 )
             }
         }
-        let resolved = try await self.podcast(feed: podcast.feed)
+        let resolved = try await self.podcast(feed: podcast.feed, forceRefresh: forceRefresh)
         guard resolved.id != nil else { return resolved }
-        return try await detail(of: resolved)
+        return try await detail(of: resolved, forceRefresh: forceRefresh)
     }
 
     public func podcastInfo(id: Int) async throws -> Podcast {
