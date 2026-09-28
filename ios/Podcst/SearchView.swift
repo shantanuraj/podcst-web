@@ -31,6 +31,7 @@ struct SearchView: View {
                     }
                     ForEach(results, id: \.identity) { podcast in
                         PodcastRow(podcast: podcast)
+                            .environment(\.artworkPolicy, .memory)
                             .simultaneousGesture(TapGesture().onEnded { remember(term) })
                     }
                 } else if !recent.isEmpty {

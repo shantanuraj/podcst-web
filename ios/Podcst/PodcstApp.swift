@@ -13,6 +13,7 @@ struct PodcstApp: App {
         _api = State(initialValue: api)
         let session = SessionStore(api: api)
         _session = State(initialValue: session)
+        ArtworkStore.shared.configure(accountID: session.user?.id)
         let library = LibraryStore(api: api, session: session)
         _library = State(initialValue: library)
         PodcstAppearance.configure()
@@ -28,6 +29,7 @@ struct PodcstApp: App {
             do { try await media.switchAccount(to: accountID) }
             catch { if media.accountID != accountID { throw error } }
             playback?.switchAccount(to: accountID)
+            await ArtworkStore.shared.switchAccount(to: accountID)
             playback?.onProgress = { [weak library] update in library?.saveProgress(update) }
         }
         playback.onProgress = { [weak library] update in library?.saveProgress(update) }
@@ -36,6 +38,8 @@ struct PodcstApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .id(session.user?.id)
+                .modifier(ArtworkRetention())
                 .environment(session)
                 .environment(library)
                 .environment(playback)

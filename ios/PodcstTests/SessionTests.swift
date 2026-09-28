@@ -113,6 +113,36 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(podcast.shareURL?.absoluteString, podcast.link)
     }
 
+    func testArtworkRetentionIncludesOwnedEpisodeAndFallbackArt() {
+        let libraryCover = "https://example.test/library.jpg"
+        let fallback = "https://example.test/cover.jpg"
+        let episodeArt = "https://example.test/episode.jpg?token=private"
+        let episode = Episode(guid: "queued", feed: "https://example.test/feed", title: "Queued", cover: fallback, episodeArt: episodeArt, file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let snapshot = ArtworkRetentionSnapshot(
+            accountID: "listener",
+            podcasts: [Podcast(feed: "https://example.test/library", title: "Library", cover: libraryCover)],
+            episodes: [episode, episode]
+        )
+
+        XCTAssertEqual(snapshot.urls, Set([libraryCover, fallback, episodeArt].compactMap(URL.init(string:))))
+        XCTAssertEqual(snapshot.accountID, "listener")
+    }
+
+    func testArtworkRetentionKeepsSharedArtUntilItsLastOwnerLeaves() {
+        let cover = "https://example.test/shared.jpg"
+        let episode = Episode(guid: "download", feed: "https://example.test/feed", title: "Downloaded", cover: cover, file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let subscribed = Podcast(feed: episode.feed, title: "Subscribed", cover: cover)
+        let both = ArtworkRetentionSnapshot(accountID: "listener", podcasts: [subscribed], episodes: [episode])
+        let downloaded = ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [episode])
+        let removed = ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [])
+
+        XCTAssertEqual(both, downloaded)
+        XCTAssertFalse(downloaded.urls.isEmpty)
+        XCTAssertTrue(removed.urls.isEmpty)
+        XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "other", podcasts: [], episodes: [episode]))
+        XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [episode], isActive: false))
+    }
+
     private func fixture(status: Int? = nil) throws -> SessionFixture {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

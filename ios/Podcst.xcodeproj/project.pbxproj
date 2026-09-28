@@ -121,6 +121,10 @@
 		82189A7933BEEDF621E48A00 = {isa = PBXBuildFile; fileRef = 2804D820C382177C62E11228; };
 		0D2DAEFDC659968964551E41 = {isa = PBXBuildFile; fileRef = 2804D820C382177C62E11228; };
 		F1EBB576915CDFAD37BDEC80 = {isa = PBXBuildFile; fileRef = CCF1F07C6DEA6CCD122B6BC1; };
+		AC2800000000000000000011 = {isa = PBXBuildFile; fileRef = AC2800000000000000000001; };
+		AC2800000000000000000012 = {isa = PBXBuildFile; fileRef = AC2800000000000000000001; };
+		AC2800000000000000000013 = {isa = PBXBuildFile; fileRef = AC2800000000000000000002; };
+		AC2800000000000000000014 = {isa = PBXBuildFile; fileRef = AC2800000000000000000003; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -229,6 +233,9 @@
 		D76F7DCE83148E0977D42F4F = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackNowPlayingTests.swift; sourceTree = "<group>"; };
 		2804D820C382177C62E11228 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/LocalAudioWorker.swift; sourceTree = "<group>"; };
 		CCF1F07C6DEA6CCD122B6BC1 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRetirementTests.swift; sourceTree = "<group>"; };
+		AC2800000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStore.swift; sourceTree = "<group>"; };
+		AC2800000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkRetention.swift; sourceTree = "<group>"; };
+		AC2800000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -259,6 +266,8 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				AC2800000000000000000001,
+				AC2800000000000000000002,
 				2804D820C382177C62E11228,
 				C96F62A08467C6B284423573,
 				4A0A9B4B81C3FA0B6B09C2B6,
@@ -337,6 +346,7 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				AC2800000000000000000003,
 				CCF1F07C6DEA6CCD122B6BC1,
 				D76F7DCE83148E0977D42F4F,
 				30A1249A8DFB4652F53CE56D,
@@ -566,6 +576,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC2800000000000000000014,
 				F1EBB576915CDFAD37BDEC80,
 				D0CF9999271A713BB3876BB4,
 				35224A28FC434849EDE18D6C,
@@ -591,6 +602,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC2800000000000000000011,
+				AC2800000000000000000013,
 				82189A7933BEEDF621E48A00,
 				40591B621A00B21FAF4C2802,
 				2BD41B943113E142AF7D40DE,
@@ -639,6 +652,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC2800000000000000000012,
 				0D2DAEFDC659968964551E41,
 				C7D2332023618C336CD89BD7,
 				157F7254FC2C6775D18121A4,

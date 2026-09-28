@@ -63,7 +63,7 @@ private struct NowPlayingCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ArtworkView(url: episode.artworkURL, size: 52)
+            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 52)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Now playing").eyebrow(PodcstPalette.accent)
                 Text(episode.title)
@@ -91,7 +91,7 @@ struct QueueRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ArtworkView(url: episode.artworkURL, size: 48)
+            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
             VStack(alignment: .leading, spacing: 2) {
                 Text(episode.title)
                     .font(.serif(.body))

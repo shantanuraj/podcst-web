@@ -1,98 +1,23 @@
-import ImageIO
 import SwiftUI
 import UIKit
 
-struct ArtworkHue: Hashable, Sendable {
-    let hue: CGFloat
-    let saturation: CGFloat
+private struct ArtworkPolicyKey: EnvironmentKey {
+    static let defaultValue = ArtworkPolicy.disk
 }
 
-@MainActor
-final class ArtworkStore {
-    static let shared = ArtworkStore()
-
-    private let images: NSCache<NSURL, UIImage> = {
-        let cache = NSCache<NSURL, UIImage>()
-        cache.countLimit = 160
-        cache.totalCostLimit = 64 * 1024 * 1024
-        return cache
-    }()
-    private var hues: [URL: ArtworkHue] = [:]
-    private var requests: [URL: Task<UIImage?, Never>] = [:]
-
-    func cached(_ url: URL?) -> UIImage? {
-        url.flatMap { images.object(forKey: $0 as NSURL) }
-    }
-
-    func image(_ url: URL?) async -> UIImage? {
-        guard let url else { return nil }
-        if let cached = images.object(forKey: url as NSURL) { return cached }
-        if let request = requests[url] { return await request.value }
-        let request = Task.detached(priority: .utility) { await Self.fetch(url) }
-        requests[url] = request
-        let image = await request.value
-        requests[url] = nil
-        if let image {
-            let pixels = image.size.width * image.scale * image.size.height * image.scale
-            images.setObject(image, forKey: url as NSURL, cost: Int(pixels) * 4)
-        }
-        return image
-    }
-
-    func hue(_ url: URL?) async -> ArtworkHue? {
-        guard let url else { return nil }
-        if let hue = hues[url] { return hue }
-        guard let image = await image(url) else { return nil }
-        let hue = await Task.detached(priority: .utility) { Self.averageHue(image) }.value
-        hues[url] = hue
-        return hue
-    }
-
-    private nonisolated static func fetch(_ url: URL) async -> UIImage? {
-        guard let (data, response) = try? await URLSession.shared.data(from: url),
-              let http = response as? HTTPURLResponse,
-              200..<300 ~= http.statusCode,
-              let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else { return nil }
-        let options = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1024,
-        ] as CFDictionary
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options).map { UIImage(cgImage: $0) }
-    }
-
-    private nonisolated static func averageHue(_ image: UIImage) -> ArtworkHue? {
-        guard let cgImage = image.cgImage else { return nil }
-        let side = 12
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        let drawn = pixels.withUnsafeMutableBytes { buffer in
-            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
-            context.interpolationQuality = .medium
-            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
-            return true
-        }
-        guard drawn else { return nil }
-        let count = CGFloat(side * side * 255)
-        let channel = { (offset: Int) in CGFloat(stride(from: offset, to: pixels.count, by: 4).reduce(0) { $0 + Int(pixels[$1]) }) / count }
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        UIColor(red: channel(0), green: channel(1), blue: channel(2), alpha: 1).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        return ArtworkHue(hue: hue, saturation: min(1, saturation * 1.8))
+extension EnvironmentValues {
+    var artworkPolicy: ArtworkPolicy {
+        get { self[ArtworkPolicyKey.self] }
+        set { self[ArtworkPolicyKey.self] = newValue }
     }
 }
 
 struct ArtworkView: View {
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.artworkPolicy) private var policy
     let url: URL?
+    var fallbackURL: URL? = nil
     var size: CGFloat? = nil
-    @State private var loaded: (url: URL, image: UIImage)?
-
-    private var image: UIImage? {
-        if let loaded, loaded.url == url { return loaded.image }
-        return ArtworkStore.shared.cached(url)
-    }
 
     private var radius: CGFloat {
         guard let size else { return 16 }
@@ -104,23 +29,62 @@ struct ArtworkView: View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                if let image {
-                    Image(uiImage: image).resizable().scaledToFill()
-                } else {
-                    ZStack {
-                        PodcstPalette.surface
-                        Image(systemName: "waveform").foregroundStyle(PodcstPalette.faint)
-                    }
+                GeometryReader { geometry in
+                    ArtworkImage(url: url, fallbackURL: fallbackURL,
+                                 pixels: ArtworkStore.pixelSize(for: max(geometry.size.width, geometry.size.height), scale: displayScale),
+                                 policy: policy)
                 }
             }
             .frame(width: size, height: size)
             .clipShape(shape)
             .overlay { shape.strokeBorder(PodcstPalette.rule.opacity(0.8), lineWidth: 1) }
-            .task(id: url) {
-                guard let url, let image = await ArtworkStore.shared.image(url) else { return }
-                loaded = (url, image)
-            }
             .accessibilityHidden(true)
+    }
+}
+
+private struct ArtworkImage: View {
+    struct Identity: Hashable {
+        let url: URL?
+        let fallback: URL?
+        let pixels: Int
+        let accountID: String?
+    }
+
+    let url: URL?
+    let fallbackURL: URL?
+    let pixels: Int
+    let policy: ArtworkPolicy
+    @Environment(SessionStore.self) private var session
+    @State private var loaded: (Identity, UIImage)?
+
+    private var identity: Identity {
+        Identity(url: url, fallback: fallbackURL, pixels: pixels, accountID: session.user?.id)
+    }
+
+    private var image: UIImage? {
+        ArtworkStore.shared.cached(url, pixelSize: pixels)
+            ?? ArtworkStore.shared.cached(fallbackURL, pixelSize: pixels)
+            ?? (loaded?.0 == identity ? loaded?.1 : nil)
+    }
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                PodcstPalette.surface
+                Image(systemName: "waveform").foregroundStyle(PodcstPalette.faint)
+            }
+        }
+        .task(id: identity) {
+            let requested = identity
+            var image = await ArtworkStore.shared.image(url, pixelSize: pixels, policy: policy)
+            if image == nil, fallbackURL != url {
+                image = await ArtworkStore.shared.image(fallbackURL, pixelSize: pixels, policy: policy)
+            }
+            guard !Task.isCancelled, let image else { return }
+            loaded = (requested, image)
+        }
     }
 }
 

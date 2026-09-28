@@ -42,7 +42,8 @@ final class FeedCacheTests: XCTestCase {
             "feed": "https://example.com/feed.xml",
             "title": "Example",
             "author": "Author",
-            "thumbnail": "https://example.com/cover.jpg",
+            "cover": "https://example.com/cover.jpg",
+            "thumbnail": "https://example.com/thumbnail.jpg",
         ]
         var preview = Self.podcastPayload(episodeCount: 3)
         preview["episodes"] = [Self.episodePayload(id: 1), Self.episodePayload(id: 2)]
