@@ -2,7 +2,6 @@ import SwiftUI
 
 struct AudioSettingsView: View {
     @Environment(PlaybackController.self) private var playback
-    @Environment(\.dismiss) private var dismiss
     private let defaultsOnly: Bool
     private let podcast: AudioSettingsPodcast?
     @State private var allPodcasts = false
@@ -90,11 +89,6 @@ struct AudioSettingsView: View {
             .foregroundStyle(PodcstPalette.ink)
             .navigationTitle("Audio")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
         .tint(PodcstPalette.accent)
         .presentationDragIndicator(.visible)
