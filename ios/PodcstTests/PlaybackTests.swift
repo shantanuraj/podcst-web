@@ -1,12 +1,13 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+import Observation
 import XCTest
 @testable import Podcst
 
 @MainActor
 final class PlaybackTests: XCTestCase {
-    func testSystemAudioSessionAllowsPlaybackToReachTransport() {
+    func testSystemAudioSessionAllowsPlaybackToReachTransport() async {
         let session = AVAudioSession.sharedInstance()
         let previousCategory = session.category
         let previousMode = session.mode
@@ -29,26 +30,301 @@ final class PlaybackTests: XCTestCase {
         )
         defer {
             controller.shutdown()
-            XCTAssertNoThrow(try session.setActive(false, options: .notifyOthersOnDeactivation))
-            XCTAssertNoThrow(try session.setCategory(previousCategory, mode: previousMode, policy: previousPolicy, options: previousOptions))
             nowPlaying.nowPlayingInfo = previousInfo
             for (command, enabled) in previousCommands { command.isEnabled = enabled }
             try? FileManager.default.removeItem(at: url)
         }
 
         XCTAssertEqual(controller.state, .idle)
-        XCTAssertEqual(session.category, .playback)
-        XCTAssertEqual(session.mode, .spokenAudio)
-        XCTAssertTrue(session.categoryOptions.isEmpty)
+        let loaded = expectation(description: "System session prepared before loading")
+        transport.onLoad = { loaded.fulfill() }
         var item = episode(guid: "audio-session")
         item.file = EpisodeFile(url: url.appendingPathExtension("mp3").absoluteString)
         controller.play(item)
+        await fulfillment(of: [loaded], timeout: 3)
 
+        XCTAssertEqual(session.category, .playback)
+        XCTAssertEqual(session.mode, .spokenAudio)
+        XCTAssertTrue(session.categoryOptions.isEmpty)
         XCTAssertTrue(transport.hasSource)
         XCTAssertEqual(controller.state, .loading)
         transport.becomeReady(duration: 30)
         XCTAssertEqual(controller.state, .playing)
         XCTAssertEqual(transport.playedRates, [1])
+        controller.shutdown()
+        do {
+            try await Task.detached {
+                let session = AVAudioSession.sharedInstance()
+                try session.setActive(false, options: .notifyOthersOnDeactivation)
+                try session.setCategory(previousCategory, mode: previousMode, policy: previousPolicy, options: previousOptions)
+            }.value
+        } catch {
+            XCTFail("Could not restore audio session: \(error)")
+        }
+    }
+
+    func testPlaybackWaitsForAudioSessionAndUsesLatestRate() async {
+        let session = ControlledAudioSession()
+        let activation = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Transport loaded after activation")
+        transport.onLoad = { loaded.fulfill() }
+
+        controller.play(episode(guid: "pending"))
+        await fulfillment(of: [activation.started], timeout: 2)
+        XCTAssertEqual(controller.state, .loading)
+        XCTAssertTrue(controller.isPlaybackRequested)
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertTrue(transport.playedRates.isEmpty)
+        controller.setRate(1.5)
+
+        activation.succeed()
+        await fulfillment(of: [activation.completed, loaded], timeout: 2)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1.5])
+        XCTAssertEqual(session.activations, [true])
+    }
+
+    func testPauseCancelsPendingActivationAndRepeatedResumeStartsOnce() async {
+        let session = ControlledAudioSession()
+        let cancelled = session.request()
+        let resumed = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Resumed transport loaded once")
+        transport.onLoad = { loaded.fulfill() }
+
+        controller.play(episode(guid: "pending"))
+        await fulfillment(of: [cancelled.started], timeout: 2)
+        controller.pause()
+        cancelled.succeed()
+        await fulfillment(of: [cancelled.completed], timeout: 2)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertFalse(transport.hasSource)
+
+        controller.resume()
+        controller.resume()
+        await fulfillment(of: [resumed.started], timeout: 2)
+        XCTAssertEqual(session.activations, [true, true])
+        resumed.succeed()
+        await fulfillment(of: [resumed.completed, loaded], timeout: 2)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(transport.loadCount, 1)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testReplacedEpisodeRejectsLateActivationSuccessAndFailure() async {
+        for fails in [false, true] {
+            let session = ControlledAudioSession()
+            let obsolete = session.request()
+            let latest = session.request()
+            let transport = FakePlaybackTransport()
+            let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+            let loaded = expectation(description: "Replacement loaded")
+            transport.onLoad = { loaded.fulfill() }
+
+            controller.play(episode(guid: "obsolete"))
+            await fulfillment(of: [obsolete.started], timeout: 2)
+            controller.play(episode(guid: "latest"), at: 42)
+            await fulfillment(of: [latest.started], timeout: 2)
+            latest.succeed()
+            await fulfillment(of: [latest.completed, loaded], timeout: 2)
+            transport.becomeReady(duration: 300)
+            if fails { obsolete.fail() } else { obsolete.succeed() }
+            await fulfillment(of: [obsolete.completed], timeout: 2)
+
+            XCTAssertEqual(controller.currentEpisode?.guid, "latest")
+            XCTAssertEqual(controller.currentTime, 42)
+            XCTAssertEqual(controller.state, .playing)
+            XCTAssertTrue(controller.isPlaybackRequested)
+            XCTAssertEqual(transport.loadCount, 1)
+            XCTAssertEqual(transport.playedRates, [1])
+        }
+    }
+
+    func testSeekDuringInitialActivationLoadsLatestPosition() async {
+        let session = ControlledAudioSession()
+        let activation = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Latest seek position loaded")
+        transport.onLoad = { loaded.fulfill() }
+
+        controller.play(episode(guid: "pending"), at: 10)
+        await fulfillment(of: [activation.started], timeout: 2)
+        controller.seek(to: 90)
+        controller.seek(to: 120)
+        activation.succeed()
+        await fulfillment(of: [activation.completed, loaded], timeout: 2)
+        XCTAssertEqual(transport.position, 120)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.currentTime, 120)
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(session.activations, [true])
+    }
+
+    func testReadinessAndSeekCannotBypassPendingResumeActivation() async {
+        let session = ControlledAudioSession()
+        let configuration = session.request(activate: false)
+        let activation = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Paused source loaded")
+        let played = expectation(description: "Playback starts after activation")
+        transport.onLoad = { loaded.fulfill() }
+        transport.onPlay = { played.fulfill() }
+
+        controller.restore(episode(guid: "restored"), at: 10)
+        await fulfillment(of: [configuration.started], timeout: 2)
+        configuration.succeed()
+        await fulfillment(of: [configuration.completed, loaded], timeout: 2)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.state, .paused)
+
+        controller.resume()
+        await fulfillment(of: [activation.started], timeout: 2)
+        transport.becomeReady(duration: 300)
+        controller.seek(to: 180)
+        transport.finishSeek()
+        XCTAssertTrue(transport.playedRates.isEmpty)
+        XCTAssertEqual(controller.state, .loading)
+        activation.succeed()
+        await fulfillment(of: [activation.completed, played], timeout: 2)
+        XCTAssertEqual(controller.currentTime, 180)
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1])
+        XCTAssertEqual(session.activations, [false, true])
+    }
+
+    func testRetiringPlaybackRejectsPendingActivation() async {
+        for retirement in ["clear", "account", "shutdown", "remove"] {
+            let session = ControlledAudioSession()
+            let activation = session.request()
+            let transport = FakePlaybackTransport()
+            let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+            controller.play(episode(guid: "private"))
+            await fulfillment(of: [activation.started], timeout: 2)
+
+            switch retirement {
+            case "clear": controller.clear()
+            case "account":
+                controller.beginAccountChange()
+                controller.switchAccount(to: "another-account")
+            case "shutdown": controller.shutdown()
+            default: controller.remove(atOffsets: IndexSet(integer: 0))
+            }
+            activation.succeed()
+            await fulfillment(of: [activation.completed], timeout: 2)
+
+            XCTAssertEqual(controller.state, .idle, retirement)
+            XCTAssertFalse(controller.isPlaybackRequested, retirement)
+            XCTAssertFalse(transport.hasSource, retirement)
+            XCTAssertEqual(transport.loadCount, 0, retirement)
+            XCTAssertTrue(transport.playedRates.isEmpty, retirement)
+        }
+    }
+
+    func testTransportFailureCancelsPendingResumeActivation() async {
+        let session = ControlledAudioSession()
+        let configuration = session.request(activate: false)
+        let activation = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Paused source loaded")
+        transport.onLoad = { loaded.fulfill() }
+
+        controller.restore(episode(guid: "restored"), at: 10)
+        await fulfillment(of: [configuration.started], timeout: 2)
+        configuration.succeed()
+        await fulfillment(of: [configuration.completed, loaded], timeout: 2)
+        transport.becomeReady(duration: 300)
+        controller.resume()
+        await fulfillment(of: [activation.started], timeout: 2)
+        transport.emit(.failed)
+        activation.succeed()
+        await fulfillment(of: [activation.completed], timeout: 2)
+
+        XCTAssertEqual(controller.state, .failed)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertTrue(transport.playedRates.isEmpty)
+    }
+
+    func testActivationFailureClearsIntentAndCanBeRetried() async {
+        let session = ControlledAudioSession()
+        let failed = session.request()
+        let retried = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Retry loaded")
+        transport.onLoad = { loaded.fulfill() }
+
+        controller.play(episode(guid: "pending"))
+        await fulfillment(of: [failed.started], timeout: 2)
+        let failureObserved = expectation(description: "Controller receives activation failure")
+        withObservationTracking {
+            _ = controller.state
+        } onChange: {
+            failureObserved.fulfill()
+        }
+        failed.fail()
+        await fulfillment(of: [failed.completed, failureObserved], timeout: 2)
+        XCTAssertEqual(controller.state, .failed)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertFalse(transport.hasSource)
+
+        controller.toggle()
+        await fulfillment(of: [retried.started], timeout: 2)
+        retried.succeed()
+        await fulfillment(of: [retried.completed, loaded], timeout: 2)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testInterruptionDuringActivationResumesOnlyAfterNewActivation() async {
+        let session = ControlledAudioSession()
+        let interrupted = session.request()
+        let resumed = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+        let loaded = expectation(description: "Interrupted playback resumed")
+        transport.onLoad = { loaded.fulfill() }
+
+        controller.play(episode(guid: "pending"))
+        await fulfillment(of: [interrupted.started], timeout: 2)
+        controller.handleInterruption(typeRaw: 1, optionsRaw: nil)
+        interrupted.succeed()
+        await fulfillment(of: [interrupted.completed], timeout: 2)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(transport.hasSource)
+
+        controller.handleInterruption(typeRaw: 0, optionsRaw: 1)
+        await fulfillment(of: [resumed.started], timeout: 2)
+        resumed.succeed()
+        await fulfillment(of: [resumed.completed, loaded], timeout: 2)
+        transport.becomeReady(duration: 300)
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testRouteDisconnectionCancelsPendingActivation() async {
+        let session = ControlledAudioSession()
+        let activation = session.request()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, prepareAudioSession: { try await session.prepare($0) })
+
+        controller.play(episode(guid: "pending"))
+        await fulfillment(of: [activation.started], timeout: 2)
+        controller.handleRouteChange(reasonRaw: 2)
+        activation.succeed()
+        await fulfillment(of: [activation.completed], timeout: 2)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertTrue(transport.playedRates.isEmpty)
     }
 
     func testPlaybackStateBelongsToItsAccountAndSwitchingClearsIt() {
@@ -459,9 +735,9 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(transport.changedRates, [1, 1.25, 2, 1.25])
     }
 
-    private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil) -> PlaybackController {
+    private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil) -> PlaybackController {
         let url = persistenceURL ?? temporaryURL()
-        let controller = PlaybackController(transport: transport, persistenceURL: url, monotonicTime: { clock.time })
+        let controller = PlaybackController(transport: transport, persistenceURL: url, monotonicTime: { clock.time }, prepareAudioSession: prepareAudioSession)
         addTeardownBlock {
             await MainActor.run { controller.shutdown() }
             try? FileManager.default.removeItem(at: url)
@@ -476,6 +752,66 @@ final class PlaybackTests: XCTestCase {
     private func temporaryURL() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("json")
     }
+}
+
+@MainActor
+private final class ControlledAudioSession {
+    private var requests: [PendingAudioSessionRequest] = []
+    private(set) var activations: [Bool] = []
+
+    func request(activate: Bool = true) -> PendingAudioSessionRequest {
+        let request = PendingAudioSessionRequest(activate: activate)
+        requests.append(request)
+        return request
+    }
+
+    func prepare(_ activate: Bool) async throws {
+        let index = activations.count
+        activations.append(activate)
+        guard requests.indices.contains(index) else {
+            XCTFail("Unexpected audio session preparation")
+            throw AudioSessionTestError.failed
+        }
+        let request = requests[index]
+        XCTAssertEqual(activate, request.activate)
+        try await request.wait()
+    }
+}
+
+@MainActor
+private final class PendingAudioSessionRequest {
+    let activate: Bool
+    let started = XCTestExpectation(description: "Audio session preparation started")
+    let completed = XCTestExpectation(description: "Audio session preparation completed")
+    private var continuation: CheckedContinuation<Void, any Error>?
+
+    init(activate: Bool) {
+        self.activate = activate
+    }
+
+    func wait() async throws {
+        defer { completed.fulfill() }
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            started.fulfill()
+        }
+    }
+
+    func succeed() {
+        guard let continuation else { XCTFail("No audio session preparation to complete"); return }
+        self.continuation = nil
+        continuation.resume()
+    }
+
+    func fail() {
+        guard let continuation else { XCTFail("No audio session preparation to fail"); return }
+        self.continuation = nil
+        continuation.resume(throwing: AudioSessionTestError.failed)
+    }
+}
+
+private enum AudioSessionTestError: Error {
+    case failed
 }
 
 @MainActor
@@ -496,6 +832,9 @@ private final class FakePlaybackTransport: PlaybackTransport {
     var playedRates: [Double] = []
     var changedRates: [Double] = []
     var shutdownCount = 0
+    var onLoad: (() -> Void)?
+    var onPlay: (() -> Void)?
+    var loadCount = 0
     private var ready = false
     private var isPlaying = false
     private var duration: TimeInterval = 0
@@ -505,6 +844,8 @@ private final class FakePlaybackTransport: PlaybackTransport {
         self.generation = generation
         hasSource = true
         ready = false
+        loadCount += 1
+        onLoad?()
     }
 
     func becomeReady(duration: TimeInterval) {
@@ -517,6 +858,7 @@ private final class FakePlaybackTransport: PlaybackTransport {
         guard ready else { return }
         playedRates.append(rate)
         if !isPlaying { emit(.playback(isPlaying: true)) }
+        onPlay?()
     }
 
     func pause() {
