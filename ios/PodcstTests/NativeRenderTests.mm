@@ -229,7 +229,7 @@ struct PodcstTestPlanarList {
         };
         PodcstOutputTelemetryInfo info = {};
         XCTAssertEqual(render(&flags, &stamp, quantum, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
-        XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], 0);
+        XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum throughOutputFrame:UINT64_MAX info:&info], 0);
         XCTAssertEqual(unit.droppedTelemetryFrames, 0);
         const uint64_t storage = unit.allocatedBytes;
         unit.telemetryEnabled = YES;
@@ -243,9 +243,11 @@ struct PodcstTestPlanarList {
                 }
             }
             const uint32_t expected = std::min(64u, 32768u / quantum);
-            XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum - 1 info:&info], 0);
+            XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum - 1 throughOutputFrame:UINT64_MAX info:&info], 0);
             for (uint32_t packet = 0; packet < expected; ++packet) {
-                XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], quantum);
+                const uint64_t end = start + uint64_t(packet + 1) * quantum;
+                XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum throughOutputFrame:end - 1 info:&info], 0);
+                XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum throughOutputFrame:end info:&info], quantum);
                 XCTAssertEqual(info.outputStartFrame, start + packet * quantum);
                 XCTAssertEqual(info.frameCount, quantum);
                 XCTAssertEqual(info.channels, 2);
@@ -256,13 +258,13 @@ struct PodcstTestPlanarList {
                     XCTAssertEqual(captured[frame * 2 + 1], -0.5f);
                 }
             }
-            XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], 0);
+            XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum throughOutputFrame:UINT64_MAX info:&info], 0);
             XCTAssertEqual(unit.droppedTelemetryFrames, uint64_t(pass + 1) * (70 - expected) * quantum);
         }
         XCTAssertEqual(unit.allocatedBytes, storage);
         unit.telemetryEnabled = NO;
         XCTAssertEqual(render(&flags, &stamp, quantum, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
-        XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], 0);
+        XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum throughOutputFrame:UINT64_MAX info:&info], 0);
         [unit reset];
         XCTAssertEqual(unit.droppedTelemetryFrames, 0);
         [unit deallocateRenderResources];
@@ -289,7 +291,7 @@ struct PodcstTestPlanarList {
     };
     XCTAssertEqual(render(&flags, &stamp, 2048, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
     PodcstOutputTelemetryInfo info = {};
-    XCTAssertEqual([unit copyTelemetryFrames:captured capacity:2048 info:&info], 2048);
+    XCTAssertEqual([unit copyTelemetryFrames:captured capacity:2048 throughOutputFrame:UINT64_MAX info:&info], 2048);
     XCTAssertGreaterThan(info.limiterReductionDB, 6.0f);
     for (float sample : captured) { XCTAssertLessThanOrEqual(sample, 0.9f); }
     [unit reset];

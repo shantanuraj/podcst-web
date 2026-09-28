@@ -167,12 +167,12 @@ struct RenderContext {
         telemetryWritePacket.store(writePacket + 1, std::memory_order_release);
     }
 
-    uint32_t copyTelemetry(float *samples, uint32_t capacity, PodcstOutputTelemetryInfo *info) {
+    uint32_t copyTelemetry(float *samples, uint32_t capacity, uint64_t throughOutputFrame, PodcstOutputTelemetryInfo *info) {
         if (!samples || !info) { return 0; }
         const uint64_t readPacket = telemetryReadPacket.load(std::memory_order_relaxed);
         if (readPacket == telemetryWritePacket.load(std::memory_order_acquire)) { return 0; }
         const auto &packet = telemetryPackets[readPacket % packetCapacity];
-        if (capacity < packet.info.frameCount) { return 0; }
+        if (capacity < packet.info.frameCount || packet.info.outputStartFrame + packet.info.frameCount > throughOutputFrame) { return 0; }
         *info = packet.info;
         for (uint32_t frame = 0; frame < info->frameCount; ++frame) {
             const uint64_t storageFrame = (packet.storageStart + frame) % telemetryCapacity;
@@ -389,8 +389,8 @@ bool SupportedFormat(AVAudioFormat *format) {
 - (void)setTelemetryEnabled:(BOOL)enabled { _context->telemetryEnabled.store(enabled, std::memory_order_relaxed); }
 - (uint64_t)droppedTelemetryFrames { return _context->droppedTelemetryFrames.load(std::memory_order_relaxed); }
 
-- (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity info:(PodcstOutputTelemetryInfo *)info {
-    return _context->copyTelemetry(samples, capacity, info);
+- (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity throughOutputFrame:(uint64_t)throughOutputFrame info:(PodcstOutputTelemetryInfo *)info {
+    return _context->copyTelemetry(samples, capacity, throughOutputFrame, info);
 }
 
 - (BOOL)configureLimiterEnabled:(BOOL)enabled error:(NSError **)error {
