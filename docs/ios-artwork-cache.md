@@ -14,6 +14,27 @@ Per-process admission is limited to eight active requests. Additional requests r
 
 Search responses now include the full `cover` URL alongside `thumbnail`. iTunes search already supplied cover artwork; database URL search now supplies it too. A 100-pixel search thumbnail is insufficient for the native 156-pixel row frame.
 
+## Native cache implementation
+
+The shared `ArtworkStore` chooses its decoded size from the resolved view dimensions and display scale. Rows and the mini player generally use 160 pixels, Library covers and the Discover feature use 384, and full-player and system artwork use 1024. Larger layouts can request larger originals. ImageIO downsamples off the main actor without first decoding the original at full resolution. Rectangular sources retain enough pixels for a square aspect-fill frame, and small sources are never upscaled by the decoder.
+
+One account-scoped store owns compressed artwork in Application Support, excluded from backup. Canonical source identity deduplicates direct and existing proxied URLs; one larger stored representation can supply several smaller decoded sizes. Signed source query parameters are preserved. The policy is:
+
+| Use | Retention |
+| --- | --- |
+| Library covers | Persist while subscribed; prefetch the 1024-pixel variant for detail and offline use |
+| Current, queued, and downloaded episodes | Persist episode artwork and podcast-cover fallback while referenced |
+| Library's three visible new releases | Prefetch and retain their artwork with the Library snapshot |
+| Discover | Prefetch chart artwork to disk at its browsing size |
+| Other browsing | Least-recently-used eviction within a 64 MiB compressed disk allowance |
+| Search-only results | An 8 MiB compressed memory cache; promote the existing bytes when retained elsewhere |
+
+Retained artwork is outside the disposable browsing allowance and has no age-based deletion. Its owners are derived from Library, queue, and downloads, rather than stored as another source of truth. Removing one owner leaves artwork available to the others. Signing out or switching accounts cancels pending work and removes the previous account's artwork directory.
+
+Freshness is independent of retention. Cached images remain visible during background revalidation and failed requests, including offline relaunch. A smaller cached variant appears immediately while a larger one downloads, then the view updates when the larger version is ready. ETag and Last-Modified validators avoid retransferring unchanged content. The default freshness is one day, with server max-age capped at seven days; expiration does not delete useful artwork. The store uses three concurrent transfers across all hosts and a 32 MiB decoded-image cache. View-held images and system artwork remain additional memory, so these limits are not a bound on whole-app footprint.
+
+The system Now Playing artwork callback reuses the loaded image or returns a requested-size thumbnail. It no longer encodes a JPEG and decodes it again for lock-screen requests. Existing download availability continues to represent audio availability; retained artwork alone does not mark an episode downloaded.
+
 ## Measured image format choice
 
 The exact 30 public cover files collected for the baseline were resized locally with Sharp 0.34.5. Each original was encoded once per size and format. All 30 source covers were square; repeating the 90 WebP transformations after changing the service to square cropping produced identical byte totals. Times include source decoding, orientation, resizing, and encoding; decode timings use Sharp on the Mac, not iPhone ImageIO. They are an indicative single pass under local system load, not a controlled server throughput benchmark.
@@ -48,6 +69,14 @@ A separate local encoding comparison of the same JSON yielded 5,564 bytes with g
 
 No Next.js compression configuration was changed, and no custom native decoder was added.
 
+## Client verification
+
+The full iOS 27 suite passed 166 tests after the cache integration. The affected iOS 18 subset passed 37 tests. A later refinement added two regression tests for immediate previews during stalled or failed larger-variant downloads; all 39 affected tests passed on the requested iOS 27.0 iPhone 18 Pro simulator (`2F9B3ABC-48D9-47C5-BD23-CE623450DECB`). These tests cover offline relaunch, retained ownership, memory-to-disk promotion, stale revalidation, missing bodies, concurrent requests, account cleanup, signed URLs, and system artwork callbacks. The proxy passed 17 tests with 82 assertions and strict TypeScript validation.
+
+The updated app was installed without clearing existing simulator data. Discover rows, the mini player, Queue, and the full player displayed artwork after relaunch. A read-only audit after browsing and chart refresh found all 30 current Discover covers, plus the current episode's preferred artwork and podcast-cover fallback. The store contained 33 image files totaling 22,691,205 bytes, with no missing indexed files. The simulator's guest Library had no subscriptions, so that run does not verify a populated Library UI. Library retention is covered by the automated ownership and offline tests.
+
+The saved image headers confirmed that the production proxy still returned oversized JPEG/PNG originals for its sized requests. These disk totals validate retention, not the projected WebP transfer savings. A 140.8-second Immediate-mode Instruments HTTP recording on this simulator produced no task, transaction, or HAR records, including no control API requests. It is inconclusive and cannot support a zero-network claim. Simulated network failures in tests verify offline cache behavior; they are not a claim that airplane-mode playback was exercised. Simulator memory also cannot replace the physical iPhone baseline.
+
 ## Deployment and verification
 
 1. Update the `img_proxy` checkout at `/opt/img_proxy` through the existing deployment process, install dependencies there with `bun install --frozen-lockfile`, and restart `podcst-img-proxy.service`. Install Sharp for the server's OS and architecture, rather than copying Mac dependencies. The tracked `systemd/podcst-img-proxy.service` runs Bun as `svc-podcst`, with its existing sandboxing and loopback binding retained. No service-unit change is needed for this release.
@@ -55,4 +84,4 @@ No Next.js compression configuration was changed, and no custom native decoder w
 3. Deploy `podcst-web` so database search returns `cover`, then release the native client. No database migration is needed for these server changes.
 4. Repeat the physical-device baseline sequence with cold and warm caches, then test offline relaunch. Attribute transfer reductions to live resized responses only after verifying their dimensions. Preserve the original baseline rather than replacing its whole-app memory measurements with theoretical buffer savings.
 
-No production deployment or database mutation was performed as part of this implementation. Local comparison evidence is under `/tmp/podcst-image-audit-20260928/`: `proxy-resize-measurement.json`, `modern-artwork-formats.json`, `api-compression-headers.json`, and `api-local-compression.json`. Only aggregate measurements appear here; private source URLs, account state, and cached private images are excluded.
+No production deployment or database mutation was performed as part of this implementation. Local comparison evidence is under `/tmp/podcst-image-audit-20260928/`: `proxy-resize-measurement.json`, `modern-artwork-formats.json`, `api-compression-headers.json`, `api-local-compression.json`, `simulator-artwork-after-ui-safe.json`, and `simulator-http-capture-summary.json`. Only aggregate measurements appear here; private source URLs, account state, and cached private images are excluded.

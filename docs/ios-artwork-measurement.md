@@ -1,6 +1,6 @@
 # iOS artwork measurements
 
-Measured September 28, 2026; source audited at commit `5362369`. This is a baseline and a proposal for discussion; no image-loading or caching changes were made. Subsequent implementation decisions and transport measurements are recorded in [Artwork sizing and transport](ios-artwork-cache.md).
+Measured September 28, 2026; source audited at commit `5362369`. This records the baseline before image-loading and caching changes. References to the current loader below describe that commit. The subsequent implementation and transport measurements are recorded in [Artwork sizing and transport](ios-artwork-cache.md).
 
 The current loader reduces decoding to a maximum of 1024 pixels, but downloads the complete source image for every frame size. The existing HTTP cache does reuse images, yet it does not guarantee that library or queue artwork remains available offline. Smaller decoded variants and deliberate disk retention address different problems and should be evaluated separately.
 
@@ -107,7 +107,7 @@ Discover coverage improved from six to twelve covers, but **18 covers totaling 1
 
 The initial Instruments Network Connections recording crashed and the first HTTP-only run produced incomplete HAR data. The Immediate-mode HTTP recording above resolved that measurement gap. A true offline relaunch has not been tested; neither cache inspection nor a warm revisit substitutes for that test.
 
-## Proposed direction, not yet implemented
+## Recommendations from the baseline
 
 1. **Size images for their use.** Pass resolved frame size and display scale into the shared loader. Start with 160-pixel rows, 384-pixel Library/Discover browsing artwork, and 1024-pixel large artwork. Select the smallest sufficient bucket, bounded by source dimensions; never upscale a small source merely to fill a bucket. Derive smaller decoded variants from a larger source already available locally, and upgrade browsing artwork when a full image is needed. Retain the larger source fallback when no suitable remote variant exists. Use measured frame requirements for larger layouts rather than assuming these three sizes cover every device.
 2. **Reduce transfer at the source where supported.** The repository only establishes the assets proxy's `p=sourceURL` contract; its server implementation and resizing contract are absent. Verify or implement server resizing before adding any width parameters. Keep source identity separate from size variants so list and player artwork can share retrieval without always downloading full originals. Do not introduce new public-proxy routing for private artwork.
