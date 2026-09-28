@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -220,4 +219,3 @@ struct LocalAudioHarnessView: View {
             : String(format: "%d:%02d", value / 60, value % 60)
     }
 }
-#endif

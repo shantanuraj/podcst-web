@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "F75109BEB4DD8800DA6B45F8"
-               BuildableName = "Podcst.app"
-               BlueprintName = "Podcst"
+               BlueprintIdentifier = "AB1000000000000000000010"
+               BuildableName = "AudioLab.app"
+               BlueprintName = "AudioLab"
                ReferencedContainer = "container:Podcst.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -43,16 +43,16 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "F75109BEB4DD8800DA6B45F8"
-            BuildableName = "Podcst.app"
-            BlueprintName = "Podcst"
+            BlueprintIdentifier = "AB1000000000000000000010"
+            BuildableName = "AudioLab.app"
+            BlueprintName = "AudioLab"
             ReferencedContainer = "container:Podcst.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "-LocalAudioHarness"
-            isEnabled = "YES">
+            argument = "-AudioLabReference"
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>
@@ -66,9 +66,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "F75109BEB4DD8800DA6B45F8"
-            BuildableName = "Podcst.app"
-            BlueprintName = "Podcst"
+            BlueprintIdentifier = "AB1000000000000000000010"
+            BuildableName = "AudioLab.app"
+            BlueprintName = "AudioLab"
             ReferencedContainer = "container:Podcst.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

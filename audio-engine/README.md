@@ -278,8 +278,8 @@ by name or RSS feed link, then select a podcast and episode. The episode list al
 supports title filtering. Choose **Open audio file** to select a local audio file.
 Selected podcast episodes offer **Download** and **Play download** for repeatable
 comparisons using the same completed file with either engine.
-The launch argument `-LocalAudioHarness` selects this debug-only entry point;
-normal launches use the web-backed app. The lab uses `RoutingAudioTransport`
+The scheme builds the `AudioLab` target, a separate app installed beside Podcst
+with its own bundle identifier, icon and entry point. The lab uses `RoutingAudioTransport`
 with the existing `PlaybackController`, so streaming, decoding, seeking, speed,
 audio sessions, interruptions and Now Playing use the production path. Lab media
 has its own cache, and test playback never updates subscriptions or listening

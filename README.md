@@ -197,10 +197,11 @@ The client uses the web API for discovery, feed indexing, subscriptions, authent
 
 Development of Volume Boost, Trim Silence, and native audio playback follows the [two-milestone audio experience plan](docs/audio-experience-plan.md).
 
-Choose the **Podcst Audio Lab** scheme to run the development player. Open a local
-audio file to exercise the native backend, speed, seeking and lock-screen controls.
-The lab uses a separate temporary playback state and does not sync progress to
-the server. Normal podcast playback still uses AVPlayer. See the
+Choose the **Podcst Audio Lab** scheme to run the development player. It builds
+**Audio Lab**, a separate app (`app.podcst.ios.audiolab`) that installs beside
+Podcst. Open a local audio file to exercise the native backend, speed, seeking
+and lock-screen controls. The lab uses a separate temporary playback state and
+does not sync progress to the server. Normal podcast playback still uses AVPlayer. See the
 [local audio harness instructions](audio-engine/README.md#local-ios-audio-lab)
 for its current timing policy and validation limits.
 
