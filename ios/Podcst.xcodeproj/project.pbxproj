@@ -103,6 +103,19 @@
 		AB1000000000000000000035 = {isa = PBXBuildFile; fileRef = 2FF58CC5CDAD096FA7DE89F1; };
 		AB1000000000000000000031 = {isa = PBXBuildFile; fileRef = AB1000000000000000000021; };
 		AB1000000000000000000032 = {isa = PBXBuildFile; fileRef = AB1000000000000000000022; };
+		C6D5778C51D9818D1993865F = {isa = PBXBuildFile; fileRef = 1C8D790B0680332B67AD4D78; };
+		E7968722E97668A45D8C589A = {isa = PBXBuildFile; fileRef = 1C8D790B0680332B67AD4D78; };
+		2BD41B943113E142AF7D40DE = {isa = PBXBuildFile; fileRef = 4A0A9B4B81C3FA0B6B09C2B6; };
+		A5D41C5980F53DF441B6F24B = {isa = PBXBuildFile; fileRef = 4A0A9B4B81C3FA0B6B09C2B6; };
+		40591B621A00B21FAF4C2802 = {isa = PBXBuildFile; fileRef = C96F62A08467C6B284423573; };
+		271ECE1C2989812631696FC6 = {isa = PBXBuildFile; fileRef = C96F62A08467C6B284423573; };
+		54DE3C565A20C8A6F59F7004 = {isa = PBXBuildFile; fileRef = 4D9F13472DBF461ED5F6D58E; };
+		E82783F30BFA26C5D55FE689 = {isa = PBXBuildFile; fileRef = 2AB743E4ADA8F159A37D017C; };
+		FE29041F6C9214B6F4681CCD = {isa = PBXBuildFile; fileRef = 38C22A5AA53107A39CB0D89D; };
+		511C95E86F50246997EF70AD = {isa = PBXBuildFile; fileRef = 0065D03CD093FEF4214AB838; };
+		BDF5D5EBC3D268368AABF26A = {isa = PBXBuildFile; fileRef = B3DCC8C092A2135095B93AD7; };
+		157F7254FC2C6775D18121A4 = {isa = PBXBuildFile; fileRef = 16002EED7D5BD78F0FC19E6C; };
+		C7D2332023618C336CD89BD7 = {isa = PBXBuildFile; fileRef = 90F2ADBE7B36EF07CB46E1CF; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -197,6 +210,16 @@
 		AB1000000000000000000022 = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB1000000000000000000023 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB1000000000000000000024 = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		1C8D790B0680332B67AD4D78 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/AudioInspection.swift"; sourceTree = "<group>"; };
+		4A0A9B4B81C3FA0B6B09C2B6 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/AudioSignalMeter.swift"; sourceTree = "<group>"; };
+		C96F62A08467C6B284423573 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/AudioComparison.swift"; sourceTree = "<group>"; };
+		4D9F13472DBF461ED5F6D58E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioInspectionTests.swift"; sourceTree = "<group>"; };
+		2AB743E4ADA8F159A37D017C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioSignalMeterTests.swift"; sourceTree = "<group>"; };
+		38C22A5AA53107A39CB0D89D = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioComparisonTests.swift"; sourceTree = "<group>"; };
+		0065D03CD093FEF4214AB838 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioLabInspectionSession.swift"; sourceTree = "<group>"; };
+		B3DCC8C092A2135095B93AD7 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioLabInspectorView.swift"; sourceTree = "<group>"; };
+		16002EED7D5BD78F0FC19E6C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioLabComparisonView.swift"; sourceTree = "<group>"; };
+		90F2ADBE7B36EF07CB46E1CF = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioLabFixtures.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -227,6 +250,9 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				C96F62A08467C6B284423573,
+				4A0A9B4B81C3FA0B6B09C2B6,
+				1C8D790B0680332B67AD4D78,
 				803D70EC12218D1A1A8668EE,
 				F51489B7D9F10CD28113E8D5,
 				4ECB540D702E141A18DDE982,
@@ -301,6 +327,9 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				38C22A5AA53107A39CB0D89D,
+				2AB743E4ADA8F159A37D017C,
+				4D9F13472DBF461ED5F6D58E,
 				9D5CECAB09B2F497B2D8B156,
 				18E14DA3DD9ED2F8E6C11FEF,
 				069B4F2A62D3542804C4B51C,
@@ -320,6 +349,10 @@
 		AB1000000000000000000020 /* AudioLab */ = {
 			isa = PBXGroup;
 			children = (
+				90F2ADBE7B36EF07CB46E1CF,
+				16002EED7D5BD78F0FC19E6C,
+				B3DCC8C092A2135095B93AD7,
+				0065D03CD093FEF4214AB838,
 				AB1000000000000000000021,
 				D92800000000000000000001,
 				A01500000000000000000006 /* LocalAudioHarnessView.swift */,
@@ -389,6 +422,7 @@
 				AB1000000000000000000011 /* Sources */,
 				AB1000000000000000000012 /* Frameworks */,
 				AB1000000000000000000013 /* Resources */,
+				AB1000000000000000000040,
 			);
 			buildRules = (
 			);
@@ -499,6 +533,19 @@
 			shellPath = /bin/bash;
 			shellScript = "bash \"$SRCROOT/scripts/build-test-audio.sh\"";
 		};
+		AB1000000000000000000040 = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/scripts/audio-lab-build-metadata.sh");
+			name = "Stamp Audio Lab build";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/AudioLabBuild.json");
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "/bin/bash \"$SRCROOT/scripts/audio-lab-build-metadata.sh\"";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -506,6 +553,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FE29041F6C9214B6F4681CCD,
+				E82783F30BFA26C5D55FE689,
+				54DE3C565A20C8A6F59F7004,
 				7693D81C239C225BC1344815,
 				3FBEDBE118BCE9D655083028,
 				60395D230B1BE0B0918BEA42,
@@ -525,6 +575,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				40591B621A00B21FAF4C2802,
+				2BD41B943113E142AF7D40DE,
+				C6D5778C51D9818D1993865F,
 				01831B70CA7AE0D8732FD73F,
 				5EF630DE2C85684AA6F0151F,
 				C0D52B7E04F2923BCB429365,
@@ -569,6 +622,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7D2332023618C336CD89BD7,
+				157F7254FC2C6775D18121A4,
+				BDF5D5EBC3D268368AABF26A,
+				511C95E86F50246997EF70AD,
+				271ECE1C2989812631696FC6,
+				A5D41C5980F53DF441B6F24B,
+				E7968722E97668A45D8C589A,
 				AB1000000000000000000031,
 				D92800000000000000000002,
 				A01500000000000000000016 /* LocalAudioHarnessView.swift in Sources */,
@@ -722,6 +782,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = AB1000000000000000000024;
 			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = AudioLab/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios.audiolab;
 				PRODUCT_NAME = AudioLab;
@@ -732,6 +793,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = AB1000000000000000000024;
 			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = AudioLab/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = app.podcst.ios.audiolab;
 				PRODUCT_NAME = AudioLab;
