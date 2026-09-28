@@ -201,22 +201,137 @@ final class MediaTests: XCTestCase {
         XCTAssertTrue(MediaStore(accountID: "one", rootURL: root).downloadedEpisodes.isEmpty)
     }
 
-    func testRouterReleaseDuringPreparationAllowsAccountSwitchWithoutLeakedPin() async throws {
-        for waitForNetwork in [false, true] {
-            let server = try MediaHTTPServer(data: payload(count: 350_000), delay: 2)
+    func testSystemRouterStreamsWithoutCustomPreflightOrDownloadPromotion() async throws {
+        let data = try mp3Fixture()
+        let server = try MediaHTTPServer(data: data, mode: .ignoreRange, contentType: "audio/mpeg")
+        let url = try await server.start()
+        defer { server.stop() }
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let router = RoutingAudioTransport(media: media, preferSystemPlayback: true)
+        defer { router.shutdown() }
+        var readyCount = 0
+        var failed = false
+        router.onUpdate = { update in
+            if case .ready = update.event { readyCount += 1 }
+            if case .failed = update.event { failed = true }
+        }
+        let episode = episode(url: url)
+        router.setEffects(AudioEffects(volumeBoost: true, trimSilence: true))
+        router.load(source: .episode(episode), at: 3.25, generation: UUID())
+        for _ in 0..<500 {
+            if readyCount > 0 || failed { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(failed)
+        XCTAssertEqual(readyCount, 1)
+        XCTAssertEqual(router.position, 3.25, accuracy: 0.05)
+        XCTAssertEqual(router.activeBackend, .system)
+        XCTAssertNil(router.diagnostics)
+        let probe = try await media.pin(episode)
+        let snapshot = await probe.byteSource.snapshot()
+        XCTAssertNil(snapshot.metadata)
+        XCTAssertEqual(snapshot.storedBytes, 0)
+        await probe.release()
+        try await media.remove(episode)
+        try await media.download(episode)
+        router.setEffects(AudioEffects())
+        router.setEffects(AudioEffects(volumeBoost: true, trimSilence: true))
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(readyCount, 1)
+        XCTAssertEqual(router.activeBackend, .system)
+        XCTAssertEqual(router.position, 3.25, accuracy: 0.05)
+        try await media.remove(episode)
+        await router.releaseMedia()
+        XCTAssertNil(router.activeBackend)
+        try await media.switchAccount(to: "two")
+    }
+
+    func testSystemRouterRetainsCompletedFilesOfflineUntilReleased() async throws {
+        for durable in [false, true] {
+            let data = try mp3Fixture()
+            let server = try MediaHTTPServer(data: data, contentType: "audio/mpeg")
             let url = try await server.start()
             let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
-            let router = RoutingAudioTransport(media: media)
-            router.load(source: .episode(episode(url: url)), at: 0, generation: UUID())
-            if waitForNetwork { try await waitForRequests(server, count: 1) }
-            let start = ContinuousClock.now
-            await router.releaseMedia()
-            XCTAssertLessThan(start.duration(to: .now), .seconds(1), "A canceled consumer must not wait for the shared network transfer")
-            try await media.switchAccount(to: "two")
-            XCTAssertEqual(media.accountID, "two")
-            XCTAssertTrue(media.downloadedEpisodes.isEmpty)
-            router.shutdown()
+            let episode = episode(url: url)
+            if durable { try await media.download(episode) }
+            else {
+                let lease = try await media.pin(episode)
+                _ = try await lease.byteSource.materialize()
+                await lease.release()
+            }
             server.stop()
+            let router = RoutingAudioTransport(media: media, preferSystemPlayback: true)
+            var ready = false
+            var failed = false
+            router.onUpdate = { update in
+                if case .ready = update.event { ready = true }
+                if case .failed = update.event { failed = true }
+            }
+            router.load(source: .episode(episode), at: 15.375, generation: UUID())
+            for _ in 0..<500 {
+                if ready || failed { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            XCTAssertTrue(ready)
+            XCTAssertFalse(failed)
+            XCTAssertEqual(router.activeBackend, .system)
+            XCTAssertEqual(router.position, 15.375, accuracy: 0.05)
+            do { try await media.remove(episode); XCTFail("AVPlayer must retain its local playback lease") }
+            catch { XCTAssertEqual(error as? MediaFailure, .pinned) }
+            await router.releaseMedia()
+            try await media.remove(episode)
+            try await media.switchAccount(to: "two")
+            router.shutdown()
+        }
+    }
+
+    func testSystemRouterPlaysLocalFilesAndCancelsPendingReplacement() async throws {
+        let fixture = try XCTUnwrap(Bundle(for: MediaTests.self).url(forResource: "progressive-vbr", withExtension: "mp3"))
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let router = RoutingAudioTransport(media: media, preferSystemPlayback: true)
+        defer { router.shutdown() }
+        let generation = UUID()
+        var ready = false
+        var failed = false
+        router.onUpdate = { update in
+            XCTAssertEqual(update.generation, generation)
+            if case .ready = update.event { ready = true }
+            if case .failed = update.event { failed = true }
+        }
+        let invalid = Episode(id: 43, guid: "invalid", feed: "https://example.test/feed", title: "Invalid", file: EpisodeFile(url: "http://["))
+        router.load(source: .episode(invalid), at: 0, generation: UUID())
+        router.load(source: .url(fixture), at: 6.5, generation: generation)
+        for _ in 0..<500 {
+            if ready || failed { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(ready)
+        XCTAssertFalse(failed)
+        XCTAssertEqual(router.activeBackend, .system)
+        XCTAssertEqual(router.position, 6.5, accuracy: 0.05)
+        await router.releaseMedia()
+        XCTAssertFalse(router.hasSource)
+        try await media.switchAccount(to: "two")
+    }
+
+    func testRouterReleaseDuringPreparationAllowsAccountSwitchWithoutLeakedPin() async throws {
+        for preferSystemPlayback in [false, true] {
+            for waitForNetwork in [false, true] {
+                let server = try MediaHTTPServer(data: payload(count: 350_000), delay: 2)
+                let url = try await server.start()
+                let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+                let router = RoutingAudioTransport(media: media, preferSystemPlayback: preferSystemPlayback)
+                router.load(source: .episode(episode(url: url)), at: 0, generation: UUID())
+                if waitForNetwork { try await waitForRequests(server, count: 1) }
+                let start = ContinuousClock.now
+                await router.releaseMedia()
+                XCTAssertLessThan(start.duration(to: .now), .seconds(1), "A canceled consumer must not wait for the shared network transfer")
+                try await media.switchAccount(to: "two")
+                XCTAssertEqual(media.accountID, "two")
+                XCTAssertTrue(media.downloadedEpisodes.isEmpty)
+                router.shutdown()
+                server.stop()
+            }
         }
     }
 
@@ -298,6 +413,8 @@ final class MediaTests: XCTestCase {
         XCTAssertFalse(failed)
         XCTAssertEqual(try XCTUnwrap(readyDuration), 1, accuracy: 0.1)
         XCTAssertTrue(unavailable)
+        XCTAssertEqual(router.activeBackend, .systemFallback)
+        XCTAssertNil(router.diagnostics)
         do { try await media.remove(episode); XCTFail("The downloaded fallback must retain its playback lease") }
         catch { XCTAssertEqual(error as? MediaFailure, .pinned) }
         await router.releaseMedia()
