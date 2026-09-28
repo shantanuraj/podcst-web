@@ -777,7 +777,7 @@ public final class PlaybackController {
     }
 }
 
-private enum PlaybackAudioSession {
+enum PlaybackAudioSession {
     private static let queue = DispatchQueue(label: "app.podcst.audio-session", qos: .userInitiated)
 
     static func prepare(forPlayback: Bool) async throws {
