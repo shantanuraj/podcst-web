@@ -136,7 +136,7 @@ struct AudioLabComparisonView: View {
                     } header: {
                         Text("Rendered output")
                     } footer: {
-                        Text("LUFS uses K-weighting and absolute/relative gating. True peak is an oversampled estimate. Measurements describe the original render before listening attenuation; start/end boundaries are resolved to a 256-frame render block.")
+                        Text("LUFS uses K-weighting and absolute/relative gating. True peak is an oversampled estimate. Measurements describe the original render before listening attenuation; audition files have \(report.auditionEdgeFadeSeconds * 1_000, specifier: "%.0f") ms fades at passage edges to avoid loop clicks. Interior audio is unchanged.")
                     }
                 }
 

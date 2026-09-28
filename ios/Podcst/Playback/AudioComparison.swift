@@ -60,10 +60,20 @@ struct AudioComparisonMeasurement: Codable, Sendable {
 }
 
 struct AudioComparisonReport: Codable, Sendable {
+    static let defaultEdgeFadeSeconds = 0.005
     let passage: AudioComparisonPassage
     let speed: Double
     let sampleRate: Double
     let measurements: [AudioComparisonMeasurement]
+    let auditionEdgeFadeSeconds: Double
+
+    init(passage: AudioComparisonPassage, speed: Double, sampleRate: Double, measurements: [AudioComparisonMeasurement], auditionEdgeFadeSeconds: Double = AudioComparisonReport.defaultEdgeFadeSeconds) {
+        self.passage = passage
+        self.speed = speed
+        self.sampleRate = sampleRate
+        self.measurements = measurements
+        self.auditionEdgeFadeSeconds = auditionEdgeFadeSeconds
+    }
 
     var matchedTargetLUFS: Double? {
         guard measurements.count == AudioComparisonPreset.allCases.count,
@@ -162,14 +172,13 @@ enum AudioComparisonRenderer {
         var reachedBoundary = false
         for _ in 0..<maximumBlocks {
             try Task.checkCancellation()
-            let before = transport.position
+            let outputStartFrame = transport.diagnostics.renderedFrames
             let status = try await transport.renderOffline(frames: maximumFrames, into: buffer)
             guard status == .success, let data = buffer.floatChannelData else { throw AudioComparisonError.renderFailed }
-            let after = transport.position
-            if after > before, after > passage.start, before < passage.end {
-                let frames = Int(buffer.frameLength)
-                let first = max(0, min(frames, Int(ceil((passage.start - before) / (after - before) * Double(frames)))))
-                let last = max(first, min(frames, Int(ceil((passage.end - before) / (after - before) * Double(frames)))))
+            let frames = Int(buffer.frameLength)
+            let first = boundary(passage.start, transport: transport, outputStartFrame: outputStartFrame, count: frames)
+            let last = boundary(passage.end, transport: transport, outputStartFrame: outputStartFrame, count: frames)
+            if last > first {
                 var samples: [Float] = []
                 samples.reserveCapacity((last - first) * 2)
                 for frame in first..<last {
@@ -178,13 +187,25 @@ enum AudioComparisonRenderer {
                 }
                 try await writer.append(samples)
             }
-            if after >= passage.end || transport.diagnostics.reachedEnd {
+            if transport.position >= passage.end || transport.diagnostics.reachedEnd {
                 reachedBoundary = true
                 break
             }
         }
         guard reachedBoundary else { throw AudioComparisonError.renderFailed }
         return try await writer.finish(preset: preset)
+    }
+
+    private static func boundary(_ sourceTime: Double, transport: LocalAudioTransport, outputStartFrame: UInt64, count: Int) -> Int {
+        var lower = 0
+        var upper = count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            let time = transport.sourcePosition(forRenderedOutputFrame: outputStartFrame + UInt64(middle)) ?? -.infinity
+            if time < sourceTime { lower = middle + 1 }
+            else { upper = middle }
+        }
+        return lower
     }
 }
 
@@ -193,6 +214,9 @@ private actor AudioComparisonWriter {
     private let buffer: AVAudioPCMBuffer
     private var meter: AudioSignalMeter
     private var frames: UInt64 = 0
+    private var writtenFrames: UInt64 = 0
+    private var pending: [Float] = []
+    private let edgeFrames: Int
     private let sampleRate: Double
 
     init(url: URL, sampleRate: Double, capacity: AVAudioFrameCount) throws {
@@ -203,28 +227,46 @@ private actor AudioComparisonWriter {
         file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
         self.buffer = buffer
         self.sampleRate = sampleRate
+        edgeFrames = Int(sampleRate * AudioComparisonReport.defaultEdgeFadeSeconds)
         meter = AudioSignalMeter(sampleRate: sampleRate, channels: 2)
     }
 
     func append(_ samples: [Float]) throws {
         guard !samples.isEmpty else { return }
-        guard let file, let output = buffer.floatChannelData, samples.count % 2 == 0,
-              samples.count / 2 <= buffer.frameCapacity else { throw AudioComparisonError.renderFailed }
-        let count = samples.count / 2
-        for index in 0..<count {
-            output[0][index] = samples[index * 2]
-            output[1][index] = samples[index * 2 + 1]
-        }
-        buffer.frameLength = AVAudioFrameCount(count)
-        try file.write(from: buffer)
+        guard samples.count.isMultiple(of: 2) else { throw AudioComparisonError.renderFailed }
         _ = meter.process(samples)
-        frames += UInt64(count)
+        frames += UInt64(samples.count / 2)
+        pending.append(contentsOf: samples)
+        let count = max(0, pending.count - edgeFrames * 2)
+        if count > 0 {
+            try write(Array(pending.prefix(count)), ending: false)
+            pending.removeFirst(count)
+        }
     }
 
     func finish(preset: AudioComparisonPreset) throws -> AudioComparisonMeasurement {
+        try write(pending, ending: true)
+        pending.removeAll()
         file = nil
         guard frames > 0 else { throw AudioComparisonError.emptyOutput }
         return AudioComparisonMeasurement(preset: preset, duration: Double(frames) / sampleRate, metrics: meter.finish())
+    }
+
+    private func write(_ samples: [Float], ending: Bool) throws {
+        guard !samples.isEmpty else { return }
+        guard let file, let output = buffer.floatChannelData,
+              samples.count / 2 <= buffer.frameCapacity else { throw AudioComparisonError.renderFailed }
+        let count = samples.count / 2
+        for index in 0..<count {
+            let first = min(1, Double(writtenFrames + UInt64(index)) / Double(edgeFrames - 1))
+            let last = ending ? Double(count - 1 - index) / Double(edgeFrames - 1) : 1
+            let gain = Float(min(first, last))
+            output[0][index] = samples[index * 2] * gain
+            output[1][index] = samples[index * 2 + 1] * gain
+        }
+        buffer.frameLength = AVAudioFrameCount(count)
+        try file.write(from: buffer)
+        writtenFrames += UInt64(count)
     }
 }
 
