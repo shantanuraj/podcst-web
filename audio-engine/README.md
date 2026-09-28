@@ -285,6 +285,32 @@ audio sessions, interruptions and Now Playing use the production path. Lab media
 has its own cache, and test playback never updates subscriptions or listening
 history. Audio preferences begin fresh for each lab launch.
 
+Choose **Use test signal** for a deterministic 45-second signal with quiet and loud
+tones and pauses. **Measure audio** enables original/processed waveforms on the
+same amplitude and episode-time scales. Freeze a reading, change the 5–60 second
+window, and inspect earlier audio without changing playback. Shaded intervals
+show actual removed source audio. Gain and RMS describe the effects stage;
+the separate final-output meters include speed processing and limiting.
+
+**Compare a passage** renders Off, Boost, Trim and Both from the same local or
+downloaded source, with the same pre-roll. Loop a version or cycle all four at
+fixed level or attenuation-only matched loudness. Selecting a silence cut opens
+a passage around it; cuts longer than the thirty-second limit focus on the
+return to audio. Comparisons use the current playback speed and leave ordinary
+playback paused when dismissed.
+
+**Export capture** saves bounded JSON with waveform envelopes, cuts, effect and
+route events, output metrics, comparison results, settings, selected inspection
+window and Git/build provenance. It excludes raw audio, episode titles, source
+URLs and personal accessory names. The source identity hash identifies the
+episode/import session, not the file's byte contents. Frozen exports retain the
+reading's capture time and settings; final-output meters show that capture time
+when inspecting an earlier waveform window. True peak is an oversampled estimate.
+
+Disable **Measure audio** for engine power comparisons. It is always disabled
+in Podcst. The lab's separate `-AudioLabReference` launch mode uses AVPlayer and
+hides unsupported inspection/effects. See inspection design and validation.
+
 The decoder reads bounded planar Float32 blocks on a worker. The Rust speech
 processor emits retained PCM and original-source spans. Each of two native
 source Audio Units has a preallocated single-producer/single-consumer ring;
