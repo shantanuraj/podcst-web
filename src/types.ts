@@ -239,6 +239,7 @@ export interface IPodcastSearchResult {
   id?: number;
   author: string;
   feed: string;
+  cover: string;
   thumbnail: string;
   title: string;
 }
