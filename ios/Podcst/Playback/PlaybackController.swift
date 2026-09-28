@@ -97,7 +97,7 @@ public final class PlaybackController {
     @ObservationIgnored private var audioSessionTask: Task<Void, Never>?
     @ObservationIgnored private var systemObservers: SystemPlaybackObservers?
     @ObservationIgnored private var generation = UUID()
-    @ObservationIgnored private var shouldPlay = false
+    private var shouldPlay = false
     @ObservationIgnored private var changingAccount = false
     @ObservationIgnored private var wasPlayingBeforeInterruption = false
     @ObservationIgnored private var playingSince: TimeInterval?

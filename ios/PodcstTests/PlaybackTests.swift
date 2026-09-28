@@ -7,6 +7,32 @@ import XCTest
 
 @MainActor
 final class PlaybackTests: XCTestCase {
+    func testPlaybackIntentNotifiesObserversOnToggleAndFailure() async {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.restore(episode(guid: "observed"), at: 42)
+        transport.becomeReady(duration: 300)
+
+        for (index, requested) in [true, false, true, false].enumerated() {
+            let changed = expectation(description: "Playback intent changed at step \(index)")
+            withObservationTracking {
+                _ = controller.isPlaybackRequested
+            } onChange: {
+                changed.fulfill()
+            }
+
+            if index == 3 {
+                transport.emit(.failed)
+            } else {
+                controller.toggle()
+            }
+
+            XCTAssertEqual(controller.isPlaybackRequested, requested)
+            XCTAssertEqual(controller.currentTime, 42)
+            await fulfillment(of: [changed], timeout: 1)
+        }
+    }
+
     func testSystemAudioSessionAllowsPlaybackToReachTransport() async {
         let session = AVAudioSession.sharedInstance()
         let previousCategory = session.category
