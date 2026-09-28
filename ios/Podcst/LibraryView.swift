@@ -32,7 +32,7 @@ struct LibraryView: View {
                                 .foregroundStyle(PodcstPalette.accent)
                         }
                         ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
-                            EpisodeRow(episode: episode, lead: .artwork)
+                            EpisodeRow(episode: episode, context: .library)
                         }
                     }
                     SectionHeader("Subscriptions") {
@@ -80,18 +80,38 @@ struct LibraryView: View {
 
 struct ReleasesView: View {
     @Environment(LibraryStore.self) private var library
+    @Environment(\.locale) private var locale
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(library.newReleases, id: \.identity) { episode in
-                    EpisodeRow(episode: episode, lead: .artwork)
+        TimelineView(.periodic(from: ReleaseSection.calendar.startOfDay(for: .now), by: 86400)) { timeline in
+            let sections = ReleaseSection.grouping(library.newReleases)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections) { section in
+                        Section {
+                            ForEach(section.episodes, id: \.identity) { episode in
+                                EpisodeRow(
+                                    episode: episode,
+                                    context: .releases,
+                                    showsSeparator: episode.identity != section.episodes.last?.identity
+                                )
+                            }
+                        } header: {
+                            let recent = section.isRecent(relativeTo: timeline.date)
+                            Text(section.title(relativeTo: timeline.date, locale: locale))
+                                .font(.sans(recent ? .subheadline : .footnote).weight(.medium))
+                                .foregroundStyle(recent ? PodcstPalette.ink : PodcstPalette.secondary)
+                                .accessibilityAddTraits(.isHeader)
+                                .padding(.top, section.id == sections.first?.id ? 8 : 20)
+                                .padding(.bottom, 4)
+                        }
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .refreshable { await library.load(forceRefresh: true) }
         }
-        .refreshable { await library.load(forceRefresh: true) }
         .podcstPage()
         .navigationTitle("New releases")
     }
