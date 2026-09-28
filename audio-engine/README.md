@@ -273,11 +273,15 @@ or a checked-in media file.
 ### Local iOS Audio Lab
 
 Open `ios/Podcst.xcodeproj`, select the **Podcst Audio Lab** scheme and run on an
-iPhone or simulator. Choose **Open audio file** to select a local audio file.
+iPhone or simulator. Choose **Browse podcasts** for the US top podcasts, search
+by name or RSS feed link, then select a podcast and episode. The episode list also
+supports title filtering. Choose **Open audio file** to select a local audio file.
 The launch argument `-LocalAudioHarness` selects this debug-only entry point;
-normal launches use the web-backed app. The lab injects `LocalAudioTransport`
-into the existing `PlaybackController`, so queue policy, seeking, speed, audio
-sessions, interruptions and Now Playing use the shared controller.
+normal launches use the web-backed app. The lab uses `RoutingAudioTransport`
+with the existing `PlaybackController`, so streaming, decoding, seeking, speed,
+audio sessions, interruptions and Now Playing use the production path. Lab media
+has its own cache, and test playback never updates subscriptions or listening
+history. Audio preferences begin fresh for each lab launch.
 
 The decoder reads bounded planar Float32 blocks on a worker. The Rust speech
 processor emits retained PCM and original-source spans. Each of two native
@@ -305,9 +309,11 @@ source boundary, lets pending real audio pass, and reopens there with a new grap
 generation. It never treats missing input as EOF. All retired worker results and
 callbacks are rejected by generation.
 
-The lab exposes source/output formats, queued buffers, owned audio memory and
-underrun counts. It keeps the selected document security scope while using the
-file. The temporary local playback state and diagnostics are not synchronized.
+The lab identifies the active engine and exposes source/output formats, queued
+buffers, owned audio memory and underrun counts for the custom engine. Sources
+requiring AVPlayer fallback are labeled explicitly. It keeps the selected
+document security scope while using the file. Lab playback state and diagnostics
+are not synchronized, and each launch begins without a selected episode.
 For simulator automation, `-AudioLabFile <local-path>` opens an existing file
 alongside `-LocalAudioHarness`. Do not put private media paths in checked-in
 scheme arguments or scripts.
@@ -321,9 +327,12 @@ before measuring final converted output with an independent 16× peak meter.
 `HandoffRenderTests` exercises raw PCM rings and crossfade publication.
 
 Add `-AudioLabReference` to the debug lab launch arguments to use AVPlayer with
-the same controller and local file, without effects. Remove it to return to
-native playback and use the Audio control to enable effects. This comparison
-mode exists for the physical validation worksheet;
+the same controller and selected episode or local file. The reference hides
+unsupported effect controls while keeping speed controls available. Completed
+cached files are reused; uncached episodes stream directly through AVPlayer.
+Remove the argument to return to custom playback and use the Audio control to
+enable effects. This comparison mode exists for the
+physical validation worksheet;
 it is not a production playback preference. Test source, route, volume, rate and
 optimized build settings must match when comparing power.
 

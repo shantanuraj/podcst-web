@@ -61,6 +61,7 @@
 		3FBEDBE118BCE9D655083028 = {isa = PBXBuildFile; fileRef = 18E14DA3DD9ED2F8E6C11FEF; };
 		7693D81C239C225BC1344815 = {isa = PBXBuildFile; fileRef = 9D5CECAB09B2F497B2D8B156; };
 		01831B70CA7AE0D8732FD73F = {isa = PBXBuildFile; fileRef = 803D70EC12218D1A1A8668EE; };
+		D92800000000000000000002 = {isa = PBXBuildFile; fileRef = D92800000000000000000001; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -135,6 +136,7 @@
 		9D5CECAB09B2F497B2D8B156 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EffectsPeakTests.swift"; sourceTree = "<group>"; };
 		F51489B7D9F10CD28113E8D5 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Playback/Native/PodcstPCMSourceAudioUnit.h"; sourceTree = "<group>"; };
 		803D70EC12218D1A1A8668EE = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "Playback/Native/PodcstPCMSourceAudioUnit.mm"; sourceTree = "<group>"; };
+		D92800000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/AudioLabCatalogView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -174,6 +176,7 @@
 				66901724E3390218A59F91E6,
 				4EB1CF9AC787100216BACF87,
 				F65EBD8CDAC3B8F695D021CF,
+				D92800000000000000000001,
 				A01500000000000000000006 /* Playback/LocalAudioHarnessView.swift */,
 				A01500000000000000000005 /* Playback/LocalAudioTransport.swift */,
 				A01500000000000000000004 /* Playback/LocalAudioDecoder.swift */,
@@ -405,6 +408,7 @@
 				F342B6E15A36F4D370CDC6A4,
 				A5EF66A8FB7D9FC358BC6568,
 				2CAFEC8D879AA60B35CA526A,
+				D92800000000000000000002,
 				A01500000000000000000016 /* Playback/LocalAudioHarnessView.swift in Sources */,
 				A01500000000000000000015 /* Playback/LocalAudioTransport.swift in Sources */,
 				A01500000000000000000014 /* Playback/LocalAudioDecoder.swift in Sources */,
