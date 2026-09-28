@@ -8,7 +8,7 @@ struct PodcstApp: App {
     @State private var playback: PlaybackController
     @State private var media: MediaStore
     #if DEBUG
-    @State private var localAudio: LocalAudioTransport?
+    @State private var audioLab: RoutingAudioTransport?
     #endif
 
     init() {
@@ -18,28 +18,32 @@ struct PodcstApp: App {
         _session = State(initialValue: session)
         let library = LibraryStore(api: api, session: session)
         _library = State(initialValue: library)
+        PodcstAppearance.configure()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LocalAudioHarness") {
+            let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("PodcstAudioLab", isDirectory: true)
+            let media = MediaStore(rootURL: directory.appendingPathComponent("Media", isDirectory: true))
+            _media = State(initialValue: media)
+            let reference = ProcessInfo.processInfo.arguments.contains("-AudioLabReference")
+            let routing = RoutingAudioTransport(media: media, preferSystemPlayback: reference)
+            _audioLab = State(initialValue: routing)
+            let playback = PlaybackController(
+                transport: routing,
+                persistenceURL: directory.appendingPathComponent("playback.json"),
+                preferences: AudioPreferences(),
+                integratesWithSystem: true
+            )
+            playback.clear()
+            _playback = State(initialValue: playback)
+            return
+        }
+        _audioLab = State(initialValue: nil)
+        #endif
         let media = MediaStore(accountID: session.user?.id)
         _media = State(initialValue: media)
         let routing = RoutingAudioTransport(media: media)
-        let playback: PlaybackController
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-LocalAudioHarness") {
-            let local = LocalAudioTransport()
-            let reference = ProcessInfo.processInfo.arguments.contains("-AudioLabReference")
-            let transport: any PlaybackTransport = reference ? AVPlayerTransport() : local
-            _localAudio = State(initialValue: local)
-            playback = PlaybackController(
-                transport: transport,
-                persistenceURL: FileManager.default.temporaryDirectory.appendingPathComponent("audio-lab-\(UUID().uuidString).json"),
-                integratesWithSystem: true
-            )
-        } else {
-            _localAudio = State(initialValue: nil)
-            playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: true)
-        }
-        #else
-        playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: true)
-        #endif
+        let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: true)
         _playback = State(initialValue: playback)
         session.prepareAccountChange = { [weak library, weak playback] accountID in
             playback?.beginAccountChange()
@@ -51,15 +55,15 @@ struct PodcstApp: App {
             playback?.onProgress = { [weak library] update in library?.saveProgress(update) }
         }
         playback.onProgress = { [weak library] update in library?.saveProgress(update) }
-        PodcstAppearance.configure()
     }
 
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if let localAudio {
-                LocalAudioHarnessView(transport: localAudio)
+            if let audioLab {
+                LocalAudioHarnessView(transport: audioLab)
                     .environment(playback)
+                    .environment(api)
             } else {
                 application
             }
