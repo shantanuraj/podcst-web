@@ -218,6 +218,8 @@ final class LocalAudioTransport: PlaybackTransport {
         }
     }
 
+    var activeInspectionEpoch: UUID? { inspection?.epoch }
+
     func inspectionSnapshot() -> AudioInspectionSnapshot? {
         let dropped = graph?.limiter.droppedTelemetryFrames ?? outputInspectionDroppedBaseline
         return inspection?.snapshot(presentedSourceTime: position, outputTelemetryDroppedFrames: dropped >= outputInspectionDroppedBaseline ? dropped - outputInspectionDroppedBaseline : 0)

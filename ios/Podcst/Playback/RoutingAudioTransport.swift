@@ -3,7 +3,7 @@ import Observation
 
 @MainActor
 final class RoutingAudioTransport: PlaybackTransport {
-    enum Backend {
+    enum Backend: String {
         case custom
         case system
         case systemFallback
@@ -34,10 +34,26 @@ final class RoutingAudioTransport: PlaybackTransport {
     private var effects = AudioEffects()
     private var fallbackReason: String?
     private var needsDownloadForEffects = false
+    private var inspectionEnabled = false
 
     init(media: MediaStore, preferSystemPlayback: Bool = false) {
         self.media = media
         self.preferSystemPlayback = preferSystemPlayback
+    }
+
+    func configureInspection(enabled: Bool) {
+        inspectionEnabled = enabled
+        (backend as? LocalAudioTransport)?.configureInspection(enabled: enabled)
+    }
+
+    func inspectionSnapshot() -> AudioInspectionSnapshot? {
+        (backend as? LocalAudioTransport)?.inspectionSnapshot()
+    }
+
+    var activeInspectionEpoch: UUID? { (backend as? LocalAudioTransport)?.activeInspectionEpoch }
+
+    func takeOutputInspection() -> [AudioOutputInspectionPacket] {
+        (backend as? LocalAudioTransport)?.takeOutputInspection() ?? []
     }
 
     func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
@@ -173,6 +189,7 @@ final class RoutingAudioTransport: PlaybackTransport {
     private func installNative(source: PlaybackSource, decoder: (any PCMDecoder)?, token: UUID) {
         guard session == token else { return }
         let transport = LocalAudioTransport(sourceDecoder: decoder)
+        transport.configureInspection(enabled: inspectionEnabled)
         backend = transport
         transport.onUpdate = { [weak self, weak transport] update in
             guard let self, let transport, self.backend === transport, self.session == token, update.generation == self.generation else { return }
