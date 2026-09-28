@@ -1,0 +1,6 @@
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+DEFINES_MODULE = YES
+LIBRARY_SEARCH_PATHS = $(inherited) $(BUILT_PRODUCTS_DIR)
+OTHER_LDFLAGS = $(inherited) -lpodcst_audio_engine -liconv -lc++ -framework Security -framework CoreFoundation
+SWIFT_INCLUDE_PATHS = $(inherited) $(SRCROOT)/../audio-engine/include
+SWIFT_OBJC_BRIDGING_HEADER = Podcst/Playback/Native/PodcstAudio-Bridging-Header.h

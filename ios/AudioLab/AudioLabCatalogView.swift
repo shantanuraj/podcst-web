@@ -1,4 +1,3 @@
-#if DEBUG
 import SwiftUI
 
 struct AudioLabCatalogView: View {
@@ -287,4 +286,3 @@ private struct AudioLabCatalogError: View {
         }
     }
 }
-#endif

@@ -7,9 +7,6 @@ struct PodcstApp: App {
     @State private var library: LibraryStore
     @State private var playback: PlaybackController
     @State private var media: MediaStore
-    #if DEBUG
-    @State private var audioLab: RoutingAudioTransport?
-    #endif
 
     init() {
         let api = APIClient()
@@ -19,27 +16,6 @@ struct PodcstApp: App {
         let library = LibraryStore(api: api, session: session)
         _library = State(initialValue: library)
         PodcstAppearance.configure()
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-LocalAudioHarness") {
-            let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("PodcstAudioLab", isDirectory: true)
-            let media = MediaStore(rootURL: directory.appendingPathComponent("Media", isDirectory: true))
-            _media = State(initialValue: media)
-            let reference = ProcessInfo.processInfo.arguments.contains("-AudioLabReference")
-            let routing = RoutingAudioTransport(media: media, preferSystemPlayback: reference)
-            _audioLab = State(initialValue: routing)
-            let playback = PlaybackController(
-                transport: routing,
-                persistenceURL: directory.appendingPathComponent("playback.json"),
-                preferences: AudioPreferences(),
-                integratesWithSystem: true
-            )
-            playback.clear()
-            _playback = State(initialValue: playback)
-            return
-        }
-        _audioLab = State(initialValue: nil)
-        #endif
         let media = MediaStore(accountID: session.user?.id)
         _media = State(initialValue: media)
         let routing = RoutingAudioTransport(media: media)
@@ -59,30 +35,15 @@ struct PodcstApp: App {
 
     var body: some Scene {
         WindowGroup {
-            #if DEBUG
-            if let audioLab {
-                LocalAudioHarnessView(transport: audioLab)
-                    .environment(playback)
-                    .environment(api)
-                    .environment(media)
-            } else {
-                application
-            }
-            #else
-            application
-            #endif
+            RootView()
+                .environment(session)
+                .environment(library)
+                .environment(playback)
+                .environment(api)
+                .environment(media)
+                .task {
+                    await session.restore()
+                }
         }
-    }
-
-    private var application: some View {
-        RootView()
-            .environment(session)
-            .environment(library)
-            .environment(playback)
-            .environment(api)
-            .environment(media)
-            .task {
-                await session.restore()
-            }
     }
 }

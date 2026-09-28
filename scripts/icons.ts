@@ -8,16 +8,25 @@ import { parse } from 'opentype.js';
 const font = parse(
   readFileSync('ios/Podcst/Fonts/InstrumentSerif-Italic.ttf').buffer,
 );
-const glyph = font.charToGlyph('p');
 const em = font.unitsPerEm;
 const { ascender, descender } = font.tables.hhea;
 const baseline = (em - ascender + descender) / 2 / em + ascender / em;
-const advance = (glyph.advanceWidth ?? em) / em;
+
+function letter(char: string) {
+  const glyph = font.charToGlyph(char);
+  return { glyph, advance: (glyph.advanceWidth ?? em) / em };
+}
+
+type Letter = ReturnType<typeof letter>;
+
+const podcst = letter('p');
+const lab = letter('a');
 
 const paper = '#FAF9F7';
 const ink = '#1A1A1A';
 const accent = '#C84B31';
 const night = '#1C1B1A';
+const pitch = '#0E0E0D';
 const moon = '#F2F0ED';
 const ember = '#E06B52';
 const white = '#FFFFFF';
@@ -31,7 +40,12 @@ const favicon: Scale = { glyph: 30 / 32, dot: 0.12 };
 
 type Frame = { origin: number; size: number };
 
-function mark({ origin, size }: Frame, scale: Scale, decimals: number) {
+function mark(
+  { glyph, advance }: Letter,
+  { origin, size }: Frame,
+  scale: Scale,
+  decimals: number,
+) {
   const fontSize = scale.glyph * size;
   const x =
     origin + ((1 - advance * scale.glyph) / 2 - 0.1 * scale.glyph) * size;
@@ -47,24 +61,48 @@ function mark({ origin, size }: Frame, scale: Scale, decimals: number) {
   };
 }
 
+function grid({ origin, size }: Frame, cells: number) {
+  const step = size / cells;
+  const line = step / 16;
+  const end = origin + size;
+  return Array.from({ length: cells }, (_, i) => {
+    const at = +(origin + (i + 1) * step - line).toFixed(1);
+    const w = +line.toFixed(1);
+    return `M${origin} ${at}H${end}v${w}H${origin}ZM${at} ${origin}h${w}V${end}h${-w}Z`;
+  }).join('');
+}
+
 type Tile = {
+  letter: Letter;
   scale: Scale;
   fg: string;
   dot?: string;
   bg?: string;
   radius?: number;
   inset?: number;
+  lines?: string;
 };
 
 const canvas = 1024;
 
-function svg({ scale, fg, dot, bg, radius = 0, inset = 0 }: Tile) {
+function svg({
+  letter,
+  scale,
+  fg,
+  dot,
+  bg,
+  radius = 0,
+  inset = 0,
+  lines,
+}: Tile) {
   const frame = { origin: inset * canvas, size: (1 - 2 * inset) * canvas };
-  const paths = mark(frame, scale, 1);
+  const paths = mark(letter, frame, scale, 1);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvas} ${canvas}">`,
     bg &&
       `<rect width="${canvas}" height="${canvas}" rx="${radius * canvas}" fill="${bg}"/>`,
+    lines &&
+      `<path fill="${lines}" fill-opacity="0.08" d="${grid(frame, 10)}"/>`,
     `<path fill="${fg}" d="${paths.glyph}"/>`,
     dot && `<path fill="${dot}" d="${paths.dot}"/>`,
     '</svg>',
@@ -100,7 +138,7 @@ function ico(images: Buffer[]) {
 }
 
 function vector(dp: number, frame: Frame, scale: Scale, fg: string, dot = fg) {
-  const paths = mark(frame, scale, 2);
+  const paths = mark(podcst, frame, scale, 2);
   const layers =
     fg === dot
       ? [[fg, paths.glyph + paths.dot]]
@@ -124,25 +162,70 @@ function vector(dp: number, frame: Frame, scale: Scale, fg: string, dot = fg) {
   ].join('\n');
 }
 
-const tab: Tile = { scale: favicon, fg: paper, bg: ink, radius: 3 / 16 };
+const tab: Tile = {
+  letter: podcst,
+  scale: favicon,
+  fg: paper,
+  bg: ink,
+  radius: 3 / 16,
+};
 const tabDot: Tile = { ...tab, dot: ember, radius: 7 / 32 };
-const day: Tile = { scale: hero, fg: ink, dot: accent, bg: paper };
+const day: Tile = {
+  letter: podcst,
+  scale: hero,
+  fg: ink,
+  dot: accent,
+  bg: paper,
+};
 const tile: Tile = { ...day, radius: 36 / 160 };
 const maskable: Tile = { ...day, scale: launcher, inset: 0.1 };
 const adaptive: Frame = { origin: 18, size: 72 };
 
-const appIcon = [
-  ['AppIcon.png', day, []],
-  ['AppIcon-Dark.png', { ...day, fg: moon, dot: ember, bg: night }, ['dark']],
-  [
-    'AppIcon-Tinted.png',
-    { ...day, fg: white, dot: white, bg: black },
-    ['tinted'],
-  ],
-] as const;
+const bench: Tile = {
+  letter: lab,
+  scale: hero,
+  fg: moon,
+  dot: ember,
+  bg: night,
+  lines: white,
+};
+
+type Appearance = 'dark' | 'tinted';
+
+function appIcon(catalog: string, light: Tile, dark: Tile, tinted: Tile) {
+  const icons: [string, Tile, Appearance[]][] = [
+    ['AppIcon.png', light, []],
+    ['AppIcon-Dark.png', dark, ['dark']],
+    ['AppIcon-Tinted.png', tinted, ['tinted']],
+  ];
+  const set = `${catalog}/AppIcon.appiconset`;
+  return {
+    ...Object.fromEntries(
+      icons.map(([name, icon]) => [`${set}/${name}`, png(icon, 1024)]),
+    ),
+    [`${set}/Contents.json`]: `${JSON.stringify(
+      {
+        images: icons.map(([filename, , appearance]) => ({
+          ...(appearance.length && {
+            appearances: appearance.map((value) => ({
+              appearance: 'luminosity',
+              value,
+            })),
+          }),
+          filename,
+          idiom: 'universal',
+          platform: 'ios',
+          size: '1024x1024',
+        })),
+        info: { author: 'xcode', version: 1 },
+      },
+      null,
+      2,
+    )}\n`,
+  };
+}
 
 const res = 'android/app/src/main/res';
-const catalog = 'ios/Podcst/Assets.xcassets/AppIcon.appiconset';
 
 const files: Record<string, string | Buffer> = {
   'src/app/icon.svg': svg(tabDot),
@@ -153,28 +236,18 @@ const files: Record<string, string | Buffer> = {
   'public/icons/icon-512.png': png(tile, 512),
   'public/icons/maskable-192.png': png(maskable, 192),
   'public/icons/maskable-512.png': png(maskable, 512),
-  ...Object.fromEntries(
-    appIcon.map(([name, icon]) => [`${catalog}/${name}`, png(icon, 1024)]),
+  ...appIcon(
+    'ios/Podcst/Assets.xcassets',
+    day,
+    { ...day, fg: moon, dot: ember, bg: night },
+    { ...day, fg: white, dot: white, bg: black },
   ),
-  [`${catalog}/Contents.json`]: `${JSON.stringify(
-    {
-      images: appIcon.map(([filename, , appearance]) => ({
-        ...(appearance.length && {
-          appearances: appearance.map((value) => ({
-            appearance: 'luminosity',
-            value,
-          })),
-        }),
-        filename,
-        idiom: 'universal',
-        platform: 'ios',
-        size: '1024x1024',
-      })),
-      info: { author: 'xcode', version: 1 },
-    },
-    null,
-    2,
-  )}\n`,
+  ...appIcon(
+    'ios/AudioLab/Assets.xcassets',
+    bench,
+    { ...bench, bg: pitch },
+    { ...bench, fg: white, dot: white, bg: black },
+  ),
   'android/app/src/main/ic_launcher-playstore.png': png(day, 512),
   [`${res}/drawable/ic_launcher_foreground.xml`]: vector(
     108,
