@@ -46,14 +46,14 @@ final class RoutingAudioTransport: PlaybackTransport {
         (backend as? LocalAudioTransport)?.configureInspection(enabled: enabled)
     }
 
-    func inspectionSnapshot() -> AudioInspectionSnapshot? {
-        (backend as? LocalAudioTransport)?.inspectionSnapshot()
+    func inspectionSnapshot() async -> AudioInspectionSnapshot? {
+        await (backend as? LocalAudioTransport)?.inspectionSnapshot()
     }
 
     var activeInspectionEpoch: UUID? { (backend as? LocalAudioTransport)?.activeInspectionEpoch }
 
-    func takeOutputInspection() -> [AudioOutputInspectionPacket] {
-        (backend as? LocalAudioTransport)?.takeOutputInspection() ?? []
+    func takeOutputInspection() async -> [AudioOutputInspectionPacket] {
+        await (backend as? LocalAudioTransport)?.takeOutputInspection() ?? []
     }
 
     func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
@@ -63,10 +63,13 @@ final class RoutingAudioTransport: PlaybackTransport {
         self.generation = generation
         targetPosition = position
         let token = session
+        let pendingRetirements = Array(retirements.values)
         preparation = Task { [weak self] in
             guard let self, self.session == token, !Task.isCancelled else { return }
             guard let url = source.url else { self.emit(.failed); return }
             do {
+                for retirement in pendingRetirements { await retirement.value }
+                guard self.session == token, !Task.isCancelled else { return }
                 if url.isFileURL {
                     if self.preferSystemPlayback { self.installSystem(token: token) }
                     else { self.installNative(source: source, decoder: nil, token: token) }
@@ -163,13 +166,13 @@ final class RoutingAudioTransport: PlaybackTransport {
             }
         }
         preparation = nil
-        backend?.shutdown()
+        let retiring = backend
         backend = nil
         source = nil
         fallbackReason = nil
         needsDownloadForEffects = false
         targetPosition = 0
-        releaseLease()
+        retire(retiring, releasingLease: true)
     }
 
     func shutdown() {
@@ -207,7 +210,7 @@ final class RoutingAudioTransport: PlaybackTransport {
 
     private func installSystem(reason: String? = nil, token: UUID, effectiveSource: PlaybackSource? = nil, needsDownload: Bool = false) {
         guard session == token, let source = effectiveSource ?? source else { return }
-        backend?.shutdown()
+        retire(backend, releasingLease: source.url?.isFileURL != true)
         let transport = AVPlayerTransport()
         backend = transport
         fallbackReason = reason
@@ -221,7 +224,6 @@ final class RoutingAudioTransport: PlaybackTransport {
         transport.load(source: source, at: targetPosition, generation: generation)
         emit(.effects(systemEffectState))
         guard session == token else { return }
-        if source.url?.isFileURL != true { releaseLease() }
         if needsDownload { observeDownload(token: token) }
     }
 
@@ -256,12 +258,18 @@ final class RoutingAudioTransport: PlaybackTransport {
         return true
     }
 
-    private func releaseLease() {
-        guard let lease else { return }
-        self.lease = nil
+    private func retire(_ transport: (any PlaybackTransport)?, releasingLease: Bool) {
+        transport?.shutdown()
+        let native = transport as? LocalAudioTransport
+        let retiringLease = releasingLease ? lease : nil
+        if releasingLease { lease = nil }
+        guard native != nil || retiringLease != nil else { return }
+        let pendingRetirements = Array(retirements.values)
         let id = UUID()
         retirements[id] = Task { [weak self] in
-            await lease.release()
+            await native?.shutdownAndWait()
+            for retirement in pendingRetirements { await retirement.value }
+            await retiringLease?.release()
             self?.retirements[id] = nil
         }
     }
