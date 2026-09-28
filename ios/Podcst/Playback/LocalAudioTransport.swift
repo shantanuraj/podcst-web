@@ -239,6 +239,12 @@ final class LocalAudioTransport: PlaybackTransport {
         return packets
     }
 
+    func sourcePosition(forRenderedOutputFrame frame: UInt64) -> TimeInterval? {
+        guard let graph, let info, frame <= graph.limiter.renderedFrameCount,
+              Double(frame) >= latencyFrames(in: graph) else { return nil }
+        return sourceFrame(at: presentedContentFrame(in: graph, renderedFrame: Double(frame))) / info.sampleRate
+    }
+
     func stop() {
         let oldGeneration = graphGeneration
         graphGeneration = UUID()
@@ -566,13 +572,13 @@ final class LocalAudioTransport: PlaybackTransport {
         }
     }
 
-    private func audibleGateFrame(in graph: LocalAudioGraph) -> Double {
-        max(0, Double(graph.limiter.renderedFrameCount) - latencyFrames(in: graph)) / graph.format.sampleRate * graph.pitchFormat.sampleRate
+    private func audibleGateFrame(in graph: LocalAudioGraph, renderedFrame: Double? = nil) -> Double {
+        max(0, (renderedFrame ?? Double(graph.limiter.renderedFrameCount)) - latencyFrames(in: graph)) / graph.format.sampleRate * graph.pitchFormat.sampleRate
     }
 
-    private func presentedContentFrame(in graph: LocalAudioGraph) -> Double {
+    private func presentedContentFrame(in graph: LocalAudioGraph, renderedFrame: Double? = nil) -> Double {
         guard let info else { return 0 }
-        let frame = audibleGateFrame(in: graph)
+        let frame = audibleGateFrame(in: graph, renderedFrame: renderedFrame)
         if let transition, transition.scheduled {
             let old = transition.previous.content(at: frame, sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate)
             let new = transition.next.content(at: frame, sourceRate: info.sampleRate, graphRate: graph.pitchFormat.sampleRate)
