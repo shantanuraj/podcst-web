@@ -579,7 +579,7 @@ public final class PlaybackController {
     }
 
     private func configureAudioSession() throws {
-        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.allowAirPlay, .allowBluetoothA2DP])
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
     }
 
     func handleInterruption(typeRaw: UInt?, optionsRaw: UInt?) {

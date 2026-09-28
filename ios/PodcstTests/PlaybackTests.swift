@@ -1,9 +1,56 @@
+import AVFoundation
 import Foundation
+import MediaPlayer
 import XCTest
 @testable import Podcst
 
 @MainActor
 final class PlaybackTests: XCTestCase {
+    func testSystemAudioSessionAllowsPlaybackToReachTransport() {
+        let session = AVAudioSession.sharedInstance()
+        let previousCategory = session.category
+        let previousMode = session.mode
+        let previousPolicy = session.routeSharingPolicy
+        let previousOptions = session.categoryOptions
+        let nowPlaying = MPNowPlayingInfoCenter.default()
+        let previousInfo = nowPlaying.nowPlayingInfo
+        let commands = MPRemoteCommandCenter.shared()
+        let previousCommands = [
+            commands.playCommand, commands.pauseCommand, commands.togglePlayPauseCommand,
+            commands.nextTrackCommand, commands.previousTrackCommand, commands.changePlaybackPositionCommand,
+        ].map { ($0, $0.isEnabled) }
+        let url = temporaryURL()
+        let transport = FakePlaybackTransport()
+        let controller = PlaybackController(
+            transport: transport,
+            persistenceURL: url,
+            preferences: AudioPreferences(),
+            integratesWithSystem: true
+        )
+        defer {
+            controller.shutdown()
+            XCTAssertNoThrow(try session.setActive(false, options: .notifyOthersOnDeactivation))
+            XCTAssertNoThrow(try session.setCategory(previousCategory, mode: previousMode, policy: previousPolicy, options: previousOptions))
+            nowPlaying.nowPlayingInfo = previousInfo
+            for (command, enabled) in previousCommands { command.isEnabled = enabled }
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        XCTAssertEqual(controller.state, .idle)
+        XCTAssertEqual(session.category, .playback)
+        XCTAssertEqual(session.mode, .spokenAudio)
+        XCTAssertTrue(session.categoryOptions.isEmpty)
+        var item = episode(guid: "audio-session")
+        item.file = EpisodeFile(url: url.appendingPathExtension("mp3").absoluteString)
+        controller.play(item)
+
+        XCTAssertTrue(transport.hasSource)
+        XCTAssertEqual(controller.state, .loading)
+        transport.becomeReady(duration: 30)
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
     func testPlaybackStateBelongsToItsAccountAndSwitchingClearsIt() {
         let url = temporaryURL()
         let transport = FakePlaybackTransport()
