@@ -208,4 +208,92 @@ struct PodcstTestPlanarList {
     [unit deallocateRenderResources];
 }
 
+- (void)testTelemetryIsOptionalBoundedAndPreservesFinalOutput {
+    for (uint32_t quantum : {128, 8192}) {
+        NSError *error = nil;
+        auto *unit = [[PodcstLimiterAudioUnit alloc] initWithComponentDescription:[PodcstLimiterAudioUnit componentDescription] options:0 error:&error];
+        XCTAssertTrue([unit configureLimiterEnabled:NO error:&error]);
+        unit.maximumFramesToRender = quantum;
+        XCTAssertTrue([unit allocateRenderResourcesAndReturnError:&error]);
+        auto render = unit.internalRenderBlock;
+        std::vector<float> output(quantum * 2);
+        std::vector<float> captured(quantum * 2);
+        PodcstTestPlanarList list = {2, {{1, quantum * 4, output.data()}, {1, quantum * 4, output.data() + quantum}}};
+        AudioTimeStamp stamp = {};
+        AudioUnitRenderActionFlags flags = 0;
+        auto pull = ^AUAudioUnitStatus(AudioUnitRenderActionFlags *, const AudioTimeStamp *, AUAudioFrameCount frames, NSInteger, AudioBufferList *input) {
+            for (uint32_t channel = 0; channel < 2; ++channel) {
+                std::fill_n(static_cast<float *>(input->mBuffers[channel].mData), frames, channel == 0 ? 0.25f : -0.5f);
+            }
+            return noErr;
+        };
+        PodcstOutputTelemetryInfo info = {};
+        XCTAssertEqual(render(&flags, &stamp, quantum, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
+        XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], 0);
+        XCTAssertEqual(unit.droppedTelemetryFrames, 0);
+        const uint64_t storage = unit.allocatedBytes;
+        unit.telemetryEnabled = YES;
+        for (int pass = 0; pass < 3; ++pass) {
+            const uint64_t start = unit.renderedFrameCount;
+            for (int packet = 0; packet < 70; ++packet) {
+                XCTAssertEqual(render(&flags, &stamp, quantum, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
+                for (uint32_t frame = 0; frame < quantum; ++frame) {
+                    XCTAssertEqual(output[frame], 0.25f);
+                    XCTAssertEqual(output[quantum + frame], -0.5f);
+                }
+            }
+            const uint32_t expected = std::min(64u, 32768u / quantum);
+            XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum - 1 info:&info], 0);
+            for (uint32_t packet = 0; packet < expected; ++packet) {
+                XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], quantum);
+                XCTAssertEqual(info.outputStartFrame, start + packet * quantum);
+                XCTAssertEqual(info.frameCount, quantum);
+                XCTAssertEqual(info.channels, 2);
+                XCTAssertEqual(info.sampleRate, 48000);
+                XCTAssertEqual(info.limiterReductionDB, 0);
+                for (uint32_t frame = 0; frame < quantum; ++frame) {
+                    XCTAssertEqual(captured[frame * 2], 0.25f);
+                    XCTAssertEqual(captured[frame * 2 + 1], -0.5f);
+                }
+            }
+            XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], 0);
+            XCTAssertEqual(unit.droppedTelemetryFrames, uint64_t(pass + 1) * (70 - expected) * quantum);
+        }
+        XCTAssertEqual(unit.allocatedBytes, storage);
+        unit.telemetryEnabled = NO;
+        XCTAssertEqual(render(&flags, &stamp, quantum, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
+        XCTAssertEqual([unit copyTelemetryFrames:captured.data() capacity:quantum info:&info], 0);
+        [unit reset];
+        XCTAssertEqual(unit.droppedTelemetryFrames, 0);
+        [unit deallocateRenderResources];
+    }
+}
+
+- (void)testTelemetryReportsActualFinalLimiterReduction {
+    NSError *error = nil;
+    auto *unit = [[PodcstLimiterAudioUnit alloc] initWithComponentDescription:[PodcstLimiterAudioUnit componentDescription] options:0 error:&error];
+    unit.maximumFramesToRender = 2048;
+    unit.telemetryEnabled = YES;
+    XCTAssertTrue([unit allocateRenderResourcesAndReturnError:&error]);
+    auto render = unit.internalRenderBlock;
+    float output[4096] = {};
+    float captured[4096] = {};
+    PodcstTestPlanarList list = {2, {{1, 8192, output}, {1, 8192, output + 2048}}};
+    AudioTimeStamp stamp = {};
+    AudioUnitRenderActionFlags flags = 0;
+    auto pull = ^AUAudioUnitStatus(AudioUnitRenderActionFlags *, const AudioTimeStamp *, AUAudioFrameCount frames, NSInteger, AudioBufferList *input) {
+        for (uint32_t channel = 0; channel < 2; ++channel) {
+            std::fill_n(static_cast<float *>(input->mBuffers[channel].mData), frames, 2.0f);
+        }
+        return noErr;
+    };
+    XCTAssertEqual(render(&flags, &stamp, 2048, 0, reinterpret_cast<AudioBufferList *>(&list), nullptr, pull), noErr);
+    PodcstOutputTelemetryInfo info = {};
+    XCTAssertEqual([unit copyTelemetryFrames:captured capacity:2048 info:&info], 2048);
+    XCTAssertGreaterThan(info.limiterReductionDB, 6.0f);
+    for (float sample : captured) { XCTAssertLessThanOrEqual(sample, 0.9f); }
+    [unit reset];
+    [unit deallocateRenderResources];
+}
+
 @end

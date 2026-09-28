@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <memory>
@@ -18,7 +19,22 @@ static_assert(std::atomic<int32_t>::is_always_lock_free);
 
 namespace {
 
+struct TelemetryPacket {
+    PodcstOutputTelemetryInfo info = {};
+    uint64_t storageStart = 0;
+};
+
 struct RenderContext {
+    static constexpr uint32_t telemetryCapacity = 32768;
+    static constexpr uint32_t packetCapacity = 64;
+    std::vector<float> telemetrySamples;
+    std::array<TelemetryPacket, packetCapacity> telemetryPackets;
+    std::atomic<bool> telemetryEnabled{false};
+    std::atomic<uint64_t> telemetryReadPacket{0};
+    std::atomic<uint64_t> telemetryWritePacket{0};
+    std::atomic<uint64_t> telemetryReadFrame{0};
+    std::atomic<uint64_t> droppedTelemetryFrames{0};
+    uint64_t telemetryWriteFrame = 0;
     PodcstAudioProcessor *processor = nullptr;
     AudioBufferList *inputList = nullptr;
     std::vector<float> inputPlanar;
@@ -55,6 +71,7 @@ struct RenderContext {
         std::vector<float>().swap(outputPlanar);
         std::vector<float>().swap(interleaved);
         std::vector<float>().swap(processed);
+        std::vector<float>().swap(telemetrySamples);
         maximumFrames = 0;
         latencyFrames = 0;
         processorBytes = 0;
@@ -62,6 +79,11 @@ struct RenderContext {
     }
 
     void resetCounters() {
+        telemetryReadPacket.store(0, std::memory_order_relaxed);
+        telemetryWritePacket.store(0, std::memory_order_relaxed);
+        telemetryReadFrame.store(0, std::memory_order_relaxed);
+        droppedTelemetryFrames.store(0, std::memory_order_relaxed);
+        telemetryWriteFrame = 0;
         primingFrames = latencyFrames;
         drainRequested.store(false, std::memory_order_relaxed);
         drained.store(false, std::memory_order_relaxed);
@@ -101,6 +123,7 @@ struct RenderContext {
             outputPlanar.assign(sampleCount, 0);
             interleaved.assign(sampleCount, 0);
             processed.assign(sampleCount, 0);
+            telemetrySamples.assign(static_cast<size_t>(telemetryCapacity) * channels, 0);
         } catch (const std::bad_alloc &) {
             release();
             return false;
@@ -117,8 +140,49 @@ struct RenderContext {
 
     uint64_t allocatedBytes() const {
         return processorBytes + sizeof(RenderContext)
-            + (inputPlanar.capacity() + outputPlanar.capacity() + interleaved.capacity() + processed.capacity()) * sizeof(float)
+            + (inputPlanar.capacity() + outputPlanar.capacity() + interleaved.capacity() + processed.capacity() + telemetrySamples.capacity()) * sizeof(float)
             + (inputList ? offsetof(AudioBufferList, mBuffers) + channels * sizeof(AudioBuffer) : 0);
+    }
+
+    void captureOutput(AudioBufferList *output, uint32_t frames, uint64_t outputStartFrame) {
+        if (!telemetryEnabled.load(std::memory_order_relaxed) || frames == 0) { return; }
+        const uint64_t writePacket = telemetryWritePacket.load(std::memory_order_relaxed);
+        if (writePacket - telemetryReadPacket.load(std::memory_order_acquire) >= packetCapacity
+            || telemetryWriteFrame - telemetryReadFrame.load(std::memory_order_acquire) + frames > telemetryCapacity) {
+            droppedTelemetryFrames.fetch_add(frames, std::memory_order_relaxed);
+            return;
+        }
+        for (uint32_t frame = 0; frame < frames; ++frame) {
+            const uint64_t storageFrame = (telemetryWriteFrame + frame) % telemetryCapacity;
+            for (uint32_t channel = 0; channel < channels; ++channel) {
+                telemetrySamples[storageFrame * channels + channel] = static_cast<float *>(output->mBuffers[channel].mData)[frame];
+            }
+        }
+        PodcstAudioInfo processorInfo = {};
+        podcst_audio_get_info(processor, &processorInfo);
+        telemetryPackets[writePacket % packetCapacity] = {
+            {outputStartFrame, frames, channels, sampleRate, processorInfo.limiter_reduction_db}, telemetryWriteFrame
+        };
+        telemetryWriteFrame += frames;
+        telemetryWritePacket.store(writePacket + 1, std::memory_order_release);
+    }
+
+    uint32_t copyTelemetry(float *samples, uint32_t capacity, PodcstOutputTelemetryInfo *info) {
+        if (!samples || !info) { return 0; }
+        const uint64_t readPacket = telemetryReadPacket.load(std::memory_order_relaxed);
+        if (readPacket == telemetryWritePacket.load(std::memory_order_acquire)) { return 0; }
+        const auto &packet = telemetryPackets[readPacket % packetCapacity];
+        if (capacity < packet.info.frameCount) { return 0; }
+        *info = packet.info;
+        for (uint32_t frame = 0; frame < info->frameCount; ++frame) {
+            const uint64_t storageFrame = (packet.storageStart + frame) % telemetryCapacity;
+            for (uint32_t channel = 0; channel < info->channels; ++channel) {
+                samples[frame * info->channels + channel] = telemetrySamples[storageFrame * info->channels + channel];
+            }
+        }
+        telemetryReadFrame.store(packet.storageStart + info->frameCount, std::memory_order_release);
+        telemetryReadPacket.store(readPacket + 1, std::memory_order_release);
+        return info->frameCount;
     }
 
     AUAudioUnitStatus prepareOutput(AudioBufferList *output, uint32_t frames) {
@@ -235,6 +299,7 @@ struct RenderContext {
         writeOutput(flags, output, frames, prefix, report.emitted_frames);
         emittedFrames.fetch_add(report.emitted_frames, std::memory_order_relaxed);
         const uint64_t renderStart = renderedFrames.fetch_add(frames, std::memory_order_relaxed);
+        captureOutput(output, frames, renderStart);
         if (frames > 0 && firstRenderHostTime.load(std::memory_order_relaxed) == 0
             && (timestamp->mFlags & kAudioTimeStampHostTimeValid) && timestamp->mHostTime != 0) {
             firstRenderHostFrameOffset.store(renderStart, std::memory_order_relaxed);
@@ -320,6 +385,13 @@ bool SupportedFormat(AVAudioFormat *format) {
 - (uint64_t)renderFailureCount { return _context->renderFailures.load(std::memory_order_acquire); }
 - (OSStatus)lastRenderStatus { return _context->lastRenderStatus.load(std::memory_order_relaxed); }
 - (BOOL)isDrained { return _context->drained.load(std::memory_order_acquire); }
+- (BOOL)telemetryEnabled { return _context->telemetryEnabled.load(std::memory_order_relaxed); }
+- (void)setTelemetryEnabled:(BOOL)enabled { _context->telemetryEnabled.store(enabled, std::memory_order_relaxed); }
+- (uint64_t)droppedTelemetryFrames { return _context->droppedTelemetryFrames.load(std::memory_order_relaxed); }
+
+- (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity info:(PodcstOutputTelemetryInfo *)info {
+    return _context->copyTelemetry(samples, capacity, info);
+}
 
 - (BOOL)configureLimiterEnabled:(BOOL)enabled error:(NSError **)error {
     if (self.renderResourcesAllocated) {

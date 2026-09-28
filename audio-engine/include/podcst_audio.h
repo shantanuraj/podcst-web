@@ -42,6 +42,7 @@ typedef struct PodcstAudioReport {
 } PodcstAudioReport;
 
 typedef struct PodcstAudioInfo {
+  float limiter_reduction_db;
   uint32_t latency_frames;
   uint32_t max_block_frames;
   uint64_t allocated_bytes;

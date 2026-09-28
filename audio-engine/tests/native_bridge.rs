@@ -623,3 +623,53 @@ fn bounded_rust_api_rejects_partial_frames_without_mutation() {
         assert_eq!(actual.samples(), expected);
     }
 }
+
+#[test]
+fn limiter_info_exposes_actual_reduction_and_reset() {
+    let config = PodcstAudioConfig {
+        limiter_enabled: 1,
+        ..Default::default()
+    };
+    let mut handle = std::ptr::null_mut();
+    assert_eq!(
+        unsafe { podcst_audio_create(&config, &mut handle) },
+        PODCST_AUDIO_OK
+    );
+    let mut info = PodcstAudioInfo::default();
+    assert_eq!(
+        unsafe { podcst_audio_get_info(handle, &mut info) },
+        PODCST_AUDIO_OK
+    );
+    assert_eq!(info.limiter_reduction_db, 0.0);
+    let input = vec![2.0; 8192];
+    let mut output = vec![0.0; 8192];
+    let mut report = PodcstAudioReport::default();
+    assert_eq!(
+        unsafe {
+            podcst_audio_process(
+                handle,
+                input.as_ptr(),
+                4096,
+                output.as_mut_ptr(),
+                4096,
+                &mut report,
+            )
+        },
+        PODCST_AUDIO_OK
+    );
+    assert_eq!(
+        unsafe { podcst_audio_get_info(handle, &mut info) },
+        PODCST_AUDIO_OK
+    );
+    assert!(info.limiter_reduction_db > 6.0);
+    assert_eq!(unsafe { podcst_audio_reset(handle) }, PODCST_AUDIO_OK);
+    assert_eq!(
+        unsafe { podcst_audio_get_info(handle, &mut info) },
+        PODCST_AUDIO_OK
+    );
+    assert_eq!(info.limiter_reduction_db, 0.0);
+    assert_eq!(
+        unsafe { podcst_audio_destroy(&mut handle) },
+        PODCST_AUDIO_OK
+    );
+}
