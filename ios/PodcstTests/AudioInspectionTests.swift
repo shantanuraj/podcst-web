@@ -4,6 +4,27 @@ import XCTest
 
 @MainActor
 final class AudioInspectionTests: XCTestCase {
+    func testOutputPresentationGateAccountsForRouteLatencyWithoutCountingLimiterAgain() {
+        XCTAssertEqual(AudioOutputInspectionPacket.presentedFrame(renderedFrames: 48_000, presentationLatency: 0.2, sampleRate: 48_000), 38_400)
+        XCTAssertEqual(AudioOutputInspectionPacket.presentedFrame(renderedFrames: 48_000, presentationLatency: 0, sampleRate: 48_000), 48_000)
+        XCTAssertEqual(AudioOutputInspectionPacket.presentedFrame(renderedFrames: 480, presentationLatency: 0.2, sampleRate: 48_000), 0)
+        XCTAssertEqual(AudioOutputInspectionPacket.presentedFrame(renderedFrames: 48_000, presentationLatency: 0.000001, sampleRate: 48_000), 47_999)
+        XCTAssertEqual(AudioOutputInspectionPacket.presentedFrame(renderedFrames: 48_000, presentationLatency: .nan, sampleRate: 48_000), 0)
+    }
+
+    func testCollectorRetainsOriginalWaveformAcrossLongSingleRead() throws {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 8_000, channels: 1))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48_000))
+        buffer.frameLength = 48_000
+        buffer.floatChannelData?[0].update(repeating: 0, count: 48_000)
+        let collector = AudioInspectionCollector(epoch: UUID(), sampleRate: 8_000)
+        collector.consume(buffer, offset: 0, count: 48_000, sourceStart: 0)
+        let packet = collector.take(output: buffer, spans: [], ended: true)
+        XCTAssertEqual(packet.original.count, 600)
+        XCTAssertEqual(packet.original.first?.sourceStart, 0)
+        XCTAssertEqual(packet.original.last?.sourceEnd, 6)
+    }
+
     func testEnvelopePreservesChannelExtremaAndEnergyOnSourceTimeline() throws {
         let epoch = UUID()
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 8_000, channels: 2))

@@ -55,6 +55,13 @@ struct AudioOutputInspectionPacket: Sendable {
     let channels: Int
     let sampleRate: Double
     let limiterReductionDB: Float
+
+    static func presentedFrame(renderedFrames: UInt64, presentationLatency: TimeInterval, sampleRate: Double) -> UInt64 {
+        guard presentationLatency.isFinite, presentationLatency >= 0, sampleRate.isFinite, sampleRate > 0 else { return 0 }
+        let frames = ceil(presentationLatency * sampleRate)
+        guard frames < Double(renderedFrames) else { return 0 }
+        return renderedFrames - UInt64(frames)
+    }
 }
 
 struct AudioInspectionPacket: Sendable {
@@ -86,7 +93,8 @@ struct AudioInspectionRing<Element: Sendable>: Sendable {
     }
 
     mutating func removeAll() {
-        for index in storage.indices { storage[index] = nil }
+        let first = count == storage.count ? next : 0
+        for index in 0..<count { storage[(first + index) % storage.count] = nil }
         next = 0
         count = 0
     }
@@ -227,7 +235,7 @@ private struct AudioEnvelopeAccumulator {
     private var maximum = -Float.infinity
     private var energy: Double = 0
     private var samples = 0
-    private var completed = AudioInspectionRing<AudioInspectionEnvelope>(capacity: 512)
+    private var completed = AudioInspectionRing<AudioInspectionEnvelope>(capacity: AudioInspectionStore.envelopeCapacity)
 
     init(sampleRate: Double) {
         self.sampleRate = sampleRate
