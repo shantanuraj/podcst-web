@@ -169,14 +169,16 @@ struct PodcastDetailView: View {
 }
 
 struct EpisodeRow: View {
-    enum Lead {
-        case date
-        case artwork
+    enum Context {
+        case podcast
+        case library
+        case releases
     }
 
     @Environment(PlaybackController.self) private var playback
     let episode: Episode
-    var lead: Lead = .date
+    var context: Context = .podcast
+    var showsSeparator = true
 
     private var duration: TimeInterval? { episode.duration.flatMap { $0 > 0 ? $0 : nil } }
 
@@ -185,28 +187,31 @@ struct EpisodeRow: View {
         return min(1, position / duration)
     }
 
-    private var meta: String {
+    private var metadata: [String] {
         let remaining = playback.position(of: episode).flatMap { position in
             duration.flatMap { position > 0 ? "\(Duration.seconds(max(0, $0 - position))) left" : nil }
         }
-        switch lead {
-        case .date:
-            return [duration.map(Duration.seconds), remaining].compactMap { $0 }.joined(separator: " · ")
-        case .artwork:
-            if let remaining { return remaining }
+        switch context {
+        case .podcast:
+            return [duration.map(Duration.seconds), remaining].compactMap { $0 }
+        case .library:
+            if let remaining { return [remaining] }
             let isNew = episode.published.map { $0 > .now.addingTimeInterval(-7 * 86400) } ?? false
-            return [isNew ? "New" : episode.podcastTitle, duration.map(Duration.seconds)].compactMap { $0 }.joined(separator: " · ")
+            return [isNew ? "New" : episode.podcastTitle, duration.map(Duration.seconds)].compactMap { $0 }
+        case .releases:
+            return [episode.podcastTitle, remaining ?? duration.map(Duration.seconds)].compactMap { $0 }.filter { !$0.isEmpty }
         }
     }
 
     var body: some View {
         let isCurrent = playback.position(of: episode) != nil
+        let metadata = metadata
         HStack(spacing: 14) {
             NavigationLink(value: Route.episode(episode)) {
                 HStack(spacing: 14) {
-                    switch lead {
-                    case .date: DateBlock(date: episode.published)
-                    case .artwork: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
+                    switch context {
+                    case .podcast: DateBlock(date: episode.published)
+                    case .library, .releases: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(episode.title)
@@ -214,7 +219,7 @@ struct EpisodeRow: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         HStack(spacing: 8) {
-                            if lead == .artwork, let fraction {
+                            if context != .podcast, let fraction {
                                 Capsule()
                                     .fill(PodcstPalette.rule)
                                     .frame(width: 44, height: 3)
@@ -222,10 +227,15 @@ struct EpisodeRow: View {
                                         Capsule().fill(PodcstPalette.accent).frame(width: 44 * fraction)
                                     }
                             }
-                            Text(meta)
-                                .font(.sans(.caption))
-                                .foregroundStyle(PodcstPalette.tertiary)
-                                .lineLimit(1)
+                            HStack(spacing: 4) {
+                                ForEach(Array(metadata.enumerated()), id: \.offset) { index, text in
+                                    Text(index == 0 ? text : "· \(text)")
+                                        .layoutPriority(index == 0 ? 0 : 1)
+                                }
+                            }
+                            .font(.sans(.caption))
+                            .foregroundStyle(PodcstPalette.tertiary)
+                            .lineLimit(1)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -233,7 +243,7 @@ struct EpisodeRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(episode.title), \(episode.dateline)")
+            .accessibilityLabel(([episode.title] + (context == .releases ? metadata : [episode.dateline])).joined(separator: ", "))
             Button {
                 if isCurrent { playback.toggle() } else { playback.play(episode) }
             } label: {
@@ -243,7 +253,7 @@ struct EpisodeRow: View {
             .accessibilityLabel(isCurrent && playback.isPlaybackRequested ? "Pause \(episode.title)" : "Play \(episode.title)")
         }
         .padding(.vertical, 12)
-        .hairline()
+        .hairline(showsSeparator)
         .contextMenu {
             DownloadMenuActions(episode: episode)
             Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") { playback.enqueue(episode, next: true) }

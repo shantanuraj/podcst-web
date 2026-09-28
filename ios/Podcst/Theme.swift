@@ -156,9 +156,11 @@ extension View {
             .foregroundStyle(color)
     }
 
-    func hairline() -> some View {
+    func hairline(_ visible: Bool = true) -> some View {
         overlay(alignment: .bottom) {
-            PodcstPalette.rule.frame(height: 1)
+            if visible {
+                PodcstPalette.rule.frame(height: 1)
+            }
         }
     }
 }
