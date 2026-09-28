@@ -112,6 +112,8 @@ The development-only Audio Lab can run both transports. Use the **Podcst Audio L
 
 For streaming checks, choose **Browse podcasts** to pick from US charts or search by podcast name or RSS link, then select an episode. Lab media uses a separate cache and test playback does not update listening history. The Engine label distinguishes the custom engine, AVPlayer reference, and format/server fallbacks. A fallback run does not measure the custom engine. Keep local-file power comparisons separate from streaming comparisons, which also measure network and cache behavior.
 
+The selected episode's **Download** control stores its complete audio in the lab cache. Choose **Play download** to restart from that file. This also lets the custom engine test downloadable formats from servers that cannot stream reliably through the progressive decoder.
+
 
 Compare the native player with both effects enabled against an AVPlayer reference using the same downloaded file, route, device volume, playback speed, display state, and network conditions. Alternate the order and repeat matched pairs; compare medians. Use at least three pairs for each reported condition. Record charging state, thermal state, and the profiling tool so results can be repeated. Battery percentage alone is insufficient for this comparison.
 

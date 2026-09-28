@@ -64,6 +64,7 @@ struct PodcstApp: App {
                 LocalAudioHarnessView(transport: audioLab)
                     .environment(playback)
                     .environment(api)
+                    .environment(media)
             } else {
                 application
             }
