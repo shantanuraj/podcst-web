@@ -2,6 +2,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef struct PodcstOutputTelemetryInfo {
+    uint64_t outputStartFrame;
+    uint32_t frameCount;
+    uint32_t channels;
+    double sampleRate;
+    float limiterReductionDB;
+} PodcstOutputTelemetryInfo;
+
 @interface PodcstLimiterAudioUnit : AUAudioUnit
 
 + (AudioComponentDescription)componentDescription;
@@ -18,6 +26,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) uint64_t renderFailureCount;
 @property(nonatomic, readonly) OSStatus lastRenderStatus;
 @property(nonatomic, readonly) BOOL isDrained;
+@property(nonatomic) BOOL telemetryEnabled;
+@property(nonatomic, readonly) uint64_t droppedTelemetryFrames;
+
+- (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity info:(PodcstOutputTelemetryInfo *)info NS_SWIFT_NAME(copyTelemetryFrames(_:capacity:info:));
 
 - (BOOL)configureLimiterEnabled:(BOOL)enabled error:(NSError * _Nullable * _Nullable)error;
 - (void)beginDraining;

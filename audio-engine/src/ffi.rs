@@ -52,6 +52,7 @@ pub struct PodcstAudioReport {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PodcstAudioInfo {
+    pub limiter_reduction_db: f32,
     pub latency_frames: u32,
     pub max_block_frames: u32,
     pub allocated_bytes: u64,
@@ -305,6 +306,7 @@ pub unsafe extern "C" fn podcst_audio_get_info(
         Ok(unsafe {
             with_processor(handle, |processor| {
                 info.write(PodcstAudioInfo {
+                    limiter_reduction_db: processor.limiter_reduction_db(),
                     latency_frames: processor.latency_frames() as u32,
                     max_block_frames: PODCST_AUDIO_MAX_BLOCK_FRAMES,
                     allocated_bytes: (processor.allocated_bytes()

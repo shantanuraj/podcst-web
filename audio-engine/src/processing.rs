@@ -617,6 +617,12 @@ impl PcmProcessor {
         })
     }
 
+    pub fn limiter_reduction_db(&self) -> f32 {
+        self.limiter
+            .as_ref()
+            .map_or(0.0, |limiter| -20.0 * limiter.current_gain.log10())
+    }
+
     pub fn allocated_bytes(&self) -> usize {
         size_of::<Self>()
             + self.limiter.as_ref().map_or(0, |limiter| {
