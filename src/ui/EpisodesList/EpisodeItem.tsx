@@ -37,6 +37,7 @@ function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {
             loading="lazy"
             src={episodeArt || cover || undefined}
             alt=""
+            sizes="(max-width: 768px) 56px, 64px"
           />
         </div>
         <div className={styles.meta}>

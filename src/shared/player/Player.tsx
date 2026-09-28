@@ -64,7 +64,11 @@ export const Player = () => {
               href={getEpisodeHref(currentEpisode)}
               className={styles.artwork}
             >
-              <ProxiedImage alt="" src={currentEpisode.cover} />
+              <ProxiedImage
+                alt=""
+                src={currentEpisode.episodeArt || currentEpisode.cover}
+                sizes="(max-width: 767px) 48px, 56px"
+              />
             </Link>
             <div
               className={styles.info}
