@@ -15,6 +15,7 @@ public final class LibraryStore {
     private let session: SessionStore
     private let defaults: UserDefaults
     private let guestKey = "guest.library.podcasts"
+    private static let releasesPerPodcast = 2
     @ObservationIgnored private var progressWriter: PlaybackProgressWriter?
     @ObservationIgnored private var progressAccountID: String?
 
@@ -28,7 +29,11 @@ public final class LibraryStore {
     }
 
     public var newReleases: [Episode] {
-        podcasts.flatMap(\.episodes).sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+        podcasts.flatMap {
+            $0.episodes.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+                .prefix(Self.releasesPerPodcast)
+        }
+        .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
     }
 
     public func isSubscribed(_ podcast: Podcast) -> Bool {
@@ -59,22 +64,17 @@ public final class LibraryStore {
             } else {
                 podcasts = loadGuest()
                 progress = nil
-                if forceRefresh {
-                    var refreshError: Error?
-                    for podcast in podcasts {
-                        do {
-                            let updated = try await api.detail(of: podcast, forceRefresh: true)
-                            guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
-                            guard let index = podcasts.firstIndex(of: podcast) else { continue }
-                            podcasts[index] = updated
-                            persistGuest()
-                        } catch {
-                            guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
-                            refreshError = error
-                        }
+                var refreshError: Error?
+                for podcast in podcasts {
+                    do {
+                        try await loadGuestPodcast(podcast, forceRefresh: forceRefresh)
+                    } catch {
+                        guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
+                        refreshError = error
                     }
-                    if let refreshError { throw refreshError }
+                    guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
                 }
+                if let refreshError { throw refreshError }
             }
             error = nil
         } catch let failure {
@@ -84,6 +84,8 @@ public final class LibraryStore {
     }
 
     public func toggleSubscription(_ podcast: Podcast) async {
+        guard !session.isLoading else { return }
+        let accountID = session.user?.id
         do {
             if session.user != nil {
                 guard let id = podcast.id else { throw APIError(statusCode: 400, message: "Podcast ID required") }
@@ -96,13 +98,17 @@ public final class LibraryStore {
             } else {
                 if let index = podcasts.firstIndex(where: { $0.identity == podcast.identity }) {
                     podcasts.remove(at: index)
+                    persistGuest()
                 } else {
                     podcasts.append(podcast)
+                    persistGuest()
+                    try await loadGuestPodcast(podcast)
                 }
-                persistGuest()
+                guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
             }
             error = nil
         } catch let failure {
+            guard session.user?.id == accountID, !session.isLoading, !Task.isCancelled else { return }
             error = failure.localizedDescription
         }
     }
@@ -182,6 +188,24 @@ public final class LibraryStore {
     private func loadGuest() -> [Podcast] {
         guard let data = defaults.data(forKey: guestKey), let value = try? JSONDecoder().decode([Podcast].self, from: data) else { return [] }
         return value
+    }
+
+    private func loadGuestPodcast(_ podcast: Podcast, forceRefresh: Bool = false) async throws {
+        var updated: Podcast
+        if forceRefresh {
+            updated = try await api.detail(of: podcast, forceRefresh: true)
+        } else if let id = podcast.id {
+            let page = try await api.episodes(podcastID: id, limit: Self.releasesPerPodcast)
+            updated = podcast
+            updated.episodes = page.episodes
+            updated.episodeCount = page.total
+        } else {
+            updated = try await api.podcast(feed: podcast.feed)
+        }
+        guard session.user == nil, !session.isLoading, !Task.isCancelled,
+              let index = podcasts.firstIndex(of: podcast) else { return }
+        podcasts[index] = updated
+        persistGuest()
     }
 
     private func persistGuest() {
