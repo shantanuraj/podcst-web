@@ -195,8 +195,8 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests -destination 'platf
 
 #### Install a Release build on your iPhone
 
-If needed, select your team under **Podcst → Signing & Capabilities**, or set
-`DEVELOPMENT_TEAM` when running the script. The app's Associated Domains
+If needed, select your team under the chosen target's **Signing & Capabilities**,
+or set `DEVELOPMENT_TEAM` when running the script. Podcst's Associated Domains
 capability requires a team that supports it.
 
 ```bash
@@ -212,8 +212,15 @@ The script always builds the **Release** configuration for the phone, including
 the release-mode audio engine, then installs and launches it without a
 debugger. Builds are cached in `ios/build/device/`.
 
-This replaces the existing Podcst app with the same bundle ID; Audio Lab is
-unaffected.
+By default, this installs Podcst. To install the separate Audio Lab app beside it,
+add `--audio-lab`:
+
+```bash
+yarn ios:install --audio-lab <device-udid>
+```
+
+With `IOS_DEVICE_ID` saved, run `yarn ios:install --audio-lab`. Each command
+replaces only the app with the matching bundle ID.
 
 The client uses the web API for discovery, feed indexing, subscriptions,
 authentication and playback progress. An HTTP(S) feed URL entered in Discover
