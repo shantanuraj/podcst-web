@@ -92,7 +92,9 @@ final class ArtworkStore {
             let scope = scope
             if policy == .disk { await storage.promote(url, pixelSize: pixelSize) }
             guard self.scope == scope else { return nil }
-            if cached.expiresAt <= now() { refresh(url, pixelSize: pixelSize, policy: policy) }
+            if cached.expiresAt <= now() || cached.capacity < pixelSize {
+                refresh(url, pixelSize: pixelSize, policy: policy)
+            }
             return cached.image
         }
         if let request = requests[key] {
@@ -127,10 +129,12 @@ final class ArtworkStore {
             self.requests[key] = nil
             if let image {
                 let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
-                self.images.setObject(DecodedArtwork(image: image, expiresAt: payload.expiresAt), forKey: key as NSString, cost: cost)
+                self.images.setObject(DecodedArtwork(image: image, expiresAt: payload.expiresAt, capacity: payload.capacity), forKey: key as NSString, cost: cost)
                 self.revision += 1
             }
-            if payload.expiresAt <= self.now(), !refreshing { self.refresh(url, pixelSize: pixelSize, policy: policy) }
+            if !refreshing, payload.expiresAt <= self.now() || payload.capacity < pixelSize {
+                self.refresh(url, pixelSize: pixelSize, policy: policy)
+            }
             return image
         }
         requests[key] = task
@@ -150,10 +154,12 @@ final class ArtworkStore {
 private final class DecodedArtwork: NSObject {
     let image: UIImage
     let expiresAt: Date
+    let capacity: Int
 
-    init(image: UIImage, expiresAt: Date) {
+    init(image: UIImage, expiresAt: Date, capacity: Int) {
         self.image = image
         self.expiresAt = expiresAt
+        self.capacity = capacity
     }
 }
 
@@ -253,11 +259,11 @@ private actor ArtworkStorage {
             var iterator = urls.makeIterator()
             for _ in 0..<3 {
                 guard let url = iterator.next() else { break }
-                group.addTask { _ = await self.load(url, pixelSize: pixelSize, policy: .disk, refreshing: false) }
+                group.addTask { _ = await self.load(url, pixelSize: pixelSize, policy: .disk, refreshing: true) }
             }
             while await group.next() != nil {
                 guard !Task.isCancelled, let url = iterator.next() else { continue }
-                group.addTask { _ = await self.load(url, pixelSize: pixelSize, policy: .disk, refreshing: false) }
+                group.addTask { _ = await self.load(url, pixelSize: pixelSize, policy: .disk, refreshing: true) }
             }
         }
     }
@@ -267,12 +273,9 @@ private actor ArtworkStorage {
         restore()
         let key = ArtworkSource.identity(url)
         let cached = read(key)
-        if let cached, cached.capacity >= pixelSize, !refreshing || cached.expiresAt > now() {
+        if let cached, !refreshing || (cached.capacity >= pixelSize && cached.expiresAt > now()) {
             if pinned?.contains(key) == true || policy == .disk || entries[key] != nil {
                 persist(cached, key: key, replacing: false)
-            }
-            if cached.expiresAt <= now() {
-                Task { _ = await self.load(url, pixelSize: pixelSize, policy: policy, refreshing: true) }
             }
             return cached
         }

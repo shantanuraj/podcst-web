@@ -84,6 +84,59 @@ final class ArtworkStoreTests: XCTestCase {
         XCTAssertEqual(fixture.requests.count, 1)
     }
 
+    func testSmallCachedVariantStaysVisibleWhileOneLargerUpgradeIsPending() async throws {
+        let fixture = makeFixture(width: 160)
+        let url = proxyURL(for: fixture)
+        let root = temporaryDirectory()
+        let store = makeStore(fixture, root: root)
+        let initial = await store.image(url, pixelSize: 160)
+        XCTAssertEqual(initial?.cgImage?.width, 160)
+        fixture.data = png(width: 1024)
+        fixture.holdResponses = true
+        var preview: UIImage?
+        let loading = Task {
+            preview = await store.image(url, pixelSize: 1024)
+        }
+        try await wait { preview != nil }
+        XCTAssertEqual(preview?.cgImage?.width, 160)
+        try await wait { fixture.requests.count == 2 }
+        let repeated = await store.image(url, pixelSize: 1024)
+        XCTAssertEqual(repeated?.cgImage?.width, 160)
+        let request = try XCTUnwrap(fixture.requests.last?.url)
+        let query = URLComponents(url: request, resolvingAgainstBaseURL: false)?.queryItems
+        XCTAssertEqual(query?.first { $0.name == "w" }?.value, "1024")
+        XCTAssertEqual(fixture.requests.count, 2)
+        fixture.releaseResponses()
+        await loading.value
+        try await wait { store.cached(url, pixelSize: 1024)?.cgImage?.width == 1024 }
+        XCTAssertEqual(fixture.requests.count, 2)
+        fixture.failure = URLError(.notConnectedToInternet)
+        let relaunched = makeStore(fixture, root: root)
+        let player = await relaunched.image(url, pixelSize: 1024)
+        XCTAssertEqual(player?.cgImage?.width, 1024)
+        XCTAssertEqual(fixture.requests.count, 2)
+    }
+
+    func testSmallDiskVariantRemainsAvailableWhenLargerUpgradeFailsOffline() async throws {
+        let fixture = makeFixture(width: 160)
+        let url = proxyURL(for: fixture)
+        let root = temporaryDirectory()
+        let store = makeStore(fixture, root: root)
+        let initial = await store.image(url, pixelSize: 160)
+        XCTAssertEqual(initial?.cgImage?.width, 160)
+        fixture.failure = URLError(.notConnectedToInternet)
+        let offline = makeStore(fixture, root: root)
+        let preview = await offline.image(url, pixelSize: 1024)
+        XCTAssertEqual(preview?.cgImage?.width, 160)
+        try await wait { offline.revision >= 2 }
+        XCTAssertEqual(offline.cached(url, pixelSize: 1024)?.cgImage?.width, 160)
+        XCTAssertEqual(fixture.requests.count, 2)
+        let relaunched = makeStore(fixture, root: root)
+        let row = await relaunched.image(url, pixelSize: 160)
+        XCTAssertEqual(row?.cgImage?.width, 160)
+        XCTAssertEqual(fixture.requests.count, 2)
+    }
+
     func testDiscoverDiskImageSurvivesRelaunchWithoutRefetching() async throws {
         let fixture = makeFixture(width: 384)
         let root = temporaryDirectory()
@@ -327,6 +380,12 @@ final class ArtworkStoreTests: XCTestCase {
         return fixture
     }
 
+    private func proxyURL(for fixture: ArtworkFixture) -> URL {
+        var components = URLComponents(string: "https://assets.podcst.app/")!
+        components.queryItems = [URLQueryItem(name: "p", value: fixture.url.absoluteString)]
+        return components.url!
+    }
+
     private func png(width: Int, height: Int? = nil) -> Data {
         let height = height ?? width
         let format = UIGraphicsImageRendererFormat()
@@ -354,8 +413,8 @@ final class ArtworkStoreTests: XCTestCase {
 
 private final class ArtworkFixture: @unchecked Sendable {
     let url = URL(string: "https://\(UUID().uuidString.lowercased()).example.test/cover.png")!
-    let data: Data
     private let lock = NSLock()
+    private var body: Data
     private var recorded: [URLRequest] = []
     private var pending: [ArtworkTestProtocol] = []
     private var held = false
@@ -363,9 +422,13 @@ private final class ArtworkFixture: @unchecked Sendable {
     private var code = 200
     private var fields: [String: String] = [:]
 
-    init(data: Data) { self.data = data }
+    init(data: Data) { body = data }
 
     var requests: [URLRequest] { lock.withLock { recorded } }
+    var data: Data {
+        get { lock.withLock { body } }
+        set { lock.withLock { body = newValue } }
+    }
     var holdResponses: Bool {
         get { lock.withLock { held } }
         set { lock.withLock { held = newValue } }
