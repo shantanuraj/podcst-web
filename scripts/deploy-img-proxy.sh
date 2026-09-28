@@ -193,7 +193,6 @@ main() {
     for command in sudo systemctl systemd-analyze flock runuser curl python3; do
       command -v "$command" >/dev/null || die "Required command not found: $command"
     done
-    sudo -v
   fi
 
   log "Fetching origin/main from $repo (your working tree is not modified)."

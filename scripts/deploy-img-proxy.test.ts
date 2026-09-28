@@ -49,7 +49,8 @@ case "$name" in
     if [[ \${1:-} == -u ]]; then printf '%s\\n' "\${MOCK_ROOT:-1000}"; fi
     ;;
   sudo)
-    if [[ \${1:-} == -v ]]; then exit 0; fi
+    if [[ \${1:-} == -v ]]; then printf 'sudo: a password is required\\n' >&2; exit 98; fi
+    [[ \${MOCK_FAIL:-} != sudo ]] || exit 1
     [[ $1 == /bin/bash && $3 == --activate ]] || exit 99
     export MOCK_ROOT=0
     exec "$@"
@@ -344,6 +345,16 @@ describe.skipIf(process.platform !== 'linux')(
       ).toBe(false);
     });
 
+    it('supports passwordless commands without invoking sudo credential validation', async () => {
+      const f = await fixture();
+      const result = await f.run();
+      expect(result.code, result.output).toBe(0);
+      const logs = await readFile(f.log, 'utf8');
+      expect(logs).not.toContain('sudo:operator:-v');
+      expect(logs).toContain(`sudo:operator:/bin/bash ${script} --activate`);
+      expect(result.output).not.toContain('a password is required');
+    });
+
     it('offers a check-only mode with no sudo or production changes', async () => {
       const f = await fixture();
       const result = await f.run(['--check']);
@@ -357,7 +368,7 @@ describe.skipIf(process.platform !== 'linux')(
       expect(await readdir(f.releases)).toEqual(['previous']);
     });
 
-    for (const failure of ['install', 'units', 'tests', 'socket']) {
+    for (const failure of ['install', 'sudo', 'units', 'tests', 'socket']) {
       it(`leaves production untouched when ${failure} fails`, async () => {
         const f = await fixture();
         const result = await f.run([], { MOCK_FAIL: failure });
