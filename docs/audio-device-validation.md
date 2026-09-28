@@ -1,6 +1,6 @@
 # Audio experience: iPhone validation
 
-All physical-device results are **pending**. The first supported routes to check are the iPhone speaker and Bluetooth headphones. AirPlay is **unverified**. Passing a simulator test or building the app does not complete these checks.
+Hands-on listening and physical-route checks below remain **pending**. Automated physical-device scheduling evidence is recorded separately. The first supported routes to check are the iPhone speaker and Bluetooth headphones. AirPlay is **unverified**. Passing a simulator test or building the app does not complete these checks.
 
 The candidate has one known numerical gap: Apple TimePitch transient displacement reached 18.782 ms against the original 10 ms target; the position discrepancy is not cumulative drift. Conservative device buffering also makes the ≤300 ms effect-response target unverified, particularly for low-rate audio at 0.5×. Record these measurements without assuming the simulator bounds apply to hardware.
 
@@ -12,13 +12,31 @@ This worksheet follows the [audio experience plan](audio-experience-plan.md). St
 | --- | --- |
 | Date and tester | Pending |
 | iPhone model and iOS version | Pending |
-| App build / commit | Candidate `7f0ea9c`; record the exact device build tested |
+| App build / commit | Scheduling candidate `5245a9e`; record the exact device build tested |
 | Bluetooth headphones and firmware, if known | Pending |
 | Public speech episode | Pending |
 | Private-feed episode, using a local label only | Pending |
 | Music / noisy recording / quiet speech examples | Pending |
 
 Download one public episode and one existing private-feed episode completely. Choose an episode with show-note timestamps or chapters. Keep the device volume comfortable and fixed when comparing Volume Boost. Use the same source passage when comparing settings.
+
+## Scheduling regression recorded 2026-09-28
+
+The reported Home Screen transition glitch exposed PCM refill on the main actor.
+A local-file regression with both effects enabled blocks that actor for 600 ms
+three times, with 400 ms between stalls. Before isolation, the simulator recorded
+three underruns, four preparations and only 1.62 seconds of source progress over
+the three-second interval. With the dedicated audio executor, the same regression
+passes on both the iOS 27 simulator and a physical iPhone 14 Pro running iOS 27:
+zero underruns, one preparation and more than 2.7 seconds of source progress.
+Buffer sizes are unchanged.
+
+The simulator regression run passed 108 tests. After final shutdown and inspection
+changes, 50 targeted tests passed, including two new retirement tests. The physical
+iPhone also passed all three Now Playing cadence tests. Both app targets build.
+This demonstrates independence from UI-thread stalls; it does not replace listening
+to the original downloaded episode while repeatedly entering and leaving the app,
+or speaker/Bluetooth route and interruption checks.
 
 ## Hands-on checks
 

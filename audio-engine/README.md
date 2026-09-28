@@ -311,6 +311,13 @@ Disable **Measure audio** for engine power comparisons. It is always disabled
 in Podcst. The lab's separate `-AudioLabReference` launch mode uses AVPlayer and
 hides unsupported inspection/effects. See [inspection design and validation](../docs/audio-lab-inspection-plan.md).
 
+Graph control, refill scheduling and source clocks run on a dedicated serial
+audio executor. The main actor sends ordered commands and consumes coalesced
+position snapshots; a stalled UI cannot block PCM delivery. Shutdown waits for
+decoder closure before releasing media leases. Periodic Now Playing metadata
+publishes at most once per second, with controls and source changes published
+immediately.
+
 The decoder reads bounded planar Float32 blocks on a worker. The Rust speech
 processor emits retained PCM and original-source spans. Each of two native
 source Audio Units has a preallocated single-producer/single-consumer ring;
