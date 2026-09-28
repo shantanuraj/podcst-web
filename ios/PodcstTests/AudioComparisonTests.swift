@@ -91,10 +91,47 @@ final class AudioComparisonTests: XCTestCase {
             XCTAssertEqual(measurement.metrics.nonFiniteSampleCount, 0)
             let file = try AVAudioFile(forReading: XCTUnwrap(rendered.files[measurement.preset]))
             XCTAssertEqual(Double(file.length) / file.processingFormat.sampleRate, measurement.duration, accuracy: 1 / 48_000)
+            let edge = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 1))
+            try file.read(into: edge, frameCount: 1)
+            XCTAssertEqual(edge.floatChannelData?[0][0], 0)
+            file.framePosition = file.length - 1
+            try file.read(into: edge, frameCount: 1)
+            XCTAssertEqual(edge.floatChannelData?[0][0], 0)
         }
         let json = try XCTUnwrap(String(data: JSONEncoder().encode(rendered.report), encoding: .utf8))
         XCTAssertFalse(json.contains(sourceURL.path))
         XCTAssertFalse(json.contains("file:"))
+    }
+
+    func testColdPassageExcludesPrimingAndRepeatedRendersMatch() async throws {
+        let sourceURL = try fixture()
+        let passage = try AudioComparisonPassage(start: 0, end: 2)
+        let first = try await AudioComparisonRenderer.render(sourceURL: sourceURL, passage: passage, rate: 1)
+        defer { try? FileManager.default.removeItem(at: first.directory) }
+        let second = try await AudioComparisonRenderer.render(sourceURL: sourceURL, passage: passage, rate: 1)
+        defer { try? FileManager.default.removeItem(at: second.directory) }
+        for preset in AudioComparisonPreset.allCases {
+            let measurement = try XCTUnwrap(first.report.measurements.first(where: { $0.preset == preset }))
+            if preset == .off || preset == .boost {
+                XCTAssertEqual(measurement.duration, 2, accuracy: 1 / 48_000)
+            }
+            let left = try AVAudioFile(forReading: XCTUnwrap(first.files[preset]))
+            let right = try AVAudioFile(forReading: XCTUnwrap(second.files[preset]))
+            XCTAssertEqual(left.length, right.length)
+            let leftBuffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: left.processingFormat, frameCapacity: 1024))
+            let rightBuffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: right.processingFormat, frameCapacity: 1024))
+            while left.framePosition < left.length {
+                try left.read(into: leftBuffer, frameCount: 1024)
+                try right.read(into: rightBuffer, frameCount: 1024)
+                XCTAssertEqual(leftBuffer.frameLength, rightBuffer.frameLength)
+                for channel in 0..<2 {
+                    let count = Int(leftBuffer.frameLength)
+                    let leftSamples = UnsafeBufferPointer(start: leftBuffer.floatChannelData?[channel], count: count)
+                    let rightSamples = UnsafeBufferPointer(start: rightBuffer.floatChannelData?[channel], count: count)
+                    XCTAssertEqual(Array(leftSamples), Array(rightSamples))
+                }
+            }
+        }
     }
 
     private func fixture() throws -> URL {
