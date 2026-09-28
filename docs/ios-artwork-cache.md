@@ -4,7 +4,7 @@ Implementation and compression measurements from September 28, 2026. The [device
 
 ## Server contract
 
-The existing artwork service is maintained in the sibling `img_proxy` repository. Its `p` parameter identifies the source image. Adding `w=160`, `w=384`, or `w=1024` produces a WebP image whose longest edge is bounded by that size, preserving aspect ratio and orientation without enlarging small sources. The selected quality is 82. Requests without `w` continue to return original bytes for the web client.
+The existing artwork service is maintained in the sibling `img_proxy` repository. The implementation was rebased onto its latest `origin/main` at `c18bee7`, preserving the production loopback binding, exported server handler, and tracked systemd service. The server listens on `127.0.0.1` using `PORT` or 3102 by default; its public reverse proxy remains responsible for external access. Its `p` parameter identifies the source image. Adding `w=160`, `w=384`, or `w=1024` produces a WebP image whose longest edge is bounded by that size, preserving aspect ratio and orientation without enlarging small sources. The selected quality is 82. Requests without `w` continue to return original bytes for the web client.
 
 The native client should add the width parameter only to URLs already served by `assets.podcst.app`, preserving their existing source value. Direct URLs retain their existing route. This introduces no new public-proxy routing for private artwork. Image sizing and HTTP compression are separate: raster images use their image codec, while JSON uses the server's negotiated HTTP encoding.
 
@@ -50,7 +50,7 @@ No Next.js compression configuration was changed, and no custom native decoder w
 
 ## Deployment and verification
 
-1. Deploy `img_proxy` with its new Sharp dependency using the service's existing deployment process. Install dependencies for the server's OS and architecture; the service requires a Bun/Node-compatible native runtime for Sharp. This repository has no deployment manifest identifying that process.
+1. Update the `img_proxy` checkout at `/opt/img_proxy` through the existing deployment process, install dependencies there with `bun install --frozen-lockfile`, and restart `podcst-img-proxy.service`. Install Sharp for the server's OS and architecture, rather than copying Mac dependencies. The tracked `systemd/podcst-img-proxy.service` runs Bun as `svc-podcst`, with its existing sandboxing and loopback binding retained. No service-unit change is needed for this release.
 2. Verify the live proxy returns the expected WebP dimensions for each width, distinct variant ETags, the new freshness header, and 304 for a matching validator. Ensure any intermediary cache includes `w` as well as `p` in its key. The previous proxy ignores `w`; deploying the app first would still download full originals. Previously cached unparameterized responses can retain the old immutable lifetime until expiry or invalidation.
 3. Deploy `podcst-web` so database search returns `cover`, then release the native client. No database migration is needed for these server changes.
 4. Repeat the physical-device baseline sequence with cold and warm caches, then test offline relaunch. Attribute transfer reductions to live resized responses only after verifying their dimensions. Preserve the original baseline rather than replacing its whole-app memory measurements with theoretical buffer savings.
