@@ -21,6 +21,7 @@ struct ProcessedAudioBlock: Sendable {
     let applied: AppliedAudioEffects
     let allocatedBytes: UInt64
     let fileEndFrame: Int64?
+    let inspection: AudioInspectionPacket?
 }
 
 actor AudioProcessingDecoder {
@@ -40,6 +41,9 @@ actor AudioProcessingDecoder {
     private var sourceEndFrame: Int64 = 0
     private var revision: UInt64 = 0
     private var requested = AudioEffects()
+    private var inspectionEpoch: UUID?
+    private var inspection: AudioInspectionCollector?
+    private var sampleRate: Double = 0
 
     init(source: any PCMDecoder, blockFrames: AVAudioFrameCount, bufferCount: Int, outputBlockDuration: TimeInterval? = nil) {
         self.source = source
@@ -62,6 +66,8 @@ actor AudioProcessingDecoder {
         }
         let outputFrames = outputBlockDuration.map { min(blockFrames, AVAudioFrameCount(max(1, floor(info.sampleRate * $0)))) } ?? blockFrames
         processor = try EffectsWorker(info: info, effects: requested, capacity: Int(blockFrames), revision: revision)
+        sampleRate = info.sampleRate
+        inspection = inspectionEpoch.map { AudioInspectionCollector(epoch: $0, sampleRate: info.sampleRate) }
         buffers = try (0..<bufferCount).map { _ in
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: outputFrames) else { throw LocalAudioError.cannotDecode }
             return buffer
@@ -82,6 +88,12 @@ actor AudioProcessingDecoder {
         self.revision = revision
         guard !finishing else { return }
         try processor?.configure(effects, revision: revision)
+    }
+
+    func configureInspection(epoch: UUID?) {
+        guard epoch != inspectionEpoch else { return }
+        inspectionEpoch = epoch
+        inspection = sampleRate > 0 ? epoch.map { AudioInspectionCollector(epoch: $0, sampleRate: sampleRate) } : nil
     }
 
     func read(slot: Int, generation: UUID) async throws -> ProcessedAudioBlock {
@@ -107,6 +119,14 @@ actor AudioProcessingDecoder {
                 output: output,
                 spans: &spans
             )
+            if let inspection {
+                if let input, report.consumed > 0 {
+                    inspection.consume(input.lease.buffer, offset: inputOffset, count: report.consumed, sourceStart: input.sourceStart + Int64(inputOffset))
+                }
+                let sourceFrame = input.map { $0.sourceStart + Int64(inputOffset + report.consumed) } ?? sourceEndFrame
+                let measurement = try processor.inspectionMeasurement()
+                inspection.measure(gain: measurement.gain, at: sourceFrame, applied: measurement.applied)
+            }
             inputOffset += report.consumed
             drained = report.finished
             if let input, inputOffset == Int(input.lease.buffer.frameLength) {
@@ -128,7 +148,8 @@ actor AudioProcessingDecoder {
             endOfFile: drained,
             applied: try processor.applied(),
             allocatedBytes: try sourceBytes + processor.allocatedBytes() + UInt64(bufferCount) * UInt64(output.frameCapacity) * UInt64(output.format.channelCount) * 4,
-            fileEndFrame: drained ? sourceEndFrame : nil
+            fileEndFrame: drained ? sourceEndFrame : nil,
+            inspection: inspection?.take(output: output, spans: spans, ended: drained)
         )
     }
 
@@ -151,6 +172,8 @@ actor AudioProcessingDecoder {
         guard self.generation == generation else { return }
         self.generation = UUID()
         processor = nil
+        inspection = nil
+        sampleRate = 0
         input = nil
         buffers = []
         leased = []
@@ -231,6 +254,11 @@ private final class EffectsWorker {
 
     func allocatedBytes() throws -> UInt64 {
         try information().allocated_bytes + UInt64((input.count + output.count) * MemoryLayout<Float>.stride + spans.count * MemoryLayout<PodcstSourceSpan>.stride)
+    }
+
+    func inspectionMeasurement() throws -> (gain: Float, applied: AppliedAudioEffects) {
+        let info = try information()
+        return (info.boost_gain_db, AppliedAudioEffects(effects: AudioEffects(volumeBoost: info.boost_enabled != 0, trimSilence: info.trim_enabled != 0), sourceFrame: Int64(info.applied_source_frame), revision: info.applied_revision))
     }
 
     private func information() throws -> PodcstEffectsInfo {
