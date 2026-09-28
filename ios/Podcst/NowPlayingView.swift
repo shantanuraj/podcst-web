@@ -76,7 +76,7 @@ private struct FullPlayer: View {
     var body: some View {
         let chapters = playback.chapters
         VStack(spacing: 0) {
-            ArtworkView(url: episode.artworkURL)
+            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover))
                 .frame(maxWidth: 300)
                 .shadow(color: .black.opacity(0.4), radius: 30, y: 22)
                 .padding(.horizontal, 16)
@@ -149,7 +149,7 @@ private struct CompactPlayer: View {
             HStack(spacing: 12) {
                 Button(action: expand) {
                     HStack(spacing: 12) {
-                        ArtworkView(url: episode.artworkURL, size: 56)
+                        ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 56)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(episode.title)
                                 .font(.serif(.title3))

@@ -33,6 +33,12 @@ struct DiscoverView: View {
         .screenHeader("Discover") { AccountButton() }
         .refreshable { await loadTop(forceRefresh: true) }
         .task(id: region) { await loadTop() }
+        .task(id: topPodcasts.map(\.artworkURL)) {
+            let urls = topPodcasts.compactMap(\.artworkURL)
+            if let first = urls.first { await ArtworkStore.shared.prefetch([first], pixelSize: 384) }
+            guard !Task.isCancelled else { return }
+            await ArtworkStore.shared.prefetch(Array(urls.dropFirst()), pixelSize: 160)
+        }
     }
 
     private func loadTop(forceRefresh: Bool = false) async {

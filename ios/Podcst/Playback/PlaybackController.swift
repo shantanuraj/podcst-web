@@ -4,9 +4,11 @@ import Observation
 import Foundation
 import UIKit
 
-private func makeNowPlayingArtwork(data: Data, size: CGSize) -> MPMediaItemArtwork {
-    MPMediaItemArtwork(boundsSize: size) { _ in
-        UIImage(data: data) ?? UIImage()
+func makeNowPlayingArtwork(image: UIImage) -> MPMediaItemArtwork {
+    MPMediaItemArtwork(boundsSize: image.size) { size in
+        guard size.width > 0, size.height > 0,
+              size.width < image.size.width || size.height < image.size.height else { return image }
+        return image.preparingThumbnail(of: size) ?? image
     }
 }
 
@@ -747,12 +749,11 @@ public final class PlaybackController {
             guard let self else { return }
             for url in urls {
                 guard !Task.isCancelled else { return }
-                if let image = await ArtworkStore.shared.image(url) {
+                if let image = await ArtworkStore.shared.image(url, pixelSize: 1024) {
                     guard !Task.isCancelled,
                           self.artworkKey == key,
                           self.currentEpisode?.identity == identity else { return }
-                    guard let data = image.jpegData(compressionQuality: 0.9) else { return }
-                    self.nowPlayingArtwork = makeNowPlayingArtwork(data: data, size: image.size)
+                    self.nowPlayingArtwork = makeNowPlayingArtwork(image: image)
                     self.updateNowPlayingInfo()
                     return
                 }

@@ -76,7 +76,7 @@ private struct DownloadRow: View {
             HStack(alignment: .top, spacing: 12) {
                 NavigationLink(value: Route.episode(episode)) {
                     HStack(alignment: .top, spacing: 12) {
-                        ArtworkView(url: episode.artworkURL, size: 56)
+                        ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 56)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(episode.title)
                                 .font(.serif(.body))

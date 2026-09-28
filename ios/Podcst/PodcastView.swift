@@ -205,7 +205,7 @@ struct EpisodeRow: View {
                 HStack(spacing: 14) {
                     switch lead {
                     case .date: DateBlock(date: episode.published)
-                    case .artwork: ArtworkView(url: episode.artworkURL, size: 48)
+                    case .artwork: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(episode.title)
@@ -259,7 +259,7 @@ struct EpisodeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 16) {
-                    ArtworkView(url: episode.artworkURL, size: 96)
+                    ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 96)
                     Text(episode.dateline)
                         .eyebrow()
                 }

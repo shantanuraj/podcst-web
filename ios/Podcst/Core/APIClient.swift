@@ -68,7 +68,7 @@ public final class APIClient {
 
     public func search(term: String, locale: String = "us") async throws -> [Podcast] {
         let rows: [RawSearchResult] = try await get(path: "/api/search", query: [URLQueryItem(name: "term", value: term), URLQueryItem(name: "locale", value: locale)])
-        return rows.map { Podcast(feed: $0.feed, title: $0.title, author: $0.author, cover: $0.thumbnail, thumbnail: $0.thumbnail) }
+        return rows.map { Podcast(feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail) }
     }
 
     public func cachedPodcast(id: Int? = nil, feed: String) -> Podcast? {
@@ -761,7 +761,7 @@ private struct RawPasskeyOptions: Decodable {
 private struct RawPasskeyDescriptor: Decodable { var id: String }
 private struct RawSession: Decodable { var user: RawUser? }
 private struct RawUser: Decodable { var id: String; var email: String; var name: String?; var image: String?; var hasPasskey: Bool }
-private struct RawSearchResult: Decodable { var author: String; var feed: String; var thumbnail: String; var title: String }
+private struct RawSearchResult: Decodable { var author: String; var feed: String; var cover: String; var thumbnail: String; var title: String }
 private struct RawEpisodePage: Decodable { var episodes: [RawEpisode]; var total: Int; var hasMore: Bool; var nextCursor: Int? }
 private struct RawProgress: Decodable { var episode: RawEpisode; var position: Double }
 private struct RawPodcastInfo: Decodable { var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
