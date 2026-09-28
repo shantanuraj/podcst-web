@@ -83,9 +83,7 @@ struct SearchView: View {
             if feedURL != nil {
                 results = [try await api.podcast(feed: term)]
             } else {
-                results = try await api.search(term: term, locale: region).map {
-                    Podcast(id: $0.id, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.thumbnail, thumbnail: $0.thumbnail)
-                }
+                results = try await api.search(term: term, locale: region)
             }
         } catch {
             guard !Task.isCancelled else { return }
