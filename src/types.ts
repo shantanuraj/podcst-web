@@ -237,6 +237,7 @@ export interface IPaginatedEpisodes {
  */
 export interface IPodcastSearchResult {
   id?: number;
+  itunes_id?: number;
   author: string;
   feed: string;
   cover: string;

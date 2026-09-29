@@ -1,7 +1,7 @@
 import { adaptResponse } from '@/app/api/adapter';
 import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
 import { sql } from '@/server/db';
-import { searchPodcastsByFeedUrl } from '@/server/search';
+import { matchSearchResults, searchPodcastsByFeedUrl } from '@/server/search';
 import type { IPodcastSearchResult, iTunes } from '@/types';
 
 export async function search(term: string, locale = DEFAULT_PODCASTS_LOCALE) {
@@ -24,7 +24,7 @@ async function searchByTerm(
     () => [] as IPodcastSearchResult[],
   );
 
-  return itunesResults;
+  return matchSearchResults(sql, itunesResults);
 }
 
 const URL_REGEX = /^https?:\//;

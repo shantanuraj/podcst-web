@@ -508,13 +508,3 @@ export async function getEpisodeWithPodcast(
 
   return { episode, podcast };
 }
-
-export async function getPodcastIdByItunesId(
-  itunesId: string,
-): Promise<number | null> {
-  const [podcast] = await sql`
-    SELECT id FROM podcasts WHERE itunes_id = ${itunesId} LIMIT 1
-  `;
-
-  return podcast ? (podcast.id as number) : null;
-}
