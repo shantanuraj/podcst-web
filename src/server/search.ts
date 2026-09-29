@@ -1,6 +1,27 @@
 import type postgres from 'postgres';
 import type { IPodcastSearchResult } from '@/types';
 
+export async function matchSearchResults(
+  sql: postgres.ISql,
+  results: IPodcastSearchResult[],
+): Promise<IPodcastSearchResult[]> {
+  const ids = results.flatMap((result) =>
+    result.itunes_id === undefined ? [] : [result.itunes_id],
+  );
+  if (ids.length === 0) return results;
+  const rows = await sql`
+    SELECT id, itunes_id, feed_url FROM podcasts
+    WHERE itunes_id = ANY(${ids}::bigint[])
+  `;
+  const byItunesId = new Map(rows.map((row) => [Number(row.itunes_id), row]));
+  return results.map((result) => {
+    const existing = byItunesId.get(result.itunes_id ?? 0);
+    return existing
+      ? { ...result, id: Number(existing.id), feed: existing.feed_url }
+      : result;
+  });
+}
+
 export async function searchPodcasts(
   sql: postgres.ISql,
   term: string,
@@ -14,7 +35,8 @@ export async function searchPodcasts(
 
   const rows = await sql`
     SELECT
-      p.itunes_id AS id,
+      p.id,
+      p.itunes_id,
       p.title,
       p.feed_url,
       p.thumbnail,
@@ -32,6 +54,7 @@ export async function searchPodcasts(
 
   return rows.map((row) => ({
     id: Number(row.id),
+    itunes_id: Number(row.itunes_id),
     title: row.title,
     feed: row.feed_url,
     cover: row.cover,
@@ -46,7 +69,8 @@ export async function searchPodcastsByFeedUrl(
 ): Promise<IPodcastSearchResult | null> {
   const [row] = await sql`
     SELECT
-      p.itunes_id AS id,
+      p.id,
+      p.itunes_id,
       p.title,
       p.feed_url,
       p.thumbnail,
@@ -60,7 +84,8 @@ export async function searchPodcastsByFeedUrl(
   if (!row) return null;
 
   return {
-    id: row.id === null ? undefined : Number(row.id),
+    id: Number(row.id),
+    itunes_id: row.itunes_id === null ? undefined : Number(row.itunes_id),
     title: row.title,
     feed: row.feed_url,
     cover: row.cover,

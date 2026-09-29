@@ -68,7 +68,7 @@ public final class APIClient {
 
     public func search(term: String, locale: String = "us") async throws -> [Podcast] {
         let rows: [RawSearchResult] = try await get(path: "/api/search", query: [URLQueryItem(name: "term", value: term), URLQueryItem(name: "locale", value: locale)])
-        return rows.map { Podcast(feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail) }
+        return rows.map { Podcast(id: $0.id, itunesId: $0.itunesId, itunesLocale: locale, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail) }
     }
 
     public func cachedPodcast(id: Int? = nil, feed: String) -> Podcast? {
@@ -113,6 +113,12 @@ public final class APIClient {
                     episodes: catalogueResult.episodes
                 )
             }
+        }
+        if let itunesId = podcast.itunesId {
+            let identity: RawPodcastIdentity = try await post(path: "/api/feed/resolve", body: ResolvePodcastBody(itunes_id: itunesId, locale: podcast.itunesLocale ?? "us"))
+            var resolved = podcast
+            resolved.id = identity.id
+            return try await detail(of: resolved, forceRefresh: forceRefresh)
         }
         let resolved = try await self.podcast(feed: podcast.feed, forceRefresh: forceRefresh)
         guard resolved.id != nil else { return resolved }
@@ -762,7 +768,19 @@ private struct RawPasskeyOptions: Decodable {
 private struct RawPasskeyDescriptor: Decodable { var id: String }
 private struct RawSession: Decodable { var user: RawUser? }
 private struct RawUser: Decodable { var id: String; var email: String; var name: String?; var image: String?; var hasPasskey: Bool }
-private struct RawSearchResult: Decodable { var author: String; var feed: String; var cover: String; var thumbnail: String; var title: String }
+private struct ResolvePodcastBody: Encodable { var itunes_id: Int; var locale: String }
+private struct RawPodcastIdentity: Decodable { var id: Int }
+private struct RawSearchResult: Decodable {
+    var id: Int?
+    var itunesId: Int?
+    var author: String
+    var feed: String
+    var cover: String
+    var thumbnail: String
+    var title: String
+
+    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", author, feed, cover, thumbnail, title }
+}
 private struct RawEpisodePage: Decodable { var episodes: [RawEpisode]; var total: Int; var hasMore: Bool; var nextCursor: Int? }
 private struct RawProgress: Decodable { var episode: RawEpisode; var position: Double }
 private struct RawPodcastInfo: Decodable { var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }

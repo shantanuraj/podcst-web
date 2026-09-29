@@ -33,49 +33,96 @@ final class FeedCacheTests: XCTestCase {
         XCTAssertEqual(DetailURLProtocol.requests.count, 3)
     }
 
-    func testSearchResolvesAppleIdentityThroughFeedBeforeLoadingFullCatalogue() async throws {
-        let externalID = 1253186678
-        let searchResult: [String: Any] = [
-            "id": externalID,
-            "feed": "https://example.com/feed.xml",
-            "title": "Example",
-            "author": "Author",
-            "cover": "https://example.com/cover.jpg",
-            "thumbnail": "https://example.com/thumbnail.jpg",
-        ]
-        var preview = Self.podcastPayload(episodeCount: 3)
-        preview["episodes"] = [Self.episodePayload(id: 1), Self.episodePayload(id: 2)]
-        let catalogue: [String: Any] = [
-            "episodes": [Self.episodePayload(id: 1), Self.episodePayload(id: 2), Self.episodePayload(id: 3)],
-            "total": 3,
-            "hasMore": false,
-        ]
+    func testSearchUsesDatabaseIdentityAndResolvesOnlyUnindexedAppleResults() async throws {
+        for databaseID in [9001, nil] as [Int?] {
+            let externalID = 6806963519
+            var searchResult: [String: Any] = [
+                "itunes_id": externalID,
+                "feed": "https://example.com/migrated-feed.xml",
+                "title": "Example",
+                "author": "Author",
+                "cover": "https://example.com/cover.jpg",
+                "thumbnail": "https://example.com/thumbnail.jpg",
+            ]
+            searchResult["id"] = databaseID
+            let catalogue: [String: Any] = [
+                "episodes": [Self.episodePayload(id: 1), Self.episodePayload(id: 2), Self.episodePayload(id: 3)],
+                "total": 3,
+                "hasMore": false,
+            ]
+            DetailURLProtocol.responses = [
+                "/api/search": try JSONSerialization.data(withJSONObject: [searchResult]),
+                "/api/feed/resolve": Data(#"{"id":9001}"#.utf8),
+                "/api/feed/info": try JSONSerialization.data(withJSONObject: Self.podcastPayload(episodeCount: 3)),
+                "/api/feed/episodes": try JSONSerialization.data(withJSONObject: catalogue),
+            ]
+            defer { DetailURLProtocol.reset() }
+
+            let api = makeAPI()
+            let results = try await api.search(term: "Example", locale: "nl")
+            let podcast = try XCTUnwrap(results.first)
+            XCTAssertEqual(podcast.id, databaseID)
+            XCTAssertEqual(podcast.itunesId, externalID)
+            XCTAssertEqual(podcast.cover, "https://example.com/cover.jpg")
+            XCTAssertEqual(DetailURLProtocol.requests.count, 1)
+
+            let detail = try await api.detail(of: podcast)
+
+            XCTAssertEqual(detail.id, 9001)
+            XCTAssertEqual(detail.feed, "https://example.com/feed.xml")
+            XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
+            XCTAssertEqual(DetailURLProtocol.requests.count, databaseID == nil ? 4 : 3)
+            let infoRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/info" })
+            let episodesRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/episodes" })
+            XCTAssertEqual(Self.query("id", in: infoRequest), "9001")
+            XCTAssertEqual(Self.query("podcastId", in: episodesRequest), "9001")
+            XCTAssertFalse(DetailURLProtocol.requests.contains { $0.url?.path == "/api/feed" })
+            let resolution = DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/resolve" }
+            if databaseID == nil {
+                let request = try XCTUnwrap(resolution)
+                XCTAssertEqual(request.httpMethod, "POST")
+                let body = try XCTUnwrap(request.httpBody)
+                let values = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+                XCTAssertEqual(values["itunes_id"] as? Int, externalID)
+                XCTAssertEqual(values["locale"] as? String, "nl")
+                XCTAssertNil(values["id"])
+            } else {
+                XCTAssertNil(resolution)
+            }
+        }
+    }
+
+    func testAppleResolutionFailuresNeverFallBackToFeedIngestion() async throws {
+        for status in [404, 409, 502] {
+            DetailURLProtocol.responses = ["/api/feed/resolve": Data(#"{"message":"Cannot resolve"}"#.utf8)]
+            DetailURLProtocol.statuses = ["/api/feed/resolve": status]
+            defer { DetailURLProtocol.reset() }
+            let api = makeAPI()
+            let podcast = Podcast(itunesId: 1614253637, feed: "https://example.com/migrated-feed.xml", title: "Search Engine")
+            do {
+                _ = try await api.detail(of: podcast)
+                XCTFail("Resolution errors must be surfaced")
+            } catch {
+                XCTAssertEqual((error as? APIError)?.statusCode, status)
+            }
+            XCTAssertEqual(DetailURLProtocol.requests.map { $0.url?.path }, ["/api/feed/resolve"])
+        }
+    }
+
+    func testForcedAppleDetailResolvesBeforeRefreshingTheInternalID() async throws {
         DetailURLProtocol.responses = [
-            "/api/search": try JSONSerialization.data(withJSONObject: [searchResult]),
-            "/api/feed": try JSONSerialization.data(withJSONObject: preview),
-            "/api/feed/info": try JSONSerialization.data(withJSONObject: Self.podcastPayload(episodeCount: 3)),
-            "/api/feed/episodes": try JSONSerialization.data(withJSONObject: catalogue),
+            "/api/feed/resolve": Data(#"{"id":9001}"#.utf8),
+            "/api/feed/refresh": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3])),
         ]
         defer { DetailURLProtocol.reset() }
-
         let api = makeAPI()
-        let results = try await api.search(term: "Example")
-        let podcast = try XCTUnwrap(results.first)
-        XCTAssertNil(podcast.id)
-        XCTAssertEqual(podcast.cover, "https://example.com/cover.jpg")
-
-        let detail = try await api.detail(of: podcast)
-
+        let podcast = Podcast(itunesId: 1614253637, feed: "https://example.com/feed.xml", title: "Example")
+        let detail = try await api.detail(of: podcast, forceRefresh: true)
         XCTAssertEqual(detail.id, 9001)
-        XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
-        XCTAssertEqual(DetailURLProtocol.requests.count, 4)
-        let feedRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed" })
-        let infoRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/info" })
-        let episodesRequest = try XCTUnwrap(DetailURLProtocol.requests.first { $0.url?.path == "/api/feed/episodes" })
-        XCTAssertEqual(Self.query("url", in: feedRequest), podcast.feed)
-        XCTAssertEqual(Self.query("id", in: infoRequest), "9001")
-        XCTAssertEqual(Self.query("podcastId", in: episodesRequest), "9001")
-        XCTAssertFalse(DetailURLProtocol.requests.contains { $0.url?.absoluteString.contains(String(externalID)) == true })
+        XCTAssertEqual(DetailURLProtocol.requests.map { $0.url?.path }, ["/api/feed/resolve", "/api/feed/refresh"])
+        let body = try XCTUnwrap(DetailURLProtocol.requests.last?.httpBody)
+        let values = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(values["podcastId"] as? Int, 9001)
     }
 
     func testForcedPodcastDetailRefreshesCompleteCachedCatalogue() async throws {
@@ -311,7 +358,20 @@ private final class DetailURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: APIError(statusCode: 0, message: "Missing URL"))
             return
         }
-        Self.requests.append(request)
+        var recorded = request
+        if recorded.httpBody == nil, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var data = Data()
+            var buffer = [UInt8](repeating: 0, count: 1024)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                guard count > 0 else { break }
+                data.append(contentsOf: buffer.prefix(count))
+            }
+            recorded.httpBody = data
+        }
+        Self.requests.append(recorded)
         let key = url.path + (url.query?.contains("cursor=200") == true ? "?cursor=200" : "")
         guard let data = Self.responses[key] else {
             client?.urlProtocol(self, didFailWithError: APIError(statusCode: 404, message: "Missing fixture"))

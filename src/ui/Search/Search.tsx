@@ -9,18 +9,12 @@ import { useSearch } from '@/data/search';
 import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { useKeydown } from '@/shared/keyboard/useKeydown';
+import { getSearchResultHref } from '@/shared/links';
 import type { IPodcastSearchResult } from '@/types';
 import { ProxiedImage } from '@/ui/Image';
 import { LoadBar } from '@/ui/LoadBar';
 
 import styles from './Search.module.css';
-
-function getSearchResultHref(result: IPodcastSearchResult): string {
-  if (result.id) {
-    return `/itunes/${result.id}`;
-  }
-  return `/episodes/${encodeURIComponent(result.feed)}`;
-}
 
 export function Search() {
   const router = useRouter();
@@ -103,7 +97,11 @@ const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({
   podcast,
 }) => {
   return (
-    <Link href={getSearchResultHref(podcast)} className={styles.searchItem}>
+    <Link
+      href={getSearchResultHref(podcast)}
+      prefetch={false}
+      className={styles.searchItem}
+    >
       <ProxiedImage
         loading="lazy"
         alt={`${podcast.title} by ${podcast.author}`}

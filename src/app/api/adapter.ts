@@ -2,18 +2,17 @@
  * Podcast adapter module
  */
 
-import type { IPodcast, iTunes } from '@/types';
+import type { IPodcastSearchResult, iTunes } from '@/types';
 
 /**
  * Adapt iTunes podcast to App podcast
  */
-export const adaptPodcast = (podcast: iTunes.Podcast): IPodcast => ({
-  id: podcast.collectionId,
+export const adaptPodcast = (
+  podcast: iTunes.Podcast,
+): IPodcastSearchResult => ({
+  itunes_id: podcast.collectionId,
   author: podcast.artistName,
-  categories: podcast.genreIds.map((c) => parseInt(c, 10)),
-  count: podcast.trackCount,
   cover: podcast.artworkUrl600,
-  explicit: podcast.collectionExplicitness,
   feed:
     podcast.feedUrl ||
     feedURLExceptions[podcast.collectionId as keyof typeof feedURLExceptions],
@@ -24,7 +23,10 @@ export const adaptPodcast = (podcast: iTunes.Podcast): IPodcast => ({
 /**
  * Filters out podcasts without feed URL
  */
-const withFeed = (podcast: IPodcast): boolean => !!podcast.feed;
+const withFeed = (podcast: IPodcastSearchResult): boolean =>
+  !!podcast.feed &&
+  Number.isSafeInteger(podcast.itunes_id) &&
+  (podcast.itunes_id ?? 0) > 0;
 
 /**
  * Adapt iTunes response

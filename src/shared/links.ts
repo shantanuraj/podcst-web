@@ -1,4 +1,14 @@
-import type { IEpisodeInfo, RenderablePodcast } from '@/types';
+import type {
+  IEpisodeInfo,
+  IPodcastSearchResult,
+  RenderablePodcast,
+} from '@/types';
+
+export function getSearchResultHref(result: IPodcastSearchResult): string {
+  if (result.id) return getPodcastHref(result);
+  if (result.itunes_id) return `/itunes/${result.itunes_id}`;
+  return getPodcastHref(result);
+}
 
 export function getPodcastHref(
   podcast: Pick<RenderablePodcast, 'id' | 'feed'>,

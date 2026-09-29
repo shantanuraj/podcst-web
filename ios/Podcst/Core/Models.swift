@@ -59,6 +59,8 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
 
 public struct Podcast: Codable, Hashable, Sendable, Identifiable {
     public var id: Int?
+    public var itunesId: Int?
+    public var itunesLocale: String?
     public var feed: String
     public var title: String
     public var author: String
@@ -72,8 +74,10 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
     public var episodeCount: Int
     public var episodes: [Episode]
 
-    public init(id: Int? = nil, feed: String, title: String, author: String = "", cover: String = "", thumbnail: String = "", description: String = "", link: String? = nil, published: Date? = nil, explicit: Bool = false, keywords: [String] = [], episodeCount: Int = 0, episodes: [Episode] = []) {
+    public init(id: Int? = nil, itunesId: Int? = nil, itunesLocale: String? = nil, feed: String, title: String, author: String = "", cover: String = "", thumbnail: String = "", description: String = "", link: String? = nil, published: Date? = nil, explicit: Bool = false, keywords: [String] = [], episodeCount: Int = 0, episodes: [Episode] = []) {
         self.id = id
+        self.itunesId = itunesId
+        self.itunesLocale = itunesLocale
         self.feed = feed
         self.title = title
         self.author = author
