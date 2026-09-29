@@ -1,11 +1,18 @@
 import Foundation
 import MediaPlayer
+import SwiftUI
 import UIKit
 import XCTest
 @testable import Podcst
 
 @MainActor
 final class ArtworkStoreTests: XCTestCase {
+    func testArtworkRendersWithoutAnAccountSession() throws {
+        let renderer = ImageRenderer(content: ArtworkView(url: nil, size: 52))
+        let image = try XCTUnwrap(renderer.uiImage)
+        XCTAssertEqual(image.size, CGSize(width: 52, height: 52))
+    }
+
     func testFramePixelsSelectSmallestSufficientVariant() {
         XCTAssertEqual(ArtworkStore.pixelSize(for: 44, scale: 3), 160)
         XCTAssertEqual(ArtworkStore.pixelSize(for: 52, scale: 3), 160)

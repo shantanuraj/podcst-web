@@ -54,11 +54,11 @@ private struct ArtworkImage: View {
     let fallbackURL: URL?
     let pixels: Int
     let policy: ArtworkPolicy
-    @Environment(SessionStore.self) private var session
+    @Environment(SessionStore.self) private var session: SessionStore?
     @State private var loaded: (Identity, UIImage)?
 
     private var identity: Identity {
-        Identity(url: url, fallback: fallbackURL, pixels: pixels, accountID: session.user?.id)
+        Identity(url: url, fallback: fallbackURL, pixels: pixels, accountID: session?.user?.id)
     }
 
     private var image: UIImage? {
