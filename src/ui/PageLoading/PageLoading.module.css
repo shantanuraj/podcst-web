@@ -10,6 +10,21 @@
   height: 1rem;
 }
 
+.meta {
+  align-self: stretch;
+}
+
+.title {
+  width: min(100%, 24rem);
+  height: 2rem;
+  margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+  width: 12rem;
+  height: 1.25rem;
+}
+
 .action {
   width: 8rem;
   height: 2.5rem;

@@ -10,15 +10,19 @@ export function PodcastLoading() {
 
   return (
     <section className={podcastStyles.header} aria-busy="true">
+      <span className="sr-only" role="status">
+        {t('common.loading')}
+      </span>
       <div className={podcastStyles.top}>
         <div
           className={`${podcastStyles.artwork} ${styles.placeholder}`}
           aria-hidden="true"
         />
-        <div className={podcastStyles.meta}>
-          <p className={podcastStyles.title} role="status">
-            {t('common.loading')}
-          </p>
+        <div className={`${podcastStyles.meta} ${styles.meta}`}>
+          <div
+            className={`${styles.line} ${styles.title}`}
+            aria-hidden="true"
+          />
           <div className={styles.line} aria-hidden="true" />
           <div className={styles.action} aria-hidden="true" />
         </div>
@@ -37,10 +41,14 @@ export function PodcastsLoading() {
 
   return (
     <section className={gridStyles.container} aria-busy="true">
+      <span className="sr-only" role="status">
+        {t('common.loading')}
+      </span>
       <div className={gridStyles.sectionHeader}>
-        <p className={gridStyles.sectionTitle} role="status">
-          {t('common.loading')}
-        </p>
+        <div
+          className={`${styles.line} ${styles.sectionTitle}`}
+          aria-hidden="true"
+        />
       </div>
       <div className={gridStyles.grid} aria-hidden="true">
         {Array.from({ length: 10 }, (_, index) => (

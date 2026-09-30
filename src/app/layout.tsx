@@ -76,7 +76,10 @@ export default function App({ children }: { children: React.ReactNode }) {
             <Init />
             <ThemeListener />
             <SiteHeader />
-            <main className={styles.main}>{children}</main>
+            <main className={styles.main}>
+              <div id="page-loading" />
+              {children}
+            </main>
             <Player />
             <Toast />
             <CastManager />

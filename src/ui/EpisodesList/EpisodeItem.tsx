@@ -1,14 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { memo } from 'react';
 import { localeForLanguage } from '@/messages';
 import { useTranslation } from '@/shared/i18n';
 import { getEpisodeHref } from '@/shared/links';
-import type { IEpisodeInfo, IPodcastInfo } from '@/types';
+import type { IEpisodeInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
 import { ProxiedImage } from '@/ui/Image';
+import { PageLink } from '@/ui/PageLink/PageLink';
 
 import styles from './EpisodeItem.module.css';
 
@@ -31,7 +31,11 @@ function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {
 
   return (
     <div className={styles.container}>
-      <Link href={getEpisodeHref(episode, podcastId)} className={styles.link}>
+      <PageLink
+        href={getEpisodeHref(episode, podcastId)}
+        className={styles.link}
+        loading="podcast"
+      >
         <div className={styles.artwork}>
           <ProxiedImage
             loading="lazy"
@@ -48,7 +52,7 @@ function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {
           <h3 className={styles.title}>{title}</h3>
           {minutes > 0 && <div className={styles.duration}>{minutes} min</div>}
         </div>
-      </Link>
+      </PageLink>
       <div className={styles.actions}>
         <PlayButton icon episode={episode} />
         <QueueButton episode={episode} />
