@@ -6,6 +6,7 @@ import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { LocaleSwitcher } from '@/ui/LocaleSwitcher';
+import { PageLink } from '@/ui/PageLink/PageLink';
 import { Search } from '@/ui/Search/Search';
 
 import styles from './SiteHeader.module.css';
@@ -24,12 +25,17 @@ export function SiteHeader() {
   return (
     <header className={styles.header}>
       <div className={styles.container}>
-        <Link href="/feed/top" className={styles.wordmark}>
+        <PageLink
+          href="/feed/top"
+          className={styles.wordmark}
+          loading="podcasts"
+        >
           {t('common.appName')}
-        </Link>
+        </PageLink>
         <nav className={styles.nav}>
-          <Link
+          <PageLink
             href="/feed/top"
+            loading="podcasts"
             className={styles.navLink}
             data-active={
               pathname === '/feed/top' ||
@@ -38,7 +44,7 @@ export function SiteHeader() {
             }
           >
             {t('nav.discover')}
-          </Link>
+          </PageLink>
           <Link
             href={libraryHref}
             className={styles.navLink}

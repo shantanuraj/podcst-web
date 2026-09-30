@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { getPodcastHref } from '@/shared/links';
 import type { RenderablePodcast } from '@/types';
 import { ProxiedImage } from '@/ui/Image';
+import { PageLink } from '@/ui/PageLink/PageLink';
 
 import styles from './PodcastTile.module.css';
 
@@ -14,7 +14,11 @@ export function PodcastTile({ podcast, priority = false }: PodcastTileProps) {
   const { author, cover, title } = podcast;
 
   return (
-    <Link href={getPodcastHref(podcast)} className={styles.tile}>
+    <PageLink
+      href={getPodcastHref(podcast)}
+      className={styles.tile}
+      loading="podcast"
+    >
       <div className={styles.artwork}>
         <ProxiedImage
           src={cover || undefined}
@@ -26,6 +30,6 @@ export function PodcastTile({ podcast, priority = false }: PodcastTileProps) {
       </div>
       <h3 className={styles.title}>{title}</h3>
       <p className={styles.author}>{author}</p>
-    </Link>
+    </PageLink>
   );
 }

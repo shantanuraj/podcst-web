@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { localeForLanguage } from '@/messages';
 import { translations } from '@/shared/i18n/server';
 import { getPodcastHref } from '@/shared/links';
@@ -8,6 +7,7 @@ import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
+import { PageLink } from '@/ui/PageLink/PageLink';
 
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';
@@ -52,7 +52,9 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             )}
           </h1>
           <p className={styles.podcast}>
-            <Link href={getPodcastHref(podcast)}>{podcast.title}</Link>
+            <PageLink href={getPodcastHref(podcast)} loading="podcast">
+              {podcast.title}
+            </PageLink>
             {podcast.link && (
               <ExternalLink href={podcast.link}>
                 <Icon icon="external-link" size={14} />
