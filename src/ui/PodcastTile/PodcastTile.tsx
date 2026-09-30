@@ -7,9 +7,10 @@ import styles from './PodcastTile.module.css';
 
 type PodcastTileProps = {
   podcast: RenderablePodcast;
+  priority?: boolean;
 };
 
-export function PodcastTile({ podcast }: PodcastTileProps) {
+export function PodcastTile({ podcast, priority = false }: PodcastTileProps) {
   const { author, cover, title } = podcast;
 
   return (
@@ -18,7 +19,8 @@ export function PodcastTile({ podcast }: PodcastTileProps) {
         <ProxiedImage
           src={cover || undefined}
           alt=""
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
           sizes="(min-width: 1280px) 201.6px, (min-width: 1152px) 258px, (min-width: 1024px) calc((100vw - 120px) / 4), (min-width: 640px) calc((100vw - 112px) / 3), calc((100vw - 80px) / 2)"
         />
       </div>

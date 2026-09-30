@@ -1,0 +1,42 @@
+.placeholder,
+.cover,
+.line,
+.action {
+  background-color: var(--color-rule);
+}
+
+.line {
+  width: min(100%, 32rem);
+  height: 1rem;
+}
+
+.action {
+  width: 8rem;
+  height: 2.5rem;
+  margin-top: var(--space-6);
+}
+
+.details {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-rule);
+}
+
+.details .line:nth-child(2) {
+  width: min(100%, 40rem);
+}
+
+.details .line:last-child {
+  width: min(75%, 24rem);
+}
+
+.tile {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.cover {
+  aspect-ratio: 1;
+}

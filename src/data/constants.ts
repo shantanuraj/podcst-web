@@ -38,10 +38,7 @@ export const KEY_PARSED_FEED = 'feed';
  */
 export const KEY_SHORT_URL = 'short';
 
-/**
- * Time delta to determine if cache is stale in seconds
- */
-export const CACHE_STALE_DELTA = 3600; // 1 hour
+export const CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 
 /**
  * Image proxy URL

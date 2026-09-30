@@ -12,6 +12,7 @@ import {
 } from '@/server/ingest/podcast';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
+import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
 import { EpisodesNotFound } from './EpisodesNotFound';
 import { FeedRefresh } from './FeedRefresh';
@@ -60,9 +61,11 @@ export async function generateMetadata(props: {
   const parsed = parseSlugs(params.slugs);
 
   if (parsed.type === 'id' && parsed.episodeId) {
-    const episode = await getEpisodeById(parsed.episodeId);
+    const [episode, podcast] = await Promise.all([
+      getEpisodeById(parsed.episodeId),
+      getPodcastInfoById(parsed.podcastId),
+    ]);
     if (episode) {
-      const podcast = await getPodcastInfoById(parsed.podcastId);
       const url = `/episodes/${parsed.podcastId}/${parsed.episodeId}`;
       return {
         title: episode.title,
@@ -185,10 +188,13 @@ export default async function Page(props: {
     if (initialEpisodes.episodes.length === 0) {
       const infoData = { ...podcast, episodes: [] };
       return (
-        <>
+        <EpisodesHydration
+          podcastId={parsed.podcastId}
+          initialData={initialEpisodes}
+        >
           <FeedRefresh podcastId={parsed.podcastId} empty />
           <PodcastInfo info={infoData} />
-        </>
+        </EpisodesHydration>
       );
     }
 
@@ -200,13 +206,14 @@ export default async function Page(props: {
       <>
         <FeedRefresh podcastId={parsed.podcastId} />
         <PodcastSeriesSchema podcast={schemaData} url={url} />
-        <PaginatedEpisodesList
+        <EpisodesHydration
           podcastId={parsed.podcastId}
-          podcast={podcast}
           initialData={initialEpisodes}
         >
-          <PodcastInfo info={infoData} />
-        </PaginatedEpisodesList>
+          <PaginatedEpisodesList podcastId={parsed.podcastId} podcast={podcast}>
+            <PodcastInfo info={infoData} />
+          </PaginatedEpisodesList>
+        </EpisodesHydration>
       </>
     );
   }

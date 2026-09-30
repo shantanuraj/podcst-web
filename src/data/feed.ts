@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { hashKey, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import type {
@@ -8,6 +8,7 @@ import type {
   IPodcastInfo,
 } from '@/types';
 import { get } from './api';
+import { episodesQueryKey } from './episode-query';
 import { patchEpisodesResponse } from './episodes';
 
 const fetchFeed = async (
@@ -118,33 +119,21 @@ const fetchEpisodesPaginated = async (
   return res;
 };
 
-export const useEpisodesInfinite = (
-  options: EpisodesQueryOptions,
-  initialData?: IPaginatedEpisodes,
-) => {
+export const useEpisodesInfinite = (options: EpisodesQueryOptions) => {
   return useInfiniteQuery({
-    queryKey: [
-      'episodes',
+    queryKey: episodesQueryKey(
       options.podcastId,
-      options.search || '',
-      options.sortBy || 'published',
-      options.sortDir || 'desc',
-    ],
+      options.search,
+      options.sortBy,
+      options.sortDir,
+    ),
     queryFn: ({ pageParam }) =>
       fetchEpisodesPaginated({ ...options, cursor: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialData: initialData
-      ? { pages: [initialData], pageParams: [undefined] }
-      : undefined,
+    refetchOnMount: (query) =>
+      query.queryHash !== hashKey(episodesQueryKey(options.podcastId)),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 };
-
-export const episodesQueryKey = (
-  podcastId: number,
-  search = '',
-  sortBy = 'published',
-  sortDir = 'desc',
-) => ['episodes', podcastId, search, sortBy, sortDir];

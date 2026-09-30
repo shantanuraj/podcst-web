@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 
 import {
-  CACHE_STALE_DELTA,
+  CACHE_MAX_AGE_MS,
   KEY_PARSED_FEED,
   KEY_SHORT_URL,
   KEY_TOP_PODCASTS,
@@ -128,13 +128,10 @@ const read = async <T>(key: string): CacheResponse<T | null> => {
     }
     const cached = parse<T>(res);
     const { timestamp } = cached;
-    if (
-      Date.now() - timestamp <=
-      CACHE_STALE_DELTA // Cache is fresh
-    ) {
+    if (Date.now() - timestamp <= CACHE_MAX_AGE_MS) {
       return cached;
     } else {
-      return cacheMiss(null); // Cache is stale
+      return cacheMiss(null);
     }
   } catch (err) {
     console.error(err);
