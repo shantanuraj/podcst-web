@@ -2,6 +2,10 @@
 
 Status: proposed architecture and rollout requirements. This document contains no production inventory, account mapping, incident record or migration target list.
 
+Entry point: [Release hub](release.md).
+
+This plan owns visibility, authorization, credential storage, source classification and account lifecycle. The [feed identity plan](feed-identity-resolution-plan.md) owns alias keys, canonical selection, concurrent ingestion and duplicate-record reconciliation.
+
 ## Ownership model
 
 Attach `owner_user_id` and explicit visibility to the podcast/source boundary. Do not infer ownership from subscriptions, and do not attach an owner to every public catalog show.
@@ -14,7 +18,7 @@ Attach `owner_user_id` and explicit visibility to the podcast/source boundary. D
 
 Enforce visibility/owner consistency. Quarantine is an access decision, not simply an inactive scheduling flag. If owned sources need suspension later, model that without losing ownership.
 
-Store private locators encrypted behind a restricted secret-storage boundary. Use an HMAC-based fingerprint for owner-scoped source deduplication instead of raw credential-bearing URLs in globally shared keys. Keep the owner in one place and derive episode authorization through the source relationship.
+Store private locators encrypted behind a restricted secret-storage boundary. Private lookup fingerprints use HMAC over the complete credential-bearing locator and owner scope, rather than exposing raw URLs in shared keys. Keep the owner in one place and derive episode authorization through the source relationship.
 
 Public-source uniqueness and private `(owner, source)` uniqueness have different scopes. Public imports must not merge into, promote or overwrite private/quarantined records through provider-ID or URL matching.
 
@@ -25,21 +29,21 @@ Preserve stable podcast/episode IDs when ownership is established. A separate ep
 - Require sign-in for server-owned private feeds. Guest private listening, if offered, needs an explicit device-local design.
 - Treat arbitrary submitted URLs as private unless independently established public provenance is available. Do not let an untrusted caller mark a source public.
 - Receive credential-bearing locators in authenticated request bodies, not public navigation URLs. Exclude them from logs, traces and request-body capture.
-- Deduplicate within an owner. Another account must supply its own authorized source and must not gain access by subscribing to an existing private ID.
-- Keep a private feed separate from its public counterpart; matching titles or GUIDs do not justify merging bonus content into the public catalog.
+- Another account must supply its own authorized source and must not gain access by subscribing to an existing private ID.
 - Unfollowing, removing a private source and deleting an account are separate operations. Define their effects on downloads, pending mutations, backups and provider credentials.
-- Credential rotation changes the locator, not library identity.
 - Authorized clients may receive publisher media URLs when necessary for playback, but those responses must not enter shared caches, previews or analytics.
+
+Locator changes and credential rotation follow the identity plan's [canonical selection and alias lifecycle](feed-identity-resolution-plan.md#canonical-selection-and-alias-lifecycle).
 
 ## Existing-data classification
 
-Perform inventory and ownership review in a protected operational environment. Do not commit raw results, source locators, user identifiers, personalized titles, backups or database snapshots.
+Perform inventory and ownership review in a protected operational environment. Keep raw results, source locators, user identifiers, personalized titles, backups, database snapshots, environment-specific repair scripts and execution receipts outside Git.
 
 URL patterns and provider families are candidate signals, not classification or authorization rules. A missing directory ID does not prove privacy, and a directory ID does not prove that the current locator is safe to expose. Public hosts often use opaque path identifiers.
 
 Use trusted provenance and explicit owner confirmation. A sole or earliest subscriber is only an investigation lead, not ownership proof. Include playback-only and guest/unsubscribed cases where evidence is available.
 
-Classify each reviewed source as verified public, confirmed private with an owner, or quarantined. Keep the mapping to real records outside Git. Resolve public duplicates separately, preserving references and choosing canonical metadata deliberately; do not collapse episodes by title or silently discard conflicting user state.
+Classify each reviewed source as verified public, confirmed private with an owner, or quarantined. Keep the mapping to real records outside Git. Handle duplicate sources separately through the identity plan's [reconciliation procedure](feed-identity-resolution-plan.md#existing-identity-conflicts); classification does not authorize merging them.
 
 Where credentials may have been exposed, ownership confirmation alone does not remediate that exposure. Review rotation, retained copies and any notification obligations through the appropriate private process.
 
@@ -60,27 +64,27 @@ Use a central server-only access service with an explicit actor or public projec
 
 ## Rollout requirements
 
-1. Establish migration safety and prepare a protected inventory/classification process.
+1. Apply the [migration safeguards](pre-release-foundations.md#8-treat-migrations-as-an-audited-mechanism) and prepare a protected inventory/classification process.
 2. Add visibility, owner, protected locator storage and consistency constraints.
 3. Cover every read, mutation, cache and worker path with authorization tests.
-4. Introduce authenticated owner-scoped imports and safe bounded fetching.
-5. Apply a reviewed, private backfill mapping; preserve or explicitly reconcile existing identities and references.
+4. Integrate authenticated imports with the [shared resolver](feed-identity-resolution-plan.md#shared-resolver-algorithm), passing the authorized scope.
+5. Apply a reviewed, private ownership backfill mapping; send identity conflicts through the linked reconciliation procedure.
 6. Coordinate clients and server, reject unsafe obsolete contracts, and invalidate affected caches without globally flushing unrelated data.
 7. Verify access, offline account isolation, deletion and recovery before enabling the release promise.
 
-A database column alone is not containment. Production mutation requires a reviewed target set, protected backup, concurrency handling, explicit conflict policy and postcondition checks. Environment-specific repair scripts and execution receipts belong outside the public repository.
+Coordinate with the identity plan's [implementation slices](feed-identity-resolution-plan.md#implementation-slices). An ownership column alone is not containment; every access path must enforce it.
 
 ## Acceptance tests
 
 - Anonymous, owner and other-account requests exercise IDs, URL lookup, metadata, redirects, warmed caches and refresh.
 - A non-owner cannot gain access by subscribing, saving progress or adding an episode to a list.
-- Concurrent/repeated imports are idempotent within an owner and isolated between owners.
 - Public importers cannot overwrite private records or promote quarantine.
-- Locator rotation preserves episode identity and invalidates obsolete cache entries.
 - Offline logout/account switch cannot expose another account's files or replay its pending mutations.
 - Ambiguous legacy records fail closed rather than receiving a guessed owner.
 - Backups restore ownership and deletion/quarantine semantics; missing decryption keys fail closed.
 - Logging/error/test fixtures contain no real private URLs, credentials, account identifiers or payloads.
+
+Run these with the identity plan's [regression matrix](feed-identity-resolution-plan.md#regression-matrix), which covers alias convergence, concurrent claims, credential rotation and scoped identity lookup.
 
 ## Read-only inventory helpers
 

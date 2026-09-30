@@ -1,6 +1,6 @@
 # Foundations to settle before the public release
 
-Related plans: [release roadmap](first-release-roadmap.md) and [private-feed ownership](private-feed-ownership-plan.md).
+Entry point: [Release hub](release.md). This document owns foundational contracts and architecture choices; execution order and current focus live in the hub.
 
 Use the pre-release breaking-change window to establish ownership, identity, mutation and persistence contracts. Keep the stack and useful audio work. Breaking compatibility does not authorize discarding user data.
 
@@ -14,7 +14,7 @@ An owned podcast record plus protected locator storage can establish this bounda
 
 ## 2. Use one stable identity scheme
 
-Use durable Podcst podcast/episode IDs across clients, queues, caches and synchronization. Scope publisher GUIDs to their source; feed URLs, provider IDs and GUIDs are not interchangeable primary keys.
+Use durable Podcst podcast/episode IDs across clients, queues, caches and synchronization. Scope publisher GUIDs to their source; feed URLs, provider IDs and GUIDs are not interchangeable primary keys. Implement the [shared alias-aware resolver](feed-identity-resolution-plan.md) across all ingestion paths so verified historical and current locators converge without unsafe cross-owner merges.
 
 Model unresolved discovery/import records separately. If offline provisional entities are supported, give them explicit local identities and a resolution mapping instead of spreading optional-ID fallbacks throughout the product.
 
@@ -79,10 +79,6 @@ For a coordinated breaking cutover, pause obsolete writers, verify a protected b
 
 ## Order and non-goals
 
-1. Resolve trust boundaries and establish migration safety.
-2. Settle source ownership, identity and the API contract together.
-3. Deliver transactional user-state persistence and revisioned mutations.
-4. Establish saved-content retention and explicit playback transitions.
-5. Ship saving/sharing features and prove the release gates.
+Follow the [release hub's execution sequence](release.md#execution-sequence). The numbered sections above group architecture topics; they are not a separate ordered backlog.
 
 Do not turn this into a framework migration, database replacement, audio rewrite, generic playlist platform, microservice split or broad repository reorganization. The goal is to remove ambiguity from planned features, not build a separate platform.

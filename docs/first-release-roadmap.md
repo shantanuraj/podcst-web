@@ -2,7 +2,7 @@
 
 Status: proposed product scope, not release certification.
 
-Related plans: [pre-release foundations](pre-release-foundations.md) and [private-feed ownership](private-feed-ownership-plan.md).
+Entry point: [Release hub](release.md). This document owns product scope, behavior and release gates; cross-plan execution order and current focus live in the hub.
 
 This public roadmap contains requirements and design decisions. Production inventories, account mappings, security investigation results, deployment receipts and recovery artifacts belong in protected operational storage, not this repository.
 
