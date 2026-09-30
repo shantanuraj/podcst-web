@@ -20,31 +20,24 @@ function getLocale(request: NextRequest): string {
     negotiatorHeaders[key] = value;
   });
 
-  const languages = new Negotiator({ headers: negotiatorHeaders }).languages(
-    // @ts-expect-error: Readonly array is not assignable to mutable array
-    locales,
-  );
+  const languages = new Negotiator({ headers: negotiatorHeaders }).languages([
+    ...locales,
+  ]);
 
   return matchLocale(languages, locales, i18n.defaultLocale);
 }
 
 export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  if (!pathname.includes('/feed/top')) return NextResponse.next();
-
-  const pathnameIsMissingLocale = locales.every(
-    (locale) =>
-      !pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`,
-  );
-
-  if (pathnameIsMissingLocale) {
-    const locale = getLocale(request);
-    return NextResponse.redirect(
-      new URL(`/${locale}/${pathname}`, request.url),
-    );
+  if (pathname !== '/' && pathname !== '/feed/top') {
+    return NextResponse.next();
   }
+
+  const url = request.nextUrl.clone();
+  url.pathname = `/${getLocale(request)}/feed/top`;
+  return NextResponse.redirect(url);
 }
 
 export const config = {
-  matcher: ['/((?!_next).*)', '/'],
+  matcher: ['/', '/feed/top'],
 };

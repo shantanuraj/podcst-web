@@ -22,8 +22,12 @@ export function PodcastsGrid({ podcasts, title }: PodcastsGridProps) {
           </header>
         )}
         <div className={styles.grid}>
-          {podcasts.map((podcast) => (
-            <PodcastTile key={podcast.id || podcast.feed} podcast={podcast} />
+          {podcasts.map((podcast, index) => (
+            <PodcastTile
+              key={podcast.id || podcast.feed}
+              podcast={podcast}
+              priority={index === 0}
+            />
           ))}
         </div>
       </section>

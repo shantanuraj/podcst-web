@@ -36,7 +36,8 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
       <div className={styles.top}>
         <div className={styles.artwork}>
           <ProxiedImage
-            loading="lazy"
+            loading="eager"
+            fetchPriority="high"
             alt=""
             src={showArt}
             sizes="(max-width: 480px) 140px, (max-width: 768px) 180px, 200px"

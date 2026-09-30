@@ -43,11 +43,6 @@ const config: NextConfig = {
   async redirects() {
     return [
       {
-        source: '/',
-        destination: '/feed/top',
-        permanent: false,
-      },
-      {
         source: '/episode',
         destination: '/feed/top',
         permanent: false,

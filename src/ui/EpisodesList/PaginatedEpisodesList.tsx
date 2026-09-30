@@ -8,7 +8,7 @@ import {
   useEpisodesInfinite,
 } from '@/data/feed';
 import { useTranslation } from '@/shared/i18n';
-import type { IEpisodeInfo, IPaginatedEpisodes, IPodcastInfo } from '@/types';
+import type { IEpisodeInfo, IPodcastInfo } from '@/types';
 import { EpisodeItem } from './EpisodeItem';
 import styles from './EpisodesList.module.css';
 
@@ -17,7 +17,6 @@ interface PaginatedEpisodesListProps {
   children?: React.ReactNode;
   podcastId: number;
   podcast: IPodcastInfo;
-  initialData?: IPaginatedEpisodes;
 }
 
 type SortPreference =
@@ -62,7 +61,6 @@ export function PaginatedEpisodesList({
   children,
   podcastId,
   podcast,
-  initialData,
 }: PaginatedEpisodesListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -88,19 +86,13 @@ export function PaginatedEpisodesList({
     isFetchingNextPage,
     isLoading,
     isError,
-  } = useEpisodesInfinite(
-    {
-      podcastId,
-      search: debouncedSearch || undefined,
-      sortBy,
-      sortDir,
-      limit: 20,
-    },
-    // Only use initialData when no search and default sort
-    !debouncedSearch && sortPreference === 'releaseDesc'
-      ? initialData
-      : undefined,
-  );
+  } = useEpisodesInfinite({
+    podcastId,
+    search: debouncedSearch || undefined,
+    sortBy,
+    sortDir,
+    limit: 20,
+  });
 
   const onSortChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -133,9 +125,8 @@ export function PaginatedEpisodesList({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const allEpisodes =
-    data?.pages.flatMap((page) => page.episodes) ?? initialData?.episodes ?? [];
-  const totalCount = data?.pages[0]?.total ?? initialData?.total ?? 0;
+  const allEpisodes = data?.pages.flatMap((page) => page.episodes) ?? [];
+  const totalCount = data?.pages[0]?.total ?? 0;
 
   const { t } = useTranslation();
 
@@ -172,7 +163,7 @@ export function PaginatedEpisodesList({
         </div>
       </div>
 
-      {isLoading && !initialData && (
+      {isLoading && (
         <div className={styles.loading}>{t('podcast.loadingEpisodes')}</div>
       )}
 
