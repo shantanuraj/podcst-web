@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { createSchemaFixture } from '../../scripts/lib/schema-fixture';
 import {
   matchSearchResults,
   searchPodcasts,
@@ -26,9 +26,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
     });
-    await sql.unsafe(
-      readFileSync('migrations/active/0000-baseline.sql', 'utf8'),
-    );
+    await createSchemaFixture(sql);
     const [author] = await sql`
       INSERT INTO authors (name) VALUES ('Author') RETURNING id
     `;
@@ -72,7 +70,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     expect(result?.itunes_id).toBe(6806963519);
   });
 
-  test('private feeds retain their database identity without an Apple ID', async () => {
+  test('unlisted public feeds retain their database identity without an Apple ID', async () => {
     const result = await searchPodcastsByFeedUrl(sql, privateFeed);
     expect(result).toMatchObject({
       feed: privateFeed,

@@ -38,10 +38,15 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
   init: async () => {
     const subscriptions = await getValue('subscriptions');
     if (subscriptions) {
-      set({ subs: subscriptions });
+      set({
+        subs: Object.fromEntries(
+          Object.entries(subscriptions).filter(([, info]) => !info.isPrivate),
+        ),
+      });
     }
   },
   addSubscription: (feed: string, info: IPodcastEpisodesInfo) => {
+    if (info.isPrivate) return;
     set({ subs: { ...get().subs, [feed]: info } });
   },
   removeSubscription: (feed: string) => {
@@ -64,13 +69,15 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
   addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => {
     const nextSubscriptions: SubscriptionsState['subs'] = {};
     podcasts.forEach((info) => {
-      nextSubscriptions[info.feed] = info;
+      if (!info.isPrivate) nextSubscriptions[info.feed] = info;
     });
     set({ subs: nextSubscriptions });
   },
   syncSubscription: (feed, info) => {
     const state = get();
-    if (isSubscribed(feed)(state)) {
+    if (info.isPrivate) {
+      state.removeSubscription(feed);
+    } else if (isSubscribed(feed)(state)) {
       state.addSubscription(feed, info);
     }
   },
@@ -84,8 +91,8 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
     const feeds = Object.keys(get().subs);
 
     for (const feed of feeds) {
-      await fetchEpisodesInfo(feed).catch((err) => {
-        console.error('Error fetching feed', feed, err);
+      await fetchEpisodesInfo(feed).catch(() => {
+        console.warn('Unable to refresh subscription');
 
         // Wait a second in likely case of rate-limit from iTunes
         return new Promise((resolve) => setTimeout(resolve, 1000));

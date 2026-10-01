@@ -1,6 +1,11 @@
 import type postgres from 'postgres';
 import { ITUNES_API } from '../../data/constants';
 import { sanitize } from './episodes';
+import {
+  claimPublicIdentity,
+  findPodcastIdentity,
+  lockPodcastIdentities,
+} from './index-podcast';
 
 const TOP_LIMIT = 100;
 
@@ -119,15 +124,6 @@ export async function fetchTopFromItunes(
   return [...podcasts.values()].sort((a, b) => a.rank - b.rank);
 }
 
-function findPodcast(sql: postgres.ISql, podcast: ChartPodcast) {
-  return sql`
-    SELECT id FROM podcasts
-    WHERE itunes_id = ${podcast.itunesId} OR feed_url = ${podcast.feed}
-    ORDER BY (itunes_id = ${podcast.itunesId}) DESC NULLS LAST
-    LIMIT 1
-  `;
-}
-
 export async function storeTopPodcasts(
   sql: postgres.Sql,
   podcasts: ChartPodcast[],
@@ -137,6 +133,10 @@ export async function storeTopPodcasts(
     throw new Error('Refusing to store an empty chart');
 
   return sql.begin(async (tx) => {
+    await lockPodcastIdentities(
+      tx,
+      podcasts.map(({ feed, itunesId }) => ({ feedUrl: feed, itunesId })),
+    );
     await tx`
       INSERT INTO countries (id, name) VALUES (${locale}, ${locale.toUpperCase()})
       ON CONFLICT (id) DO NOTHING
@@ -150,7 +150,7 @@ export async function storeTopPodcasts(
 
     let newPodcasts = 0;
     for (const p of podcasts) {
-      let [podcast] = await findPodcast(tx, p);
+      let podcast = await findPodcastIdentity(tx, p.feed, p.itunesId);
       if (!podcast) {
         let [author] =
           await tx`SELECT id FROM authors WHERE name = ${p.author} LIMIT 1`;
@@ -166,18 +166,15 @@ export async function storeTopPodcasts(
             ${p.explicit}, ${p.count}
           )
           ON CONFLICT DO NOTHING
-          RETURNING id
+          RETURNING id, itunes_id, feed_url, owner_user_id
         `;
         if (podcast) newPodcasts++;
-        else [podcast] = await findPodcast(tx, p);
+        else podcast = await findPodcastIdentity(tx, p.feed, p.itunesId);
       }
       if (!podcast)
         throw new Error(`Unable to store Apple podcast ${p.itunesId}`);
 
-      await tx`
-        UPDATE podcasts SET itunes_id = ${p.itunesId}
-        WHERE id = ${podcast.id} AND itunes_id IS NULL
-      `;
+      await claimPublicIdentity(tx, podcast, p.feed, p.itunesId);
       await tx`
         INSERT INTO feed_poll_state (podcast_id) VALUES (${podcast.id})
         ON CONFLICT (podcast_id) DO NOTHING

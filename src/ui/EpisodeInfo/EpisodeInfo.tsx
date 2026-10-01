@@ -40,6 +40,7 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
             fetchPriority="high"
             alt=""
             src={showArt}
+            privateSource={episode.isPrivate}
             sizes="(max-width: 480px) 140px, (max-width: 768px) 180px, 200px"
           />
         </div>
@@ -65,10 +66,12 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
           {releaseDate && <p className={styles.published}>{releaseDate}</p>}
           <div className={styles.actions}>
             <PlayButton episode={episode} />
-            <ShareButton
-              text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
-              title={shareTitle}
-            />
+            {!episode.isPrivate && (
+              <ShareButton
+                text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
+                title={shareTitle}
+              />
+            )}
           </div>
         </div>
       </div>

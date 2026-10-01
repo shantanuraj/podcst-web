@@ -37,6 +37,7 @@ export async function PodcastInfo({ info }: PodcastInfoProps) {
             fetchPriority="high"
             alt=""
             src={cover}
+            privateSource={info.isPrivate}
             sizes="(max-width: 480px) 140px, (max-width: 768px) 180px, 200px"
           />
         </div>
@@ -59,10 +60,12 @@ export async function PodcastInfo({ info }: PodcastInfoProps) {
           )}
           <div className={styles.actions}>
             <SubscribeButton info={info} />
-            <ShareButton
-              title={title}
-              text={`Listen to ${title} by ${author} on Podcst`}
-            />
+            {!info.isPrivate && (
+              <ShareButton
+                title={title}
+                text={`Listen to ${title} by ${author} on Podcst`}
+              />
+            )}
           </div>
         </div>
       </div>

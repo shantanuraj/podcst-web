@@ -9,6 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 import { refreshFeed } from './feed-refresh';
 import { getDuePodcasts } from './feed-schedule';
 
@@ -34,9 +35,7 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
     });
-    await sql.unsafe(
-      readFileSync('migrations/active/0000-baseline.sql', 'utf8'),
-    );
+    await createSchemaFixture(sql);
     server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,

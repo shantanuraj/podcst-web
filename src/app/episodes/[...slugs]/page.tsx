@@ -3,12 +3,12 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
+import { getSession } from '@/server/auth/session';
 import {
   getEpisodeById,
   getEpisodesPaginated,
   getPodcastByFeedUrl,
   getPodcastInfoById,
-  ingestPodcast,
 } from '@/server/ingest/podcast';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
@@ -65,7 +65,7 @@ export async function generateMetadata(props: {
       getEpisodeById(parsed.episodeId),
       getPodcastInfoById(parsed.podcastId),
     ]);
-    if (episode) {
+    if (episode && podcast && episode.podcastId === parsed.podcastId) {
       const url = `/episodes/${parsed.podcastId}/${parsed.episodeId}`;
       return {
         title: episode.title,
@@ -99,13 +99,10 @@ export async function generateMetadata(props: {
         },
       };
     }
-    return {};
+    return { robots: { index: false, follow: false } };
   }
 
-  let info = await getPodcastByFeedUrl(parsed.feedUrl);
-  if (!info) {
-    info = await ingestPodcast(parsed.feedUrl);
-  }
+  const info = await getPodcastByFeedUrl(parsed.feedUrl);
 
   if (!info) return {};
 
@@ -148,12 +145,13 @@ export default async function Page(props: {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
   const baseUrl = await getBaseUrl();
+  const userId = (await getSession())?.userId ?? null;
 
   if (parsed.type === 'id') {
     if (parsed.episodeId) {
       const [episode, podcast] = await Promise.all([
-        getEpisodeById(parsed.episodeId),
-        getPodcastInfoById(parsed.podcastId),
+        getEpisodeById(parsed.episodeId, userId),
+        getPodcastInfoById(parsed.podcastId, userId),
       ]);
 
       if (!episode || !podcast || episode.podcastId !== parsed.podcastId) {
@@ -166,19 +164,21 @@ export default async function Page(props: {
       return (
         <>
           <FeedRefresh podcastId={parsed.podcastId} />
-          <PodcastEpisodeSchema
-            podcast={podcastData}
-            episode={episode}
-            url={url}
-          />
+          {!podcast.isPrivate && (
+            <PodcastEpisodeSchema
+              podcast={podcastData}
+              episode={episode}
+              url={url}
+            />
+          )}
           <EpisodeInfo podcast={podcastData} episode={episode} />
         </>
       );
     }
 
     const [podcast, initialEpisodes] = await Promise.all([
-      getPodcastInfoById(parsed.podcastId),
-      getEpisodesPaginated({ podcastId: parsed.podcastId, limit: 20 }),
+      getPodcastInfoById(parsed.podcastId, userId),
+      getEpisodesPaginated({ podcastId: parsed.podcastId, limit: 20 }, userId),
     ]);
 
     if (!podcast) {
@@ -205,7 +205,9 @@ export default async function Page(props: {
     return (
       <>
         <FeedRefresh podcastId={parsed.podcastId} />
-        <PodcastSeriesSchema podcast={schemaData} url={url} />
+        {!podcast.isPrivate && (
+          <PodcastSeriesSchema podcast={schemaData} url={url} />
+        )}
         <EpisodesHydration
           podcastId={parsed.podcastId}
           initialData={initialEpisodes}
@@ -233,11 +235,7 @@ export default async function Page(props: {
       }
     }
   }
-  if (!info) {
-    info = await ingestPodcast(feedUrl);
-  }
-
-  if (!info || !info.id) {
+  if (!info?.id) {
     return <EpisodesNotFound type="podcast" />;
   }
 

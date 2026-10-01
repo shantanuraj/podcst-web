@@ -22,6 +22,7 @@ export function PodcastTile({ podcast, priority = false }: PodcastTileProps) {
       <div className={styles.artwork}>
         <ProxiedImage
           src={cover || undefined}
+          privateSource={podcast.isPrivate}
           alt=""
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : undefined}

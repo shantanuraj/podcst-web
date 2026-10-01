@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct PodcstApp: App {
+    private let isTesting: Bool
     @State private var api: APIClient
     @State private var session: SessionStore
     @State private var library: LibraryStore
@@ -9,6 +10,8 @@ struct PodcstApp: App {
     @State private var media: MediaStore
 
     init() {
+        let testing = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        isTesting = testing
         let api = APIClient()
         _api = State(initialValue: api)
         let session = SessionStore(api: api)
@@ -20,7 +23,7 @@ struct PodcstApp: App {
         let media = MediaStore(accountID: session.user?.id)
         _media = State(initialValue: media)
         let routing = RoutingAudioTransport(media: media)
-        let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: true)
+        let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: !testing)
         _playback = State(initialValue: playback)
         session.prepareAccountChange = { [weak library, weak playback] accountID in
             playback?.beginAccountChange()
@@ -37,17 +40,19 @@ struct PodcstApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .id(session.user?.id)
-                .modifier(ArtworkRetention())
-                .environment(session)
-                .environment(library)
-                .environment(playback)
-                .environment(api)
-                .environment(media)
-                .task {
-                    await session.restore()
-                }
+            if !isTesting {
+                RootView()
+                    .id(session.user?.id)
+                    .modifier(ArtworkRetention())
+                    .environment(session)
+                    .environment(library)
+                    .environment(playback)
+                    .environment(api)
+                    .environment(media)
+                    .task {
+                        await session.restore()
+                    }
+            }
         }
     }
 }

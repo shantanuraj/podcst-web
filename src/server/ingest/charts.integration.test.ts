@@ -9,6 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 import {
   type ChartPodcast,
   refreshTopCharts,
@@ -41,9 +42,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
     });
-    await sql.unsafe(
-      readFileSync('migrations/active/0000-baseline.sql', 'utf8'),
-    );
+    await createSchemaFixture(sql);
   });
 
   afterAll(async () => {
@@ -197,14 +196,14 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
     expect(row.itunes_id).toBe('6806963519');
   });
 
-  test('prefers an exact Apple ID when another podcast matches the feed URL', async () => {
+  test('rejects conflicting provider and feed identities without replacing the chart', async () => {
     await storeTopPodcasts(sql, [podcast(6806963519)], 'ca');
+    const before = await chart();
     const replacement = { ...podcast(6806963519), feed: podcast(101).feed };
-    expect(await storeTopPodcasts(sql, [replacement], 'nl')).toEqual({
-      stored: 1,
-      newPodcasts: 0,
-    });
-    expect((await chart())[0].itunes_id).toBe('6806963519');
+    await expect(storeTopPodcasts(sql, [replacement], 'nl')).rejects.toThrow(
+      'different podcasts',
+    );
+    expect(await chart()).toEqual(before);
   });
 
   test('preserves failure backoff and unrelated genres while replacing a chart', async () => {

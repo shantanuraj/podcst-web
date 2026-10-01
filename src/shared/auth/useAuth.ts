@@ -3,7 +3,12 @@ import {
   startAuthentication,
   startRegistration,
 } from '@simplewebauthn/browser';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 type User = {
   id: string;
@@ -16,6 +21,12 @@ type User = {
 type SessionResponse = {
   user: User | null;
 };
+
+async function accountChanged(queryClient: QueryClient) {
+  await queryClient.cancelQueries();
+  queryClient.clear();
+  if (typeof window !== 'undefined') window.location.replace('/');
+}
 
 const getVisitorId = () => {
   if (typeof window === 'undefined') return '';
@@ -91,9 +102,7 @@ export function useEmailLogin() {
 
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session'] });
-    },
+    onSuccess: () => accountChanged(queryClient),
   });
 }
 
@@ -187,9 +196,7 @@ export function usePasskeyLogin() {
 
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session'] });
-    },
+    onSuccess: () => accountChanged(queryClient),
   });
 }
 
@@ -222,9 +229,7 @@ export function useLogin() {
 
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session'] });
-    },
+    onSuccess: () => accountChanged(queryClient),
   });
 }
 
@@ -233,11 +238,10 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!response.ok) throw new Error('Unable to sign out');
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session'] });
-    },
+    onSuccess: () => accountChanged(queryClient),
   });
 }
 
@@ -270,8 +274,6 @@ export function useDiscoverableLogin() {
 
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session'] });
-    },
+    onSuccess: () => accountChanged(queryClient),
   });
 }

@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/server/auth/session';
 import { getPodcastInfoById } from '@/server/ingest/podcast';
+import { privateFeedHeaders as headers } from '@/server/podcast-access';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -20,10 +22,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const podcast = await getPodcastInfoById(podcastId);
+  const session = await getSession();
+  const podcast = await getPodcastInfoById(podcastId, session?.userId ?? null);
   if (!podcast) {
-    return NextResponse.json({ message: 'podcast not found' }, { status: 404 });
+    return NextResponse.json(
+      { message: 'podcast not found' },
+      { status: 404, headers },
+    );
   }
 
-  return NextResponse.json(podcast);
+  return NextResponse.json(podcast, { headers });
 }

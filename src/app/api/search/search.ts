@@ -1,19 +1,27 @@
 import { adaptResponse } from '@/app/api/adapter';
 import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
 import { sql } from '@/server/db';
+import {
+  indexPrivatePodcast,
+  PodcastAccessDenied,
+} from '@/server/ingest/index-podcast';
 import { matchSearchResults, searchPodcastsByFeedUrl } from '@/server/search';
+import { feedUrl, isFeedUrlInput } from '@/shared/feed-url';
 import type { IPodcastSearchResult, iTunes } from '@/types';
 
-export async function search(term: string, locale = DEFAULT_PODCASTS_LOCALE) {
-  if (isURL(term)) {
-    return searchByUrl(term);
+export async function search(
+  term: string,
+  locale = DEFAULT_PODCASTS_LOCALE,
+  userId: string | null = null,
+) {
+  if (isFeedUrlInput(term)) {
+    if (!userId) throw new PodcastAccessDenied('Sign in to open an RSS link');
+    const url = feedUrl(term);
+    await indexPrivatePodcast(sql, url, userId);
+    const result = await searchPodcastsByFeedUrl(sql, url, userId);
+    return result ? [result] : [];
   }
   return searchByTerm(term, locale);
-}
-
-async function searchByUrl(url: string): Promise<IPodcastSearchResult[]> {
-  const dbResult = await searchPodcastsByFeedUrl(sql, url);
-  return dbResult ? [dbResult] : [];
 }
 
 async function searchByTerm(
@@ -26,9 +34,6 @@ async function searchByTerm(
 
   return matchSearchResults(sql, itunesResults);
 }
-
-const URL_REGEX = /^https?:\//;
-const isURL = (str: string) => URL_REGEX.test(str);
 
 async function searchFromItunes(
   term: string,

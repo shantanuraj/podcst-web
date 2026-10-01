@@ -6,44 +6,42 @@ import type {
   IPodcastInfo,
 } from '@/types';
 import { sql } from '../db';
+import { canAccessPodcast, podcastAccess } from '../podcast-access';
 import {
   type EpisodePageOptions,
   prepareEpisodeRead,
   readEpisodePage,
 } from './episode-read';
 import { refreshFeed } from './feed-refresh';
-import { indexPodcast } from './index-podcast';
+import { indexPrivatePodcast } from './index-podcast';
 
 export async function ingestPodcast(
   feedUrl: string,
+  userId: string,
 ): Promise<IPodcastEpisodesInfo | null> {
-  const existing = await getPodcastByFeedUrl(feedUrl);
-  if (existing?.id) {
-    return existing.episodes.length > 0
-      ? existing
-      : refreshPodcast(existing.id);
-  }
-
-  const id = await indexPodcast(sql, feedUrl).catch(() => null);
-  return id === null ? null : getPodcastById(id);
+  const id = await indexPrivatePodcast(sql, feedUrl, userId);
+  return getPodcastById(id, userId);
 }
 
 export async function refreshPodcast(
   podcastId: number,
+  userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
+  if (!(await canAccessPodcast(sql, podcastId, userId))) return null;
   const result = await refreshFeed(sql, podcastId);
   if (result === 'not_found' || result === 'error') return null;
-  return getPodcastById(podcastId);
+  return getPodcastById(podcastId, userId);
 }
 
 export async function getPodcastByFeedUrl(
   feedUrl: string,
+  userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
-    WHERE p.feed_url = ${feedUrl}
+    WHERE p.feed_url = ${feedUrl} AND ${podcastAccess(sql, userId)}
   `;
 
   if (!podcast) {
@@ -64,6 +62,7 @@ export async function getPodcastByFeedUrl(
 
   return {
     id: podcast.id,
+    isPrivate: podcast.owner_user_id !== null,
     feed: feedUrl,
     title: podcast.title,
     author: podcast.author_name,
@@ -77,6 +76,7 @@ export async function getPodcastByFeedUrl(
       (ep): IEpisodeInfo => ({
         id: ep.id,
         podcastId: podcast.id,
+        isPrivate: podcast.owner_user_id !== null,
         feed: feedUrl,
         podcastTitle: podcast.title,
         guid: ep.guid,
@@ -102,12 +102,13 @@ export async function getPodcastByFeedUrl(
 
 export async function getPodcastById(
   id: number,
+  userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
-    WHERE p.id = ${id}
+    WHERE p.id = ${id} AND ${podcastAccess(sql, userId)}
   `;
 
   if (!podcast) return null;
@@ -126,6 +127,7 @@ export async function getPodcastById(
 
   return {
     id: podcast.id,
+    isPrivate: podcast.owner_user_id !== null,
     feed: podcast.feed_url,
     title: podcast.title,
     author: podcast.author_name,
@@ -139,6 +141,7 @@ export async function getPodcastById(
       (ep): IEpisodeInfo => ({
         id: ep.id,
         podcastId: podcast.id,
+        isPrivate: podcast.owner_user_id !== null,
         feed: podcast.feed_url,
         podcastTitle: podcast.title,
         guid: ep.guid,
@@ -163,18 +166,21 @@ export async function getPodcastById(
 }
 
 export const getEpisodeById = cache(
-  async (episodeId: number): Promise<IEpisodeInfo | null> => {
+  async (
+    episodeId: number,
+    userId: string | null = null,
+  ): Promise<IEpisodeInfo | null> => {
     const query = () => sql`
     SELECT e.id, e.guid, e.published, e.podcast_id,
            c.title, c.summary, c.duration, c.episode_art,
            c.file_url, c.file_length, c.file_type,
            p.feed_url, p.title as podcast_title, p.cover as podcast_cover,
-           p.explicit as podcast_explicit, a.name as author_name
+           p.explicit as podcast_explicit, p.owner_user_id, a.name as author_name
     FROM episodes e
     JOIN podcasts p ON p.id = e.podcast_id
     JOIN authors a ON a.id = p.author_id
     LEFT JOIN episode_content c ON c.episode_id = e.id
-    WHERE e.id = ${episodeId}
+    WHERE e.id = ${episodeId} AND ${podcastAccess(sql, userId)}
   `;
 
     let [row] = await query();
@@ -189,6 +195,7 @@ export const getEpisodeById = cache(
     return {
       id: row.id,
       podcastId: row.podcast_id,
+      isPrivate: row.owner_user_id !== null,
       feed: row.feed_url,
       podcastTitle: row.podcast_title,
       guid: row.guid,
@@ -212,18 +219,22 @@ export const getEpisodeById = cache(
 );
 
 export const getPodcastInfoById = cache(
-  async (id: number): Promise<IPodcastInfo | null> => {
+  async (
+    id: number,
+    userId: string | null = null,
+  ): Promise<IPodcastInfo | null> => {
     const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
-    WHERE p.id = ${id}
+    WHERE p.id = ${id} AND ${podcastAccess(sql, userId)}
   `;
 
     if (!podcast) return null;
 
     return {
       id: podcast.id,
+      isPrivate: podcast.owner_user_id !== null,
       feed: podcast.feed_url,
       title: podcast.title,
       author: podcast.author_name,
@@ -242,18 +253,16 @@ export type { SortDirection, SortField } from './episode-read';
 
 export async function getEpisodesPaginated(
   options: EpisodePageOptions,
+  userId: string | null = null,
 ): Promise<IPaginatedEpisodes> {
   const { podcastId } = options;
-
-  const [podcast] = await Promise.all([
-    getPodcastInfoById(podcastId),
-    prepareEpisodeRead(sql, podcastId),
-  ]);
+  const podcast = await getPodcastInfoById(podcastId, userId);
 
   if (!podcast) {
     return { episodes: [], total: 0, hasMore: false };
   }
 
+  await prepareEpisodeRead(sql, podcastId);
   const page = await readEpisodePage(sql, options);
 
   return {
@@ -262,6 +271,7 @@ export async function getEpisodesPaginated(
       (ep): IEpisodeInfo => ({
         id: ep.id,
         podcastId: podcast.id,
+        isPrivate: podcast.isPrivate,
         feed: podcast.feed,
         podcastTitle: podcast.title,
         guid: ep.guid,
@@ -287,11 +297,12 @@ export async function getEpisodesPaginated(
 
 export async function getEpisodeWithPodcast(
   episodeId: number,
+  userId: string | null = null,
 ): Promise<{ episode: IEpisodeInfo; podcast: IPodcastInfo } | null> {
-  const episode = await getEpisodeById(episodeId);
+  const episode = await getEpisodeById(episodeId, userId);
   if (!episode || !episode.podcastId) return null;
 
-  const podcast = await getPodcastInfoById(episode.podcastId);
+  const podcast = await getPodcastInfoById(episode.podcastId, userId);
   if (!podcast) return null;
 
   return { episode, podcast };

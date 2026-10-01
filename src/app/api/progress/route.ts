@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
+import { privateFeedHeaders as headers } from '@/server/podcast-access';
 import { getCurrentProgress, saveProgress } from '@/server/progress';
 
 export async function GET() {
@@ -9,7 +10,7 @@ export async function GET() {
   }
 
   const progress = await getCurrentProgress(session.userId);
-  return NextResponse.json(progress);
+  return NextResponse.json(progress, { headers });
 }
 
 export async function PUT(request: NextRequest) {

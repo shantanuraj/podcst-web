@@ -13,6 +13,7 @@ public struct EpisodeFile: Codable, Hashable, Sendable {
 }
 
 public struct Episode: Codable, Hashable, Sendable, Identifiable {
+    public var isPrivate: Bool?
     public var id: Int?
     public var podcastId: Int?
     public var guid: String
@@ -30,7 +31,8 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
     public var author: String?
     public var file: EpisodeFile
 
-    public init(id: Int? = nil, podcastId: Int? = nil, guid: String, feed: String, podcastTitle: String? = nil, title: String, summary: String? = nil, published: Date? = nil, cover: String = "", explicit: Bool = false, duration: Double? = nil, link: String? = nil, episodeArt: String? = nil, showNotes: String = "", author: String? = nil, file: EpisodeFile) {
+    public init(id: Int? = nil, podcastId: Int? = nil, guid: String, feed: String, podcastTitle: String? = nil, title: String, summary: String? = nil, published: Date? = nil, cover: String = "", explicit: Bool = false, duration: Double? = nil, link: String? = nil, episodeArt: String? = nil, showNotes: String = "", author: String? = nil, file: EpisodeFile, isPrivate: Bool = false) {
+        self.isPrivate = isPrivate
         self.id = id
         self.podcastId = podcastId
         self.guid = guid
@@ -53,11 +55,12 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
     public var audioURL: URL? { URL(string: file.url) }
     public var artworkURL: URL? { URL(string: episodeArt ?? cover) }
     public var shareURL: URL? {
-        webpageForSharing(link, excluding: [feed, file.url])
+        isPrivate == true ? nil : webpageForSharing(link, excluding: [feed, file.url])
     }
 }
 
 public struct Podcast: Codable, Hashable, Sendable, Identifiable {
+    public var isPrivate: Bool?
     public var id: Int?
     public var itunesId: Int?
     public var itunesLocale: String?
@@ -74,7 +77,8 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
     public var episodeCount: Int
     public var episodes: [Episode]
 
-    public init(id: Int? = nil, itunesId: Int? = nil, itunesLocale: String? = nil, feed: String, title: String, author: String = "", cover: String = "", thumbnail: String = "", description: String = "", link: String? = nil, published: Date? = nil, explicit: Bool = false, keywords: [String] = [], episodeCount: Int = 0, episodes: [Episode] = []) {
+    public init(id: Int? = nil, itunesId: Int? = nil, itunesLocale: String? = nil, feed: String, title: String, author: String = "", cover: String = "", thumbnail: String = "", description: String = "", link: String? = nil, published: Date? = nil, explicit: Bool = false, keywords: [String] = [], episodeCount: Int = 0, episodes: [Episode] = [], isPrivate: Bool = false) {
+        self.isPrivate = isPrivate
         self.id = id
         self.itunesId = itunesId
         self.itunesLocale = itunesLocale
@@ -94,7 +98,7 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
 
     public var identity: String { feed }
     public var artworkURL: URL? { URL(string: cover) }
-    public var shareURL: URL? { webpageForSharing(link, excluding: [feed]) }
+    public var shareURL: URL? { isPrivate == true ? nil : webpageForSharing(link, excluding: [feed]) }
 }
 
 private func webpageForSharing(_ link: String?, excluding sources: [String]) -> URL? {

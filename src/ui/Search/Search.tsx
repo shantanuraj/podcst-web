@@ -34,8 +34,12 @@ export function Search() {
     return () => clearTimeout(timer);
   }, [inputTerm]);
 
-  const { data: searchResults = emptyResult, isFetching } =
-    useSearch(debouncedTerm);
+  const {
+    data: searchResults = emptyResult,
+    isFetching,
+    needsSignIn,
+    error,
+  } = useSearch(debouncedTerm);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
   const focusSearchShortcut = React.useCallback(() => {
@@ -77,6 +81,14 @@ export function Search() {
         placeholder={t('search.placeholder')}
       />
       <ul {...getMenuProps()} className={styles.results}>
+        {isOpen && needsSignIn && (
+          <li>
+            <Link href="/auth">Sign in to open an RSS link</Link>
+          </li>
+        )}
+        {isOpen && error && (
+          <li role="status">Feed unavailable. Please try again.</li>
+        )}
         {isOpen &&
           Array.isArray(searchResults) &&
           searchResults.map((item, index) => (
@@ -106,6 +118,7 @@ const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({
         loading="lazy"
         alt={`${podcast.title} by ${podcast.author}`}
         src={podcast.cover}
+        privateSource={podcast.isPrivate}
         sizes="56px"
       />
       <div>

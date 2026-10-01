@@ -1,9 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/server/auth/session';
+import { sql } from '@/server/db';
 import {
   getEpisodesPaginated,
   type SortDirection,
   type SortField,
 } from '@/server/ingest/podcast';
+import {
+  canAccessPodcast,
+  privateFeedHeaders as headers,
+} from '@/server/podcast-access';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -29,21 +35,33 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const session = await getSession();
+  const userId = session?.userId ?? null;
+  if (!(await canAccessPodcast(sql, parsedPodcastId, userId))) {
+    return NextResponse.json(
+      { message: 'Podcast not found' },
+      { status: 404, headers },
+    );
+  }
+
   const validSortFields: SortField[] = ['published', 'title', 'duration'];
   const validSortDirs: SortDirection[] = ['asc', 'desc'];
 
-  const result = await getEpisodesPaginated({
-    podcastId: parsedPodcastId,
-    limit: limit ? parseInt(limit, 10) : 20,
-    cursor: cursor ? parseInt(cursor, 10) : undefined,
-    search: search || undefined,
-    sortBy: validSortFields.includes(sortBy as SortField)
-      ? (sortBy as SortField)
-      : 'published',
-    sortDir: validSortDirs.includes(sortDir as SortDirection)
-      ? (sortDir as SortDirection)
-      : 'desc',
-  });
+  const result = await getEpisodesPaginated(
+    {
+      podcastId: parsedPodcastId,
+      limit: limit ? parseInt(limit, 10) : 20,
+      cursor: cursor ? parseInt(cursor, 10) : undefined,
+      search: search || undefined,
+      sortBy: validSortFields.includes(sortBy as SortField)
+        ? (sortBy as SortField)
+        : 'published',
+      sortDir: validSortDirs.includes(sortDir as SortDirection)
+        ? (sortDir as SortDirection)
+        : 'desc',
+    },
+    userId,
+  );
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, { headers });
 }

@@ -67,6 +67,7 @@ export const Player = () => {
               <ProxiedImage
                 alt=""
                 src={currentEpisode.episodeArt || currentEpisode.cover}
+                privateSource={currentEpisode.isPrivate}
                 sizes="(max-width: 767px) 48px, 56px"
               />
             </Link>

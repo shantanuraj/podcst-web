@@ -10,6 +10,7 @@ import {
 } from 'fs';
 import { dirname, join } from 'path';
 import postgres from 'postgres';
+import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
 
 interface LogEntry {
   timestamp: string;
@@ -166,10 +167,25 @@ async function syncBatch(
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
+  const privateRows = await sql`
+    SELECT id, feed_url FROM podcasts
+    WHERE owner_user_id IS NOT NULL AND feed_url = ANY(${batch.map((row) => row.url)}::text[])
+  `;
+  const privateIds = new Map(
+    privateRows.map((row) => [row.feed_url, Number(row.id)]),
+  );
 
   for (const row of batch) {
     const itunesId = normalizeItunesId(row.itunesId);
     try {
+      const privateId = privateIds.get(row.url);
+      if (
+        privateId !== undefined &&
+        (!itunesId || (await resolvePodcast(sql, itunesId)) !== privateId)
+      ) {
+        skipped++;
+        continue;
+      }
       const authorName = row.itunesAuthor || 'Unknown';
       let authorId = authorCache.get(authorName);
       if (!authorId) {
@@ -183,9 +199,11 @@ async function syncBatch(
       if (isFirstSync) {
         const [existing] = await sql`
           SELECT id FROM podcasts
-          WHERE feed_url = ${row.url}
-             OR (itunes_id = ${itunesId}::BIGINT AND ${itunesId}::BIGINT IS NOT NULL)
-             OR podcast_index_id = ${row.id}
+          WHERE owner_user_id IS NULL AND (
+            feed_url = ${row.url}
+            OR (itunes_id = ${itunesId}::BIGINT AND ${itunesId}::BIGINT IS NOT NULL)
+            OR podcast_index_id = ${row.id}
+          )
           LIMIT 1
         `;
 
@@ -209,7 +227,7 @@ async function syncBatch(
               priority = ${row.priority}::INTEGER,
               update_frequency = ${row.updateFrequency ? row.updateFrequency * 86400 : null}::INTEGER,
               updated_at = now()
-            WHERE id = ${existing.id}
+            WHERE id = ${existing.id} AND owner_user_id IS NULL
           `;
           updated++;
         } else {
@@ -257,13 +275,12 @@ async function syncBatch(
             priority = EXCLUDED.priority,
             update_frequency = EXCLUDED.update_frequency,
             updated_at = now()
+          WHERE podcasts.owner_user_id IS NULL
           RETURNING (xmax = 0) AS is_insert
         `;
-        if (result?.is_insert) {
-          inserted++;
-        } else {
-          updated++;
-        }
+        if (!result) skipped++;
+        else if (result.is_insert) inserted++;
+        else updated++;
       }
     } catch (err) {
       logAction({

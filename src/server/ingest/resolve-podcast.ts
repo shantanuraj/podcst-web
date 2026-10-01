@@ -14,7 +14,7 @@ export async function resolvePodcast(
     throw new TypeError('itunes_id must be a positive integer');
   }
   const [existing] = await sql`
-    SELECT id FROM podcasts WHERE itunes_id = ${itunesId}
+    SELECT id FROM podcasts WHERE itunes_id = ${itunesId} AND owner_user_id IS NULL
   `;
   if (existing) return Number(existing.id);
 

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
+import { privateFeedHeaders as headers } from '@/server/podcast-access';
 import {
   addSubscription,
   getSubscriptions,
@@ -14,7 +15,7 @@ export async function GET() {
   }
 
   const subscriptions = await getSubscriptions(session.userId);
-  return NextResponse.json(subscriptions);
+  return NextResponse.json(subscriptions, { headers });
 }
 
 export async function POST(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   if (Array.isArray(body.feedUrls)) {
     const result = await importSubscriptions(session.userId, body.feedUrls);
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers });
   }
 
   const podcastId = body.podcastId;

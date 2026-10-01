@@ -32,6 +32,7 @@ export type RefreshResult =
 
 interface PodcastForRefresh extends PollState {
   feed_url: string;
+  owner_user_id: string | null;
   update_frequency: number | null;
   is_active: boolean;
   etag: string | null;
@@ -42,6 +43,7 @@ interface PodcastForRefresh extends PollState {
 export async function fetchFeed(
   feedUrl: string,
   previous?: FeedMeta,
+  privateFeed = false,
 ): Promise<FeedFetchResult> {
   if (!/^https?:\/\//i.test(feedUrl)) throw new Error('Invalid feed protocol');
 
@@ -77,7 +79,7 @@ export async function fetchFeed(
     return { status: 'not_modified', ...meta };
   }
 
-  const data = await adaptFeed(body);
+  const data = await adaptFeed(body, !privateFeed);
   if (!data) throw new Error('Invalid feed');
   return { status: 'updated', data, ...meta };
 }
@@ -118,7 +120,7 @@ export async function refreshFeed(
     if (!lock.acquired) return 'busy';
 
     const [podcast] = await tx<PodcastForRefresh[]>`
-      SELECT p.feed_url, p.update_frequency, p.is_active,
+      SELECT p.feed_url, p.owner_user_id, p.update_frequency, p.is_active,
              p.id IN (${tx.unsafe(FOLLOWED_IDS_SQL)}) AS is_followed,
              s.etag, s.last_modified, s.hash, s.last_polled_at, s.next_poll_at,
              coalesce(s.failures, 0) AS failures
@@ -145,6 +147,7 @@ export async function refreshFeed(
                 lastModified: podcast.last_modified,
                 hash: podcast.hash,
               },
+          podcast.owner_user_id !== null,
         );
 
         if (result.status === 'updated') {
