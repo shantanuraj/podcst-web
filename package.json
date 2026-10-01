@@ -15,6 +15,7 @@
   "scripts": {
     "build": "next build",
     "db:migrate": "bun scripts/migrate.ts",
+    "db:schema": "bun scripts/schema-inventory.ts",
     "deploy:img-proxy": "bash scripts/deploy-img-proxy.sh",
     "dev": "next dev",
     "format": "biome format --write src",

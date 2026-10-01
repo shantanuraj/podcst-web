@@ -114,7 +114,9 @@ The default command is read-only status. Existing databases with untracked
 history are refused, not automatically baselined. Only `migrations/active/` is
 executable; historical repair SQL must not be replayed. See the
 [migration runbook](docs/database-migrations.md) before upgrading an existing
-installation.
+installation. The [metadata-only schema tool](docs/schema-inventory.md) compares
+an existing database with a disposable reference without copying episode/user
+rows to your computer.
 
 Start the development server:
 
@@ -134,6 +136,7 @@ yarn format              # Format code with Biome
 yarn lint                # Lint code with Biome
 yarn db:migrate          # Inspect migration history (read-only)
 yarn db:migrate up       # Apply the reviewed pending migration batch
+yarn db:schema           # Show metadata inventory/comparison command usage
 ```
 
 ### Tests

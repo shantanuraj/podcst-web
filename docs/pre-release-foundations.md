@@ -71,7 +71,7 @@ Make transitions deterministic and transport side effects separate. Share behavi
 
 ## 8. Treat migrations as an audited mechanism
 
-The [audited runner and fresh-install baseline](database-migrations.md) are implemented with automated safeguards. Existing-database adoption, representative recovery and obsolete-writer cutover remain open R1 gates; tooling alone does not establish live migration history.
+The [audited runner and fresh-install baseline](database-migrations.md) and [metadata-only schema comparison](schema-inventory.md) are implemented with automated safeguards. Existing-database adoption, representative recovery and obsolete-writer cutover remain open R1 gates; tooling alone does not establish live migration history.
 
 Track applied migrations with checksums and exclusive execution locking. Apply transactionally where supported and declare exceptions explicitly. Reconcile live/manual schema history before establishing a baseline.
 

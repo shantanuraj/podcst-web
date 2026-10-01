@@ -56,9 +56,9 @@ There is no automatic baseline/adoption command in this slice. Similar table nam
 
 Before implementing and authorizing adoption:
 
-1. Inventory the actual schema, constraints, sequences, indexes, manual repairs and retained old tables. Compare with the active baseline and explain every difference. Keep records and identifiers in protected operational storage.
+1. Use the [metadata-only inventory/comparison tool](schema-inventory.md) to inspect the actual schema, constraints, sequence configuration, indexes and retained old tables without copying application rows. Compare with the active reference, explain every difference and separately investigate manual repairs. Keep records and identifiers in protected operational storage.
 2. Establish which historical data transformations occurred, including identity preservation and the tier split. Do not infer this from schema shape alone or mark historical migrations applied speculatively.
-3. Restore a protected backup into an isolated database, preserve user/episode references, and rehearse any reconciliation plus the proposed history recording.
+3. Rehearse reconciliation/history recording against the reviewed schema and a size-capped, dependency-complete synthetic or protected subset. Verify user/episode references. This correctness rehearsal does not require a full laptop restore; full backup recoverability, scale-dependent rewrite behavior and recovery objectives still need isolated remote restore/snapshot evidence.
 4. Review a database-bound, drift-checked adoption plan and the obsolete-writer/client cutover. Resolve differences before recording the active baseline; never use a manual ledger insertion to silence a refusal.
 5. Record approved execution and recovery evidence, then update R1 status in the release hub.
 
