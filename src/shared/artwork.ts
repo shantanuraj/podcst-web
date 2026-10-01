@@ -17,6 +17,18 @@ function remoteURL(src: string) {
   }
 }
 
+export function directArtwork(src?: string): string | undefined {
+  let value = src;
+  for (let depth = 0; value && depth < 4; depth++) {
+    const url = remoteURL(value);
+    if (!url) return undefined;
+    if (url.hostname !== proxyHostname) return value;
+    if (url.searchParams.getAll('p').length !== 1) return undefined;
+    value = url.searchParams.get('p') ?? undefined;
+  }
+  return undefined;
+}
+
 export function artworkFallback(src?: string) {
   if (!src) return undefined;
   const source = remoteURL(src);

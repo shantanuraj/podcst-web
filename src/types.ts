@@ -109,6 +109,7 @@ export namespace iTunes {
  * Adapted Podcast interface
  */
 export interface IPodcast {
+  isPrivate?: boolean;
   /**
    * Database id of the podcast
    */
@@ -155,6 +156,7 @@ export interface IPodcast {
  * Adapted Episode interface
  */
 export interface IEpisode {
+  isPrivate?: boolean;
   title: string;
   summary: string | null;
   published: number | null;
@@ -183,6 +185,7 @@ export interface IEpisodeInfo extends IEpisode {
  * Episode listing
  */
 export interface IEpisodeListing {
+  isPrivate?: boolean;
   title: string;
   link: string | null;
   published: number | null;
@@ -209,6 +212,7 @@ export type RenderablePodcast = IPodcast | IPodcastEpisodesInfo;
  * Podcast info without episodes (for metadata, header display)
  */
 export interface IPodcastInfo {
+  isPrivate?: boolean;
   id: number;
   feed: string;
   title: string;
@@ -236,6 +240,7 @@ export interface IPaginatedEpisodes {
  * Podcasts Search result interface
  */
 export interface IPodcastSearchResult {
+  isPrivate?: boolean;
   id?: number;
   itunes_id?: number;
   author: string;

@@ -2,27 +2,40 @@ import SwiftUI
 
 struct SearchView: View {
     @Environment(APIClient.self) private var api
+    @Environment(SessionStore.self) private var session
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
     @AppStorage("recentSearches") private var recentStorage = ""
     @State private var query = ""
     @State private var results: [Podcast] = []
     @State private var isSearching = false
+    @State private var showingLogin = false
+    @State private var error: String?
+
+    private var searchIdentity: String { "\(session.user?.id ?? "guest")\u{001F}\(session.isLoading)\u{001F}\(region)\u{001F}\(term)" }
 
     private var term: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var recent: [String] { recentStorage.split(separator: "\n").map(String.init) }
-    private var feedURL: URL? {
-        URL(string: term).flatMap { ["http", "https"].contains($0.scheme?.lowercased()) ? $0 : nil }
+    private var isFeedInput: Bool {
+        term.range(of: "^(https?:|[a-z][a-z0-9+.-]*://)", options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if term.isEmpty || feedURL != nil {
-                    FeedHint(isFeed: feedURL != nil)
+                if term.isEmpty || isFeedInput {
+                    FeedHint(isFeed: isFeedInput)
                         .padding(.bottom, 22)
                 }
+                if isFeedInput && session.user == nil {
+                    Button("Sign in to open an RSS link") { showingLogin = true }
+                        .padding(.bottom, 16)
+                }
+                if let error {
+                    Text(error).font(.sans(.footnote)).foregroundStyle(PodcstPalette.secondary)
+                        .padding(.bottom, 16)
+                }
                 if !term.isEmpty {
-                    SectionHeader(feedURL == nil ? "Podcasts" : "Feed") {
+                    SectionHeader(isFeedInput ? "Feed" : "Podcasts") {
                         if isSearching {
                             ProgressView().controlSize(.small)
                         } else {
@@ -63,37 +76,39 @@ struct SearchView: View {
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Podcasts or RSS link")
         .textInputAutocapitalization(.never)
         .onSubmit(of: .search) { remember(term) }
-        .task(id: query) {
+        .sheet(isPresented: $showingLogin) { LoginView() }
+        .task(id: searchIdentity) {
+            let identity = searchIdentity
+            results = []
+            error = nil
+            isSearching = false
             do {
                 try await Task.sleep(for: .milliseconds(300))
             } catch {
                 return
             }
-            await search(term)
+            await search(term, identity: identity)
         }
     }
 
-    private func search(_ term: String) async {
-        guard !term.isEmpty else {
-            results = []
-            return
-        }
+    private func search(_ term: String, identity: String) async {
+        guard !term.isEmpty, !session.isLoading, identity == searchIdentity,
+              !isFeedInput || session.user != nil else { return }
         isSearching = true
-        defer { isSearching = false }
+        defer { if identity == searchIdentity { isSearching = false } }
         do {
-            if feedURL != nil {
-                results = [try await api.podcast(feed: term)]
-            } else {
-                results = try await api.search(term: term, locale: region)
-            }
+            let podcasts = try await api.search(term: term, locale: region)
+            guard !Task.isCancelled, identity == searchIdentity else { return }
+            results = podcasts
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, identity == searchIdentity else { return }
             results = []
+            self.error = error.localizedDescription
         }
     }
 
     private func remember(_ term: String) {
-        guard !term.isEmpty, feedURL == nil else { return }
+        guard !term.isEmpty, !isFeedInput else { return }
         recentStorage = ([term] + recent.filter { $0.caseInsensitiveCompare(term) != .orderedSame })
             .prefix(8)
             .joined(separator: "\n")

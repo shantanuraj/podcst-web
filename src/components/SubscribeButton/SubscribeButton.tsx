@@ -52,6 +52,7 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
         serverSubscribe(podcastId);
       }
     } else {
+      if (info.isPrivate) return;
       if (isLocalSubscribed) {
         removeSubscription(feed);
       } else {
@@ -75,7 +76,7 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
     <Button
       data-is-subscribed={isSubscribedToFeed}
       onClick={onSubscribeClick}
-      disabled={isPending}
+      disabled={isPending || (!!info.isPrivate && !canUseServer)}
       suppressHydrationWarning
     >
       {isSubscribedToFeed ? t('podcast.unsubscribe') : t('podcast.subscribe')}

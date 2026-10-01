@@ -1,7 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/server/auth/session';
 import { sql } from '@/server/db';
 import { refreshFeed } from '@/server/ingest/feed-refresh';
 import { refreshPodcast } from '@/server/ingest/podcast';
+import {
+  canAccessPodcast,
+  privateFeedHeaders as headers,
+} from '@/server/podcast-access';
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -11,6 +16,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { message: 'podcastId must be a positive integer' },
       { status: 400 },
+    );
+  }
+
+  const session = await getSession();
+  const userId = session?.userId ?? null;
+  if (!(await canAccessPodcast(sql, podcastId, userId))) {
+    return NextResponse.json(
+      { message: 'Podcast not found' },
+      { status: 404, headers },
     );
   }
 
@@ -24,10 +38,10 @@ export async function POST(request: NextRequest) {
           : status === 'busy'
             ? 202
             : 200;
-    return NextResponse.json({ status }, { status: code });
+    return NextResponse.json({ status }, { status: code, headers });
   }
 
-  const podcast = await refreshPodcast(podcastId);
+  const podcast = await refreshPodcast(podcastId, userId);
 
   if (!podcast) {
     return NextResponse.json(
@@ -36,5 +50,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json(podcast);
+  return NextResponse.json(podcast, { headers });
 }

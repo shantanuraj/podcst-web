@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ProxiedImage } from '@/ui/Image';
-import { artworkFallback, artworkSources } from './artwork';
+import { artworkFallback, artworkSources, directArtwork } from './artwork';
 
 const source = 'https://images.example.com/cover.jpg?token=a%2Bb%252Fc&v=1';
 const proxy = `https://assets.podcst.app/?p=${encodeURIComponent(source)}`;
@@ -74,6 +74,37 @@ describe('artwork sources', () => {
     ]) {
       expect(artworkSources(value, '56px')).toEqual({ src: value });
     }
+  });
+});
+
+describe('private artwork', () => {
+  test('unwraps existing proxy locators without changing credential bytes', () => {
+    expect(directArtwork(proxy)).toBe(source);
+    expect(
+      directArtwork(
+        `https://assets.podcst.app/?p=${encodeURIComponent(proxy)}`,
+      ),
+    ).toBe(source);
+    expect(
+      directArtwork('https://assets.podcst.app/?p=file:///private'),
+    ).toBeUndefined();
+    expect(directArtwork(`${proxy}&p=ambiguous`)).toBeUndefined();
+  });
+
+  test('private markup never uses proxy variants or an explicit proxy srcset', () => {
+    const markup = renderToStaticMarkup(
+      <ProxiedImage
+        privateSource
+        src={proxy}
+        srcSet={`${proxy} 160w`}
+        sizes="56px"
+        alt="Private"
+      />,
+    );
+    expect(markup).not.toContain('assets.podcst.app');
+    expect(markup).not.toContain('srcSet=');
+    expect(markup).not.toContain('privateSource');
+    expect(markup).toContain('images.example.com');
   });
 });
 

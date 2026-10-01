@@ -32,6 +32,6 @@ snapshot() {
   echo "OK ${name} rows=${rows} encrypted=$(stat -c%s "${file}.age")B s3://${BUCKET}/${key}"
 }
 
-snapshot podcasts "SELECT id, feed_url, itunes_id, podcast_index_id FROM podcasts" "${BACKUP_MIN_PODCASTS:?Set BACKUP_MIN_PODCASTS}"
+snapshot podcasts "SELECT id, feed_url, itunes_id, podcast_index_id, owner_user_id FROM podcasts" "${BACKUP_MIN_PODCASTS:?Set BACKUP_MIN_PODCASTS}"
 snapshot episodes "SELECT id, podcast_id, guid FROM episodes" "${BACKUP_MIN_EPISODES:?Set BACKUP_MIN_EPISODES}"
 echo "identity snapshot complete retain_until=${RETAIN_UNTIL} (${RETAIN_DAYS}d)"

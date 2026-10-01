@@ -85,6 +85,10 @@ public final class LibraryStore {
 
     public func toggleSubscription(_ podcast: Podcast) async {
         guard !session.isLoading else { return }
+        guard podcast.isPrivate != true || session.user != nil else {
+            error = "Sign in to follow a private podcast"
+            return
+        }
         let accountID = session.user?.id
         do {
             if session.user != nil {
@@ -172,7 +176,7 @@ public final class LibraryStore {
             } else {
                 var imported: [Podcast] = []
                 for feed in feeds {
-                    if let podcast = try? await api.podcast(feed: feed) { imported.append(podcast) }
+                    if let podcast = try? await api.podcast(feed: feed), podcast.isPrivate != true { imported.append(podcast) }
                 }
                 var byIdentity = Dictionary(uniqueKeysWithValues: podcasts.map { ($0.identity, $0) })
                 imported.forEach { byIdentity[$0.identity] = $0 }
@@ -187,7 +191,7 @@ public final class LibraryStore {
 
     private func loadGuest() -> [Podcast] {
         guard let data = defaults.data(forKey: guestKey), let value = try? JSONDecoder().decode([Podcast].self, from: data) else { return [] }
-        return value
+        return value.filter { $0.isPrivate != true }
     }
 
     private func loadGuestPodcast(_ podcast: Podcast, forceRefresh: Bool = false) async throws {

@@ -398,6 +398,67 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(podcast.shareURL?.absoluteString, podcast.link)
     }
 
+    func testPrivateSourcesDoNotOfferPublicSharing() throws {
+        var podcast = Podcast(feed: "https://example.test/feed?token=private", title: "Private", link: "https://example.test/show", isPrivate: true)
+        let episode = Episode(guid: "private", feed: podcast.feed, title: "Private episode", link: "https://example.test/episode", file: EpisodeFile(url: "https://example.test/private.mp3"), isPrivate: true)
+        XCTAssertNil(podcast.shareURL)
+        XCTAssertNil(episode.shareURL)
+        XCTAssertEqual(try JSONDecoder().decode(Episode.self, from: JSONEncoder().encode(episode)).isPrivate, true)
+        podcast.isPrivate = false
+        XCTAssertEqual(podcast.shareURL?.absoluteString, "https://example.test/show")
+    }
+
+    func testPrivatePodcastsCannotEnterTheGuestLibrary() async throws {
+        let podcast = Podcast(id: 9124, feed: "https://example.test/private", title: "Private", isPrivate: true)
+        let fixture = try await guestFixture(podcasts: [podcast])
+        defer { fixture.cleanUp() }
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Guest private subscription must not make a request") }
+        XCTAssertTrue(fixture.library.podcasts.isEmpty)
+        await fixture.library.toggleSubscription(podcast)
+        XCTAssertTrue(fixture.library.podcasts.isEmpty)
+        XCTAssertNotNil(fixture.library.error)
+    }
+
+    func testAuthenticatedRSSSearchAndImportUseBodiesAndPreservePrivacy() async throws {
+        let feed = "https://example.test/\(UUID().uuidString)?token=a%2Bb"
+        let podcast = Podcast(id: 9123, feed: feed, title: "Private show", isPrivate: true)
+        let credentials = MemorySessionCredentials()
+        credentials.write("private-session")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GuestLibraryURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://private.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        var paths: [String] = []
+        GuestLibraryURLProtocol.handler = { incoming in
+            let request = incoming.request
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertNil(request.url?.query)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "session=private-session")
+            let path = try XCTUnwrap(request.url?.path)
+            paths.append(path)
+            var data = request.httpBody ?? Data()
+            if let stream = request.httpBodyStream {
+                stream.open()
+                defer { stream.close() }
+                var buffer = [UInt8](repeating: 0, count: 1024)
+                while stream.hasBytesAvailable {
+                    let count = stream.read(&buffer, maxLength: buffer.count)
+                    guard count > 0 else { break }
+                    data.append(contentsOf: buffer.prefix(count))
+                }
+            }
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
+            XCTAssertEqual(body[path == "/api/search" ? "term" : "url"], feed)
+            if path == "/api/search" { try incoming.respond([podcast]) }
+            else { try incoming.respond(podcast) }
+        }
+        let results = try await api.search(term: feed)
+        XCTAssertEqual(results.first?.isPrivate, true)
+        let detail = try await api.podcast(feed: feed)
+        XCTAssertEqual(detail.isPrivate, true)
+        XCTAssertEqual(paths, ["/api/search", "/api/feed"])
+    }
+
     func testArtworkRetentionIncludesOwnedEpisodeAndFallbackArt() {
         let libraryCover = "https://example.test/library.jpg"
         let fallback = "https://example.test/cover.jpg"

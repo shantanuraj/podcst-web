@@ -12,7 +12,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import postgres from 'postgres';
 import { startPostgres } from './lib/postgres-sandbox';
-import { loadMigrations, migrate, migrationStatus } from './migrations';
+import {
+  migrate as applyMigrations,
+  migrationStatus as inspectMigrations,
+  loadMigrations,
+} from './migrations';
 
 const baseline = loadMigrations()[0];
 
@@ -29,6 +33,14 @@ function files(extra: Record<string, string> = {}, initial = baseline.source) {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+function migrate(sql: postgres.Sql, migrations = files()) {
+  return applyMigrations(sql, migrations);
+}
+
+function migrationStatus(sql: postgres.Sql, migrations = files()) {
+  return inspectMigrations(sql, migrations);
 }
 
 function cli(args: readonly string[], url = '', cwd?: string) {
@@ -48,10 +60,10 @@ function cli(args: readonly string[], url = '', cwd?: string) {
 }
 
 describe('migration files and CLI safety', () => {
-  test('only loads the active baseline, never historical repair SQL', () => {
-    expect(loadMigrations().map(({ name }) => name)).toEqual([
-      '0000-baseline.sql',
-    ]);
+  test('loads the active chain, never historical repair SQL', () => {
+    const names = loadMigrations().map(({ name }) => name);
+    expect(names[0]).toBe('0000-baseline.sql');
+    expect(names).not.toContain('0004-episodes-bigint.sql');
     expect(baseline.checksum).toBe(
       createHash('sha256').update(baseline.source).digest('hex'),
     );
@@ -207,13 +219,17 @@ describe.skipIf(!process.env.PG_BIN)(
       const result = cli(['up'], cluster.url);
       expect(result.exitCode).toBe(0);
       expect(JSON.parse(result.stdout.toString())).toEqual({
-        applied: [baseline.name],
+        applied: loadMigrations().map(({ name }) => name),
       });
-      const status = await migrationStatus(sql);
+      const status = await migrationStatus(sql, loadMigrations());
       expect(status.state).toBe('tracked');
-      expect(status.migrations).toEqual([
-        { name: baseline.name, checksum: baseline.checksum, state: 'applied' },
-      ]);
+      expect(status.migrations).toEqual(
+        loadMigrations().map(({ name, checksum }) => ({
+          name,
+          checksum,
+          state: 'applied',
+        })),
+      );
       const columns =
         await sql`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'episodes'`;
       expect(columns.map((row) => row.column_name).sort()).toEqual([

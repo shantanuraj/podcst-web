@@ -67,8 +67,8 @@ public final class APIClient {
     }
 
     public func search(term: String, locale: String = "us") async throws -> [Podcast] {
-        let rows: [RawSearchResult] = try await get(path: "/api/search", query: [URLQueryItem(name: "term", value: term), URLQueryItem(name: "locale", value: locale)])
-        return rows.map { Podcast(id: $0.id, itunesId: $0.itunesId, itunesLocale: locale, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail) }
+        let rows: [RawSearchResult] = try await post(path: "/api/search", body: ["term": term, "locale": locale])
+        return rows.map { Podcast(id: $0.id, itunesId: $0.itunesId, itunesLocale: locale, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail, isPrivate: $0.isPrivate ?? false) }
     }
 
     public func cachedPodcast(id: Int? = nil, feed: String) -> Podcast? {
@@ -77,7 +77,9 @@ public final class APIClient {
 
     public func podcast(feed: String, forceRefresh: Bool = false) async throws -> Podcast {
         try await feedCache.load(.feed(feed), refreshing: forceRefresh) {
-            let raw: RawPodcast = try await self.get(path: "/api/feed", query: [URLQueryItem(name: "url", value: feed)])
+            let raw: RawPodcast = self.hasSession
+                ? try await self.post(path: "/api/feed", body: ["url": feed])
+                : try await self.get(path: "/api/feed", query: [URLQueryItem(name: "url", value: feed)])
             return self.mapPodcast(raw, feedFallback: feed)
         }
     }
@@ -110,7 +112,8 @@ public final class APIClient {
                     explicit: infoResult.explicit,
                     keywords: infoResult.keywords,
                     episodeCount: max(infoResult.episodeCount, catalogueResult.total),
-                    episodes: catalogueResult.episodes
+                    episodes: catalogueResult.episodes,
+                    isPrivate: infoResult.isPrivate ?? false
                 )
             }
         }
@@ -127,7 +130,7 @@ public final class APIClient {
 
     public func podcastInfo(id: Int) async throws -> Podcast {
         let raw: RawPodcastInfo = try await get(path: "/api/feed/info", query: [URLQueryItem(name: "id", value: String(id))])
-        return Podcast(id: raw.id, feed: raw.feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.cover, description: raw.description, link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords, episodeCount: raw.episodeCount)
+        return Podcast(id: raw.id, feed: raw.feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.cover, description: raw.description, link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords, episodeCount: raw.episodeCount, isPrivate: raw.isPrivate ?? false)
     }
 
     public func episodes(podcastID: Int, cursor: Int? = nil, search: String? = nil, sortBy: String = "published", sortDirection: String = "desc", limit: Int = 20) async throws -> EpisodePage {
@@ -417,11 +420,11 @@ public final class APIClient {
     private func mapPodcast(_ raw: RawPodcast, feedFallback: String? = nil) -> Podcast {
         let feed = raw.feed ?? raw.feedUrl ?? feedFallback ?? ""
         feedCache.identify(id: raw.id, feed: feed)
-        return Podcast(id: raw.id, feed: feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.thumbnail ?? raw.cover, description: raw.description ?? "", link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords ?? [], episodeCount: raw.episodeCount ?? raw.count ?? raw.episodes?.count ?? 0, episodes: raw.episodes?.map { mapEpisode($0, podcastId: raw.id, feedFallback: feed, coverFallback: raw.cover, titleFallback: raw.title) } ?? [])
+        return Podcast(id: raw.id, feed: feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.thumbnail ?? raw.cover, description: raw.description ?? "", link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords ?? [], episodeCount: raw.episodeCount ?? raw.count ?? raw.episodes?.count ?? 0, episodes: raw.episodes?.map { mapEpisode($0, podcastId: raw.id, feedFallback: feed, coverFallback: raw.cover, titleFallback: raw.title) } ?? [], isPrivate: raw.isPrivate ?? false)
     }
 
     private func mapEpisode(_ raw: RawEpisode, podcastId: Int? = nil, feedFallback: String? = nil, coverFallback: String? = nil, titleFallback: String? = nil) -> Episode {
-        Episode(id: raw.id, podcastId: raw.podcastId ?? podcastId, guid: raw.guid, feed: raw.feed ?? feedFallback ?? "", podcastTitle: raw.podcastTitle ?? titleFallback, title: raw.title, summary: raw.summary, published: date(raw.published), cover: raw.cover ?? coverFallback ?? "", explicit: raw.explicit, duration: raw.duration, link: raw.link, episodeArt: raw.episodeArt, showNotes: raw.showNotes ?? raw.summary ?? "", author: raw.author, file: EpisodeFile(url: raw.file?.url ?? "", length: raw.file?.length ?? 0, type: raw.file?.type ?? "audio/mpeg"))
+        Episode(id: raw.id, podcastId: raw.podcastId ?? podcastId, guid: raw.guid, feed: raw.feed ?? feedFallback ?? "", podcastTitle: raw.podcastTitle ?? titleFallback, title: raw.title, summary: raw.summary, published: date(raw.published), cover: raw.cover ?? coverFallback ?? "", explicit: raw.explicit, duration: raw.duration, link: raw.link, episodeArt: raw.episodeArt, showNotes: raw.showNotes ?? raw.summary ?? "", author: raw.author, file: EpisodeFile(url: raw.file?.url ?? "", length: raw.file?.length ?? 0, type: raw.file?.type ?? "audio/mpeg"), isPrivate: raw.isPrivate ?? false)
     }
 }
 
@@ -771,6 +774,7 @@ private struct RawUser: Decodable { var id: String; var email: String; var name:
 private struct ResolvePodcastBody: Encodable { var itunes_id: Int; var locale: String }
 private struct RawPodcastIdentity: Decodable { var id: Int }
 private struct RawSearchResult: Decodable {
+    var isPrivate: Bool?
     var id: Int?
     var itunesId: Int?
     var author: String
@@ -779,13 +783,14 @@ private struct RawSearchResult: Decodable {
     var thumbnail: String
     var title: String
 
-    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", author, feed, cover, thumbnail, title }
+    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", author, feed, cover, thumbnail, title, isPrivate }
 }
 private struct RawEpisodePage: Decodable { var episodes: [RawEpisode]; var total: Int; var hasMore: Bool; var nextCursor: Int? }
 private struct RawProgress: Decodable { var episode: RawEpisode; var position: Double }
-private struct RawPodcastInfo: Decodable { var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
+private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
 
 private struct RawPodcast: Decodable {
+    var isPrivate: Bool?
     var id: Int?
     var itunesId: Int?
     var feed: String?
@@ -803,10 +808,11 @@ private struct RawPodcast: Decodable {
     var count: Int?
     var episodes: [RawEpisode]?
 
-    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", feed, feedUrl = "feed_url", title, author, cover, thumbnail, description, link, published, explicit, keywords, episodeCount, count, episodes }
+    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", feed, feedUrl = "feed_url", title, author, cover, thumbnail, description, link, published, explicit, keywords, episodeCount, count, episodes, isPrivate }
 }
 
 private struct RawEpisode: Decodable {
+    var isPrivate: Bool?
     var id: Int?
     var podcastId: Int?
     var guid: String
@@ -824,7 +830,7 @@ private struct RawEpisode: Decodable {
     var author: String?
     var file: RawFile?
 
-    enum CodingKeys: String, CodingKey { case id, podcastId, guid, feed, podcastTitle, title, summary, published, cover, explicit, duration, link, episodeArt, showNotes, author, file }
+    enum CodingKeys: String, CodingKey { case id, podcastId, guid, feed, podcastTitle, title, summary, published, cover, explicit, duration, link, episodeArt, showNotes, author, file, isPrivate }
 }
 
 private struct RawFile: Decodable { var url: String?; var length: Int64?; var type: String? }

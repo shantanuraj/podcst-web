@@ -4,6 +4,7 @@
  */
 
 import { Parser } from 'xml2js';
+import { directArtwork } from '@/shared/artwork';
 import type { IEpisode, IEpisodeListing, IFileInfo } from '@/types';
 import { reformatShowNotes, showNotesSorter } from './format';
 
@@ -184,7 +185,11 @@ const readShowNotes = (ctx: any): string => {
 /**
  * Read cover art and wrap in proxy if needed
  */
-const readCover = (ctx: any, baseLink?: string | null): string | null => {
+const readCover = (
+  ctx: any,
+  baseLink?: string | null,
+  proxyArtwork = true,
+): string | null => {
   try {
     let link = '';
     const itunesImage = ctx['itunes:image'];
@@ -231,6 +236,8 @@ const readCover = (ctx: any, baseLink?: string | null): string | null => {
       }
     }
 
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (!proxyArtwork) return directArtwork(url.toString()) ?? null;
     const imgProxy = new URL('https://assets.podcst.app/');
     imgProxy.searchParams.set('p', url.toString());
     return imgProxy.toString();
@@ -277,6 +284,7 @@ const adaptEpisode = (
   item: any,
   fallbackCover: string,
   fallbackAuthor: string,
+  proxyArtwork: boolean,
 ): IEpisode | null => {
   if (
     !item.enclosure ||
@@ -305,7 +313,7 @@ const adaptEpisode = (
     title: finalTitle,
     summary: readSummary(item),
     published: readDate(item),
-    cover: readCover(item, link) || fallbackCover,
+    cover: readCover(item, link, proxyArtwork) || fallbackCover,
     explicit: readExplicit(item),
     duration: readDuration(item),
     link,
@@ -314,7 +322,9 @@ const adaptEpisode = (
       (Array.isArray(item['itunes:author'])
         ? (item['itunes:author'][0] as string)
         : null) || fallbackAuthor,
-    episodeArt: readEpisodeArtwork(item),
+    episodeArt: proxyArtwork
+      ? readEpisodeArtwork(item)
+      : (directArtwork(readEpisodeArtwork(item) ?? undefined) ?? null),
     showNotes: readShowNotes(item),
   };
 };
@@ -336,7 +346,10 @@ const xmlToJSON = (xml: string) => {
 /**
  * Transform parsed XML JSON into IEpisodeListing
  */
-const adaptJSON = (json: any): IEpisodeListing | null => {
+const adaptJSON = (
+  json: any,
+  proxyArtwork: boolean,
+): IEpisodeListing | null => {
   if (!json?.rss?.channel?.[0]) {
     console.error('Invalid Podcast RSS: Missing channel');
     return null;
@@ -344,7 +357,7 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
 
   try {
     const channel = json.rss.channel[0];
-    const cover = (readCover(channel) || '') as string;
+    const cover = readCover(channel, undefined, proxyArtwork) || '';
 
     const author =
       (Array.isArray(channel['itunes:author'])
@@ -379,7 +392,7 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
       explicit: readExplicit(channel),
       episodes: Array.isArray(channel.item)
         ? channel.item
-            .map((e: any) => adaptEpisode(e, cover, author))
+            .map((e: any) => adaptEpisode(e, cover, author, proxyArtwork))
             .filter(validEpisode)
         : [],
     };
@@ -392,7 +405,8 @@ const adaptJSON = (json: any): IEpisodeListing | null => {
 /**
  * Main entry point: parses XML and adapts to cleaned up JSON
  */
-export const adaptFeed = async (xml: string) => xmlToJSON(xml).then(adaptJSON);
+export const adaptFeed = async (xml: string, proxyArtwork = true) =>
+  xmlToJSON(xml).then((json) => adaptJSON(json, proxyArtwork));
 
 /**
  * Type guard for valid episodes

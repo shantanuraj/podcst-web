@@ -1,6 +1,8 @@
+import { feedUrl } from '@/shared/feed-url';
 import type { IPodcastEpisodesInfo } from '@/types';
 import { sql } from './db';
-import { getPodcastByFeedUrl, ingestPodcast } from './ingest/podcast';
+import { ingestPodcast } from './ingest/podcast';
+import { podcastAccess } from './podcast-access';
 
 export async function getSubscriptions(
   userId: string,
@@ -14,11 +16,12 @@ export async function getSubscriptions(
       p.cover,
       p.website_url as link,
       p.explicit,
+      p.owner_user_id,
       a.name as author
     FROM subscriptions s
     JOIN podcasts p ON p.id = s.podcast_id
     JOIN authors a ON a.id = p.author_id
-    WHERE s.user_id = ${userId}
+    WHERE s.user_id = ${userId} AND ${podcastAccess(sql, userId)}
     ORDER BY s.subscribed_at DESC
   `;
 
@@ -39,6 +42,7 @@ export async function getSubscriptions(
     const mappedEpisodes = episodes.map((e) => ({
       id: e.id,
       podcastId: row.id,
+      isPrivate: row.owner_user_id !== null,
       guid: e.guid,
       title: e.title,
       summary: e.summary,
@@ -61,6 +65,7 @@ export async function getSubscriptions(
 
     podcasts.push({
       id: row.id,
+      isPrivate: row.owner_user_id !== null,
       feed: row.feed_url,
       title: row.title,
       description: row.description || '',
@@ -81,17 +86,17 @@ export async function addSubscription(
   userId: string,
   podcastId: number,
 ): Promise<boolean> {
-  const [exists] = await sql`
-    SELECT 1 FROM podcasts WHERE id = ${podcastId}
+  const [podcast] = await sql`
+    SELECT p.id FROM podcasts p
+    WHERE p.id = ${podcastId} AND ${podcastAccess(sql, userId)}
   `;
-  if (!exists) return false;
-
+  if (!podcast) return false;
   await sql`
     INSERT INTO subscriptions (user_id, podcast_id)
-    VALUES (${userId}, ${podcastId})
+    SELECT ${userId}, p.id FROM podcasts p
+    WHERE p.id = ${podcastId} AND ${podcastAccess(sql, userId)}
     ON CONFLICT (user_id, podcast_id) DO NOTHING
   `;
-
   return true;
 }
 
@@ -114,22 +119,15 @@ export async function importSubscriptions(
   let succeeded = 0;
   let failed = 0;
 
-  for (const feedUrl of feedUrls) {
-    let podcast = await getPodcastByFeedUrl(feedUrl);
-    if (!podcast) {
-      podcast = await ingestPodcast(feedUrl);
-    }
-    if (!podcast?.id) {
+  for (const input of feedUrls) {
+    try {
+      const podcast = await ingestPodcast(feedUrl(input), userId);
+      if (podcast?.id && (await addSubscription(userId, podcast.id)))
+        succeeded++;
+      else failed++;
+    } catch {
       failed++;
-      continue;
     }
-
-    await sql`
-      INSERT INTO subscriptions (user_id, podcast_id)
-      VALUES (${userId}, ${podcast.id})
-      ON CONFLICT (user_id, podcast_id) DO NOTHING
-    `;
-    succeeded++;
   }
 
   return { succeeded, failed };

@@ -1,5 +1,6 @@
 import type { IEpisodeInfo } from '@/types';
 import { sql } from './db';
+import { podcastAccess } from './podcast-access';
 
 export interface PlaybackProgress {
   episode: IEpisodeInfo;
@@ -27,13 +28,14 @@ export async function getCurrentProgress(
       p.title as podcast_title,
       p.cover,
       p.explicit,
+      p.owner_user_id,
       a.name as author
     FROM playback_progress pp
     JOIN episodes e ON e.id = pp.episode_id
     JOIN podcasts p ON p.id = e.podcast_id
     JOIN authors a ON a.id = p.author_id
     LEFT JOIN episode_content c ON c.episode_id = e.id
-    WHERE pp.user_id = ${userId}
+    WHERE pp.user_id = ${userId} AND ${podcastAccess(sql, userId)}
       AND pp.completed = false
     ORDER BY pp.updated_at DESC
     LIMIT 1
@@ -46,6 +48,7 @@ export async function getCurrentProgress(
     episode: {
       id: row.episode_id,
       podcastId: row.podcast_id,
+      isPrivate: row.owner_user_id !== null,
       guid: row.guid,
       title: row.title,
       summary: row.summary,
@@ -74,21 +77,18 @@ export async function saveProgress(
   position: number,
   completed: boolean,
 ): Promise<boolean> {
-  const [exists] = await sql`
-    SELECT 1 FROM episodes WHERE id = ${episodeId}
-  `;
-  if (!exists) return false;
-
-  await sql`
+  const [saved] = await sql`
     INSERT INTO playback_progress (user_id, episode_id, position, completed, updated_at)
-    VALUES (${userId}, ${episodeId}, ${position}, ${completed}, now())
+    SELECT ${userId}, e.id, ${position}, ${completed}, now()
+    FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
+    WHERE e.id = ${episodeId} AND ${podcastAccess(sql, userId)}
     ON CONFLICT (user_id, episode_id) DO UPDATE SET
       position = EXCLUDED.position,
       completed = EXCLUDED.completed,
       updated_at = EXCLUDED.updated_at
+    RETURNING episode_id
   `;
-
-  return true;
+  return !!saved;
 }
 
 export async function getEpisodeProgress(
@@ -96,9 +96,12 @@ export async function getEpisodeProgress(
   episodeId: number,
 ): Promise<{ position: number; completed: boolean } | null> {
   const [row] = await sql`
-    SELECT position, completed
-    FROM playback_progress
-    WHERE user_id = ${userId} AND episode_id = ${episodeId}
+    SELECT pp.position, pp.completed
+    FROM playback_progress pp
+    JOIN episodes e ON e.id = pp.episode_id
+    JOIN podcasts p ON p.id = e.podcast_id
+    WHERE pp.user_id = ${userId} AND pp.episode_id = ${episodeId}
+      AND ${podcastAccess(sql, userId)}
   `;
 
   if (!row) return null;
