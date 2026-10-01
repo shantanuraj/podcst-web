@@ -244,6 +244,30 @@ ${seed}`);
     ).toBe(true);
   });
 
+  test('requires separate review when metadata differs but media was evicted', async () => {
+    await sql`UPDATE episodes SET published='2026-02-01' WHERE id=21`;
+    const { result } = await inspect();
+    if (!result) throw new Error('Inspection result missing');
+    const reviewed = { ...plan, reviewedDifferences: result.differencesDigest };
+    const { expectedPath } = await inspect(reviewed);
+    await expect(
+      reconcile(sql, {
+        plan: reviewed,
+        expectedPath,
+        backupPath: path(),
+        mode: 'apply',
+      }),
+    ).rejects.toThrow('Missing-media metadata cases require separate');
+    await apply('apply', {
+      ...reviewed,
+      reviewedMissingMedia: result.missingMediaDigest,
+    });
+    expect(
+      (await sql`SELECT title FROM episode_content WHERE episode_id=11`)[0]
+        .title,
+    ).toBe('shared-b');
+  });
+
   test('refuses a changed snapshot and new foreign-key dependencies', async () => {
     const { expectedPath } = await inspect();
     await sql`UPDATE playback_progress SET position=124 WHERE episode_id=20`;

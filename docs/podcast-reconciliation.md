@@ -14,7 +14,7 @@ For a verified pair:
 
 - Shared source-scoped GUIDs map to the canonical episode IDs. Where both rows contain media, enclosure URLs must match exactly; textual URL normalization is not identity proof.
 - Canonical-only episodes remain untouched. Duplicate-only episodes are reparented with their existing IDs, content and progress intact. Neither side must be a subset of the other.
-- Existing canonical content and publication timestamps win. Missing canonical content is filled from the duplicate. Title/publication differences require an exact reviewed-differences digest and matching stored media evidence. Review their live-source correspondence before authorizing that digest.
+- Existing canonical content and publication timestamps win. Missing canonical content is filled from the duplicate. Title/publication differences require an exact reviewed-differences digest. If either side's media was evicted, those cases require a separate `reviewedMissingMedia` digest backed by protected source-equivalence evidence; a missing file is not itself proof of correspondence. Review live sources and historical evidence before authorizing either digest. Disagreeing media URLs when both exist always abort.
 - Progress references move through the episode map without changing position, completion or update timestamp. If a user has progress on both corresponding episodes, the tool refuses to choose a winner—even if a maximum position or latest timestamp looks convenient.
 - Subscriptions converge on the canonical record, preserving the earliest subscription timestamp per account.
 - Duplicate transcripts, genres or chart references require a separate reviewed policy and currently abort. Canonical references are preserved.
@@ -58,7 +58,7 @@ bun scripts/reconcile-podcasts.ts \
   --mode inspect
 ```
 
-5. Review the protected `differences` and their live-source evidence. Put the reported `differencesDigest` into the plan's `reviewedDifferences` field, including the empty-list digest when there are no differences. Reinspect using the finalized plan and a new path; this is the expected snapshot for dry-run/apply. Do not edit a snapshot to bypass a changed-state check.
+5. Review the protected `differences` and their live-source evidence. Put the reported `differencesDigest` into the plan's `reviewedDifferences` field, including the empty-list digest when there are no differences. If `missingMedia` is nonempty, review every listed case using independently verified source equivalence and retained history, record that evidence privately, and set `reviewedMissingMedia` to the exact `missingMediaDigest`. An archived episode's absence from today's feed is not a reason to discard it or assume it was a different episode. Stop if identity remains uncertain. Reinspect using the finalized plan and a new path; this is the expected snapshot for dry-run/apply. Do not edit a snapshot to bypass a changed-state check.
 6. Back up affected cache values and expiry information separately. Address only source-specific keys; never globally flush caches. Verify that a cache hit cannot bypass the newly selected source identity.
 7. Run the mutation as a rollback-only rehearsal:
 
@@ -92,6 +92,6 @@ The [isolated PostgreSQL suite](../scripts/reconcile-podcasts.test.ts) starts it
 PG_BIN=/path/to/postgresql/bin bun test scripts/reconcile-podcasts.test.ts
 ```
 
-It covers inspection/rollback, preservation of both sides' unique episodes, filling evicted content, exact progress transfer, subscription timestamps, progress collisions, media mismatch, explicit metadata review, changed snapshots, unknown foreign keys, unsupported references, protected backup failures, provider conflicts, reapplication refusal, backup restore/replay and artifact permissions.
+It covers inspection/rollback, preservation of both sides' unique episodes, filling evicted content, exact progress transfer, subscription timestamps, progress collisions, media mismatch, explicit metadata and missing-media review, changed snapshots, unknown foreign keys, unsupported references, protected backup failures, provider conflicts, reapplication refusal, backup restore/replay and artifact permissions.
 
 The suite skips if `PG_BIN` is absent. A default green test run is not evidence that these database tests ran. Production data and operational evidence must never become checked-in fixtures or public CI artifacts.

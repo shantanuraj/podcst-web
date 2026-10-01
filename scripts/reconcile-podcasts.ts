@@ -20,6 +20,7 @@ export interface ReconciliationPlan {
   duplicateId: number;
   canonicalFeedUrl: string;
   reviewedDifferences: string;
+  reviewedMissingMedia?: string;
 }
 
 interface Options {
@@ -200,6 +201,7 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
   const moves: { from: number; to: number }[] = [];
   const unique: number[] = [];
   const differences: Row[] = [];
+  const missingMedia: Row[] = [];
   for (const source of state.episodes.filter(
     (row) => row.podcast_id === plan.duplicateId,
   )) {
@@ -218,17 +220,21 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
       target.published !== source.published ||
       (a && b && a.title !== b.title)
     ) {
-      invariant(
-        a && b && a.file_url === b.file_url,
-        'Metadata difference lacks matching media evidence',
-      );
-      differences.push({
+      const difference = {
         guid: source.guid,
         canonicalPublished: target.published,
         duplicatePublished: source.published,
-        canonicalTitle: a.title,
-        duplicateTitle: b.title,
-      });
+        canonicalTitle: a?.title ?? null,
+        duplicateTitle: b?.title ?? null,
+      };
+      differences.push(difference);
+      if (!a || !b) {
+        missingMedia.push({
+          ...difference,
+          canonicalMedia: a?.file_url ?? null,
+          duplicateMedia: b?.file_url ?? null,
+        });
+      }
     }
     moves.push({ from: source.id, to: target.id });
   }
@@ -261,7 +267,15 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     progressKeys.add(key);
   }
   differences.sort((a, b) => a.guid.localeCompare(b.guid));
-  return { moves, unique, differences, differencesDigest: digest(differences) };
+  missingMedia.sort((a, b) => a.guid.localeCompare(b.guid));
+  return {
+    moves,
+    unique,
+    differences,
+    missingMedia,
+    missingMediaDigest: digest(missingMedia),
+    differencesDigest: digest(differences),
+  };
 }
 
 function without(row: Row, keys: string[]) {
@@ -395,6 +409,11 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           plan.reviewedDifferences === analysis.differencesDigest,
           'Metadata differences have not been reviewed',
         );
+        invariant(
+          analysis.missingMedia.length === 0 ||
+            plan.reviewedMissingMedia === analysis.missingMediaDigest,
+          'Missing-media metadata cases require separate source-evidence review',
+        );
       }
       const artifact = {
         version: 1,
@@ -405,6 +424,8 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         uniqueEpisodeIds: analysis.unique,
         differences: analysis.differences,
         differencesDigest: analysis.differencesDigest,
+        missingMedia: analysis.missingMedia,
+        missingMediaDigest: analysis.missingMediaDigest,
       };
       backup(options.backupPath, artifact);
       result = {
@@ -412,6 +433,8 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         sharedEpisodes: analysis.moves.length,
         retainedUniqueEpisodes: analysis.unique.length,
         metadataDifferences: analysis.differences.length,
+        missingMediaDifferences: analysis.missingMedia.length,
+        missingMediaDigest: analysis.missingMediaDigest,
         differencesDigest: analysis.differencesDigest,
         backupVerified: true,
       };
