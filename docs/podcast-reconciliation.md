@@ -94,4 +94,6 @@ PG_BIN=/path/to/postgresql/bin bun test scripts/reconcile-podcasts.test.ts
 
 It covers inspection/rollback, preservation of both sides' unique episodes, filling evicted content, exact progress transfer, subscription timestamps, progress collisions, media mismatch, explicit metadata and missing-media review, changed snapshots, unknown foreign keys, unsupported references, protected backup failures, provider conflicts, reapplication refusal, backup restore/replay and artifact permissions.
 
+Tool verification: 16 isolated PostgreSQL tests passed with 39 assertions, along with targeted TypeScript checking and Biome. This verifies the synthetic tool contract, not any future production manifest or source classification.
+
 The suite skips if `PG_BIN` is absent. A default green test run is not evidence that these database tests ran. Production data and operational evidence must never become checked-in fixtures or public CI artifacts.
