@@ -26,7 +26,9 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
     });
-    await sql.unsafe(readFileSync('schema.sql', 'utf8'));
+    await sql.unsafe(
+      readFileSync('migrations/active/0000-baseline.sql', 'utf8'),
+    );
     const [author] = await sql`
       INSERT INTO authors (name) VALUES ('Author') RETURNING id
     `;

@@ -34,16 +34,9 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
     });
-    await sql.unsafe(readFileSync('schema.sql', 'utf8'));
     await sql.unsafe(
-      readFileSync('migrations/0008-tiered-episodes.sql', 'utf8'),
+      readFileSync('migrations/active/0000-baseline.sql', 'utf8'),
     );
-    await sql`
-      ALTER TABLE episodes
-        DROP COLUMN title, DROP COLUMN summary, DROP COLUMN duration,
-        DROP COLUMN episode_art, DROP COLUMN file_url,
-        DROP COLUMN file_length, DROP COLUMN file_type
-    `;
     server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,

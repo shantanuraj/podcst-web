@@ -1,49 +1,68 @@
 #!/usr/bin/env bun
 
-import { readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
 import postgres from 'postgres';
+import {
+  loadMigrations,
+  MigrationError,
+  migrate,
+  migrationStatus,
+} from './migrations';
 
-const MIGRATIONS_DIR = join(process.cwd(), 'migrations');
-
-async function migrate(filename?: string) {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required');
+export async function main(args: string[]) {
+  if (args.length > 1 || !['status', 'up'].includes(args[0] ?? 'status')) {
+    throw new MigrationError('Usage: bun scripts/migrate.ts [status|up]');
   }
-
-  const sql = postgres(connectionString, {
+  const connectionString = process.env.MIGRATION_DATABASE_URL;
+  if (!connectionString)
+    throw new MigrationError(
+      'MIGRATION_DATABASE_URL must explicitly select the target database',
+    );
+  let target: URL;
+  try {
+    target = new URL(connectionString);
+  } catch {
+    throw new MigrationError('Invalid MIGRATION_DATABASE_URL');
+  }
+  const host = target.searchParams.get('host');
+  if (
+    !['postgres:', 'postgresql:'].includes(target.protocol) ||
+    !(host || target.hostname) ||
+    target.pathname.length < 2
+  ) {
+    throw new MigrationError(
+      'MIGRATION_DATABASE_URL must name a PostgreSQL host and database',
+    );
+  }
+  target.searchParams.delete('host');
+  const migrations = loadMigrations();
+  const sql = postgres(target.toString(), {
+    ...(host ? { host } : {}),
     max: 1,
-    idle_timeout: 20,
+    connect_timeout: 5,
+    idle_timeout: 5,
+    onnotice: () => {},
   });
-
-  if (filename) {
-    await runMigration(sql, filename);
-  } else {
-    const files = readdirSync(MIGRATIONS_DIR)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
-
-    for (const file of files) {
-      await runMigration(sql, file);
+  try {
+    if (args[0] === 'up') {
+      const applied = await migrate(sql, migrations);
+      console.log(JSON.stringify({ applied }));
+    } else {
+      console.log(
+        JSON.stringify(await migrationStatus(sql, migrations), null, 2),
+      );
     }
+  } finally {
+    await sql.end({ timeout: 5 });
   }
-
-  await sql.end();
-  console.log('Done.');
 }
 
-async function runMigration(sql: postgres.Sql, filename: string) {
-  const filepath = join(MIGRATIONS_DIR, filename);
-  const content = readFileSync(filepath, 'utf-8');
-
-  console.log(`Running ${filename}...`);
-  await sql.unsafe(content);
-  console.log(`✓ ${filename}`);
+if (import.meta.main) {
+  main(process.argv.slice(2)).catch((error) => {
+    console.error(
+      error instanceof MigrationError
+        ? error.message
+        : 'Database operation failed; inspect protected diagnostics and migration status before retrying',
+    );
+    process.exitCode = 1;
+  });
 }
-
-const filename = process.argv[2];
-migrate(filename).catch((err) => {
-  console.error('Migration failed:', err.message);
-  process.exit(1);
-});
