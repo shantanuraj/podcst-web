@@ -241,9 +241,11 @@ With `IOS_DEVICE_ID` saved, run `yarn ios:install --audio-lab`. Each command
 replaces only the app with the matching bundle ID.
 
 The client uses the web API for discovery, feed indexing, subscriptions,
-authentication and playback progress. An HTTP(S) feed URL entered in Discover
-is indexed through `/api/feed`, including private feeds whose access token is
-part of the URL.
+authentication and playback progress. An HTTP(S) feed URL entered in Search requires sign-in on both clients and is
+sent in a JSON body to `/api/search`. An unindexed URL becomes private to that
+user; existing public records remain public. See the
+[ownership contract](docs/private-feed-ownership-plan.md) for access checks,
+verified public promotion and production rollout requirements.
 
 Development of Volume Boost, Trim Silence, and native audio playback follows the [two-milestone audio experience plan](docs/audio-experience-plan.md).
 

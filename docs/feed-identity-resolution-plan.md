@@ -1,10 +1,10 @@
 # Alias-aware feed identity resolution
 
-Status: implementation plan; no migration or application change is implied by this document.
+Status: follow-up identity plan, not a prerequisite for the current R2 public/private boundary. Exact-URL ownership, trusted in-place promotion and conflict refusal are implemented by the ownership slice; general alias/move resolution remains deferred.
 
 Entry point: [Release hub](release.md).
 
-This plan owns alias keys, canonical selection, concurrent ingestion and duplicate-record reconciliation. It consumes the ownership plan's [scope and credential-storage contract](private-feed-ownership-plan.md#ownership-model), [authorization boundary](private-feed-ownership-plan.md#authorization-boundary) and [existing-data classification](private-feed-ownership-plan.md#existing-data-classification).
+This plan owns future alias keys, canonical selection and duplicate-record reconciliation. It consumes the ownership plan's [single privacy field](private-feed-ownership-plan.md#one-privacy-field), [access boundary](private-feed-ownership-plan.md#access-and-cache-boundary) and [existing-record rollout policy](private-feed-ownership-plan.md#existing-records-and-rollout). The approved current model has no quarantine state and retains one source per exact feed URL.
 
 Examples are synthetic. Operational evidence follows the ownership plan's protected-data rules.
 
@@ -37,14 +37,14 @@ Non-goals: fuzzy title matching, globally unique episode GUIDs, automatic mergin
 1. One accepted locator alias maps to at most one source within its authorization scope.
 2. A source has one authoritative canonical fetch locator, independent of its stable ID and historical aliases.
 3. A provider ID is identity evidence only when obtained through a trusted provider path; callers cannot assert arbitrary associations.
-4. Alias claims and source associations preserve the [ownership model's scopes](private-feed-ownership-plan.md#ownership-model), even when content or locators match.
+4. Alias claims and source associations preserve the [ownership boundary](private-feed-ownership-plan.md#one-privacy-field), even when content or locators match.
 5. A redirect or feed hint does not itself grant access, change ownership or authorize deleting another source.
 6. A conflict between established identities requires reconciliation; ordinary lookup/import must not silently merge user state.
 7. Alias claims, source creation and provider association are transactional. Retries cannot leave partial identities or duplicate claims.
 
 ## Identity data
 
-Add alias mappings to the [existing source boundary](private-feed-ownership-plan.md#ownership-model), rather than defining a parallel catalog or a second ownership model.
+When this follow-up is implemented, add alias mappings to the [existing source boundary](private-feed-ownership-plan.md#one-privacy-field), rather than defining a parallel catalog or a second ownership model.
 
 Logical records:
 
@@ -55,7 +55,7 @@ Logical records:
 | Identity evidence | Origin/type, observation time and sufficient protected provenance to explain an association or canonical change |
 | Reconciliation case | Conflicting source IDs and reason, kept in an authorized operational workflow |
 
-For public sources, the alias lookup key represents the safely normalized URL. Private keys use the ownership model's lookup fingerprint. Enforce scope consistency between alias and source so an alias cannot bypass authorization. Do not add a second independently editable canonical flag to alias rows.
+For public sources, the alias lookup key represents the safely normalized URL. Private alias lookup needs a reviewed credential-safe, owner-scoped key design; such fingerprints are not implemented by the current exact-URL ownership model. Enforce scope consistency between alias and source so an alias cannot bypass authorization. Do not add a second independently editable canonical flag to alias rows.
 
 Keep current provider columns initially; a generic provider table is not a prerequisite. Preserve their uniqueness, with private/public policy enforced consistently. Do not use nullable-owner uniqueness that accidentally allows duplicate public alias keys.
 
@@ -119,7 +119,7 @@ For each approved case:
 5. Take and verify a protected backup, coordinate writers, apply the reviewed mapping atomically and check postconditions.
 6. Repoint accepted aliases to the survivor and invalidate affected caches so the original import path cannot recreate the duplicate.
 
-Unresolved ownership returns to [source classification](private-feed-ownership-plan.md#existing-data-classification); an identity conflict must not assign an owner or bypass quarantine.
+Unresolved ownership returns to [existing-record review](private-feed-ownership-plan.md#existing-records-and-rollout); an identity conflict must not assign an owner or make a private record public.
 
 ## Implementation slices
 
@@ -134,7 +134,7 @@ Unresolved ownership returns to [source classification](private-feed-ownership-p
 
 Bulk jobs must not fetch every source merely to adopt the shared policy. Reuse trusted identifiers/accepted aliases and enqueue bounded verification for unresolved evidence. Keep network work outside the identity-claim transaction.
 
-Backfill consumes the ownership plan's reviewed classification; it does not infer visibility from stored URLs. Coordinate with its [rollout requirements](private-feed-ownership-plan.md#rollout-requirements), cutting over all writers together or otherwise preventing old writers from creating unclaimed identities during migration.
+Backfill consumes the ownership plan's reviewed classification; it does not infer visibility from stored URLs. Coordinate with its [rollout requirements](private-feed-ownership-plan.md#existing-records-and-rollout), cutting over all writers together or otherwise preventing old writers from creating unclaimed identities during migration.
 
 ## Regression matrix
 
@@ -153,7 +153,7 @@ Use synthetic feeds, local HTTP fixtures and isolated PostgreSQL schemas; never 
 | Trusted provider ID added to an established RSS source | Stable source identity, with uniqueness/conflict checks |
 | Stale catalog import advertises an old alias | Existing canonical choice is retained |
 | Identical titles/GUIDs/content across distinct sources | No automatic merge |
-| Same locator/content across private owners or public/private scopes | Isolation preserved; no cross-owner alias lookup or metadata leak |
+| Another account supplies an owned private locator | Existing private ownership is preserved; no cross-owner lookup, reassignment or metadata leak |
 | Credential rotation and retired alias reuse | Stable owner-authorized identity; obsolete credential not restored as active |
 | Failure between source creation and alias/provider claims | Transaction rollback; retry leaves one complete identity |
 | Reconciled source imported again through an old accepted alias | Resolves to survivor without recreating a duplicate |

@@ -6,9 +6,11 @@ Status: proposed execution sequence. No phase is signed off here yet. Existing f
 
 ## Current focus
 
-**Recommended next: R1 — reviewed existing-database adoption and recovery.** The [audited migration runner and fresh-install baseline](database-migrations.md) are implemented in `b8abe98` and locally tested. Existing databases without recorded history are deliberately refused. The [metadata-only inventory/comparison tool](schema-inventory.md) now supports the next review without a full local database copy; use its protected results to reconcile live/manual history, then rehearse adoption, recovery and obsolete-writer cutover before changing source ownership or identity. R1 is not signed off.
+**Current focus: R2 — authenticated URL imports and public/private ownership.** The owner approved the [two-state ownership contract](private-feed-ownership-plan.md): nullable ownership, logged-in URL search and trusted exact-URL public promotion. This bounded slice is implemented and locally verified on disposable databases; next is the reviewed rollout/backfill and obsolete-reader cutover once the remaining R1 operations are resolved. General alias/move resolution is follow-up work.
 
-In parallel, settle the source-policy decisions needed for R2 and begin the [physical-device validation](audio-device-validation.md). Device testing and operational preparation should not wait until feature development finishes. Any urgent containment is a separate, explicitly authorized action; it must not wait for a broader redesign.
+The [R1 operational review](r1-operational-review.md) has accepted the prospective current-schema baseline without a table rewrite. Production R1 sign-off remains blocked on the existing age identity path for the small backup recovery rehearsal and a reviewed ledger-only adoption operation. No production ownership migration or cutover is authorized by local R2 tests.
+
+In parallel, resolve the remaining R1 operations and continue the [physical-device validation](audio-device-validation.md). Device testing and operational preparation should not wait until feature development finishes. Any urgent containment is a separate, explicitly authorized action; it must not wait for a broader redesign.
 
 Do not widen the feature cut while these contracts are unsettled. The [roadmap](first-release-roadmap.md#roadmap) owns launch scope and deferrals.
 
@@ -17,7 +19,7 @@ Do not widen the feature cut while these contracts are unsettled. The [roadmap](
 | Phase | Depends on | Exit condition | Authoritative detail |
 | --- | --- | --- | --- |
 | **R1 — Safe changes** | None | Migration history is established; representative upgrades and recovery are rehearsed; obsolete-writer/client cutover is defined. | [Migration safeguards](pre-release-foundations.md#8-treat-migrations-as-an-audited-mechanism) |
-| **R2 — Trusted source identity** | R1 and agreed source policy | Ownership is enforced across all access paths; scoped aliases converge across ingestion paths; conflicts and backfills use reviewed, reference-preserving procedures. | [Ownership rollout](private-feed-ownership-plan.md#rollout-requirements), [identity implementation slices](feed-identity-resolution-plan.md#implementation-slices) |
+| **R2 — Public/private ownership** | Approved source policy; R1 before production rollout | Authenticated URL import and owner-only access work across clients/read paths; trusted exact-URL promotion preserves identities; legacy backfill and obsolete-reader cutover are reviewed. | [Ownership rollout](private-feed-ownership-plan.md#existing-records-and-rollout) |
 | **R3 — Durable cross-client state** | R2 | Shared API/identity contracts, retryable user-state mutations and explicit playback transitions are proven across clients, offline recovery and account changes. | [API contract](pre-release-foundations.md#3-define-a-checked-cross-client-api-contract), [transactional state](pre-release-foundations.md#4-make-user-state-mutations-transactional), [playback intent](pre-release-foundations.md#7-separate-playback-intent-from-transport) |
 | **R4 — Complete the launch workflows** | R3 | The roadmap's launch behaviors work end to end, including account lifecycle, dependable listening, saving and sharing; saved references survive content eviction and restore. | [Product roadmap](first-release-roadmap.md#roadmap), [retention foundation](pre-release-foundations.md#5-separate-saved-state-from-disposable-content) |
 | **R5 — Prove and release** | R1–R4 | All applicable release gates pass for the exact candidate, including device evidence, operational recovery and distribution readiness. | [Release gates](first-release-roadmap.md#release-gates), [device worksheet](audio-device-validation.md) |
@@ -39,7 +41,7 @@ Domain plans retain their internal implementation order and acceptance tests. Th
 
 ## Decisions and blockers
 
-The [roadmap's decision list](first-release-roadmap.md#decisions-still-needed) is authoritative for unresolved product choices. Close the [source import/lifecycle policy](private-feed-ownership-plan.md#import-and-lifecycle-semantics) before R2 and guest-merge/conflict behavior before R3. Set the release audience, commercial scope, support and recovery commitments before making launch promises.
+The [roadmap's decision list](first-release-roadmap.md#decisions-still-needed) is authoritative for remaining product choices. R2's [URL import](private-feed-ownership-plan.md#authenticated-url-search) and [verified promotion](private-feed-ownership-plan.md#verified-public-promotion) policy is approved. Guest-merge/conflict behavior still needs agreement before R3. Set the release audience, commercial scope, support and recovery commitments before making launch promises.
 
 When a decision blocks a phase, record the decision and its disposition in the relevant plan and link it here. Do not quietly substitute an implementation assumption for owner approval.
 
@@ -49,4 +51,4 @@ When a decision blocks a phase, record the decision and its disposition in the r
 2. Update a detailed requirement in its owning document. Update this page only when execution order, current focus or phase status changes.
 3. Record implementation, automated verification and device/operational acceptance separately. A merged change or simulator pass does not close every gate.
 4. Sign off a phase only when its linked exit criteria have evidence and remaining blockers are resolved. Record the candidate revision and public-safe evidence reference here, then move current focus to the next phase.
-5. Keep production inventories, account mappings, raw captures and recovery artifacts in protected operational storage under the [classification/evidence rules](private-feed-ownership-plan.md#existing-data-classification), not in this public hub.
+5. Keep production inventories, account mappings, raw captures and recovery artifacts in protected operational storage under the [classification/evidence rules](private-feed-ownership-plan.md#existing-records-and-rollout), not in this public hub.

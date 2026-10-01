@@ -1,6 +1,6 @@
 # Guarded podcast reconciliation
 
-This is an implemented, operator-driven repair tool for reviewed **public-source duplicates**, not an automatic identity resolver or a database migration. The [identity plan](feed-identity-resolution-plan.md#existing-identity-conflicts) owns reconciliation policy; the [ownership plan](private-feed-ownership-plan.md#existing-data-classification) owns classification and protected evidence.
+This is an implemented, operator-driven repair tool for reviewed **public-source duplicates**, not an automatic identity resolver or a database migration. The [identity plan](feed-identity-resolution-plan.md#existing-identity-conflicts) owns reconciliation policy; the [ownership plan](private-feed-ownership-plan.md#existing-records-and-rollout) owns classification and protected evidence.
 
 Production plans, inventories, source/account mappings, snapshots, backups and execution receipts belong in protected operational storage, never Git. This document uses synthetic examples only. A successful repair does not complete the release hub's ownership or alias-resolution phase.
 

@@ -1,106 +1,79 @@
-# Private-feed ownership design
+# Public and private podcast ownership
 
-Status: proposed architecture and rollout requirements. This document contains no production inventory, account mapping, incident record or migration target list.
+Entry point: [Release hub](release.md). This document owns the public/private policy, access boundary and rollout requirements. The owner approved this two-state scope; quarantine and a general alias system are not prerequisites for this slice.
 
-Entry point: [Release hub](release.md).
+Status: implemented in `e8ab35c` and locally verified on the feature branch, not deployed. Feed-HTML hardening is recorded separately in `be8e18b`. Existing-data review and coordinated production cutover remain required.
 
-This plan owns visibility, authorization, credential storage, source classification and account lifecycle. The [feed identity plan](feed-identity-resolution-plan.md) owns alias keys, canonical selection, concurrent ingestion and duplicate-record reconciliation.
+## One privacy field
 
-## Ownership model
+`podcasts.owner_user_id` is the single source of truth:
 
-Attach `owner_user_id` and explicit visibility to the podcast/source boundary. Do not infer ownership from subscriptions, and do not attach an owner to every public catalog show.
+| Value | Meaning | Read access |
+| --- | --- | --- |
+| `NULL` | Public source | Anyone |
+| User ID | Private source | That user only |
 
-| Visibility | Owner | Read policy | Refresh policy |
-| --- | --- | --- | --- |
-| `public` | None | Public catalog projections | Trusted public-source ingestion and normal polling |
-| `private` | Required | Owner only, including episodes and derived metadata | Authenticated import and authorized private-source polling |
-| `quarantined` | Unassigned during initial classification | No ordinary client access | No refresh until reviewed |
+There is no stored `is_private` flag to drift out of sync. Client `isPrivate` fields are derived projections, not authorization inputs. A private record cannot have an `itunes_id`; verified promotion clears ownership and sets that identity atomically. Deleting an owner cascades to their private sources rather than accidentally making them public.
 
-Enforce visibility/owner consistency. Quarantine is an access decision, not simply an inactive scheduling flag. If owned sources need suspension later, model that without losing ownership.
+Ownership is not inferred from subscriptions. Unfollowing removes a subscription, not source ownership or another user's access policy.
 
-Store private locators encrypted behind a restricted secret-storage boundary. Private lookup fingerprints use HMAC over the complete credential-bearing locator and owner scope, rather than exposing raw URLs in shared keys. Keep the owner in one place and derive episode authorization through the source relationship.
+## Authenticated URL search
 
-Public-source uniqueness and private `(owner, source)` uniqueness have different scopes. Public imports must not merge into, promote or overwrite private/quarantined records through provider-ID or URL matching.
+Both iOS and web require a login session for URL search, including URLs already indexed publicly. Clients send the URL in a JSON request body, not a search query string. Ordinary text discovery remains available without login.
 
-Preserve stable podcast/episode IDs when ownership is established. A separate episode catalog or proxying all publisher audio through the application is not required.
+For an authenticated URL request:
 
-## Import and lifecycle semantics
+1. An indexed public source is reused as public.
+2. An indexed private source owned by this user is reused privately.
+3. An indexed private source owned by another user is unavailable. It is not exposed, reassigned or duplicated for the caller.
+4. A previously unindexed valid HTTP(S) URL is fetched and created with the session user as owner. Client-supplied ownership, privacy and provider-ID fields have no authority.
 
-- Require sign-in for server-owned private feeds. Guest private listening, if offered, needs an explicit device-local design.
-- Treat arbitrary submitted URLs as private unless independently established public provenance is available. Do not let an untrusted caller mark a source public.
-- Receive credential-bearing locators in authenticated request bodies, not public navigation URLs. Exclude them from logs, traces and request-body capture.
-- Another account must supply its own authorized source and must not gain access by subscribing to an existing private ID.
-- Unfollowing, removing a private source and deleting an account are separate operations. Define their effects on downloads, pending mutations, backups and provider credentials.
-- Authorized clients may receive publisher media URLs when necessary for playback, but those responses must not enter shared caches, previews or analytics.
+This slice retains one indexed record per exact feed URL. Multiple owners' private copies of the same locator are deliberately not introduced. Fetching a new feed occurs outside the database write transaction; identity locks and a second lookup settle concurrent imports before mutation. Concurrent fetches may occur, but only one owner/identity wins.
 
-Locator changes and credential rotation follow the identity plan's [canonical selection and alias lifecycle](feed-identity-resolution-plan.md#canonical-selection-and-alias-lifecycle).
+The search route accepts private URL imports through authenticated POST. The feed POST supports the same policy for client detail/OPML flows. The old GET-by-URL path only reads already-indexed public records; it never imports or returns private data. Page rendering and metadata generation no longer ingest arbitrary URLs.
 
-## Existing-data classification
+Searching/importing does not automatically follow a source. Subscribe remains a separate action.
 
-Perform inventory and ownership review in a protected operational environment. Keep raw results, source locators, user identifiers, personalized titles, backups, database snapshots, environment-specific repair scripts and execution receipts outside Git.
+## Verified public promotion
 
-URL patterns and provider families are candidate signals, not classification or authorization rules. A missing directory ID does not prove privacy, and a directory ID does not prove that the current locator is safe to expose. Public hosts often use opaque path identifiers.
+A trusted Apple lookup/chart result must associate a valid `itunes_id` with the **same complete stored feed URL** before a private record is promoted. Do not strip credential/query parameters, infer equivalence from a title, or trust an ID supplied alongside a client's URL.
 
-Use trusted provenance and explicit owner confirmation. A sole or earliest subscriber is only an investigation lead, not ownership proof. Include playback-only and guest/unsubscribed cases where evidence is available.
+Promotion updates the existing podcast row in place. Podcast/episode IDs, subscriptions and playback progress remain unchanged. If provider and URL evidence identify different existing records, fail with an identity conflict rather than silently merging or publishing either one.
 
-Classify each reviewed source as verified public, confirmed private with an owner, or quarantined. Keep the mapping to real records outside Git. Handle duplicate sources separately through the identity plan's [reconciliation procedure](feed-identity-resolution-plan.md#existing-identity-conflicts); classification does not authorize merging them.
+The Podcast Index bulk importer skips private candidates without an Apple ID. When a private exact-URL candidate has an ID hint, it uses the trusted lookup path; an unverified or different-source result does not clear ownership. Ordinary bulk updates are restricted to public rows. The [alias-resolution plan](feed-identity-resolution-plan.md) remains follow-up work for verified moves and conflicting identities, not permission to weaken this boundary.
 
-Where credentials may have been exposed, ownership confirmation alone does not remediate that exposure. Review rotation, retained copies and any notification obligations through the appropriate private process.
+## Access and cache boundary
 
-## Authorization boundary
+- Source/episode reads authorize through the parent podcast before returning content or initiating read-triggered refresh.
+- Private API responses use `private, no-store`; account/session identity is not inferred from a cached response.
+- Shared feed-cache data cannot bypass ownership: the feed route no longer reads or writes that legacy URL-keyed cache.
+- Public chart-cache hits are rechecked against current public source IDs and locators before being served.
+- Subscription and progress reads/writes enforce source access. Adding a reference to a private ID does not grant access; even an invalid existing reference cannot expose it.
+- Public metadata and structured-data generation never use owner-authorized private content. Legacy short links resolve only through public sources and redirect to canonical IDs, not credential-bearing URLs.
+- Both clients suppress private-source sharing. Private artwork is fetched directly rather than generated through the shared artwork proxy/fallback.
+- Web account changes cancel/clear query state and replace the document; private records cannot be written into the guest subscription store. Native search is account-scoped and discards stale results; existing account-scoped media/session retirement remains in use.
+- Feed descriptions/show notes are sanitized with an allowlist before rendering. Timestamp/link enrichment is restricted to text and sanitized again, so untrusted feed HTML cannot execute as the signed-in reader.
 
-Use a central server-only access service with an explicit actor or public projection. Apply checks before database/cache reads, rendering and refresh—not only in the UI.
+Server locators remain in the existing database column in this slice; no new field-level encryption scheme is claimed. Restrict database access and protect encrypted backups/operational artifacts. Authorized clients still receive source/media URLs required for their own listening/export workflows. Never put these into public previews, shared cache keys or raw error diagnostics.
 
-| Surface | Requirement |
-| --- | --- |
-| Feed/episode lookup, search and refresh | Authenticate/authorize private resources; avoid disclosing their existence to other users |
-| Pages, metadata, previews, links and redirects | Public output contains only public resources; private navigation uses opaque IDs |
-| Subscriptions, progress and saved membership | Referencing an episode or following a source never creates authorization |
-| Shared caches | Public resources only; private responses initially favor `private, no-store`, with scoped caches only where justified |
-| Artwork, chapters, transcripts and notes | Inherit source visibility; avoid public proxy URLs containing credentials |
-| Importers and workers | Explicit trusted authority, no quarantine bypass exposed to clients, and no secret-bearing diagnostics |
-| Client persistence | Owner-scoped state and media; defined logout/account-switch cleanup |
-| Deletion and restore | Restore preserves ownership and reapplies deletion/quarantine decisions |
+## Existing records and rollout
 
-## Rollout requirements
+Adding a nullable owner column does **not** determine who created older URL imports. Existing indexed records retain their prior public behavior until separately reviewed. This change does not claim to remediate historical private-feed exposure or classify sources merely because they lack directory IDs.
 
-1. Apply the [migration safeguards](pre-release-foundations.md#8-treat-migrations-as-an-audited-mechanism) and prepare a protected inventory/classification process.
-2. Add visibility, owner, protected locator storage and consistency constraints.
-3. Cover every read, mutation, cache and worker path with authorization tests.
-4. Integrate authenticated imports with the [shared resolver](feed-identity-resolution-plan.md#shared-resolver-algorithm), passing the authorized scope.
-5. Apply a reviewed, private ownership backfill mapping; send identity conflicts through the linked reconciliation procedure.
-6. Coordinate clients and server, reject unsafe obsolete contracts, and invalidate affected caches without globally flushing unrelated data.
-7. Verify access, offline account isolation, deletion and recovery before enabling the release promise.
+Before deploying private imports:
 
-Coordinate with the identity plan's [implementation slices](feed-identity-resolution-plan.md#implementation-slices). An ownership column alone is not containment; every access path must enforce it.
+1. Complete the applicable R1 adoption/recovery steps against the reviewed starting state.
+2. Review existing credential-bearing sources and approve any ownership backfill explicitly. Do not choose a sole/earliest subscriber as owner automatically. Unresolved legacy classification is an operational decision, not a new quarantine state hidden in the schema.
+3. Apply the append-only ownership migration, then coordinate compatible backend, web/iOS, catalog-writer and backup revisions. The identity backup now includes `owner_user_id`; older identity formats do not prove ownership. Restore only a reviewed coherent set and fail closed on missing ownership/parent evidence—never default a missing private owner to public. Old readers as well as writers must lose database access; an obsolete preview/Fly/Vercel deployment can bypass new application-level checks.
+4. Restrict/invalidate only affected legacy feed, chart, short-link, proxy and client caches where historical private data was exposed. Do not globally flush unrelated caches or mutate real records from test fixtures.
+5. Verify anonymous/owner/other-account behavior on the deployed candidate before enabling the release promise. New imports are private by default; full private-feed safety also depends on the separate safe-fetch/egress and recovery gates.
 
-## Acceptance tests
+Keep inventories, raw locators, account mappings, backups and execution receipts outside Git in protected operational storage. The [read-only catalog](../scripts/audit-private-feeds.sql) and [reference](../scripts/audit-private-feed-references.sql) audit helpers remain investigation tools, not classification or mutation authority.
 
-- Anonymous, owner and other-account requests exercise IDs, URL lookup, metadata, redirects, warmed caches and refresh.
-- A non-owner cannot gain access by subscribing, saving progress or adding an episode to a list.
-- Public importers cannot overwrite private records or promote quarantine.
-- Offline logout/account switch cannot expose another account's files or replay its pending mutations.
-- Ambiguous legacy records fail closed rather than receiving a guessed owner.
-- Backups restore ownership and deletion/quarantine semantics; missing decryption keys fail closed.
-- Logging/error/test fixtures contain no real private URLs, credentials, account identifiers or payloads.
+## Acceptance evidence
 
-Run these with the identity plan's [regression matrix](feed-identity-resolution-plan.md#regression-matrix), which covers alias convergence, concurrent claims, credential rotation and scoped identity lookup.
+Automated tests cover owner-only creation/reuse, rejection of other accounts, concurrent ownership claims, public reuse, exact verified promotion with stable IDs/progress, conflicting identities, credential-bearing URL differences, chart promotion, private refresh artwork and owner deletion.
 
-## Read-only inventory helpers
+An isolated subprocess exercises the actual API handlers and datastore against disposable PostgreSQL: guest URL rejection, ignored client privacy/owner assertions, owner reads, anonymous/other-account denial, refresh denial, stale chart/short-link boundaries, subscriptions/progress and invalid stored references. It binds the test database to an operator-owned temporary cluster and never uses application production settings.
 
-The repository includes generic queries, not their operational output:
-
-- [Catalog signal audit](../scripts/audit-private-feeds.sql): aggregates bounded primary-key ranges; defaults to `(0, 100000]` and rejects wider batches.
-- [User-reference audit](../scripts/audit-private-feed-references.sql): returns aggregate reference counts and temporary labels, not account IDs or raw locators.
-
-Use an explicitly selected database and preferably a dedicated read-only role. Both queries declare read-only transactions and statement/lock timeouts. For example, with connection settings supplied securely through the environment:
-
-```bash
-psql -X -qAt -v ON_ERROR_STOP=1 -v min_id=0 -v max_id=100000 \
-  -f scripts/audit-private-feeds.sql
-
-psql -X -qAt -v ON_ERROR_STOP=1 \
-  -f scripts/audit-private-feed-references.sql
-```
-
-Treat even aggregate outputs as private operational data. Review output before sharing; do not check it into Git or put it in public CI artifacts. These heuristics intentionally do not assign owners, mutate data, prove a source public/private or certify the absence of exposed credentials.
+Native tests cover JSON-body URL search/import, session credential forwarding, decoded privacy, disabled private sharing, guest-library exclusion and existing account/cache retirement. Web tests cover safe feed HTML and image handling. Verification: **273 Bun tests passed**, **28 unrelated platform/SSR tests skipped**, **32 targeted iOS simulator session/cache tests passed**, TypeScript passed, and the production web build passed against disposable PostgreSQL/Redis. An actual local Next server smoke check also passed real-cookie owner/other/anonymous API access, private SSR/noindex/no-store, and public access. Biome checks pass with existing warnings in touched legacy code. These are implementation checks, not a production migration, actual legacy classification or physical-device release sign-off.
