@@ -97,11 +97,24 @@ For production, use `WEBAUTHN_RP_ID=podcst.app` and
 same relying-party ID through the `webcredentials:podcst.app` associated
 domain.
 
-Run database migrations:
+Set `MIGRATION_DATABASE_URL` securely to the intended PostgreSQL host and
+database, then inspect migration history:
 
 ```bash
-yarn db:migrate
+yarn db:migrate status
 ```
+
+For an empty database or an installation already managed by the audited runner:
+
+```bash
+yarn db:migrate up
+```
+
+The default command is read-only status. Existing databases with untracked
+history are refused, not automatically baselined. Only `migrations/active/` is
+executable; historical repair SQL must not be replayed. See the
+[migration runbook](docs/database-migrations.md) before upgrading an existing
+installation.
 
 Start the development server:
 
@@ -119,7 +132,8 @@ yarn build               # Build for production
 yarn start               # Start production server
 yarn format              # Format code with Biome
 yarn lint                # Lint code with Biome
-yarn db:migrate          # Run database migrations
+yarn db:migrate          # Inspect migration history (read-only)
+yarn db:migrate up       # Apply the reviewed pending migration batch
 ```
 
 ### Tests
@@ -155,9 +169,10 @@ Feed-refresh changes require both a web deployment and a restart of
 
 Chart imports replace each country atomically, continue after individual country
 failures, and record stored/new/failed counts in `poll_metrics`. Apple IDs use
-`BIGINT`; existing installations must apply `0009-itunes-id-bigint.sql` before
-running the updated importers. This migration rewrites the podcasts table and
-its indexes, so schedule a maintenance window and stop the feed poller first.
+`BIGINT`, included in the active fresh-install baseline. Existing installations
+must reconcile their schema and recorded history through the
+[migration runbook](docs/database-migrations.md); do not blindly replay the
+historical widening/repair scripts.
 
 On the host install the chart service and six-hour timer:
 

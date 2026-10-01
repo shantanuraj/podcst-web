@@ -41,7 +41,9 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
     });
-    await sql.unsafe(readFileSync('schema.sql', 'utf8'));
+    await sql.unsafe(
+      readFileSync('migrations/active/0000-baseline.sql', 'utf8'),
+    );
   });
 
   afterAll(async () => {

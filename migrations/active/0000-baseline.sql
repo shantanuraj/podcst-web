@@ -35,6 +35,8 @@ CREATE TABLE podcasts (
   popularity_score INTEGER,
   priority INTEGER,
   update_frequency INTEGER,
+  last_accessed_at TIMESTAMPTZ,
+  is_essential BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -68,16 +70,20 @@ CREATE TABLE episodes (
   id BIGSERIAL PRIMARY KEY,
   podcast_id BIGINT NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
   guid TEXT NOT NULL,
+  published TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (podcast_id, guid)
+);
+
+CREATE TABLE episode_content (
+  episode_id BIGINT PRIMARY KEY REFERENCES episodes(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   summary TEXT,
-  published TIMESTAMPTZ NOT NULL,
   duration INTEGER,
   episode_art TEXT,
   file_url TEXT NOT NULL,
   file_length BIGINT,
-  file_type TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (podcast_id, guid)
+  file_type TEXT
 );
 
 CREATE TABLE users (
@@ -161,6 +167,8 @@ CREATE INDEX idx_podcasts_feed_url ON podcasts(feed_url);
 CREATE INDEX idx_podcasts_itunes_id ON podcasts(itunes_id);
 CREATE INDEX idx_podcasts_podcast_index_id ON podcasts(podcast_index_id);
 CREATE INDEX idx_podcasts_updated ON podcasts(updated_at);
+CREATE INDEX idx_podcasts_last_accessed ON podcasts(last_accessed_at);
+CREATE INDEX idx_podcasts_is_essential ON podcasts(is_essential) WHERE is_essential;
 CREATE INDEX idx_podcasts_is_active ON podcasts(is_active) WHERE is_active = true;
 CREATE INDEX idx_podcasts_popularity ON podcasts(popularity_score DESC NULLS LAST);
 CREATE INDEX idx_podcasts_poll_priority ON podcasts(priority DESC NULLS LAST, popularity_score DESC NULLS LAST) WHERE is_active = true;

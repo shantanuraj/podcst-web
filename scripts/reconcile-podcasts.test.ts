@@ -6,14 +6,7 @@ import {
   expect,
   test,
 } from 'bun:test';
-import {
-  chmodSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
 import {
@@ -21,11 +14,12 @@ import {
   type ReconciliationPlan,
   reconcile,
 } from './reconcile-podcasts';
+import { startPostgres } from './test/postgres';
 
 const pgBin = process.env.PG_BIN;
 let directory: string;
 let sql: postgres.Sql;
-let started = false;
+let cluster: ReturnType<typeof startPostgres>;
 let serial = 0;
 const plan: ReconciliationPlan = {
   canonicalId: 1,
@@ -33,14 +27,6 @@ const plan: ReconciliationPlan = {
   canonicalFeedUrl: 'https://feeds.example.invalid/current',
   reviewedDifferences: digest([]),
 };
-
-function run(program: string, args: string[]) {
-  if (!pgBin) throw new Error('PG_BIN required');
-  return Bun.spawnSync([join(pgBin, program), ...args], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-}
 
 function path() {
   return join(directory, `artifact-${serial++}.json`);
@@ -90,58 +76,18 @@ VALUES (1,'old','old','old',2),(2,'other','other','other',1);
 
 describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
   beforeAll(() => {
-    directory = mkdtempSync(join(tmpdir(), 'podcst-reconcile-'));
-    chmodSync(directory, 0o700);
-    const init = run('initdb', [
-      '-D',
-      join(directory, 'data'),
-      '-U',
-      'postgres',
-      '--auth=trust',
-      '--no-instructions',
-    ]);
-    if (init.exitCode !== 0) throw new Error(init.stderr.toString());
-    const start = run('pg_ctl', [
-      '-D',
-      join(directory, 'data'),
-      '-l',
-      join(directory, 'server.log'),
-      '-o',
-      `-k ${directory} -h ''`,
-      '-w',
-      'start',
-    ]);
-    if (start.exitCode !== 0) throw new Error(start.stderr.toString());
-    started = true;
-    sql = postgres({
-      host: directory,
-      username: 'postgres',
-      database: 'postgres',
-      max: 1,
-      onnotice: () => {},
-    });
-  });
+    cluster = startPostgres();
+    directory = cluster.directory;
+    sql = cluster.sql;
+  }, 30_000);
 
   afterAll(async () => {
-    await sql?.end();
-    if (started)
-      run('pg_ctl', [
-        '-D',
-        join(directory, 'data'),
-        '-m',
-        'fast',
-        '-w',
-        'stop',
-      ]);
-    if (directory) rmSync(directory, { recursive: true, force: true });
+    await cluster?.stop();
   });
 
   beforeEach(async () => {
     await sql.unsafe(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;
-${readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')}
-${readFileSync(new URL('../migrations/0008-tiered-episodes.sql', import.meta.url), 'utf8')}
-ALTER TABLE episodes DROP COLUMN title, DROP COLUMN summary, DROP COLUMN duration,
-DROP COLUMN episode_art, DROP COLUMN file_url, DROP COLUMN file_length, DROP COLUMN file_type;
+${readFileSync(new URL('../migrations/active/0000-baseline.sql', import.meta.url), 'utf8')}
 ${seed}`);
   });
 
@@ -358,12 +304,7 @@ ${seed}`);
   });
 
   test('refuses an active refresh lock', async () => {
-    const other = postgres({
-      host: directory,
-      username: 'postgres',
-      database: 'postgres',
-      max: 1,
-    });
+    const other = postgres(cluster.options);
     try {
       await other.begin(async (tx) => {
         await tx`SELECT pg_advisory_xact_lock(1::bigint)`;
