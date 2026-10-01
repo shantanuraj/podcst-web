@@ -6,7 +6,7 @@ Status: proposed execution sequence. No phase is signed off here yet. Existing f
 
 ## Current focus
 
-**Recommended next: R1 — make foundational changes safe.** Establish the migration baseline and cutover/recovery contract before changing source ownership or identity.
+**Recommended next: R1 — reviewed existing-database adoption and recovery.** The [audited migration runner and fresh-install baseline](database-migrations.md) are implemented in `b8abe98` and locally tested. Existing databases without recorded history are deliberately refused; reconcile live/manual history and rehearse adoption, recovery and obsolete-writer cutover before changing source ownership or identity. R1 is not signed off.
 
 In parallel, settle the source-policy decisions needed for R2 and begin the [physical-device validation](audio-device-validation.md). Device testing and operational preparation should not wait until feature development finishes. Any urgent containment is a separate, explicitly authorized action; it must not wait for a broader redesign.
 
