@@ -9,12 +9,9 @@ import {
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
-import {
-  digest,
-  type ReconciliationPlan,
-  reconcile,
-} from './reconcile-podcasts';
-import { startPostgres } from './test/postgres';
+import { digest } from './lib/artifacts';
+import { startPostgres } from './lib/postgres-sandbox';
+import { type ReconciliationPlan, reconcile } from './reconcile-podcasts';
 
 const pgBin = process.env.PG_BIN;
 let directory: string;

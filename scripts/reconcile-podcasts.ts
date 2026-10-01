@@ -1,16 +1,5 @@
-import { createHash } from 'node:crypto';
-import {
-  closeSync,
-  constants,
-  fsyncSync,
-  lstatSync,
-  openSync,
-  readFileSync,
-  realpathSync,
-  writeFileSync,
-} from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import postgres from 'postgres';
+import { digest, readProtected, stable, writeProtected } from './lib/artifacts';
 
 type Row = postgres.Row;
 type Snapshot = Record<string, Row[]>;
@@ -67,88 +56,8 @@ const expectedForeignKeys = [
   .map((parts) => parts.join(':'))
   .sort();
 
-export function stable(value: unknown): string {
-  if (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    !Number.isSafeInteger(value)
-  ) {
-    throw new Error('Unsafe integer in reconciliation data');
-  }
-  if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value)
-      .sort()
-      .map(
-        (key) =>
-          `${JSON.stringify(key)}:${stable((value as Record<string, unknown>)[key])}`,
-      )
-      .join(',')}}`;
-  }
-  const encoded = JSON.stringify(value);
-  invariant(encoded !== undefined, 'Value is not JSON serializable');
-  return encoded;
-}
-
-export function digest(value: unknown): string {
-  return createHash('sha256').update(stable(value)).digest('hex');
-}
-
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
-}
-
-function protectedParent(path: string) {
-  const directory = realpathSync(dirname(resolve(path)));
-  const stat = lstatSync(directory);
-  invariant(
-    stat.isDirectory() && (stat.mode & 0o077) === 0,
-    'Artifact directory must be private',
-  );
-  invariant(
-    stat.uid === process.getuid?.(),
-    'Artifact directory must belong to the operator',
-  );
-}
-
-function readProtected(path: string) {
-  protectedParent(path);
-  const stat = lstatSync(path);
-  invariant(
-    stat.isFile() &&
-      (stat.mode & 0o077) === 0 &&
-      stat.uid === process.getuid?.(),
-    'Artifact must be an operator-owned private regular file',
-  );
-  return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-function backup(path: string, value: unknown) {
-  protectedParent(path);
-  const fd = openSync(
-    path,
-    constants.O_WRONLY |
-      constants.O_CREAT |
-      constants.O_EXCL |
-      constants.O_NOFOLLOW,
-    0o600,
-  );
-  try {
-    writeFileSync(fd, stable(value));
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  invariant(
-    digest(readProtected(path)) === digest(value),
-    'Backup read-back failed',
-  );
-  const directory = openSync(dirname(resolve(path)), constants.O_RDONLY);
-  try {
-    fsyncSync(directory);
-  } finally {
-    closeSync(directory);
-  }
 }
 
 export async function snapshot(
@@ -427,7 +336,7 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         missingMedia: analysis.missingMedia,
         missingMediaDigest: analysis.missingMediaDigest,
       };
-      backup(options.backupPath, artifact);
+      writeProtected(options.backupPath, artifact);
       result = {
         mode,
         sharedEpisodes: analysis.moves.length,

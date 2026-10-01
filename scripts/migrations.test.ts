@@ -11,8 +11,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import postgres from 'postgres';
+import { startPostgres } from './lib/postgres-sandbox';
 import { loadMigrations, migrate, migrationStatus } from './migrations';
-import { startPostgres } from './test/postgres';
 
 const baseline = loadMigrations()[0];
 
