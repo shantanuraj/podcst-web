@@ -108,7 +108,7 @@ Feed aliases are part of the source domain, not a permanent compatibility layer 
 
 ## Existing identity conflicts
 
-Reconciliation remains a separate guarded operation, not a side effect of a read or ordinary import.
+Reconciliation remains a separate guarded operation, not a side effect of a read or ordinary import. The [guarded reconciliation tool](podcast-reconciliation.md) implements a bounded public-source repair workflow; it does not implement the alias resolver or authorize private-source merges.
 
 For each approved case:
 
