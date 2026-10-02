@@ -4,122 +4,75 @@ import Observation
 @MainActor
 @Observable
 final class MediaStore {
-    private(set) var states: [MediaKey: MediaDownloadState] = [:]
     private(set) var accountID: String?
-    private var catalog: [MediaKey: Episode] = [:]
 
-    var downloadedEpisodes: [Episode] { catalog.values.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
+    var states: [MediaKey: MediaDownloadState] { downloads.states }
+    var downloadedEpisodes: [Episode] { downloads.episodes }
+
     @ObservationIgnored private let rootURL: URL
     @ObservationIgnored private let session: URLSession
     @ObservationIgnored private let quotaBytes: Int64
-    @ObservationIgnored private var sources: [MediaKey: HTTPMediaByteSource] = [:]
-    @ObservationIgnored private var downloads: [MediaKey: (id: UUID, task: Task<Void, Error>)] = [:]
+    @ObservationIgnored private let downloads: BackgroundMediaDownloads
+    @ObservationIgnored private var sources: [URL: HTTPMediaByteSource] = [:]
+    @ObservationIgnored private var removing: Set<MediaKey> = []
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var purging = false
 
-    init(accountID: String? = nil, rootURL: URL? = nil, session: URLSession = .shared, quotaBytes: Int64 = 512 * 1024 * 1024) {
+    init(accountID: String? = nil, rootURL: URL? = nil, session: URLSession = .shared, quotaBytes: Int64 = 512 * 1024 * 1024, downloadConfiguration: URLSessionConfiguration? = nil) {
+        let rootURL = rootURL ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Podcst/Media", isDirectory: true)
         self.accountID = accountID
-        self.rootURL = rootURL ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Podcst/Media", isDirectory: true)
+        self.rootURL = rootURL
         self.session = session
         self.quotaBytes = max(0, quotaBytes)
-        restoreStates()
+        downloads = BackgroundMediaDownloads(accountID: accountID, rootURL: rootURL.appendingPathComponent("downloads", isDirectory: true), configuration: downloadConfiguration)
     }
 
     func key(for episode: Episode) -> MediaKey { MediaKey(accountID: accountID, episode: episode) }
     func status(for episode: Episode) -> MediaDownloadState { states[key(for: episode)] ?? .notDownloaded }
 
     func download(_ episode: Episode) async throws {
+        guard !purging, !removing.contains(key(for: episode)) else { throw MediaFailure.accountChanged }
         let token = generation
-        let key = key(for: episode)
-        if let existing = downloads[key] { return try await existing.task.value }
-        guard !purging else { throw MediaFailure.accountChanged }
-        catalog[key] = episode
-        states[key] = .downloading(received: 0, total: nil)
-        let id = UUID()
-        let task = Task { @MainActor [weak self] in
-            guard let self else { throw MediaFailure.cancelled }
-            var source: HTTPMediaByteSource?
-            do {
-                try Task.checkCancellation()
-                let asset = try await self.source(for: episode)
-                source = asset
-                try Task.checkCancellation()
-                guard self.generation == token, self.downloads[key]?.id == id else { throw MediaFailure.cancelled }
-                try await asset.markDurable(episode: episode)
-                let snapshot = await asset.snapshot()
-                try Task.checkCancellation()
-                guard self.generation == token, self.downloads[key]?.id == id else { throw MediaFailure.cancelled }
-                self.catalog[key] = episode
-                self.states[key] = .downloading(received: snapshot.storedBytes, total: snapshot.metadata?.totalBytes)
-                _ = try await asset.materialize { [weak self] received, total in
-                    await self?.updateProgress(key: key, id: id, generation: token, received: received, total: total)
-                }
-                try Task.checkCancellation()
-                let completed = await asset.snapshot()
-                guard self.generation == token else { throw MediaFailure.accountChanged }
-                if self.downloads[key]?.id == id {
-                    self.downloads[key] = nil
-                    self.states[key] = .available(bytes: completed.storedBytes)
-                }
-                await self.trimCache()
-            } catch {
-                let failure = Self.failure(error)
-                let snapshot = await source?.snapshot()
-                if self.generation == token, self.downloads[key]?.id == id {
-                    self.downloads[key] = nil
-                    self.states[key] = failure == .cancelled ? .paused(received: snapshot?.storedBytes ?? 0, total: snapshot?.metadata?.totalBytes) : .failed(failure)
-                }
-                throw failure
-            }
-        }
-        downloads[key] = (id, task)
-        try await task.value
+        try await downloads.download(episode)
+        guard generation == token else { throw MediaFailure.accountChanged }
+        await trimCache()
     }
 
     func cancel(_ episode: Episode) async {
-        let key = key(for: episode)
-        guard let download = downloads.removeValue(forKey: key) else { return }
-        download.task.cancel()
-        guard let source = sources[key] else {
-            states[key] = .paused(received: 0, total: nil)
-            return
-        }
-        let token = generation
-        let pinned = await source.isPinned()
-        guard generation == token, downloads[key] == nil else { return }
-        if !pinned { await source.cancel() }
-        let snapshot = await source.snapshot()
-        guard generation == token, downloads[key] == nil else { return }
-        states[key] = .paused(received: snapshot.storedBytes, total: snapshot.metadata?.totalBytes)
+        guard !purging, !removing.contains(key(for: episode)) else { return }
+        await downloads.pause(episode)
     }
 
-    func retry(_ episode: Episode) async throws {
-        if status(for: episode) == .failed(.representationChanged) {
-            let source = try await source(for: episode)
-            try await source.restartRepresentation()
-        }
-        try await download(episode)
-    }
+    func retry(_ episode: Episode) async throws { try await download(episode) }
 
     func remove(_ episode: Episode) async throws {
         let token = generation
         let key = key(for: episode)
-        let source = sources[key]
-        if let source, await source.isPinned() { throw MediaFailure.pinned }
-        guard generation == token else { throw MediaFailure.accountChanged }
-        await cancel(episode)
-        guard generation == token else { throw MediaFailure.accountChanged }
-        if let source { try await source.remove() }
-        else {
-            let directory = accountDirectory.appendingPathComponent(key.rawValue, isDirectory: true)
-            do {
-                if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
-            } catch { throw MediaFailure.storageUnavailable }
+        guard !purging, removing.insert(key).inserted else { throw MediaFailure.accountChanged }
+        defer { removing.remove(key) }
+        let cache = cacheDirectory.appendingPathComponent(key.rawValue, isDirectory: true)
+        let complete = completeDirectory(for: key)
+        let matching = sources.filter { $0.key == cache || $0.key == complete }
+        for source in matching.values {
+            if await source.isPinned() { throw MediaFailure.pinned }
+            guard generation == token else { throw MediaFailure.accountChanged }
+        }
+        var cleanupFailed = false
+        do { try await downloads.remove(episode) }
+        catch {
+            if downloads.states[key] != nil { throw error }
+            cleanupFailed = true
         }
         guard generation == token else { throw MediaFailure.accountChanged }
-        sources[key] = nil
-        states[key] = nil
-        catalog[key] = nil
+        for (directory, source) in matching {
+            do { try await source.retire() }
+            catch { cleanupFailed = true }
+            guard generation == token else { throw MediaFailure.accountChanged }
+            sources[directory] = nil
+        }
+        do { try Self.removeDirectory(cache) }
+        catch { cleanupFailed = true }
+        if cleanupFailed { throw MediaFailure.storageUnavailable }
     }
 
     func pin(_ episode: Episode) async throws -> MediaAssetLease {
@@ -127,12 +80,12 @@ final class MediaStore {
         let key = key(for: episode)
         let source = try await source(for: episode)
         try await source.pin()
-        guard generation == token, !purging else {
+        guard generation == token, !purging, !removing.contains(key) else {
             await source.unpin()
             throw MediaFailure.accountChanged
         }
         let fileURL = await source.completeFileURL()
-        guard generation == token, !purging else {
+        guard generation == token, !purging, !removing.contains(key) else {
             await source.unpin()
             throw MediaFailure.accountChanged
         }
@@ -148,57 +101,62 @@ final class MediaStore {
         catch MediaFailure.storageUnavailable { cleanupFailed = true }
         self.accountID = accountID
         generation = UUID()
-        restoreStates()
+        downloads.switchAccount(to: accountID)
         if cleanupFailed { throw MediaFailure.storageUnavailable }
     }
 
     func purge() async throws {
-        guard !purging else { throw MediaFailure.accountChanged }
+        guard !purging, removing.isEmpty else { throw MediaFailure.accountChanged }
         purging = true
         defer { purging = false }
         for source in sources.values {
             if await source.isPinned() { throw MediaFailure.pinned }
         }
         generation = UUID()
-        for download in downloads.values { download.task.cancel() }
-        downloads = [:]
         var cleanupFailed = false
+        do { try await downloads.purge() }
+        catch { cleanupFailed = true }
         for source in sources.values {
             do { try await source.retire() }
             catch { cleanupFailed = true }
         }
         sources = [:]
-        states = [:]
-        catalog = [:]
-        do {
-            if FileManager.default.fileExists(atPath: accountDirectory.path) { try FileManager.default.removeItem(at: accountDirectory) }
-        } catch { cleanupFailed = true }
+        do { try Self.removeDirectory(cacheDirectory) }
+        catch { cleanupFailed = true }
         if cleanupFailed { throw MediaFailure.storageUnavailable }
+    }
+
+    func reconcileDownloads() async {
+        guard !purging else { return }
+        await downloads.reconcile()
+    }
+
+    func handleBackgroundEvents(identifier: String, completionHandler: @escaping () -> Void) {
+        downloads.handleEvents(identifier: identifier, completionHandler: completionHandler)
     }
 
     func trimCache() async {
         guard !purging else { return }
         let token = generation
-        let directories = (try? FileManager.default.contentsOfDirectory(at: accountDirectory, includingPropertiesForKeys: nil)) ?? []
-        var candidates: [(MediaKey, URL, MediaManifest)] = []
+        let directories = (try? FileManager.default.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)) ?? []
+        var candidates: [(URL, MediaManifest)] = []
         for directory in directories {
-            guard let key = Self.diskKey(directory.lastPathComponent) else { continue }
+            guard let key = Self.diskKey(directory.lastPathComponent), !removing.contains(key) else { continue }
             let snapshot: MediaManifest
-            if let source = sources[key] { snapshot = await source.snapshot() }
+            if let source = sources[directory] { snapshot = await source.snapshot() }
             else { snapshot = HTTPMediaByteSource.readManifest(directory: directory) }
-            if !snapshot.durable { candidates.append((key, directory, snapshot)) }
+            if !snapshot.durable { candidates.append((directory, snapshot)) }
         }
         guard generation == token else { return }
-        var total = candidates.reduce(Int64(0)) { $0 + $1.2.storedBytes }
-        for (key, directory, snapshot) in candidates.sorted(by: { $0.2.lastAccess < $1.2.lastAccess }) where total > quotaBytes {
+        var total = candidates.reduce(Int64(0)) { $0 + $1.1.storedBytes }
+        for (directory, snapshot) in candidates.sorted(by: { $0.1.lastAccess < $1.1.lastAccess }) where total > quotaBytes {
             guard generation == token else { return }
             do {
-                if let source = sources[key] {
+                if let source = sources[directory] {
                     guard try await source.evictIfTransient() else { continue }
-                } else { try FileManager.default.removeItem(at: directory) }
+                } else { try Self.removeDirectory(directory) }
                 guard generation == token else { return }
-                sources[key] = nil
-                states[key] = nil
+                sources[directory] = nil
                 total -= snapshot.storedBytes
             } catch {
                 continue
@@ -206,40 +164,32 @@ final class MediaStore {
         }
     }
 
-    private var accountDirectory: URL { rootURL.appendingPathComponent(MediaKey.scope(accountID), isDirectory: true) }
+    private var cacheDirectory: URL {
+        rootURL.appendingPathComponent("cache", isDirectory: true).appendingPathComponent(MediaKey.scope(accountID), isDirectory: true)
+    }
+
+    private func completeDirectory(for key: MediaKey) -> URL {
+        rootURL.appendingPathComponent("downloads", isDirectory: true)
+            .appendingPathComponent(MediaKey.scope(accountID), isDirectory: true)
+            .appendingPathComponent(key.rawValue, isDirectory: true)
+            .appendingPathComponent("complete", isDirectory: true)
+    }
 
     private func source(for episode: Episode) async throws -> HTTPMediaByteSource {
-        guard !purging else { throw MediaFailure.accountChanged }
+        let key = key(for: episode)
+        guard !purging, !removing.contains(key) else { throw MediaFailure.accountChanged }
         let token = generation
         guard let url = episode.audioURL else { throw MediaFailure.invalidSource }
-        let key = key(for: episode)
-        if let source = sources[key] {
+        let complete = completeDirectory(for: key)
+        let directory = DownloadedMediaFile.manifest(in: complete) != nil ? complete : cacheDirectory.appendingPathComponent(key.rawValue, isDirectory: true)
+        if let source = sources[directory] {
             try await source.updateLocator(url)
-            guard generation == token else { throw MediaFailure.accountChanged }
+            guard generation == token, !purging, !removing.contains(key) else { throw MediaFailure.accountChanged }
             return source
         }
-        let source = try HTTPMediaByteSource(url: url, directory: accountDirectory.appendingPathComponent(key.rawValue, isDirectory: true), session: session)
-        sources[key] = source
+        let source = try HTTPMediaByteSource(url: url, directory: directory, session: session)
+        sources[directory] = source
         return source
-    }
-
-    private func restoreStates() {
-        let directories = (try? FileManager.default.contentsOfDirectory(at: accountDirectory, includingPropertiesForKeys: nil)) ?? []
-        for directory in directories {
-            guard let key = Self.diskKey(directory.lastPathComponent) else { continue }
-            let manifest = HTTPMediaByteSource.readManifest(directory: directory)
-            guard manifest.durable,
-                  let data = try? Data(contentsOf: directory.appendingPathComponent("episode.json")),
-                  let episode = try? JSONDecoder().decode(Episode.self, from: data),
-                  self.key(for: episode) == key else { continue }
-            catalog[key] = episode
-            states[key] = manifest.isComplete ? .available(bytes: manifest.storedBytes) : .paused(received: manifest.storedBytes, total: manifest.metadata?.totalBytes)
-        }
-    }
-
-    private func updateProgress(key: MediaKey, id: UUID, generation: UUID, received: Int64, total: Int64?) {
-        guard self.generation == generation, downloads[key]?.id == id else { return }
-        states[key] = .downloading(received: received, total: total)
     }
 
     private static func diskKey(_ value: String) -> MediaKey? {
@@ -247,9 +197,7 @@ final class MediaStore {
         return MediaKey(rawValue: value)
     }
 
-    private static func failure(_ error: Error) -> MediaFailure {
-        if let error = error as? MediaFailure { return error }
-        if error is CancellationError || (error as? URLError)?.code == .cancelled { return .cancelled }
-        return .invalidResponse
+    private static func removeDirectory(_ directory: URL) throws {
+        if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }
 }

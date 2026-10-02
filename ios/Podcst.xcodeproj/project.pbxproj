@@ -128,6 +128,11 @@
 		AC2900000000000000000011 = {isa = PBXBuildFile; fileRef = AC2900000000000000000001; };
 		AC2900000000000000000012 = {isa = PBXBuildFile; fileRef = AC2900000000000000000001; };
 		AC2900000000000000000013 = {isa = PBXBuildFile; fileRef = AC2900000000000000000002; };
+		4EF9C6CE8E48D8B14141088B = {isa = PBXBuildFile; fileRef = 77903BF3FCDDB37D6FDD5406; };
+		DFCFA8319512A383BC20F24E = {isa = PBXBuildFile; fileRef = 77903BF3FCDDB37D6FDD5406; };
+		F86D521B642B788319196312 = {isa = PBXBuildFile; fileRef = D5A7AB1D8FBB932075787C3E; };
+		6B3FCD8A93C1FF724498BA7B = {isa = PBXBuildFile; fileRef = D5A7AB1D8FBB932075787C3E; };
+		4E7E521EC7785029944A6534 = {isa = PBXBuildFile; fileRef = 11A8DCAAA6B9BD4AA43F0DEC; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -241,6 +246,9 @@
 		AC2800000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStore.swift; sourceTree = "<group>"; };
 		AC2800000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkRetention.swift; sourceTree = "<group>"; };
 		AC2800000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStoreTests.swift; sourceTree = "<group>"; };
+		77903BF3FCDDB37D6FDD5406 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/Media/BackgroundMediaDownloads.swift"; sourceTree = "<group>"; };
+		D5A7AB1D8FBB932075787C3E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/Media/DownloadedMediaFile.swift"; sourceTree = "<group>"; };
+		11A8DCAAA6B9BD4AA43F0DEC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadedMediaFileTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -271,6 +279,8 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				D5A7AB1D8FBB932075787C3E,
+				77903BF3FCDDB37D6FDD5406,
 				AC2900000000000000000001,
 				AC2800000000000000000001,
 				AC2800000000000000000002,
@@ -352,6 +362,7 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				11A8DCAAA6B9BD4AA43F0DEC,
 				AC2900000000000000000002,
 				AC2800000000000000000003,
 				CCF1F07C6DEA6CCD122B6BC1,
@@ -583,6 +594,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E7E521EC7785029944A6534,
 				AC2900000000000000000013,
 				AC2800000000000000000014,
 				F1EBB576915CDFAD37BDEC80,
@@ -610,6 +622,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F86D521B642B788319196312,
+				4EF9C6CE8E48D8B14141088B,
 				AC2900000000000000000011,
 				AC2800000000000000000011,
 				AC2800000000000000000013,
@@ -661,6 +675,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B3FCD8A93C1FF724498BA7B,
+				DFCFA8319512A383BC20F24E,
 				AC2900000000000000000012,
 				AC2800000000000000000012,
 				0D2DAEFDC659968964551E41,
