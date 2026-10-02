@@ -255,6 +255,56 @@ try {
     )[0].position,
     37,
   );
+  const { indexPodcast } = await import(
+    '../../src/server/ingest/index-podcast'
+  );
+  const { registerPublicAliases } = await import(
+    '../../src/server/ingest/feed-aliases'
+  );
+  await indexPodcast(sql, feed, 999);
+  const alias = 'https://public.example.invalid/historical';
+  await registerPublicAliases(sql, {
+    podcastId: id,
+    expectedFeedUrl: feed,
+    aliases: [alias],
+    evidence: { type: 'reviewed', reference: 'route-fixture' },
+  });
+  actor = null;
+  const aliasFeed = await feedRoute.GET(
+    request(`/api/feed?url=${encodeURIComponent(alias)}`),
+  );
+  assert.equal(aliasFeed.status, 200);
+  const canonicalResult = await aliasFeed.json();
+  assert.equal(canonicalResult.id, id);
+  assert.equal(canonicalResult.feed, feed);
+  assert(
+    canonicalResult.episodes.every(
+      (value: { feed: string }) => value.feed === feed,
+    ),
+  );
+  actor = 'other';
+  assert.equal(
+    (
+      await (await search.POST(request('/api/search', { term: alias }))).json()
+    )[0].id,
+    id,
+  );
+  assert.deepEqual(
+    await (
+      await subscriptions.POST(
+        request('/api/subscriptions', { feedUrls: [alias] }),
+      )
+    ).json(),
+    { succeeded: 1, failed: 0 },
+  );
+  actor = null;
+  shortLink = { feed: alias, guid: episode.guid };
+  await assert.rejects(
+    shortPage({ params: Promise.resolve({ slug: 'synthetic' }) }),
+    (error: unknown) =>
+      (error as { digest?: string }).digest ===
+      `NEXT_REDIRECT;replace;/episodes/${id}/${episodeId};307;`,
+  );
   console.log('Private route authorization, cache and reference checks passed');
 } finally {
   await sql.end();

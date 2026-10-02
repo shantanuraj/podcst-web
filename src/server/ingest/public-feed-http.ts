@@ -15,6 +15,7 @@ for (const [address, prefix] of [
   ['172.16.0.0', 12],
   ['192.0.0.0', 24],
   ['192.0.2.0', 24],
+  ['192.88.99.0', 24],
   ['192.168.0.0', 16],
   ['198.18.0.0', 15],
   ['198.51.100.0', 24],
@@ -24,9 +25,10 @@ for (const [address, prefix] of [
 ] as const)
   blocked.addSubnet(address, prefix, 'ipv4');
 for (const [address, prefix] of [
-  ['2001::', 32],
+  ['2001::', 23],
   ['2001:db8::', 32],
   ['2002::', 16],
+  ['3fff::', 20],
 ] as const)
   blocked.addSubnet(address, prefix, 'ipv6');
 const globalIPv6 = new BlockList();
@@ -74,7 +76,8 @@ export async function requestPublicFeed(
       resolve(hostname),
       new Promise<never>((_, reject) => {
         abort = () => reject(new Error('Feed lookup timed out'));
-        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
       }),
     ]);
   } finally {

@@ -4,6 +4,12 @@ import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import postgres from 'postgres';
+import {
+  CATALOG_INSERT_BATCH_SIZE,
+  type CatalogRow,
+  catalogInput,
+  insertCatalogPodcasts,
+} from '../src/server/ingest/catalog';
 
 const PODCAST_INDEX_URL =
   'https://public.podcastindex.org/podcastindex_feeds.db.tgz';
@@ -14,24 +20,7 @@ const BATCH_SIZE = 4000;
 
 const localPath = process.argv[2];
 
-interface PodcastIndexRow {
-  id: number;
-  url: string;
-  title: string;
-  lastUpdate: number | null;
-  link: string;
-  dead: number;
-  itunesAuthor: string;
-  explicit: number;
-  imageUrl: string;
-  newestItemPubdate: number | null;
-  language: string;
-  episodeCount: number | null;
-  popularityScore: number | null;
-  priority: number | null;
-  updateFrequency: number | null;
-  description: string;
-}
+type PodcastIndexRow = CatalogRow;
 
 async function downloadAndExtract(): Promise<string> {
   const tgzPath = localPath || DEFAULT_TGZ_PATH;
@@ -145,60 +134,23 @@ async function syncBatch(
   const authorNames = batch.map((r) => r.itunesAuthor || 'Unknown');
   await ensureAuthors(sql, authorNames, authorCache);
 
-  const values = batch.map((row) => {
-    const authorName = row.itunesAuthor || 'Unknown';
-    const authorId = authorCache.get(authorName)!;
-    const lastPublished = row.newestItemPubdate
-      ? new Date(row.newestItemPubdate * 1000)
-      : null;
-
-    return {
-      podcast_index_id: row.id,
-      feed_url: row.url,
-      title: row.title,
-      author_id: authorId,
-      description: row.description || null,
-      cover: row.imageUrl || 'https://podcst.app/placeholder.png',
-      website_url: row.link || null,
-      explicit: row.explicit === 1,
-      episode_count: row.episodeCount || 0,
-      last_published: lastPublished,
-      is_active: row.dead !== 1,
-      language: row.language || null,
-      popularity_score: row.popularityScore,
-      priority: row.priority,
-      update_frequency: row.updateFrequency
-        ? row.updateFrequency * 86400
-        : null,
-    };
+  const rows = batch.map((row) => {
+    const authorId = authorCache.get(row.itunesAuthor || 'Unknown');
+    if (authorId === undefined) throw new Error('Catalog author missing');
+    return catalogInput(row, authorId);
   });
-
-  const result = await sql`
-    INSERT INTO podcasts ${sql(
-      values,
-      'podcast_index_id',
-      'feed_url',
-      'title',
-      'author_id',
-      'description',
-      'cover',
-      'website_url',
-      'explicit',
-      'episode_count',
-      'last_published',
-      'is_active',
-      'language',
-      'popularity_score',
-      'priority',
-      'update_frequency',
-    )}
-    ON CONFLICT (feed_url) DO NOTHING
-  `;
-
-  const inserted = result.count;
-  const skipped = batch.length - inserted;
-
-  return { inserted, skipped };
+  let inserted = 0;
+  for (
+    let offset = 0;
+    offset < rows.length;
+    offset += CATALOG_INSERT_BATCH_SIZE
+  ) {
+    inserted += await insertCatalogPodcasts(
+      sql,
+      rows.slice(offset, offset + CATALOG_INSERT_BATCH_SIZE),
+    );
+  }
+  return { inserted, skipped: batch.length - inserted };
 }
 
 async function patch(): Promise<void> {

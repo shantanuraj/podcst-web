@@ -4,6 +4,7 @@ import { parseFeedEvidence } from '../../app/api/feed/parser';
 import { publicAliasUrl, registerPublicAliases } from './feed-aliases';
 import {
   PodcastAccessDenied,
+  PodcastIdentityBusy,
   PodcastIdentityConflict,
 } from './podcast-identity';
 import { requestPublicFeed } from './public-feed-http';
@@ -132,6 +133,8 @@ export async function resolvePublicFeedMove(
     });
     return { status: 'resolved' as const, podcastId };
   } catch (error) {
+    if (error instanceof PodcastIdentityBusy)
+      return { status: 'verification_pending' as const, reason: 'source_busy' };
     if (error instanceof PodcastIdentityConflict)
       return { status: 'identity_conflict' as const };
     if (error instanceof PodcastAccessDenied)

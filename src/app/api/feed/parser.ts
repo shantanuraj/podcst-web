@@ -412,8 +412,14 @@ export async function parseFeedEvidence(xml: string) {
   const json = await xmlToJSON(xml);
   const channel = (json as { rss?: { channel?: Record<string, unknown>[] } })
     ?.rss?.channel?.[0];
-  const links = channel?.['atom:link'];
-  const moves = channel?.['itunes:new-feed-url'];
+  const links = Object.entries(channel ?? {}).flatMap(([name, value]) =>
+    (name === 'link' || name.endsWith(':link')) && Array.isArray(value)
+      ? value
+      : [],
+  );
+  const moves = Object.entries(channel ?? {}).flatMap(([name, value]) =>
+    name.endsWith(':new-feed-url') && Array.isArray(value) ? value : [],
+  );
   const selfLinks = Array.isArray(links)
     ? links.flatMap((link: { $?: { rel?: string; href?: string } }) =>
         link.$?.rel === 'self' && typeof link.$.href === 'string'

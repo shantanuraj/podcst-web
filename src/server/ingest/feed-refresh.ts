@@ -118,6 +118,7 @@ export async function refreshFeed(
   sql: postgres.Sql,
   podcastId: number,
   mode: RefreshMode = 'stale',
+  resolveMove = resolvePublicFeedMove,
 ): Promise<RefreshResult> {
   let publicRedirect = false;
   const outcome = await sql.begin(async (tx): Promise<RefreshResult> => {
@@ -212,7 +213,7 @@ export async function refreshFeed(
   });
   if (publicRedirect && (outcome === 'updated' || outcome === 'not_modified')) {
     try {
-      const move = await resolvePublicFeedMove(sql, podcastId);
+      const move = await resolveMove(sql, podcastId);
       if (
         move.status === 'identity_conflict' ||
         move.status === 'verification_pending'
