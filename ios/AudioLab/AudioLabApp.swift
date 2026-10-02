@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct AudioLabApp: App {
+    @UIApplicationDelegateAdaptor(MediaDownloadAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var api = APIClient()
     @State private var media: MediaStore
     @State private var transport: RoutingAudioTransport
@@ -24,6 +26,7 @@ struct AudioLabApp: App {
         )
         playback.clear()
         _playback = State(initialValue: playback)
+        appDelegate.media = media
     }
 
     var body: some Scene {
@@ -32,6 +35,9 @@ struct AudioLabApp: App {
                 .environment(playback)
                 .environment(api)
                 .environment(media)
+                .task(id: scenePhase) {
+                    if scenePhase == .active { await media.reconcileDownloads() }
+                }
         }
     }
 }

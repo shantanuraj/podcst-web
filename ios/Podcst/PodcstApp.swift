@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct PodcstApp: App {
+    @UIApplicationDelegateAdaptor(MediaDownloadAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     private let isTesting: Bool
     @State private var api: APIClient
     @State private var session: SessionStore
@@ -25,6 +27,7 @@ struct PodcstApp: App {
         let routing = RoutingAudioTransport(media: media)
         let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: !testing)
         _playback = State(initialValue: playback)
+        appDelegate.media = media
         session.prepareAccountChange = { [weak library, weak playback] accountID in
             playback?.beginAccountChange()
             await library?.resetProgressSync()
@@ -51,6 +54,9 @@ struct PodcstApp: App {
                     .environment(media)
                     .task {
                         await session.restore()
+                    }
+                    .task(id: scenePhase) {
+                        if scenePhase == .active { await media.reconcileDownloads() }
                     }
             }
         }

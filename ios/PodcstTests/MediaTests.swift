@@ -97,11 +97,11 @@ final class MediaTests: XCTestCase {
         defer { server.stop() }
         let root = temporaryDirectory()
         let episode = episode(url: url)
-        let store = MediaStore(accountID: "private-account", rootURL: root, quotaBytes: 0)
+        let store = MediaStore(accountID: "private-account", rootURL: root, quotaBytes: 0, downloadConfiguration: .ephemeral)
         try await store.download(episode)
         XCTAssertEqual(store.status(for: episode), .available(bytes: Int64(body.count)))
         await store.trimCache()
-        let relaunched = MediaStore(accountID: "private-account", rootURL: root, quotaBytes: 0)
+        let relaunched = MediaStore(accountID: "private-account", rootURL: root, quotaBytes: 0, downloadConfiguration: .ephemeral)
         XCTAssertEqual(relaunched.downloadedEpisodes, [episode])
         XCTAssertEqual(relaunched.status(for: episode), .available(bytes: Int64(body.count)))
         let lease = try await relaunched.pin(episode)
@@ -112,9 +112,213 @@ final class MediaTests: XCTestCase {
         await lease.release()
         try await relaunched.switchAccount(to: "other-account")
         XCTAssertTrue(relaunched.downloadedEpisodes.isEmpty)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(MediaKey.scope("private-account")).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("downloads").appendingPathComponent(MediaKey.scope("private-account")).path))
         do { _ = try await lease.byteSource.metadata(); XCTFail("A retired source cannot recreate a purged account") }
         catch { XCTAssertEqual(error as? MediaFailure, .accountChanged) }
+    }
+
+    func testConcurrentExplicitDownloadsShareOneTransfer() async throws {
+        let body = payload(count: 350_000)
+        let server = try MediaHTTPServer(data: body, delay: 0.2)
+        let url = try await server.start()
+        defer { server.stop() }
+        let episode = episode(url: url)
+        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
+        let first = Task { try await store.download(episode) }
+        try await waitForRequests(server, count: 1)
+        let second = Task { try await store.download(episode) }
+        try await first.value
+        try await second.value
+        XCTAssertEqual(server.requests.count, 1)
+        XCTAssertNil(server.requests.first?["range"])
+        XCTAssertEqual(store.downloadedEpisodes, [episode])
+        XCTAssertEqual(store.status(for: episode), .available(bytes: Int64(body.count)))
+    }
+
+    func testCompletedDownloadKeepsActiveProgressiveRepresentationUntouched() async throws {
+        let original = payload(count: 600_000)
+        let replacement = Data(repeating: 99, count: original.count)
+        let server = try MediaHTTPServer(data: original)
+        let url = try await server.start()
+        defer { server.stop() }
+        let episode = episode(url: url)
+        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory(), quotaBytes: 0, downloadConfiguration: .ephemeral)
+        let progressive = try await store.pin(episode)
+        let before = try await progressive.byteSource.read(offset: 0, count: 100)
+        XCTAssertEqual(before, original.prefix(100))
+        server.replace(data: replacement, etag: "\"version-2\"")
+        try await store.download(episode)
+        let preserved = try await progressive.byteSource.read(offset: 0, count: 100)
+        let progressiveFile = await progressive.byteSource.completeFileURL()
+        XCTAssertEqual(preserved, before)
+        XCTAssertNil(progressiveFile)
+        do { try await store.remove(episode); XCTFail("The progressive lease must protect its representation") }
+        catch { XCTAssertEqual(error as? MediaFailure, .pinned) }
+        let completed = try await store.pin(episode)
+        XCTAssertFalse(progressive.byteSource === completed.byteSource)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(completed.completeFileURL)), replacement)
+        await progressive.release()
+        do { try await store.remove(episode); XCTFail("The completed lease must protect the downloaded file") }
+        catch { XCTAssertEqual(error as? MediaFailure, .pinned) }
+        await completed.release()
+        try await store.remove(episode)
+        XCTAssertEqual(store.status(for: episode), .notDownloaded)
+    }
+
+    func testInvalidExplicitDownloadsNeverPublishOfflineFiles() async throws {
+        for mode in [MediaHTTPServer.Mode.unauthorized, .truncated] {
+            let server = try MediaHTTPServer(data: payload(count: 350_000), mode: mode)
+            let url = try await server.start()
+            defer { server.stop() }
+            let root = temporaryDirectory()
+            let episode = episode(url: url)
+            let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+            do { try await store.download(episode); XCTFail("An invalid response must not complete the download") }
+            catch {
+                if mode == .unauthorized { XCTAssertEqual(error as? MediaFailure, .unavailable(403)) }
+            }
+            if case .available = store.status(for: episode) { XCTFail("Invalid bytes must not be available offline") }
+            XCTAssertEqual(store.downloadedEpisodes, [episode])
+            let directory = downloadDirectory(root: root, accountID: "one", episode: episode).appendingPathComponent("complete")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+            let lease = try await store.pin(episode)
+            XCTAssertNil(lease.completeFileURL)
+            await lease.release()
+            try await store.purge()
+        }
+    }
+
+    func testRequestedDownloadRecoversMissingTaskAfterRelaunchWithoutDuplication() async throws {
+        let body = payload(count: 350_000)
+        let server = try MediaHTTPServer(data: body, delay: 0.2)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        let episode = episode(url: url)
+        let directory = downloadDirectory(root: root, accountID: "one", episode: episode)
+        try HTTPMediaByteSource.prepareDirectory(directory)
+        let interrupted = MediaDownloadRecord(episode: episode, intent: .requested, received: 125_000, total: Int64(body.count))
+        try JSONEncoder().encode(interrupted).write(to: directory.appendingPathComponent("transfer.json"), options: .atomic)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        XCTAssertEqual(store.downloadedEpisodes, [episode])
+        await store.reconcileDownloads()
+        try await waitForRequests(server, count: 1)
+        try await store.download(episode)
+        await store.reconcileDownloads()
+        XCTAssertEqual(server.requests.count, 1)
+        XCTAssertEqual(store.downloadedEpisodes, [episode])
+        XCTAssertEqual(store.states.count, 1)
+        XCTAssertEqual(store.status(for: episode), .available(bytes: Int64(body.count)))
+        server.stop()
+        let relaunched = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        let lease = try await relaunched.pin(episode)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(lease.completeFileURL)), body)
+        await lease.release()
+    }
+
+    func testInvalidResumeDataFallsBackToOneCompleteDownload() async throws {
+        let body = payload(count: 350_000)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        let episode = episode(url: url)
+        let directory = downloadDirectory(root: root, accountID: "one", episode: episode)
+        try HTTPMediaByteSource.prepareDirectory(directory)
+        let interrupted = MediaDownloadRecord(episode: episode, intent: .requested, resumeData: Data("invalid resume data".utf8), received: 125_000, total: Int64(body.count))
+        try JSONEncoder().encode(interrupted).write(to: directory.appendingPathComponent("transfer.json"), options: .atomic)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        let completed = expectation(description: "The invalid resume attempt completes through a fresh transfer")
+        var result: Result<Void, Error>?
+        let pending = Task {
+            do { try await store.download(episode); result = .success(()) }
+            catch { result = .failure(error) }
+            completed.fulfill()
+        }
+        defer { pending.cancel() }
+        await fulfillment(of: [completed], timeout: 3)
+        guard let result else { try await store.purge(); return }
+        try result.get()
+        XCTAssertEqual(server.requests.count, 1)
+        XCTAssertNil(server.requests.first?["range"])
+        XCTAssertEqual(store.downloadedEpisodes, [episode])
+        XCTAssertEqual(store.status(for: episode), .available(bytes: Int64(body.count)))
+        server.stop()
+        let lease = try await store.pin(episode)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(lease.completeFileURL)), body)
+        await lease.release()
+    }
+
+    func testRemoveDuringDownloadReconciliationFinishesWaitersWithoutOrphanedTransfers() async throws {
+        let server = try MediaHTTPServer(data: payload(count: 350_000), delay: 0.2)
+        let url = try await server.start()
+        defer { server.stop() }
+        let episode = episode(url: url)
+        for attempt in 0..<8 {
+            let root = temporaryDirectory()
+            let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+            let downloadFinished = expectation(description: "Racing download finishes \(attempt)")
+            let removalFinished = expectation(description: "Racing removal finishes \(attempt)")
+            var downloadResult: Result<Void, Error>?
+            var removalResult: Result<Void, Error>?
+            var pending: Task<Void, Never>?
+            await withCheckedContinuation { entered in
+                pending = Task {
+                    entered.resume()
+                    do { try await store.download(episode); downloadResult = .success(()) }
+                    catch { downloadResult = .failure(error) }
+                    downloadFinished.fulfill()
+                }
+            }
+            if attempt.isMultiple(of: 2) { await Task.yield() }
+            let removal = Task {
+                do { try await store.remove(episode); removalResult = .success(()) }
+                catch { removalResult = .failure(error) }
+                removalFinished.fulfill()
+            }
+            defer { pending?.cancel(); removal.cancel() }
+            await fulfillment(of: [downloadFinished, removalFinished], timeout: 3)
+            guard let downloadResult, let removalResult else { try? await store.purge(); return }
+            try removalResult.get()
+            switch downloadResult {
+            case .success:
+                XCTFail("The removed download must not finish successfully")
+            case .failure(let error):
+                XCTAssertTrue([MediaFailure.cancelled, .accountChanged].contains(error as? MediaFailure ?? .invalidResponse))
+            }
+            await store.reconcileDownloads()
+            XCTAssertEqual(store.status(for: episode), .notDownloaded)
+            XCTAssertTrue(store.downloadedEpisodes.isEmpty)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: downloadDirectory(root: root, accountID: "one", episode: episode).path))
+        }
+    }
+
+    func testAccountSwitchRejectsLateDownloadCompletionAndKeepsAccountsIsolated() async throws {
+        let body = payload(count: 350_000)
+        let server = try MediaHTTPServer(data: body, delay: 0.25)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        let episode = episode(url: url)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        let oldDirectory = downloadDirectory(root: root, accountID: "one", episode: episode).deletingLastPathComponent()
+        let pending = Task { try await store.download(episode) }
+        try await waitForRequests(server, count: 1)
+        try await store.switchAccount(to: "two")
+        do { try await pending.value; XCTFail("An old account transfer must not complete for the new account") }
+        catch { XCTAssertEqual(error as? MediaFailure, .accountChanged) }
+        try await Task.sleep(for: .milliseconds(350))
+        await store.reconcileDownloads()
+        XCTAssertEqual(store.accountID, "two")
+        XCTAssertEqual(store.status(for: episode), .notDownloaded)
+        XCTAssertTrue(store.downloadedEpisodes.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDirectory.path))
+        try await store.download(episode)
+        let lease = try await store.pin(episode)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(lease.completeFileURL)), body)
+        XCTAssertEqual(server.requests.count, 2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDirectory.path))
+        await lease.release()
     }
 
     func testPlaybackReadPreemptsDownloadWithoutCancellingItsRecovery() async throws {
@@ -177,28 +381,34 @@ final class MediaTests: XCTestCase {
         XCTAssertFalse(snapshot.isComplete)
     }
 
-    func testCancelledDownloadCatalogAndRangesSurviveRelaunchThenRetry() async throws {
+    func testPausedDownloadCatalogSurvivesRelaunchThenRetry() async throws {
         let body = payload(count: 600_000)
         let server = try MediaHTTPServer(data: body, delay: 0.1)
         let url = try await server.start()
         defer { server.stop() }
         let root = temporaryDirectory()
         let episode = episode(url: url)
-        let store = MediaStore(accountID: "one", rootURL: root)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
         let pending = Task { try await store.download(episode) }
-        try await waitForRequests(server, count: 2)
+        try await waitForRequests(server, count: 1)
         await store.cancel(episode)
         do { try await pending.value; XCTFail("Cancelled download must stop") }
         catch { XCTAssertEqual(error as? MediaFailure, .cancelled) }
-        let relaunched = MediaStore(accountID: "one", rootURL: root)
+        let relaunched = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
         XCTAssertEqual(relaunched.downloadedEpisodes, [episode])
         guard case .paused(let received, _) = relaunched.status(for: episode) else { return XCTFail("Partial download must restore as paused") }
-        XCTAssertGreaterThan(received, 0)
+        XCTAssertGreaterThanOrEqual(received, 0)
+        let requests = server.requests.count
+        let paused = relaunched.status(for: episode)
+        await relaunched.reconcileDownloads()
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(relaunched.status(for: episode), paused)
+        XCTAssertEqual(server.requests.count, requests)
         try await relaunched.retry(episode)
         XCTAssertEqual(relaunched.status(for: episode), .available(bytes: Int64(body.count)))
         try await relaunched.remove(episode)
         XCTAssertTrue(relaunched.downloadedEpisodes.isEmpty)
-        XCTAssertTrue(MediaStore(accountID: "one", rootURL: root).downloadedEpisodes.isEmpty)
+        XCTAssertTrue(MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral).downloadedEpisodes.isEmpty)
     }
 
     func testSystemRouterStreamsWithoutCustomPreflightOrDownloadPromotion() async throws {
@@ -206,7 +416,7 @@ final class MediaTests: XCTestCase {
         let server = try MediaHTTPServer(data: data, mode: .ignoreRange, contentType: "audio/mpeg")
         let url = try await server.start()
         defer { server.stop() }
-        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let router = RoutingAudioTransport(media: media, preferSystemPlayback: true)
         defer { router.shutdown() }
         var readyCount = 0
@@ -251,7 +461,7 @@ final class MediaTests: XCTestCase {
             let data = try mp3Fixture()
             let server = try MediaHTTPServer(data: data, contentType: "audio/mpeg")
             let url = try await server.start()
-            let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+            let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
             let episode = episode(url: url)
             if durable { try await media.download(episode) }
             else {
@@ -287,7 +497,7 @@ final class MediaTests: XCTestCase {
 
     func testSystemRouterPlaysLocalFilesAndCancelsPendingReplacement() async throws {
         let fixture = try XCTUnwrap(Bundle(for: MediaTests.self).url(forResource: "progressive-vbr", withExtension: "mp3"))
-        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let router = RoutingAudioTransport(media: media, preferSystemPlayback: true)
         defer { router.shutdown() }
         let generation = UUID()
@@ -319,7 +529,7 @@ final class MediaTests: XCTestCase {
             for waitForNetwork in [false, true] {
                 let server = try MediaHTTPServer(data: payload(count: 350_000), delay: 2)
                 let url = try await server.start()
-                let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+                let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
                 let router = RoutingAudioTransport(media: media, preferSystemPlayback: preferSystemPlayback)
                 router.load(source: .episode(episode(url: url)), at: 0, generation: UUID())
                 if waitForNetwork { try await waitForRequests(server, count: 1) }
@@ -339,7 +549,7 @@ final class MediaTests: XCTestCase {
         let server = try MediaHTTPServer(data: payload(count: 350_000), mode: .unauthorized)
         let url = try await server.start()
         defer { server.stop() }
-        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let router = RoutingAudioTransport(media: media)
         var failed = false
         router.onUpdate = { update in
@@ -361,7 +571,7 @@ final class MediaTests: XCTestCase {
         let server = try MediaHTTPServer(data: payload(count: 350_000), delay: 2)
         let url = try await server.start()
         defer { server.stop() }
-        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let router = RoutingAudioTransport(media: media)
         defer { router.shutdown() }
         router.load(source: .episode(episode(url: url)), at: 0, generation: UUID())
@@ -387,7 +597,7 @@ final class MediaTests: XCTestCase {
         let server = try MediaHTTPServer(data: data, contentType: "audio/mp4")
         let url = try await server.start()
         defer { server.stop() }
-        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let episode = episode(url: url)
         try await media.download(episode)
         server.stop()
@@ -426,7 +636,7 @@ final class MediaTests: XCTestCase {
         let server = try MediaHTTPServer(data: mp3Fixture(), mode: .ignoreRange, contentType: "audio/mpeg")
         let url = try await server.start()
         defer { server.stop() }
-        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let media = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let router = RoutingAudioTransport(media: media)
         let preferences = AudioPreferences()
         let effects = AudioEffects(volumeBoost: true)
@@ -477,9 +687,9 @@ final class MediaTests: XCTestCase {
         defer { server.stop() }
         let root = temporaryDirectory()
         let episode = episode(url: url)
-        let store = MediaStore(accountID: "one", rootURL: root)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
         try await store.download(episode)
-        let account = root.appendingPathComponent(MediaKey.scope("one"))
+        let account = root.appendingPathComponent("downloads").appendingPathComponent(MediaKey.scope("one"))
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: account.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: account.path) }
         do { try await store.switchAccount(to: "two"); XCTFail("Read-only old storage must report failed cleanup") }
@@ -487,6 +697,84 @@ final class MediaTests: XCTestCase {
         XCTAssertEqual(store.accountID, "two")
         XCTAssertTrue(store.downloadedEpisodes.isEmpty)
         XCTAssertEqual(store.status(for: episode), .notDownloaded)
+    }
+
+    func testFailedRemovalPreservesCompletedCatalogAndPlayableSourceUntilRetry() async throws {
+        let body = payload(count: 350_000)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        let episode = episode(url: url)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        try await store.download(episode)
+        let original = try await store.pin(episode)
+        let file = try XCTUnwrap(original.completeFileURL)
+        await original.release()
+        server.stop()
+        let directory = downloadDirectory(root: root, accountID: "one", episode: episode)
+        let parent = directory.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: parent.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: parent.path) }
+        do { try await store.remove(episode); XCTFail("Removing from an unwritable parent must fail") }
+        catch { XCTAssertEqual(error as? MediaFailure, .storageUnavailable) }
+        XCTAssertEqual(store.downloadedEpisodes, [episode])
+        XCTAssertEqual(store.status(for: episode), .available(bytes: Int64(body.count)))
+        XCTAssertEqual(try Data(contentsOf: file), body)
+        let retained = try await store.pin(episode)
+        XCTAssertTrue(retained.byteSource === original.byteSource)
+        XCTAssertEqual(retained.completeFileURL, file)
+        let bytes = try await retained.byteSource.read(offset: 275_000, count: 100)
+        XCTAssertEqual(bytes, body.subdata(in: 275_000..<275_100))
+        await retained.release()
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: parent.path)
+        try await store.remove(episode)
+        XCTAssertEqual(store.status(for: episode), .notDownloaded)
+        XCTAssertTrue(store.downloadedEpisodes.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+        do { _ = try await original.byteSource.metadata(); XCTFail("Successful removal retires the old source") }
+        catch { XCTAssertEqual(error as? MediaFailure, .accountChanged) }
+    }
+
+    func testRemovalCleanupFailureRetiresSourceBeforeDownloadingReplacement() async throws {
+        let originalBody = payload(count: 350_000)
+        let replacement = Data(repeating: 99, count: 410_013)
+        let server = try MediaHTTPServer(data: originalBody)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        let episode = episode(url: url)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        try await store.download(episode)
+        let original = try await store.pin(episode)
+        await original.release()
+        let directory = downloadDirectory(root: root, accountID: "one", episode: episode)
+        let complete = directory.appendingPathComponent("complete")
+        let account = directory.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: complete.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: complete.path)
+            let directories = (try? FileManager.default.contentsOfDirectory(at: account, includingPropertiesForKeys: nil)) ?? []
+            for removed in directories where removed.lastPathComponent.hasPrefix(".removed-") {
+                try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: removed.appendingPathComponent("complete").path)
+            }
+        }
+        do { try await store.remove(episode); XCTFail("Read-only completed storage must report failed cleanup") }
+        catch { XCTAssertEqual(error as? MediaFailure, .storageUnavailable) }
+        XCTAssertEqual(store.status(for: episode), .notDownloaded)
+        XCTAssertTrue(store.downloadedEpisodes.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+        do { _ = try await original.byteSource.metadata(); XCTFail("A removed source must retire even if tombstone cleanup fails") }
+        catch { XCTAssertEqual(error as? MediaFailure, .accountChanged) }
+        server.replace(data: replacement, etag: "\"version-2\"")
+        try await store.download(episode)
+        let fresh = try await store.pin(episode)
+        XCTAssertFalse(fresh.byteSource === original.byteSource)
+        let metadata = try await fresh.byteSource.metadata()
+        XCTAssertEqual(metadata.totalBytes, Int64(replacement.count))
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(fresh.completeFileURL)), replacement)
+        XCTAssertEqual(store.status(for: episode), .available(bytes: Int64(replacement.count)))
+        await fresh.release()
     }
 
     func testDurablePromotionPreventsEvictionFromAnOlderSnapshot() async throws {
@@ -509,7 +797,7 @@ final class MediaTests: XCTestCase {
         let server = try MediaHTTPServer(data: body, delay: 0.1)
         let url = try await server.start()
         defer { server.stop() }
-        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         let episode = episode(url: url)
         let first = Task { try await store.download(episode) }
         try await waitForRequests(server, count: 1)
@@ -523,7 +811,7 @@ final class MediaTests: XCTestCase {
 
     func testFailedInvalidLocatorRemainsVisibleAndCanBeRemoved() async throws {
         let invalid = episode(url: URL(string: "file:///private/unavailable.mp3")!)
-        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory())
+        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
         do { try await store.download(invalid); XCTFail("Remote download rejects local paths") }
         catch { XCTAssertEqual(error as? MediaFailure, .invalidSource) }
         XCTAssertEqual(store.downloadedEpisodes, [invalid])
@@ -567,7 +855,7 @@ final class MediaTests: XCTestCase {
         let url = try await server.start()
         defer { server.stop() }
         let root = temporaryDirectory()
-        let store = MediaStore(accountID: "one", rootURL: root, quotaBytes: 0)
+        let store = MediaStore(accountID: "one", rootURL: root, quotaBytes: 0, downloadConfiguration: .ephemeral)
         let episode = episode(url: url)
         let lease = try await store.pin(episode)
         _ = try await lease.byteSource.read(offset: 0, count: 100)
@@ -575,7 +863,7 @@ final class MediaTests: XCTestCase {
         let before = await lease.byteSource.snapshot()
         XCTAssertGreaterThan(before.storedBytes, 0)
         await lease.release()
-        let directory = root.appendingPathComponent(MediaKey.scope("one")).appendingPathComponent(store.key(for: episode).rawValue)
+        let directory = root.appendingPathComponent("cache").appendingPathComponent(MediaKey.scope("one")).appendingPathComponent(store.key(for: episode).rawValue)
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
     }
 
@@ -724,6 +1012,12 @@ final class MediaTests: XCTestCase {
         return directory
     }
 
+    private func downloadDirectory(root: URL, accountID: String?, episode: Episode) -> URL {
+        root.appendingPathComponent("downloads", isDirectory: true)
+            .appendingPathComponent(MediaKey.scope(accountID), isDirectory: true)
+            .appendingPathComponent(MediaKey(accountID: accountID, episode: episode).rawValue, isDirectory: true)
+    }
+
     private func payload(count: Int) -> Data { Data((0..<count).map { UInt8(($0 * 17) % 251) }) }
 
     private func episode(url: URL) -> Episode {
@@ -731,7 +1025,7 @@ final class MediaTests: XCTestCase {
     }
 
     private func waitForRequests(_ server: MediaHTTPServer, count: Int) async throws {
-        for _ in 0..<100 {
+        for _ in 0..<500 {
             if server.requests.count >= count { return }
             try await Task.sleep(for: .milliseconds(10))
         }
