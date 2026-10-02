@@ -1,6 +1,6 @@
 # Public and private podcast ownership
 
-Entry point: [Release hub](release.md). This document owns the public/private policy, access boundary and rollout requirements. The owner approved this two-state scope; quarantine and a general alias system are not prerequisites for this slice.
+Entry point: [Release hub](release.md). This document owns the public/private policy, access boundary and rollout requirements. The owner approved this two-state scope; quarantine and a general alias system are not prerequisites for this slice. The subsequent [public-alias implementation](public-feed-aliases.md) preserves this private-source contract.
 
 Status: implemented in `e8ab35c` and locally verified on the feature branch, not deployed. Feed-HTML hardening is recorded separately in `be8e18b`. Existing-data review and coordinated production cutover remain required.
 
@@ -40,7 +40,7 @@ A trusted Apple lookup/chart result must associate a valid `itunes_id` with the 
 
 Promotion updates the existing podcast row in place. Podcast/episode IDs, subscriptions and playback progress remain unchanged. If provider and URL evidence identify different existing records, fail with an identity conflict rather than silently merging or publishing either one.
 
-The Podcast Index bulk importer skips private candidates without an Apple ID. When a private exact-URL candidate has an ID hint, it uses the trusted lookup path; an unverified or different-source result does not clear ownership. Ordinary bulk updates are restricted to public rows. The [alias-resolution plan](feed-identity-resolution-plan.md) remains follow-up work for verified moves and conflicting identities, not permission to weaken this boundary.
+The Podcast Index bulk importer skips private candidates without an Apple ID. When a private exact-URL candidate has an ID hint, it uses the trusted lookup path; an unverified or different-source result does not clear ownership. Ordinary bulk updates are restricted to public rows. The subsequent [public-alias implementation](public-feed-aliases.md) resolves accepted public locators without weakening this boundary. Private aliases/credential rotation remain deferred. A source with public aliases must have them explicitly removed in a reviewed ownership operation before it can become private.
 
 ## Access and cache boundary
 

@@ -1,10 +1,12 @@
 # Alias-aware feed identity resolution
 
-Status: follow-up identity plan, not a prerequisite for the current R2 public/private boundary. Exact-URL ownership, trusted in-place promotion and conflict refusal are implemented by the ownership slice; general alias/move resolution remains deferred.
+Status: the owner-approved public-alias slice is implemented and locally verified, not deployed. It accepts reviewed mappings and verified permanent public moves while retaining the ownership slice's private exact-URL behavior. Private aliases and broader hint/reassignment automation remain follow-up work.
+
+The [public-alias reference and operator workflow](public-feed-aliases.md) records the implemented schema, callers, verification limits, protected backfill process and test evidence. This design remains the policy authority; it is not a claim that every future identity feature below is delivered.
 
 Entry point: [Release hub](release.md).
 
-This plan owns future alias keys, canonical selection and duplicate-record reconciliation. It consumes the ownership plan's [single privacy field](private-feed-ownership-plan.md#one-privacy-field), [access boundary](private-feed-ownership-plan.md#access-and-cache-boundary) and [existing-record rollout policy](private-feed-ownership-plan.md#existing-records-and-rollout). The approved current model has no quarantine state and retains one source per exact feed URL.
+This plan owns alias keys, canonical selection and duplicate-record reconciliation. It consumes the ownership plan's [single privacy field](private-feed-ownership-plan.md#one-privacy-field), [access boundary](private-feed-ownership-plan.md#access-and-cache-boundary) and [existing-record rollout policy](private-feed-ownership-plan.md#existing-records-and-rollout). The approved current model has no quarantine state and retains one source per exact feed URL.
 
 Examples are synthetic. Operational evidence follows the ownership plan's protected-data rules.
 
@@ -44,7 +46,7 @@ Non-goals: fuzzy title matching, globally unique episode GUIDs, automatic mergin
 
 ## Identity data
 
-When this follow-up is implemented, add alias mappings to the [existing source boundary](private-feed-ownership-plan.md#one-privacy-field), rather than defining a parallel catalog or a second ownership model.
+Public alias mappings now attach to the [existing source boundary](private-feed-ownership-plan.md#one-privacy-field), without a parallel catalog or second ownership model. Private lookup keys remain deferred under the current exact-URL contract.
 
 Logical records:
 

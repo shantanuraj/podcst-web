@@ -53,11 +53,24 @@ async function index(
     throw new PodcastIdentityConflict(
       'Move evidence identifies another source',
     );
-  const locators = [
+  const requestedLocators = [
     ...new Set([
       feedUrl,
       ...(move?.aliases ?? []),
       ...(move ? [move.canonicalFeedUrl] : []),
+    ]),
+  ];
+  const observations = move
+    ? await Promise.all(
+        requestedLocators.map((locator) =>
+          findPodcastIdentity(sql, locator, itunesId),
+        ),
+      )
+    : [existing];
+  const locators = [
+    ...new Set([
+      ...requestedLocators,
+      ...observations.flatMap((source) => (source ? [source.feed_url] : [])),
     ]),
   ];
 
@@ -68,7 +81,13 @@ async function index(
     );
     let found: PodcastIdentity | undefined;
     for (const locator of locators) {
-      const match = await findPodcastIdentity(tx, locator, itunesId);
+      const match = await findPodcastIdentity(
+        tx,
+        locator,
+        itunesId,
+        undefined,
+        true,
+      );
       if (found && match && Number(found.id) !== Number(match.id))
         throw new PodcastIdentityConflict(
           'Move identifies different existing sources',
@@ -76,6 +95,10 @@ async function index(
       found ??= match;
     }
     if (found) {
+      if (!locators.includes(found.feed_url))
+        throw new PodcastIdentityConflict(
+          'Canonical source changed during import; retry',
+        );
       if (ownerUserId) return authorizePrivate(found, ownerUserId);
       if (move) {
         await claimPublicAliases(tx, {
@@ -113,7 +136,13 @@ async function index(
       RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
     `;
     if (!podcast) {
-      const winner = await findPodcastIdentity(tx, feedUrl, itunesId);
+      const winner = await findPodcastIdentity(
+        tx,
+        feedUrl,
+        itunesId,
+        undefined,
+        true,
+      );
       if (!winner)
         throw new PodcastIdentityConflict('Unable to resolve podcast identity');
       return ownerUserId

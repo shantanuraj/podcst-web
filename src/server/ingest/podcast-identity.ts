@@ -2,6 +2,7 @@ import type postgres from 'postgres';
 
 export class PodcastIdentityConflict extends Error {}
 export class PodcastAccessDenied extends Error {}
+export class PodcastIdentityBusy extends Error {}
 
 export interface PodcastIdentity {
   id: string | number;
@@ -33,10 +34,18 @@ export async function lockPodcastIdentities(
   `;
 }
 
+function locatorIds(sql: postgres.ISql, feedUrl: string) {
+  return sql`
+    SELECT id FROM podcasts WHERE feed_url = ${feedUrl}
+    UNION
+    SELECT alias.podcast_id FROM podcast_feed_aliases alias
+    JOIN podcasts source ON source.id = alias.podcast_id
+    WHERE alias.feed_url = ${feedUrl} AND source.owner_user_id IS NULL
+  `;
+}
+
 export function locatorMatches(sql: postgres.ISql, feedUrl: string) {
-  return sql`(p.feed_url = ${feedUrl} OR (p.owner_user_id IS NULL AND EXISTS (
-    SELECT 1 FROM podcast_feed_aliases alias WHERE alias.podcast_id = p.id AND alias.feed_url = ${feedUrl}
-  )))`;
+  return sql`p.id IN (${locatorIds(sql, feedUrl)})`;
 }
 
 export async function findPodcastIdentity(
@@ -44,11 +53,17 @@ export async function findPodcastIdentity(
   feedUrl: string,
   itunesId?: number,
   podcastIndexId?: number,
+  forUpdate = false,
 ): Promise<PodcastIdentity | undefined> {
   const matches = await sql<PodcastIdentity[]>`
     SELECT p.id, p.itunes_id, p.podcast_index_id, p.feed_url, p.owner_user_id FROM podcasts p
-    WHERE ${locatorMatches(sql, feedUrl)} OR p.itunes_id = ${itunesId ?? null}::bigint
-      OR p.podcast_index_id = ${podcastIndexId ?? null}::integer
+    WHERE p.id IN (
+      ${locatorIds(sql, feedUrl)}
+      UNION SELECT id FROM podcasts WHERE itunes_id = ${itunesId ?? null}::bigint
+      UNION SELECT id FROM podcasts WHERE podcast_index_id = ${podcastIndexId ?? null}::integer
+    )
+    ORDER BY p.id
+    ${forUpdate ? sql`FOR UPDATE OF p` : sql``}
   `;
   if (matches.length > 1)
     throw new PodcastIdentityConflict(

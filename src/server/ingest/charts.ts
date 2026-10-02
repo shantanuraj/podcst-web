@@ -5,6 +5,7 @@ import {
   claimPublicIdentity,
   findPodcastIdentity,
   lockPodcastIdentities,
+  PodcastIdentityConflict,
 } from './index-podcast';
 
 const TOP_LIMIT = 100;
@@ -132,11 +133,25 @@ export async function storeTopPodcasts(
   if (podcasts.length === 0)
     throw new Error('Refusing to store an empty chart');
 
-  return sql.begin(async (tx) => {
-    await lockPodcastIdentities(
-      tx,
-      podcasts.map(({ feed, itunesId }) => ({ feedUrl: feed, itunesId })),
+  const identities = podcasts.map(({ feed, itunesId }) => ({
+    feedUrl: feed,
+    itunesId,
+  }));
+  for (const podcast of podcasts) {
+    const observed = await findPodcastIdentity(
+      sql,
+      podcast.feed,
+      podcast.itunesId,
     );
+    if (observed)
+      identities.push({
+        feedUrl: observed.feed_url,
+        itunesId: podcast.itunesId,
+      });
+  }
+  const lockedLocators = new Set(identities.map(({ feedUrl }) => feedUrl));
+  return sql.begin(async (tx) => {
+    await lockPodcastIdentities(tx, identities);
     await tx`
       INSERT INTO countries (id, name) VALUES (${locale}, ${locale.toUpperCase()})
       ON CONFLICT (id) DO NOTHING
@@ -150,7 +165,13 @@ export async function storeTopPodcasts(
 
     let newPodcasts = 0;
     for (const p of podcasts) {
-      let podcast = await findPodcastIdentity(tx, p.feed, p.itunesId);
+      let podcast = await findPodcastIdentity(
+        tx,
+        p.feed,
+        p.itunesId,
+        undefined,
+        true,
+      );
       if (!podcast) {
         let [author] =
           await tx`SELECT id FROM authors WHERE name = ${p.author} LIMIT 1`;
@@ -166,14 +187,25 @@ export async function storeTopPodcasts(
             ${p.explicit}, ${p.count}
           )
           ON CONFLICT DO NOTHING
-          RETURNING id, itunes_id, feed_url, owner_user_id
+          RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
         `;
         if (podcast) newPodcasts++;
-        else podcast = await findPodcastIdentity(tx, p.feed, p.itunesId);
+        else
+          podcast = await findPodcastIdentity(
+            tx,
+            p.feed,
+            p.itunesId,
+            undefined,
+            true,
+          );
       }
       if (!podcast)
         throw new Error(`Unable to store Apple podcast ${p.itunesId}`);
 
+      if (!lockedLocators.has(podcast.feed_url))
+        throw new PodcastIdentityConflict(
+          'Canonical source changed during chart import; retry',
+        );
       await claimPublicIdentity(tx, podcast, p.feed, p.itunesId);
       await tx`
         INSERT INTO feed_poll_state (podcast_id) VALUES (${podcast.id})

@@ -45,6 +45,8 @@ export async function getPodcastById(
   id: number,
   userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
+  if (!(await canAccessPodcast(sql, id, userId))) return null;
+  await prepareEpisodeRead(sql, id);
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
@@ -53,8 +55,6 @@ export async function getPodcastById(
   `;
 
   if (!podcast) return null;
-
-  await prepareEpisodeRead(sql, podcast.id);
 
   const episodes = await sql`
     SELECT e.id, e.guid, e.published,
@@ -159,36 +159,36 @@ export const getEpisodeById = cache(
   },
 );
 
-export const getPodcastInfoById = cache(
-  async (
-    id: number,
-    userId: string | null = null,
-  ): Promise<IPodcastInfo | null> => {
-    const [podcast] = await sql`
+async function readPodcastInfoById(
+  id: number,
+  userId: string | null = null,
+): Promise<IPodcastInfo | null> {
+  const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
     WHERE p.id = ${id} AND ${podcastAccess(sql, userId)}
   `;
 
-    if (!podcast) return null;
+  if (!podcast) return null;
 
-    return {
-      id: podcast.id,
-      isPrivate: podcast.owner_user_id !== null,
-      feed: podcast.feed_url,
-      title: podcast.title,
-      author: podcast.author_name,
-      cover: podcast.cover,
-      description: podcast.description || '',
-      link: podcast.website_url,
-      published: podcast.last_published?.getTime() || null,
-      explicit: podcast.explicit,
-      keywords: [],
-      episodeCount: podcast.episode_count || 0,
-    };
-  },
-);
+  return {
+    id: podcast.id,
+    isPrivate: podcast.owner_user_id !== null,
+    feed: podcast.feed_url,
+    title: podcast.title,
+    author: podcast.author_name,
+    cover: podcast.cover,
+    description: podcast.description || '',
+    link: podcast.website_url,
+    published: podcast.last_published?.getTime() || null,
+    explicit: podcast.explicit,
+    keywords: [],
+    episodeCount: podcast.episode_count || 0,
+  };
+}
+
+export const getPodcastInfoById = cache(readPodcastInfoById);
 
 export type { SortDirection, SortField } from './episode-read';
 
@@ -197,13 +197,16 @@ export async function getEpisodesPaginated(
   userId: string | null = null,
 ): Promise<IPaginatedEpisodes> {
   const { podcastId } = options;
-  const podcast = await getPodcastInfoById(podcastId, userId);
+  let podcast: IPodcastInfo | null = null;
+  if (await canAccessPodcast(sql, podcastId, userId)) {
+    await prepareEpisodeRead(sql, podcastId);
+    podcast = await readPodcastInfoById(podcastId, userId);
+  }
 
   if (!podcast) {
     return { episodes: [], total: 0, hasMore: false };
   }
 
-  await prepareEpisodeRead(sql, podcastId);
   const page = await readEpisodePage(sql, options);
 
   return {

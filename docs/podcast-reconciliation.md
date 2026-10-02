@@ -8,7 +8,7 @@ Production plans, inventories, source/account mappings, snapshots, backups and e
 
 [scripts/reconcile-podcasts.ts](../scripts/reconcile-podcasts.ts) reconciles one approved pair per transaction. It defaults to inspection and requires an explicitly selected `RECONCILE_DATABASE_URL`; it does not silently use the app's database configuration.
 
-The canonical record must have a verified provider identity. The duplicate cannot have a conflicting Apple or Podcast Index ID. This tool refuses the future ownership schema until its authorization behavior has been reviewed; do not use it to classify or merge private feeds.
+The canonical record must have a verified provider identity. The duplicate cannot have a conflicting Apple or Podcast Index ID. This tool targets the pre-ownership/pre-alias schema and deliberately refuses the newer ownership fields, alias dependencies and triggers. Extend and retest its reference-preserving policy before using it on the new schema; do not use it to classify or merge private feeds.
 
 For a verified pair:
 

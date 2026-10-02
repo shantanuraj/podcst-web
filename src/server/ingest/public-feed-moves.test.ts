@@ -155,6 +155,9 @@ describe('bounded public HTTP transport', () => {
     'fc00::1',
     '2001:db8::1',
     '2002:7f00:1::',
+    '2001:20::1',
+    '3fff::1',
+    '192.88.99.1',
   ])('blocks nonpublic %s', (address) => {
     expect(isPublicAddress(address)).toBe(false);
   });

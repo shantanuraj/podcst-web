@@ -5,6 +5,7 @@ import {
   lockPodcastIdentities,
   PodcastAccessDenied,
   type PodcastIdentity,
+  PodcastIdentityBusy,
   PodcastIdentityConflict,
 } from './podcast-identity';
 
@@ -28,7 +29,7 @@ export function publicAliasUrl(input: string) {
 }
 
 export async function claimPublicAliases(
-  tx: postgres.ISql,
+  tx: postgres.TransactionSql,
   claim: PublicAliasClaim,
 ) {
   if (!Number.isSafeInteger(claim.podcastId) || claim.podcastId <= 0)
@@ -42,6 +43,12 @@ export async function claimPublicAliases(
   if (claim.aliases.length > 32) throw new TypeError('Too many aliases');
   const expected = publicAliasUrl(claim.expectedFeedUrl);
   const canonical = publicAliasUrl(claim.canonicalFeedUrl ?? expected);
+  if (canonical !== expected) {
+    const [lock] =
+      await tx`SELECT pg_try_advisory_xact_lock(${claim.podcastId}::bigint) AS acquired`;
+    if (!lock.acquired)
+      throw new PodcastIdentityBusy('Source is refreshing; retry verification');
+  }
   const locators = [
     ...new Set([expected, canonical, ...claim.aliases.map(publicAliasUrl)]),
   ];
