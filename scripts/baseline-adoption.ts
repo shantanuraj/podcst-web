@@ -31,6 +31,9 @@ interface RuntimeRole {
   name: string;
   superuser: boolean;
   createRole: boolean;
+  inherit: boolean;
+  bypassRls: boolean;
+  memberships: string[];
   assumesOperator: boolean;
 }
 
@@ -69,14 +72,21 @@ async function binding(sql: postgres.ISql, runtimeName: string) {
   `;
   const [runtime] = await sql<RuntimeRole[]>`
     SELECT r.oid::text AS oid, r.rolname AS name, r.rolsuper AS superuser,
-      r.rolcreaterole AS "createRole", pg_has_role(r.oid, ${target.operatorOid}::oid, 'MEMBER') AS "assumesOperator"
+      r.rolcreaterole AS "createRole", r.rolinherit AS inherit, r.rolbypassrls AS "bypassRls",
+      ARRAY(SELECT roleid::text FROM pg_auth_members WHERE member = r.oid ORDER BY roleid) AS memberships,
+      pg_has_role(r.oid, ${target.operatorOid}::oid, 'MEMBER') AS "assumesOperator"
     FROM pg_roles r WHERE r.rolname = ${runtimeName}
   `;
   if (!runtime) throw new AdoptionError('Runtime role does not exist');
+  if (runtime.memberships.length)
+    throw new AdoptionError(
+      'Runtime role memberships are not supported for adoption',
+    );
   if (
     target.inRecovery ||
     runtime.superuser ||
     runtime.createRole ||
+    runtime.bypassRls ||
     runtime.assumesOperator ||
     runtime.oid === target.operatorOid
   ) {
@@ -170,7 +180,10 @@ export function validateReview(value: unknown): BaselineReview {
     !Number.isFinite(Date.parse(review.inspectedAt)) ||
     stable(review.baseline) !== stable(baseline()) ||
     typeof review.target?.systemId !== 'string' ||
-    typeof review.runtime?.name !== 'string'
+    typeof review.runtime?.name !== 'string' ||
+    !Array.isArray(review.runtime.memberships) ||
+    typeof review.runtime.inherit !== 'boolean' ||
+    typeof review.runtime.bypassRls !== 'boolean'
   ) {
     throw new AdoptionError(
       'Invalid baseline review, evidence digest or baseline checksum',
@@ -245,6 +258,12 @@ export async function adoptBaseline(
       await tx.unsafe(
         `LOCK TABLE ${quote(table.schema)}.${quote(table.name)} IN SHARE UPDATE EXCLUSIVE MODE`,
       );
+    }
+    const sequences = review.observed.inventory.snapshot.objects.filter(
+      (object) => object.kind === 'sequence',
+    );
+    for (const sequence of sequences) {
+      await tx`SELECT pg_catalog.pg_sequence_last_value(${`${quote(sequence.schema)}.${quote(sequence.name)}`}::regclass) IS NOT NULL`;
     }
     const before = await captureSchemaInTransaction(tx);
     if (before.database.ledgerPresent)

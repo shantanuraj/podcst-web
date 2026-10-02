@@ -84,6 +84,9 @@ describe.skipIf(!process.env.PG_BIN)(
       directory = mkdtempSync(join(tmpdir(), 'podcst-adopt-'));
       await sql`CREATE ROLE app_runtime LOGIN`;
       await sql`CREATE ROLE wrong_runtime LOGIN`;
+      await sql`CREATE ROLE adoption_privileged SUPERUSER NOLOGIN`;
+      await sql`CREATE ROLE adoption_group NOLOGIN`;
+      await sql`GRANT adoption_privileged TO adoption_group`;
       await reset();
       reference = inventoryArtifact(await captureSchema(sql), [
         { name: baseline.name, checksum: baseline.checksum },
@@ -96,8 +99,8 @@ describe.skipIf(!process.env.PG_BIN)(
     });
 
     beforeEach(async () => {
-      await sql`ALTER ROLE app_runtime NOCREATEROLE`;
-      await sql`REVOKE pg_write_all_data FROM app_runtime`;
+      await sql`ALTER ROLE app_runtime NOCREATEROLE INHERIT NOBYPASSRLS`;
+      await sql`REVOKE pg_write_all_data, adoption_group FROM app_runtime`;
       await reset();
       await runtimeOwnership();
     });
@@ -333,22 +336,171 @@ describe.skipIf(!process.env.PG_BIN)(
       ).rejects.toThrow('isolated');
     });
 
-    test('rolls all ledger DDL back if inherited runtime powers defeat revocation', async () => {
-      await sql`GRANT pg_write_all_data TO app_runtime`;
+    test('rejects NOINHERIT membership with transitive SET ROLE escalation', async () => {
+      await sql`ALTER ROLE app_runtime NOINHERIT`;
+      await sql`GRANT adoption_group TO app_runtime`;
+      const runtime = postgres({ ...cluster.options, username: 'app_runtime' });
+      try {
+        await runtime`SET ROLE adoption_privileged`;
+        expect(
+          (await runtime`SELECT current_setting('is_superuser') AS elevated`)[0]
+            .elevated,
+        ).toBe('on');
+      } finally {
+        await runtime.end();
+      }
+      await expect(
+        inspectBaseline(sql, reference, 'app_runtime', evidence),
+      ).rejects.toThrow('memberships');
+    });
+
+    test('rejects role membership, inheritance and bypass changes after inspection', async () => {
       const review = await inspectBaseline(
         sql,
         reference,
         'app_runtime',
         evidence,
       );
+      await sql`ALTER ROLE app_runtime NOINHERIT`;
       await expect(adoptBaseline(sql, review, review.digest)).rejects.toThrow(
-        'Runtime role can access',
+        'changed',
+      );
+      await sql`ALTER ROLE app_runtime INHERIT BYPASSRLS`;
+      await expect(adoptBaseline(sql, review, review.digest)).rejects.toThrow(
+        'isolated',
+      );
+      await sql`ALTER ROLE app_runtime NOBYPASSRLS`;
+      await sql`GRANT adoption_group TO app_runtime`;
+      await expect(adoptBaseline(sql, review, review.digest)).rejects.toThrow(
+        'memberships',
       );
       expect(
         (await sql`SELECT to_regnamespace('podcst_migrations') AS ledger`)[0]
           .ledger,
       ).toBeNull();
+    });
+
+    function external(statement: string, user = 'postgres') {
+      return Bun.spawnSync(
+        [
+          join(process.env.PG_BIN ?? '', 'psql'),
+          '-h',
+          cluster.directory,
+          '-p',
+          String(cluster.options.port),
+          '-U',
+          user,
+          '-d',
+          'postgres',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-qAt',
+          '-c',
+          statement,
+        ],
+        { stdout: 'pipe', stderr: 'pipe' },
+      );
+    }
+
+    test('rolls all ledger DDL back if runtime privileges change during adoption', async () => {
+      const review = await inspectBaseline(
+        sql,
+        reference,
+        'app_runtime',
+        evidence,
+      );
+      let injected = false;
+      const connection = postgres({
+        ...cluster.options,
+        debug: (_id, query) => {
+          if (query.includes('CREATE TABLE podcst_migrations.history')) {
+            injected =
+              external('GRANT pg_write_all_data TO app_runtime').exitCode === 0;
+          }
+        },
+      });
+      try {
+        await expect(
+          adoptBaseline(connection, review, review.digest),
+        ).rejects.toThrow('Runtime role can access');
+      } finally {
+        await connection.end();
+      }
+      expect(injected).toBe(true);
+      expect(
+        (await sql`SELECT to_regnamespace('podcst_migrations') AS ledger`)[0]
+          .ledger,
+      ).toBeNull();
       expect((await sql`SELECT count(*)::int AS n FROM users`)[0].n).toBe(1);
+    });
+
+    test('locks sequence definitions without advancing application sequences', async () => {
+      const review = await inspectBaseline(
+        sql,
+        reference,
+        'app_runtime',
+        evidence,
+      );
+      const before = Array.from(
+        await sql`SELECT last_value::text, is_called FROM authors_id_seq`,
+      );
+      let calls = 0;
+      let blocked = false;
+      const connection = postgres({
+        ...cluster.options,
+        debug: (_id, query) => {
+          if (query.includes('pg_sequence_last_value') && ++calls === 2) {
+            const result = external(
+              "SET lock_timeout = '200ms'; ALTER SEQUENCE public.authors_id_seq INCREMENT BY 2",
+            );
+            blocked =
+              result.exitCode !== 0 &&
+              result.stderr.toString().includes('lock timeout');
+          }
+        },
+      });
+      try {
+        await adoptBaseline(connection, review, review.digest);
+      } finally {
+        await connection.end();
+      }
+      expect(calls).toBe(4);
+      expect(blocked).toBe(true);
+      expect(
+        Array.from(
+          await sql`SELECT last_value::text, is_called FROM authors_id_seq`,
+        ),
+      ).toEqual(before);
+    });
+
+    test('sequence locks allow ordinary runtime nextval calls', async () => {
+      const review = await inspectBaseline(
+        sql,
+        reference,
+        'app_runtime',
+        evidence,
+      );
+      let calls = 0;
+      let generated: string | undefined;
+      const connection = postgres({
+        ...cluster.options,
+        debug: (_id, query) => {
+          if (query.includes('pg_sequence_last_value') && ++calls === 2) {
+            const result = external(
+              "SET lock_timeout = '200ms'; SELECT nextval('public.authors_id_seq')",
+              'app_runtime',
+            );
+            if (result.exitCode === 0)
+              generated = result.stdout.toString().trim();
+          }
+        },
+      });
+      try {
+        await adoptBaseline(connection, review, review.digest);
+      } finally {
+        await connection.end();
+      }
+      expect(generated).toBe('1');
     });
 
     test('shares the normal runner lock and refuses concurrent adoption', async () => {
