@@ -13,7 +13,7 @@ import {
   readEpisodePage,
 } from './episode-read';
 import { refreshFeed } from './feed-refresh';
-import { indexPrivatePodcast } from './index-podcast';
+import { findPodcastIdentity, indexPrivatePodcast } from './index-podcast';
 
 export async function ingestPodcast(
   feedUrl: string,
@@ -37,67 +37,8 @@ export async function getPodcastByFeedUrl(
   feedUrl: string,
   userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
-  const [podcast] = await sql`
-    SELECT p.*, a.name as author_name
-    FROM podcasts p
-    JOIN authors a ON a.id = p.author_id
-    WHERE p.feed_url = ${feedUrl} AND ${podcastAccess(sql, userId)}
-  `;
-
-  if (!podcast) {
-    return null;
-  }
-
-  await prepareEpisodeRead(sql, podcast.id);
-
-  const episodes = await sql`
-    SELECT e.id, e.guid, e.published,
-           c.title, c.summary, c.duration, c.episode_art,
-           c.file_url, c.file_length, c.file_type
-    FROM episodes e
-    LEFT JOIN episode_content c ON c.episode_id = e.id
-    WHERE e.podcast_id = ${podcast.id}
-    ORDER BY e.published DESC
-  `;
-
-  return {
-    id: podcast.id,
-    isPrivate: podcast.owner_user_id !== null,
-    feed: feedUrl,
-    title: podcast.title,
-    author: podcast.author_name,
-    cover: podcast.cover,
-    description: podcast.description || '',
-    link: podcast.website_url,
-    published: podcast.last_published?.getTime() || null,
-    explicit: podcast.explicit,
-    keywords: [],
-    episodes: episodes.map(
-      (ep): IEpisodeInfo => ({
-        id: ep.id,
-        podcastId: podcast.id,
-        isPrivate: podcast.owner_user_id !== null,
-        feed: feedUrl,
-        podcastTitle: podcast.title,
-        guid: ep.guid,
-        title: ep.title,
-        summary: ep.summary,
-        showNotes: ep.summary || '',
-        published: ep.published?.getTime() || null,
-        duration: ep.duration,
-        cover: podcast.cover,
-        episodeArt: ep.episode_art,
-        explicit: podcast.explicit,
-        link: null,
-        author: podcast.author_name,
-        file: {
-          url: ep.file_url,
-          length: Number(ep.file_length) || 0,
-          type: ep.file_type || 'audio/mpeg',
-        },
-      }),
-    ),
-  };
+  const podcast = await findPodcastIdentity(sql, feedUrl);
+  return podcast ? getPodcastById(Number(podcast.id), userId) : null;
 }
 
 export async function getPodcastById(

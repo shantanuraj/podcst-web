@@ -12,6 +12,7 @@ import {
   type PollState,
   type RefreshMode,
 } from './feed-schedule';
+import { resolvePublicFeedMove } from './public-feed-moves';
 
 interface FeedMeta {
   etag: string | null;
@@ -19,8 +20,10 @@ interface FeedMeta {
   hash: string | null;
 }
 
-type FeedFetchResult = FeedMeta &
-  ({ status: 'updated'; data: IEpisodeListing } | { status: 'not_modified' });
+type FeedFetchResult = FeedMeta & { publicRedirect?: true } & (
+    | { status: 'updated'; data: IEpisodeListing }
+    | { status: 'not_modified' }
+  );
 
 export type RefreshResult =
   | 'updated'
@@ -59,8 +62,11 @@ export async function fetchFeed(
     signal: AbortSignal.timeout(30_000),
   });
 
+  const movement =
+    res.redirected && !privateFeed ? { publicRedirect: true as const } : {};
   if (res.status === 304 && previous) {
     return {
+      ...movement,
       status: 'not_modified',
       etag: res.headers.get('etag') ?? previous.etag,
       lastModified: res.headers.get('last-modified') ?? previous.lastModified,
@@ -76,12 +82,12 @@ export async function fetchFeed(
     hash: createHash('sha256').update(body).digest('hex'),
   };
   if (previous?.hash && previous.hash === meta.hash) {
-    return { status: 'not_modified', ...meta };
+    return { status: 'not_modified', ...meta, ...movement };
   }
 
   const data = await adaptFeed(body, !privateFeed);
   if (!data) throw new Error('Invalid feed');
-  return { status: 'updated', data, ...meta };
+  return { status: 'updated', data, ...meta, ...movement };
 }
 
 export async function savePollState(
@@ -113,7 +119,8 @@ export async function refreshFeed(
   podcastId: number,
   mode: RefreshMode = 'stale',
 ): Promise<RefreshResult> {
-  return sql.begin(async (tx): Promise<RefreshResult> => {
+  let publicRedirect = false;
+  const outcome = await sql.begin(async (tx): Promise<RefreshResult> => {
     const [lock] = await tx`
       SELECT pg_try_advisory_xact_lock(${podcastId}::bigint) AS acquired
     `;
@@ -150,6 +157,7 @@ export async function refreshFeed(
           podcast.owner_user_id !== null,
         );
 
+        publicRedirect = result.publicRedirect === true;
         if (result.status === 'updated') {
           const feed = result.data;
           const cover = sanitize(feed.cover) || podcast.feed_url;
@@ -202,4 +210,22 @@ export async function refreshFeed(
       return 'error';
     }
   });
+  if (publicRedirect && (outcome === 'updated' || outcome === 'not_modified')) {
+    try {
+      const move = await resolvePublicFeedMove(sql, podcastId);
+      if (
+        move.status === 'identity_conflict' ||
+        move.status === 'verification_pending'
+      ) {
+        console.warn(
+          `Public feed move requires review for podcast ${podcastId}: ${move.status}`,
+        );
+      }
+    } catch {
+      console.warn(
+        `Public feed move verification failed for podcast ${podcastId}`,
+      );
+    }
+  }
+  return outcome;
 }

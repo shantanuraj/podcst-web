@@ -1,92 +1,26 @@
 import type postgres from 'postgres';
 import { upsertEpisodes } from './episodes';
+import { claimPublicAliases } from './feed-aliases';
 import { fetchFeed, savePollState } from './feed-refresh';
 import { getPollInterval } from './feed-schedule';
+import {
+  claimPublicIdentity,
+  findPodcastIdentity,
+  lockPodcastIdentities,
+  PodcastAccessDenied,
+  type PodcastIdentity,
+  PodcastIdentityConflict,
+} from './podcast-identity';
+import { verifyPublicFeedMove } from './public-feed-moves';
 
-export class PodcastIdentityConflict extends Error {}
-export class PodcastAccessDenied extends Error {}
-
-export interface PodcastIdentity {
-  id: string | number;
-  itunes_id: string | number | null;
-  feed_url: string;
-  owner_user_id: string | null;
-}
-
-export async function lockPodcastIdentities(
-  sql: postgres.ISql,
-  identities: { feedUrl: string; itunesId?: number }[],
-) {
-  const keys = identities.flatMap(({ feedUrl, itunesId }) => [
-    { namespace: 'podcast:feed', value: feedUrl },
-    ...(itunesId === undefined
-      ? []
-      : [{ namespace: 'podcast:itunes', value: String(itunesId) }]),
-  ]);
-  await sql`
-    SELECT pg_advisory_xact_lock(namespace, identity) FROM (
-      SELECT DISTINCT hashtext(key->>'namespace') AS namespace,
-        hashtext(key->>'value') AS identity
-      FROM jsonb_array_elements(${sql.json(keys)}::jsonb) AS key
-      ORDER BY namespace, identity
-    ) claims
-  `;
-}
-
-export async function findPodcastIdentity(
-  sql: postgres.ISql,
-  feedUrl: string,
-  itunesId?: number,
-): Promise<PodcastIdentity | undefined> {
-  const matches = await sql<PodcastIdentity[]>`
-    SELECT id, itunes_id, feed_url, owner_user_id FROM podcasts
-    WHERE feed_url = ${feedUrl} OR itunes_id = ${itunesId ?? null}::bigint
-  `;
-  if (matches.length > 1) {
-    throw new PodcastIdentityConflict(
-      'Feed and provider identify different podcasts',
-    );
-  }
-  return matches[0];
-}
-
-export async function claimPublicIdentity(
-  sql: postgres.ISql,
-  podcast: PodcastIdentity,
-  feedUrl: string,
-  itunesId?: number,
-): Promise<number> {
-  if (
-    podcast.owner_user_id !== null &&
-    (itunesId === undefined || podcast.feed_url !== feedUrl)
-  ) {
-    throw new PodcastAccessDenied('Feed unavailable');
-  }
-  if (itunesId !== undefined) {
-    if (!Number.isSafeInteger(itunesId) || itunesId <= 0)
-      throw new PodcastIdentityConflict('Invalid public provider identity');
-    if (podcast.itunes_id !== null && Number(podcast.itunes_id) !== itunesId) {
-      throw new PodcastIdentityConflict('Feed belongs to another Apple ID');
-    }
-    if (
-      podcast.owner_user_id === null &&
-      podcast.itunes_id !== null &&
-      Number(podcast.itunes_id) === itunesId
-    )
-      return Number(podcast.id);
-    const [claimed] = await sql`
-      UPDATE podcasts SET itunes_id = ${itunesId}, owner_user_id = NULL, updated_at = now()
-      WHERE id = ${podcast.id} AND feed_url = ${feedUrl}
-        AND (itunes_id IS NULL OR itunes_id = ${itunesId})
-      RETURNING id
-    `;
-    if (!claimed)
-      throw new PodcastIdentityConflict(
-        'Source changed during public verification',
-      );
-  }
-  return Number(podcast.id);
-}
+export {
+  claimPublicIdentity,
+  findPodcastIdentity,
+  lockPodcastIdentities,
+  PodcastAccessDenied,
+  type PodcastIdentity,
+  PodcastIdentityConflict,
+} from './podcast-identity';
 
 function authorizePrivate(podcast: PodcastIdentity, userId: string) {
   if (podcast.owner_user_id !== null && podcast.owner_user_id !== userId) {
@@ -100,6 +34,7 @@ async function index(
   feedUrl: string,
   ownerUserId: string | null,
   itunesId?: number,
+  verifyMove = verifyPublicFeedMove,
 ): Promise<number> {
   const existing = await findPodcastIdentity(sql, feedUrl, itunesId);
   if (existing && ownerUserId) return authorizePrivate(existing, ownerUserId);
@@ -110,14 +45,52 @@ async function index(
     : await fetchFeed(feedUrl, undefined, ownerUserId !== null);
   if (fetched && fetched.status !== 'updated')
     throw new Error('Feed was not returned');
+  const verification =
+    !ownerUserId && fetched?.publicRedirect ? await verifyMove(feedUrl) : null;
+  const move =
+    verification?.status === 'verified' ? verification.evidence : null;
+  if (move && move.requestedUrl !== feedUrl)
+    throw new PodcastIdentityConflict(
+      'Move evidence identifies another source',
+    );
+  const locators = [
+    ...new Set([
+      feedUrl,
+      ...(move?.aliases ?? []),
+      ...(move ? [move.canonicalFeedUrl] : []),
+    ]),
+  ];
 
   return sql.begin(async (tx) => {
-    await lockPodcastIdentities(tx, [{ feedUrl, itunesId }]);
-    const found = await findPodcastIdentity(tx, feedUrl, itunesId);
-    if (found)
-      return ownerUserId
-        ? authorizePrivate(found, ownerUserId)
-        : claimPublicIdentity(tx, found, feedUrl, itunesId);
+    await lockPodcastIdentities(
+      tx,
+      locators.map((feedUrl) => ({ feedUrl, itunesId })),
+    );
+    let found: PodcastIdentity | undefined;
+    for (const locator of locators) {
+      const match = await findPodcastIdentity(tx, locator, itunesId);
+      if (found && match && Number(found.id) !== Number(match.id))
+        throw new PodcastIdentityConflict(
+          'Move identifies different existing sources',
+        );
+      found ??= match;
+    }
+    if (found) {
+      if (ownerUserId) return authorizePrivate(found, ownerUserId);
+      if (move) {
+        await claimPublicAliases(tx, {
+          podcastId: Number(found.id),
+          expectedFeedUrl: found.feed_url,
+          aliases: locators,
+          evidence: {
+            type: 'permanent_redirect',
+            reference: move.reference,
+            details: move.details,
+          },
+        });
+      }
+      return claimPublicIdentity(tx, found, feedUrl, itunesId);
+    }
     if (fetched?.status !== 'updated')
       throw new Error('Feed changed during import; retry');
     const { data } = fetched;
@@ -132,12 +105,12 @@ async function index(
         itunes_id, owner_user_id, feed_url, title, author_id, description, cover,
         website_url, explicit, episode_count, last_published
       ) VALUES (
-        ${itunesId ?? null}, ${ownerUserId}, ${feedUrl}, ${data.title}, ${author.id},
+        ${itunesId ?? null}, ${ownerUserId}, ${move?.canonicalFeedUrl ?? feedUrl}, ${data.title}, ${author.id},
         ${data.description}, ${data.cover}, ${data.link}, ${data.explicit},
         ${data.episodes.length}, ${data.published ? new Date(data.published) : null}
       )
       ON CONFLICT DO NOTHING
-      RETURNING id, itunes_id, feed_url, owner_user_id
+      RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
     `;
     if (!podcast) {
       const winner = await findPodcastIdentity(tx, feedUrl, itunesId);
@@ -148,6 +121,17 @@ async function index(
         : claimPublicIdentity(tx, winner, feedUrl, itunesId);
     }
     const id = Number(podcast.id);
+    if (move)
+      await claimPublicAliases(tx, {
+        podcastId: id,
+        expectedFeedUrl: podcast.feed_url,
+        aliases: locators,
+        evidence: {
+          type: 'permanent_redirect',
+          reference: move.reference,
+          details: move.details,
+        },
+      });
     await upsertEpisodes(tx, id, data.cover, data.episodes);
     await savePollState(tx, id, fetched, getPollInterval(null));
     return id;
@@ -158,8 +142,9 @@ export function indexPodcast(
   sql: postgres.Sql,
   feedUrl: string,
   itunesId?: number,
+  verifyMove = verifyPublicFeedMove,
 ) {
-  return index(sql, feedUrl, null, itunesId);
+  return index(sql, feedUrl, null, itunesId, verifyMove);
 }
 
 export function indexPrivatePodcast(
