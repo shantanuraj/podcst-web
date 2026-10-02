@@ -183,12 +183,20 @@ function ordered(objects: CatalogObject[]) {
 export async function captureSchema(
   sql: postgres.Sql,
 ): Promise<SchemaSnapshot> {
-  return sql.begin('isolation level repeatable read read only', async (tx) => {
-    await tx`SET LOCAL search_path TO pg_catalog`;
-    await tx`SET LOCAL statement_timeout TO '10s'`;
-    await tx`SET LOCAL lock_timeout TO '1s'`;
-    await tx`SET LOCAL idle_in_transaction_session_timeout TO '15s'`;
-    const [database] = await tx`
+  return sql.begin(
+    'isolation level repeatable read read only',
+    captureSchemaInTransaction,
+  );
+}
+
+export async function captureSchemaInTransaction(
+  tx: postgres.TransactionSql,
+): Promise<SchemaSnapshot> {
+  await tx`SET LOCAL search_path TO pg_catalog`;
+  await tx`SET LOCAL statement_timeout TO '10s'`;
+  await tx`SET LOCAL lock_timeout TO '1s'`;
+  await tx`SET LOCAL idle_in_transaction_session_timeout TO '15s'`;
+  const [database] = await tx`
       SELECT current_database() AS name, current_user AS role,
         current_setting('server_version_num')::int AS "serverVersion",
         pg_encoding_to_char(d.encoding) AS encoding, d.datcollate AS collation, d.datctype AS ctype,
@@ -197,50 +205,49 @@ export async function captureSchema(
         to_regnamespace('podcst_migrations') IS NOT NULL AS "ledgerPresent"
       FROM pg_database d WHERE d.datname = current_database()
     `;
-    if (database.serverVersion < 160000)
-      throw new InventoryError(
-        'Schema inventory requires PostgreSQL 16 or newer',
-      );
-    const objects: CatalogObject[] = [];
-    for (const [kind, query] of Object.entries(queries)) {
-      const rows = await tx.unsafe(`${scope} ${query} LIMIT $1`, [
-        objectLimit + 1,
-      ]);
-      for (const row of rows) {
-        if (row.access?.acl) row.access.acl.sort();
-        objects.push({
-          kind,
-          schema: row.schema,
-          parent: row.parent,
-          name: row.name,
-          definition: row.definition,
-          access: row.access ?? null,
-          manualReview: row.manual_review ?? false,
-        });
-      }
-      if (objects.length > objectLimit)
-        throw new InventoryError('Schema inventory exceeds the object limit');
-      if (Buffer.byteLength(stable(objects)) > artifactLimit)
-        throw new InventoryError('Schema inventory exceeds the size limit');
+  if (database.serverVersion < 160000)
+    throw new InventoryError(
+      'Schema inventory requires PostgreSQL 16 or newer',
+    );
+  const objects: CatalogObject[] = [];
+  for (const [kind, query] of Object.entries(queries)) {
+    const rows = await tx.unsafe(`${scope} ${query} LIMIT $1`, [
+      objectLimit + 1,
+    ]);
+    for (const row of rows) {
+      if (row.access?.acl) row.access.acl.sort();
+      objects.push({
+        kind,
+        schema: row.schema,
+        parent: row.parent,
+        name: row.name,
+        definition: row.definition,
+        access: row.access ?? null,
+        manualReview: row.manual_review ?? false,
+      });
     }
-    const estimates = await tx.unsafe(
-      `${scope}
+    if (objects.length > objectLimit)
+      throw new InventoryError('Schema inventory exceeds the object limit');
+    if (Buffer.byteLength(stable(objects)) > artifactLimit)
+      throw new InventoryError('Schema inventory exceeds the size limit');
+  }
+  const estimates = await tx.unsafe(
+    `${scope}
       SELECT c.nspname AS schema, c.relname AS name, c.relkind AS kind,
         CASE WHEN c.reltuples >= 0 THEN c.reltuples::text END AS "estimatedRows",
         (c.relpages::bigint * current_setting('block_size')::bigint)::text AS "estimatedRelationBytes",
         (t.relpages::bigint * current_setting('block_size')::bigint)::text AS "estimatedToastBytes"
       FROM relations c LEFT JOIN pg_class t ON t.oid = c.reltoastrelid
       WHERE c.relkind IN ('r', 'p', 'm', 'i', 'S') ORDER BY c.nspname, c.relname LIMIT $1`,
-      [objectLimit + 1],
-    );
-    if (estimates.length > objectLimit)
-      throw new InventoryError('Schema estimates exceed the object limit');
-    return {
-      database: database as SchemaSnapshot['database'],
-      objects: ordered(objects),
-      estimates: Array.from(estimates),
-    };
-  });
+    [objectLimit + 1],
+  );
+  if (estimates.length > objectLimit)
+    throw new InventoryError('Schema estimates exceed the object limit');
+  return {
+    database: database as SchemaSnapshot['database'],
+    objects: ordered(objects),
+    estimates: Array.from(estimates),
+  };
 }
 
 export function inventoryArtifact(
@@ -321,10 +328,17 @@ export function validateInventory(value: unknown): InventoryArtifact {
 export function compareSchemas(
   expected: InventoryArtifact,
   actual: InventoryArtifact,
+  through?: string,
 ) {
   validateInventory(expected);
   validateInventory(actual);
-  const migrations = loadMigrations().map(({ name, checksum }) => ({
+  const active = loadMigrations();
+  const end =
+    through === undefined
+      ? active.length - 1
+      : active.findIndex((migration) => migration.name === through);
+  if (end < 0) throw new InventoryError('Unknown migration reference boundary');
+  const migrations = active.slice(0, end + 1).map(({ name, checksum }) => ({
     name,
     checksum,
   }));

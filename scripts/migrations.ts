@@ -198,15 +198,36 @@ export async function migrationStatus(
   );
 }
 
+export async function lockMigrations(sql: postgres.ISql) {
+  const [lock] =
+    await sql`SELECT pg_catalog.pg_try_advisory_xact_lock(${lockKey}, 0) AS acquired`;
+  if (!lock.acquired)
+    throw new MigrationError('Another migration runner holds the lock');
+}
+
+export async function createMigrationLedger(sql: postgres.ISql) {
+  await sql`CREATE SCHEMA podcst_migrations`;
+  await sql`
+    CREATE TABLE podcst_migrations.history (
+      name text PRIMARY KEY,
+      checksum text NOT NULL CHECK (checksum ~ '^[a-f0-9]{64}$'),
+      applied_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+      method text NOT NULL DEFAULT 'applied' CHECK (method IN ('applied', 'adopted')),
+      review_digest text,
+      CHECK (
+        (method = 'applied' AND review_digest IS NULL) OR
+        (method = 'adopted' AND review_digest IS NOT NULL AND review_digest ~ '^[a-f0-9]{64}$')
+      )
+    )
+  `;
+}
+
 export async function migrate(
   sql: postgres.Sql,
   migrations = loadMigrations(),
 ): Promise<string[]> {
   return sql.begin(async (tx) => {
-    const [lock] =
-      await tx`SELECT pg_try_advisory_xact_lock(${lockKey}, 0) AS acquired`;
-    if (!lock.acquired)
-      throw new MigrationError('Another migration runner holds the lock');
+    await lockMigrations(tx);
     await tx`SET LOCAL search_path TO public`;
     await tx`SET LOCAL standard_conforming_strings TO on`;
     await tx`SET LOCAL lock_timeout TO '5s'`;
@@ -220,16 +241,7 @@ export async function migrate(
     const pending = migrations.slice(
       status.migrations.filter((row) => row.state === 'applied').length,
     );
-    if (status.state === 'empty') {
-      await tx`CREATE SCHEMA podcst_migrations`;
-      await tx`
-        CREATE TABLE podcst_migrations.history (
-          name text PRIMARY KEY,
-          checksum text NOT NULL CHECK (checksum ~ '^[a-f0-9]{64}$'),
-          applied_at timestamptz NOT NULL DEFAULT clock_timestamp()
-        )
-      `;
-    }
+    if (status.state === 'empty') await createMigrationLedger(tx);
     for (const migration of pending) {
       await tx.unsafe(migration.source);
       await tx`

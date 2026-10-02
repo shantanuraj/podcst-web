@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 
-import { lstatSync, realpathSync } from 'node:fs';
-import { isAbsolute, relative, sep } from 'node:path';
+import { lstatSync } from 'node:fs';
 import {
   ArtifactError,
   digest,
-  protectedPath,
+  protectedExternalPath,
   readProtected,
   writeProtected,
 } from './lib/artifacts';
@@ -51,13 +50,7 @@ function argumentsFor(args: string[]) {
 }
 
 function outsideRepository(path: string) {
-  const canonical = protectedPath(path);
-  const root = realpathSync(new URL('../', import.meta.url));
-  const child = relative(root, canonical);
-  if (!isAbsolute(child) && !child.startsWith(`..${sep}`)) {
-    throw new InventoryError('Schema artifacts must be outside the repository');
-  }
-  return canonical;
+  return protectedExternalPath(path, new URL('../', import.meta.url));
 }
 
 async function main(args: string[]) {

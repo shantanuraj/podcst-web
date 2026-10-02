@@ -10,7 +10,15 @@ import {
   realpathSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 
 export class ArtifactError extends Error {}
 
@@ -50,6 +58,17 @@ export function protectedPath(path: string): string {
   if (stat.uid !== process.getuid?.())
     throw new ArtifactError('Artifact directory must belong to the operator');
   return join(directory, basename(path));
+}
+
+export function protectedExternalPath(
+  path: string,
+  root: string | URL,
+): string {
+  const canonical = protectedPath(path);
+  const child = relative(realpathSync(root), canonical);
+  if (!isAbsolute(child) && !child.startsWith(`..${sep}`))
+    throw new ArtifactError('Artifacts must be outside the repository');
+  return canonical;
 }
 
 export function readProtected(path: string, maxBytes = Infinity) {
