@@ -398,6 +398,76 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(podcast.shareURL?.absoluteString, podcast.link)
     }
 
+    func testForegroundProgressFlushRetriesWithoutReloadingLibraryOrPlayback() async throws {
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: directory)
+        GuestLibraryURLProtocol.handler = { request in
+            try request.respond(["user": User(id: "listener", email: "listener@example.test")])
+        }
+        await fixture.session.restore()
+        var offlineRequests = 0
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.httpMethod, "PUT")
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            offlineRequests += 1
+            request.fail(URLError(.notConnectedToInternet))
+        }
+        let episode = Episode(id: 42, guid: "downloaded", feed: "https://example.test/feed", title: "Downloaded", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        library.saveProgress(.init(episode: episode, position: 123, completed: false))
+        await library.flushProgress()
+        XCTAssertGreaterThan(offlineRequests, 0)
+        XCTAssertNotNil(library.error)
+        var retriedRequests = 0
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.httpMethod, "PUT")
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            retriedRequests += 1
+            try request.respond(["success": true])
+        }
+        await library.flushProgress()
+        await library.flushProgress()
+        XCTAssertEqual(retriedRequests, 1)
+        XCTAssertNil(library.error)
+    }
+
+    func testProgressFlushCannotReplayRetiredAccountDuringOrAfterSwitch() async throws {
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: directory)
+        GuestLibraryURLProtocol.handler = { request in
+            try request.respond(["user": User(id: "first", email: "listener@example.test")])
+        }
+        await fixture.session.restore()
+        GuestLibraryURLProtocol.handler = { request in
+            request.fail(URLError(.notConnectedToInternet))
+        }
+        let episode = Episode(id: 42, guid: "private", feed: "https://example.test/feed", title: "Private", file: EpisodeFile(url: "https://example.test/audio.mp3"), isPrivate: true)
+        library.saveProgress(.init(episode: episode, position: 123, completed: false))
+        await library.flushProgress()
+        fixture.session.prepareAccountChange = { _ in
+            await library.flushProgress()
+            await library.resetProgressSync()
+        }
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/auth/session")
+            try request.respond(["user": User(id: "second", email: "listener@example.test")])
+        }
+        await fixture.session.restore()
+        await library.flushProgress()
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/auth/session")
+            try request.respond(["user": User(id: "first", email: "listener@example.test")])
+        }
+        await fixture.session.restore()
+        await library.flushProgress()
+        XCTAssertEqual(fixture.session.user?.id, "first")
+    }
+
     func testPrivateSourcesDoNotOfferPublicSharing() throws {
         var podcast = Podcast(feed: "https://example.test/feed?token=private", title: "Private", link: "https://example.test/show", isPrivate: true)
         let episode = Episode(guid: "private", feed: podcast.feed, title: "Private episode", link: "https://example.test/episode", file: EpisodeFile(url: "https://example.test/private.mp3"), isPrivate: true)

@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 
 enum AppTab: Hashable {
     case discover
@@ -40,6 +41,7 @@ struct RootView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackController.self) private var playback
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Appearance.key) private var appearance = Appearance.system
     @AppStorage("onboarded") private var onboarded = false
     @State private var router = Router()
@@ -81,8 +83,30 @@ struct RootView: View {
                 playback.restore(progress.episode, at: progress.position)
             }
         }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await library.flushProgress() }
+        }
+        .task(id: session.user?.id) {
+            guard session.user != nil else { return }
+            await retryProgressWhenConnected()
+        }
         .downloadAlerts()
         .font(.sans(.body))
+    }
+
+    private func retryProgressWhenConnected() async {
+        let monitor = NWPathMonitor()
+        let changes = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            monitor.pathUpdateHandler = { path in
+                if path.status == .satisfied { continuation.yield(()) }
+            }
+            continuation.onTermination = { _ in monitor.cancel() }
+            monitor.start(queue: DispatchQueue(label: "app.podcst.progress-connectivity"))
+        }
+        defer { monitor.cancel() }
+        for await _ in changes {
+            await library.flushProgress()
+        }
     }
 
     private var onboarding: Binding<Bool> {

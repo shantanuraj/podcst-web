@@ -14,6 +14,7 @@ final class PlaybackProgressWriter {
     private var inFlight: Update?
     private var worker: Task<Void, Never>?
     private var generation = UUID()
+    private var retryRequested = false
 
     init(storageURL: URL? = nil, send: @escaping @MainActor (Update) async throws -> Void) {
         self.send = send
@@ -35,10 +36,11 @@ final class PlaybackProgressWriter {
     }
 
     private func start() {
-        guard worker == nil else { return }
+        guard worker == nil, !pending.isEmpty else { return }
         let token = generation
         worker = Task { [weak self] in
             while let self, !Task.isCancelled, self.generation == token, !self.pending.isEmpty {
+                self.retryRequested = false
                 let next = self.pending.removeFirst()
                 self.inFlight = next
                 do { try await self.send(next) }
@@ -49,6 +51,7 @@ final class PlaybackProgressWriter {
                     }
                     self.inFlight = nil
                     self.persist()
+                    if self.retryRequested { continue }
                     self.worker = nil
                     return
                 }
@@ -62,12 +65,14 @@ final class PlaybackProgressWriter {
     }
 
     func flush() async {
+        retryRequested = worker != nil
         start()
         await worker?.value
     }
 
     func reset() async {
         generation = UUID()
+        retryRequested = false
         pending.removeAll()
         inFlight = nil
         persist()
