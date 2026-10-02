@@ -79,4 +79,30 @@ final class AudioPreferencesTests: XCTestCase {
         await writer.flush()
         XCTAssertEqual(sent, [1])
     }
+
+    func testReconnectDuringFailedWriteRetriesTheLatestPausedPosition() async {
+        var release: CheckedContinuation<Void, Error>?
+        var sent: [PlaybackProgressWriter.Update] = []
+        let writer = PlaybackProgressWriter { update in
+            sent.append(update)
+            if sent.count == 1 {
+                try await withCheckedThrowingContinuation { release = $0 }
+            }
+        }
+        writer.submit(.init(episodeID: 1, position: 60, completed: false))
+        while release == nil { await Task.yield() }
+        writer.submit(.init(episodeID: 1, position: 15, completed: false))
+        let requested = expectation(description: "Reconnect requested progress retry")
+        let reconnect = Task {
+            requested.fulfill()
+            await writer.flush()
+        }
+        await fulfillment(of: [requested], timeout: 2)
+        release?.resume(throwing: URLError(.networkConnectionLost))
+        await reconnect.value
+        XCTAssertEqual(sent, [
+            .init(episodeID: 1, position: 60, completed: false),
+            .init(episodeID: 1, position: 15, completed: false)
+        ])
+    }
 }

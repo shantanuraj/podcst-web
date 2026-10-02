@@ -14,15 +14,18 @@ public final class LibraryStore {
     private let api: APIClient
     private let session: SessionStore
     private let defaults: UserDefaults
+    private let progressDirectory: URL
     private let guestKey = "guest.library.podcasts"
     private static let releasesPerPodcast = 2
     @ObservationIgnored private var progressWriter: PlaybackProgressWriter?
     @ObservationIgnored private var progressAccountID: String?
 
-    public init(api: APIClient, session: SessionStore, defaults: UserDefaults = .standard) {
+    public init(api: APIClient, session: SessionStore, defaults: UserDefaults = .standard, progressDirectory: URL? = nil) {
         self.api = api
         self.session = session
         self.defaults = defaults
+        self.progressDirectory = progressDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Podcst/Progress", isDirectory: true)
         let cached = session.user == nil ? nil : api.cachedSubscriptions()
         podcasts = session.user == nil ? loadGuest() : cached ?? []
         hasLoaded = cached != nil || !api.hasSession
@@ -135,12 +138,16 @@ public final class LibraryStore {
         writer(for: accountID).submit(.init(episodeID: episodeID, position: update.position, completed: update.completed))
     }
 
+    func flushProgress() async {
+        guard !Task.isCancelled, !session.isLoading,
+              let accountID = session.user?.id, api.accountID == accountID else { return }
+        await writer(for: accountID).flush()
+    }
+
     private func writer(for accountID: String) -> PlaybackProgressWriter {
         if progressAccountID == accountID, let progressWriter { return progressWriter }
         let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Podcst/Progress", isDirectory: true)
-        let writer = PlaybackProgressWriter(storageURL: directory.appendingPathComponent(key + ".json")) { [weak self] value in
+        let writer = PlaybackProgressWriter(storageURL: progressDirectory.appendingPathComponent(key + ".json")) { [weak self] value in
             guard let self, self.session.user?.id == accountID, self.api.accountID == accountID else { throw CancellationError() }
             do {
                 try await self.api.saveProgress(episodeID: value.episodeID, position: value.position, completed: value.completed)
