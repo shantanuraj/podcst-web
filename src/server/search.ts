@@ -1,5 +1,6 @@
 import type postgres from 'postgres';
 import type { IPodcastSearchResult } from '@/types';
+import { locatorMatches } from './ingest/podcast-identity';
 import { podcastAccess } from './podcast-access';
 
 export async function matchSearchResults(
@@ -82,7 +83,7 @@ export async function searchPodcastsByFeedUrl(
       a.name as author
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
-    WHERE p.feed_url = ${feedUrl} AND ${podcastAccess(sql, userId)}
+    WHERE ${locatorMatches(sql, feedUrl)} AND ${podcastAccess(sql, userId)}
   `;
 
   if (!row) return null;
