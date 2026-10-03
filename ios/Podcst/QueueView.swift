@@ -46,6 +46,7 @@ struct QueueView: View {
                 EmptyState(systemImage: "text.line.first.and.arrowtriangle.forward", title: "Your queue is empty", message: "Add episodes as you browse and they will appear here.")
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .podcstPage()
         .screenHeader("Queue") {
             if !playback.upNext.isEmpty {
