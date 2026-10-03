@@ -6,7 +6,18 @@ import { refreshTopCharts } from '../src/server/ingest/charts';
 import { refreshFeed } from '../src/server/ingest/feed-refresh';
 
 const POLL_CONCURRENCY = 10;
-const EPISODES_ONLY = process.argv.includes('--episodes-only');
+export function parseChartJobArgs(args: string[]) {
+  if (
+    args.some((arg) => !['--episodes-only', '--charts-only'].includes(arg)) ||
+    new Set(args).size !== args.length ||
+    args.length > 1
+  )
+    throw new Error('Choose at most one of --charts-only or --episodes-only');
+  return {
+    charts: !args.includes('--episodes-only'),
+    episodes: !args.includes('--charts-only'),
+  };
+}
 
 async function pollMissingEpisodes(sql: postgres.Sql, locales: string[]) {
   const podcasts = await sql<{ id: string | number }[]>`
@@ -51,7 +62,28 @@ async function pollMissingEpisodes(sql: postgres.Sql, locales: string[]) {
   }
 }
 
+export async function runChartJob(
+  sql: postgres.Sql,
+  args: string[],
+  jobs = { refreshCharts: refreshTopCharts, pollEpisodes: pollMissingEpisodes },
+) {
+  const mode = parseChartJobArgs(args);
+  const locales = [...i18n.locales];
+  let failedLocales: string[] = [];
+  if (mode.charts) {
+    const result = await jobs.refreshCharts(sql, locales);
+    failedLocales = result.failedLocales;
+    console.log(
+      `Charts: ${result.stored} stored, ${result.newPodcasts} new, ${failedLocales.length} countries failed`,
+    );
+  }
+  if (mode.episodes) await jobs.pollEpisodes(sql, locales);
+  return { failedLocales };
+}
+
 async function main() {
+  const args = process.argv.slice(2);
+  parseChartJobArgs(args);
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL required');
 
@@ -60,29 +92,20 @@ async function main() {
     idle_timeout: 20,
     ...(process.env.PGHOST && { host: process.env.PGHOST }),
   });
-  const locales = [...i18n.locales];
 
   try {
-    if (!EPISODES_ONLY) {
-      const { stored, newPodcasts, failedLocales } = await refreshTopCharts(
-        sql,
-        locales,
-      );
-      console.log(
-        `Charts: ${stored} stored, ${newPodcasts} new, ${failedLocales.length} countries failed`,
-      );
-      if (failedLocales.length > 0) process.exitCode = 1;
-    }
-    await pollMissingEpisodes(sql, locales);
+    const { failedLocales } = await runChartJob(sql, args);
+    if (failedLocales.length > 0) process.exitCode = 1;
   } finally {
     await sql.end();
   }
 }
 
-main().catch((error) => {
-  console.error(
-    'Chart job failed:',
-    error instanceof Error ? error.message : String(error),
-  );
-  process.exitCode = 1;
-});
+if (import.meta.main)
+  main().catch((error) => {
+    console.error(
+      'Chart job failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+    process.exitCode = 1;
+  });

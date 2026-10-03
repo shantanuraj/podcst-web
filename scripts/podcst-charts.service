@@ -11,7 +11,7 @@ Environment=HOME=/var/lib/podcst
 Environment=DATABASE_URL=postgres://podcst_app@localhost/podcst
 Environment=PGHOST=/var/run/postgresql
 WorkingDirectory=/opt/podcst
-ExecStart=/usr/local/bin/bun run scripts/poll-top-charts.ts
+ExecStart=/usr/local/bin/bun run scripts/poll-top-charts.ts --charts-only
 TimeoutStartSec=30min
 NoNewPrivileges=true
 ProtectSystem=strict
