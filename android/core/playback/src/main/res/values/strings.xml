@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="skip_back">Back 10 seconds</string>
+    <string name="skip_forward">Forward 30 seconds</string>
+    <string name="star">Star</string>
+    <string name="unstar">Unstar</string>
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloading">Downloading episodes</string>
+</resources>

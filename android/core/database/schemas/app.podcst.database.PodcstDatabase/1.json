@@ -1,0 +1,521 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "636ab776ff6c9e51e8ab613664e1377e",
+    "entities": [
+      {
+        "tableName": "podcasts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`feed` TEXT NOT NULL, `id` INTEGER, `itunesId` INTEGER, `title` TEXT NOT NULL, `author` TEXT NOT NULL, `cover` TEXT NOT NULL, `thumbnail` TEXT NOT NULL, `description` TEXT NOT NULL, `link` TEXT, `published` INTEGER, `explicit` INTEGER NOT NULL, `keywords` TEXT NOT NULL, `episodeCount` INTEGER NOT NULL, `isPrivate` INTEGER NOT NULL, `refreshedAt` INTEGER, `complete` INTEGER NOT NULL, PRIMARY KEY(`feed`))",
+        "fields": [
+          {
+            "fieldPath": "feed",
+            "columnName": "feed",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "itunesId",
+            "columnName": "itunesId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cover",
+            "columnName": "cover",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnail",
+            "columnName": "thumbnail",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "link",
+            "columnName": "link",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "published",
+            "columnName": "published",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "explicit",
+            "columnName": "explicit",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keywords",
+            "columnName": "keywords",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "episodeCount",
+            "columnName": "episodeCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPrivate",
+            "columnName": "isPrivate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "refreshedAt",
+            "columnName": "refreshedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "complete",
+            "columnName": "complete",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "feed"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_podcasts_id",
+            "unique": false,
+            "columnNames": [
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_podcasts_id` ON `${TABLE_NAME}` (`id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "episodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identity` TEXT NOT NULL, `id` INTEGER, `podcastId` INTEGER, `guid` TEXT NOT NULL, `feed` TEXT NOT NULL, `podcastTitle` TEXT, `title` TEXT NOT NULL, `summary` TEXT, `published` INTEGER, `cover` TEXT NOT NULL, `explicit` INTEGER NOT NULL, `durationMs` INTEGER, `link` TEXT, `episodeArt` TEXT, `showNotes` TEXT NOT NULL, `author` TEXT, `fileUrl` TEXT NOT NULL, `fileLength` INTEGER NOT NULL, `fileType` TEXT NOT NULL, `isPrivate` INTEGER NOT NULL, PRIMARY KEY(`identity`))",
+        "fields": [
+          {
+            "fieldPath": "identity",
+            "columnName": "identity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "podcastId",
+            "columnName": "podcastId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "guid",
+            "columnName": "guid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "feed",
+            "columnName": "feed",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "podcastTitle",
+            "columnName": "podcastTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "published",
+            "columnName": "published",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "cover",
+            "columnName": "cover",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "explicit",
+            "columnName": "explicit",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "durationMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "link",
+            "columnName": "link",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "episodeArt",
+            "columnName": "episodeArt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "showNotes",
+            "columnName": "showNotes",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fileUrl",
+            "columnName": "fileUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileLength",
+            "columnName": "fileLength",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileType",
+            "columnName": "fileType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPrivate",
+            "columnName": "isPrivate",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "identity"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_episodes_feed_published",
+            "unique": false,
+            "columnNames": [
+              "feed",
+              "published"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_feed_published` ON `${TABLE_NAME}` (`feed`, `published`)"
+          },
+          {
+            "name": "index_episodes_id",
+            "unique": false,
+            "columnNames": [
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_id` ON `${TABLE_NAME}` (`id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "subscriptions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`feed` TEXT NOT NULL, `subscribedAt` INTEGER NOT NULL, PRIMARY KEY(`feed`))",
+        "fields": [
+          {
+            "fieldPath": "feed",
+            "columnName": "feed",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subscribedAt",
+            "columnName": "subscribedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "feed"
+          ]
+        }
+      },
+      {
+        "tableName": "charts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`locale` TEXT NOT NULL, `rank` INTEGER NOT NULL, `feed` TEXT NOT NULL, PRIMARY KEY(`locale`, `rank`))",
+        "fields": [
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rank",
+            "columnName": "rank",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "feed",
+            "columnName": "feed",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "locale",
+            "rank"
+          ]
+        }
+      },
+      {
+        "tableName": "chart_refreshes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`locale` TEXT NOT NULL, `refreshedAt` INTEGER NOT NULL, PRIMARY KEY(`locale`))",
+        "fields": [
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "refreshedAt",
+            "columnName": "refreshedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "locale"
+          ]
+        }
+      },
+      {
+        "tableName": "queue",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`position` INTEGER NOT NULL, `identity` TEXT NOT NULL, PRIMARY KEY(`position`))",
+        "fields": [
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "identity",
+            "columnName": "identity",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "position"
+          ]
+        }
+      },
+      {
+        "tableName": "player",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`slot` INTEGER NOT NULL, `current` TEXT, `positionMs` INTEGER NOT NULL, `active` INTEGER NOT NULL, PRIMARY KEY(`slot`))",
+        "fields": [
+          {
+            "fieldPath": "slot",
+            "columnName": "slot",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "current",
+            "columnName": "current",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "positionMs",
+            "columnName": "positionMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "active",
+            "columnName": "active",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "slot"
+          ]
+        }
+      },
+      {
+        "tableName": "progress",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identity` TEXT NOT NULL, `positionMs` INTEGER NOT NULL, `durationMs` INTEGER, `completed` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`identity`))",
+        "fields": [
+          {
+            "fieldPath": "identity",
+            "columnName": "identity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionMs",
+            "columnName": "positionMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "durationMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "identity"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_progress_updatedAt",
+            "unique": false,
+            "columnNames": [
+              "updatedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_progress_updatedAt` ON `${TABLE_NAME}` (`updatedAt`)"
+          }
+        ]
+      },
+      {
+        "tableName": "progress_outbox",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`episodeId` INTEGER NOT NULL, `position` REAL NOT NULL, `completed` INTEGER NOT NULL, `queuedAt` INTEGER NOT NULL, PRIMARY KEY(`episodeId`))",
+        "fields": [
+          {
+            "fieldPath": "episodeId",
+            "columnName": "episodeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completed",
+            "columnName": "completed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queuedAt",
+            "columnName": "queuedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "episodeId"
+          ]
+        }
+      },
+      {
+        "tableName": "stars",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identity` TEXT NOT NULL, `starredAt` INTEGER NOT NULL, PRIMARY KEY(`identity`))",
+        "fields": [
+          {
+            "fieldPath": "identity",
+            "columnName": "identity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "starredAt",
+            "columnName": "starredAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "identity"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '636ab776ff6c9e51e8ab613664e1377e')"
+    ]
+  }
+}
