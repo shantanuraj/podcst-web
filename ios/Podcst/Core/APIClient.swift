@@ -454,7 +454,6 @@ final class FeedCache {
         var id: Int?
         var feed: String
         var podcast: Podcast
-        var expires: Date
         var lastAccess: Date
         var complete: Bool
     }
@@ -465,14 +464,12 @@ final class FeedCache {
     @ObservationIgnored private var pending: [Key: Pending] = [:]
     @ObservationIgnored private var sequence = 0
     private let lifetime: TimeInterval
-    private let persistentLifetime: TimeInterval
     private let capacity: Int
     private let now: () -> Date
     private let storageURL: URL?
 
-    init(lifetime: TimeInterval = 300, persistentLifetime: TimeInterval = 7 * 24 * 60 * 60, capacity: Int = 40, now: @escaping () -> Date = Date.init, storageURL: URL? = nil) {
+    init(lifetime: TimeInterval = 300, capacity: Int = 40, now: @escaping () -> Date = Date.init, storageURL: URL? = nil) {
         self.lifetime = lifetime
-        self.persistentLifetime = persistentLifetime
         self.capacity = max(1, capacity)
         self.now = now
         self.storageURL = storageURL
@@ -511,7 +508,6 @@ final class FeedCache {
         persistentIDs.insert(id)
         if var entry = entries[.id(id)] {
             entry.persistent = true
-            entry.expires = max(entry.expires, now().addingTimeInterval(persistentLifetime))
             entries[.id(id)] = entry
         }
         persist()
@@ -521,7 +517,6 @@ final class FeedCache {
         persistentIDs.remove(id)
         if var entry = entries[.id(id)] {
             entry.persistent = false
-            entry.expires = now().addingTimeInterval(lifetime)
             entries[.id(id)] = entry
         }
         persist()
@@ -563,7 +558,7 @@ final class FeedCache {
                 let persistent = entries[resolved]?.persistent ?? podcast.id.map { persistentIDs.contains($0) } ?? false
                 entries[destination] = Entry(
                     podcast: podcast,
-                    expires: date.addingTimeInterval(persistent ? persistentLifetime : lifetime),
+                    expires: date.addingTimeInterval(lifetime),
                     lastAccess: date,
                     persistent: persistent,
                     complete: true
@@ -591,12 +586,11 @@ final class FeedCache {
         let key = Key.id(id)
         if var entry = entries[key] {
             entry.persistent = true
-            entry.expires = max(entry.expires, now().addingTimeInterval(persistentLifetime))
             if !entry.complete { entry.podcast = podcast }
             entries[key] = entry
         } else {
             let date = now()
-            entries[key] = Entry(podcast: podcast, expires: date.addingTimeInterval(persistentLifetime), lastAccess: date, persistent: true, complete: false)
+            entries[key] = Entry(podcast: podcast, expires: .distantPast, lastAccess: date, persistent: true, complete: false)
         }
     }
 
@@ -625,7 +619,7 @@ final class FeedCache {
             } else {
                 key = .feed(item.feed)
             }
-            entries[key] = Entry(podcast: item.podcast, expires: item.expires, lastAccess: item.lastAccess, persistent: true, complete: item.complete)
+            entries[key] = Entry(podcast: item.podcast, expires: .distantPast, lastAccess: item.lastAccess, persistent: true, complete: item.complete)
         }
         evictIfNeeded()
     }
@@ -644,7 +638,7 @@ final class FeedCache {
                 id = nil
                 feed = value
             }
-            return StoredEntry(id: id, feed: feed, podcast: entry.podcast, expires: entry.expires, lastAccess: entry.lastAccess, complete: entry.complete)
+            return StoredEntry(id: id, feed: feed, podcast: entry.podcast, lastAccess: entry.lastAccess, complete: entry.complete)
         }
         guard let data = try? JSONEncoder().encode(stored) else { return }
         do {

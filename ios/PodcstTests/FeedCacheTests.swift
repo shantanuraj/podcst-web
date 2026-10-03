@@ -258,18 +258,109 @@ final class FeedCacheTests: XCTestCase {
     func testSubscribedSnapshotSurvivesRestartAndServesStaleOfflineData() async throws {
         var now = Date(timeIntervalSince1970: 100)
         let storageURL = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: storageURL) }
         let summary = Podcast(id: 8, feed: "https://example.com/feed.xml", title: "Example", episodes: [episode(guid: "latest")])
-        let cache = FeedCache(lifetime: 300, persistentLifetime: 100, now: { now }, storageURL: storageURL)
+        let cache = FeedCache(lifetime: 300, now: { now }, storageURL: storageURL)
         cache.markSubscribed([summary])
         let full = Podcast(id: 8, feed: summary.feed, title: "Example", episodes: [episode(guid: "latest"), episode(guid: "older")])
         _ = try await cache.load(.id(8)) { full }
 
-        let restored = FeedCache(lifetime: 300, persistentLifetime: 100, now: { now }, storageURL: storageURL)
+        let restored = FeedCache(lifetime: 300, now: { now }, storageURL: storageURL)
         XCTAssertEqual(restored.cached(id: 8, feed: summary.feed), full)
-        now = now.addingTimeInterval(101)
-        let offline = try await restored.load(.id(8)) { throw APIError(statusCode: 0, message: "offline") }
+        var fetches = 0
+        for elapsed: TimeInterval in [0, 30 * 86400, 3650 * 86400] {
+            now = Date(timeIntervalSince1970: 100 + elapsed)
+            let offline = try await restored.load(.id(8)) {
+                fetches += 1
+                throw APIError(statusCode: 0, message: "offline")
+            }
+            XCTAssertEqual(offline, full)
+            XCTAssertEqual(restored.cached(id: 8, feed: summary.feed), full)
+        }
 
-        XCTAssertEqual(offline, full)
+        XCTAssertEqual(fetches, 3)
+        let relaunched = FeedCache(now: { now }, storageURL: storageURL)
+        XCTAssertEqual(relaunched.cached(id: 8, feed: summary.feed), full)
+    }
+
+    func testRepeatedSubscriptionMarkingDoesNotRenewCatalogueFreshness() async throws {
+        for markByID in [false, true] {
+            var now = Date(timeIntervalSince1970: 100)
+            let cache = FeedCache(lifetime: 300, now: { now })
+            let summary = Podcast(id: 8, feed: "https://example.com/feed.xml", title: "Example", episodes: [episode(guid: "latest")])
+            let full = Podcast(id: 8, feed: summary.feed, title: "Example", episodes: [episode(guid: "latest"), episode(guid: "older")])
+            let updated = Podcast(id: 8, feed: summary.feed, title: "Example", episodes: [episode(guid: "new"), episode(guid: "latest"), episode(guid: "older")])
+            cache.markSubscribed([summary])
+            _ = try await cache.load(.id(8)) { full }
+            var fetches = 0
+
+            for instant: TimeInterval in [200, 399, 400] {
+                now = Date(timeIntervalSince1970: instant)
+                if markByID {
+                    cache.markSubscribed(id: 8)
+                } else {
+                    cache.markSubscribed([summary])
+                }
+                XCTAssertEqual(cache.cached(id: 8, feed: summary.feed), full)
+                let result = try await cache.load(.id(8)) {
+                    fetches += 1
+                    return updated
+                }
+                XCTAssertEqual(result, instant < 400 ? full : updated)
+            }
+
+            XCTAssertEqual(fetches, 1)
+            XCTAssertEqual(cache.cached(id: 8, feed: summary.feed), updated)
+        }
+    }
+
+    func testRemovingSubscriptionDoesNotRenewCatalogueFreshness() async throws {
+        var now = Date(timeIntervalSince1970: 100)
+        let cache = FeedCache(lifetime: 300, now: { now })
+        let original = Podcast(id: 8, feed: "https://example.com/feed.xml", title: "Original")
+        let updated = Podcast(id: 8, feed: original.feed, title: "Updated")
+        cache.markSubscribed([original])
+        _ = try await cache.load(.id(8)) { original }
+
+        now = Date(timeIntervalSince1970: 399)
+        cache.removeSubscription(id: 8)
+        XCTAssertEqual(cache.cached(id: 8, feed: original.feed), original)
+        now = Date(timeIntervalSince1970: 400)
+        var fetches = 0
+        let result = try await cache.load(.id(8)) {
+            fetches += 1
+            return updated
+        }
+
+        XCTAssertEqual(result, updated)
+        XCTAssertEqual(fetches, 1)
+    }
+
+    func testRestoredCatalogueRevalidatesDespiteSavedFutureExpiry() async throws {
+        let now = Date(timeIntervalSince1970: 100)
+        let storageURL = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: storageURL) }
+        let cache = FeedCache(lifetime: 300, now: { now }, storageURL: storageURL)
+        let original = Podcast(id: 8, feed: "https://example.com/feed.xml", title: "Original", episodes: [episode(guid: "latest"), episode(guid: "older")])
+        let updated = Podcast(id: 8, feed: original.feed, title: "Updated", episodes: [episode(guid: "new"), episode(guid: "latest"), episode(guid: "older")])
+        cache.markSubscribed([original])
+        _ = try await cache.load(.id(8)) { original }
+        var stored = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: storageURL)) as? [[String: Any]])
+        XCTAssertEqual(stored.count, 1)
+        stored[0]["expires"] = now.addingTimeInterval(7 * 86400).timeIntervalSinceReferenceDate
+        try JSONSerialization.data(withJSONObject: stored).write(to: storageURL)
+
+        let restored = FeedCache(lifetime: 300, now: { now }, storageURL: storageURL)
+        XCTAssertEqual(restored.cached(id: 8, feed: original.feed), original)
+        var fetches = 0
+        let result = try await restored.load(.id(8)) {
+            fetches += 1
+            return updated
+        }
+
+        XCTAssertEqual(result, updated)
+        XCTAssertEqual(fetches, 1)
+        XCTAssertEqual(restored.cached(id: 8, feed: original.feed), updated)
     }
 
     private func episode(guid: String) -> Episode {
