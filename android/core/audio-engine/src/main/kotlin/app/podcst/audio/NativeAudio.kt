@@ -11,7 +11,7 @@ internal object NativeAudio {
     }
 
     fun created(address: Long): Long {
-        if (address < 0) throw AudioEngineException(AudioStatus.entries[(-address).toInt()])
+        if (address in 0 until AudioStatus.entries.size) throw AudioEngineException(AudioStatus.entries[address.toInt()])
         return address
     }
 

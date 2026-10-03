@@ -57,7 +57,7 @@ jlong pack(uint32_t status, uint32_t consumed = 0, uint32_t emitted = 0, uint32_
 template <typename Handle>
 jlong create(uint32_t status, Handle* handle, jint channels) {
     if (status != PODCST_AUDIO_OK) {
-        return -static_cast<jlong>(status);
+        return static_cast<jlong>(status);
     }
     return static_cast<jlong>(reinterpret_cast<uintptr_t>(
         new Shell<Handle>{handle, static_cast<uint32_t>(channels), State::Idle}));
@@ -148,7 +148,7 @@ extern "C" {
 JNIEXPORT jlong JNICALL Java_app_podcst_audio_NativeAudio_effectsCreate(
     JNIEnv*, jclass, jint sample_rate, jint channels, jboolean boost, jboolean trim) {
     if (sample_rate < 0 || channels < 0) {
-        return -static_cast<jlong>(PODCST_AUDIO_INVALID_CONFIG);
+        return static_cast<jlong>(PODCST_AUDIO_INVALID_CONFIG);
     }
     PodcstEffectsConfig config;
     podcst_effects_config_default(&config);
@@ -244,7 +244,7 @@ JNIEXPORT void JNICALL Java_app_podcst_audio_NativeAudio_effectsRelease(
 JNIEXPORT jlong JNICALL Java_app_podcst_audio_NativeAudio_limiterCreate(
     JNIEnv*, jclass, jint sample_rate, jint channels) {
     if (sample_rate < 0 || channels < 0) {
-        return -static_cast<jlong>(PODCST_AUDIO_INVALID_CONFIG);
+        return static_cast<jlong>(PODCST_AUDIO_INVALID_CONFIG);
     }
     PodcstAudioConfig config;
     podcst_audio_config_default(&config);
