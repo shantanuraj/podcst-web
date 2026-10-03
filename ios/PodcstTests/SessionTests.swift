@@ -4,6 +4,92 @@ import XCTest
 
 @MainActor
 final class SessionTests: XCTestCase {
+    func testOnboardingChartsSurviveGuestSessionRestoration() async throws {
+        let fixture = try await guestFixture(podcasts: [], restoreSession: false)
+        defer { fixture.cleanUp() }
+        let locale = "onboarding-\(UUID().uuidString.lowercased())"
+        defer { PodcastSnapshotCache(namespace: "top", lifetime: 3600).remove("\(locale)-30") }
+        let podcast = Podcast(id: 9201, feed: "https://example.test/onboarding", title: "Onboarding show", cover: "https://example.test/onboarding.jpg")
+        let started = expectation(description: "Onboarding chart request started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            switch request.request.url?.path {
+            case "/api/top":
+                pending = request
+                started.fulfill()
+            case "/api/auth/session":
+                try request.respond(["user": Optional<User>.none])
+            default:
+                XCTFail("Unexpected onboarding request")
+                request.fail(URLError(.unsupportedURL))
+            }
+        }
+
+        let charts = Task { try await fixture.api.top(locale: locale) }
+        await fulfillment(of: [started], timeout: 2)
+        await fixture.session.restore()
+        XCTAssertNil(fixture.session.user)
+        XCTAssertFalse(fixture.session.isLoading)
+        try XCTUnwrap(pending).respond([podcast])
+
+        let result = try await charts.value
+        XCTAssertEqual(result, [podcast])
+        XCTAssertEqual(fixture.api.cachedTop(locale: locale), [podcast])
+    }
+
+    func testPublicChartsDoNotSendOrAcceptSessionCredentials() async throws {
+        let credentials = MemorySessionCredentials()
+        credentials.write("listener-session")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GuestLibraryURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://charts.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/top")
+            XCTAssertNil(request.request.value(forHTTPHeaderField: "Cookie"))
+            XCTAssertFalse(request.request.httpShouldHandleCookies)
+            try request.respond([Podcast](), headers: ["Set-Cookie": "session=unexpected-session; Path=/; HttpOnly"])
+        }
+
+        let locale = "credentials-\(UUID().uuidString.lowercased())"
+        defer { PodcastSnapshotCache(namespace: "top", lifetime: 3600).remove("\(locale)-30") }
+        let charts = try await api.top(locale: locale)
+
+        XCTAssertTrue(charts.isEmpty)
+        XCTAssertEqual(credentials.read(), "listener-session")
+    }
+
+    func testRetiredAccountResponseCannotRestoreCredentials() async throws {
+        let credentials = MemorySessionCredentials()
+        credentials.write("listener-session")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GuestLibraryURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://progress.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        let started = expectation(description: "Authenticated progress request started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            XCTAssertEqual(request.request.value(forHTTPHeaderField: "Cookie"), "session=listener-session")
+            pending = request
+            started.fulfill()
+        }
+
+        let progress = Task { try await api.currentProgress() }
+        await fulfillment(of: [started], timeout: 2)
+        api.clearSession()
+        try XCTUnwrap(pending).respond(Optional<PlaybackProgress>.none, headers: ["Set-Cookie": "session=retired-session; Path=/; HttpOnly"])
+
+        do {
+            _ = try await progress.value
+            XCTFail("Retired account responses must be rejected")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertNil(credentials.read())
+        XCTAssertFalse(api.hasSession)
+    }
+
     func testCachedAccountSurvivesOfflineRestoreAndSignsOutOffline() async throws {
         let fixture = try fixture()
         defer { fixture.cleanUp() }
@@ -576,7 +662,7 @@ final class SessionTests: XCTestCase {
         return SessionFixture(api: api, keychain: keychain, url: url)
     }
 
-    private func guestFixture(podcasts: [Podcast]) async throws -> GuestLibraryFixture {
+    private func guestFixture(podcasts: [Podcast], restoreSession: Bool = true) async throws -> GuestLibraryFixture {
         let defaultsName = "GuestLibrary-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsName)!
         defaults.set(try JSONEncoder().encode(podcasts), forKey: "guest.library.podcasts")
@@ -588,7 +674,7 @@ final class SessionTests: XCTestCase {
             try request.respond(["user": Optional<User>.none])
         }
         let session = SessionStore(api: api, storageURL: url)
-        await session.restore()
+        if restoreSession { await session.restore() }
         let library = LibraryStore(api: api, session: session, defaults: defaults)
         return GuestLibraryFixture(api: api, session: session, library: library, defaults: defaults, defaultsName: defaultsName, url: url)
     }
@@ -619,8 +705,8 @@ private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         let request = GuestLibraryRequest(request: request) { [self] result in
             switch result {
-            case .success(let data):
-                let response = HTTPURLResponse(url: self.request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            case .success(let (data, headers)):
+                let response = HTTPURLResponse(url: self.request.url!, statusCode: 200, httpVersion: nil, headerFields: headers)!
                 client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
                 client?.urlProtocol(self, didLoad: data)
                 client?.urlProtocolDidFinishLoading(self)
@@ -639,12 +725,12 @@ private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
 
 private struct GuestLibraryRequest: Sendable {
     let request: URLRequest
-    let complete: @Sendable (Result<Data, Error>) -> Void
+    let complete: @Sendable (Result<(Data, [String: String]), Error>) -> Void
 
-    func respond<T: Encodable>(_ value: T) throws {
+    func respond<T: Encodable>(_ value: T, headers: [String: String] = [:]) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
-        complete(.success(try encoder.encode(value)))
+        complete(.success((try encoder.encode(value), headers.merging(["Content-Type": "application/json"]) { first, _ in first })))
     }
 
     func fail(_ error: Error) {

@@ -57,7 +57,7 @@ public final class APIClient {
         let request = Task { @MainActor [weak self] in
             guard let self else { throw APIError(statusCode: 0, message: "API client unavailable") }
             defer { self.topRequests[key] = nil }
-            let rows: [RawPodcast] = try await self.get(path: "/api/top", query: [URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "locale", value: locale)])
+            let rows: [RawPodcast] = try await self.get(path: "/api/top", query: [URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "locale", value: locale)], usesSession: false)
             let podcasts = rows.map { self.mapPodcast($0) }
             self.topCache.store(podcasts, key: key)
             return podcasts
@@ -357,8 +357,8 @@ public final class APIClient {
         let _: RawSuccess = try await put(path: "/api/progress", body: ProgressBody(episodeId: episodeID, position: Int(position.rounded(.towardZero)), completed: completed))
     }
 
-    private func get<T: Decodable>(path: String, query: [URLQueryItem] = []) async throws -> T {
-        try await request(method: "GET", path: path, query: query, body: Optional<EmptyBody>.none)
+    private func get<T: Decodable>(path: String, query: [URLQueryItem] = [], usesSession: Bool = true) async throws -> T {
+        try await request(method: "GET", path: path, query: query, body: Optional<EmptyBody>.none, usesSession: usesSession)
     }
 
     private func post<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
@@ -373,7 +373,7 @@ public final class APIClient {
         try await request(method: "DELETE", path: path, query: query, body: Optional<EmptyBody>.none)
     }
 
-    private func request<T: Decodable, B: Encodable>(method: String, path: String, query: [URLQueryItem], body: B?) async throws -> T {
+    private func request<T: Decodable, B: Encodable>(method: String, path: String, query: [URLQueryItem], body: B?, usesSession: Bool = true) async throws -> T {
         var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
         components?.queryItems = query.isEmpty ? nil : query
         guard let url = components?.url else { throw APIError(statusCode: 0, message: "Invalid API URL") }
@@ -387,12 +387,12 @@ public final class APIClient {
         }
         let revision = sessionRevision
         let cookie = sessionCookie
-        if let cookie { request.setValue("session=\(cookie)", forHTTPHeaderField: "Cookie") }
+        if usesSession, let cookie { request.setValue("session=\(cookie)", forHTTPHeaderField: "Cookie") }
 
         let (data, response) = try await session.data(for: request)
-        guard revision == sessionRevision else { throw CancellationError() }
+        guard !usesSession || revision == sessionRevision else { throw CancellationError() }
         guard let http = response as? HTTPURLResponse else { throw APIError(statusCode: 0, message: "Invalid API response") }
-        persistCookie(from: http)
+        if usesSession { persistCookie(from: http) }
         guard (200..<300).contains(http.statusCode) else {
             let message = (try? JSONDecoder().decode(RawError.self, from: data).message) ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw APIError(statusCode: http.statusCode, message: message)
