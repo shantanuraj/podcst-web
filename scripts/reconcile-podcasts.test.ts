@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import postgres from 'postgres';
 import { digest } from './lib/artifacts';
 import { startPostgres } from './lib/postgres-sandbox';
+import { createSchemaFixture } from './lib/schema-fixture';
 import { type ReconciliationPlan, reconcile } from './reconcile-podcasts';
 
 const pgBin = process.env.PG_BIN;
@@ -22,6 +23,8 @@ const plan: ReconciliationPlan = {
   canonicalId: 1,
   duplicateId: 2,
   canonicalFeedUrl: 'https://feeds.example.invalid/current',
+  sourceEvidenceReference: digest('Reviewed synthetic source equivalence'),
+  reviewedIdentities: '',
   reviewedDifferences: digest([]),
 };
 
@@ -63,7 +66,7 @@ INSERT INTO episodes(id,podcast_id,guid,published) VALUES
 (10,1,'shared-a','2026-01-01'),(11,1,'shared-b','2026-01-02'),(12,1,'canonical-only','2025-01-01'),
 (20,2,'shared-a','2026-01-01'),(21,2,'shared-b','2026-01-02'),(22,2,'duplicate-only','2026-01-03');
 INSERT INTO episode_content(episode_id,title,file_url)
-SELECT id,guid,'https://media.example.invalid/'||guid||'.mp3' FROM episodes WHERE id<>11;
+SELECT id,guid,'https://media.example.invalid/'||guid||'.mp3' FROM episodes;
 INSERT INTO subscriptions(user_id,podcast_id,subscribed_at) VALUES ('listener',2,'2026-01-01');
 INSERT INTO playback_progress(user_id,episode_id,position,completed,updated_at)
 VALUES ('listener',20,123,false,'2026-01-01'),('listener',22,45,true,'2026-01-02');
@@ -83,9 +86,11 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
   });
 
   beforeEach(async () => {
-    await sql.unsafe(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;
-${readFileSync(new URL('../migrations/active/0000-baseline.sql', import.meta.url), 'utf8')}
-${seed}`);
+    await sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
+    await createSchemaFixture(sql);
+    await sql.unsafe(seed);
+    plan.reviewedIdentities = (await inspect()).result?.identitiesDigest;
+    delete plan.reviewedMissingMedia;
   });
 
   test('inspection backs up without changing data; dry run checks and rolls back', async () => {
@@ -100,7 +105,12 @@ ${seed}`);
   test('preserves the union, fills missing content and transfers exact progress', async () => {
     const before =
       await sql`SELECT episode_id,position,completed,updated_at FROM playback_progress ORDER BY episode_id`;
-    const result = await apply();
+    await sql`DELETE FROM episode_content WHERE episode_id=11`;
+    const { result: inspection } = await inspect();
+    const result = await apply('apply', {
+      ...plan,
+      reviewedMissingMedia: inspection?.missingMediaDigest,
+    });
     expect(result?.retainedEpisodes).toBe(4);
     expect(result?.retainedContent).toBe(4);
     expect(result?.retainedProgress).toBe(2);
@@ -188,6 +198,7 @@ ${seed}`);
   });
 
   test('requires separate review when metadata differs but media was evicted', async () => {
+    await sql`DELETE FROM episode_content WHERE episode_id=11`;
     await sql`UPDATE episodes SET published='2026-02-01' WHERE id=21`;
     const { result } = await inspect();
     if (!result) throw new Error('Inspection result missing');
@@ -200,7 +211,7 @@ ${seed}`);
         backupPath: path(),
         mode: 'apply',
       }),
-    ).rejects.toThrow('Missing-media metadata cases require separate');
+    ).rejects.toThrow('Missing-media cases require separate');
     await apply('apply', {
       ...reviewed,
       reviewedMissingMedia: result.missingMediaDigest,
@@ -261,12 +272,19 @@ ${seed}`);
     await expect(inspect()).rejects.toThrow('Expected two existing podcasts');
   });
 
-  test('a verified backup restores and can replay the dry run', async () => {
+  test('a verified alias-inclusive backup restores and can replay the dry run', async () => {
+    await sql`INSERT INTO podcast_feed_aliases (feed_url,podcast_id,evidence_type,evidence_reference) VALUES ('https://feeds.example.invalid/archived',2,'reviewed','archive-proof')`;
+    await sql`INSERT INTO podcast_apple_aliases (itunes_id,podcast_id,evidence_type,evidence_reference) VALUES (101,1,'reviewed','listing-proof')`;
+    plan.reviewedIdentities = (await inspect()).result?.identitiesDigest;
     const { artifact } = await inspect();
+    expect(artifact.snapshot.podcast_feed_aliases).toHaveLength(1);
+    expect(artifact.snapshot.podcast_apple_aliases).toHaveLength(1);
     await apply();
     await sql`TRUNCATE podcasts CASCADE`;
     for (const table of [
       'podcasts',
+      'podcast_feed_aliases',
+      'podcast_apple_aliases',
       'episodes',
       'episode_content',
       'subscriptions',
@@ -325,6 +343,192 @@ CREATE TRIGGER fixture_trigger BEFORE UPDATE ON podcasts FOR EACH ROW EXECUTE FU
     await expect(inspect()).rejects.toThrow(
       'User triggers require a tool review',
     );
+  });
+
+  test('requires explicit review of source and alias transitions', async () => {
+    const unreviewed = { ...plan, reviewedIdentities: '' };
+    const { expectedPath } = await inspect(unreviewed);
+    await expect(
+      reconcile(sql, {
+        plan: unreviewed,
+        expectedPath,
+        backupPath: path(),
+        mode: 'apply',
+      }),
+    ).rejects.toThrow('Source identities and alias changes');
+    await expect(
+      inspect({ ...plan, sourceEvidenceReference: '' }),
+    ).rejects.toThrow('source-equivalence evidence digest');
+  });
+
+  test('preserves accepted aliases and registers old primary locators with reviewed evidence', async () => {
+    await sql`INSERT INTO podcast_feed_aliases (feed_url,podcast_id,evidence_type,evidence_reference,evidence,accepted_at) VALUES
+      ('https://feeds.example.invalid/canonical-history',1,'permanent_redirect','original-canonical','{"proof":1}','2026-01-01'),
+      ('https://feeds.example.invalid/duplicate-history',2,'reviewed','original-duplicate','{"proof":2}','2026-01-02')`;
+    await sql`INSERT INTO podcast_apple_aliases (itunes_id,podcast_id,evidence_type,evidence_reference) VALUES (101,1,'reviewed','verified-secondary')`;
+    const { result } = await inspect();
+    const reviewed = { ...plan, reviewedIdentities: result?.identitiesDigest };
+    expect((await apply('dry-run', reviewed))?.retainedFeedAliases).toBe(3);
+    await apply('apply', reviewed);
+    expect(
+      Array.from(
+        await sql`SELECT feed_url,podcast_id::int,evidence_reference FROM podcast_feed_aliases ORDER BY feed_url`,
+      ),
+    ).toEqual([
+      {
+        feed_url: 'https://feeds.example.invalid/canonical-history',
+        podcast_id: 1,
+        evidence_reference: 'original-canonical',
+      },
+      {
+        feed_url: 'https://feeds.example.invalid/duplicate-history',
+        podcast_id: 1,
+        evidence_reference: 'original-duplicate',
+      },
+      {
+        feed_url: 'https://feeds.example.invalid/old',
+        podcast_id: 1,
+        evidence_reference: plan.sourceEvidenceReference,
+      },
+    ]);
+    expect(
+      (
+        await sql`SELECT itunes_id::int,podcast_id::int FROM podcast_apple_aliases`
+      )[0],
+    ).toEqual({ itunes_id: 101, podcast_id: 1 });
+    expect(
+      (
+        await sql`SELECT evidence,accepted_at='2026-01-02'::timestamptz AS original FROM podcast_feed_aliases WHERE evidence_reference='original-duplicate'`
+      )[0],
+    ).toEqual({ evidence: { proof: 2 }, original: true });
+    await expect(
+      sql`INSERT INTO podcasts(id,title,feed_url,author_id,cover) VALUES (3,'Recreated','https://feeds.example.invalid/old',1,'art')`.execute(),
+    ).rejects.toThrow('accepted alias');
+  });
+
+  test('can select an accepted duplicate locator while retaining both former primary locators', async () => {
+    const future = 'https://feeds.example.invalid/future';
+    await sql`INSERT INTO podcast_feed_aliases (feed_url,podcast_id,evidence_type,evidence_reference) VALUES (${future},2,'reviewed','prior')`;
+    const custom = { ...plan, canonicalFeedUrl: future };
+    custom.reviewedIdentities = (
+      await inspect(custom)
+    ).result?.identitiesDigest;
+    await apply('apply', custom);
+    expect((await sql`SELECT feed_url FROM podcasts`)[0].feed_url).toBe(future);
+    expect(
+      (await sql`SELECT count(*)::int AS n FROM podcast_feed_aliases`)[0].n,
+    ).toBe(2);
+    expect(
+      (
+        await sql`SELECT count(*)::int AS n FROM podcast_feed_aliases WHERE feed_url=${future}`
+      )[0].n,
+    ).toBe(0);
+  });
+
+  test.each([
+    1, 2,
+  ])('refuses private source %i without inferring ownership', async (id) => {
+    await sql`UPDATE podcasts SET itunes_id=NULL,owner_user_id='listener' WHERE id=${id}`;
+    await expect(inspect()).rejects.toThrow('two public sources');
+    expect(
+      (await sql`SELECT owner_user_id FROM podcasts WHERE id=${id}`)[0]
+        .owner_user_id,
+    ).toBe('listener');
+  });
+
+  test('refuses third-party accepted locator claims', async () => {
+    await sql`INSERT INTO podcasts(id,title,feed_url,author_id,cover) VALUES (3,'Third','https://feeds.example.invalid/third',1,'art')`;
+    await sql`INSERT INTO podcast_feed_aliases (feed_url,podcast_id,evidence_type,evidence_reference) VALUES ('https://feeds.example.invalid/claimed',3,'reviewed','third-proof')`;
+    await expect(
+      inspect({
+        ...plan,
+        canonicalFeedUrl: 'https://feeds.example.invalid/claimed',
+      }),
+    ).rejects.toThrow('Canonical locator belongs');
+  });
+
+  test('binds accepted-alias evidence to the reviewed snapshot', async () => {
+    const { expectedPath } = await inspect();
+    await sql`INSERT INTO podcast_apple_aliases (itunes_id,podcast_id,evidence_type,evidence_reference) VALUES (101,1,'reviewed','new-proof')`;
+    await expect(
+      reconcile(sql, { plan, expectedPath, backupPath: path(), mode: 'apply' }),
+    ).rejects.toThrow('Reviewed snapshot changed');
+  });
+
+  test.each([
+    'ALTER TABLE podcast_feed_aliases DISABLE TRIGGER guard_public_feed_alias',
+    'ALTER FUNCTION guard_public_apple_alias() SECURITY DEFINER',
+    'ALTER FUNCTION guard_podcast_alias_claim() SET search_path TO public',
+    'CREATE OR REPLACE FUNCTION guard_public_feed_alias() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$',
+  ])('refuses changed guard semantics: %s', async (change) => {
+    await sql.unsafe(change);
+    await expect(inspect()).rejects.toThrow(
+      'User triggers require a tool review',
+    );
+  });
+
+  test('refuses new alias dependents and row-security policies', async () => {
+    await sql`CREATE TABLE saved_alias(feed_url text REFERENCES podcast_feed_aliases(feed_url) ON DELETE CASCADE)`;
+    await expect(inspect()).rejects.toThrow(
+      'Unexpected foreign-key dependencies',
+    );
+    await sql`DROP TABLE saved_alias`;
+    await sql`ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY`;
+    await expect(inspect()).rejects.toThrow(
+      'Relation policies require a tool review',
+    );
+  });
+
+  test('requires review for missing media even without metadata differences', async () => {
+    await sql`DELETE FROM episode_content WHERE episode_id IN (10,20)`;
+    const { result } = await inspect();
+    expect(result?.metadataDifferences).toBe(0);
+    expect(result?.missingMediaDifferences).toBe(1);
+    await expect(apply()).rejects.toThrow(
+      'Missing-media cases require separate',
+    );
+    expect(
+      (
+        await apply('dry-run', {
+          ...plan,
+          reviewedMissingMedia: result?.missingMediaDigest,
+        })
+      )?.postconditionsVerified,
+    ).toBe(true);
+  });
+
+  test.each([
+    ['podcast:feed', 'https://feeds.example.invalid/history'],
+    ['podcast:itunes', '101'],
+    ['podcast:index', '200'],
+  ])('coordinates the %s namespace for retained identities', async (namespace, value) => {
+    await sql`INSERT INTO podcast_feed_aliases (feed_url,podcast_id,evidence_type,evidence_reference) VALUES ('https://feeds.example.invalid/history',2,'reviewed','history')`;
+    await sql`INSERT INTO podcast_apple_aliases (itunes_id,podcast_id,evidence_type,evidence_reference) VALUES (101,1,'reviewed','listing')`;
+    const other = postgres(cluster.options);
+    try {
+      await other.begin(async (tx) => {
+        await tx`SELECT pg_advisory_xact_lock(hashtext(${namespace}),hashtext(${value}))`;
+        await expect(inspect()).rejects.toThrow(
+          'Feed identity import is active',
+        );
+      });
+    } finally {
+      await other.end();
+    }
+  });
+
+  test('refuses stronger default isolation rather than changing it', async () => {
+    const other = postgres({
+      ...cluster.options,
+      connection: { default_transaction_isolation: 'repeatable read' },
+    });
+    try {
+      await expect(
+        reconcile(other, { plan, backupPath: path(), mode: 'inspect' }),
+      ).rejects.toThrow('requires read committed');
+    } finally {
+      await other.end();
+    }
   });
 
   test('rejects non-private artifact files and changed plans', async () => {

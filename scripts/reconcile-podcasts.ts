@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { digest, readProtected, stable, writeProtected } from './lib/artifacts';
+import { verifyReconciliationTriggers } from './reconciliation-schema';
 
 type Row = postgres.Row;
 type Snapshot = Record<string, Row[]>;
@@ -8,6 +9,8 @@ export interface ReconciliationPlan {
   canonicalId: number;
   duplicateId: number;
   canonicalFeedUrl: string;
+  sourceEvidenceReference: string;
+  reviewedIdentities: string;
   reviewedDifferences: string;
   reviewedMissingMedia?: string;
 }
@@ -21,6 +24,8 @@ interface Options {
 
 const tables = {
   podcasts: ['t.id', 't.id'],
+  podcast_feed_aliases: ['t.podcast_id', 't.feed_url'],
+  podcast_apple_aliases: ['t.podcast_id', 't.itunes_id'],
   episodes: ['t.podcast_id', 't.id'],
   episode_content: [
     'e.podcast_id',
@@ -48,6 +53,8 @@ const expectedForeignKeys = [
   ['episodes', 'podcast_id', 'podcasts', 'id'],
   ['feed_poll_state', 'podcast_id', 'podcasts', 'id'],
   ['playback_progress', 'episode_id', 'episodes', 'id'],
+  ['podcast_feed_aliases', 'podcast_id', 'podcasts', 'id'],
+  ['podcast_apple_aliases', 'podcast_id', 'podcasts', 'id'],
   ['podcasts_genres', 'podcast_id', 'podcasts', 'id'],
   ['subscriptions', 'podcast_id', 'podcasts', 'id'],
   ['top_podcasts', 'podcast_id', 'podcasts', 'id'],
@@ -68,9 +75,10 @@ export async function snapshot(
   const result: Snapshot = {};
   for (const [table, [column, order, join = '']] of Object.entries(tables)) {
     const rows = await tx.unsafe(
-      `SELECT to_jsonb(t) AS data FROM public.${table} t ${join} WHERE ${column} IN ($1::bigint, $2::bigint) ORDER BY ${order}${lock ? ' FOR UPDATE OF t' : ''}`,
+      `SELECT to_jsonb(t) AS data FROM public.${table} t ${join} WHERE ${column} IN ($1::bigint, $2::bigint) ORDER BY ${order} LIMIT 20001${lock ? ' FOR UPDATE OF t' : ''}`,
       ids,
     );
+    invariant(rows.length <= 20000, 'Affected-row bound exceeded');
     result[table] = rows.map((row) => row.data);
   }
   stable(result);
@@ -85,8 +93,11 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     'Expected two distinct podcast records',
   );
   invariant(
-    !('visibility' in canonical) && !('owner_user_id' in canonical),
-    'Ownership schema requires a new tool review',
+    state.podcasts.every(
+      (row) =>
+        Object.hasOwn(row, 'owner_user_id') && row.owner_user_id === null,
+    ),
+    'Reconciliation requires two public sources on the ownership schema',
   );
   invariant(
     canonical.itunes_id !== null,
@@ -99,6 +110,48 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
         duplicate.podcast_index_id === canonical.podcast_index_id),
     'Conflicting provider identities',
   );
+  invariant(
+    state.podcast_apple_aliases.every(
+      (row) => row.podcast_id === plan.canonicalId,
+    ),
+    'Duplicate Apple aliases require separate provider reconciliation',
+  );
+  const feedAliases = new Map<string, Row>(
+    state.podcast_feed_aliases
+      .filter((row) => row.feed_url !== plan.canonicalFeedUrl)
+      .map((row) => [row.feed_url, { ...row, podcast_id: plan.canonicalId }]),
+  );
+  for (const row of state.podcasts) {
+    if (row.feed_url === plan.canonicalFeedUrl || feedAliases.has(row.feed_url))
+      continue;
+    feedAliases.set(row.feed_url, {
+      feed_url: row.feed_url,
+      podcast_id: plan.canonicalId,
+      evidence_type: 'reviewed',
+      evidence_reference: plan.sourceEvidenceReference,
+      evidence: {
+        canonicalId: plan.canonicalId,
+        duplicateId: plan.duplicateId,
+      },
+    });
+  }
+  const identities = {
+    sources: state.podcasts.map(
+      ({ id, feed_url, itunes_id, podcast_index_id, owner_user_id }) => ({
+        id,
+        feed_url,
+        itunes_id,
+        podcast_index_id,
+        owner_user_id,
+      }),
+    ),
+    canonicalFeedUrl: plan.canonicalFeedUrl,
+    feedAliases: [...feedAliases.values()].sort((a, b) =>
+      a.feed_url.localeCompare(b.feed_url),
+    ),
+    appleAliases: state.podcast_apple_aliases,
+    sourceEvidenceReference: plan.sourceEvidenceReference,
+  };
   const episodes = new Map(
     state.episodes
       .filter((row) => row.podcast_id === plan.canonicalId)
@@ -125,25 +178,24 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
       !a || !b || a.file_url === b.file_url,
       'Shared episode media differs',
     );
+    const difference = {
+      guid: source.guid,
+      canonicalPublished: target.published,
+      duplicatePublished: source.published,
+      canonicalTitle: a?.title ?? null,
+      duplicateTitle: b?.title ?? null,
+    };
     if (
       target.published !== source.published ||
       (a && b && a.title !== b.title)
-    ) {
-      const difference = {
-        guid: source.guid,
-        canonicalPublished: target.published,
-        duplicatePublished: source.published,
-        canonicalTitle: a?.title ?? null,
-        duplicateTitle: b?.title ?? null,
-      };
+    )
       differences.push(difference);
-      if (!a || !b) {
-        missingMedia.push({
-          ...difference,
-          canonicalMedia: a?.file_url ?? null,
-          duplicateMedia: b?.file_url ?? null,
-        });
-      }
+    if (!a || !b) {
+      missingMedia.push({
+        ...difference,
+        canonicalMedia: a?.file_url ?? null,
+        duplicateMedia: b?.file_url ?? null,
+      });
     }
     moves.push({ from: source.id, to: target.id });
   }
@@ -178,6 +230,8 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
   differences.sort((a, b) => a.guid.localeCompare(b.guid));
   missingMedia.sort((a, b) => a.guid.localeCompare(b.guid));
   return {
+    identities,
+    identitiesDigest: digest(identities),
     moves,
     unique,
     differences,
@@ -209,6 +263,10 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
     ) && plan.canonicalId !== plan.duplicateId,
     'Invalid podcast IDs',
   );
+  invariant(
+    /^[a-f0-9]{64}$/.test(plan.sourceEvidenceReference),
+    'Protected source-equivalence evidence digest required',
+  );
   const feed = new URL(plan.canonicalFeedUrl);
   invariant(
     feed.protocol === 'https:' &&
@@ -218,10 +276,12 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
     'Canonical locator must be a verified HTTPS public feed',
   );
   const expected =
-    mode === 'inspect' ? null : readProtected(options.expectedPath ?? '');
+    mode === 'inspect'
+      ? null
+      : readProtected(options.expectedPath ?? '', 64 * 1024 * 1024);
   if (expected)
     invariant(
-      expected.version === 1 && stable(expected.plan) === stable(plan),
+      expected.version === 2 && stable(expected.plan) === stable(plan),
       'Reviewed plan mismatch',
     );
   const ids = [plan.canonicalId, plan.duplicateId];
@@ -233,25 +293,42 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       await tx`SET LOCAL lock_timeout = '5s'`;
       await tx`SET LOCAL idle_in_transaction_session_timeout = '60s'`;
       await tx`SET LOCAL timezone = 'UTC'`;
+      await tx`SET LOCAL search_path = pg_catalog, public, pg_temp`;
+      const [settings] =
+        await tx`SELECT current_setting('transaction_isolation') AS isolation, to_jsonb(now()) AS now`;
+      invariant(
+        settings.isolation === 'read committed',
+        'Reconciliation requires read committed isolation',
+      );
       for (const id of [...ids].sort((a, b) => a - b)) {
         const [lock] =
           await tx`SELECT pg_try_advisory_xact_lock(${id}::bigint) AS acquired`;
         invariant(lock.acquired, 'Feed refresh is active');
       }
       const initial =
-        await tx`SELECT id, feed_url, itunes_id FROM public.podcasts WHERE id IN (${ids[0]}, ${ids[1]}) ORDER BY id`;
+        await tx`SELECT id, feed_url, itunes_id, podcast_index_id, owner_user_id FROM public.podcasts WHERE id IN (${ids[0]}, ${ids[1]}) ORDER BY id`;
       invariant(initial.length === 2, 'Expected two existing podcasts');
+      const initialFeedAliases =
+        await tx`SELECT to_jsonb(a) AS data FROM public.podcast_feed_aliases a WHERE podcast_id IN (${ids[0]}, ${ids[1]}) ORDER BY feed_url`;
+      const initialAppleAliases =
+        await tx`SELECT to_jsonb(a) AS data FROM public.podcast_apple_aliases a WHERE podcast_id IN (${ids[0]}, ${ids[1]}) ORDER BY itunes_id`;
       const claims = [
-        ...new Set(
-          initial
-            .map((row) => `podcast:feed\u001f${row.feed_url}`)
-            .concat(
-              `podcast:feed\u001f${plan.canonicalFeedUrl}`,
-              initial
-                .filter((row) => row.itunes_id !== null)
-                .map((row) => `podcast:itunes\u001f${row.itunes_id}`),
-            ),
-        ),
+        ...new Set([
+          ...initial.map((row) => `podcast:feed\u001f${row.feed_url}`),
+          `podcast:feed\u001f${plan.canonicalFeedUrl}`,
+          ...initial
+            .filter((row) => row.itunes_id !== null)
+            .map((row) => `podcast:itunes\u001f${row.itunes_id}`),
+          ...initial
+            .filter((row) => row.podcast_index_id !== null)
+            .map((row) => `podcast:index\u001f${row.podcast_index_id}`),
+          ...initialFeedAliases.map(
+            (row) => `podcast:feed\u001f${row.data.feed_url}`,
+          ),
+          ...initialAppleAliases.map(
+            (row) => `podcast:itunes\u001f${row.data.itunes_id}`,
+          ),
+        ]),
       ].sort();
       for (const claim of claims) {
         const [namespace, value] = claim.split('\u001f');
@@ -261,14 +338,22 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       }
       const keys = await tx`
         SELECT ns.nspname AS schema, child.relname AS child, parent.relname AS parent,
+          c.convalidated, c.condeferrable, c.confdeltype, c.confupdtype,
           ARRAY(SELECT attname FROM pg_attribute WHERE attrelid=c.conrelid AND attnum=ANY(c.conkey) ORDER BY attnum) AS child_columns,
           ARRAY(SELECT attname FROM pg_attribute WHERE attrelid=c.confrelid AND attnum=ANY(c.confkey) ORDER BY attnum) AS parent_columns
         FROM pg_constraint c JOIN pg_class child ON child.oid=c.conrelid
         JOIN pg_namespace ns ON ns.oid=child.relnamespace JOIN pg_class parent ON parent.oid=c.confrelid
-        WHERE c.contype='f' AND c.confrelid IN ('public.podcasts'::regclass,'public.episodes'::regclass)
+        WHERE c.contype='f' AND c.confrelid=ANY(${Object.keys(tables).map((table) => `public.${table}`)}::regclass[])
       `;
       invariant(
-        keys.every((row) => row.schema === 'public') &&
+        keys.every(
+          (row) =>
+            row.schema === 'public' &&
+            row.convalidated &&
+            !row.condeferrable &&
+            row.confdeltype === 'c' &&
+            row.confupdtype === 'a',
+        ) &&
           stable(
             keys
               .map(
@@ -279,18 +364,13 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           ) === stable(expectedForeignKeys),
         'Unexpected foreign-key dependencies',
       );
-      const triggers = await tx`
-        SELECT 1 FROM pg_trigger WHERE NOT tgisinternal
-          AND tgrelid IN ('public.podcasts'::regclass,'public.episodes'::regclass,
-            'public.episode_content'::regclass,'public.subscriptions'::regclass,
-            'public.playback_progress'::regclass,'public.transcripts'::regclass,
-            'public.feed_poll_state'::regclass,'public.podcasts_genres'::regclass,
-            'public.top_podcasts'::regclass)
-      `;
-      invariant(triggers.length === 0, 'User triggers require a tool review');
+      await verifyReconciliationTriggers(tx, Object.keys(tables));
       const conflictingLocator = await tx`
         SELECT 1 FROM public.podcasts WHERE feed_url=${plan.canonicalFeedUrl}
           AND id NOT IN (${ids[0]},${ids[1]})
+        UNION ALL
+        SELECT 1 FROM public.podcast_feed_aliases WHERE feed_url=${plan.canonicalFeedUrl}
+          AND podcast_id NOT IN (${ids[0]},${ids[1]})
       `;
       invariant(
         conflictingLocator.length === 0,
@@ -303,10 +383,23 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
             (p) =>
               String(p.id) === String(row.id) &&
               p.feed_url === row.feed_url &&
-              String(p.itunes_id) === String(row.itunes_id),
+              String(p.itunes_id) === String(row.itunes_id) &&
+              String(p.podcast_index_id) === String(row.podcast_index_id) &&
+              p.owner_user_id === row.owner_user_id,
           ),
         ),
         'Source identity changed while acquiring locks',
+      );
+      invariant(
+        sameRows(
+          before.podcast_feed_aliases,
+          initialFeedAliases.map((row) => row.data),
+        ) &&
+          sameRows(
+            before.podcast_apple_aliases,
+            initialAppleAliases.map((row) => row.data),
+          ),
+        'Accepted aliases changed while acquiring locks',
       );
       const analysis = analyze(before, plan);
       if (mode !== 'inspect') {
@@ -315,20 +408,26 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           'Reviewed snapshot changed; inspect again',
         );
         invariant(
+          plan.reviewedIdentities === analysis.identitiesDigest,
+          'Source identities and alias changes have not been reviewed',
+        );
+        invariant(
           plan.reviewedDifferences === analysis.differencesDigest,
           'Metadata differences have not been reviewed',
         );
         invariant(
           analysis.missingMedia.length === 0 ||
             plan.reviewedMissingMedia === analysis.missingMediaDigest,
-          'Missing-media metadata cases require separate source-evidence review',
+          'Missing-media cases require separate source-evidence review',
         );
       }
       const artifact = {
-        version: 1,
+        version: 2,
         capturedAt: new Date().toISOString(),
         plan,
         snapshot: before,
+        identities: analysis.identities,
+        identitiesDigest: analysis.identitiesDigest,
         episodeMap: analysis.moves,
         uniqueEpisodeIds: analysis.unique,
         differences: analysis.differences,
@@ -336,9 +435,12 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         missingMedia: analysis.missingMedia,
         missingMediaDigest: analysis.missingMediaDigest,
       };
-      writeProtected(options.backupPath, artifact);
+      writeProtected(options.backupPath, artifact, 64 * 1024 * 1024);
       result = {
         mode,
+        identitiesDigest: analysis.identitiesDigest,
+        retainedFeedAliases: analysis.identities.feedAliases.length,
+        retainedAppleAliases: before.podcast_apple_aliases.length,
         sharedEpisodes: analysis.moves.length,
         retainedUniqueEpisodes: analysis.unique.length,
         metadataDifferences: analysis.differences.length,
@@ -387,6 +489,16 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           is_essential=${before.podcasts.some((row) => row.is_essential) || before.subscriptions.length > 0 || before.playback_progress.length > 0},
           last_accessed_at=${dates.at(-1) ?? null}, updated_at=now()
         WHERE id=${plan.canonicalId}
+      `;
+      await tx`DELETE FROM public.podcast_feed_aliases WHERE podcast_id=${plan.canonicalId} AND feed_url=${plan.canonicalFeedUrl}`;
+      const expectedFeedAliases = analysis.identities.feedAliases.map(
+        (row) => ({ ...row, accepted_at: row.accepted_at ?? settings.now }),
+      );
+      if (expectedFeedAliases.length)
+        await tx`
+        INSERT INTO public.podcast_feed_aliases
+        SELECT * FROM jsonb_populate_recordset(NULL::public.podcast_feed_aliases, ${tx.json(expectedFeedAliases)}::jsonb)
+        ON CONFLICT (feed_url) DO NOTHING
       `;
       await tx`
         INSERT INTO public.feed_poll_state (podcast_id,next_poll_at,failures) VALUES (${plan.canonicalId},now(),0)
@@ -446,6 +558,15 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
             ]),
           ),
         'Canonical metadata changed unexpectedly',
+      );
+      invariant(
+        sameRows(after.podcast_feed_aliases, expectedFeedAliases) &&
+          sameRows(after.podcast_apple_aliases, before.podcast_apple_aliases),
+        'Accepted alias preservation failed',
+      );
+      invariant(
+        after.podcasts[0].episode_count === expectedEpisodes.length,
+        'Episode count postcondition failed',
       );
       invariant(
         sameRows(after.episodes, expectedEpisodes),
@@ -516,7 +637,7 @@ if (import.meta.main) {
     const planPath = args.get('--plan');
     const backupPath = args.get('--backup');
     invariant(planPath && backupPath, 'Plan and backup paths are required');
-    const plan = readProtected(planPath) as ReconciliationPlan;
+    const plan = readProtected(planPath, 16 * 1024) as ReconciliationPlan;
     sql = postgres(process.env.RECONCILE_DATABASE_URL, {
       max: 1,
       connect_timeout: 10,
