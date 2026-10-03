@@ -21,6 +21,7 @@ const schema = `chart_test_${randomUUID().replaceAll('-', '')}`;
 const podcast = (itunesId: number, rank = 1): ChartPodcast => ({
   itunesId,
   rank,
+  verifiedAt: new Date().toISOString(),
   title: `Podcast ${itunesId}`,
   author: `Author ${itunesId}`,
   feed: `https://example.com/${itunesId}/feed`,
@@ -91,18 +92,24 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
     await storeTopPodcasts(sql, [podcast(2147483647)], 'ca');
     const before =
       await sql`SELECT id::text, itunes_id::text FROM podcasts ORDER BY id`;
-    await sql`ALTER TABLE podcasts ALTER COLUMN itunes_id TYPE INTEGER`;
+    const [guard] = await sql`
+      SELECT pg_get_triggerdef(oid) AS definition FROM pg_trigger
+      WHERE tgrelid='podcasts'::regclass AND tgname='guard_podcast_apple_claim'
+    `;
     const migration = postgres(databaseUrl ?? '', {
       max: 1,
       connection: { search_path: schema },
       onnotice: () => {},
     });
+    await sql`DROP TRIGGER guard_podcast_apple_claim ON podcasts`;
     try {
+      await sql`ALTER TABLE podcasts ALTER COLUMN itunes_id TYPE INTEGER`;
       await migration.unsafe(
         readFileSync('migrations/0009-itunes-id-bigint.sql', 'utf8'),
       );
     } finally {
       await migration.end();
+      await sql.unsafe(guard.definition);
     }
     const [column] = await sql`
       SELECT data_type FROM information_schema.columns

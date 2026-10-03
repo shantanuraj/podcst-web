@@ -1,8 +1,25 @@
+import { createHash } from 'node:crypto';
 import type postgres from 'postgres';
 
 export class PodcastIdentityConflict extends Error {}
 export class PodcastAccessDenied extends Error {}
 export class PodcastIdentityBusy extends Error {}
+
+export interface AppleListingVerification {
+  country: string;
+  verifiedAt: string;
+}
+
+export function appleIdentities(sql: postgres.ISql, ids: number[]) {
+  return sql`
+    SELECT id, itunes_id FROM podcasts
+    WHERE itunes_id = ANY(${ids}::bigint[]) AND owner_user_id IS NULL
+    UNION ALL
+    SELECT p.id, alias.itunes_id FROM podcast_apple_aliases alias
+    JOIN podcasts p ON p.id = alias.podcast_id
+    WHERE alias.itunes_id = ANY(${ids}::bigint[]) AND p.owner_user_id IS NULL
+  `;
+}
 
 export interface PodcastIdentity {
   id: string | number;
@@ -59,7 +76,7 @@ export async function findPodcastIdentity(
     SELECT p.id, p.itunes_id, p.podcast_index_id, p.feed_url, p.owner_user_id FROM podcasts p
     WHERE p.id IN (
       ${locatorIds(sql, feedUrl)}
-      UNION SELECT id FROM podcasts WHERE itunes_id = ${itunesId ?? null}::bigint
+      UNION SELECT id FROM (${appleIdentities(sql, itunesId === undefined ? [] : [itunesId])}) apple
       UNION SELECT id FROM podcasts WHERE podcast_index_id = ${podcastIndexId ?? null}::integer
     )
     ORDER BY p.id
@@ -73,10 +90,11 @@ export async function findPodcastIdentity(
 }
 
 export async function claimPublicIdentity(
-  sql: postgres.ISql,
+  sql: postgres.TransactionSql,
   podcast: PodcastIdentity,
   feedUrl: string,
   itunesId?: number,
+  verification?: AppleListingVerification,
 ): Promise<number> {
   if (
     podcast.owner_user_id !== null &&
@@ -87,8 +105,56 @@ export async function claimPublicIdentity(
   if (itunesId !== undefined) {
     if (!Number.isSafeInteger(itunesId) || itunesId <= 0)
       throw new PodcastIdentityConflict('Invalid public provider identity');
-    if (podcast.itunes_id !== null && Number(podcast.itunes_id) !== itunesId)
-      throw new PodcastIdentityConflict('Feed belongs to another Apple ID');
+    if (podcast.itunes_id !== null && Number(podcast.itunes_id) !== itunesId) {
+      const [accepted] = await sql`
+        SELECT podcast_id FROM podcast_apple_aliases WHERE itunes_id = ${itunesId}
+      `;
+      if (accepted) {
+        if (Number(accepted.podcast_id) !== Number(podcast.id))
+          throw new PodcastIdentityConflict(
+            'Apple alias belongs to another source',
+          );
+        return Number(podcast.id);
+      }
+      const verifiedAt = Date.parse(verification?.verifiedAt ?? '');
+      const age = Date.now() - verifiedAt;
+      if (
+        !verification ||
+        !/^[a-z]{2}$/.test(verification.country) ||
+        !Number.isFinite(verifiedAt) ||
+        age < 0 ||
+        age > 10 * 60 * 1000
+      )
+        throw new PodcastIdentityConflict(
+          'Fresh Apple listing verification required',
+        );
+      const [source] = await sql`
+        SELECT p.id FROM podcasts p WHERE p.id = ${podcast.id}
+          AND p.owner_user_id IS NULL AND ${locatorMatches(sql, feedUrl)}
+        FOR UPDATE
+      `;
+      if (!source)
+        throw new PodcastIdentityConflict(
+          'Verified listing does not identify this public source',
+        );
+      const evidence = { feedUrl, ...verification };
+      const reference = createHash('sha256')
+        .update(JSON.stringify({ itunesId, ...evidence }))
+        .digest('hex');
+      await sql`
+        INSERT INTO podcast_apple_aliases (itunes_id,podcast_id,evidence_type,evidence_reference,evidence)
+        VALUES (${itunesId},${podcast.id},'apple_lookup',${reference},${sql.json(evidence)})
+        ON CONFLICT (itunes_id) DO NOTHING
+      `;
+      const [claimed] = await sql`
+        SELECT podcast_id FROM podcast_apple_aliases WHERE itunes_id = ${itunesId}
+      `;
+      if (!claimed || Number(claimed.podcast_id) !== Number(podcast.id))
+        throw new PodcastIdentityConflict(
+          'Apple alias belongs to another source',
+        );
+      return Number(podcast.id);
+    }
     if (
       podcast.owner_user_id === null &&
       podcast.itunes_id !== null &&

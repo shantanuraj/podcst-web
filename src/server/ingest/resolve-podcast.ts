@@ -1,6 +1,8 @@
 import type postgres from 'postgres';
 import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '../../data/constants';
+import { feedUrl } from '../../shared/feed-url';
 import { indexPodcast } from './index-podcast';
+import { appleIdentities, PodcastIdentityConflict } from './podcast-identity';
 
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -13,10 +15,12 @@ export async function resolvePodcast(
   if (!Number.isSafeInteger(itunesId) || itunesId <= 0) {
     throw new TypeError('itunes_id must be a positive integer');
   }
-  const [existing] = await sql`
-    SELECT id FROM podcasts WHERE itunes_id = ${itunesId} AND owner_user_id IS NULL
-  `;
-  if (existing) return Number(existing.id);
+  const existing = await sql`${appleIdentities(sql, [itunesId])}`;
+  if (existing.length > 1)
+    throw new PodcastIdentityConflict(
+      'Apple identity identifies multiple sources',
+    );
+  if (existing[0]) return Number(existing[0].id);
 
   const url = new URL('/lookup', ITUNES_API);
   url.search = new URLSearchParams({
@@ -37,13 +41,8 @@ export async function resolvePodcast(
       result?.collectionId === itunesId && result.kind === 'podcast',
   );
   if (!podcast) return null;
-  const feed = new URL(podcast.feedUrl);
-  if (
-    !['http:', 'https:'].includes(feed.protocol) ||
-    feed.username ||
-    feed.password
-  ) {
-    throw new Error('Apple returned an invalid feed URL');
-  }
-  return indexPodcast(sql, feed.href, itunesId);
+  return indexPodcast(sql, feedUrl(podcast.feedUrl), itunesId, undefined, {
+    country: locale,
+    verifiedAt: new Date().toISOString(),
+  });
 }

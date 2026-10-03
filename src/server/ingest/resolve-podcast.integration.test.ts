@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
-import { indexPodcast, PodcastIdentityConflict } from './index-podcast';
+import { indexPodcast } from './index-podcast';
 import { resolvePodcast } from './resolve-podcast';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -147,11 +147,12 @@ describe.skipIf(!databaseUrl)(
       expect(podcast.itunes_id).toBe(String(newAppleId));
     });
 
-    test('another Apple identity on the same feed is not silently overwritten', async () => {
+    test('another verified Apple listing is retained without overwriting the preferred ID', async () => {
       await sql`UPDATE podcasts SET feed_url = ${server.url.href} WHERE id = 152`;
-      await expect(
-        resolvePodcast(sql, newAppleId, 'us', lookup()),
-      ).rejects.toBeInstanceOf(PodcastIdentityConflict);
+      expect(await resolvePodcast(sql, newAppleId, 'us', lookup())).toBe(152);
+      const [alias] =
+        await sql`SELECT podcast_id FROM podcast_apple_aliases WHERE itunes_id=${newAppleId}`;
+      expect(alias.podcast_id).toBe('152');
       const [podcast] =
         await sql`SELECT itunes_id::text FROM podcasts WHERE id = 152`;
       expect(podcast.itunes_id).toBe(String(knownAppleId));

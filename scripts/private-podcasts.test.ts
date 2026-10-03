@@ -228,7 +228,9 @@ describe.skipIf(!process.env.PG_BIN)(
       if (!identity) throw new Error('Missing private identity');
       await sql`UPDATE podcasts SET feed_url = ${new URL('/rotated?token=new', server.url).href} WHERE id = ${id}`;
       await expect(
-        claimPublicIdentity(sql, identity, server.url.href, 101),
+        sql.begin((tx) =>
+          claimPublicIdentity(tx, identity, server.url.href, 101),
+        ),
       ).rejects.toBeInstanceOf(PodcastIdentityConflict);
       expect(await canAccessPodcast(sql, id)).toBe(false);
       expect(
@@ -250,6 +252,7 @@ describe.skipIf(!process.env.PG_BIN)(
             author: 'Author',
             feed: server.url.href,
             title: 'Public show',
+            verifiedAt: new Date().toISOString(),
             cover: 'cover',
             thumbnail: null,
             explicit: false,
@@ -306,11 +309,13 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(identity).toBeDefined();
       if (!identity) throw new Error('Missing private identity');
       await expect(
-        claimPublicIdentity(
-          sql,
-          identity,
-          new URL('/different', server.url).href,
-          101,
+        sql.begin((tx) =>
+          claimPublicIdentity(
+            tx,
+            identity,
+            new URL('/different', server.url).href,
+            101,
+          ),
         ),
       ).rejects.toBeInstanceOf(PodcastAccessDenied);
       expect(

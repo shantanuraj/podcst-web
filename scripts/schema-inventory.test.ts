@@ -334,7 +334,7 @@ describe.skipIf(!process.env.PG_BIN)(
 
     test.each([
       {
-        sql: 'ALTER TABLE podcasts ALTER COLUMN itunes_id TYPE integer',
+        sql: 'ALTER TABLE episode_content ALTER COLUMN file_length TYPE integer',
         kind: 'column',
         category: 'changed',
       },

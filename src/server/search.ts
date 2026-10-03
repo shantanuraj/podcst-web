@@ -1,6 +1,10 @@
 import type postgres from 'postgres';
 import type { IPodcastSearchResult } from '@/types';
-import { locatorMatches } from './ingest/podcast-identity';
+import {
+  appleIdentities,
+  locatorMatches,
+  PodcastIdentityConflict,
+} from './ingest/podcast-identity';
 import { podcastAccess } from './podcast-access';
 
 export async function matchSearchResults(
@@ -12,15 +16,22 @@ export async function matchSearchResults(
   );
   if (ids.length === 0) return results;
   const rows = await sql`
-    SELECT id, itunes_id, feed_url FROM podcasts
-    WHERE itunes_id = ANY(${ids}::bigint[]) AND owner_user_id IS NULL
+    SELECT p.id, apple.itunes_id, p.feed_url FROM (${appleIdentities(sql, ids)}) apple
+    JOIN podcasts p ON p.id = apple.id
   `;
   const byItunesId = new Map(rows.map((row) => [Number(row.itunes_id), row]));
-  return results.map((result) => {
+  if (byItunesId.size !== rows.length)
+    throw new PodcastIdentityConflict(
+      'Apple identity identifies multiple sources',
+    );
+  const seen = new Set<number>();
+  return results.flatMap((result) => {
     const existing = byItunesId.get(result.itunes_id ?? 0);
-    return existing
-      ? { ...result, id: Number(existing.id), feed: existing.feed_url }
-      : result;
+    if (!existing) return [result];
+    const id = Number(existing.id);
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ ...result, id, feed: existing.feed_url }];
   });
 }
 

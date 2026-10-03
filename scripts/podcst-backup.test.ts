@@ -21,7 +21,8 @@ const tables = [...script.matchAll(/-t (public\.[a-z_]+)/g)].map(
 
 test('user backup explicitly includes aliases and refuses missing selected tables', () => {
   expect(tables).toContain('public.podcast_feed_aliases');
-  expect(tables).toHaveLength(8);
+  expect(tables).toContain('public.podcast_apple_aliases');
+  expect(tables).toHaveLength(9);
   expect(script).toContain('--strict-names');
 });
 
@@ -62,8 +63,9 @@ describe.skipIf(!process.env.PG_BIN)(
       );
       await createSchemaFixture(cluster.sql);
       await cluster.sql`INSERT INTO authors (id,name) VALUES (1,'Synthetic')`;
-      await cluster.sql`INSERT INTO podcasts (id,author_id,title,cover,feed_url) VALUES (1,1,'Synthetic','','https://example.invalid/current')`;
+      await cluster.sql`INSERT INTO podcasts (id,itunes_id,author_id,title,cover,feed_url) VALUES (1,101,1,'Synthetic','','https://example.invalid/current')`;
       await cluster.sql`INSERT INTO podcast_feed_aliases (feed_url,podcast_id,evidence_type,evidence_reference) VALUES ('https://example.invalid/previous',1,'reviewed','synthetic-review')`;
+      await cluster.sql`INSERT INTO podcast_apple_aliases (itunes_id,podcast_id,evidence_type,evidence_reference) VALUES (303,1,'reviewed','synthetic-review')`;
     }, 30_000);
     afterAll(async () => {
       await cluster?.stop();
@@ -72,6 +74,9 @@ describe.skipIf(!process.env.PG_BIN)(
     test('selected dump restores exact alias rows when required parent identity is present', async () => {
       const before = Array.from(
         await cluster.sql`SELECT * FROM podcast_feed_aliases`,
+      );
+      const appleBefore = Array.from(
+        await cluster.sql`SELECT * FROM podcast_apple_aliases`,
       );
       const result = dump();
       expect({
@@ -82,12 +87,13 @@ describe.skipIf(!process.env.PG_BIN)(
       const extracted = run('pg_restore', [
         '--data-only',
         '--table=podcast_feed_aliases',
+        '--table=podcast_apple_aliases',
         '--file',
         path,
         join(cluster.directory, 'selected.dump'),
       ]);
       expect(extracted.exitCode).toBe(0);
-      await cluster.sql`TRUNCATE podcast_feed_aliases`;
+      await cluster.sql`TRUNCATE podcast_feed_aliases, podcast_apple_aliases`;
       const restored = run('psql', [
         '-X',
         '-q',
@@ -111,6 +117,9 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(
         Array.from(await cluster.sql`SELECT * FROM podcast_feed_aliases`),
       ).toEqual(before);
+      expect(
+        Array.from(await cluster.sql`SELECT * FROM podcast_apple_aliases`),
+      ).toEqual(appleBefore);
     });
 
     test('temporary tables cannot shadow either alias guard', async () => {
@@ -133,6 +142,11 @@ describe.skipIf(!process.env.PG_BIN)(
           }),
         ).rejects.toThrow('Locator is an accepted alias');
       });
+    });
+
+    test('missing Apple alias table fails instead of omitting listing identity', async () => {
+      await cluster.sql`DROP TABLE podcast_apple_aliases CASCADE`;
+      expect(dump().exitCode).not.toBe(0);
     });
 
     test('missing alias table fails instead of silently producing an incomplete dump', async () => {

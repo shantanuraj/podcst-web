@@ -4,6 +4,7 @@ import { claimPublicAliases } from './feed-aliases';
 import { fetchFeed, savePollState } from './feed-refresh';
 import { getPollInterval } from './feed-schedule';
 import {
+  type AppleListingVerification,
   claimPublicIdentity,
   findPodcastIdentity,
   lockPodcastIdentities,
@@ -35,6 +36,7 @@ async function index(
   ownerUserId: string | null,
   itunesId?: number,
   verifyMove = verifyPublicFeedMove,
+  verification?: AppleListingVerification,
 ): Promise<number> {
   const existing = await findPodcastIdentity(sql, feedUrl, itunesId);
   if (existing && ownerUserId) return authorizePrivate(existing, ownerUserId);
@@ -45,10 +47,10 @@ async function index(
     : await fetchFeed(feedUrl, undefined, ownerUserId !== null);
   if (fetched && fetched.status !== 'updated')
     throw new Error('Feed was not returned');
-  const verification =
+  const moveVerification =
     !ownerUserId && fetched?.publicRedirect ? await verifyMove(feedUrl) : null;
   const move =
-    verification?.status === 'verified' ? verification.evidence : null;
+    moveVerification?.status === 'verified' ? moveVerification.evidence : null;
   if (move && move.requestedUrl !== feedUrl)
     throw new PodcastIdentityConflict(
       'Move evidence identifies another source',
@@ -112,7 +114,7 @@ async function index(
           },
         });
       }
-      return claimPublicIdentity(tx, found, feedUrl, itunesId);
+      return claimPublicIdentity(tx, found, feedUrl, itunesId, verification);
     }
     if (fetched?.status !== 'updated')
       throw new Error('Feed changed during import; retry');
@@ -147,7 +149,7 @@ async function index(
         throw new PodcastIdentityConflict('Unable to resolve podcast identity');
       return ownerUserId
         ? authorizePrivate(winner, ownerUserId)
-        : claimPublicIdentity(tx, winner, feedUrl, itunesId);
+        : claimPublicIdentity(tx, winner, feedUrl, itunesId, verification);
     }
     const id = Number(podcast.id);
     if (move)
@@ -172,8 +174,9 @@ export function indexPodcast(
   feedUrl: string,
   itunesId?: number,
   verifyMove = verifyPublicFeedMove,
+  verification?: AppleListingVerification,
 ) {
-  return index(sql, feedUrl, null, itunesId, verifyMove);
+  return index(sql, feedUrl, null, itunesId, verifyMove, verification);
 }
 
 export function indexPrivatePodcast(

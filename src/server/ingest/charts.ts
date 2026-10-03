@@ -20,6 +20,7 @@ export interface ChartPodcast {
   explicit: boolean;
   count: number;
   rank: number;
+  verifiedAt: string;
 }
 
 interface ITunesFeedResponse {
@@ -82,6 +83,7 @@ export async function fetchTopFromItunes(
     throw new Error('Apple returned an invalid lookup response');
   }
 
+  const verifiedAt = new Date().toISOString();
   const ranks = new Map(ids.map((id, i) => [id, i + 1]));
   const podcasts = new Map<number, ChartPodcast>();
   for (const podcast of lookup.results) {
@@ -105,6 +107,7 @@ export async function fetchTopFromItunes(
     podcasts.set(id, {
       itunesId: id,
       rank,
+      verifiedAt,
       title,
       feed,
       cover,
@@ -164,7 +167,8 @@ export async function storeTopPodcasts(
     await tx`DELETE FROM top_podcasts WHERE country_id = ${locale} AND genre_id = 0`;
 
     let newPodcasts = 0;
-    for (const p of podcasts) {
+    const storedSources = new Set<number>();
+    for (const p of [...podcasts].sort((a, b) => a.rank - b.rank)) {
       let podcast = await findPodcastIdentity(
         tx,
         p.feed,
@@ -206,7 +210,12 @@ export async function storeTopPodcasts(
         throw new PodcastIdentityConflict(
           'Canonical source changed during chart import; retry',
         );
-      await claimPublicIdentity(tx, podcast, p.feed, p.itunesId);
+      const id = await claimPublicIdentity(tx, podcast, p.feed, p.itunesId, {
+        country: locale,
+        verifiedAt: p.verifiedAt,
+      });
+      if (storedSources.has(id)) continue;
+      storedSources.add(id);
       await tx`
         INSERT INTO feed_poll_state (podcast_id) VALUES (${podcast.id})
         ON CONFLICT (podcast_id) DO NOTHING
@@ -216,7 +225,7 @@ export async function storeTopPodcasts(
         VALUES (${locale}, 0, ${p.rank}, ${podcast.id}, now())
       `;
     }
-    return { stored: podcasts.length, newPodcasts };
+    return { stored: storedSources.size, newPodcasts };
   });
 }
 

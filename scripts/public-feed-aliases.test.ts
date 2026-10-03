@@ -511,6 +511,7 @@ describe.skipIf(!process.env.PG_BIN)(
             author: 'Publisher',
             feed: old,
             title: 'Public',
+            verifiedAt: new Date().toISOString(),
             cover: 'art',
             thumbnail: null,
             explicit: false,
