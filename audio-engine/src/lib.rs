@@ -4,6 +4,7 @@ pub mod ffi;
 pub mod fixtures;
 pub mod processing;
 pub mod speech;
+pub mod vectors;
 pub mod wav;
 
 pub use analysis::{

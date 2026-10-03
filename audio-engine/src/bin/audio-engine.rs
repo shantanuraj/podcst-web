@@ -3,6 +3,7 @@ use std::error::Error;
 use std::path::Path;
 
 use podcst_audio_engine::fixtures::generate_fixtures;
+use podcst_audio_engine::vectors::write_bridge_vectors;
 use podcst_audio_engine::wav::{read_wav, write_wav};
 use podcst_audio_engine::{
     AdaptiveSilenceConfig, AnalysisConfig, BoostConfig, LimiterConfig, ProcessingConfig,
@@ -18,6 +19,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 return Err("generate-fixtures accepts exactly one directory".into());
             }
             for path in generate_fixtures(directory)? {
+                println!("{}", path.display());
+            }
+        }
+        Some("bridge-vectors") => {
+            let directory = args.next().ok_or("missing vector directory")?;
+            for path in write_bridge_vectors(directory, &args.collect::<Vec<_>>())? {
                 println!("{}", path.display());
             }
         }
@@ -273,7 +280,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         _ => {
             print_usage();
-            return Err("expected generate-fixtures, analyze, or process".into());
+            return Err("expected generate-fixtures, bridge-vectors, analyze, or process".into());
         }
     }
     Ok(())
@@ -281,7 +288,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  audio-engine generate-fixtures <directory>\n  audio-engine analyze <file.wav> [--json] [--silence-threshold-dbfs <dbfs>] [--min-silence-ms <ms>] [--guard-ms <ms>]\n  audio-engine process <input.wav> <output.wav> [--boost] [--target-lufs <lufs>] [--trim-silence|--adaptive-silence] [--retain-silence-ms <ms>] [--max-trim-ms <ms>] [--fade-ms <ms>] [--limit] [--json]"
+        "Usage:\n  audio-engine generate-fixtures <directory>\n  audio-engine bridge-vectors <directory> [case...]\n  audio-engine analyze <file.wav> [--json] [--silence-threshold-dbfs <dbfs>] [--min-silence-ms <ms>] [--guard-ms <ms>]\n  audio-engine process <input.wav> <output.wav> [--boost] [--target-lufs <lufs>] [--trim-silence|--adaptive-silence] [--retain-silence-ms <ms>] [--max-trim-ms <ms>] [--fade-ms <ms>] [--limit] [--json]"
     );
 }
 

@@ -270,6 +270,69 @@ prebuilt binary is downloaded or checked in. The iOS test target also needs
 AAC fixtures in Derived Data. The test build copies them into the test bundle; it is never an app resource
 or a checked-in media file.
 
+### Android packaging and linking
+
+Install the Android SDK with NDK `30.0.16248370` and CMake `3.30.3`, then add
+the three Android targets to the toolchain named by `podcst.rustToolchain` in
+`android/gradle.properties` (currently `stable`):
+
+```sh
+rustup target add --toolchain stable aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+RUSTUP_TOOLCHAIN=stable audio-engine/scripts/build-android.sh [--target-dir <dir>] [arm64-v8a armeabi-v7a x86_64]
+```
+
+The script builds the release static library for each requested ABI (all three
+by default) and copies it to `<target-dir>/android/<abi>/libpodcst_audio_engine.a`
+under the ignored `target/`. A static library needs no NDK linker. It uses the
+active rustup toolchain unless `RUSTUP_TOOLCHAIN` is set; Gradle sets it from
+`podcst.rustToolchain` and runs the script before every CMake build.
+
+`:core:audio-engine` links that library into one `libpodcst_audio_jni.so` per ABI
+with a small C++ JNI adapter (`android/core/audio-engine/src/main/cpp`). Only the
+`Java_app_podcst_audio_NativeAudio_*` entry points are exported; the shared object
+needs `liblog`, `libdl`, `libm` and `libc`, and NDK 30 aligns 64-bit `LOAD`
+segments to 16 KB. The adapter accepts direct buffers only, validates offsets,
+lengths, alignment and channel framing, caps each call at 8,192 frames and packs
+reports into the returned `long`, so the processing path allocates nothing on
+the Java heap. Each processor has one atomic owner flag: concurrent entry
+returns `BUSY`, close is refused while a call is in flight and later calls return
+`CLOSED`. The native shell itself is freed by a `Cleaner` once its Kotlin owner
+is unreachable.
+
+The Kotlin API (`app.podcst.audio`) offers `EffectsProcessor`, `Limiter` (default
+limiter configuration) and the Media3 `RustEffectsAudioProcessor` and
+`RustLimiterAudioProcessor`. The effects processor accepts 16-bit or float PCM,
+emits float, applies `setEffects` from any thread at its next buffer, maps
+`flush(StreamMetadata)` to a source origin and reports each native span to a
+`SourceSpanSink` with its output frame counted since that flush; spans are
+delivered per native call, unmerged. Finish is reached only through
+`queueEndOfStream`.
+
+```sh
+cd android
+./gradlew :core:audio-engine:assembleRelease :core:audio-engine:testDebugUnitTest :core:audio-engine:assembleAndroidTest
+./gradlew :core:audio-engine:connectedDebugAndroidTest
+```
+
+JVM tests build the host Rust library and the same adapter with the SDK CMake
+against the Gradle JDK headers, then load it from `java.library.path`. They
+replay `bridge-vectors`, generated from the Rust API rather than the C ABI:
+
+```sh
+cargo run --release --manifest-path audio-engine/Cargo.toml -- bridge-vectors <dir> [case...]
+```
+
+`manifest.json` lists each case's engine, format, encoding, initial effects and
+exact call schedule: `process` (offered frames, output and span capacities with
+the expected consumed/emitted/span counts), `finish`, `configure` and `reset`
+steps. Effects cases also list the expected spans per reset segment as merged
+`[source, output, frames]` triples. `<case>.input.f32` or `.input.s16` and
+`<case>.output.f32` hold little-endian interleaved samples; 16-bit cases expect
+the output for `sample / 32768`. The wrappers replay every schedule call by call;
+the Media3 processors replay the same stream with their own chunking, which the
+Rust tests show cannot change the output. The connected test embeds a four-case
+subset as test assets; it needs an attached device or emulator.
+
 ### Local iOS Audio Lab
 
 Open `ios/Podcst.xcodeproj`, select the **Podcst Audio Lab** scheme and run on an
