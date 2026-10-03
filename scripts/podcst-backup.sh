@@ -21,10 +21,10 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 DUMP="$TMP/dump"
 
-"$PGDUMP" "$DATABASE_URL" -Fc --no-owner --no-privileges \
+"$PGDUMP" "$DATABASE_URL" -Fc --strict-names --no-owner --no-privileges \
   -t public.users -t public.subscriptions -t public.playback_progress \
   -t public.passkeys -t public.sessions -t public.email_verifications \
-  -t public.transcripts > "$DUMP"
+  -t public.transcripts -t public.podcast_feed_aliases > "$DUMP"
 [ -s "$DUMP" ] || { echo "ERROR: empty pg_dump output" >&2; exit 1; }
 
 "$AGE" -r "$RECIPIENT" -o "$DUMP.age" "$DUMP"
