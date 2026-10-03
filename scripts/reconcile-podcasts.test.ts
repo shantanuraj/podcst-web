@@ -636,6 +636,25 @@ CREATE TRIGGER fixture_trigger BEFORE UPDATE ON podcasts FOR EACH ROW EXECUTE FU
     ).toBe(2);
   });
 
+  test('reactivates only through explicit reviewed identity policy', async () => {
+    await sql`UPDATE podcasts SET is_active=false WHERE id=1`;
+    await apply('dry-run');
+    expect(
+      (await sql`SELECT is_active FROM podcasts WHERE id=1`)[0].is_active,
+    ).toBe(false);
+    const requested = { ...plan, reactivateCanonical: true };
+    await expect(apply('apply', requested)).rejects.toThrow(
+      'Source identities and alias changes',
+    );
+    requested.reviewedIdentities = (
+      await inspect(requested)
+    ).result?.identitiesDigest;
+    await apply('apply', requested);
+    expect(
+      (await sql`SELECT is_active FROM podcasts WHERE id=1`)[0].is_active,
+    ).toBe(true);
+  });
+
   test('does not infer correspondence between nonempty disjoint GUID sets', async () => {
     await sql`UPDATE episodes SET guid='other-'||guid WHERE podcast_id=2`;
     await expect(inspect()).rejects.toThrow(

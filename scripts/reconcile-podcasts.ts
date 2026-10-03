@@ -18,6 +18,7 @@ export interface ReconciliationPlan {
   reviewedProviderRetirements?: string;
   reviewedEmptyCanonical?: string;
   reviewedCatalogChanges?: string;
+  reactivateCanonical?: boolean;
 }
 
 interface Options {
@@ -160,6 +161,7 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     appleAliases: state.podcast_apple_aliases,
     sourceEvidenceReference: plan.sourceEvidenceReference,
     providerRetirements,
+    ...(plan.reactivateCanonical ? { reactivateCanonical: true } : {}),
   };
   const episodes = new Map(
     state.episodes
@@ -321,6 +323,11 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
   invariant(
     /^[a-f0-9]{64}$/.test(plan.sourceEvidenceReference),
     'Protected source-equivalence evidence digest required',
+  );
+  invariant(
+    plan.reactivateCanonical === undefined ||
+      typeof plan.reactivateCanonical === 'boolean',
+    'Invalid canonical activity policy',
   );
   const feed = new URL(plan.canonicalFeedUrl);
   invariant(
@@ -598,6 +605,7 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       await tx`
         UPDATE public.podcasts SET feed_url=${plan.canonicalFeedUrl},
           episode_count=(SELECT count(*) FROM public.episodes WHERE podcast_id=${plan.canonicalId}),
+          is_active=${plan.reactivateCanonical ? true : canonicalBefore.is_active},
           is_essential=${before.podcasts.some((row) => row.is_essential) || before.subscriptions.length > 0 || before.playback_progress.length > 0},
           last_accessed_at=${dates.at(-1) ?? null}, updated_at=now()
         WHERE id=${plan.canonicalId}
@@ -655,6 +663,7 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           without(after.podcasts[0], [
             'feed_url',
             'episode_count',
+            'is_active',
             'is_essential',
             'last_accessed_at',
             'updated_at',
@@ -664,12 +673,18 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
             without(canonicalBefore, [
               'feed_url',
               'episode_count',
+              'is_active',
               'is_essential',
               'last_accessed_at',
               'updated_at',
             ]),
           ),
         'Canonical metadata changed unexpectedly',
+      );
+      invariant(
+        after.podcasts[0].is_active ===
+          (plan.reactivateCanonical ? true : canonicalBefore.is_active),
+        'Canonical activity policy changed unexpectedly',
       );
       for (const claim of analysis.providerRetirements) {
         const claimed = await tx.unsafe(
