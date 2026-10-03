@@ -315,25 +315,24 @@ struct NowPlayingBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button {
-                router.showingPlayer = true
-            } label: {
-                HStack(spacing: 12) {
-                    ArtworkView(url: playback.currentEpisode?.artworkURL, fallbackURL: playback.currentEpisode.flatMap { URL(string: $0.cover) }, size: 44)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(playback.currentEpisode?.title ?? "")
-                            .font(.sans(.subheadline).weight(.medium))
-                            .lineLimit(1)
-                        subtitle
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 12) {
+                ArtworkView(url: playback.currentEpisode?.artworkURL, fallbackURL: playback.currentEpisode.flatMap { URL(string: $0.cover) }, size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(playback.currentEpisode?.title ?? "")
+                        .font(.sans(.subheadline).weight(.medium))
+                        .lineLimit(1)
+                    subtitle
                 }
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .offset(x: drag.width)
-                .opacity(1 - min(0.55, abs(drag.width) / 240))
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.plain)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .offset(x: drag.width)
+            .opacity(1 - min(0.55, abs(drag.width) / 240))
+            .onTapGesture { router.showingPlayer = true }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { router.showingPlayer = true }
             .accessibilityLabel("\(playback.currentEpisode?.title ?? ""), \(playback.currentEpisode?.podcastTitle ?? "Podcst")")
             .accessibilityHint("Open Now Playing")
             .accessibilityAction(named: "Next episode") { playback.next() }
