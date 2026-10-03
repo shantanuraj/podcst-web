@@ -1,5 +1,6 @@
-import postgres from 'postgres';
+import type postgres from 'postgres';
 import { digest, readProtected, stable, writeProtected } from './lib/artifacts';
+import { openDatabase } from './lib/database';
 import { verifyReconciliationTriggers } from './reconciliation-schema';
 
 type Row = postgres.Row;
@@ -630,18 +631,11 @@ if (import.meta.main) {
       );
       args.set(input[i], input[i + 1]);
     }
-    invariant(
-      process.env.RECONCILE_DATABASE_URL,
-      'RECONCILE_DATABASE_URL must explicitly select a database',
-    );
     const planPath = args.get('--plan');
     const backupPath = args.get('--backup');
     invariant(planPath && backupPath, 'Plan and backup paths are required');
     const plan = readProtected(planPath, 16 * 1024) as ReconciliationPlan;
-    sql = postgres(process.env.RECONCILE_DATABASE_URL, {
-      max: 1,
-      connect_timeout: 10,
-    });
+    sql = openDatabase('RECONCILE_DATABASE_URL');
     const result = await reconcile(sql, {
       plan,
       backupPath,

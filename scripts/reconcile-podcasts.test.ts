@@ -9,7 +9,7 @@ import {
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
-import { digest } from './lib/artifacts';
+import { digest, writeProtected } from './lib/artifacts';
 import { startPostgres } from './lib/postgres-sandbox';
 import { createSchemaFixture } from './lib/schema-fixture';
 import { type ReconciliationPlan, reconcile } from './reconcile-podcasts';
@@ -91,6 +91,52 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
     await sql.unsafe(seed);
     plan.reviewedIdentities = (await inspect()).result?.identitiesDigest;
     delete plan.reviewedMissingMedia;
+  });
+
+  test('the CLI honors the explicitly selected Unix socket instead of app defaults', async () => {
+    const planPath = path();
+    const backupPath = path();
+    writeProtected(planPath, plan);
+    const cli = new URL(
+      import.meta.url.endsWith('.js')
+        ? './reconcile-podcasts.js'
+        : './reconcile-podcasts.ts',
+      import.meta.url,
+    );
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        cli.pathname,
+        '--plan',
+        planPath,
+        '--backup',
+        backupPath,
+        '--mode',
+        'inspect',
+      ],
+      {
+        env: {
+          ...process.env,
+          RECONCILE_DATABASE_URL: cluster.url,
+          DATABASE_URL: 'postgres://not-selected@127.0.0.1:1/not-selected',
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    );
+    const [code, output, errors] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(errors).toBe('');
+    expect(code).toBe(0);
+    expect(JSON.parse(output).mode).toBe('inspect');
+    expect(
+      JSON.parse(readFileSync(backupPath, 'utf8')).snapshot.podcasts.map(
+        (p: { id: number }) => p.id,
+      ),
+    ).toEqual([1, 2]);
   });
 
   test('inspection backs up without changing data; dry run checks and rolls back', async () => {
