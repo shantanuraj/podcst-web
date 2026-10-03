@@ -163,6 +163,23 @@ extension View {
             }
         }
     }
+
+    func callout<S: InsettableShape>(in shape: S) -> some View {
+        modifier(Callout(shape: shape))
+    }
+}
+
+private struct Callout<S: InsettableShape>: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    let shape: S
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundStyle(PodcstPalette.ink)
+            .background(PodcstPalette.paper, in: shape)
+            .shadow(color: .black.opacity(0.3), radius: 14, y: 10)
+            .environment(\.colorScheme, colorScheme == .dark ? .light : .dark)
+    }
 }
 
 @MainActor

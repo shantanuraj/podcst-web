@@ -702,6 +702,77 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(controller.currentTime, 0)
     }
 
+    func testStopKeepsPlaceAndQueueAcrossRelaunch() {
+        let url = temporaryURL()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, persistenceURL: url)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"))
+        controller.enqueue(episode(guid: "second"))
+        transport.becomeReady(duration: 100)
+        transport.advance(to: 42)
+        controller.stop()
+
+        XCTAssertFalse(controller.isActive)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertEqual(controller.currentEpisode?.guid, "first")
+        XCTAssertEqual(controller.currentTime, 42)
+        XCTAssertEqual(controller.queue.map(\.guid), ["first", "second"])
+        XCTAssertEqual(updates.last?.position, 42)
+        XCTAssertEqual(updates.last?.completed, false)
+
+        let relaunched = makeController(transport: FakePlaybackTransport(), persistenceURL: url)
+        XCTAssertFalse(relaunched.isActive)
+        XCTAssertEqual(relaunched.currentEpisode?.guid, "first")
+        XCTAssertEqual(relaunched.currentTime, 42)
+
+        controller.resume()
+        XCTAssertTrue(controller.isActive)
+        XCTAssertTrue(controller.isPlaybackRequested)
+        XCTAssertEqual(transport.position, 42)
+    }
+
+    func testStoppedSessionIgnoresInterruptionsAndReopensPaused() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "first"))
+        transport.becomeReady(duration: 100)
+        controller.stop()
+        controller.handleInterruption(typeRaw: 1, optionsRaw: nil)
+        controller.handleInterruption(typeRaw: 0, optionsRaw: 1)
+
+        XCTAssertFalse(controller.isActive)
+        XCTAssertEqual(transport.playedRates, [1])
+
+        controller.reopen()
+        XCTAssertTrue(controller.isActive)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(transport.hasSource)
+    }
+
+    func testMarkPlayedCompletesAndPlaysNext() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "first"))
+        controller.enqueue(episode(guid: "second"))
+        transport.becomeReady(duration: 100)
+        transport.advance(to: 12)
+        controller.markPlayed()
+
+        XCTAssertEqual(updates.last?.episode.guid, "first")
+        XCTAssertEqual(updates.last?.completed, true)
+        XCTAssertEqual(controller.queue.map(\.guid), ["second"])
+        XCTAssertTrue(controller.isPlaybackRequested)
+
+        controller.markPlayed()
+        XCTAssertTrue(controller.queue.isEmpty)
+        XCTAssertFalse(controller.isActive)
+    }
+
     func testUserPauseDuringInterruptionCancelsAutomaticResume() {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport)

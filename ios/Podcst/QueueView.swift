@@ -66,7 +66,7 @@ private struct NowPlayingCard: View {
         HStack(spacing: 12) {
             ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 52)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Now playing").eyebrow(PodcstPalette.accent)
+                Text(playback.isActive ? "Now playing" : "Continue").eyebrow(PodcstPalette.accent)
                 Text(episode.title)
                     .font(.serif(.body))
                     .lineLimit(1)

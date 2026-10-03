@@ -18,8 +18,14 @@ enum Route: Hashable {
 @MainActor
 @Observable
 final class Router {
+    struct StoppedPlayback: Equatable {
+        let id = UUID()
+        let wasPlaying: Bool
+    }
+
     var tab: AppTab = .discover
     var showingPlayer = false
+    var stoppedPlayback: StoppedPlayback?
     private var paths: [AppTab: [Route]] = [:]
 
     func path(_ tab: AppTab) -> Binding<[Route]> {
@@ -34,6 +40,19 @@ final class Router {
     func open(_ route: Route) {
         showingPlayer = false
         paths[tab, default: []].append(route)
+    }
+
+    func stop(_ playback: PlaybackController) {
+        guard playback.isActive else { return }
+        showingPlayer = false
+        stoppedPlayback = StoppedPlayback(wasPlaying: playback.isPlaybackRequested)
+        playback.stop()
+    }
+
+    func undoStop(_ playback: PlaybackController) {
+        guard let stoppedPlayback else { return }
+        self.stoppedPlayback = nil
+        if stoppedPlayback.wasPlaying { playback.resume() } else { playback.reopen() }
     }
 }
 
@@ -85,6 +104,13 @@ struct RootView: View {
         }
         .task(id: scenePhase) {
             if scenePhase == .active { await library.flushProgress() }
+        }
+        .task(id: router.stoppedPlayback?.id) {
+            guard router.stoppedPlayback != nil, (try? await Task.sleep(for: .seconds(5))) != nil else { return }
+            router.stoppedPlayback = nil
+        }
+        .onChange(of: playback.isActive) { _, active in
+            if active { router.stoppedPlayback = nil }
         }
         .task(id: session.user?.id) {
             guard session.user != nil else { return }
@@ -186,17 +212,61 @@ private struct StartupView: View {
 
 private struct PlayerInset: ViewModifier {
     @Environment(PlaybackController.self) private var playback
+    @Environment(Router.self) private var router
 
     func body(content: Content) -> some View {
         content.safeAreaInset(edge: .bottom, spacing: 0) {
-            if playback.currentEpisode != nil {
-                NowPlayingBar()
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            Group {
+                if playback.isActive {
+                    NowPlayingBar()
+                } else if router.stoppedPlayback != nil {
+                    StoppedPlaybackToast()
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
-        .animation(.snappy, value: playback.currentEpisode == nil)
+        .animation(.snappy, value: playback.isActive)
+        .animation(.snappy, value: router.stoppedPlayback)
+    }
+}
+
+private struct StoppedPlaybackToast: View {
+    @Environment(PlaybackController.self) private var playback
+    @Environment(Router.self) private var router
+
+    private var detail: String {
+        let saved = "Saved at \(Duration.clock(playback.currentTime))"
+        let left = playback.upNext.count
+        return left > 0 ? "\(saved) · \(left) left in queue" : saved
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Playback stopped")
+                    .font(.sans(.subheadline).weight(.medium))
+                Text(detail)
+                    .font(.sans(.caption))
+                    .monospacedDigit()
+                    .foregroundStyle(PodcstPalette.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            Button("Undo") { router.undoStop(playback) }
+                .font(.sans(.subheadline).weight(.semibold))
+                .foregroundStyle(PodcstPalette.accent)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .frame(height: 56)
+        .callout(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -224,7 +294,9 @@ struct AccountButton: View {
 struct NowPlayingBar: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(Router.self) private var router
-    @State private var dragOffset: CGFloat = 0
+    @State private var drag: CGSize = .zero
+
+    private var stopsOnRelease: Bool { drag.height > 56 }
 
     private var subtitle: some View {
         Group {
@@ -258,14 +330,15 @@ struct NowPlayingBar: View {
                 }
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .offset(x: dragOffset)
-                .opacity(1 - min(0.55, abs(dragOffset) / 240))
+                .offset(x: drag.width)
+                .opacity(1 - min(0.55, abs(drag.width) / 240))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(playback.currentEpisode?.title ?? ""), \(playback.currentEpisode?.podcastTitle ?? "Podcst")")
             .accessibilityHint("Open Now Playing")
             .accessibilityAction(named: "Next episode") { playback.next() }
             .accessibilityAction(named: "Previous episode") { playback.previous() }
+            .accessibilityAction(named: "Stop playback") { router.stop(playback) }
             if playback.isPlaying {
                 Equalizer(active: true)
             }
@@ -299,15 +372,42 @@ struct NowPlayingBar: View {
         }
         .shadow(color: PodcstPalette.floatingShadow, radius: 12, y: 8)
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .scaleEffect(stopsOnRelease ? 0.96 : 1)
+        .opacity(stopsOnRelease ? 0.7 : 1)
+        .overlay(alignment: .top) {
+            if stopsOnRelease {
+                Label("Release to stop", systemImage: "stop.fill")
+                    .font(.sans(.footnote).weight(.semibold))
+                    .labelStyle(.titleAndIcon)
+                    .padding(.horizontal, 14)
+                    .frame(height: 34)
+                    .callout(in: Capsule())
+                    .offset(y: -48)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
+        }
+        .offset(y: drag.height / 2)
+        .animation(.snappy(duration: 0.2), value: stopsOnRelease)
+        .sensoryFeedback(.impact, trigger: stopsOnRelease) { _, stops in stops }
         .simultaneousGesture(
             DragGesture(minimumDistance: 24)
                 .onChanged { value in
-                    guard abs(value.translation.width) > abs(value.translation.height), playback.queue.count > 1 else { return }
-                    dragOffset = value.translation.width
+                    let translation = value.translation
+                    if abs(translation.height) > abs(translation.width) {
+                        drag = CGSize(width: 0, height: max(0, translation.height))
+                    } else if playback.queue.count > 1 {
+                        drag = CGSize(width: translation.width, height: 0)
+                    }
                 }
                 .onEnded { _ in
-                    if dragOffset < -70 { playback.next() } else if dragOffset > 70 { playback.previous() }
-                    withAnimation(.snappy) { dragOffset = 0 }
+                    if stopsOnRelease {
+                        router.stop(playback)
+                    } else if drag.width < -70 {
+                        playback.next()
+                    } else if drag.width > 70 {
+                        playback.previous()
+                    }
+                    withAnimation(.snappy) { drag = .zero }
                 }
         )
         .accessibilityElement(children: .contain)

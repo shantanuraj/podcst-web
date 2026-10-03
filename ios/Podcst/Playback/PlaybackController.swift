@@ -54,6 +54,7 @@ public final class PlaybackController {
         return queue[currentIndex]
     }
 
+    public var isActive: Bool { currentEpisode != nil && state != .idle }
     public var isPlaying: Bool { state == .playing }
     public var isPlaybackRequested: Bool { shouldPlay }
 
@@ -115,6 +116,7 @@ public final class PlaybackController {
         var queue: [Episode]
         var currentIndex: Int
         var currentTime: TimeInterval
+        var stopped: Bool
     }
 
     init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil, nowPlayingInfoSink: (@MainActor ([String: Any]?) -> Void)? = nil) {
@@ -219,7 +221,7 @@ public final class PlaybackController {
 
     public func pause() {
         wasPlayingBeforeInterruption = false
-        guard !isShutdown, currentEpisode != nil else { return }
+        guard !isShutdown, isActive else { return }
         shouldPlay = false
         cancelAudioSessionTask()
         transport.pause()
@@ -228,6 +230,28 @@ public final class PlaybackController {
         persist()
         emitProgress(completed: false)
         updateNowPlayingInfo()
+    }
+
+    public func stop() {
+        guard isActive else { return }
+        if transport.hasSource { currentTime = transport.position }
+        stopPlayback()
+        persist()
+        emitProgress(completed: false)
+        updateNowPlayingInfo()
+        if integratesWithSystem { PlaybackAudioSession.deactivate() }
+    }
+
+    public func reopen() {
+        guard !changingAccount, !isShutdown, currentEpisode != nil, !isActive else { return }
+        transition(to: .paused)
+        persist()
+        updateNowPlayingInfo()
+    }
+
+    public func markPlayed() {
+        guard !changingAccount, !isShutdown, isActive else { return }
+        finishCurrentEpisode()
     }
 
     public func resume() {
@@ -705,7 +729,7 @@ public final class PlaybackController {
         let now = monotonicTime()
         if periodic, let lastNowPlayingUpdate, now - lastNowPlayingUpdate < 1 { return }
         lastNowPlayingUpdate = now
-        guard let episode = currentEpisode else {
+        guard isActive, let episode = currentEpisode else {
             artworkTask?.cancel()
             artworkTask = nil
             artworkKey = nil
@@ -762,7 +786,7 @@ public final class PlaybackController {
     }
 
     private func persist() {
-        let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex, currentTime: currentTime)
+        let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex, currentTime: currentTime, stopped: state == .idle)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         do {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -783,7 +807,7 @@ public final class PlaybackController {
         currentIndex = queue.isEmpty ? 0 : min(max(0, persisted.currentIndex), queue.count - 1)
         currentTime = max(0, persisted.currentTime)
         duration = currentEpisode?.duration ?? 0
-        transition(to: queue.isEmpty ? .idle : .paused)
+        transition(to: queue.isEmpty || persisted.stopped ? .idle : .paused)
     }
 
     static func defaultStorageURL() -> URL {
@@ -812,6 +836,12 @@ enum PlaybackAudioSession {
             }
         }
         try Task.checkCancellation()
+    }
+
+    static func deactivate() {
+        queue.async {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 }
 

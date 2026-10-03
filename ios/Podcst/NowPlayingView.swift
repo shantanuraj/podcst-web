@@ -359,6 +359,7 @@ private struct UpNextPanel: View {
 }
 
 private struct EpisodeMenu: View {
+    @Environment(PlaybackController.self) private var playback
     @Environment(Router.self) private var router
     let episode: Episode
     let showNotes: () -> Void
@@ -371,6 +372,19 @@ private struct EpisodeMenu: View {
             Button("Go to podcast", systemImage: "square.stack") { router.open(.podcast(episode.podcast)) }
             if let url = episode.shareURL {
                 ShareLink(item: url)
+            }
+            Section {
+                Button { router.stop(playback) } label: {
+                    Label("Stop playback", systemImage: "stop.fill")
+                    Text("Saves your place and keeps the queue")
+                }
+                Button {
+                    if playback.upNext.isEmpty { router.showingPlayer = false }
+                    playback.markPlayed()
+                } label: {
+                    Label("Mark as played", systemImage: "checkmark.circle")
+                    Text("Stops and plays the next in queue")
+                }
             }
         } label: {
             Image(systemName: "ellipsis")

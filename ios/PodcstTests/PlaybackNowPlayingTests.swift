@@ -89,6 +89,19 @@ final class PlaybackNowPlayingTests: XCTestCase {
         XCTAssertEqual(recorder.entries.count, count)
     }
 
+    func testStopClearsSystemPlayerUntilPlaybackResumes() {
+        let (controller, transport, _, recorder) = makeController()
+        controller.play(episode("first"))
+        transport.emit(.ready(duration: 300))
+        transport.emit(.position(40))
+        controller.stop()
+        XCTAssertNil(recorder.last)
+
+        controller.resume()
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "first")
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 40)
+    }
+
     private func makeController() -> (PlaybackController, NowPlayingTransport, NowPlayingClock, NowPlayingRecorder) {
         let transport = NowPlayingTransport()
         let clock = NowPlayingClock()
