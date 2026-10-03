@@ -215,9 +215,21 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
     expect((await sql`SELECT count(*)::int AS n FROM podcasts`)[0].n).toBe(2);
   });
 
-  test('refuses media disagreement', async () => {
+  test('requires exact media-difference review and retains canonical media', async () => {
     await sql`UPDATE episode_content SET file_url='https://media.example.invalid/different.mp3' WHERE episode_id=20`;
-    await expect(inspect()).rejects.toThrow('Shared episode media differs');
+    const { result, artifact } = await inspect();
+    expect(artifact.mediaDifferences).toHaveLength(1);
+    await expect(apply()).rejects.toThrow(
+      'Shared media differences require exact review',
+    );
+    await apply('apply', {
+      ...plan,
+      reviewedMediaDifferences: result?.mediaDifferencesDigest,
+    });
+    expect(
+      (await sql`SELECT file_url FROM episode_content WHERE episode_id=10`)[0]
+        .file_url,
+    ).toBe('https://media.example.invalid/shared-a.mp3');
   });
 
   test('requires review of metadata differences and retains canonical values', async () => {
@@ -286,7 +298,9 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
     await sql`DELETE FROM transcripts`;
     await sql`INSERT INTO genres(id,name) VALUES (1,'Fixture')`;
     await sql`INSERT INTO podcasts_genres(podcast_id,genre_id) VALUES (2,1)`;
-    await expect(inspect()).rejects.toThrow('Duplicate catalog references');
+    await expect(apply()).rejects.toThrow(
+      'Catalog reference changes require exact review',
+    );
   });
 
   test('refuses backup overwrite or unavailable storage', async () => {
@@ -310,11 +324,29 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
     expect((await sql`SELECT count(*)::int AS n FROM episodes`)[0].n).toBe(6);
   });
 
-  test('refuses reapplication and conflicting provider identities', async () => {
-    await sql`UPDATE podcasts SET itunes_id=101 WHERE id=2`;
-    await expect(inspect()).rejects.toThrow('Conflicting provider identities');
-    await sql`UPDATE podcasts SET itunes_id=NULL WHERE id=2`;
-    await apply();
+  test('requires exact provider-retirement review and refuses reapplication', async () => {
+    await sql`UPDATE podcasts SET itunes_id=101,podcast_index_id=201 WHERE id=2`;
+    const { result, artifact } = await inspect();
+    const reviewed = { ...plan, reviewedIdentities: result?.identitiesDigest };
+    expect(artifact.providerRetirements).toEqual([
+      { podcastId: 2, field: 'itunes_id', value: 101 },
+      { podcastId: 2, field: 'podcast_index_id', value: 201 },
+    ]);
+    await expect(apply('apply', reviewed)).rejects.toThrow(
+      'Provider retirements require exact review',
+    );
+    await apply('apply', {
+      ...reviewed,
+      reviewedProviderRetirements: result?.providerRetirementsDigest,
+    });
+    expect(
+      (await sql`SELECT itunes_id::int,podcast_index_id FROM podcasts`)[0],
+    ).toEqual({ itunes_id: 100, podcast_index_id: 200 });
+    expect(
+      (
+        await sql`SELECT count(*)::int AS n FROM podcast_apple_aliases WHERE itunes_id=101`
+      )[0].n,
+    ).toBe(0);
     await expect(inspect()).rejects.toThrow('Expected two existing podcasts');
   });
 
@@ -575,6 +607,118 @@ CREATE TRIGGER fixture_trigger BEFORE UPDATE ON podcasts FOR EACH ROW EXECUTE FU
     } finally {
       await other.end();
     }
+  });
+
+  test('moves every episode into an explicitly reviewed empty canonical source', async () => {
+    await sql`DELETE FROM episodes WHERE podcast_id=1`;
+    const { result } = await inspect();
+    expect(result?.emptyCanonical).toBe(true);
+    await expect(apply()).rejects.toThrow(
+      'Empty canonical source requires exact review',
+    );
+    const reviewed = {
+      ...plan,
+      reviewedEmptyCanonical: result?.emptyCanonicalDigest,
+    };
+    expect((await apply('dry-run', reviewed))?.retainedEpisodes).toBe(3);
+    await apply('apply', reviewed);
+    expect(
+      Array.from(
+        await sql`SELECT id::int,podcast_id::int FROM episodes ORDER BY id`,
+      ),
+    ).toEqual([
+      { id: 20, podcast_id: 1 },
+      { id: 21, podcast_id: 1 },
+      { id: 22, podcast_id: 1 },
+    ]);
+    expect(
+      (await sql`SELECT count(*)::int AS n FROM playback_progress`)[0].n,
+    ).toBe(2);
+  });
+
+  test('does not infer correspondence between nonempty disjoint GUID sets', async () => {
+    await sql`UPDATE episodes SET guid='other-'||guid WHERE podcast_id=2`;
+    await expect(inspect()).rejects.toThrow(
+      'Nonempty sources require shared episode identities',
+    );
+  });
+
+  test('preserves genre union and the best original chart rank after exact review', async () => {
+    await sql`INSERT INTO podcasts(id,title,feed_url,author_id,cover) VALUES (3,'Unrelated','https://feeds.example.invalid/unrelated',1,'art')`;
+    await sql`INSERT INTO genres(id,name) VALUES (0,'All'),(1,'One'),(2,'Two')`;
+    await sql`INSERT INTO countries(id,name) VALUES ('aa','First'),('bb','Second')`;
+    await sql`INSERT INTO podcasts_genres VALUES (1,1),(2,1),(2,2)`;
+    await sql`INSERT INTO top_podcasts(country_id,genre_id,rank,podcast_id,fetched_at) VALUES ('aa',0,5,1,'2026-01-02'),('aa',0,2,2,'2026-01-01'),('aa',0,9,2,'2026-01-03'),('bb',0,7,2,'2026-01-04'),('aa',0,3,3,'2026-01-05')`;
+    const { result } = await inspect();
+    await expect(apply()).rejects.toThrow(
+      'Catalog reference changes require exact review',
+    );
+    const reviewed = {
+      ...plan,
+      reviewedCatalogChanges: result?.catalogChangesDigest,
+    };
+    await apply('dry-run', reviewed);
+    expect((await sql`SELECT count(*)::int AS n FROM top_podcasts`)[0].n).toBe(
+      5,
+    );
+    await apply('apply', reviewed);
+    expect(
+      Array.from(
+        await sql`SELECT podcast_id::int,genre_id FROM podcasts_genres ORDER BY genre_id`,
+      ),
+    ).toEqual([
+      { podcast_id: 1, genre_id: 1 },
+      { podcast_id: 1, genre_id: 2 },
+    ]);
+    expect(
+      Array.from(
+        await sql`SELECT country_id,rank,podcast_id::int FROM top_podcasts ORDER BY country_id,rank`,
+      ),
+    ).toEqual([
+      { country_id: 'aa', rank: 2, podcast_id: 1 },
+      { country_id: 'aa', rank: 3, podcast_id: 3 },
+      { country_id: 'bb', rank: 7, podcast_id: 1 },
+    ]);
+    expect(
+      (
+        await sql`SELECT fetched_at='2026-01-01'::timestamptz AS preserved FROM top_podcasts WHERE country_id='aa' AND rank=2`
+      )[0].preserved,
+    ).toBe(true);
+  });
+
+  test('does not retire accepted duplicate Apple aliases under primary-ID approval', async () => {
+    await sql`UPDATE podcasts SET itunes_id=101 WHERE id=2`;
+    await sql`INSERT INTO podcast_apple_aliases(itunes_id,podcast_id,evidence_type,evidence_reference) VALUES (102,2,'reviewed','existing-claim')`;
+    await expect(inspect()).rejects.toThrow(
+      'Duplicate Apple aliases require separate',
+    );
+  });
+
+  test('rejects an inexact reviewed exception digest', async () => {
+    await sql`UPDATE episode_content SET file_url='https://media.example.invalid/revised.mp3' WHERE episode_id=20`;
+    await expect(
+      apply('apply', { ...plan, reviewedMediaDifferences: digest([]) }),
+    ).rejects.toThrow('Shared media differences require exact review');
+    await sql`UPDATE podcasts SET podcast_index_id=201 WHERE id=2`;
+    const { result } = await inspect();
+    await expect(
+      apply('apply', {
+        ...plan,
+        reviewedIdentities: result?.identitiesDigest,
+        reviewedMediaDifferences: result?.mediaDifferencesDigest,
+        reviewedProviderRetirements: digest([]),
+      }),
+    ).rejects.toThrow('Provider retirements require exact review');
+  });
+
+  test('does not reinterpret version-two approvals under new repair policies', async () => {
+    const { expectedPath } = await inspect();
+    const artifact = JSON.parse(readFileSync(expectedPath, 'utf8'));
+    artifact.version = 2;
+    writeFileSync(expectedPath, JSON.stringify(artifact));
+    await expect(
+      reconcile(sql, { plan, expectedPath, backupPath: path(), mode: 'apply' }),
+    ).rejects.toThrow('Reviewed plan mismatch');
   });
 
   test('rejects non-private artifact files and changed plans', async () => {

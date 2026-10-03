@@ -14,6 +14,10 @@ export interface ReconciliationPlan {
   reviewedIdentities: string;
   reviewedDifferences: string;
   reviewedMissingMedia?: string;
+  reviewedMediaDifferences?: string;
+  reviewedProviderRetirements?: string;
+  reviewedEmptyCanonical?: string;
+  reviewedCatalogChanges?: string;
 }
 
 interface Options {
@@ -104,13 +108,16 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     canonical.itunes_id !== null,
     'Canonical record requires verified provider identity',
   );
-  invariant(
-    (duplicate.itunes_id === null ||
-      duplicate.itunes_id === canonical.itunes_id) &&
-      (duplicate.podcast_index_id === null ||
-        duplicate.podcast_index_id === canonical.podcast_index_id),
-    'Conflicting provider identities',
-  );
+  const providerRetirements = ['itunes_id', 'podcast_index_id']
+    .filter(
+      (field) =>
+        duplicate[field] !== null && duplicate[field] !== canonical[field],
+    )
+    .map((field) => ({
+      podcastId: plan.duplicateId,
+      field,
+      value: duplicate[field],
+    }));
   invariant(
     state.podcast_apple_aliases.every(
       (row) => row.podcast_id === plan.canonicalId,
@@ -152,6 +159,7 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     ),
     appleAliases: state.podcast_apple_aliases,
     sourceEvidenceReference: plan.sourceEvidenceReference,
+    providerRetirements,
   };
   const episodes = new Map(
     state.episodes
@@ -165,6 +173,7 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
   const unique: number[] = [];
   const differences: Row[] = [];
   const missingMedia: Row[] = [];
+  const mediaDifferences: Row[] = [];
   for (const source of state.episodes.filter(
     (row) => row.podcast_id === plan.duplicateId,
   )) {
@@ -175,10 +184,14 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     }
     const a = content.get(target.id);
     const b = content.get(source.id);
-    invariant(
-      !a || !b || a.file_url === b.file_url,
-      'Shared episode media differs',
-    );
+    if (a && b && a.file_url !== b.file_url)
+      mediaDifferences.push({
+        guid: source.guid,
+        canonicalEpisodeId: target.id,
+        duplicateEpisodeId: source.id,
+        canonicalMedia: a.file_url,
+        duplicateMedia: b.file_url,
+      });
     const difference = {
       guid: source.guid,
       canonicalPublished: target.published,
@@ -200,7 +213,19 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     }
     moves.push({ from: source.id, to: target.id });
   }
-  invariant(moves.length > 0, 'No shared episode identities');
+  invariant(
+    moves.length > 0 || episodes.size === 0,
+    'Nonempty sources require shared episode identities',
+  );
+  const emptyCanonical =
+    episodes.size === 0
+      ? {
+          canonicalId: plan.canonicalId,
+          duplicateId: plan.duplicateId,
+          retainedEpisodeIds: unique,
+          sourceEvidenceReference: plan.sourceEvidenceReference,
+        }
+      : null;
   const map = new Map(moves.map((move) => [move.from, move.to]));
   const sourceIds = new Set(
     state.episodes
@@ -211,10 +236,29 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     !state.transcripts.some((row) => sourceIds.has(row.episode_id)),
     'Duplicate transcripts require manual reconciliation',
   );
-  invariant(
-    !state.podcasts_genres.some((row) => row.podcast_id === plan.duplicateId) &&
-      !state.top_podcasts.some((row) => row.podcast_id === plan.duplicateId),
-    'Duplicate catalog references require manual reconciliation',
+  const genres = new Map<number, Row>();
+  for (const row of state.podcasts_genres)
+    if (!genres.has(row.genre_id) || row.podcast_id === plan.canonicalId)
+      genres.set(row.genre_id, { ...row, podcast_id: plan.canonicalId });
+  const charts = new Map<string, Row>();
+  for (const row of state.top_podcasts) {
+    const key = stable([row.country_id, row.genre_id]);
+    const prior = charts.get(key);
+    if (!prior || row.rank < prior.rank)
+      charts.set(key, { ...row, podcast_id: plan.canonicalId });
+  }
+  const catalog = {
+    podcasts_genres: [...genres.values()].sort(
+      (a, b) => a.genre_id - b.genre_id,
+    ),
+    top_podcasts: [...charts.values()].sort((a, b) =>
+      stable([a.country_id, a.genre_id]).localeCompare(
+        stable([b.country_id, b.genre_id]),
+      ),
+    ),
+  };
+  const catalogChanges = Object.entries(catalog).some(
+    ([table, rows]) => !sameRows(rows, state[table]),
   );
   const progressKeys = new Set<string>();
   for (const row of state.playback_progress) {
@@ -230,7 +274,17 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
   }
   differences.sort((a, b) => a.guid.localeCompare(b.guid));
   missingMedia.sort((a, b) => a.guid.localeCompare(b.guid));
+  mediaDifferences.sort((a, b) => a.guid.localeCompare(b.guid));
   return {
+    providerRetirements,
+    providerRetirementsDigest: digest(providerRetirements),
+    mediaDifferences,
+    mediaDifferencesDigest: digest(mediaDifferences),
+    emptyCanonical,
+    emptyCanonicalDigest: digest(emptyCanonical),
+    catalog,
+    catalogChanges,
+    catalogChangesDigest: digest(catalog),
     identities,
     identitiesDigest: digest(identities),
     moves,
@@ -282,7 +336,7 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       : readProtected(options.expectedPath ?? '', 64 * 1024 * 1024);
   if (expected)
     invariant(
-      expected.version === 2 && stable(expected.plan) === stable(plan),
+      expected.version === 3 && stable(expected.plan) === stable(plan),
       'Reviewed plan mismatch',
     );
   const ids = [plan.canonicalId, plan.duplicateId];
@@ -412,6 +466,33 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           plan.reviewedIdentities === analysis.identitiesDigest,
           'Source identities and alias changes have not been reviewed',
         );
+        for (const [needed, supplied, required, message] of [
+          [
+            analysis.providerRetirements.length > 0,
+            plan.reviewedProviderRetirements,
+            analysis.providerRetirementsDigest,
+            'Provider retirements require exact review',
+          ],
+          [
+            analysis.mediaDifferences.length > 0,
+            plan.reviewedMediaDifferences,
+            analysis.mediaDifferencesDigest,
+            'Shared media differences require exact review',
+          ],
+          [
+            analysis.emptyCanonical !== null,
+            plan.reviewedEmptyCanonical,
+            analysis.emptyCanonicalDigest,
+            'Empty canonical source requires exact review',
+          ],
+          [
+            analysis.catalogChanges,
+            plan.reviewedCatalogChanges,
+            analysis.catalogChangesDigest,
+            'Catalog reference changes require exact review',
+          ],
+        ] as const)
+          invariant(!needed || supplied === required, message);
         invariant(
           plan.reviewedDifferences === analysis.differencesDigest,
           'Metadata differences have not been reviewed',
@@ -423,9 +504,18 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         );
       }
       const artifact = {
-        version: 2,
+        version: 3,
         capturedAt: new Date().toISOString(),
         plan,
+        providerRetirements: analysis.providerRetirements,
+        providerRetirementsDigest: analysis.providerRetirementsDigest,
+        mediaDifferences: analysis.mediaDifferences,
+        mediaDifferencesDigest: analysis.mediaDifferencesDigest,
+        emptyCanonical: analysis.emptyCanonical,
+        emptyCanonicalDigest: analysis.emptyCanonicalDigest,
+        catalog: analysis.catalog,
+        catalogChanges: analysis.catalogChanges,
+        catalogChangesDigest: analysis.catalogChangesDigest,
         snapshot: before,
         identities: analysis.identities,
         identitiesDigest: analysis.identitiesDigest,
@@ -442,6 +532,14 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         identitiesDigest: analysis.identitiesDigest,
         retainedFeedAliases: analysis.identities.feedAliases.length,
         retainedAppleAliases: before.podcast_apple_aliases.length,
+        retiredProviderClaims: analysis.providerRetirements.length,
+        providerRetirementsDigest: analysis.providerRetirementsDigest,
+        mediaDifferences: analysis.mediaDifferences.length,
+        mediaDifferencesDigest: analysis.mediaDifferencesDigest,
+        emptyCanonical: analysis.emptyCanonical !== null,
+        emptyCanonicalDigest: analysis.emptyCanonicalDigest,
+        catalogChanges: analysis.catalogChanges,
+        catalogChangesDigest: analysis.catalogChangesDigest,
         sharedEpisodes: analysis.moves.length,
         retainedUniqueEpisodes: analysis.unique.length,
         metadataDifferences: analysis.differences.length,
@@ -475,6 +573,19 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         WHERE e.id=m."from" AND e.podcast_id=${plan.duplicateId}
       `;
       await tx`UPDATE public.episodes SET podcast_id=${plan.canonicalId} WHERE podcast_id=${plan.duplicateId}`;
+      if (analysis.catalogChanges) {
+        for (const [table, rows] of Object.entries(analysis.catalog)) {
+          await tx.unsafe(
+            `DELETE FROM public.${table} WHERE podcast_id IN ($1::bigint,$2::bigint)`,
+            ids,
+          );
+          if (rows.length)
+            await tx.unsafe(
+              `INSERT INTO public.${table} SELECT * FROM jsonb_populate_recordset(NULL::public.${table},$1::text::jsonb)`,
+              [JSON.stringify(rows)],
+            );
+        }
+      }
       await tx`DELETE FROM public.podcasts WHERE id=${plan.duplicateId}`;
       const canonicalBefore = before.podcasts.find(
         (row) => row.id === plan.canonicalId,
@@ -560,6 +671,16 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           ),
         'Canonical metadata changed unexpectedly',
       );
+      for (const claim of analysis.providerRetirements) {
+        const claimed = await tx.unsafe(
+          `SELECT 1 FROM public.podcasts WHERE ${claim.field}=$1`,
+          [claim.value],
+        );
+        invariant(
+          claimed.length === 0,
+          'Retired provider claim was reassigned unexpectedly',
+        );
+      }
       invariant(
         sameRows(after.podcast_feed_aliases, expectedFeedAliases) &&
           sameRows(after.podcast_apple_aliases, before.podcast_apple_aliases),
@@ -585,9 +706,13 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         sameRows(after.subscriptions, [...expectedSubscriptions.values()]),
         'Subscription preservation failed',
       );
-      for (const table of ['transcripts', 'podcasts_genres', 'top_podcasts'])
+      invariant(
+        sameRows(after.transcripts, before.transcripts),
+        'Transcript preservation failed',
+      );
+      for (const [table, rows] of Object.entries(analysis.catalog))
         invariant(
-          sameRows(after[table], before[table]),
+          sameRows(after[table], rows),
           'Catalog references changed unexpectedly',
         );
       const poll = after.feed_poll_state[0];
