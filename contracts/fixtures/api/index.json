@@ -1,0 +1,317 @@
+{
+  "auth-email-login.invalid-code.json": {
+    "endpoint": "POST /api/auth/email-login",
+    "status": 400,
+    "decodesAs": "ErrorField"
+  },
+  "auth-email-login.verified.json": {
+    "endpoint": "POST /api/auth/email-login",
+    "status": 200,
+    "decodesAs": "Verified"
+  },
+  "auth-login.challenge-expired.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 400,
+    "decodesAs": "ErrorField"
+  },
+  "auth-login.discoverable.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 200,
+    "decodesAs": "PasskeyLoginStart"
+  },
+  "auth-login.missing-visitor.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 400,
+    "decodesAs": "ErrorField"
+  },
+  "auth-login.no-account.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 200,
+    "decodesAs": "PasskeyLoginStart"
+  },
+  "auth-login.no-passkey.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 200,
+    "decodesAs": "PasskeyLoginStart"
+  },
+  "auth-login.passkey.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 200,
+    "decodesAs": "PasskeyLoginStart"
+  },
+  "auth-login.verified.json": {
+    "endpoint": "POST /api/auth/login",
+    "status": 200,
+    "decodesAs": "PasskeyLoginResult"
+  },
+  "auth-logout.success.json": {
+    "endpoint": "POST /api/auth/logout",
+    "status": 200,
+    "decodesAs": "Success"
+  },
+  "auth-register.options.json": {
+    "endpoint": "POST /api/auth/register",
+    "status": 200,
+    "decodesAs": "PasskeyRegistrationStart"
+  },
+  "auth-register.unauthenticated.json": {
+    "endpoint": "POST /api/auth/register",
+    "status": 401,
+    "decodesAs": "ErrorField"
+  },
+  "auth-register.verified.json": {
+    "endpoint": "POST /api/auth/register",
+    "status": 200,
+    "decodesAs": "PasskeyRegistrationResult"
+  },
+  "auth-session.guest.json": {
+    "endpoint": "GET /api/auth/session",
+    "status": 200,
+    "decodesAs": "Session"
+  },
+  "auth-session.user.json": {
+    "endpoint": "GET /api/auth/session",
+    "status": 200,
+    "decodesAs": "Session"
+  },
+  "auth-verify.invalid-code.json": {
+    "endpoint": "POST /api/auth/verify",
+    "status": 400,
+    "decodesAs": "ErrorField"
+  },
+  "auth-verify.send-failed.json": {
+    "endpoint": "POST /api/auth/verify",
+    "status": 500,
+    "decodesAs": "ErrorField"
+  },
+  "auth-verify.sent.json": {
+    "endpoint": "POST /api/auth/verify",
+    "status": 200,
+    "decodesAs": "CodeSent"
+  },
+  "auth-verify.verified.json": {
+    "endpoint": "POST /api/auth/verify",
+    "status": 200,
+    "decodesAs": "Verified"
+  },
+  "feed-episodes.first.json": {
+    "endpoint": "GET /api/feed/episodes",
+    "status": 200,
+    "decodesAs": "EpisodePage"
+  },
+  "feed-episodes.missing-content.json": {
+    "endpoint": "GET /api/feed/episodes",
+    "status": 200,
+    "decodesAs": "EpisodePage"
+  },
+  "feed-episodes.missing-podcast-id.json": {
+    "endpoint": "GET /api/feed/episodes",
+    "status": 400,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed-episodes.not-found.json": {
+    "endpoint": "GET /api/feed/episodes",
+    "status": 404,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed-episodes.second.json": {
+    "endpoint": "GET /api/feed/episodes",
+    "status": 200,
+    "decodesAs": "EpisodePage"
+  },
+  "feed-info.json": {
+    "endpoint": "GET /api/feed/info",
+    "status": 200,
+    "decodesAs": "PodcastInfo"
+  },
+  "feed-info.missing-id.json": {
+    "endpoint": "GET /api/feed/info",
+    "status": 400,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed-info.private.json": {
+    "endpoint": "GET /api/feed/info",
+    "status": 200,
+    "decodesAs": "PodcastInfo"
+  },
+  "feed-refresh.busy.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 202,
+    "decodesAs": "RefreshStatus"
+  },
+  "feed-refresh.error.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 502,
+    "decodesAs": "RefreshStatus"
+  },
+  "feed-refresh.failed.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 500,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed-refresh.invalid-id.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 400,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed-refresh.not-found.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 404,
+    "decodesAs": "RefreshStatus"
+  },
+  "feed-refresh.not-modified.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 200,
+    "decodesAs": "RefreshStatus"
+  },
+  "feed-refresh.skipped.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 200,
+    "decodesAs": "RefreshStatus"
+  },
+  "feed-refresh.updated.json": {
+    "endpoint": "POST /api/feed/refresh",
+    "status": 200,
+    "decodesAs": "RefreshStatus"
+  },
+  "feed-resolve.not-found.json": {
+    "endpoint": "POST /api/feed/resolve",
+    "status": 404,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed-resolve.resolved.json": {
+    "endpoint": "POST /api/feed/resolve",
+    "status": 200,
+    "decodesAs": "ResolvedPodcast"
+  },
+  "feed-resolve.unavailable.json": {
+    "endpoint": "POST /api/feed/resolve",
+    "status": 502,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed.id.json": {
+    "endpoint": "GET /api/feed",
+    "status": 200,
+    "decodesAs": "Podcast"
+  },
+  "feed.invalid-id.json": {
+    "endpoint": "GET /api/feed",
+    "status": 400,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed.not-found.json": {
+    "endpoint": "GET /api/feed",
+    "status": 404,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed.private.json": {
+    "endpoint": "POST /api/feed",
+    "status": 200,
+    "decodesAs": "Podcast"
+  },
+  "feed.sign-in-required.json": {
+    "endpoint": "POST /api/feed",
+    "status": 401,
+    "decodesAs": "ErrorMessage"
+  },
+  "feed.unavailable.json": {
+    "endpoint": "POST /api/feed",
+    "status": 404,
+    "decodesAs": "ErrorMessage"
+  },
+  "progress-save.invalid.json": {
+    "endpoint": "PUT /api/progress",
+    "status": 400,
+    "decodesAs": "ErrorField"
+  },
+  "progress-save.success.json": {
+    "endpoint": "PUT /api/progress",
+    "status": 200,
+    "decodesAs": "Success"
+  },
+  "progress.current.json": {
+    "endpoint": "GET /api/progress",
+    "status": 200,
+    "decodesAs": "Progress?"
+  },
+  "progress.empty.json": {
+    "endpoint": "GET /api/progress",
+    "status": 200,
+    "decodesAs": "Progress?"
+  },
+  "progress.unauthorized.json": {
+    "endpoint": "GET /api/progress",
+    "status": 401,
+    "decodesAs": "ErrorField"
+  },
+  "search.empty.json": {
+    "endpoint": "POST /api/search",
+    "status": 200,
+    "decodesAs": "SearchResult[]"
+  },
+  "search.feed-url.json": {
+    "endpoint": "POST /api/search",
+    "status": 200,
+    "decodesAs": "SearchResult[]"
+  },
+  "search.missing-term.json": {
+    "endpoint": "POST /api/search",
+    "status": 400,
+    "decodesAs": "ErrorMessage"
+  },
+  "search.sign-in-required.json": {
+    "endpoint": "POST /api/search",
+    "status": 401,
+    "decodesAs": "ErrorMessage"
+  },
+  "search.text.json": {
+    "endpoint": "POST /api/search",
+    "status": 200,
+    "decodesAs": "SearchResult[]"
+  },
+  "subscriptions-add.not-found.json": {
+    "endpoint": "POST /api/subscriptions",
+    "status": 404,
+    "decodesAs": "ErrorField"
+  },
+  "subscriptions-add.success.json": {
+    "endpoint": "POST /api/subscriptions",
+    "status": 200,
+    "decodesAs": "Success"
+  },
+  "subscriptions-import.result.json": {
+    "endpoint": "POST /api/subscriptions",
+    "status": 200,
+    "decodesAs": "ImportResult"
+  },
+  "subscriptions-remove.success.json": {
+    "endpoint": "DELETE /api/subscriptions",
+    "status": 200,
+    "decodesAs": "Success"
+  },
+  "subscriptions.list.json": {
+    "endpoint": "GET /api/subscriptions",
+    "status": 200,
+    "decodesAs": "Podcast[]"
+  },
+  "subscriptions.unauthorized.json": {
+    "endpoint": "GET /api/subscriptions",
+    "status": 401,
+    "decodesAs": "ErrorField"
+  },
+  "top.explicit.json": {
+    "endpoint": "GET /api/top",
+    "status": 200,
+    "decodesAs": "TopPodcast[]"
+  },
+  "top.nl.json": {
+    "endpoint": "GET /api/top",
+    "status": 200,
+    "decodesAs": "TopPodcast[]"
+  },
+  "top.us.json": {
+    "endpoint": "GET /api/top",
+    "status": 200,
+    "decodesAs": "TopPodcast[]"
+  }
+}

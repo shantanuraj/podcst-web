@@ -1,0 +1,11 @@
+[
+  {
+    "id": 9002,
+    "isPrivate": true,
+    "title": "Members Feed",
+    "feed": "https://private.example/feed.xml?token=redacted",
+    "cover": "https://private.example/cover.jpg",
+    "thumbnail": "https://private.example/cover.jpg",
+    "author": "Example Author"
+  }
+]

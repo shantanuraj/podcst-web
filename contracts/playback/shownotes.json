@@ -1,0 +1,303 @@
+{
+  "chapters": [
+    {
+      "html": "<p>Why attention feels free.</p><ul><li>00:00 Cold open</li><li>(02:14) The price of a glance</li><li>17:40 – Scarcity, reconsidered</li><li>1:02:05 What we owe each other</li></ul><p>At 12:30 we digress.</p>",
+      "expected": [
+        {
+          "title": "Cold open",
+          "start": 0
+        },
+        {
+          "title": "The price of a glance",
+          "start": 134
+        },
+        {
+          "title": "Scarcity, reconsidered",
+          "start": 1060
+        },
+        {
+          "title": "What we owe each other",
+          "start": 3725
+        }
+      ]
+    },
+    {
+      "html": "<p>05:00 Only one chapter</p>",
+      "expected": []
+    },
+    {
+      "html": "10:00 Late<br>02:00 Early",
+      "expected": []
+    },
+    {
+      "html": "00:00 First<br>00:00 Same start",
+      "expected": []
+    },
+    {
+      "html": "<p><b>OUTLINE:</b><br />\n(00:00) – Introduction<br />\n(01:07) – Sponsors, Comments, and Reflections<br />\n(1:03:26) – Malaria</p>",
+      "expected": [
+        {
+          "title": "Introduction",
+          "start": 0
+        },
+        {
+          "title": "Sponsors, Comments, and Reflections",
+          "start": 67
+        },
+        {
+          "title": "Malaria",
+          "start": 3806
+        }
+      ]
+    },
+    {
+      "html": "Intro at 00:00<br>Middle at 05:00",
+      "expected": []
+    },
+    {
+      "html": "00:00 Opening<br>01:60 Not a time<br>02:00 Closing",
+      "expected": [
+        {
+          "title": "Opening",
+          "start": 0
+        },
+        {
+          "title": "Closing",
+          "start": 120
+        }
+      ]
+    },
+    {
+      "html": "00:00<br>01:00 Has a title<br>02:00 Also titled",
+      "expected": [
+        {
+          "title": "Has a title",
+          "start": 60
+        },
+        {
+          "title": "Also titled",
+          "start": 120
+        }
+      ]
+    },
+    {
+      "html": "<h2>00:00 Start</h2><div>1:00:00 Hour mark</div>",
+      "expected": [
+        {
+          "title": "Start",
+          "start": 0
+        },
+        {
+          "title": "Hour mark",
+          "start": 3600
+        }
+      ]
+    },
+    {
+      "html": "00:00 Upper<BR>05:00 Case break",
+      "expected": [
+        {
+          "title": "Upper",
+          "start": 0
+        },
+        {
+          "title": "Case break",
+          "start": 300
+        }
+      ]
+    },
+    {
+      "html": "00:00 | Intro<br>03:15 | Topic",
+      "expected": [
+        {
+          "title": "Intro",
+          "start": 0
+        },
+        {
+          "title": "Topic",
+          "start": 195
+        }
+      ]
+    },
+    {
+      "html": "[00:00] Intro<br>[10:00] Outro",
+      "expected": [
+        {
+          "title": "Intro",
+          "start": 0
+        },
+        {
+          "title": "Outro",
+          "start": 600
+        }
+      ]
+    },
+    {
+      "html": "00:00 Q&amp;A<br>05:00 Tom &amp; Jerry",
+      "expected": [
+        {
+          "title": "Q&A",
+          "start": 0
+        },
+        {
+          "title": "Tom & Jerry",
+          "start": 300
+        }
+      ]
+    },
+    {
+      "html": "a00:00 Glued<br>b01:00 Glued again",
+      "expected": []
+    },
+    {
+      "html": "00:00   Spaced title   <br>01:00 Second",
+      "expected": [
+        {
+          "title": "Spaced title",
+          "start": 0
+        },
+        {
+          "title": "Second",
+          "start": 60
+        }
+      ]
+    },
+    {
+      "html": "00:00 -<br>01:00 Dash only before",
+      "expected": [
+        {
+          "title": "-",
+          "start": 0
+        },
+        {
+          "title": "Dash only before",
+          "start": 60
+        }
+      ]
+    },
+    {
+      "html": "<p>00:00 One</p>\n\n<p>02:00 Two</p><p>04:00 Three</p>",
+      "expected": [
+        {
+          "title": "One",
+          "start": 0
+        },
+        {
+          "title": "Two",
+          "start": 120
+        },
+        {
+          "title": "Three",
+          "start": 240
+        }
+      ]
+    }
+  ],
+  "timestamps": [
+    {
+      "text": "Jump to 02:14 or 1:02:03.",
+      "expected": [
+        "02:14",
+        "1:02:03"
+      ]
+    },
+    {
+      "text": "Version2:30 and 2:30pm and 12:345",
+      "expected": []
+    },
+    {
+      "text": "Minutes 75:00 and 5:60",
+      "expected": [
+        "75:00"
+      ]
+    },
+    {
+      "text": "1:2:03",
+      "expected": [
+        "1:2:03"
+      ]
+    },
+    {
+      "text": "(00:00) start",
+      "expected": [
+        "00:00"
+      ]
+    },
+    {
+      "text": "10:00:00:00",
+      "expected": [
+        "10:00:00"
+      ]
+    },
+    {
+      "text": "at 3:33.",
+      "expected": [
+        "3:33"
+      ]
+    },
+    {
+      "text": "00:00–05:00",
+      "expected": [
+        "00:00",
+        "05:00"
+      ]
+    },
+    {
+      "text": "1:02:03:04 and 99:59:59",
+      "expected": [
+        "1:02:03",
+        "99:59:59"
+      ]
+    }
+  ],
+  "seconds": [
+    {
+      "timestamp": "3:33",
+      "expected": 213
+    },
+    {
+      "timestamp": "00:05:00",
+      "expected": 300
+    },
+    {
+      "timestamp": "2:36:47",
+      "expected": 9407
+    },
+    {
+      "timestamp": "2:75",
+      "expected": null
+    },
+    {
+      "timestamp": "1:60:00",
+      "expected": null
+    },
+    {
+      "timestamp": "1:02:03",
+      "expected": 3723
+    },
+    {
+      "timestamp": "75:00",
+      "expected": 4500
+    },
+    {
+      "timestamp": "1:2:03",
+      "expected": 3723
+    },
+    {
+      "timestamp": "00:00",
+      "expected": 0
+    },
+    {
+      "timestamp": "59:59",
+      "expected": 3599
+    },
+    {
+      "timestamp": "99:59:59",
+      "expected": 359999
+    },
+    {
+      "timestamp": "12",
+      "expected": null
+    }
+  ]
+}

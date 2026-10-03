@@ -1,0 +1,1286 @@
+{
+  "cases": [
+    {
+      "name": "play into an empty queue",
+      "initial": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "play",
+          "episode": "a"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "play a new episode appends and selects it",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "play",
+          "episode": "c"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      }
+    },
+    {
+      "name": "play a queued episode selects it in place",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "play",
+          "episode": "b"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "play a queued episode after stop",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "play",
+          "episode": "b"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "enqueue ignores episodes already queued",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "a",
+          "next": false
+        },
+        {
+          "op": "enqueue",
+          "episode": "b",
+          "next": true
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "enqueue appends after the last episode",
+      "initial": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "b",
+          "next": false
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "enqueue next into an empty queue selects without playing",
+      "initial": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "a",
+          "next": true
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "enqueue next inserts after the current episode",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "d",
+          "next": true
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "d",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "enqueue next when current is last appends",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "c",
+          "next": true
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "enqueue into an empty queue never starts playback",
+      "initial": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "a",
+          "next": false
+        },
+        {
+          "op": "enqueue",
+          "episode": "b",
+          "next": false
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "finish in the middle continues at the same index",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "finish"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "finish at the last index continues with the new last episode",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "finish"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "finish the first episode",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "finish"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "finish the only episode ends the session",
+      "initial": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "finish"
+        }
+      ],
+      "expected": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "mark played advances like finish",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "markPlayed"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "mark played is ignored while stopped",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "markPlayed"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "mark played on the only episode ends the session",
+      "initial": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "markPlayed"
+        }
+      ],
+      "expected": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "next wraps from the last episode to the first",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "next"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "previous wraps from the first episode to the last",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "previous"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      }
+    },
+    {
+      "name": "next from a stopped session starts playback",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "next"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "next on an empty queue is ignored",
+      "initial": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "next"
+        },
+        {
+          "op": "previous"
+        }
+      ],
+      "expected": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "remove the current episode selects the episode now at its index",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            1
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "remove the current last episode selects the new last episode",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            2
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "remove before the current episode keeps its identity",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            0
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "remove after the current episode keeps the index",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            2
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "remove every episode ends the session",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            0,
+            1
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "remove the current episode with earlier episodes",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "d",
+          "e"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "remove the current episode of a stopped session reopens paused",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            0
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "remove ignores indices outside the queue",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "indices": [
+            5
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "remove up next rotates the current episode to the front",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "removeUpNext",
+          "offsets": [
+            1
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "c",
+          "d",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "remove up next at the front",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "removeUpNext",
+          "offsets": [
+            0
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "move up next rotates then reorders",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "moveUpNext",
+          "from": 2,
+          "to": 0
+        }
+      ],
+      "expected": {
+        "queue": [
+          "c",
+          "b",
+          "d",
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "move up next to the end",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "moveUpNext",
+          "from": 0,
+          "to": 2
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "move the current episode forward",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 0,
+          "to": 3
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b",
+          "c",
+          "a"
+        ],
+        "current": 2,
+        "active": true
+      }
+    },
+    {
+      "name": "move the current episode backward",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 2,
+          "to": 0
+        }
+      ],
+      "expected": {
+        "queue": [
+          "c",
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "move from before current to after it",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 0,
+          "to": 4
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b",
+          "c",
+          "d",
+          "a"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "move from before current to just before it",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 0,
+          "to": 2
+        }
+      ],
+      "expected": {
+        "queue": [
+          "b",
+          "a",
+          "c",
+          "d"
+        ],
+        "current": 2,
+        "active": true
+      }
+    },
+    {
+      "name": "move from after current to before it",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 3,
+          "to": 0
+        }
+      ],
+      "expected": {
+        "queue": [
+          "d",
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      }
+    },
+    {
+      "name": "move from after current to the end",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 1,
+          "to": 4
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c",
+          "d",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "move clamps the destination to the queue end",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 1,
+          "to": 99
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "move to the same position changes nothing",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 0,
+          "to": 1
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "move ignores a source outside the queue",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "move",
+          "from": 5,
+          "to": 0
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "clear empties the queue and ends the session",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "clear"
+        }
+      ],
+      "expected": {
+        "queue": [],
+        "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "stop keeps the queue and the current episode",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "stop"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": false
+      }
+    },
+    {
+      "name": "reopen after stop restores a paused session",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "stop"
+        },
+        {
+          "op": "reopen"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": true
+      }
+    },
+    {
+      "name": "stop is ignored when already stopped",
+      "initial": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": false
+      },
+      "steps": [
+        {
+          "op": "stop"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 1,
+        "active": false
+      }
+    },
+    {
+      "name": "pause keeps the session active",
+      "initial": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "pause"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      }
+    },
+    {
+      "name": "a listening session",
+      "initial": {
+        "queue": [
+          "a"
+        ],
+        "current": 0,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "enqueue",
+          "episode": "b",
+          "next": true
+        },
+        {
+          "op": "enqueue",
+          "episode": "c",
+          "next": false
+        },
+        {
+          "op": "finish"
+        },
+        {
+          "op": "previous"
+        },
+        {
+          "op": "markPlayed"
+        },
+        {
+          "op": "markPlayed"
+        },
+        {
+          "op": "enqueue",
+          "episode": "d",
+          "next": false
+        }
+      ],
+      "expected": {
+        "queue": [
+          "d"
+        ],
+        "current": 0,
+        "active": false
+      }
+    }
+  ]
+}

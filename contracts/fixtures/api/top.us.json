@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "itunes_id": 1200361736,
+    "author": "The New York Times",
+    "feed": "https://feeds.simplecast.com/Sl5CSM3S",
+    "title": "The Daily",
+    "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fimage.simplecastcdn.com%2Fimages%2F7f2f4c05-9c2f-4deb-82b7-b538062bc22d%2F73549bf1-94b3-40ff-8aeb-b4054848ec1b%2F3000x3000%2Fthe-daily-album-art-original.jpg%3Faid%3Drss_feed",
+    "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/ab/64/66/ab6466a9-9a7d-e20e-7a3d-bc5be37d29ce/mza_15084852813176276273.jpg/100x100bb.jpg",
+    "categories": [],
+    "explicit": "notExplicit",
+    "count": 64
+  },
+  {
+    "id": 3,
+    "itunes_id": 1322200189,
+    "author": "Audiochuck",
+    "feed": "https://feeds.simplecast.com/qm_9xx0g",
+    "title": "Crime Junkie",
+    "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fimage.simplecastcdn.com%2Fimages%2Fa1a87b67-2865-4234-a087-b342aa30c358%2Fae42d51b-df99-4b19-bb3f-09f25598bcdd%2F3000x3000%2Fcrimejunkie-logo-registered.jpg%3Faid%3Drss_feed",
+    "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts126/v4/8c/35/04/8c350430-2fbf-98d0-0a25-00b76550ffeb/mza_13445204151221888086.jpg/100x100bb.jpg",
+    "categories": [],
+    "explicit": "notExplicit",
+    "count": 531
+  },
+  {
+    "id": 4,
+    "itunes_id": 1464919521,
+    "author": "NBC News",
+    "feed": "https://podcastfeeds.nbcnews.com/HL4TzgYC",
+    "title": "Dateline NBC",
+    "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fimage.simplecastcdn.com%2Fimages%2Fae183fe2-c634-458a-93dd-5770f0676f77%2Fb010809a-c311-425c-9325-2235c21e6939%2F3000x3000%2F7f0421f73d2ce0ca272e392c937e1a301285d44fe7c6d710c2844d80c0c7bb1a3e9838ac03ee80fc64199891cb9d5c6e9d4490f5081fb379c0ab2317f2cadf14.jpeg%3Faid%3Drss_feed",
+    "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts115/v4/8c/00/7a/8c007a42-e550-0214-d4cb-b59cd7edf194/mza_5305664083935674472.jpeg/100x100bb.jpg",
+    "categories": [],
+    "explicit": "notExplicit",
+    "count": 862
+  }
+]

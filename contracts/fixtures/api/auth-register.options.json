@@ -1,0 +1,45 @@
+{
+  "options": {
+    "challenge": "ZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5_gIGCg4Q",
+    "rp": {
+      "name": "Podcst",
+      "id": "www.podcst.app"
+    },
+    "user": {
+      "id": "M2Y5YTZjMmU4YjFkNGY3YTBjNWU5YjJkNmE4ZjFjM2U3YjRkMGE5Mg",
+      "name": "listener@example.com",
+      "displayName": ""
+    },
+    "pubKeyCredParams": [
+      {
+        "alg": -8,
+        "type": "public-key"
+      },
+      {
+        "alg": -7,
+        "type": "public-key"
+      },
+      {
+        "alg": -257,
+        "type": "public-key"
+      }
+    ],
+    "timeout": 60000,
+    "attestation": "none",
+    "excludeCredentials": [
+      {
+        "id": "KCkqKywtLi8wMTIzNDU2Nzg5Ojs",
+        "type": "public-key"
+      }
+    ],
+    "authenticatorSelection": {
+      "residentKey": "preferred",
+      "userVerification": "preferred",
+      "requireResidentKey": false
+    },
+    "extensions": {
+      "credProps": true
+    },
+    "hints": []
+  }
+}

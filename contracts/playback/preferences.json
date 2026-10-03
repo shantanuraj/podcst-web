@@ -1,0 +1,579 @@
+{
+  "cases": [
+    {
+      "name": "defaults apply to every podcast",
+      "steps": [],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "changing defaults updates inheriting podcasts",
+      "steps": [
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1.5,
+          "volumeBoost": true,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "an override keeps its intent when defaults change",
+      "steps": [
+        {
+          "op": "set",
+          "feed": "https://example.com/a.xml",
+          "options": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        },
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": true
+          }
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1.5,
+          "volumeBoost": true,
+          "trimSilence": true
+        },
+        "overrides": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        },
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": true
+          }
+        }
+      }
+    },
+    {
+      "name": "setRate without an override changes the defaults",
+      "steps": [
+        {
+          "op": "setRate",
+          "currentFeed": "https://example.com/a.xml",
+          "speed": 1.25
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1.25,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1.25,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1.25,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "setRate with an override changes only the override",
+      "steps": [
+        {
+          "op": "set",
+          "feed": "https://example.com/a.xml",
+          "options": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        },
+        {
+          "op": "setRate",
+          "currentFeed": "https://example.com/a.xml",
+          "speed": 2
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {
+          "https://example.com/a.xml": {
+            "speed": 2,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        },
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 2,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "setRate without a current episode changes the defaults",
+      "steps": [
+        {
+          "op": "setRate",
+          "currentFeed": null,
+          "speed": 0.75
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 0.75,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "setRate ignores unsupported speeds",
+      "steps": [
+        {
+          "op": "setRate",
+          "currentFeed": "https://example.com/a.xml",
+          "speed": 3
+        },
+        {
+          "op": "setRate",
+          "currentFeed": "https://example.com/a.xml",
+          "speed": 1.1
+        },
+        {
+          "op": "setRate",
+          "currentFeed": null,
+          "speed": 0
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "setRate keeps inherited effects",
+      "steps": [
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 1,
+            "volumeBoost": true,
+            "trimSilence": true
+          }
+        },
+        {
+          "op": "setRate",
+          "currentFeed": "https://example.com/a.xml",
+          "speed": 1.5
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1.5,
+          "volumeBoost": true,
+          "trimSilence": true
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": true
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": true
+          }
+        }
+      }
+    },
+    {
+      "name": "setRate keeps the override's own effects",
+      "steps": [
+        {
+          "op": "set",
+          "feed": "https://example.com/a.xml",
+          "options": {
+            "speed": 1,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        },
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        },
+        {
+          "op": "setRate",
+          "currentFeed": "https://example.com/a.xml",
+          "speed": 1.5
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": false,
+          "trimSilence": true
+        },
+        "overrides": {
+          "https://example.com/a.xml": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        },
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1.5,
+            "volumeBoost": true,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        }
+      }
+    },
+    {
+      "name": "useDefaults removes the override",
+      "steps": [
+        {
+          "op": "set",
+          "feed": "https://example.com/a.xml",
+          "options": {
+            "speed": 2,
+            "volumeBoost": true,
+            "trimSilence": true
+          }
+        },
+        {
+          "op": "useDefaults",
+          "feed": "https://example.com/a.xml"
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "useDefaults without an override changes nothing",
+      "steps": [
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        },
+        {
+          "op": "useDefaults",
+          "feed": "https://example.com/a.xml"
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 0.75,
+          "volumeBoost": false,
+          "trimSilence": false
+        },
+        "overrides": {},
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "unsupported stored speeds become 1",
+      "steps": [
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 1.1,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        },
+        {
+          "op": "set",
+          "feed": "https://example.com/a.xml",
+          "options": {
+            "speed": 0,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": true,
+          "trimSilence": false
+        },
+        "overrides": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        },
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": true
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "restored preferences are validated",
+      "steps": [
+        {
+          "op": "restore",
+          "defaults": {
+            "speed": 2.5,
+            "volumeBoost": true,
+            "trimSilence": false
+          },
+          "overrides": {
+            "https://example.com/a.xml": {
+              "speed": 0.75,
+              "volumeBoost": false,
+              "trimSilence": true
+            },
+            "https://private.example/b.xml?token=secret": {
+              "speed": 7,
+              "volumeBoost": false,
+              "trimSilence": false
+            }
+          }
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": true,
+          "trimSilence": false
+        },
+        "overrides": {
+          "https://example.com/a.xml": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": true
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        },
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 0.75,
+            "volumeBoost": false,
+            "trimSilence": true
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1,
+            "volumeBoost": false,
+            "trimSilence": false
+          }
+        }
+      }
+    },
+    {
+      "name": "an override replaces every option, not only speed",
+      "steps": [
+        {
+          "op": "set",
+          "feed": null,
+          "options": {
+            "speed": 1,
+            "volumeBoost": true,
+            "trimSilence": false
+          }
+        },
+        {
+          "op": "set",
+          "feed": "https://private.example/b.xml?token=secret",
+          "options": {
+            "speed": 1.25,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        }
+      ],
+      "expected": {
+        "defaults": {
+          "speed": 1,
+          "volumeBoost": true,
+          "trimSilence": false
+        },
+        "overrides": {
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1.25,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        },
+        "effective": {
+          "https://example.com/a.xml": {
+            "speed": 1,
+            "volumeBoost": true,
+            "trimSilence": false
+          },
+          "https://private.example/b.xml?token=secret": {
+            "speed": 1.25,
+            "volumeBoost": false,
+            "trimSilence": true
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": 9001,
+    "itunes_id": null,
+    "author": "Example Author",
+    "feed": "https://example.com/explicit.xml",
+    "title": "Explicit Example",
+    "cover": "https://example.com/cover.jpg",
+    "thumbnail": "https://example.com/cover.jpg",
+    "categories": [],
+    "explicit": "explicit",
+    "count": 0
+  }
+]

@@ -1,0 +1,70 @@
+{
+  "speeds": {
+    "supported": [0.5, 0.75, 1, 1.25, 1.5, 2],
+    "default": 1,
+    "hold": 2
+  },
+  "skip": {
+    "backwardSeconds": 10,
+    "forwardSeconds": 30
+  },
+  "progress": {
+    "periodicPlayingSeconds": 30
+  },
+  "completion": {
+    "parity": {
+      "ended": true,
+      "markedPlayed": true,
+      "savedPositionFractionOfKnownDuration": 0.95
+    },
+    "current": {
+      "ios": {
+        "ended": true,
+        "markedPlayed": true,
+        "savedPositionFractionOfKnownDuration": null
+      },
+      "web": {
+        "ended": true,
+        "markedPlayed": false,
+        "savedPositionFractionOfKnownDuration": 0.95
+      }
+    }
+  },
+  "chapters": {
+    "minimumCount": 2,
+    "strictlyIncreasing": true,
+    "previousRestartThresholdSeconds": 3,
+    "nextStartEpsilonSeconds": 0.5
+  },
+  "releases": {
+    "perPodcast": 2,
+    "maximum": null
+  },
+  "guestRefreshMinimumIntervalSeconds": null,
+  "media": {
+    "transientCacheQuotaBytes": 536870912,
+    "maximumMediaBytes": 4294967296
+  },
+  "artwork": {
+    "variantHost": "assets.podcst.app",
+    "variantParameter": "w",
+    "variantWidths": [160, 384, 1024]
+  },
+  "discovery": {
+    "chartLimit": 30,
+    "defaultRegion": "us",
+    "regionDetection": "deviceRegionWhenListed",
+    "regions": [
+      { "code": "us", "name": "United States" },
+      { "code": "nl", "name": "Netherlands" },
+      { "code": "ca", "name": "Canada" },
+      { "code": "kr", "name": "South Korea" },
+      { "code": "my", "name": "Malaysia" },
+      { "code": "in", "name": "India" },
+      { "code": "mx", "name": "Mexico" },
+      { "code": "fr", "name": "France" },
+      { "code": "se", "name": "Sweden" },
+      { "code": "no", "name": "Norway" }
+    ]
+  }
+}

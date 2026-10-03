@@ -1,0 +1,14 @@
+{
+  "id": 9002,
+  "isPrivate": true,
+  "feed": "https://private.example/feed.xml?token=redacted",
+  "title": "Members Feed",
+  "author": "Example Author",
+  "cover": "https://private.example/cover.jpg",
+  "description": "",
+  "link": null,
+  "published": null,
+  "explicit": true,
+  "keywords": [],
+  "episodeCount": 0
+}
