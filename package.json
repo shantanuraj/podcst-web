@@ -87,7 +87,6 @@
     "@peculiar/asn1-x509": "^2.8.0",
     "@peculiar/asn1-x509-attr": "^2.8.0",
     "minimatch": "^10.2.5",
-    "nanoid": "^5.1.16",
     "picomatch": "^4.0.4",
     "postcss": "^8.5.15",
     "shell-quote": "^1.8.4"
