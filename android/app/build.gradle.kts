@@ -17,12 +17,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val release = providers.gradleProperty("podcst.release.storeFile").orNull?.let { storeFile ->
+        signingConfigs.create("release") {
+            this.storeFile = file(storeFile)
+            storePassword = providers.gradleProperty("podcst.release.storePassword").get()
+            keyAlias = providers.gradleProperty("podcst.release.keyAlias").get()
+            keyPassword = providers.gradleProperty("podcst.release.keyPassword").get()
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = release
         }
     }
 

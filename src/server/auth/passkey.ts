@@ -9,6 +9,7 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 import { sql } from '../db';
+import { acceptedOrigins } from './native-apps';
 import { generateId } from './session';
 
 const RP_NAME = 'Podcst';
@@ -17,13 +18,7 @@ const ORIGIN =
   process.env.WEBAUTHN_RP_ORIGIN ||
   process.env.WEBAUTHN_ORIGIN ||
   'http://localhost:3000';
-const ORIGINS = Array.from(
-  new Set([
-    ORIGIN,
-    process.env.WEBAUTHN_NATIVE_ORIGIN ||
-      (RP_ID === 'localhost' ? 'http://localhost' : `https://${RP_ID}`),
-  ]),
-);
+const ORIGINS = acceptedOrigins(RP_ID, ORIGIN);
 
 type ChallengeType = 'registration' | 'authentication';
 

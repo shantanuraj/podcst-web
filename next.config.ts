@@ -20,10 +20,6 @@ const config: NextConfig = {
   async headers() {
     return [
       {
-        source: '/.well-known/apple-app-site-association',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-      },
-      {
         source: '/api/:path*',
         headers: [
           { key: 'Access-Control-Allow-Credentials', value: 'true' },
@@ -43,6 +39,12 @@ const config: NextConfig = {
   },
   async redirects() {
     return [
+      {
+        source: '/:path((?!\\.well-known/).*)',
+        has: [{ type: 'host', value: 'podcst.app' }],
+        destination: 'https://www.podcst.app/:path',
+        permanent: true,
+      },
       {
         source: '/episode',
         destination: '/feed/top',

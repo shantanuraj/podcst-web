@@ -162,18 +162,16 @@ describe('Android Release installation', () => {
     }
   });
 
-  for (const step of ['build', 'install', 'launch']) {
+  for (const [step, command] of [
+    ['build', ':app:assembleRelease'],
+    ['install', 'install'],
+    ['launch', 'am'],
+  ]) {
     it(`stops when ${step} fails`, async () => {
       const f = await fixture();
       const result = await f.run([], { MOCK_FAIL: step });
       expect(result.code).not.toBe(0);
-      const last = result.commands.at(-1) ?? [];
-      const expected = {
-        build: ':app:assembleRelease',
-        install: 'install',
-        launch: 'am',
-      }[step];
-      expect(last).toContain(expected);
+      expect(result.commands.at(-1) ?? []).toContain(command);
     });
   }
 });
