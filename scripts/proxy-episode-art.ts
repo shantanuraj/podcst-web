@@ -23,21 +23,25 @@ export async function main(args: string[]) {
   try {
     let after = '0';
     for (;;) {
-      const rows = await sql<Row[]>`
-        SELECT ec.episode_id, ec.episode_art, p.cover
-        FROM episode_content ec
+      const rows = await sql<(Row & { public: boolean })[]>`
+        SELECT ec.episode_id, ec.episode_art, p.cover,
+          p.owner_user_id IS NULL AS public
+        FROM (
+          SELECT episode_id, episode_art
+          FROM episode_content
+          WHERE episode_id > ${after} AND episode_art IS NOT NULL
+          ORDER BY episode_id
+          LIMIT ${batchSize}
+        ) ec
         JOIN episodes e ON e.id = ec.episode_id
         JOIN podcasts p ON p.id = e.podcast_id
-        WHERE ec.episode_id > ${after}
-          AND ec.episode_art IS NOT NULL
-          AND p.owner_user_id IS NULL
         ORDER BY ec.episode_id
-        LIMIT ${batchSize}
       `;
       if (rows.length === 0) break;
       after = rows[rows.length - 1].episode_id;
       totals.scanned += rows.length;
       const changes = rows.flatMap((row) => {
+        if (!row.public) return [];
         const next = proxiedEpisodeArt(row);
         return next === row.episode_art
           ? []
