@@ -88,10 +88,58 @@ export function fixtureMp3(version: 3 | 4) {
   ]);
 }
 
+export function artworkFixtureMp3(version: 3 | 4) {
+  const images = [
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGP4z8AARAAI/gH/xp559wAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGNgYPgPRAAFAgH/wSuWnwAAAABJRU5ErkJggg==',
+  ].map((image) =>
+    frame(
+      version,
+      'APIC',
+      Buffer.concat([
+        Buffer.from('\0image/png\0\0\0'),
+        Buffer.from(image, 'base64'),
+      ]),
+    ),
+  );
+  const chapter = (
+    id: string,
+    start: number,
+    end: number,
+    title: string,
+    image?: Buffer,
+  ) => {
+    const body = chapterFrame(version, id, start, title, end).subarray(10);
+    return frame(
+      version,
+      'CHAP',
+      Buffer.concat([body, image ?? Buffer.alloc(0)]),
+    );
+  };
+  const silence = fixtureMp3(version).subarray(fixtureTag(version).length);
+  return Buffer.concat([
+    tag(version, [
+      contentsFrame(version, 'toc', ['opening', 'group']),
+      contentsFrame(version, 'group', ['topic', 'ending'], 1),
+      chapter('opening', 0, 4000, 'Opening', images[0]),
+      chapter('visual', 2000, 3500, '', images[1]),
+      chapter('topic', 4000, 8000, 'No artwork'),
+      chapter('ending', 8000, 12000, 'Ending', images[1]),
+    ]),
+    silence,
+    silence,
+  ]);
+}
+
 if (import.meta.main) {
-  for (const version of [3, 4] as const)
+  for (const version of [3, 4] as const) {
     await Bun.write(
       `contracts/fixtures/media/chapters-v2${version}.mp3`,
       fixtureMp3(version),
     );
+    await Bun.write(
+      `contracts/fixtures/media/chapters-artwork-v2${version}.mp3`,
+      artworkFixtureMp3(version),
+    );
+  }
 }
