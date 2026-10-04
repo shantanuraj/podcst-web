@@ -287,7 +287,7 @@
       }
     },
     {
-      "name": "finish at the last index continues with the new last episode",
+      "name": "finish at the last index continues with the first queued episode",
       "initial": {
         "queue": [
           "a",
@@ -307,7 +307,7 @@
           "a",
           "b"
         ],
-        "current": 1,
+        "current": 0,
         "active": true
       }
     },
@@ -419,6 +419,31 @@
         "queue": [],
         "current": 0,
         "active": false
+      }
+    },
+    {
+      "name": "mark played at the last index continues with the first queued episode",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 2,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "markPlayed"
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "b"
+        ],
+        "current": 0,
+        "active": true
       }
     },
     {
@@ -547,7 +572,7 @@
       }
     },
     {
-      "name": "remove the current last episode selects the new last episode",
+      "name": "remove the current last episode selects the first queued episode",
       "initial": {
         "queue": [
           "a",
@@ -570,7 +595,7 @@
           "a",
           "b"
         ],
-        "current": 1,
+        "current": 0,
         "active": true
       }
     },
@@ -658,7 +683,7 @@
       }
     },
     {
-      "name": "remove the current episode with earlier episodes",
+      "name": "remove the current episode with earlier episodes selects the episode that followed it",
       "initial": {
         "queue": [
           "a",
@@ -685,12 +710,12 @@
           "d",
           "e"
         ],
-        "current": 1,
+        "current": 0,
         "active": true
       }
     },
     {
-      "name": "remove the current episode of a stopped session reopens paused",
+      "name": "remove the current episode of a stopped session keeps it stopped",
       "initial": {
         "queue": [
           "a",
@@ -712,6 +737,37 @@
           "b"
         ],
         "current": 0,
+        "active": false
+      }
+    },
+    {
+      "name": "remove the current episode of a paused session keeps it paused",
+      "initial": {
+        "queue": [
+          "a",
+          "b",
+          "c"
+        ],
+        "current": 1,
+        "active": true
+      },
+      "steps": [
+        {
+          "op": "pause"
+        },
+        {
+          "op": "remove",
+          "indices": [
+            1
+          ]
+        }
+      ],
+      "expected": {
+        "queue": [
+          "a",
+          "c"
+        ],
+        "current": 1,
         "active": true
       }
     },

@@ -381,6 +381,7 @@ public final class PlaybackController {
 
     public func remove(atOffsets offsets: IndexSet) {
         guard !offsets.isEmpty, !queue.isEmpty else { return }
+        let wasActive = isActive
         let removedCurrent = offsets.contains(currentIndex)
         if removedCurrent { saveOutgoingProgress() }
         offsets.sorted(by: >).forEach { index in
@@ -396,15 +397,12 @@ public final class PlaybackController {
             updateNowPlayingInfo()
             return
         }
+        currentIndex = following(currentIndex - offsets.filter { $0 < currentIndex }.count)
         if removedCurrent {
-            currentIndex = min(currentIndex, queue.count - 1)
             currentTime = 0
             duration = queue[currentIndex].duration ?? 0
             stopPlayback()
-            transition(to: .paused)
-        } else {
-            let removedBeforeCurrent = offsets.filter { $0 < currentIndex }.count
-            currentIndex = max(0, currentIndex - removedBeforeCurrent)
+            if wasActive { transition(to: .paused) }
         }
         persist()
         updateNowPlayingInfo()
@@ -418,6 +416,10 @@ public final class PlaybackController {
     public func moveUpNext(fromOffsets offsets: IndexSet, toOffset destination: Int) {
         rotateToCurrent()
         move(fromOffsets: IndexSet(offsets.map { $0 + 1 }), toOffset: destination + 1)
+    }
+
+    private func following(_ index: Int) -> Int {
+        queue.indices.contains(index) ? index : 0
     }
 
     private func rotateToCurrent() {
@@ -579,7 +581,7 @@ public final class PlaybackController {
         emitProgress(completed: true)
         if queue.count > 1 {
             queue.remove(at: currentIndex)
-            currentIndex = min(currentIndex, queue.count - 1)
+            currentIndex = following(currentIndex)
             currentTime = 0
             duration = queue[currentIndex].duration ?? 0
             replaceCurrentItem(startingAt: 0, autoPlay: true)

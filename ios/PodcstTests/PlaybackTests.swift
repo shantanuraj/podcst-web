@@ -832,6 +832,47 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(transport.changedRates, [1, 1.25, 2, 1.25])
     }
 
+    func testQueueMatchesSharedVectors() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/playback/queue.json")
+        let vectors = try JSONDecoder().decode(QueueVectors.self, from: Data(contentsOf: url))
+        XCTAssertFalse(vectors.cases.isEmpty)
+        for vector in vectors.cases {
+            let transport = FakePlaybackTransport()
+            let controller = makeController(transport: transport)
+            vector.initial.queue.forEach { controller.enqueue(episode(guid: $0)) }
+            if vector.initial.active {
+                controller.play(episode(guid: vector.initial.queue[vector.initial.current]))
+            } else if vector.initial.current > 0 {
+                controller.play(episode(guid: vector.initial.queue[vector.initial.current]))
+                controller.stop()
+            }
+            for step in vector.steps {
+                switch step.op {
+                case "play": controller.play(episode(guid: step.episode!))
+                case "enqueue": controller.enqueue(episode(guid: step.episode!), next: step.next ?? false)
+                case "finish": transport.emit(.ended)
+                case "markPlayed": controller.markPlayed()
+                case "next": controller.next()
+                case "previous": controller.previous()
+                case "remove": controller.remove(atOffsets: IndexSet(step.indices!))
+                case "removeUpNext": controller.removeUpNext(atOffsets: IndexSet(step.offsets!))
+                case "moveUpNext": controller.moveUpNext(fromOffsets: IndexSet(integer: step.from!), toOffset: step.to!)
+                case "move": controller.move(fromOffsets: IndexSet(integer: step.from!), toOffset: step.to!)
+                case "clear": controller.clear()
+                case "stop": controller.stop()
+                case "reopen": controller.reopen()
+                case "pause": controller.pause()
+                default: XCTFail("Unknown operation \(step.op) in \(vector.name)")
+                }
+            }
+            XCTAssertEqual(controller.queue.map(\.guid), vector.expected.queue, vector.name)
+            XCTAssertEqual(controller.currentIndex, vector.expected.current, vector.name)
+            XCTAssertEqual(controller.isActive, vector.expected.active, vector.name)
+        }
+    }
+
     private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil) -> PlaybackController {
         let url = persistenceURL ?? temporaryURL()
         let controller = PlaybackController(transport: transport, persistenceURL: url, monotonicTime: { clock.time }, prepareAudioSession: prepareAudioSession)
@@ -849,6 +890,33 @@ final class PlaybackTests: XCTestCase {
     private func temporaryURL() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("json")
     }
+}
+
+private struct QueueVectors: Decodable {
+    struct State: Decodable {
+        let queue: [String]
+        let current: Int
+        let active: Bool
+    }
+
+    struct Step: Decodable {
+        let op: String
+        let episode: String?
+        let next: Bool?
+        let indices: [Int]?
+        let offsets: [Int]?
+        let from: Int?
+        let to: Int?
+    }
+
+    struct Case: Decodable {
+        let name: String
+        let initial: State
+        let steps: [Step]
+        let expected: State
+    }
+
+    let cases: [Case]
 }
 
 @MainActor

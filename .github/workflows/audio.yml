@@ -3,10 +3,10 @@ name: Native audio
 on:
   push:
     branches: [main]
-    paths: ['audio-engine/**', 'ios/**', '.github/workflows/audio.yml']
+    paths: ['audio-engine/**', 'ios/**', 'contracts/**', '.github/workflows/audio.yml']
   pull_request:
     branches: [main]
-    paths: ['audio-engine/**', 'ios/**', '.github/workflows/audio.yml']
+    paths: ['audio-engine/**', 'ios/**', 'contracts/**', '.github/workflows/audio.yml']
 
 permissions:
   contents: read

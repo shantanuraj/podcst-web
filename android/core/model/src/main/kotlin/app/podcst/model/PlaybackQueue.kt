@@ -38,7 +38,7 @@ data class PlaybackQueue(
         if (episode == null) return this
         if (episodes.size <= 1) return PlaybackQueue()
         val remaining = episodes.toMutableList().apply { removeAt(current) }
-        return copy(episodes = remaining, current = minOf(current, remaining.size - 1), active = true)
+        return copy(episodes = remaining, current = following(current, remaining), active = true)
     }
 
     fun markedPlayed(): PlaybackQueue = if (active) finished() else this
@@ -53,11 +53,7 @@ data class PlaybackQueue(
         if (indices.isEmpty() || episodes.isEmpty()) return this
         val remaining = episodes.filterIndexed { index, _ -> index !in indices }
         if (remaining.isEmpty()) return PlaybackQueue()
-        return if (current in indices) {
-            copy(episodes = remaining, current = minOf(current, remaining.size - 1), active = true)
-        } else {
-            copy(episodes = remaining, current = maxOf(0, current - indices.count { it < current }))
-        }
+        return copy(episodes = remaining, current = following(current - indices.count { it < current }, remaining))
     }
 
     fun removingUpNext(offsets: Set<Int>): PlaybackQueue = rotatedToCurrent().removing(offsets.mapTo(mutableSetOf()) { it + 1 })
@@ -92,5 +88,7 @@ data class PlaybackQueue(
     fun rotatedToCurrent(): PlaybackQueue =
         if (current > 0 && current in episodes.indices) copy(episodes = episodes.drop(current) + episodes.take(current), current = 0) else this
 }
+
+private fun following(index: Int, remaining: List<Episode>) = if (index < remaining.size) index else 0
 
 private fun <T> List<T>.replacing(index: Int, value: T): List<T> = toMutableList().apply { set(index, value) }
