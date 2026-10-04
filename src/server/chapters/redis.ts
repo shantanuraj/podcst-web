@@ -14,6 +14,7 @@ export const chapterRedisOptions: RedisOptions = {
   autoResendUnfulfilledCommands: false,
   enableReadyCheck: false,
   connectTimeout: REDIS_TIMEOUT_MS,
+  disconnectTimeout: 0,
   commandTimeout: REDIS_TIMEOUT_MS,
   socketTimeout: REDIS_TIMEOUT_MS,
   maxRetriesPerRequest: 0,

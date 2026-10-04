@@ -1,79 +1,239 @@
-import { createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
-  type Chapter,
   type EpisodeChapters,
   showNoteChapters,
   validTimeline,
 } from '@/shared/chapters';
+import {
+  type ChapterCache,
+  type ChapterCacheEntry,
+  chapterCacheKey,
+  expiresAt,
+  FAILURE_TTL_MS,
+  needsRefresh,
+  usableEntry,
+  WORK_TIMEOUT_MS,
+} from './cache';
 import type { ChapterEpisode } from './episode';
-import { fetchEmbeddedChapters } from './http';
+import { type ChapterFetchResult, fetchChapterMetadata } from './http';
 
-export const CHAPTER_TTL_MS = 5 * 60_000;
-export const FALLBACK_TTL_MS = 60_000;
-export const MAX_CACHE_ENTRIES = 128;
+export const MAX_LOCAL_ENTRIES = 128;
 export const MAX_IN_FLIGHT = 16;
 
 type ResolveEpisode = (
   id: number,
   userId: string | null,
 ) => Promise<ChapterEpisode | null>;
+interface Options {
+  cache: ChapterCache;
+  schedule: (work: () => Promise<void>) => void;
+  fetchChapters?: typeof fetchChapterMetadata;
+  now?: () => number;
+  deadline?: () => AbortSignal;
+}
 
 export function createChapterService(
   resolveEpisode: ResolveEpisode,
-  fetchChapters: (url: string) => Promise<Chapter[]> = fetchEmbeddedChapters,
-  now = Date.now,
+  {
+    cache,
+    schedule,
+    fetchChapters = fetchChapterMetadata,
+    now = Date.now,
+    deadline = () => AbortSignal.timeout(WORK_TIMEOUT_MS),
+  }: Options,
 ) {
-  const cache = new Map<string, { expires: number; data: EpisodeChapters }>();
-  const pending = new Map<string, Promise<EpisodeChapters>>();
+  const local = new Map<
+    string,
+    { expires: number; entry: ChapterCacheEntry }
+  >();
+  const pending = new Map<string, Promise<ChapterCacheEntry | null>>();
+
+  async function authorized(id: number, userId: string | null) {
+    const episode = await resolveEpisode(id, userId);
+    return episode &&
+      (episode.owner_user_id === null || episode.owner_user_id === userId)
+      ? episode
+      : null;
+  }
+
+  function remember(key: string, entry: ChapterCacheEntry) {
+    for (const [key, value] of local)
+      if (value.expires <= now()) local.delete(key);
+    if (local.size >= MAX_LOCAL_ENTRIES) {
+      const oldest = local.keys().next().value;
+      if (oldest !== undefined) local.delete(oldest);
+    }
+    local.set(key, {
+      entry,
+      expires: Math.min(now() + FAILURE_TTL_MS, expiresAt(entry)),
+    });
+  }
+
+  async function read(key: string) {
+    let shared: ChapterCacheEntry | null = null;
+    try {
+      shared = usableEntry(await cache.get(key), now());
+    } catch {}
+    const saved = local.get(key);
+    const recent =
+      saved && saved.expires > now() ? usableEntry(saved.entry, now()) : null;
+    if (!recent) local.delete(key);
+    if (
+      recent?.kind === 'embedded' &&
+      shared?.kind === 'embedded' &&
+      (recent.checkedAt > shared.checkedAt ||
+        (recent.checkedAt === shared.checkedAt &&
+          (recent.retryAt ?? 0) > (shared.retryAt ?? 0)))
+    )
+      return recent;
+    return shared ?? recent;
+  }
+
+  async function refresh(
+    episode: ChapterEpisode,
+    key: string,
+    known: ChapterCacheEntry | null,
+    signal: AbortSignal,
+  ) {
+    const token = randomUUID();
+    let acquired: boolean | undefined;
+    try {
+      try {
+        acquired = await cache.acquire(key, token);
+      } catch {}
+      signal.throwIfAborted();
+      const latest = await read(key);
+      signal.throwIfAborted();
+      const previous = latest ?? usableEntry(known, now());
+      if (acquired === false || (previous && !needsRefresh(previous, now())))
+        return previous;
+      let result: ChapterFetchResult = { status: 'failed' };
+      try {
+        if (episode.file_url)
+          result = await fetchChapters(
+            episode.file_url,
+            previous?.kind === 'embedded' ? previous.validators : undefined,
+            signal,
+          );
+      } catch {}
+      signal.throwIfAborted();
+      let entry: ChapterCacheEntry;
+      if (result.status === 'modified' && validTimeline(result.chapters)) {
+        entry = {
+          kind: 'embedded',
+          checkedAt: now(),
+          chapters: result.chapters,
+          validators: result.validators,
+        };
+      } else if (result.status === 'modified' || !episode.file_url) {
+        entry = { kind: 'absent', checkedAt: now() };
+      } else if (previous?.kind === 'embedded') {
+        entry =
+          result.status === 'not-modified'
+            ? {
+                kind: 'embedded',
+                chapters: previous.chapters,
+                checkedAt: now(),
+                validators: result.validators,
+              }
+            : { ...previous, retryAt: now() + FAILURE_TTL_MS };
+      } else entry = { kind: 'failure', checkedAt: now() };
+      if (acquired) {
+        try {
+          const stored = await cache.publish(
+            key,
+            token,
+            entry,
+            expiresAt(entry) - now(),
+          );
+          signal.throwIfAborted();
+          if (!stored) return await read(key);
+          remember(key, entry);
+          return entry;
+        } catch {
+          signal.throwIfAborted();
+        }
+      }
+      remember(key, entry);
+      return entry;
+    } finally {
+      if (acquired !== false) {
+        try {
+          await cache.release(key, token);
+        } catch {}
+      }
+    }
+  }
+
+  function begin(
+    episode: ChapterEpisode,
+    userId: string | null,
+    key: string,
+    entry: ChapterCacheEntry | null,
+    background: boolean,
+  ) {
+    const running = pending.get(key);
+    if (running) return running;
+    if (pending.size >= MAX_IN_FLIGHT) return Promise.resolve(null);
+    const signal = deadline();
+    let finish: (entry: ChapterCacheEntry | null) => void = () => {};
+    const promise = new Promise<ChapterCacheEntry | null>((resolve) => {
+      finish = resolve;
+    });
+    const abort = () => finish(null);
+    signal.addEventListener('abort', abort, { once: true });
+    const completed = promise.finally(() => {
+      signal.removeEventListener('abort', abort);
+      if (pending.get(key) === completed) pending.delete(key);
+    });
+    pending.set(key, completed);
+    const execute = async () => {
+      try {
+        signal.throwIfAborted();
+        const current = background
+          ? await authorized(episode.id, userId)
+          : episode;
+        signal.throwIfAborted();
+        if (!current || chapterCacheKey(current) !== key) {
+          finish(null);
+          return;
+        }
+        const result = await refresh(current, key, entry, signal);
+        signal.throwIfAborted();
+        finish(result);
+      } catch {
+        finish(null);
+      }
+    };
+    try {
+      if (signal.aborted) abort();
+      else if (background)
+        schedule(() => {
+          void execute();
+          return completed.then(() => {});
+        });
+      else void execute();
+    } catch {
+      finish(null);
+    }
+    return completed;
+  }
+
   return async (
     id: number,
     userId: string | null,
   ): Promise<EpisodeChapters | null> => {
-    const episode = await resolveEpisode(id, userId);
-    if (
-      !episode ||
-      (episode.owner_user_id !== null && episode.owner_user_id !== userId)
-    )
-      return null;
-    const key = createHash('sha256')
-      .update(JSON.stringify(episode))
-      .digest('hex');
-    for (const [key, entry] of cache)
-      if (entry.expires <= now()) cache.delete(key);
-    const cached = cache.get(key);
-    if (cached) return cached.data;
-    const active = pending.get(key);
-    if (active) return active;
+    const episode = await authorized(id, userId);
+    if (!episode) return null;
+    const key = chapterCacheKey(episode);
+    let entry = await read(key);
+    if (entry) {
+      if (needsRefresh(entry, now()))
+        void begin(episode, userId, key, entry, true);
+    } else entry = await begin(episode, userId, key, null, false);
+    if (entry?.kind === 'embedded' && expiresAt(entry) > now())
+      return { chapters: entry.chapters, source: 'embedded' };
     const chapters = showNoteChapters(episode.summary ?? '');
-    const fallback: EpisodeChapters = {
-      chapters,
-      source: chapters.length ? 'shownotes' : 'none',
-    };
-    if (pending.size >= MAX_IN_FLIGHT) return fallback;
-    const promise = Promise.resolve()
-      .then(async () => {
-        let embedded: Chapter[] = [];
-        try {
-          if (episode.file_url)
-            embedded = await fetchChapters(episode.file_url);
-        } catch {}
-        const data: EpisodeChapters = validTimeline(embedded)
-          ? { chapters: embedded, source: 'embedded' }
-          : fallback;
-        if (cache.size >= MAX_CACHE_ENTRIES) {
-          const oldest = cache.keys().next().value;
-          if (oldest !== undefined) cache.delete(oldest);
-        }
-        cache.set(key, {
-          data,
-          expires:
-            now() +
-            (data.source === 'embedded' ? CHAPTER_TTL_MS : FALLBACK_TTL_MS),
-        });
-        return data;
-      })
-      .finally(() => pending.delete(key));
-    pending.set(key, promise);
-    return promise;
+    return { chapters, source: chapters.length ? 'shownotes' : 'none' };
   };
 }

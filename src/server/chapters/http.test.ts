@@ -13,7 +13,8 @@ import {
   fixtureTag,
   syncsafe,
 } from '../../../scripts/fixtures/mp3-chapters';
-import { MAX_REDIRECTS, readMp3Tag } from './http';
+import { fingerprint } from './cache';
+import { fetchChapterMetadata, MAX_REDIRECTS, readMp3Tag } from './http';
 import { MAX_TAG_BYTES } from './mp3';
 
 let handler: (request: IncomingMessage, response: ServerResponse) => void;
@@ -23,8 +24,10 @@ const address = server.address();
 if (!address || typeof address === 'string') throw new Error('No fixture port');
 const url = `http://fixture.example.invalid:${address.port}/audio`;
 const resolveFixture = async () => '127.0.0.1';
-const read = (signal = AbortSignal.timeout(1000)) =>
-  readMp3Tag(url, signal, resolveFixture);
+const read = async (signal = AbortSignal.timeout(1000)) => {
+  const result = await readMp3Tag(url, signal, resolveFixture);
+  return result.status === 'modified' ? result.body : null;
+};
 afterAll(() => server.close());
 
 function rangeResponse(
@@ -136,7 +139,7 @@ test('validates every redirect, resolves new hosts, and bounds loops', async () 
       hosts.push(host);
       return '127.0.0.1';
     }),
-  ).toEqual(fixtureTag(4));
+  ).toMatchObject({ status: 'modified', body: fixtureTag(4) });
   expect(hosts).toEqual([
     'fixture.example.invalid',
     'cdn.example.invalid',
@@ -229,8 +232,176 @@ test('absent or oversized metadata requires only one header request', async () =
       Buffer.concat([Buffer.from('ID3\x04\0\0'), syncsafe(MAX_TAG_BYTES)]),
     );
   };
-  await expect(read()).rejects.toThrow();
+  expect(await read()).toBeNull();
   expect(count).toBe(2);
+});
+
+test('retains validators and revalidates with a single conditional header request', async () => {
+  const modified = 'Wed, 01 Oct 2025 00:00:00 GMT';
+  for (const etag of ['"fixture"', 'W/"fixture"', undefined]) {
+    const requests: IncomingMessage['headers'][] = [];
+    handler = (request, response) => {
+      requests.push(request.headers);
+      response.writeHead(304);
+      response.end();
+    };
+    const validators = {
+      urlFingerprint: fingerprint(url),
+      etag,
+      lastModified: modified,
+    };
+    expect(
+      await readMp3Tag(
+        url,
+        AbortSignal.timeout(1000),
+        resolveFixture,
+        validators,
+      ),
+    ).toEqual({ status: 'not-modified', validators });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].range).toBe('bytes=0-9');
+    expect(requests[0]['if-none-match']).toBe(etag);
+    expect(requests[0]['if-modified-since']).toBe(etag ? undefined : modified);
+  }
+  handler = (request, response) => {
+    response.setHeader('Last-Modified', modified);
+    rangeResponse(request, response);
+  };
+  expect(
+    await readMp3Tag(url, AbortSignal.timeout(1000), resolveFixture),
+  ).toMatchObject({
+    status: 'modified',
+    validators: {
+      urlFingerprint: fingerprint(url),
+      etag: '"fixture"',
+      lastModified: modified,
+    },
+  });
+});
+
+test('changed or ignored conditional responses read bounded metadata again', async () => {
+  const requests: IncomingMessage['headers'][] = [];
+  handler = (request, response) => {
+    requests.push(request.headers);
+    rangeResponse(request, response);
+  };
+  const result = await readMp3Tag(
+    url,
+    AbortSignal.timeout(1000),
+    resolveFixture,
+    { urlFingerprint: fingerprint(url), etag: '"old"' },
+  );
+  expect(result).toMatchObject({
+    status: 'modified',
+    body: fixtureTag(4),
+    validators: { etag: '"fixture"' },
+  });
+  expect(requests).toHaveLength(2);
+  expect(requests[0]['if-none-match']).toBe('"old"');
+  expect(requests[1]['if-none-match']).toBeUndefined();
+  expect(requests[1]['if-match']).toBe('"fixture"');
+});
+
+test('binds validators to exact redirect targets and does not forward them to different media', async () => {
+  const target = `http://cdn.example.invalid:${address.port}/media?secret=original`;
+  const requests: IncomingMessage['headers'][] = [];
+  handler = (request, response) => {
+    requests.push(request.headers);
+    if (request.url === '/audio') {
+      response.writeHead(302, { Location: target });
+      response.end();
+    } else {
+      response.writeHead(304);
+      response.end();
+    }
+  };
+  const validators = {
+    urlFingerprint: fingerprint(target),
+    etag: '"same-cdn-media"',
+  };
+  expect(
+    await readMp3Tag(
+      url,
+      AbortSignal.timeout(1000),
+      resolveFixture,
+      validators,
+    ),
+  ).toEqual({ status: 'not-modified', validators });
+  expect(requests[0]['if-none-match']).toBeUndefined();
+  expect(requests[1]['if-none-match']).toBe('"same-cdn-media"');
+  handler = (request, response) => {
+    if (request.url === '/audio') {
+      response.writeHead(302, {
+        Location: target.replace('original', 'replaced'),
+      });
+      response.end();
+    } else {
+      expect(request.headers['if-none-match']).toBeUndefined();
+      rangeResponse(request, response);
+    }
+  };
+  expect(
+    (
+      await readMp3Tag(
+        url,
+        AbortSignal.timeout(1000),
+        resolveFixture,
+        validators,
+      )
+    ).status,
+  ).toBe('modified');
+});
+
+test('rejects unsolicited or contradictory 304 responses and sanitizes validators', async () => {
+  handler = (_, response) => {
+    response.writeHead(304);
+    response.end();
+  };
+  await expect(
+    readMp3Tag(url, AbortSignal.timeout(1000), resolveFixture),
+  ).rejects.toThrow();
+  await expect(
+    readMp3Tag(url, AbortSignal.timeout(1000), resolveFixture, {
+      urlFingerprint: fingerprint(url),
+      etag: 'invalid\r\nHeader',
+    }),
+  ).rejects.toThrow();
+  handler = (_, response) => {
+    response.writeHead(304, { ETag: '"changed"' });
+    response.end();
+  };
+  await expect(
+    readMp3Tag(url, AbortSignal.timeout(1000), resolveFixture, {
+      urlFingerprint: fingerprint(url),
+      etag: '"old"',
+    }),
+  ).rejects.toThrow();
+  handler = (request, response) => {
+    response.setHeader('Last-Modified', 'invalid date');
+    rangeResponse(request, response);
+  };
+  const result = await readMp3Tag(
+    url,
+    AbortSignal.timeout(1000),
+    resolveFixture,
+  );
+  expect(result.validators.lastModified).toBeUndefined();
+});
+
+test('conditional refreshes retain SSRF protection and report failure without a URL', async () => {
+  handler = (_, response) => {
+    response.writeHead(302, { Location: 'http://169.254.169.254/private' });
+    response.end();
+  };
+  await expect(
+    readMp3Tag(url, AbortSignal.timeout(1000), resolveFixture, {
+      urlFingerprint: fingerprint(url),
+      etag: '"old"',
+    }),
+  ).rejects.toThrow();
+  expect(await fetchChapterMetadata('http://127.0.0.1/secret')).toEqual({
+    status: 'failed',
+  });
 });
 
 test('rejects representations changing between ranges', async () => {

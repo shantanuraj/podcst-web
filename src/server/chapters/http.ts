@@ -5,6 +5,13 @@ import {
   isPublicAddress,
   resolvePublicAddress,
 } from '@/server/ingest/public-feed-http';
+import type { Chapter } from '@/shared/chapters';
+import {
+  fingerprint,
+  type HttpValidators,
+  validEtag,
+  validLastModified,
+} from './cache';
 import { id3TagSize, MAX_TAG_BYTES, parseMp3Chapters } from './mp3';
 
 export const METADATA_TIMEOUT_MS = 8000;
@@ -49,17 +56,53 @@ function enclosureUrl(input: string) {
 interface PrefixResponse {
   body: Buffer;
   location?: string;
-  etag?: string;
+  validators: HttpValidators;
+  notModified?: boolean;
 }
+
+export type TagResult =
+  | {
+      status: 'modified';
+      body: Buffer | null;
+      validators: HttpValidators;
+    }
+  | { status: 'not-modified'; validators: HttpValidators };
+
+export type ChapterFetchResult =
+  | {
+      status: 'modified';
+      chapters: Chapter[];
+      validators: HttpValidators;
+    }
+  | { status: 'not-modified'; validators: HttpValidators }
+  | { status: 'failed' };
 
 async function requestPrefix(
   input: string,
   bytes: number,
   signal: AbortSignal,
   resolve: Resolver,
-  etag?: string,
+  conditions: { revalidate?: HttpValidators; match?: HttpValidators },
 ): Promise<PrefixResponse> {
   const { url, hostname } = enclosureUrl(input);
+  const urlFingerprint = fingerprint(url.href);
+  const revalidate =
+    conditions.revalidate?.urlFingerprint === urlFingerprint
+      ? conditions.revalidate
+      : undefined;
+  const match =
+    conditions.match?.urlFingerprint === urlFingerprint
+      ? conditions.match
+      : undefined;
+  const conditional: Record<string, string> = {};
+  if (validEtag(revalidate?.etag))
+    conditional['If-None-Match'] = revalidate.etag;
+  else if (validLastModified(revalidate?.lastModified))
+    conditional['If-Modified-Since'] = revalidate.lastModified;
+  if (validEtag(match?.etag) && match.etag.startsWith('"'))
+    conditional['If-Match'] = match.etag;
+  else if (validLastModified(match?.lastModified))
+    conditional['If-Unmodified-Since'] = match.lastModified;
   const address = await pinnedAddress(hostname, signal, resolve);
   signal.throwIfAborted();
   return new Promise((accept, reject) => {
@@ -79,16 +122,45 @@ async function requestPrefix(
           'User-Agent': 'Podcst/1.0',
           'Accept-Encoding': 'identity',
           Range: `bytes=0-${bytes - 1}`,
-          ...(etag ? { 'If-Match': etag } : {}),
+          ...conditional,
         },
       },
       (response) => {
         response.on('error', fail);
         const status = response.statusCode ?? 0;
+        const etag = response.headers.etag;
+        const lastModified = response.headers['last-modified'];
+        const validators: HttpValidators = {
+          urlFingerprint,
+          ...(validEtag(etag) ? { etag } : {}),
+          ...(validLastModified(lastModified) ? { lastModified } : {}),
+        };
+        if (status === 304) {
+          if (
+            (!conditional['If-None-Match'] &&
+              !conditional['If-Modified-Since']) ||
+            (conditional['If-None-Match'] &&
+              validators.etag &&
+              validators.etag !== revalidate?.etag) ||
+            (conditional['If-Modified-Since'] &&
+              validators.lastModified &&
+              validators.lastModified !== revalidate?.lastModified)
+          )
+            fail();
+          else
+            accept({
+              body: Buffer.alloc(0),
+              validators: { ...revalidate, ...validators },
+              notModified: true,
+            });
+          response.destroy();
+          return;
+        }
         if ([301, 302, 303, 307, 308].includes(status)) {
           accept({
             body: Buffer.alloc(0),
             location: response.headers.location ?? '',
+            validators,
           });
           response.destroy();
           return;
@@ -118,7 +190,7 @@ async function requestPrefix(
           if (size === bytes) {
             accept({
               body: Buffer.concat(chunks, bytes),
-              etag: response.headers.etag,
+              validators,
             });
             response.destroy();
             connection.destroy();
@@ -141,48 +213,82 @@ export async function readMp3Tag(
   input: string,
   signal: AbortSignal,
   resolve: Resolver = resolvePublicAddress,
-): Promise<Buffer | null> {
+  validators?: HttpValidators,
+): Promise<TagResult> {
   const active = AbortSignal.any([
     signal,
     AbortSignal.timeout(METADATA_TIMEOUT_MS),
   ]);
   let redirects = 0;
-  const prefix = async (bytes: number, etag?: string) => {
+  const prefix = async (
+    bytes: number,
+    conditions: { revalidate?: HttpValidators; match?: HttpValidators },
+  ) => {
     if (bytes > MAX_TAG_BYTES) throw new Error('Metadata too large');
     for (;;) {
-      const response = await requestPrefix(input, bytes, active, resolve, etag);
+      const response = await requestPrefix(
+        input,
+        bytes,
+        active,
+        resolve,
+        conditions,
+      );
       if (response.location === undefined) return response;
       if (!response.location || redirects++ >= MAX_REDIRECTS)
         throw new Error('Metadata redirect limit');
       input = new URL(response.location, input).href;
       enclosureUrl(input);
-      etag = undefined;
     }
   };
-  const header = await prefix(10);
-  const size = id3TagSize(header.body);
-  if (size === null) return null;
-  if (size === 10) return header.body;
-  const tag = await prefix(
-    size,
-    header.etag?.startsWith('"') ? header.etag : undefined,
-  );
+  const header = await prefix(10, { revalidate: validators });
+  if (header.notModified)
+    return { status: 'not-modified', validators: header.validators };
+  let size: number | null;
+  try {
+    size = id3TagSize(header.body);
+  } catch {
+    size = null;
+  }
+  if (size === null || size === 10)
+    return {
+      status: 'modified',
+      body: size === null ? null : header.body,
+      validators: header.validators,
+    };
+  const tag = await prefix(size, { match: header.validators });
   if (
     !tag.body.subarray(0, 10).equals(header.body) ||
-    (header.etag && tag.etag && header.etag !== tag.etag)
+    header.validators.urlFingerprint !== tag.validators.urlFingerprint ||
+    (header.validators.etag &&
+      tag.validators.etag &&
+      header.validators.etag !== tag.validators.etag) ||
+    (header.validators.lastModified &&
+      tag.validators.lastModified &&
+      header.validators.lastModified !== tag.validators.lastModified)
   )
     throw new Error('Metadata changed during read');
-  return tag.body;
+  return { status: 'modified', body: tag.body, validators: tag.validators };
 }
 
-export async function fetchEmbeddedChapters(input: string) {
+export async function fetchChapterMetadata(
+  input: string,
+  validators?: HttpValidators,
+  signal = AbortSignal.timeout(METADATA_TIMEOUT_MS),
+): Promise<ChapterFetchResult> {
   try {
-    const buffer = await readMp3Tag(
+    const result = await readMp3Tag(
       input,
-      AbortSignal.timeout(METADATA_TIMEOUT_MS),
+      signal,
+      resolvePublicAddress,
+      validators,
     );
-    return buffer ? await parseMp3Chapters(buffer) : [];
+    if (result.status === 'not-modified') return result;
+    return {
+      status: 'modified',
+      chapters: result.body ? await parseMp3Chapters(result.body) : [],
+      validators: result.validators,
+    };
   } catch {
-    return [];
+    return { status: 'failed' };
   }
 }

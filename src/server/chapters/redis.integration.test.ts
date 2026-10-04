@@ -3,12 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { Redis } from 'ioredis';
 import {
   type ChapterCacheEntry,
+  chapterCacheKey,
+  FRESH_MS,
   fingerprint,
   LOCK_TTL_MS,
   MAX_CACHE_BYTES,
   RETENTION_MS,
 } from './cache';
 import { chapterRedisOptions, createRedisChapterCache } from './redis';
+import { createChapterService } from './service';
 
 const url = process.env.TEST_REDIS_URL;
 
@@ -80,6 +83,70 @@ describe.skipIf(!url)('shared chapter cache with Redis', () => {
     const newer = { ...entry, checkedAt: 2000 };
     expect(await b.publish(id, 'replacement', newer, RETENTION_MS)).toBe(true);
     expect(await a.get(id)).toEqual(newer);
+  });
+
+  test('deduplicates services through real Redis and performs weekly background renewal', async () => {
+    const episode = {
+      id: 42,
+      owner_user_id: null,
+      file_url: `https://example.invalid/${randomUUID()}`,
+      file_type: 'audio/mpeg',
+      file_length: 1000,
+      summary: '00:00 One<br>01:00 Two',
+    };
+    const id = chapterCacheKey(episode);
+    keys.push(id);
+    let now = 1000;
+    let fetched = 0;
+    let started: () => void = () => {};
+    let finish: () => void = () => {};
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const hold = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const jobs: (() => Promise<void>)[] = [];
+    const options = {
+      now: () => now,
+      schedule: (work: () => Promise<void>) => {
+        jobs.push(work);
+      },
+      fetchChapters: async () => {
+        fetched++;
+        started();
+        await hold;
+        return {
+          status: 'modified' as const,
+          chapters: entry.chapters,
+          validators: {
+            urlFingerprint: fingerprint(episode.file_url),
+            etag: '"fixture"',
+          },
+        };
+      },
+    };
+    const one = createChapterService(async () => episode, {
+      ...options,
+      cache: a,
+    });
+    const two = createChapterService(async () => episode, {
+      ...options,
+      cache: b,
+    });
+    const initial = one(42, null);
+    await running;
+    expect((await two(42, null))?.source).toBe('shownotes');
+    expect(fetched).toBe(1);
+    finish();
+    await initial;
+    expect((await two(42, null))?.source).toBe('embedded');
+    now += FRESH_MS;
+    await Promise.all([one(42, null), two(42, null)]);
+    expect(fetched).toBe(1);
+    await Promise.all(jobs.splice(0).map((work) => work()));
+    expect(fetched).toBe(2);
+    expect((await a.get(id))?.checkedAt).toBe(now);
   });
 
   test('rejects malformed and oversized stored payloads without returning them', async () => {

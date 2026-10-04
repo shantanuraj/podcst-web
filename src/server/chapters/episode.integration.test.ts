@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+import { MemoryChapterCache } from './__fixtures__/cache';
+import { fingerprint } from './cache';
 import { readChapterEpisode } from './episode';
 import { createChapterService } from './service';
 
@@ -42,12 +44,20 @@ describe.skipIf(!databaseUrl)('chapter authorization with PostgreSQL', () => {
     let fetched = 0;
     const service = createChapterService(
       (id, user) => readChapterEpisode(sql, id, user),
-      async () => {
-        fetched++;
-        return [
-          { title: 'Start', start: 0 },
-          { title: 'Finish', start: 60 },
-        ];
+      {
+        cache: new MemoryChapterCache(),
+        schedule() {},
+        fetchChapters: async (url) => {
+          fetched++;
+          return {
+            status: 'modified',
+            validators: { urlFingerprint: fingerprint(url) },
+            chapters: [
+              { title: 'Start', start: 0 },
+              { title: 'Finish', start: 60 },
+            ],
+          };
+        },
       },
     );
     expect((await service(101, null))?.source).toBe('embedded');
