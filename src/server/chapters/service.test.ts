@@ -16,6 +16,7 @@ import type { ChapterFetchResult } from './http';
 import { chapterResponse } from './response';
 import {
   createChapterService,
+  LOCAL_TTL_MS,
   MAX_IN_FLIGHT,
   MAX_LOCAL_ENTRIES,
 } from './service';
@@ -118,6 +119,92 @@ test('authorizes before every shared/local lookup and never shares private owner
   expect(h.fetch).toHaveBeenCalledTimes(3);
   expect(h.cache.entries.size).toBe(3);
   expect(h.resolve).toHaveBeenCalledTimes(8);
+});
+
+test('five-minute L1 hits authorize but avoid Redis and do not slide expiry', async () => {
+  const h = fixture();
+  const service = h.instance();
+  expect(LOCAL_TTL_MS).toBe(5 * 60_000);
+  await service(42, null);
+  const accesses = h.cache.calls.length;
+  const expires = h.cache.entries.get(h.key())?.expires;
+  h.clock.value += LOCAL_TTL_MS - 1;
+  expect((await service(42, null))?.chapters).toEqual(chapters);
+  expect(h.cache.calls).toHaveLength(accesses);
+  expect(h.resolve).toHaveBeenCalledTimes(2);
+  h.clock.value++;
+  expect((await service(42, null))?.chapters).toEqual(chapters);
+  expect(h.cache.calls).toHaveLength(accesses + 1);
+  expect(h.cache.calls.at(-1)?.operation).toBe('get');
+  expect(h.cache.entries.get(h.key())?.expires).toBe(expires);
+  expect(h.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('Redis hits populate the L1 cache of a new instance', async () => {
+  const h = fixture();
+  await h.instance()(42, null);
+  const service = h.instance();
+  await service(42, null);
+  const accesses = h.cache.calls.length;
+  await service(42, null);
+  expect(h.cache.calls).toHaveLength(accesses);
+  expect(h.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('warm L1 entries still trigger weekly revalidation at the freshness boundary', async () => {
+  const h = fixture();
+  const service = h.instance();
+  await service(42, null);
+  h.clock.value += FRESH_MS - 1;
+  await service(42, null);
+  const accesses = h.cache.calls.length;
+  h.clock.value++;
+  expect((await service(42, null))?.source).toBe('embedded');
+  expect(h.cache.calls).toHaveLength(accesses);
+  expect(h.jobs).toHaveLength(1);
+  await h.flush();
+  expect(h.fetch).toHaveBeenCalledTimes(2);
+});
+
+test("refresh workers bypass stale L1 entries and adopt another instance's fresh result", async () => {
+  const h = fixture();
+  const first = h.instance();
+  const second = h.instance();
+  await first(42, null);
+  h.clock.value += FRESH_MS;
+  await first(42, null);
+  await second(42, null);
+  const changed = {
+    ...metadata,
+    chapters: [
+      { title: 'Changed', start: 0 },
+      { title: 'Media', start: 100 },
+    ],
+  };
+  h.fetch.mockResolvedValue(changed);
+  await h.jobs.pop()?.();
+  await h.flush();
+  expect(h.fetch).toHaveBeenCalledTimes(2);
+  const accesses = h.cache.calls.length;
+  expect((await first(42, null))?.chapters).toEqual(changed.chapters);
+  expect(h.cache.calls).toHaveLength(accesses);
+});
+
+test('L1 entries cannot extend retention when loaded just before six-month expiry', async () => {
+  const h = fixture();
+  const service = h.instance({
+    schedule: () => {
+      throw new Error('Synthetic scheduler unavailable');
+    },
+  });
+  await service(42, null);
+  h.clock.value += RETENTION_MS - 1;
+  await service(42, null);
+  expect(h.fetch).toHaveBeenCalledTimes(1);
+  h.clock.value++;
+  await service(42, null);
+  expect(h.fetch).toHaveBeenCalledTimes(2);
+  expect(h.fetch.mock.calls[1][1]).toBeUndefined();
 });
 
 test('shares fresh results across service instances without extending retention on reads', async () => {
@@ -422,7 +509,7 @@ test('partial Redis write outages back off failed refreshes without extending st
   await h.flush();
 });
 
-test('outage-local results have bounded size and lifetime and recovery fills Redis', async () => {
+test('L1 results have bounded size and lifetime during outages and recovery fills Redis', async () => {
   const h = fixture();
   h.cache.failures.add('get');
   h.cache.failures.add('acquire');
@@ -430,7 +517,7 @@ test('outage-local results have bounded size and lifetime and recovery fills Red
   await service(42, null);
   await service(42, null);
   expect(h.fetch).toHaveBeenCalledTimes(1);
-  h.clock.value += FAILURE_TTL_MS;
+  h.clock.value += LOCAL_TTL_MS;
   await service(42, null);
   expect(h.fetch).toHaveBeenCalledTimes(2);
   for (let id = 100; id < 100 + MAX_LOCAL_ENTRIES; id++)
@@ -438,7 +525,7 @@ test('outage-local results have bounded size and lifetime and recovery fills Red
   await service(42, null);
   expect(h.fetch).toHaveBeenCalledTimes(MAX_LOCAL_ENTRIES + 3);
   h.cache.failures.clear();
-  h.clock.value += FAILURE_TTL_MS;
+  h.clock.value += LOCAL_TTL_MS;
   await service(42, null);
   expect(h.cache.entries.get(h.key())?.entry.kind).toBe('embedded');
 });

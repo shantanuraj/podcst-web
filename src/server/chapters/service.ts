@@ -17,6 +17,7 @@ import {
 import type { ChapterEpisode } from './episode';
 import { type ChapterFetchResult, fetchChapterMetadata } from './http';
 
+export const LOCAL_TTL_MS = 5 * 60_000;
 export const MAX_LOCAL_ENTRIES = 128;
 export const MAX_IN_FLIGHT = 16;
 
@@ -59,34 +60,33 @@ export function createChapterService(
   function remember(key: string, entry: ChapterCacheEntry) {
     for (const [key, value] of local)
       if (value.expires <= now()) local.delete(key);
-    if (local.size >= MAX_LOCAL_ENTRIES) {
+    if (!local.has(key) && local.size >= MAX_LOCAL_ENTRIES) {
       const oldest = local.keys().next().value;
       if (oldest !== undefined) local.delete(oldest);
     }
     local.set(key, {
       entry,
-      expires: Math.min(now() + FAILURE_TTL_MS, expiresAt(entry)),
+      expires: Math.min(now() + LOCAL_TTL_MS, expiresAt(entry)),
     });
   }
 
-  async function read(key: string) {
-    let shared: ChapterCacheEntry | null = null;
-    try {
-      shared = usableEntry(await cache.get(key), now());
-    } catch {}
+  function readLocal(key: string) {
     const saved = local.get(key);
-    const recent =
+    const entry =
       saved && saved.expires > now() ? usableEntry(saved.entry, now()) : null;
-    if (!recent) local.delete(key);
-    if (
-      recent?.kind === 'embedded' &&
-      shared?.kind === 'embedded' &&
-      (recent.checkedAt > shared.checkedAt ||
-        (recent.checkedAt === shared.checkedAt &&
-          (recent.retryAt ?? 0) > (shared.retryAt ?? 0)))
-    )
-      return recent;
-    return shared ?? recent;
+    if (!entry) local.delete(key);
+    return entry;
+  }
+
+  async function readShared(key: string) {
+    try {
+      const entry = usableEntry(await cache.get(key), now());
+      if (entry) {
+        remember(key, entry);
+        return entry;
+      }
+    } catch {}
+    return readLocal(key);
   }
 
   async function refresh(
@@ -102,7 +102,7 @@ export function createChapterService(
         acquired = await cache.acquire(key, token);
       } catch {}
       signal.throwIfAborted();
-      const latest = await read(key);
+      const latest = await readShared(key);
       signal.throwIfAborted();
       const previous = latest ?? usableEntry(known, now());
       if (acquired === false || (previous && !needsRefresh(previous, now())))
@@ -147,7 +147,7 @@ export function createChapterService(
             expiresAt(entry) - now(),
           );
           signal.throwIfAborted();
-          if (!stored) return await read(key);
+          if (!stored) return await readShared(key);
           remember(key, entry);
           return entry;
         } catch {
@@ -226,7 +226,7 @@ export function createChapterService(
     const episode = await authorized(id, userId);
     if (!episode) return null;
     const key = chapterCacheKey(episode);
-    let entry = await read(key);
+    let entry = readLocal(key) ?? (await readShared(key));
     if (entry) {
       if (needsRefresh(entry, now()))
         void begin(episode, userId, key, entry, true);
