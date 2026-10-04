@@ -20,14 +20,6 @@ enum PodcstPalette {
     static let floatingShadow = Color(UIColor { traits in
         UIColor(white: 0, alpha: traits.userInterfaceStyle == .dark ? 0.35 : 0.08)
     })
-
-    static func tint(_ hue: ArtworkHue) -> Color {
-        Color(UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(hue: hue.hue, saturation: 0.45 * hue.saturation, brightness: 0.34, alpha: 1)
-                : UIColor(hue: hue.hue, saturation: 0.14 * hue.saturation, brightness: 0.93, alpha: 1)
-        })
-    }
 }
 
 enum Appearance: String, CaseIterable, Identifiable {

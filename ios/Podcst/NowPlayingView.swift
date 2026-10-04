@@ -12,7 +12,7 @@ enum PlayerPanel: String, CaseIterable, Identifiable {
 struct NowPlayingView: View {
     @Environment(PlaybackController.self) private var playback
     @State private var panel: PlayerPanel?
-    @State private var hue: ArtworkHue?
+    @State private var tint: ArtworkTint?
 
     private var panels: [PlayerPanel] {
         playback.chapters.isEmpty ? [.notes, .upNext] : PlayerPanel.allCases
@@ -44,14 +44,14 @@ struct NowPlayingView: View {
         .background {
             LinearGradient(
                 stops: [
-                    .init(color: hue.map(PodcstPalette.tint) ?? PodcstPalette.cream, location: 0),
+                    .init(color: tint.map { Color(light: $0.light, dark: $0.dark) } ?? PodcstPalette.cream, location: 0),
                     .init(color: PodcstPalette.paper, location: panel == nil ? 0.56 : 0.26),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.4), value: hue)
+            .animation(.easeInOut(duration: 0.4), value: tint)
         }
         .foregroundStyle(PodcstPalette.ink)
         .presentationBackground(PodcstPalette.paper)
@@ -61,7 +61,7 @@ struct NowPlayingView: View {
             if let panel, !available.contains(panel) { self.panel = available.first }
         }
         .task(id: playback.currentEpisode?.artworkURL) {
-            hue = await ArtworkStore.shared.hue(playback.currentEpisode?.artworkURL)
+            tint = await ArtworkStore.shared.tint(playback.currentEpisode?.artworkURL)
         }
     }
 }

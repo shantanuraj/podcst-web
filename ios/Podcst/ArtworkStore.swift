@@ -4,11 +4,6 @@ import ImageIO
 import Observation
 import UIKit
 
-struct ArtworkHue: Hashable, Sendable {
-    let hue: CGFloat
-    let saturation: CGFloat
-}
-
 enum ArtworkPolicy: Sendable {
     case memory
     case disk
@@ -141,9 +136,9 @@ final class ArtworkStore {
         return task
     }
 
-    func hue(_ url: URL?) async -> ArtworkHue? {
+    func tint(_ url: URL?) async -> ArtworkTint? {
         guard let image = await image(url, pixelSize: 160) else { return nil }
-        return await Task.detached(priority: .utility) { ArtworkDecoder.hue(image) }.value
+        return await Task.detached(priority: .utility) { image.cgImage.flatMap { ArtworkPalette($0).tint } }.value
     }
 
     private func key(_ url: URL, _ pixels: Int) -> String {
@@ -440,26 +435,5 @@ private enum ArtworkDecoder {
         let target = min(longest, Int(ceil(Double(pixelSize) * Double(longest) / Double(min(width, height)))))
         let options = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceShouldCacheImmediately: true, kCGImageSourceThumbnailMaxPixelSize: target] as CFDictionary
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options).map { UIImage(cgImage: $0) }
-    }
-
-    static func hue(_ image: UIImage) -> ArtworkHue? {
-        guard let cgImage = image.cgImage else { return nil }
-        let side = 12
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        let drawn = pixels.withUnsafeMutableBytes { buffer in
-            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
-            context.interpolationQuality = .medium
-            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
-            return true
-        }
-        guard drawn else { return nil }
-        let count = CGFloat(side * side * 255)
-        let channel = { (offset: Int) in CGFloat(stride(from: offset, to: pixels.count, by: 4).reduce(0) { $0 + Int(pixels[$1]) }) / count }
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        UIColor(red: channel(0), green: channel(1), blue: channel(2), alpha: 1).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        return ArtworkHue(hue: hue, saturation: min(1, saturation * 1.8))
     }
 }
