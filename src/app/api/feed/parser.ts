@@ -182,7 +182,7 @@ const readShowNotes = (ctx: any): string => {
   return reformatShowNotes(notes[notes.length - 1] || '').trim();
 };
 
-const artworkURL = (
+export const artworkURL = (
   link: string | null,
   baseLink: string | null | undefined,
   proxyArtwork: boolean,
