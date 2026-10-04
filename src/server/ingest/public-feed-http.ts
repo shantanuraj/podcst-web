@@ -1,3 +1,4 @@
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import { lookup } from 'node:dns/promises';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
@@ -44,8 +45,14 @@ export function isPublicAddress(address: string) {
         !blocked.check(address, 'ipv6');
 }
 
-async function resolveAddress(hostname: string) {
-  const addresses = await lookup(hostname, { all: true, verbatim: true });
+export async function resolvePublicAddress(
+  hostname: string,
+  resolve: (
+    hostname: string,
+    options: LookupAllOptions,
+  ) => Promise<LookupAddress[]> = lookup,
+) {
+  const addresses = await resolve(hostname, { all: true, verbatim: true });
   if (
     !addresses.length ||
     addresses.some(({ address }) => !isPublicAddress(address))
@@ -63,7 +70,7 @@ export interface PublicFeedResponse {
 export async function requestPublicFeed(
   input: string,
   signal: AbortSignal,
-  resolve = resolveAddress,
+  resolve = resolvePublicAddress,
   maxBytes = MAX_BYTES,
 ): Promise<PublicFeedResponse> {
   const url = new URL(publicAliasUrl(input));
