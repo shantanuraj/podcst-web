@@ -82,4 +82,43 @@ describe('adaptFeed', () => {
     // Snapshot the full result for regression testing
     expect(result).toMatchSnapshot();
   });
+
+  test('routes episode artwork through the image proxy', async () => {
+    const proxied =
+      'https://assets.podcst.app/?p=https%3A%2F%2Fcdn.example.com%2Fep+1.jpg';
+    const item = (art: string) => `
+      <item>
+        <guid>${art}</guid>
+        <title>Episode</title>
+        <link>https://cdn.example.com/episodes/1</link>
+        <enclosure url="https://cdn.example.com/1.mp3" type="audio/mpeg" />
+        <itunes:image href="${art}" />
+      </item>`;
+    const xml = `<?xml version="1.0"?>
+      <rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+        <channel>
+          <title>Artwork</title>
+          ${item('https://cdn.example.com/ep 1.jpg')}
+          ${item('/ep%201.jpg')}
+          ${item(proxied.replaceAll('&', '&amp;'))}
+          ${item('ftp://cdn.example.com/ep.jpg')}
+        </channel>
+      </rss>`;
+
+    const published = await adaptFeed(xml);
+    expect(published?.episodes.map((e) => e.episodeArt)).toEqual([
+      'https://assets.podcst.app/?p=https%3A%2F%2Fcdn.example.com%2Fep%25201.jpg',
+      'https://assets.podcst.app/?p=https%3A%2F%2Fcdn.example.com%2Fep%25201.jpg',
+      proxied,
+      null,
+    ]);
+
+    const privateFeed = await adaptFeed(xml, false);
+    expect(privateFeed?.episodes.map((e) => e.episodeArt)).toEqual([
+      'https://cdn.example.com/ep%201.jpg',
+      'https://cdn.example.com/ep%201.jpg',
+      'https://cdn.example.com/ep 1.jpg',
+      null,
+    ]);
+  });
 });

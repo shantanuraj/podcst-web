@@ -4,7 +4,7 @@
  */
 
 import { Parser } from 'xml2js';
-import { directArtwork } from '@/shared/artwork';
+import { artworkFallback, directArtwork } from '@/shared/artwork';
 import type { IEpisode, IEpisodeListing, IFileInfo } from '@/types';
 import { reformatShowNotes, showNotesSorter } from './format';
 
@@ -182,6 +182,19 @@ const readShowNotes = (ctx: any): string => {
   return reformatShowNotes(notes[notes.length - 1] || '').trim();
 };
 
+const artworkURL = (
+  link: string | null,
+  baseLink: string | null | undefined,
+  proxyArtwork: boolean,
+): string | null => {
+  if (!link) return null;
+  const url = URL.parse(link) ?? (baseLink ? URL.parse(link, baseLink) : null);
+  if (!url || !['http:', 'https:'].includes(url.protocol)) return null;
+  const direct = directArtwork(url.toString());
+  if (!direct || !proxyArtwork) return direct ?? null;
+  return artworkFallback(direct) ?? null;
+};
+
 /**
  * Read cover art and wrap in proxy if needed
  */
@@ -219,28 +232,7 @@ const readCover = (
       }
     }
 
-    if (!link) return null;
-
-    let url: URL;
-    try {
-      url = new URL(link);
-    } catch (_err) {
-      if (baseLink) {
-        try {
-          url = new URL(link, baseLink);
-        } catch (__err) {
-          return null;
-        }
-      } else {
-        return null;
-      }
-    }
-
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
-    if (!proxyArtwork) return directArtwork(url.toString()) ?? null;
-    const imgProxy = new URL('https://assets.podcst.app/');
-    imgProxy.searchParams.set('p', url.toString());
-    return imgProxy.toString();
+    return artworkURL(link, baseLink, proxyArtwork);
   } catch (_err) {
     return null;
   }
@@ -322,9 +314,7 @@ const adaptEpisode = (
       (Array.isArray(item['itunes:author'])
         ? (item['itunes:author'][0] as string)
         : null) || fallbackAuthor,
-    episodeArt: proxyArtwork
-      ? readEpisodeArtwork(item)
-      : (directArtwork(readEpisodeArtwork(item) ?? undefined) ?? null),
+    episodeArt: artworkURL(readEpisodeArtwork(item), link, proxyArtwork),
     showNotes: readShowNotes(item),
   };
 };

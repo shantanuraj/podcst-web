@@ -10,7 +10,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1765225169.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1765225169.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1765225169.jpg",
       "explicit": false,
       "file": {
         "length": 4459197663,
@@ -28,7 +28,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1765225119.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1765225119.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1765225119.jpg",
       "explicit": false,
       "file": {
         "length": 1363241411,
@@ -46,7 +46,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759176692.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1759176692.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759176692.jpg",
       "explicit": false,
       "file": {
         "length": 3963653044,
@@ -64,7 +64,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759176732.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1759176732.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759176732.jpg",
       "explicit": false,
       "file": {
         "length": 1130933485,
@@ -82,7 +82,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759142456.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1759142456.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759142456.jpg",
       "explicit": false,
       "file": {
         "length": 6437789298,
@@ -100,7 +100,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759053188.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1759053188.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1759053188.jpg",
       "explicit": false,
       "file": {
         "length": 6350444653,
@@ -118,7 +118,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1712599862.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1712599862.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1712599862.jpg",
       "explicit": false,
       "file": {
         "length": 6288364117,
@@ -136,7 +136,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1665401320.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1665401320.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1665401320.jpg",
       "explicit": false,
       "file": {
         "length": 5048129898,
@@ -154,7 +154,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1626632854.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1626632854.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1626632854.jpg",
       "explicit": false,
       "file": {
         "length": 7128706579,
@@ -172,7 +172,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1610487726.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1610487726.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1610487726.jpg",
       "explicit": false,
       "file": {
         "length": 1678922804,
@@ -190,7 +190,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1610487646.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1610487646.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1610487646.jpg",
       "explicit": false,
       "file": {
         "length": 7390750894,
@@ -208,7 +208,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1608592693.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1608592693.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1608592693.jpg",
       "explicit": false,
       "file": {
         "length": 1794167788,
@@ -226,7 +226,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1608592721.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1608592721.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1608592721.jpg",
       "explicit": false,
       "file": {
         "length": 1609066913,
@@ -244,7 +244,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1607364659.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1607364659.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1607364659.jpg",
       "explicit": false,
       "file": {
         "length": 1087142902,
@@ -262,7 +262,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1606764651.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1606764651.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1606764651.jpg",
       "explicit": false,
       "file": {
         "length": 2401295840,
@@ -280,7 +280,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1588111685.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1588111685.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1588111685.jpg",
       "explicit": false,
       "file": {
         "length": 2540022876,
@@ -298,7 +298,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1585655836.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1585655836.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1585655836.jpg",
       "explicit": false,
       "file": {
         "length": 2359540508,
@@ -316,7 +316,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1585085729.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1585085729.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1585085729.jpg",
       "explicit": false,
       "file": {
         "length": 774973758,
@@ -334,7 +334,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1584394581.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1584394581.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1584394581.png",
       "explicit": false,
       "file": {
         "length": 1131422331,
@@ -352,7 +352,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F227014_l.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/227014_l.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F227014_l.jpg",
       "explicit": false,
       "file": {
         "length": 1076945055,
@@ -370,7 +370,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F226354_l.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/226354_l.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F226354_l.jpg",
       "explicit": false,
       "file": {
         "length": 1148623058,
@@ -388,7 +388,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1583776629.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1583776629.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1583776629.png",
       "explicit": false,
       "file": {
         "length": 1043696636,
@@ -406,7 +406,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1583272933.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1583272933.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1583272933.png",
       "explicit": false,
       "file": {
         "length": 282966003,
@@ -424,7 +424,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F225582_l.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/225582_l.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F225582_l.jpg",
       "explicit": false,
       "file": {
         "length": 1078777454,
@@ -442,7 +442,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1582578255.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1582578255.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1582578255.png",
       "explicit": false,
       "file": {
         "length": 1134817918,
@@ -460,7 +460,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F224340_l.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/224340_l.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F224340_l.jpg",
       "explicit": false,
       "file": {
         "length": 339278417,
@@ -478,7 +478,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1581976974.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1581976974.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1581976974.png",
       "explicit": false,
       "file": {
         "length": 1061138852,
@@ -496,7 +496,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1581366650.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1581366650.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1581366650.png",
       "explicit": false,
       "file": {
         "length": 1089097072,
@@ -514,7 +514,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1581366590.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1581366590.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1581366590.png",
       "explicit": false,
       "file": {
         "length": 1043096912,
@@ -532,7 +532,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1580760819.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1580760819.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1580760819.png",
       "explicit": false,
       "file": {
         "length": 1001070792,
@@ -550,7 +550,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F222835_l.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/222835_l.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F222835_l.jpg",
       "explicit": false,
       "file": {
         "length": 1019622551,
@@ -568,7 +568,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1580155285.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1580155285.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1580155285.png",
       "explicit": false,
       "file": {
         "length": 917642918,
@@ -586,7 +586,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1580154786.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1580154786.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1580154786.png",
       "explicit": false,
       "file": {
         "length": 969094362,
@@ -604,7 +604,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1579551424.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1579551424.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1579551424.png",
       "explicit": false,
       "file": {
         "length": 1048838868,
@@ -622,7 +622,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1579542316.png",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/cstmthmb_474_1579542316.png",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2Fcstmthmb_474_1579542316.png",
       "explicit": false,
       "file": {
         "length": 1008225108,
@@ -640,7 +640,7 @@ exports[`adaptFeed parsing ChristianWorldMedia feed (snapshot) 1`] = `
       "author": "Maranatha Sacramento RCOG",
       "cover": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F220628_l.jpg",
       "duration": null,
-      "episodeArt": "https://www.christianworldmedia.com/images/thumbs/220628_l.jpg",
+      "episodeArt": "https://assets.podcst.app/?p=https%3A%2F%2Fwww.christianworldmedia.com%2Fimages%2Fthumbs%2F220628_l.jpg",
       "explicit": false,
       "file": {
         "length": 1065075876,
