@@ -31,7 +31,7 @@ internal object Explicitness : KSerializer<Boolean> {
 }
 
 @Serializable
-internal data class WireFile(val url: String? = null, val length: Long? = null, val type: String? = null)
+internal data class WireFile(val url: String, val length: Long? = null, val type: String? = null)
 
 @Serializable
 internal data class WireEpisode(
@@ -41,7 +41,7 @@ internal data class WireEpisode(
     val guid: String,
     val feed: String? = null,
     val podcastTitle: String? = null,
-    val title: String? = null,
+    val title: String,
     val summary: String? = null,
     val published: Double? = null,
     val cover: String? = null,
@@ -51,7 +51,7 @@ internal data class WireEpisode(
     val episodeArt: String? = null,
     val showNotes: String? = null,
     val author: String? = null,
-    val file: WireFile? = null,
+    val file: WireFile,
 )
 
 @Serializable
@@ -122,7 +122,7 @@ internal fun WireEpisode.domain(
     guid = guid,
     feed = this.feed ?: feed.orEmpty(),
     podcastTitle = this.podcastTitle ?: podcastTitle,
-    title = title.orEmpty(),
+    title = title,
     summary = summary,
     published = instant(published),
     cover = this.cover ?: cover.orEmpty(),
@@ -132,7 +132,7 @@ internal fun WireEpisode.domain(
     episodeArt = episodeArt,
     showNotes = showNotes ?: summary.orEmpty(),
     author = author,
-    file = EpisodeFile(file?.url.orEmpty(), file?.length ?: 0, file?.type ?: "audio/mpeg"),
+    file = EpisodeFile(file.url, file.length ?: 0, file.type ?: "audio/mpeg"),
     isPrivate = isPrivate ?: false,
 )
 

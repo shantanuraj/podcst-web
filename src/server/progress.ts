@@ -34,7 +34,7 @@ export async function getCurrentProgress(
     JOIN episodes e ON e.id = pp.episode_id
     JOIN podcasts p ON p.id = e.podcast_id
     JOIN authors a ON a.id = p.author_id
-    LEFT JOIN episode_content c ON c.episode_id = e.id
+    JOIN episode_content c ON c.episode_id = e.id
     WHERE pp.user_id = ${userId} AND ${podcastAccess(sql, userId)}
       AND pp.completed = false
     ORDER BY pp.updated_at DESC

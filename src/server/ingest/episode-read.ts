@@ -74,22 +74,17 @@ export async function readEpisodePage(
   const nulls = sortBy === 'duration' ? sql`NULLS LAST` : sql``;
 
   const [countResult, episodes] = await Promise.all([
-    search
-      ? sql`
-          SELECT COUNT(*)::text AS count FROM episodes e
-          LEFT JOIN episode_content c ON c.episode_id = e.id
-          WHERE e.podcast_id = ${podcastId} ${filter}
-        `
-      : sql`
-          SELECT COUNT(*)::text AS count FROM episodes
-          WHERE podcast_id = ${podcastId}
-        `,
+    sql`
+      SELECT COUNT(*)::text AS count FROM episodes e
+      JOIN episode_content c ON c.episode_id = e.id
+      WHERE e.podcast_id = ${podcastId} ${filter}
+    `,
     sql<EpisodeRow[]>`
       SELECT e.id, e.guid, e.published,
              c.title, c.summary, c.duration, c.episode_art,
              c.file_url, c.file_length, c.file_type
       FROM episodes e
-      LEFT JOIN episode_content c ON c.episode_id = e.id
+      JOIN episode_content c ON c.episode_id = e.id
       WHERE e.podcast_id = ${podcastId} ${filter}
       ORDER BY ${sortColumn} ${direction} ${nulls}, e.id ${direction}
       LIMIT ${limit + 1}

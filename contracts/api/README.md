@@ -56,7 +56,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 `Podcast` has no `thumbnail`, `itunes_id`, `count` or `episodeCount`. A client needing the episode count of a full `Podcast` uses `episodes.length`; for a subscription, where only two episodes are returned, it must call `/api/feed/info`.
 
-`Episode` is `IEpisodeInfo`. Its content columns come from a `LEFT JOIN episode_content` (`getPodcastById`, `readEpisodePage`, `getSubscriptions`, `getCurrentProgress`). The schema keeps content in a separate table (`migrations/active/0000-baseline.sql`), so an episode can exist without content, and every content-derived field is then null.
+`Episode` is `IEpisodeInfo`. The schema keeps episode content in a separate table that can be evicted for podcasts nobody follows (`src/server/tiering.ts`), and an episode dropped from its feed keeps its identity row without content. Every endpoint joins `episode_content` and omits episodes without content (`getPodcastById`, `getEpisodeById`, `readEpisodePage`, `getSubscriptions`, `getCurrentProgress`), so `title` and `file.url` are always present and counts include only returned episodes.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 | `isPrivate` | boolean | Copied from the podcast. |
 | `feed`, `podcastTitle`, `cover`, `author` | string | Copied from the podcast. |
 | `guid` | string | Unique within the podcast. |
-| `title` | string or null | Null without content. |
+| `title` | string | |
 | `summary` | string or null | Show notes HTML. |
 | `showNotes` | string | Always `summary ?? ""`. |
 | `published` | integer | The column is `NOT NULL`, though the type permits null. |
@@ -72,11 +72,9 @@ The messages are human-readable English, not stable codes; clients branch on the
 | `episodeArt` | string or null | |
 | `explicit` | boolean | Copied from the podcast. |
 | `link` | null | Always null. |
-| `file.url` | string or null | Null without content. |
+| `file.url` | string | |
 | `file.length` | integer | `0` when unknown. Some feeds report placeholder lengths. |
 | `file.type` | string | `"audio/mpeg"` when unknown. |
-
-Fixture: [`feed-episodes.missing-content.json`](../fixtures/api/feed-episodes.missing-content.json), derived from `getEpisodesPaginated`.
 
 ### Chart and search shapes
 
@@ -167,13 +165,13 @@ Query (`src/app/api/feed/episodes/route.ts`, `readEpisodePage` in `src/server/in
 | `sortDir` | `desc` (default) or `asc`; other values fall back to `desc`. |
 | `search` | Case-insensitive substring match against title or show notes. |
 
-Ordering is the sort column, then episode ID in the same direction. Only `duration` sorts nulls last; a null title sorts according to PostgreSQL's default (last ascending, first descending).
+Ordering is the sort column, then episode ID in the same direction. Only `duration` sorts nulls last.
 
 Response `EpisodePage`: `{ "episodes": Episode[], "total": integer, "hasMore": boolean, "nextCursor"?: integer }`. `total` counts all matching episodes. `nextCursor` is omitted on the last page. The cursor is a plain offset, so episodes published between page requests shift later pages; clients de-duplicate by episode `id`.
 
 Errors: 400 `{message: "parameter \`podcastId\` required"}` or `{message: "parameter \`podcastId\` must be a number"}`; 404 `{message: "Podcast not found"}`. Successful and 404 responses carry private-feed headers.
 
-Fixtures: `feed-episodes.first.json` and `feed-episodes.second.json` (captured; the second page follows the first page's `nextCursor`), `feed-episodes.missing-podcast-id.json` (captured), `feed-episodes.missing-content.json` and `feed-episodes.not-found.json` (derived from `getEpisodesPaginated` and the route).
+Fixtures: `feed-episodes.first.json` and `feed-episodes.second.json` (captured; the second page follows the first page's `nextCursor`), `feed-episodes.missing-podcast-id.json` (captured), `feed-episodes.not-found.json` (derived from the route).
 
 ### `POST /api/feed/resolve` — public
 
@@ -261,7 +259,7 @@ Deletes the session if present and clears the cookie. Always returns `Success` `
 
 ### `GET /api/subscriptions` — required
 
-Returns `Podcast[]` ordered by subscription time, newest first, each with at most two episodes (`getSubscriptions`). Private podcasts appear only for their owner. Private-feed headers. 401 `{error: "Unauthorized"}`. Fixtures: `subscriptions.list.json` (derived; includes an episode without content and a podcast with no episodes), `subscriptions.unauthorized.json` (captured).
+Returns `Podcast[]` ordered by subscription time, newest first, each with at most two episodes (`getSubscriptions`). Private podcasts appear only for their owner. Private-feed headers. 401 `{error: "Unauthorized"}`. Fixtures: `subscriptions.list.json` (derived; includes a private podcast and a podcast with no episodes), `subscriptions.unauthorized.json` (captured).
 
 ### `POST /api/subscriptions` — required
 

@@ -126,13 +126,19 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
     expect((await readEpisodePage(sql, { podcastId: 999 })).total).toBe(0);
   });
 
-  test('preserves partially retained content without a rebuild', async () => {
+  test('reads only episodes with retained content without a rebuild', async () => {
     await sql`DELETE FROM episode_content WHERE episode_id <> 101`;
     await prepareEpisodeRead(sql, 1);
     expect(requests).toBe(0);
     const page = await readEpisodePage(sql, { podcastId: 1 });
-    expect(page.total).toBe(4);
-    expect(page.episodes).toHaveLength(4);
+    expect(page.total).toBe(1);
+    expect(page.episodes.map((episode) => episode.id)).toEqual([101]);
+    const search = await readEpisodePage(sql, {
+      podcastId: 1,
+      search: 'needle',
+    });
+    expect(search.total).toBe(1);
+    expect(search.episodes.map((episode) => episode.id)).toEqual([101]);
   });
 
   test('waits for evicted content to rebuild before the page is read', async () => {

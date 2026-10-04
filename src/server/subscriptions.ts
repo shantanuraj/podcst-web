@@ -33,7 +33,7 @@ export async function getSubscriptions(
              c.title, c.summary, c.duration, c.episode_art,
              c.file_url, c.file_length, c.file_type
       FROM episodes e
-      LEFT JOIN episode_content c ON c.episode_id = e.id
+      JOIN episode_content c ON c.episode_id = e.id
       WHERE e.podcast_id = ${row.id}
       ORDER BY e.published DESC
       LIMIT 2

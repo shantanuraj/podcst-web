@@ -61,7 +61,7 @@ export async function getPodcastById(
            c.title, c.summary, c.duration, c.episode_art,
            c.file_url, c.file_length, c.file_type
     FROM episodes e
-    LEFT JOIN episode_content c ON c.episode_id = e.id
+    JOIN episode_content c ON c.episode_id = e.id
     WHERE e.podcast_id = ${podcast.id}
     ORDER BY e.published DESC
   `;
@@ -130,7 +130,7 @@ export const getEpisodeById = cache(
     if (row.file_url == null) {
       await prepareEpisodeRead(sql, row.podcast_id as number);
       [row] = await query();
-      if (!row) return null;
+      if (row?.file_url == null) return null;
     }
 
     return {
@@ -151,7 +151,7 @@ export const getEpisodeById = cache(
       link: null,
       author: row.author_name,
       file: {
-        url: row.file_url ?? '',
+        url: row.file_url,
         length: Number(row.file_length) || 0,
         type: row.file_type || 'audio/mpeg',
       },

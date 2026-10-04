@@ -99,11 +99,6 @@
     "status": 200,
     "decodesAs": "EpisodePage"
   },
-  "feed-episodes.missing-content.json": {
-    "endpoint": "GET /api/feed/episodes",
-    "status": 200,
-    "decodesAs": "EpisodePage"
-  },
   "feed-episodes.missing-podcast-id.json": {
     "endpoint": "GET /api/feed/episodes",
     "status": 400,
