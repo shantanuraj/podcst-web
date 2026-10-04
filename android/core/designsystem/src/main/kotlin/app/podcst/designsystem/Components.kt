@@ -32,6 +32,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +53,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.podcst.model.Artwork as ArtworkSizing
+import app.podcst.model.ChapterArtwork
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import coil3.compose.AsyncImage
 import kotlin.time.Instant
 
@@ -60,6 +68,7 @@ fun Artwork(
     corner: Dp = 9.dp,
     bordered: Boolean = true,
     contentDescription: String? = null,
+    chapterArtwork: ChapterArtwork? = null,
 ) {
     val colors = Podcst.colors
     val shape = RoundedCornerShape(corner)
@@ -77,6 +86,22 @@ fun Artwork(
                 contentDescription = contentDescription,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
+            )
+        }
+        if (chapterArtwork != null) key(chapterArtwork.id) {
+            var ready by remember { mutableStateOf(false) }
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(chapterArtwork.data)
+                    .size(pixels)
+                    .memoryCachePolicy(CachePolicy.DISABLED)
+                    .diskCachePolicy(CachePolicy.DISABLED)
+                    .build(),
+                contentDescription = contentDescription,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                onSuccess = { ready = true },
+                onError = { ready = false },
+                modifier = Modifier.matchParentSize().background(if (ready) colors.surface else Color.Transparent),
             )
         }
     }

@@ -3,7 +3,13 @@ package app.podcst.model
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-data class Chapter(val title: String, val start: Duration)
+data class Chapter(
+    val title: String,
+    val start: Duration,
+    val end: Duration? = null,
+    val artwork: ChapterArtwork? = null,
+    val isHidden: Boolean = false,
+)
 
 fun List<Chapter>.indexAt(time: Duration): Int? = indexOfLast { it.start <= time }.takeIf { it >= 0 }
 

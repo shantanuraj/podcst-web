@@ -16,7 +16,6 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.android.gms.cast.framework.CastContext
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.extractor.metadata.Chapter as EmbeddedChapter
 import app.podcst.data.Preferences
 import app.podcst.data.ProgressRepository
 import app.podcst.data.Scopes
@@ -27,6 +26,8 @@ import app.podcst.model.Artwork
 import app.podcst.model.AudioEffects
 import app.podcst.model.AudioSettings
 import app.podcst.model.Chapter
+import app.podcst.model.ChapterArtwork
+import app.podcst.model.ChapterMetadata
 import app.podcst.model.Episode
 import app.podcst.model.PlaybackQueue
 import app.podcst.model.PlaybackRules
@@ -38,6 +39,8 @@ import app.podcst.playback.media.MediaStore
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +69,7 @@ data class PlayerState(
     val sinkEffects: EffectState = EffectState.Inactive,
     val castDevice: String? = null,
     val chapters: List<Chapter> = emptyList(),
+    val chapterMetadata: ChapterMetadata = ChapterMetadata(),
     val sleepTimer: SleepTimer? = null,
 ) {
     val episode: Episode? get() = queue.episode
@@ -78,6 +82,7 @@ data class PlayerState(
     val remaining: Duration get() = (duration - position).coerceAtLeast(Duration.ZERO)
     val progress: Float get() = if (duration.isPositive()) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
     val chapterIndex: Int? get() = chapters.indexAt(position)
+    val chapterArtwork: ChapterArtwork? get() = chapterMetadata.artworkAt(position, duration)
     val buffering: Boolean get() = requested && status == PlaybackStatus.Loading
 }
 
@@ -115,7 +120,7 @@ class PlaybackCoordinator(
     private var playedSinceProgress = 0L
     private var ticker: Job? = null
     private var sleep: Job? = null
-    private var embeddedChapters: Pair<String, List<Chapter>>? = null
+    private var chaptersJob: Job? = null
 
     init {
         player.addListener(Listener())
@@ -340,7 +345,8 @@ class PlaybackCoordinator(
 
     private fun load(episode: Episode, at: Duration, autoplay: Boolean) {
         loaded = episode.identity.value
-        embeddedChapters = null
+        chaptersJob?.cancel()
+        update { it.copy(chapterMetadata = ChapterMetadata(), chapters = parsedChapters(episode)) }
         playedSinceProgress = 0
         player.setMediaItem(item(episode), at.inWholeMilliseconds)
         player.prepare()
@@ -350,6 +356,9 @@ class PlaybackCoordinator(
     }
 
     private fun unload() {
+        chaptersJob?.cancel()
+        chaptersJob = null
+        update { it.copy(chapterMetadata = ChapterMetadata(), chapters = it.episode?.let(::parsedChapters).orEmpty()) }
         loaded = null
         player.stop()
         player.clearMediaItems()
@@ -380,10 +389,7 @@ class PlaybackCoordinator(
         renderers.sink.setEffects(current.effects)
     }
 
-    private fun parsedChapters(episode: Episode): List<Chapter> {
-        embeddedChapters?.takeIf { it.first == episode.identity.value }?.second?.takeIf { it.isNotEmpty() }?.let { return it }
-        return ShowNotes.chapters(episode.notes)
-    }
+    private fun parsedChapters(episode: Episode): List<Chapter> = ShowNotes.chapters(episode.notes)
 
     private fun capturePosition() {
         if (loaded != null && player.playbackState != Player.STATE_IDLE) {
@@ -437,7 +443,12 @@ class PlaybackCoordinator(
         }
     }
 
-    private fun update(transform: (PlayerState) -> PlayerState) = mutable.update(transform)
+    private fun update(transform: (PlayerState) -> PlayerState) = mutable.update { previous ->
+        val next = transform(previous)
+        if (previous.episode?.identity != next.episode?.identity)
+            next.copy(chapterMetadata = ChapterMetadata(), chapters = next.episode?.let(::parsedChapters).orEmpty())
+        else next
+    }
 
     private fun startTicker() {
         if (ticker?.isActive == true) return
@@ -527,18 +538,24 @@ class PlaybackCoordinator(
 
         override fun onTracksChanged(tracks: Tracks) {
             val identity = loaded ?: return
-            val chapters = tracks.groups.asSequence()
+            if (player.currentMediaItem?.mediaId != identity) return
+            chaptersJob?.cancel()
+            val entries = tracks.groups.asSequence()
                 .flatMap { group -> (0 until group.length).asSequence().map { group.getTrackFormat(it) } }
                 .mapNotNull { it.metadata }
                 .flatMap { metadata -> (0 until metadata.length()).asSequence().map { metadata[it] } }
-                .filterIsInstance<EmbeddedChapter>()
-                .filterNot { it.isHidden }
-                .mapIndexed { index, chapter -> Chapter(chapter.title?.value?.takeIf(String::isNotBlank) ?: "Chapter ${index + 1}", chapter.startTimeMs.milliseconds) }
-                .sortedBy { it.start }
                 .toList()
-            if (chapters.size < 2) return
-            embeddedChapters = identity to chapters
-            update { it.copy(chapters = chapters) }
+            chaptersJob = scope.launch {
+                val metadata = withContext(Dispatchers.Default) { EmbeddedChapters.decode(entries) }
+                if (!isActive || loaded != identity || state.value.episode?.identity?.value != identity) return@launch
+                update {
+                    it.copy(
+                        chapterMetadata = metadata,
+                        chapters = metadata.navigation.takeIf { chapters -> chapters.size >= 2 }
+                            ?: it.episode?.let(::parsedChapters).orEmpty(),
+                    )
+                }
+            }
         }
     }
 

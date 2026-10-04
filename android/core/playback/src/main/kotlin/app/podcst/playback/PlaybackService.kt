@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.media3.common.ForwardingSimpleBasePlayer
 import androidx.media3.common.Player
+import androidx.media3.common.MediaMetadata
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
@@ -13,6 +14,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import app.podcst.model.ChapterArtwork
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,6 +23,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+
+internal fun MediaMetadata.withChapterArtwork(artwork: ChapterArtwork?): MediaMetadata =
+    if (artwork == null) this else buildUpon()
+        .setArtworkUri(null)
+        .setArtworkData(artwork.data, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+        .build()
 
 interface PlaybackHost {
     val playback: PlaybackCoordinator
@@ -119,7 +127,12 @@ class PlaybackService : MediaSessionService() {
                     if (queued) addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
                 }
                 .build()
-            return state.buildUpon().setAvailableCommands(commands).build()
+            val artwork = coordinator.state.value.chapterArtwork
+            val metadata = state.currentMetadata.withChapterArtwork(artwork)
+            return state.buildUpon()
+                .setAvailableCommands(commands)
+                .setPlaylist(state.timeline, state.currentTracks, metadata)
+                .build()
         }
 
         override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {

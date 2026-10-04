@@ -151,7 +151,7 @@ fun MiniPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Artwork(episode.artwork, 44.dp, corner = 10.dp, bordered = false)
+                Artwork(episode.artwork, 44.dp, corner = 10.dp, bordered = false, chapterArtwork = player.chapterArtwork)
                 Column(Modifier.weight(1f)) {
                     Text(episode.title, style = Podcst.type.label, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val device = player.castDevice

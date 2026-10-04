@@ -105,7 +105,7 @@ private fun CompactHeader(state: PlayerScreenState, viewModel: PlayerViewModel) 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Artwork(episode.artwork, 56.dp, corner = 10.dp, bordered = false)
+        Artwork(episode.artwork, 56.dp, corner = 10.dp, bordered = false, chapterArtwork = player.chapterArtwork)
         Column(Modifier.weight(1f)) {
             Text(episode.title, style = Podcst.type.rowTitle, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(

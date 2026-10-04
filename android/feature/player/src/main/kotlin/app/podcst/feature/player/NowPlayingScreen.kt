@@ -115,6 +115,7 @@ fun NowPlayingScreen(
                         corner = 24.dp,
                         bordered = false,
                         contentDescription = episode.title,
+                        chapterArtwork = player.chapterArtwork,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     Column(Modifier.fillMaxWidth().widthIn(max = 560.dp).padding(top = if (compact) 18.dp else 26.dp)) {
