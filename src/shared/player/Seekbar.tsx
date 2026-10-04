@@ -3,7 +3,7 @@ import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import { useKeydown } from '@/shared/keyboard/useKeydown';
 import type { IEpisodeInfo } from '@/types';
-import { sameEpisode } from './chapter-playback';
+import { sameEpisode } from './episode-identity';
 import { formatSecondsToTimestamp } from './formatTime';
 import styles from './Player.module.css';
 import { useAccountPlayback } from './useAccountPlayback';

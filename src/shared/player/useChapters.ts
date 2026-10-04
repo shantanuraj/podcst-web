@@ -23,7 +23,11 @@ export function useChapters(episode?: IEpisodeInfo) {
     return { chapters, source: chapters.length ? 'shownotes' : 'none' };
   }, [episode?.showNotes]);
   return {
-    ...(available ? (query.data ?? fallback) : empty),
+    ...(available
+      ? query.isError
+        ? fallback
+        : (query.data ?? fallback)
+      : empty),
     loading: available && query.isFetching,
   };
 }

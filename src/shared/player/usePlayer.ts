@@ -4,6 +4,7 @@ import type { AccountScope } from '@/shared/auth/account';
 import type { IEpisodeInfo, IPlaybackControls, PlayerState } from '@/types';
 import AudioUtils, { seekUtils } from './AudioUtils';
 import { getAdaptedPlaybackState, isChromecastConnected } from './castUtils';
+import { sameEpisode } from './episode-identity';
 import { updatePlaybackHandlers, updatePlaybackMetadata } from './mediaUtils';
 
 export interface IPlayerState extends IPlaybackControls {
@@ -106,7 +107,9 @@ export const usePlayer = create<IPlayerState>()(
         restoreEpisode: (episode, seekPosition) =>
           set((prevState) => {
             let queue = prevState.queue;
-            let trackIndex = queue.findIndex((q) => q.guid === episode.guid);
+            let trackIndex = queue.findIndex((queued) =>
+              sameEpisode(queued, episode),
+            );
             if (trackIndex === -1) {
               trackIndex = queue.length;
               queue = queue.concat(episode);
@@ -135,8 +138,8 @@ export const usePlayer = create<IPlayerState>()(
         playEpisode: (episode, seekPosition = 0) =>
           set((prevState) => {
             let queue = prevState.queue;
-            let trackIndex = queue.findIndex(
-              (queuedEpisode) => queuedEpisode.guid === episode.guid,
+            let trackIndex = queue.findIndex((queuedEpisode) =>
+              sameEpisode(queuedEpisode, episode),
             );
             // Queue episode if not in the queue
             if (trackIndex === -1) {
@@ -334,8 +337,9 @@ export const usePlayer = create<IPlayerState>()(
         },
 
         seekTo: (seconds) => {
-          const { chromecastState } = get();
+          const { chromecastState, audioInitialised, setSeekPosition } = get();
           if (!isChromecastConnected(chromecastState)) {
+            if (!audioInitialised) return setSeekPosition(seconds);
             return AudioUtils.seekTo(seconds);
           }
 
@@ -411,7 +415,7 @@ export const usePlayer = create<IPlayerState>()(
         seekOrStartAt(episode, seekPosition) {
           const playerState = get();
           const isCurrentEpisode =
-            getCurrentEpisode(playerState)?.guid === episode.guid &&
+            sameEpisode(getCurrentEpisode(playerState), episode) &&
             playerState.state !== 'idle';
           if (isCurrentEpisode) {
             return playerState.seekTo(seekPosition);
@@ -452,7 +456,7 @@ usePlayer.subscribe((currentState, previousState) => {
     if (
       currentEpisode &&
       previousEpisode &&
-      currentEpisode.guid !== previousEpisode.guid &&
+      !sameEpisode(currentEpisode, previousEpisode) &&
       (previousState.state === 'playing' || previousState.state === 'paused')
     ) {
       currentState.playOnChromecast();

@@ -1,13 +1,7 @@
 import { type Chapter, chapterTarget } from '@/shared/chapters';
 import type { IEpisodeInfo } from '@/types';
+import { sameEpisode } from './episode-identity';
 import { getCurrentEpisode, type IPlayerState } from './usePlayer';
-
-export function sameEpisode(first?: IEpisodeInfo, second?: IEpisodeInfo) {
-  if (!first || !second) return false;
-  return first.id && second.id
-    ? first.id === second.id
-    : first.feed === second.feed && first.guid === second.guid;
-}
 
 export function navigateChapter(
   player: IPlayerState,

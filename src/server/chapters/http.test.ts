@@ -97,6 +97,14 @@ test('truncation, invalid ranges, encodings and upstream failures fall back', as
   }
 });
 
+test('rejects a truncated tag after a successful header probe', async () => {
+  handler = (request, response) => {
+    if (request.headers.range === 'bytes=0-9') rangeResponse(request, response);
+    else response.end(fixtureTag(4).subarray(0, -1));
+  };
+  await expect(read()).rejects.toThrow();
+});
+
 test('bounds slow headers, slow bodies, DNS resolution and explicit cancellation', async () => {
   handler = () => {};
   await expect(read(AbortSignal.timeout(20))).rejects.toThrow();
@@ -186,6 +194,25 @@ test('rejects private DNS, literals, mixed answers and unsupported schemes', asy
     await expect(
       readMp3Tag(target, AbortSignal.timeout(1000)),
     ).rejects.toThrow();
+});
+
+test('revalidates named DNS destinations at redirects before connecting', async () => {
+  let requests = 0;
+  handler = (_, response) => {
+    requests++;
+    response.writeHead(302, {
+      Location: `http://localhost:${address.port}/private`,
+    });
+    response.end();
+  };
+  await expect(
+    readMp3Tag(url, AbortSignal.timeout(1000), (host) =>
+      host === 'fixture.example.invalid'
+        ? resolveFixture()
+        : resolvePublicAddress(host),
+    ),
+  ).rejects.toThrow();
+  expect(requests).toBe(1);
 });
 
 test('absent or oversized metadata requires only one header request', async () => {

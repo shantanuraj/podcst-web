@@ -57,6 +57,32 @@ for (const version of [3, 4] as const) {
     ).toEqual([]);
   });
 
+  test(`ID3v2.${version} decodes Latin-1 and multi-byte frame sizes with bounded titles`, async () => {
+    const latin = frame(
+      version,
+      'CHAP',
+      Buffer.concat([
+        chapterFrame(version, 'latin', 1500).subarray(10),
+        frame(
+          version,
+          'TIT2',
+          Buffer.concat([Buffer.from([0]), Buffer.from('Café', 'latin1')]),
+        ),
+      ]),
+    );
+    expect(
+      await parseMp3Chapters(
+        tag(version, [
+          chapterFrame(version, 'long', 0, 'x'.repeat(400)),
+          latin,
+        ]),
+      ),
+    ).toEqual([
+      { title: 'x'.repeat(300), start: 0 },
+      { title: 'Café', start: 1.5 },
+    ]);
+  });
+
   test(`ID3v2.${version} absent, single and truncated chapters`, async () => {
     expect(await parseMp3Chapters(tag(version, []))).toEqual([]);
     expect(

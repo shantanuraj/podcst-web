@@ -3,7 +3,8 @@
 import { useId } from 'react';
 import { currentChapterIndex } from '@/shared/chapters';
 import { useTranslation } from '@/shared/i18n';
-import { navigateChapter, sameEpisode } from '@/shared/player/chapter-playback';
+import { navigateChapter } from '@/shared/player/chapter-playback';
+import { sameEpisode } from '@/shared/player/episode-identity';
 import { formatSecondsToTimestamp } from '@/shared/player/formatTime';
 import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
 import { useChapters } from '@/shared/player/useChapters';

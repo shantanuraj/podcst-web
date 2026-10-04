@@ -18,7 +18,7 @@ const episode = {
   showNotes: '00:00 Notes start<br>01:00 Notes end',
 } as IEpisodeInfo;
 
-function render(data?: EpisodeChapters, item = episode) {
+function render(data?: EpisodeChapters, item = episode, failed = false) {
   const client = new QueryClient();
   const session = new AccountSession(client, null, {
     resetPlayer() {},
@@ -27,6 +27,11 @@ function render(data?: EpisodeChapters, item = episode) {
   });
   if (data)
     client.setQueryData(chapterQueryOptions(session, item).queryKey, data);
+  if (failed)
+    client
+      .getQueryCache()
+      .find({ queryKey: chapterQueryOptions(session, item).queryKey })
+      ?.setState({ status: 'error', error: new Error('Metadata unavailable') });
   const markup = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <AccountContext.Provider value={session}>
@@ -68,6 +73,22 @@ test('shows fallback while loading and no chapters when unavailable', () => {
   expect(render({ chapters: [], source: 'none' })).toContain(
     'No chapters available',
   );
+});
+
+test('failed refetches discard stale embedded metadata in favor of show notes', () => {
+  const markup = render(
+    {
+      source: 'embedded',
+      chapters: [
+        { title: 'Stale embedded', start: 0 },
+        { title: 'Stale ending', start: 20 },
+      ],
+    },
+    episode,
+    true,
+  );
+  expect(markup).toContain('Notes start');
+  expect(markup).not.toContain('Stale embedded');
 });
 
 test('does not render private show-note fallback to a guest', () => {

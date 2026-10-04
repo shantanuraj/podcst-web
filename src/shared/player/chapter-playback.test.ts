@@ -1,7 +1,8 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import type { IEpisodeInfo } from '@/types';
 import AudioUtils from './AudioUtils';
-import { navigateChapter, sameEpisode } from './chapter-playback';
+import { navigateChapter } from './chapter-playback';
+import { sameEpisode } from './episode-identity';
 import { getSeekOrStartAt, type IPlayerState, usePlayer } from './usePlayer';
 
 const episode = {
@@ -63,6 +64,7 @@ test('selection uses existing seek/start action for local audio and unloaded epi
     currentTrackIndex: 0,
     state: 'paused',
     playEpisode: start,
+    audioInitialised: true,
   });
   getSeekOrStartAt(usePlayer.getState())(episode, 30.5);
   expect(seek).toHaveBeenCalledWith(30.5);
@@ -70,6 +72,48 @@ test('selection uses existing seek/start action for local audio and unloaded epi
   getSeekOrStartAt(usePlayer.getState())(other, 12.25);
   expect(start).toHaveBeenCalledWith(other, 12.25);
   usePlayer.setState(state, true);
+});
+
+test('restored paused episodes retain chapter seeks before Howler is initialized', () => {
+  const saved = usePlayer.getState();
+  const seek = spyOn(AudioUtils, 'seekTo').mockImplementation(() => {});
+  try {
+    usePlayer.setState({
+      queue: [episode],
+      currentTrackIndex: 0,
+      state: 'paused',
+      audioInitialised: false,
+      seekPosition: 0,
+    });
+    getSeekOrStartAt(usePlayer.getState())(episode, 30.5);
+    expect(usePlayer.getState().seekPosition).toBe(30.5);
+    expect(usePlayer.getState().state).toBe('paused');
+    expect(seek).not.toHaveBeenCalled();
+  } finally {
+    usePlayer.setState(saved, true);
+  }
+});
+
+test('chapter selection cannot seek a different episode with a reused GUID', () => {
+  const saved = usePlayer.getState();
+  const seek = spyOn(AudioUtils, 'seekTo').mockImplementation(() => {});
+  const play = spyOn(AudioUtils, 'play').mockImplementation(() => {});
+  const other = { ...episode, id: 43, feed: 'different-feed' };
+  try {
+    usePlayer.setState({
+      queue: [episode],
+      currentTrackIndex: 0,
+      state: 'paused',
+      audioInitialised: true,
+    });
+    getSeekOrStartAt(usePlayer.getState())(other, 12.25);
+    expect(usePlayer.getState().queue).toEqual([episode, other]);
+    expect(usePlayer.getState().currentTrackIndex).toBe(1);
+    expect(play).toHaveBeenCalledWith(other, true, 12.25);
+    expect(seek).not.toHaveBeenCalled();
+  } finally {
+    usePlayer.setState(saved, true);
+  }
 });
 
 test('chapter selection reaches Chromecast seek without changing system track handlers', () => {
