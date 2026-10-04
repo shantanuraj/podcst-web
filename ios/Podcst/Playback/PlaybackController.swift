@@ -69,8 +69,8 @@ public final class PlaybackController {
 
     public var chapters: [Chapter] {
         guard let episode = currentEpisode else { return [] }
-        if let assetChapters, assetChapters.identity == episode.identity, !assetChapters.chapters.isEmpty {
-            return assetChapters.chapters
+        if let assetChapters, assetChapters.identity == episode.identity, assetChapters.metadata.navigation.count >= 2 {
+            return assetChapters.metadata.navigation
         }
         if let parsedChapters, parsedChapters.identity == episode.identity { return parsedChapters.chapters }
         let chapters = ShowNotesParser.chapters(ShowNotesParser.notes(of: episode))
@@ -80,13 +80,19 @@ public final class PlaybackController {
 
     public var currentChapterIndex: Int? { chapters.index(at: currentTime) }
 
+    public var currentChapterArtwork: ChapterArtwork? {
+        guard let assetChapters, assetChapters.identity == currentEpisode?.identity else { return nil }
+        return assetChapters.metadata.artwork(at: currentTime, duration: effectiveDuration)
+    }
+
     public func position(of episode: Episode) -> TimeInterval? {
         episode.identity == currentEpisode?.identity ? currentTime : nil
     }
 
     public static let supportedRates: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
-    private var assetChapters: (identity: String, chapters: [Chapter])?
+    private var assetChapters: (identity: String, metadata: ChapterMetadata)?
+    @ObservationIgnored private let chapterLoader: (@MainActor (Episode) async -> ChapterMetadata?)?
     @ObservationIgnored private var parsedChapters: (identity: String, chapters: [Chapter])?
     @ObservationIgnored private let transport: any PlaybackTransport
     @ObservationIgnored private let storageURL: URL
@@ -119,8 +125,9 @@ public final class PlaybackController {
         var stopped: Bool
     }
 
-    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil, nowPlayingInfoSink: (@MainActor ([String: Any]?) -> Void)? = nil) {
+    init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil, nowPlayingInfoSink: (@MainActor ([String: Any]?) -> Void)? = nil, chapterLoader: (@MainActor (Episode) async -> ChapterMetadata?)? = nil) {
         self.accountID = accountID
+        self.chapterLoader = chapterLoader
         self.transport = transport
         self.storageURL = persistenceURL
         self.monotonicTime = monotonicTime
@@ -461,6 +468,7 @@ public final class PlaybackController {
         changingAccount = true
         onProgress = nil
         stopPlayback()
+        updateNowPlayingInfo()
     }
 
     func switchAccount(to id: String?) {
@@ -490,7 +498,7 @@ public final class PlaybackController {
 
     private func replaceCurrentItem(startingAt position: TimeInterval, autoPlay: Bool) {
         stopPlayback()
-        guard let episode = currentEpisode, let url = episode.audioURL else {
+        guard let episode = currentEpisode, episode.audioURL != nil else {
             transition(to: .failed)
             return
         }
@@ -504,8 +512,8 @@ public final class PlaybackController {
             self.applyAudioOptions()
             self.transport.load(source: .episode(episode), at: self.currentTime, generation: self.generation)
             self.transport.setEffects(self.requestedEffects)
-            if self.integratesWithSystem {
-                self.loadChapters(from: AVURLAsset(url: url), identity: episode.identity)
+            if self.integratesWithSystem || self.chapterLoader != nil {
+                self.loadChapters(for: episode)
             }
         }
         persist()
@@ -612,7 +620,8 @@ public final class PlaybackController {
         wasPlayingBeforeInterruption = false
         generation = UUID()
         chaptersTask?.cancel()
-        chaptersTask = nil
+        assetChapters = nil
+        parsedChapters = nil
         transport.stop()
         transition(to: .idle)
     }
@@ -675,24 +684,56 @@ public final class PlaybackController {
             .portName
     }
 
-    private func loadChapters(from asset: AVURLAsset, identity: String) {
+    func releaseChapterMetadata() async {
         chaptersTask?.cancel()
+        await chaptersTask?.value
+        chaptersTask = nil
+    }
+
+    private func loadChapters(for episode: Episode) {
+        chaptersTask?.cancel()
+        let previous = chaptersTask
+        let token = generation
+        let loader = chapterLoader
         chaptersTask = Task { [weak self] in
-            let chapters = await Self.chapters(in: asset)
-            guard !Task.isCancelled, let self, self.currentEpisode?.identity == identity else { return }
-            self.assetChapters = (identity, chapters)
+            await previous?.value
+            guard !Task.isCancelled else { return }
+            var metadata = await loader?(episode)
+            if metadata == nil, !Task.isCancelled, let url = episode.audioURL {
+                let asset = AVURLAsset(url: url)
+                metadata = await withTaskCancellationHandler {
+                    await Self.chapters(in: asset)
+                } onCancel: {
+                    asset.cancelLoading()
+                }
+            }
+            guard !Task.isCancelled, let self, self.generation == token,
+                  self.currentEpisode?.identity == episode.identity else { return }
+            self.assetChapters = (episode.identity, metadata ?? ChapterMetadata())
+            self.updateNowPlayingInfo()
         }
     }
 
-    private nonisolated static func chapters(in asset: AVURLAsset) async -> [Chapter] {
-        guard let groups = try? await asset.loadChapterMetadataGroups(bestMatchingPreferredLanguages: Locale.preferredLanguages) else { return [] }
+    private nonisolated static func chapters(in asset: AVURLAsset) async -> ChapterMetadata {
+        guard let groups = try? await asset.loadChapterMetadataGroups(bestMatchingPreferredLanguages: Locale.preferredLanguages) else { return ChapterMetadata() }
         var chapters: [Chapter] = []
-        for group in groups {
+        var artworkBytes = 0
+        for group in groups.prefix(1000) {
+            guard !Task.isCancelled else { return ChapterMetadata() }
             let title = try? await AVMetadataItem.metadataItems(from: group.items, filteredByIdentifier: .commonIdentifierTitle).first?.load(.stringValue)
-            let start = group.timeRange.start.playbackSeconds ?? 0
-            chapters.append(Chapter(title: title ?? "Chapter \(chapters.count + 1)", start: start))
+            let picture = try? await AVMetadataItem.metadataItems(from: group.items, filteredByIdentifier: .commonIdentifierArtwork).first?.load(.dataValue)
+            guard let start = group.timeRange.start.playbackSeconds else { continue }
+            let end = group.timeRange.end.playbackSeconds
+            let artwork = picture.flatMap { data -> ChapterArtwork? in
+                guard artworkBytes + data.count <= ID3Chapters.maximumTagBytes,
+                      let image = ChapterArtwork(data) else { return nil }
+                artworkBytes += data.count
+                return image
+            }
+            chapters.append(Chapter(title: title ?? "Chapter \(chapters.count + 1)", start: start,
+                                    end: end.flatMap { $0 > start ? $0 : nil }, artwork: artwork))
         }
-        return chapters.count >= 2 ? chapters : []
+        return ChapterMetadata(chapters)
     }
 
     func handleRouteChange(reasonRaw: UInt?) {
@@ -767,7 +808,7 @@ public final class PlaybackController {
     }
 
     private func artworkKey(for episode: Episode) -> String {
-        [episode.identity, episode.episodeArt ?? "", episode.cover].joined(separator: "\u{001F}")
+        [episode.identity, currentChapterArtwork?.id ?? "", episode.episodeArt ?? "", episode.cover].joined(separator: "\u{001F}")
     }
 
     private func requestArtwork(for episode: Episode, key: String) {
@@ -778,10 +819,18 @@ public final class PlaybackController {
             .reduce(into: [URL]()) { urls, url in
                 if !urls.contains(url) { urls.append(url) }
             }
-        guard !urls.isEmpty else { return }
+        let chapterArtwork = currentChapterArtwork
         let identity = episode.identity
         artworkTask = Task { [weak self] in
             guard let self else { return }
+            if let chapterArtwork,
+               let image = await Task.detached(priority: .utility, operation: { chapterArtwork.image() }).value {
+                guard !Task.isCancelled, self.artworkKey == key,
+                      self.currentEpisode?.identity == identity else { return }
+                self.nowPlayingArtwork = makeNowPlayingArtwork(image: image)
+                self.updateNowPlayingInfo()
+                return
+            }
             for url in urls {
                 guard !Task.isCancelled else { return }
                 if let image = await ArtworkStore.shared.image(url, pixelSize: 1024) {

@@ -40,7 +40,7 @@ actor HTTPMediaByteSource {
         return metadata
     }
 
-    func read(offset: Int64, count: Int) async throws -> Data {
+    func read(offset: Int64, count: Int, prioritizing: Bool = true) async throws -> Data {
         guard offset >= 0, count >= 0, count <= Self.blockSize, offset <= Int64.max - Int64(count) else { throw MediaFailure.invalidSource }
         if count == 0 { return Data() }
         let metadata = try await metadata()
@@ -51,8 +51,8 @@ actor HTTPMediaByteSource {
             guard metadata.capability == .randomAccess else { throw MediaFailure.requiresCompleteFile }
             let aligned = offset / Int64(Self.blockSize) * Int64(Self.blockSize)
             let upper = min(total, max(requested.upper, aligned + Int64(Self.blockSize)))
-            readPriority &+= 1
-            try await ensure(MediaByteRange(lower: aligned, upper: upper), priority: readPriority)
+            if prioritizing { readPriority &+= 1 }
+            try await ensure(MediaByteRange(lower: aligned, upper: upper), priority: prioritizing ? readPriority : 0)
         }
         try Task.checkCancellation()
         do {

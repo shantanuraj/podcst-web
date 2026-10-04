@@ -6,6 +6,42 @@ import XCTest
 
 @MainActor
 final class MediaTests: XCTestCase {
+    func testChapterArtworkReadsCompletedDownloadsOfflineAndReleasesItsLease() async throws {
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/fixtures/media/chapters-artwork-v23.mp3")
+        let body = try Data(contentsOf: fixture)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        let episode = episode(url: url)
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        try await store.download(episode)
+        let requests = server.requests.count
+        server.stop()
+        let metadata = await store.chapterMetadata(for: episode)
+        XCTAssertEqual(metadata?.navigation.count, 3)
+        XCTAssertNotNil(metadata?.artwork(at: 2.5, duration: 16))
+        XCTAssertEqual(server.requests.count, requests)
+        try await store.switchAccount(to: "two")
+        XCTAssertTrue(store.downloadedEpisodes.isEmpty)
+    }
+
+    func testCancelledChapterReadDoesNotLeaveAPinnedMediaLease() async throws {
+        let server = try MediaHTTPServer(data: payload(count: 400_000), delay: 0.25)
+        let url = try await server.start()
+        defer { server.stop() }
+        let store = MediaStore(accountID: "one", rootURL: temporaryDirectory(), downloadConfiguration: .ephemeral)
+        let episode = episode(url: url)
+        let task = Task { await store.chapterMetadata(for: episode) }
+        try await waitForRequests(server, count: 1)
+        task.cancel()
+        let metadata = await task.value
+        XCTAssertNil(metadata)
+        try await store.switchAccount(to: "two")
+        XCTAssertEqual(store.accountID, "two")
+    }
+
     func testValidatedRangesResumeAcrossRelaunchWithoutNetwork() async throws {
         let body = payload(count: 800_019)
         let server = try MediaHTTPServer(data: body)

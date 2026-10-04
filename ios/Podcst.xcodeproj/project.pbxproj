@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AC3200000000000000000011 = {isa = PBXBuildFile; fileRef = AC3200000000000000000001; };
+		AC3200000000000000000012 = {isa = PBXBuildFile; fileRef = AC3200000000000000000002; };
+		AC3200000000000000000013 = {isa = PBXBuildFile; fileRef = AC3200000000000000000003; };
+		AC3200000000000000000014 = {isa = PBXBuildFile; fileRef = AC3200000000000000000001; };
+		AC3200000000000000000015 = {isa = PBXBuildFile; fileRef = AC3200000000000000000002; };
 		0CFBEBF3E82F8CAFDD299718 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56A8841AF99B2422E9F26A5 /* LibraryView.swift */; };
 		0EC5B114FA482DA96E18D17E /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B641C1E84C37A6A1F2B3869 /* SearchView.swift */; };
 		2CAFEC8D879AA60B35CA526A = {isa = PBXBuildFile; fileRef = F65EBD8CDAC3B8F695D021CF; };
@@ -169,6 +174,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AC3200000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ChapterMetadata.swift; sourceTree = "<group>"; };
+		AC3200000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/ID3Chapters.swift; sourceTree = "<group>"; };
+		AC3200000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterArtworkTests.swift; sourceTree = "<group>"; };
 		AC2900000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseSection.swift; sourceTree = "<group>"; };
 		AC2900000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseSectionTests.swift; sourceTree = "<group>"; };
 		0B641C1E84C37A6A1F2B3869 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
@@ -294,6 +302,8 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				AC3200000000000000000001,
+				AC3200000000000000000002,
 				D5A7AB1D8FBB932075787C3E,
 				77903BF3FCDDB37D6FDD5406,
 				AC2900000000000000000001,
@@ -380,6 +390,7 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				AC3200000000000000000003,
 				11A8DCAAA6B9BD4AA43F0DEC,
 				AC2900000000000000000002,
 				AC2800000000000000000003,
@@ -615,6 +626,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC3200000000000000000013,
 				4E7E521EC7785029944A6534,
 				AC2900000000000000000013,
 				AC2800000000000000000014,
@@ -646,6 +658,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC3200000000000000000011,
+				AC3200000000000000000012,
 				F86D521B642B788319196312,
 				4EF9C6CE8E48D8B14141088B,
 				AC2900000000000000000011,
@@ -702,6 +716,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC3200000000000000000014,
+				AC3200000000000000000015,
 				6B3FCD8A93C1FF724498BA7B,
 				DFCFA8319512A383BC20F24E,
 				AC2900000000000000000012,

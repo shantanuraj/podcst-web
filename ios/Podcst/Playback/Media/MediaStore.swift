@@ -94,6 +94,26 @@ final class MediaStore {
         }
     }
 
+    func chapterMetadata(for episode: Episode) async -> ChapterMetadata? {
+        guard let lease = try? await pin(episode) else { return nil }
+        let result: ChapterMetadata?
+        do {
+            var data = try await lease.byteSource.read(offset: 0, count: 10, prioritizing: false)
+            if let size = ID3Chapters.tagSize(data) {
+                while data.count < size {
+                    try Task.checkCancellation()
+                    let bytes = try await lease.byteSource.read(offset: Int64(data.count), count: min(HTTPMediaByteSource.blockSize, size - data.count), prioritizing: false)
+                    guard !bytes.isEmpty else { throw MediaFailure.invalidResponse }
+                    data.append(bytes)
+                }
+                let bytes = data
+                result = await Task.detached(priority: .utility) { ID3Chapters.parse(bytes) }.value
+            } else { result = nil }
+        } catch { result = nil }
+        await lease.release()
+        return Task.isCancelled ? nil : result
+    }
+
     func switchAccount(to accountID: String?) async throws {
         guard self.accountID != accountID else { return }
         var cleanupFailed = false

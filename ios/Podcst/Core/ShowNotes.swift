@@ -4,10 +4,16 @@ import UIKit
 public struct Chapter: Hashable, Sendable {
     public let title: String
     public let start: TimeInterval
+    public let end: TimeInterval?
+    public let artwork: ChapterArtwork?
+    public let isHidden: Bool
 
-    public init(title: String, start: TimeInterval) {
+    public init(title: String, start: TimeInterval, end: TimeInterval? = nil, artwork: ChapterArtwork? = nil, isHidden: Bool = false) {
         self.title = title
         self.start = start
+        self.end = end
+        self.artwork = artwork
+        self.isHidden = isHidden
     }
 }
 

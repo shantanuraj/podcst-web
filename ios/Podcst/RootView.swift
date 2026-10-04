@@ -313,7 +313,7 @@ struct NowPlayingBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 12) {
-                ArtworkView(url: playback.currentEpisode?.artworkURL, fallbackURL: playback.currentEpisode.flatMap { URL(string: $0.cover) }, size: 44)
+                ArtworkView(url: playback.currentEpisode?.artworkURL, fallbackURL: playback.currentEpisode.flatMap { URL(string: $0.cover) }, size: 44, chapterArtwork: playback.currentChapterArtwork)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(playback.currentEpisode?.title ?? "")
                         .font(.sans(.subheadline).weight(.medium))

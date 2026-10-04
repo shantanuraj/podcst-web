@@ -18,6 +18,7 @@ struct ArtworkView: View {
     let url: URL?
     var fallbackURL: URL? = nil
     var size: CGFloat? = nil
+    var chapterArtwork: ChapterArtwork? = nil
 
     private var radius: CGFloat {
         guard let size else { return 16 }
@@ -30,15 +31,41 @@ struct ArtworkView: View {
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 GeometryReader { geometry in
-                    ArtworkImage(url: url, fallbackURL: fallbackURL,
-                                 pixels: ArtworkStore.pixelSize(for: max(geometry.size.width, geometry.size.height), scale: displayScale),
-                                 policy: policy)
+                    let pixels = ArtworkStore.pixelSize(for: max(geometry.size.width, geometry.size.height), scale: displayScale)
+                    ArtworkImage(url: url, fallbackURL: fallbackURL, pixels: pixels, policy: policy)
+                        .overlay {
+                            if let chapterArtwork {
+                                ChapterArtworkImage(artwork: chapterArtwork, pixels: pixels)
+                            }
+                        }
                 }
             }
             .frame(width: size, height: size)
             .clipShape(shape)
             .overlay { shape.strokeBorder(PodcstPalette.rule.opacity(0.8), lineWidth: 1) }
             .accessibilityHidden(true)
+    }
+}
+
+private struct ChapterArtworkImage: View {
+    let artwork: ChapterArtwork
+    let pixels: Int
+    @State private var loaded: (String, UIImage)?
+
+    var body: some View {
+        Color.clear.overlay {
+            if let loaded, loaded.0 == artwork.id {
+                PodcstPalette.surface
+                Image(uiImage: loaded.1).resizable().scaledToFit()
+            }
+        }
+        .task(id: "\(artwork.id):\(pixels)") {
+            let requested = artwork
+            let pixels = pixels
+            let image = await Task.detached(priority: .utility) { requested.image(pixelSize: pixels) }.value
+            guard !Task.isCancelled, let image else { return }
+            loaded = (requested.id, image)
+        }
     }
 }
 

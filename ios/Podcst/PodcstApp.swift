@@ -28,13 +28,14 @@ struct PodcstApp: App {
         let stars = StarStore(accountID: session.user?.id)
         _stars = State(initialValue: stars)
         let routing = RoutingAudioTransport(media: media)
-        let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: !testing)
+        let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: !testing, chapterLoader: { episode in await media.chapterMetadata(for: episode) })
         _playback = State(initialValue: playback)
         appDelegate.media = media
         session.prepareAccountChange = { [weak library, weak playback] accountID in
             playback?.beginAccountChange()
             await library?.resetProgressSync()
             await routing.releaseMedia()
+            await playback?.releaseChapterMetadata()
             do { try await media.switchAccount(to: accountID) }
             catch { if media.accountID != accountID { throw error } }
             playback?.switchAccount(to: accountID)
