@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="subscribe">Subscribe</string>
+    <string name="subscribed">Subscribed</string>
+    <string name="subscription_failed">Couldn\'t update your subscription</string>
+    <string name="play_latest">Play latest</string>
+    <string name="share_podcast">Share podcast</string>
+    <string name="updated">Updated %1$s</string>
+    <string name="expand_description">Expand description</string>
+    <string name="collapse_description">Collapse description</string>
+    <string name="tab_episodes">Episodes</string>
+    <string name="tab_about">About</string>
+    <plurals name="episode_count">
+        <item quantity="one">%1$d episode</item>
+        <item quantity="other">%1$d episodes</item>
+    </plurals>
+    <string name="sort_episodes">Sort episodes</string>
+    <string name="newest_first">Newest first</string>
+    <string name="oldest_first">Oldest first</string>
+    <string name="title_ascending">Title A–Z</string>
+    <string name="title_descending">Title Z–A</string>
+    <string name="shortest_first">Shortest first</string>
+    <string name="longest_first">Longest first</string>
+    <string name="filter_episodes">Filter episodes</string>
+    <string name="clear_filter">Clear filter</string>
+    <string name="no_matches">No episodes match “%1$s”</string>
+    <string name="no_episodes">No episodes available</string>
+    <string name="catalogue_failed">Couldn\'t load the full catalogue</string>
+    <string name="refresh">Refresh</string>
+    <string name="open_website">Open website</string>
+    <string name="website">Website</string>
+    <string name="episodes">Episodes</string>
+    <string name="content">Content</string>
+    <string name="explicit">Explicit</string>
+    <string name="clean">Clean</string>
+    <string name="resume">Resume</string>
+    <string name="resume_left">Resume · %1$s</string>
+    <string name="play_again">Play again</string>
+    <string name="last_played">Last played %1$s</string>
+    <string name="no_notes">No show notes were provided for this episode.</string>
+    <string name="open_episode_website">Open episode website</string>
+    <string name="go_to_podcast">Go to podcast</string>
+</resources>
