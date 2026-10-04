@@ -13,24 +13,26 @@ struct LibraryView: View {
 
     var body: some View {
         ScrollView {
-            if library.podcasts.isEmpty {
-                Group {
-                    if library.isLoading {
-                        ProgressView().tint(PodcstPalette.accent)
-                    } else {
-                        EmptyLibraryView(signedIn: session.user != nil) { showingLogin = true }
+            LazyVStack(alignment: .leading, spacing: 0) {
+                LibraryLists()
+                if library.podcasts.isEmpty {
+                    Group {
+                        if library.isLoading {
+                            ProgressView().tint(PodcstPalette.accent)
+                        } else {
+                            EmptyLibraryView(signedIn: session.user != nil) { showingLogin = true }
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity)
-                .containerRelativeFrame(.vertical)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                } else {
                     if !continueAndNew.isEmpty {
                         SectionHeader("Continue & new") {
                             NavigationLink("See all", value: Route.releases)
                                 .font(.sans(.footnote).weight(.medium))
                                 .foregroundStyle(PodcstPalette.accent)
                         }
+                        .padding(.top, 22)
                         ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
                             EpisodeRow(episode: episode, context: .library)
                         }
@@ -52,20 +54,15 @@ struct LibraryView: View {
                     }
                     .padding(.top, 14)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
         .refreshable { await library.load(forceRefresh: true) }
         .podcstPage()
         .screenHeader("Library") {
             HStack(spacing: 14) {
-                NavigationLink(value: Route.downloads) {
-                    Image(systemName: "arrow.down.circle")
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .accessibilityLabel("Downloads")
                 if session.user == nil {
                     Button("Sign in") { showingLogin = true }
                         .font(.sans(.body).weight(.medium))
@@ -75,6 +72,43 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $showingLogin) { LoginView() }
+    }
+}
+
+private struct LibraryLists: View {
+    @Environment(StarStore.self) private var stars
+    @Environment(MediaStore.self) private var media
+
+    var body: some View {
+        VStack(spacing: 0) {
+            row(.starred, count: stars.stars.count)
+                .hairline()
+            row(.downloads, count: media.downloadedEpisodes.count)
+        }
+        .background(PodcstPalette.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.top, 4)
+    }
+
+    private func row(_ list: EpisodeList, count: Int) -> some View {
+        NavigationLink(value: Route.list(list)) {
+            HStack(spacing: 12) {
+                ListTile(systemImage: list.systemImage)
+                Text(list.title)
+                    .font(.sans(.body))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(count)")
+                    .font(.sans(.body))
+                    .foregroundStyle(PodcstPalette.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(PodcstPalette.muted)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(list.title), \(count)")
     }
 }
 

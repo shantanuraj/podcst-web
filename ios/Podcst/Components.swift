@@ -290,6 +290,70 @@ struct SectionHeader<Trailing: View>: View {
     }
 }
 
+struct Toast: Identifiable, Equatable {
+    struct Action {
+        let title: String
+        var emphasized = true
+        let perform: @MainActor () -> Void
+    }
+
+    let id = UUID()
+    let title: String
+    var detail: String? = nil
+    var systemImage: String? = nil
+    var actions: [Action] = []
+
+    static func == (lhs: Toast, rhs: Toast) -> Bool { lhs.id == rhs.id }
+}
+
+struct ToastView: View {
+    let toast: Toast
+    var dismiss: () -> Void = {}
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let systemImage = toast.systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(PodcstPalette.accent)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(toast.title)
+                    .font(.sans(.subheadline).weight(.medium))
+                    .lineLimit(1)
+                if let detail = toast.detail {
+                    Text(detail)
+                        .font(.sans(.caption))
+                        .monospacedDigit()
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            ForEach(Array(toast.actions.enumerated()), id: \.offset) { _, action in
+                Button(action.title) {
+                    dismiss()
+                    action.perform()
+                }
+                .font(.sans(.subheadline).weight(action.emphasized ? .semibold : .medium))
+                .foregroundStyle(action.emphasized ? PodcstPalette.accent : PodcstPalette.secondary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 6)
+        .frame(height: 56)
+        .callout(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
 struct ErrorRow: View {
     let message: String
     let retry: () async -> Void

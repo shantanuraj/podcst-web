@@ -173,9 +173,15 @@ struct EpisodeRow: View {
         case podcast
         case library
         case releases
+        case starred
+        case downloads
     }
 
     @Environment(PlaybackController.self) private var playback
+    @Environment(StarStore.self) private var stars
+    @Environment(MediaStore.self) private var media
+    @Environment(DownloadAlertState.self) private var alerts
+    @Environment(Router.self) private var router
     let episode: Episode
     var context: Context = .podcast
     var showsSeparator = true
@@ -198,20 +204,23 @@ struct EpisodeRow: View {
             if let remaining { return [remaining] }
             let isNew = episode.published.map { $0 > .now.addingTimeInterval(-7 * 86400) } ?? false
             return [isNew ? "New" : episode.podcastTitle, duration.map(Duration.seconds)].compactMap { $0 }
-        case .releases:
+        case .downloads where media.status(for: episode).downloadedBytes == nil:
+            return [media.status(for: episode).downloadDescription]
+        case .releases, .starred, .downloads:
             return [episode.podcastTitle, remaining ?? duration.map(Duration.seconds)].compactMap { $0 }.filter { !$0.isEmpty }
         }
     }
 
     var body: some View {
         let isCurrent = playback.position(of: episode) != nil
+        let starred = stars.contains(episode)
         let metadata = metadata
         HStack(spacing: 14) {
             NavigationLink(value: Route.episode(episode)) {
                 HStack(spacing: 14) {
                     switch context {
                     case .podcast: DateBlock(date: episode.published)
-                    case .library, .releases: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
+                    case .library, .releases, .starred, .downloads: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(episode.title)
@@ -226,6 +235,11 @@ struct EpisodeRow: View {
                                     .overlay(alignment: .leading) {
                                         Capsule().fill(PodcstPalette.accent).frame(width: 44 * fraction)
                                     }
+                            }
+                            if starred {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(PodcstPalette.accent)
                             }
                             HStack(spacing: 4) {
                                 ForEach(Array(metadata.enumerated()), id: \.offset) { index, text in
@@ -243,7 +257,49 @@ struct EpisodeRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(([episode.title] + (context == .releases ? metadata : [episode.dateline])).joined(separator: ", "))
+            .accessibilityLabel(([episode.title] + (context == .podcast || context == .library ? [episode.dateline] : metadata) + (starred ? ["Starred"] : [])).joined(separator: ", "))
+            .accessibilityAction(named: starred ? "Unstar" : "Star") { router.star(episode, !starred, in: stars) }
+            trailing(isCurrent: isCurrent)
+        }
+        .padding(.vertical, 12)
+        .hairline(showsSeparator)
+        .modifier(EpisodeSwipe(
+            leading: EpisodeSwipe.Action(title: starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star.fill") {
+                router.star(episode, !starred, in: stars)
+            },
+            trailing: context == .downloads ? EpisodeSwipe.Action(title: "Remove", systemImage: "trash") {
+                Task { await DownloadOperation.remove.perform(for: episode, media: media, alerts: alerts) }
+            } : nil
+        ))
+        .contextMenu {
+            EpisodeMenuActions(episode: episode)
+        }
+    }
+
+    @ViewBuilder
+    private func trailing(isCurrent: Bool) -> some View {
+        switch context {
+        case .starred:
+            Button {
+                router.star(episode, false, in: stars)
+            } label: {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(PodcstPalette.accent)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Unstar \(episode.title)")
+        case .downloads:
+            if let bytes = media.status(for: episode).downloadedBytes {
+                Text(bytes.formatted(.byteCount(style: .file)))
+                    .font(.sans(.caption).monospacedDigit())
+                    .foregroundStyle(PodcstPalette.tertiary)
+            } else {
+                DownloadButton(episode: episode, compact: true)
+            }
+        case .podcast, .library, .releases:
             Button {
                 if isCurrent { playback.toggle() } else { playback.play(episode) }
             } label: {
@@ -252,18 +308,31 @@ struct EpisodeRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(isCurrent && playback.isPlaybackRequested ? "Pause \(episode.title)" : "Play \(episode.title)")
         }
-        .padding(.vertical, 12)
-        .hairline(showsSeparator)
-        .contextMenu {
-            DownloadMenuActions(episode: episode)
-            Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") { playback.enqueue(episode, next: true) }
-            Button("Add to queue", systemImage: "text.append") { playback.enqueue(episode) }
-        }
+    }
+}
+
+struct EpisodeMenuActions: View {
+    @Environment(PlaybackController.self) private var playback
+    @Environment(StarStore.self) private var stars
+    @Environment(Router.self) private var router
+    let episode: Episode
+
+    var body: some View {
+        let starred = stars.contains(episode)
+        Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") { playback.enqueue(episode, next: true) }
+        Button("Add to queue", systemImage: "text.append") { playback.enqueue(episode) }
+        Divider()
+        Button(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star") { router.star(episode, !starred, in: stars) }
+        Button("Add to list…", systemImage: "text.badge.plus") { router.listing = episode }
+        Divider()
+        DownloadMenuActions(episode: episode)
     }
 }
 
 struct EpisodeDetailView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(StarStore.self) private var stars
+    @Environment(Router.self) private var router
     let episode: Episode
 
     var body: some View {
@@ -289,6 +358,19 @@ struct EpisodeDetailView: View {
                 .padding(.top, 6)
                 HStack(spacing: 10) {
                     EpisodePlayButton(episode: episode)
+                    let starred = stars.contains(episode)
+                    Menu {
+                        Button("Add to list…", systemImage: "text.badge.plus") { router.listing = episode }
+                    } label: {
+                        Image(systemName: starred ? "star.fill" : "star")
+                            .foregroundStyle(starred ? PodcstPalette.accent : PodcstPalette.ink)
+                    } primaryAction: {
+                        router.star(episode, !starred, in: stars)
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(PodcstButtonStyle(kind: .surface))
+                    .frame(width: 48)
+                    .accessibilityLabel(starred ? "Unstar" : "Star")
                     DownloadButton(episode: episode, compact: true)
                     let queued = playback.queue.contains { $0.identity == episode.identity }
                     Button {

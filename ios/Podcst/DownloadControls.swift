@@ -165,6 +165,11 @@ extension MediaDownloadState {
         }
     }
 
+    var downloadedBytes: Int64? {
+        guard case .available(let bytes) = self else { return nil }
+        return bytes
+    }
+
     var downloadDescription: String {
         switch self {
         case .notDownloaded:
@@ -190,7 +195,7 @@ extension MediaDownloadState {
     }
 }
 
-private enum DownloadOperation {
+enum DownloadOperation {
     case download
     case pause
     case retry
@@ -236,7 +241,7 @@ private enum DownloadOperation {
 
 @MainActor
 @Observable
-private final class DownloadAlertState {
+final class DownloadAlertState {
     var message: String?
 }
 

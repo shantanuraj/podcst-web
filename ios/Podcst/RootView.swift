@@ -12,7 +12,7 @@ enum Route: Hashable {
     case podcast(Podcast)
     case episode(Episode)
     case releases
-    case downloads
+    case list(EpisodeList)
 }
 
 @MainActor
@@ -26,6 +26,8 @@ final class Router {
     var tab: AppTab = .discover
     var showingPlayer = false
     var stoppedPlayback: StoppedPlayback?
+    var toast: Toast?
+    var listing: Episode?
     private var paths: [AppTab: [Route]] = [:]
 
     func path(_ tab: AppTab) -> Binding<[Route]> {
@@ -83,6 +85,9 @@ struct RootView: View {
                 .environment(router)
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $router.listing) { episode in
+            AddToListSheet(episode: episode)
+        }
         .fullScreenCover(isPresented: onboarding) {
             OnboardingView { onboarded = true }
         }
@@ -108,6 +113,12 @@ struct RootView: View {
         .task(id: router.stoppedPlayback?.id) {
             guard router.stoppedPlayback != nil, (try? await Task.sleep(for: .seconds(5))) != nil else { return }
             router.stoppedPlayback = nil
+        }
+        .task(id: router.toast?.id) {
+            guard let toast = router.toast,
+                  (try? await Task.sleep(for: .seconds(toast.actions.isEmpty ? 2.5 : 5))) != nil,
+                  router.toast == toast else { return }
+            router.toast = nil
         }
         .onChange(of: playback.isActive) { _, active in
             if active { router.stoppedPlayback = nil }
@@ -185,7 +196,7 @@ private struct TabStack<Content: View>: View {
                         case .podcast(let podcast): PodcastDetailView(podcast: podcast)
                         case .episode(let episode): EpisodeDetailView(episode: episode)
                         case .releases: ReleasesView()
-                        case .downloads: DownloadsView()
+                        case .list(let list): EpisodeListView(list: list)
                         }
                     }
                     .modifier(PlayerInset())
@@ -216,19 +227,26 @@ private struct PlayerInset: ViewModifier {
 
     func body(content: Content) -> some View {
         content.safeAreaInset(edge: .bottom, spacing: 0) {
-            Group {
-                if playback.isActive {
-                    NowPlayingBar()
-                } else if router.stoppedPlayback != nil {
-                    StoppedPlaybackToast()
+            VStack(spacing: 8) {
+                if let toast = router.toast {
+                    ToastView(toast: toast) { router.toast = nil }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                Group {
+                    if playback.isActive {
+                        NowPlayingBar()
+                    } else if router.stoppedPlayback != nil {
+                        StoppedPlaybackToast()
+                    }
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.snappy, value: playback.isActive)
         .animation(.snappy, value: router.stoppedPlayback)
+        .animation(.snappy, value: router.toast)
     }
 }
 
@@ -243,30 +261,9 @@ private struct StoppedPlaybackToast: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Playback stopped")
-                    .font(.sans(.subheadline).weight(.medium))
-                Text(detail)
-                    .font(.sans(.caption))
-                    .monospacedDigit()
-                    .foregroundStyle(PodcstPalette.secondary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            Button("Undo") { router.undoStop(playback) }
-                .font(.sans(.subheadline).weight(.semibold))
-                .foregroundStyle(PodcstPalette.accent)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-                .buttonStyle(.plain)
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, 8)
-        .frame(height: 56)
-        .callout(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        ToastView(toast: Toast(title: "Playback stopped", detail: detail, actions: [
+            Toast.Action(title: "Undo") { router.undoStop(playback) }
+        ]))
     }
 }
 
@@ -330,6 +327,9 @@ struct NowPlayingBar: View {
             .offset(x: drag.width)
             .opacity(1 - min(0.55, abs(drag.width) / 240))
             .onTapGesture { router.showingPlayer = true }
+            .contextMenu {
+                if let episode = playback.currentEpisode { EpisodeMenuActions(episode: episode) }
+            }
             .accessibilityElement(children: .ignore)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { router.showingPlayer = true }

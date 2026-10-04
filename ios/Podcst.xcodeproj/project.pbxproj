@@ -125,6 +125,11 @@
 		AC2800000000000000000012 = {isa = PBXBuildFile; fileRef = AC2800000000000000000001; };
 		AC2800000000000000000013 = {isa = PBXBuildFile; fileRef = AC2800000000000000000002; };
 		AC2800000000000000000014 = {isa = PBXBuildFile; fileRef = AC2800000000000000000003; };
+		AC3100000000000000000011 = {isa = PBXBuildFile; fileRef = AC3100000000000000000001; };
+		AC3100000000000000000012 = {isa = PBXBuildFile; fileRef = AC3100000000000000000001; };
+		AC3100000000000000000013 = {isa = PBXBuildFile; fileRef = AC3100000000000000000003; };
+		AC3100000000000000000014 = {isa = PBXBuildFile; fileRef = AC3100000000000000000002; };
+		AC3100000000000000000015 = {isa = PBXBuildFile; fileRef = AC3100000000000000000002; };
 		AC3000000000000000000011 = {isa = PBXBuildFile; fileRef = AC3000000000000000000001; };
 		AC3000000000000000000012 = {isa = PBXBuildFile; fileRef = AC3000000000000000000001; };
 		AC3000000000000000000013 = {isa = PBXBuildFile; fileRef = AC3000000000000000000002; };
@@ -215,7 +220,7 @@
 		1C00679BE348417E142A1D3B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/AudioProcessingDecoder.swift"; sourceTree = "<group>"; };
 		34A3A3D752678985E2838520 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MediaTests.swift"; sourceTree = "<group>"; };
 		DDAEA93B53C6007FC2948986 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/RoutingAudioTransport.swift"; sourceTree = "<group>"; };
-		A690F8948F34D9FD2269A63E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadsView.swift"; sourceTree = "<group>"; };
+		A690F8948F34D9FD2269A63E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeListView.swift; sourceTree = "<group>"; };
 		81C26C3039C5F5764A76A028 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadControls.swift"; sourceTree = "<group>"; };
 		F1000643AFB0573AAC0A3ECD = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionTests.swift"; sourceTree = "<group>"; };
 		275A938D623C4E7A346A1823 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Playback/Native/PodcstHandoffAudioUnit.h"; sourceTree = "<group>"; };
@@ -249,6 +254,9 @@
 		AC2800000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStore.swift; sourceTree = "<group>"; };
 		AC2800000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkRetention.swift; sourceTree = "<group>"; };
 		AC2800000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStoreTests.swift; sourceTree = "<group>"; };
+		AC3100000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/StarStore.swift; sourceTree = "<group>"; };
+		AC3100000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Starring.swift; sourceTree = "<group>"; };
+		AC3100000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarStoreTests.swift; sourceTree = "<group>"; };
 		AC3000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkPalette.swift; sourceTree = "<group>"; };
 		AC3000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkPaletteTests.swift; sourceTree = "<group>"; };
 		77903BF3FCDDB37D6FDD5406 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/Media/BackgroundMediaDownloads.swift"; sourceTree = "<group>"; };
@@ -289,6 +297,8 @@
 				AC2900000000000000000001,
 				AC2800000000000000000001,
 				AC2800000000000000000002,
+				AC3100000000000000000001,
+				AC3100000000000000000002,
 				AC3000000000000000000001,
 				2804D820C382177C62E11228,
 				C96F62A08467C6B284423573,
@@ -371,6 +381,7 @@
 				11A8DCAAA6B9BD4AA43F0DEC,
 				AC2900000000000000000002,
 				AC2800000000000000000003,
+				AC3100000000000000000003,
 				AC3000000000000000000002,
 				CCF1F07C6DEA6CCD122B6BC1,
 				D76F7DCE83148E0977D42F4F,
@@ -604,6 +615,7 @@
 				4E7E521EC7785029944A6534,
 				AC2900000000000000000013,
 				AC2800000000000000000014,
+				AC3100000000000000000013,
 				AC3000000000000000000013,
 				F1EBB576915CDFAD37BDEC80,
 				D0CF9999271A713BB3876BB4,
@@ -634,6 +646,8 @@
 				4EF9C6CE8E48D8B14141088B,
 				AC2900000000000000000011,
 				AC2800000000000000000011,
+				AC3100000000000000000011,
+				AC3100000000000000000014,
 				AC3000000000000000000011,
 				AC2800000000000000000013,
 				82189A7933BEEDF621E48A00,
@@ -688,6 +702,8 @@
 				DFCFA8319512A383BC20F24E,
 				AC2900000000000000000012,
 				AC2800000000000000000012,
+				AC3100000000000000000012,
+				AC3100000000000000000015,
 				AC3000000000000000000012,
 				0D2DAEFDC659968964551E41,
 				C7D2332023618C336CD89BD7,
