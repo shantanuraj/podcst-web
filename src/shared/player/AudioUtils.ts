@@ -34,6 +34,7 @@ export const getInitialVolume = () => getValue('volume', defaultVolume);
 
 export default class AudioUtils {
   private static playbackInstance: Howl | null;
+  private static generation = 0;
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null =
     null;
@@ -110,12 +111,14 @@ export default class AudioUtils {
     seekPosition: number = 0,
   ) {
     AudioUtils.stop();
+    const generation = AudioUtils.generation;
     AudioUtils.playbackId = undefined;
     AudioUtils.playbackInstance = new Howl({
       src: [episode.file.url],
       volume: AudioUtils.volume / 100,
       html5: true,
       onload() {
+        if (generation !== AudioUtils.generation) return;
         AudioUtils.callbacks.setPlaybackStarted();
         AudioUtils.callbacks.duration(
           AudioUtils.playbackInstance?.duration() || 0,
@@ -134,9 +137,11 @@ export default class AudioUtils {
         );
       },
       onplay(playbackId) {
+        if (generation !== AudioUtils.generation) return;
         AudioUtils.playbackId = playbackId;
       },
       onend() {
+        if (generation !== AudioUtils.generation) return;
         AudioUtils.removeAirplayAvailabilityListener();
         AudioUtils.callbacks.stopEpisode();
         AudioUtils.getAudioElement()?.removeEventListener(
@@ -161,10 +166,25 @@ export default class AudioUtils {
   }
 
   public static stop() {
-    AudioUtils.playbackInstance?.stop();
-    AudioUtils.playbackInstance?.unload();
-    AudioUtils.playbackInstance = null;
-    AudioUtils.playbackId = undefined;
+    AudioUtils.generation++;
+    if (AudioUtils.playbackInstance) {
+      AudioUtils.removeAirplayAvailabilityListener();
+      AudioUtils.getAudioElement()?.removeEventListener(
+        'timeupdate',
+        AudioUtils.seekPositionListener,
+      );
+    }
+    const instance = AudioUtils.playbackInstance;
+    try {
+      instance?.stop();
+    } finally {
+      try {
+        instance?.unload();
+      } finally {
+        AudioUtils.playbackInstance = null;
+        AudioUtils.playbackId = undefined;
+      }
+    }
   }
 
   public static skipTo(episode: IEpisode) {

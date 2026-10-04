@@ -10,6 +10,6 @@ export const getAdaptedPlaybackState = (
 export const isChromecastConnected = (
   castState: cast.framework.CastState | undefined,
 ): boolean => {
-  if (!('cast' in window)) return false;
+  if (typeof window === 'undefined' || !('cast' in window)) return false;
   return castState === cast.framework.CastState.CONNECTED;
 };

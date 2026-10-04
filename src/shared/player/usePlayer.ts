@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-
+import type { AccountScope } from '@/shared/auth/account';
 import type { IEpisodeInfo, IPlaybackControls, PlayerState } from '@/types';
 import AudioUtils, { seekUtils } from './AudioUtils';
 import { getAdaptedPlaybackState, isChromecastConnected } from './castUtils';
 import { updatePlaybackHandlers, updatePlaybackMetadata } from './mediaUtils';
 
 export interface IPlayerState extends IPlaybackControls {
+  accountScope: AccountScope | undefined;
+  accountRevision: number;
+  setAccount: (scope: AccountScope | undefined, revision: number) => void;
   audioInitialised: boolean;
   queue: IEpisodeInfo[];
   currentTrackIndex: number;
@@ -43,6 +46,45 @@ export const usePlayer = create<IPlayerState>()(
   subscribeWithSelector(
     (set, get) =>
       ({
+        accountScope: undefined,
+        accountRevision: 0,
+        setAccount: (accountScope, accountRevision) => {
+          const state = get();
+          if (
+            state.accountScope === accountScope &&
+            state.accountRevision === accountRevision
+          )
+            return;
+          try {
+            AudioUtils.stop();
+          } catch {}
+          try {
+            state.remotePlayerController?.stop();
+          } catch {}
+          try {
+            if (typeof window !== 'undefined' && 'cast' in window)
+              cast.framework.CastContext.getInstance()
+                .getCurrentSession()
+                ?.endSession(true);
+          } catch {}
+          set({
+            accountScope,
+            accountRevision,
+            queue: [],
+            currentTrackIndex: 0,
+            seekPosition: 0,
+            duration: 0,
+            state: 'idle',
+            audioInitialised: false,
+            rate: state.savedRate ?? state.rate,
+            savedRate: undefined,
+            isAirplayEnabled: false,
+            isChromecastConnecting: false,
+            chromecastState: undefined,
+            remotePlayer: undefined,
+            remotePlayerController: undefined,
+          });
+        },
         audioInitialised: false,
         queue: [] as IEpisodeInfo[],
         currentTrackIndex: 0,
@@ -163,6 +205,10 @@ export const usePlayer = create<IPlayerState>()(
         },
 
         playOnChromecast: async () => {
+          const { accountScope, accountRevision } = get();
+          const current = () =>
+            get().accountScope === accountScope &&
+            get().accountRevision === accountRevision;
           const currentEpisode = getCurrentEpisode(get());
           if (!('cast' in window) || !currentEpisode) return;
 
@@ -177,6 +223,10 @@ export const usePlayer = create<IPlayerState>()(
             }
           }
           if (!session) return;
+          if (!current()) {
+            session.endSession(true);
+            return;
+          }
 
           const mediaInfo = new chrome.cast.media.MediaInfo(
             currentEpisode.file.url,
@@ -205,6 +255,10 @@ export const usePlayer = create<IPlayerState>()(
           try {
             set({ isChromecastConnecting: true });
             await session.loadMedia(request);
+            if (!current()) {
+              session.endSession(true);
+              return;
+            }
             const remotePlayer = new cast.framework.RemotePlayer();
             const remotePlayerController =
               new cast.framework.RemotePlayerController(remotePlayer);
@@ -221,7 +275,7 @@ export const usePlayer = create<IPlayerState>()(
           } catch (err) {
             console.error('Error loading media', err);
           } finally {
-            set({ isChromecastConnecting: false });
+            if (current()) set({ isChromecastConnecting: false });
           }
         },
 
@@ -369,6 +423,14 @@ export const usePlayer = create<IPlayerState>()(
 );
 
 usePlayer.subscribe((currentState, previousState) => {
+  if (
+    currentState.accountScope !== previousState.accountScope ||
+    currentState.accountRevision !== previousState.accountRevision
+  ) {
+    updatePlaybackMetadata(undefined);
+    updatePlaybackHandlers();
+    return;
+  }
   const currentEpisode = currentState.queue[currentState.currentTrackIndex];
   const previousEpisode = previousState.queue[previousState.currentTrackIndex];
 

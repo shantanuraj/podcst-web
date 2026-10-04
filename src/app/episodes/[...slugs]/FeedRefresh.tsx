@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { feedRefreshOptions } from '@/data/feed-refresh';
+import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { useTranslation } from '@/shared/i18n';
 
 interface Props {
@@ -12,10 +13,10 @@ interface Props {
 
 export function FeedRefresh({ podcastId, empty = false }: Props) {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const session = useAccountSession();
   const { t } = useTranslation();
   const { isPending } = useQuery(
-    feedRefreshOptions(queryClient, podcastId, () => router.refresh(), empty),
+    feedRefreshOptions(session, podcastId, () => router.refresh(), empty),
   );
 
   if (!empty || !isPending) return null;

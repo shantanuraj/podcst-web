@@ -10,6 +10,7 @@ import {
   getPodcastByFeedUrl,
   getPodcastInfoById,
 } from '@/server/ingest/podcast';
+import { AccountContent } from '@/shared/auth/AccountBoundary';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
@@ -162,7 +163,11 @@ export default async function Page(props: {
       const podcastData = { ...podcast, episodes: [episode] };
 
       return (
-        <>
+        <AccountContent
+          scope={userId}
+          resource={parsed.podcastId}
+          privateContent={!!podcast.isPrivate}
+        >
           <FeedRefresh podcastId={parsed.podcastId} />
           {!podcast.isPrivate && (
             <PodcastEpisodeSchema
@@ -172,7 +177,7 @@ export default async function Page(props: {
             />
           )}
           <EpisodeInfo podcast={podcastData} episode={episode} />
-        </>
+        </AccountContent>
       );
     }
 
@@ -188,13 +193,20 @@ export default async function Page(props: {
     if (initialEpisodes.episodes.length === 0) {
       const infoData = { ...podcast, episodes: [] };
       return (
-        <EpisodesHydration
-          podcastId={parsed.podcastId}
-          initialData={initialEpisodes}
+        <AccountContent
+          scope={userId}
+          resource={parsed.podcastId}
+          privateContent={!!podcast.isPrivate}
         >
-          <FeedRefresh podcastId={parsed.podcastId} empty />
-          <PodcastInfo info={infoData} />
-        </EpisodesHydration>
+          <EpisodesHydration
+            scope={userId}
+            podcastId={parsed.podcastId}
+            initialData={initialEpisodes}
+          >
+            <FeedRefresh podcastId={parsed.podcastId} empty />
+            <PodcastInfo info={infoData} />
+          </EpisodesHydration>
+        </AccountContent>
       );
     }
 
@@ -203,12 +215,17 @@ export default async function Page(props: {
     const infoData = { ...podcast, episodes: [] };
 
     return (
-      <>
+      <AccountContent
+        scope={userId}
+        resource={parsed.podcastId}
+        privateContent={!!podcast.isPrivate}
+      >
         <FeedRefresh podcastId={parsed.podcastId} />
         {!podcast.isPrivate && (
           <PodcastSeriesSchema podcast={schemaData} url={url} />
         )}
         <EpisodesHydration
+          scope={userId}
           podcastId={parsed.podcastId}
           initialData={initialEpisodes}
         >
@@ -216,7 +233,7 @@ export default async function Page(props: {
             <PodcastInfo info={infoData} />
           </PaginatedEpisodesList>
         </EpisodesHydration>
-      </>
+      </AccountContent>
     );
   }
 

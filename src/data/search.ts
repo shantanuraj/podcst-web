@@ -1,23 +1,34 @@
 import { useQuery } from '@tanstack/react-query';
-import { useSession } from '@/shared/auth/useAuth';
+import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { isFeedUrlInput } from '@/shared/feed-url';
 import type { IPodcastSearchResult } from '@/types';
 import { get, post } from './api';
 
 export const useSearch = (input: string) => {
   const term = input.trim();
-  const { data: user, isPending } = useSession();
+  const session = useAccountSession();
+  const token = session.token();
   const url = isFeedUrlInput(term);
-  const query = useQuery({
-    queryKey: ['search', user?.id ?? null, term],
-    queryFn: () =>
-      url
-        ? post<IPodcastSearchResult[]>('/search', { term })
-        : get<IPodcastSearchResult[]>('/search', { term }),
-    enabled: !!term && (!url || !!user),
+  const privateQuery = session.query('search', term, (signal) =>
+    post<IPodcastSearchResult[]>('/search', { term }, signal),
+  );
+  const query = useQuery<IPodcastSearchResult[]>({
+    ...(url
+      ? privateQuery
+      : {
+          queryKey: ['catalog-search', term],
+          queryFn: ({ signal }: { signal: AbortSignal }) =>
+            get<IPodcastSearchResult[]>('/search', { term }, undefined, signal),
+        }),
+    enabled:
+      !!term && (!url || (session.scope !== null && privateQuery.enabled)),
     staleTime: 30_000,
     gcTime: url ? 0 : 5 * 60_000,
     retry: false,
   });
-  return { ...query, needsSignIn: url && !isPending && !user };
+  return {
+    ...query,
+    data: !url || session.current(token, term) ? query.data : undefined,
+    needsSignIn: url && session.getSnapshot().ready && session.scope === null,
+  };
 };

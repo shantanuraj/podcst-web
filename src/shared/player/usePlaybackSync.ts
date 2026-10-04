@@ -1,6 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
-import { useSession } from '@/shared/auth/useAuth';
-import type { IEpisodeInfo } from '@/types';
+import { responseData } from '@/data/api';
+import { useAccountSession } from '@/shared/auth/AccountBoundary';
+import { playbackQueryOptions, restoreAccountProgress } from './playback-state';
 import {
   getCurrentEpisode,
   getPlaybackState,
@@ -11,95 +13,103 @@ import {
 const SYNC_INTERVAL_MS = 30_000;
 const COMPLETION_THRESHOLD = 0.95;
 
-interface PlaybackProgress {
-  episode: IEpisodeInfo;
-  position: number;
-}
-
-async function fetchCurrentProgress(): Promise<PlaybackProgress | null> {
-  const res = await fetch('/api/progress');
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function saveProgress(
-  episodeId: number,
-  position: number,
-  completed: boolean,
-) {
-  await fetch('/api/progress', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ episodeId, position, completed }),
-  });
-}
-
 export function usePlaybackSync() {
-  const { data: user, isLoading: sessionLoading } = useSession();
-  const restoredRef = useRef(false);
-  const lastSavedRef = useRef<{ episodeId: number; position: number } | null>(
-    null,
-  );
-
-  const restoreEpisode = usePlayer((s) => s.restoreEpisode);
+  const session = useAccountSession();
+  const token = session.token();
+  const restoredRef = useRef<number | null>(null);
+  const lastSavedRef = useRef<{
+    revision: number;
+    episodeId: number;
+    position: number;
+  } | null>(null);
   const duration = usePlayer((s) => s.duration);
+  const progress = useQuery(playbackQueryOptions(session));
 
   useEffect(() => {
-    if (sessionLoading || !user || restoredRef.current) return;
-    restoredRef.current = true;
+    if (
+      !session.current(token) ||
+      !progress.isSuccess ||
+      restoredRef.current === token.revision
+    )
+      return;
+    restoredRef.current = token.revision;
+    if (progress.data) restoreAccountProgress(session, token, progress.data);
+  }, [session, token, progress.data, progress.isSuccess]);
 
-    const queue = usePlayer.getState().queue;
-    if (queue.length > 0) return;
-
-    fetchCurrentProgress().then((progress) => {
-      if (!progress?.episode) return;
-      restoreEpisode(progress.episode, progress.position);
-    });
-  }, [user, sessionLoading, restoreEpisode]);
+  const save = useCallback(
+    async (episodeId: number, position: number, completed: boolean) => {
+      if (token.scope === null || !session.current(token)) return;
+      try {
+        await session.run(token, 'playback', async (signal) =>
+          responseData(
+            await fetch('/api/progress', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ episodeId, position, completed }),
+              signal,
+            }),
+          ),
+        );
+        if (session.current(token))
+          lastSavedRef.current = {
+            revision: token.revision,
+            episodeId,
+            position,
+          };
+      } catch {}
+    },
+    [session, token],
+  );
 
   const saveCurrentProgress = useCallback(
     (completed = false) => {
-      if (!user) return;
-
       const state = usePlayer.getState();
+      if (
+        token.scope === null ||
+        !session.current(token) ||
+        state.accountScope !== token.scope ||
+        state.accountRevision !== token.revision
+      )
+        return;
       const episode = getCurrentEpisode(state);
       if (!episode?.id) return;
-
       const position = getSeekPosition(state);
       const last = lastSavedRef.current;
-
       if (
         !completed &&
-        last?.episodeId === episode.id &&
-        last?.position === position
-      ) {
+        last?.revision === token.revision &&
+        last.episodeId === episode.id &&
+        last.position === position
+      )
         return;
-      }
-
-      lastSavedRef.current = { episodeId: episode.id, position };
-      saveProgress(episode.id, position, completed);
+      void save(episode.id, position, completed);
     },
-    [user],
+    [session, token, save],
   );
 
   useEffect(() => {
-    if (!user) return;
-
+    if (token.scope === null || !session.current(token)) return;
     let intervalId: ReturnType<typeof setInterval> | null = null;
-
+    if (getPlaybackState(usePlayer.getState()) === 'playing')
+      intervalId = setInterval(() => saveCurrentProgress(), SYNC_INTERVAL_MS);
     const unsubscribe = usePlayer.subscribe(
       (state) => ({
         playbackState: getPlaybackState(state),
         episode: getCurrentEpisode(state),
       }),
-      ({ playbackState, episode }, prev) => {
-        if (playbackState === 'playing' && !intervalId) {
+      ({ playbackState }, prev) => {
+        if (!session.current(token)) return;
+        const state = usePlayer.getState();
+        if (
+          state.accountScope !== token.scope ||
+          state.accountRevision !== token.revision
+        )
+          return;
+        if (playbackState === 'playing' && !intervalId)
           intervalId = setInterval(
             () => saveCurrentProgress(),
             SYNC_INTERVAL_MS,
           );
-        }
-
         if (playbackState === 'paused' && prev.playbackState === 'playing') {
           saveCurrentProgress();
           if (intervalId) {
@@ -107,14 +117,12 @@ export function usePlaybackSync() {
             intervalId = null;
           }
         }
-
         if (
           playbackState === 'idle' &&
           prev.playbackState !== 'idle' &&
           prev.episode?.id
         ) {
-          saveProgress(prev.episode.id, 0, true);
-          lastSavedRef.current = null;
+          void save(prev.episode.id, 0, true);
           if (intervalId) {
             clearInterval(intervalId);
             intervalId = null;
@@ -127,49 +135,52 @@ export function usePlaybackSync() {
           a.episode?.id === b.episode?.id,
       },
     );
-
     return () => {
       unsubscribe();
       if (intervalId) clearInterval(intervalId);
     };
-  }, [user, saveCurrentProgress]);
+  }, [session, token, saveCurrentProgress, save]);
 
   useEffect(() => {
-    if (!user) return;
-
+    if (token.scope === null || !session.current(token)) return;
     const state = usePlayer.getState();
     const episode = getCurrentEpisode(state);
-    if (!episode?.id || !duration) return;
-
-    const position = getSeekPosition(state);
-    if (position / duration >= COMPLETION_THRESHOLD) {
-      saveProgress(episode.id, position, true);
-    }
-  }, [user, duration]);
+    if (
+      !episode?.id ||
+      !duration ||
+      state.accountScope !== token.scope ||
+      state.accountRevision !== token.revision
+    )
+      return;
+    if (getSeekPosition(state) / duration >= COMPLETION_THRESHOLD)
+      void save(episode.id, getSeekPosition(state), true);
+  }, [session, token, duration, save]);
 
   useEffect(() => {
-    if (!user) return;
-
-    const handleBeforeUnload = () => {
+    if (token.scope === null || !session.current(token)) return;
+    const beforeUnload = () => {
       const state = usePlayer.getState();
-      const playbackState = getPlaybackState(state);
-      if (playbackState === 'playing' || playbackState === 'paused') {
-        const episode = getCurrentEpisode(state);
-        if (episode?.id) {
-          const position = getSeekPosition(state);
-          navigator.sendBeacon(
-            '/api/progress',
-            JSON.stringify({
-              episodeId: episode.id,
-              position,
-              completed: false,
-            }),
-          );
-        }
-      }
+      if (
+        !session.current(token) ||
+        state.accountScope !== token.scope ||
+        state.accountRevision !== token.revision
+      )
+        return;
+      const episode = getCurrentEpisode(state);
+      if (
+        episode?.id &&
+        ['playing', 'paused'].includes(getPlaybackState(state))
+      )
+        navigator.sendBeacon(
+          '/api/progress',
+          JSON.stringify({
+            episodeId: episode.id,
+            position: getSeekPosition(state),
+            completed: false,
+          }),
+        );
     };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [user]);
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [session, token]);
 }

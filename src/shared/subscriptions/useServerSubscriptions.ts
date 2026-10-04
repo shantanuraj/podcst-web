@@ -1,72 +1,84 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { get, post, responseData } from '@/data/api';
+import { useAccountSession } from '@/shared/auth/AccountBoundary';
+import { accountQueryKey } from '@/shared/auth/account';
 import type { IPodcastEpisodesInfo } from '@/types';
 
-const SUBSCRIPTIONS_KEY = ['subscriptions'];
-
 export function useServerSubscriptions() {
-  return useQuery({
-    queryKey: SUBSCRIPTIONS_KEY,
-    queryFn: async (): Promise<IPodcastEpisodesInfo[]> => {
-      const res = await fetch('/api/subscriptions');
-      if (!res.ok) return [];
-      return res.json();
-    },
+  const session = useAccountSession();
+  const token = session.token();
+  const options = session.query('subscriptions', 'library', (signal) =>
+    get<IPodcastEpisodesInfo[]>('/subscriptions', {}, undefined, signal),
+  );
+  const query = useQuery({
+    ...options,
+    enabled: options.enabled && token.scope !== null,
   });
+  return {
+    ...query,
+    data: session.current(token, 'library') ? query.data : undefined,
+  };
 }
 
 export function useSubscribe() {
-  const queryClient = useQueryClient();
-
+  const session = useAccountSession();
+  const token = session.token();
   return useMutation({
-    mutationFn: async (podcastId: number) => {
-      const res = await fetch('/api/subscriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ podcastId }),
-      });
-      if (!res.ok) throw new Error('Failed to subscribe');
-      return res.json();
-    },
+    mutationKey: accountQueryKey(token.scope, 'subscribe'),
+    mutationFn: (podcastId: number) =>
+      session.run(token, podcastId, (signal) =>
+        post('/subscriptions', { podcastId }, signal),
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_KEY });
+      if (session.current(token))
+        void session.client.invalidateQueries({
+          queryKey: accountQueryKey(token.scope, 'subscriptions'),
+        });
     },
   });
 }
 
 export function useUnsubscribe() {
-  const queryClient = useQueryClient();
-
+  const session = useAccountSession();
+  const token = session.token();
   return useMutation({
-    mutationFn: async (podcastId: number) => {
-      const res = await fetch(`/api/subscriptions?podcastId=${podcastId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Failed to unsubscribe');
-      return res.json();
-    },
+    mutationKey: accountQueryKey(token.scope, 'unsubscribe'),
+    mutationFn: (podcastId: number) =>
+      session.run(token, podcastId, async (signal) =>
+        responseData(
+          await fetch(`/api/subscriptions?podcastId=${podcastId}`, {
+            method: 'DELETE',
+            signal,
+          }),
+        ),
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_KEY });
+      if (session.current(token))
+        void session.client.invalidateQueries({
+          queryKey: accountQueryKey(token.scope, 'subscriptions'),
+        });
     },
   });
 }
 
 export function useSyncToCloud() {
-  const queryClient = useQueryClient();
-
+  const session = useAccountSession();
+  const token = session.token();
   return useMutation({
-    mutationFn: async (
-      feedUrls: string[],
-    ): Promise<{ succeeded: number; failed: number }> => {
-      const res = await fetch('/api/subscriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedUrls }),
-      });
-      if (!res.ok) throw new Error('Failed to sync');
-      return res.json();
-    },
+    mutationKey: accountQueryKey(token.scope, 'sync-subscriptions'),
+    mutationFn: (feedUrls: string[]) =>
+      session.run(token, 'library', (signal) =>
+        post<{ succeeded: number; failed: number }>(
+          '/subscriptions',
+          { feedUrls },
+          signal,
+        ),
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SUBSCRIPTIONS_KEY });
+      if (session.current(token))
+        void session.client.invalidateQueries({
+          queryKey: accountQueryKey(token.scope, 'subscriptions'),
+        });
     },
   });
 }

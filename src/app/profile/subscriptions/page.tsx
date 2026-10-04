@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { ItemListSchema } from '@/components/Schema';
 import { getSession } from '@/server/auth/session';
 import { getSubscriptions } from '@/server/subscriptions';
+import { AccountContent } from '@/shared/auth/AccountBoundary';
 import { translations } from '@/shared/i18n/server';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import styles from './Subscriptions.module.css';
@@ -21,16 +22,20 @@ export default async function ProfileSubscriptionsPage() {
   const podcasts = await getSubscriptions(session.userId);
 
   if (!podcasts.length) {
-    return <EmptyState />;
+    return (
+      <AccountContent scope={session.userId} resource="library" privateContent>
+        <EmptyState />
+      </AccountContent>
+    );
   }
 
   const episodes = getRecents(podcasts);
 
   return (
-    <>
+    <AccountContent scope={session.userId} resource="library" privateContent>
       <ItemListSchema items={podcasts} title={t('profile.subscriptions')} />
       <SubscriptionsTabs podcasts={podcasts} episodes={episodes} />
-    </>
+    </AccountContent>
   );
 }
 

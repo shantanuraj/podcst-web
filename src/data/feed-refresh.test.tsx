@@ -5,10 +5,29 @@ import {
   QueryClient,
   QueryObserver,
 } from '@tanstack/react-query';
+import { AccountSession } from '@/shared/auth/account-session';
 import type { IPaginatedEpisodes } from '@/types';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
-import { episodesQueryKey } from './episode-query';
-import { feedRefreshOptions } from './feed-refresh';
+import { episodesQueryKey as scopedEpisodesQueryKey } from './episode-query';
+import { feedRefreshOptions as scopedFeedRefreshOptions } from './feed-refresh';
+
+const sessions = new WeakMap<QueryClient, AccountSession>();
+const episodesQueryKey = (
+  id: number,
+  search?: string,
+  sort?: string,
+  direction?: string,
+) => scopedEpisodesQueryKey(null, id, search, sort, direction);
+const feedRefreshOptions = (
+  client: QueryClient,
+  id: number,
+  refresh: () => void,
+  empty = false,
+) => {
+  const session = sessions.get(client);
+  if (!session) throw new Error('Missing fixture account');
+  return scopedFeedRefreshOptions(session, id, refresh, empty);
+};
 
 const clients: QueryClient[] = [];
 const fetchSpies: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>[] = [];
@@ -18,6 +37,15 @@ function client() {
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   clients.push(queryClient);
+  sessions.set(
+    queryClient,
+    new AccountSession(queryClient, null, {
+      resetPlayer() {},
+      reload() {},
+      publish() {},
+      readSession: async () => null,
+    }),
+  );
   return queryClient;
 }
 
@@ -123,6 +151,7 @@ describe('feed refresh', () => {
 
     const nextPage = { ...oldPage, total: 41 };
     const boundary = EpisodesHydration({
+      scope: null,
       podcastId: 1,
       initialData: nextPage,
       children: null,

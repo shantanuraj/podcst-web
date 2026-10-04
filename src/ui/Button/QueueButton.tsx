@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
 import { getQueueEpisode, usePlayer } from '@/shared/player/usePlayer';
 import { getShowToast, useToast } from '@/shared/toast/useToast';
 import type { IEpisodeInfo } from '@/types';
@@ -14,6 +15,7 @@ export const QueueButton = React.memo(
     { className, episode, ...props },
     ref,
   ) {
+    const withAccount = useAccountPlayback();
     const showToast = useToast(getShowToast);
     const classes = className
       ? [className, styles.queue].join(' ')
@@ -22,14 +24,16 @@ export const QueueButton = React.memo(
     const handleClick = React.useCallback(
       (e: React.MouseEvent) => {
         e.preventDefault();
-        queueEpisode(episode);
-        showToast(
-          <span>
-            <strong>{episode.title}</strong> added to queue
-          </span>,
-        );
+        withAccount(episode, () => {
+          queueEpisode(episode);
+          showToast(
+            <span>
+              <strong>{episode.title}</strong> added to queue
+            </span>,
+          );
+        });
       },
-      [showToast, queueEpisode, episode],
+      [showToast, queueEpisode, episode, withAccount],
     );
     return (
       <button {...props} className={classes} onClick={handleClick} ref={ref}>

@@ -1,6 +1,6 @@
 import Script from 'next/script';
-
 import { CastManager } from '@/components/CastManager/CastManager';
+import { getSession } from '@/server/auth/session';
 import { TranslationProvider } from '@/shared/i18n';
 import { Player } from '@/shared/player/Player';
 import { QueryProvider } from '@/shared/query/QueryProvider';
@@ -53,7 +53,17 @@ export const viewport: Viewport = {
   themeColor: '#FAF9F7',
 };
 
-export default function App({ children }: { children: React.ReactNode }) {
+export default async function App({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+  const user = session
+    ? {
+        id: session.userId,
+        email: session.email,
+        name: session.name,
+        image: session.image,
+        hasPasskey: session.hasPasskey,
+      }
+    : null;
   return (
     <html lang="en">
       <head>
@@ -71,7 +81,7 @@ export default function App({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <WebSiteSchema />
-        <QueryProvider>
+        <QueryProvider user={user}>
           <TranslationProvider>
             <Init />
             <ThemeListener />

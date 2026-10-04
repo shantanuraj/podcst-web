@@ -7,12 +7,27 @@ function getBaseUrl() {
   return 'http://localhost:3000';
 }
 
-async function responseData<T>(response: Response): Promise<T> {
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export const isAccessDenied = (error: unknown) =>
+  error instanceof ApiError && [401, 403, 404].includes(error.status);
+
+export async function responseData<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => {
-    throw new Error('Invalid API response');
+    throw new ApiError(response.status, 'Invalid API response');
   });
   if (!response.ok)
-    throw new Error(data.message || data.error || 'Request failed');
+    throw new ApiError(
+      response.status,
+      data.message || data.error || 'Request failed',
+    );
   return data as T;
 }
 
@@ -20,6 +35,7 @@ export async function get<T>(
   endpoint: string,
   params: Record<string, unknown>,
   revalidate?: number,
+  signal?: AbortSignal,
 ): Promise<T> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params))
@@ -27,17 +43,23 @@ export async function get<T>(
   return responseData<T>(
     await fetch(`${getBaseUrl()}/api${endpoint}?${query}`, {
       next: { revalidate },
+      signal,
     }),
   );
 }
 
-export async function post<T>(endpoint: string, body: unknown): Promise<T> {
+export async function post<T>(
+  endpoint: string,
+  body: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   return responseData<T>(
     await fetch(`${getBaseUrl()}/api${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
+      signal,
     }),
   );
 }

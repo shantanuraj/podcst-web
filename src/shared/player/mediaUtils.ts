@@ -7,7 +7,7 @@ import type { IEpisodeInfo } from '@/types';
 import type { IPlayerState } from './usePlayer';
 
 export const updatePlaybackMetadata = (
-  episode: IEpisodeInfo,
+  episode: IEpisodeInfo | undefined,
   podcastTitle?: string,
 ) => {
   if (
@@ -18,6 +18,14 @@ export const updatePlaybackMetadata = (
     return;
   }
   const { mediaSession } = window.navigator;
+  if (!episode) {
+    mediaSession.metadata = null;
+    mediaSession.playbackState = 'none';
+    try {
+      mediaSession.setPositionState?.();
+    } catch {}
+    return;
+  }
 
   const { title, author, episodeArt, cover } = episode;
 
@@ -38,7 +46,7 @@ export const updatePlaybackMetadata = (
   });
 };
 
-export const updatePlaybackHandlers = (playerState: IPlayerState) => {
+export const updatePlaybackHandlers = (playerState?: IPlayerState) => {
   if (
     typeof window === 'undefined' ||
     typeof window.navigator === 'undefined' ||
@@ -49,18 +57,20 @@ export const updatePlaybackHandlers = (playerState: IPlayerState) => {
   const { mediaSession } = window.navigator;
 
   const actionsAndHandlers = [
-    ['play', playerState.resumeEpisode],
-    ['pause', () => playerState.setPlayerState('paused')],
-    ['stop', () => playerState.setPlayerState('idle')],
-    ['seekbackward', playerState.seekBackward],
-    ['seekforward', playerState.seekForward],
+    ['play', playerState?.resumeEpisode ?? null],
+    ['pause', playerState ? () => playerState.setPlayerState('paused') : null],
+    ['stop', playerState ? () => playerState.setPlayerState('idle') : null],
+    ['seekbackward', playerState?.seekBackward ?? null],
+    ['seekforward', playerState?.seekForward ?? null],
     [
       'seekto',
-      (details: MediaSessionActionDetails) =>
-        playerState.seekTo(details.seekTime || 0),
+      playerState
+        ? (details: MediaSessionActionDetails) =>
+            playerState.seekTo(details.seekTime || 0)
+        : null,
     ],
-    ['previoustrack', playerState.skipToPreviousEpisode],
-    ['nexttrack', playerState.skipToNextEpisode],
+    ['previoustrack', playerState?.skipToPreviousEpisode ?? null],
+    ['nexttrack', playerState?.skipToNextEpisode ?? null],
   ] as const;
 
   actionsAndHandlers.forEach(([action, handler]) => {

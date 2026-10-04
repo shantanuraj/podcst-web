@@ -3,29 +3,16 @@ import {
   startAuthentication,
   startRegistration,
 } from '@simplewebauthn/browser';
-import {
-  type QueryClient,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { useAccountSession } from './AccountBoundary';
 
-type User = {
-  id: string;
-  email: string;
-  name: string | null;
-  image: string | null;
-  hasPasskey: boolean;
-};
-
-type SessionResponse = {
-  user: User | null;
-};
-
-async function accountChanged(queryClient: QueryClient) {
-  await queryClient.cancelQueries();
-  queryClient.clear();
-  if (typeof window !== 'undefined') window.location.replace('/');
+function useAccountChange() {
+  const session = useAccountSession();
+  return {
+    onMutate: () => session.beginAuthChange(),
+    onSuccess: () => session.finishAuthChange(true),
+    onError: () => session.finishAuthChange(false),
+  };
 }
 
 const getVisitorId = () => {
@@ -38,18 +25,14 @@ const getVisitorId = () => {
   return id;
 };
 
-async function fetchSession(): Promise<User | null> {
-  const res = await fetch('/api/auth/session');
-  const data: SessionResponse = await res.json();
-  return data.user;
-}
-
 export function useSession() {
-  return useQuery({
-    queryKey: ['session'],
-    queryFn: fetchSession,
-    staleTime: 5 * 60 * 1000,
-  });
+  const session = useAccountSession();
+  const state = session.getSnapshot();
+  return {
+    data: state.ready ? state.user : undefined,
+    isLoading: !state.ready,
+    isPending: !state.ready,
+  };
 }
 
 export function useSendCode() {
@@ -60,10 +43,8 @@ export function useSendCode() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-
       return data;
     },
   });
@@ -77,66 +58,54 @@ export function useVerifyCode() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
       });
-
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-
       return data;
     },
   });
 }
 
 export function useEmailLogin() {
-  const queryClient = useQueryClient();
-
+  const boundary = useAccountChange();
   return useMutation({
+    ...boundary,
     mutationFn: async ({ email, code }: { email: string; code: string }) => {
       const res = await fetch('/api/auth/email-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
       });
-
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
+      if (!res.ok || data.error)
+        throw new Error(data.error || 'Sign in failed');
       return data;
     },
-    onSuccess: () => accountChanged(queryClient),
   });
 }
 
 export function useRegister() {
-  const queryClient = useQueryClient();
-
+  const boundary = useAccountChange();
   return useMutation({
+    ...boundary,
     mutationFn: async (email: string) => {
       const visitorId = getVisitorId();
-
       const optionsRes = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, visitorId }),
       });
-
       const { options, error } = await optionsRes.json();
       if (error) throw new Error(error);
-
       const credential = await startRegistration({ optionsJSON: options });
-
       const verifyRes = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: credential, visitorId }),
       });
-
       const result = await verifyRes.json();
-      if (result.error) throw new Error(result.error);
-
+      if (!verifyRes.ok || result.error)
+        throw new Error(result.error || 'Registration failed');
       return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session'] });
     },
   });
 }
@@ -155,25 +124,22 @@ export function useLoginCheck() {
   return useMutation({
     mutationFn: async (email: string): Promise<LoginCheckResult> => {
       const visitorId = getVisitorId();
-
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, visitorId }),
       });
-
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-
       return data;
     },
   });
 }
 
 export function usePasskeyLogin() {
-  const queryClient = useQueryClient();
-
+  const boundary = useAccountChange();
   return useMutation({
+    ...boundary,
     mutationFn: async ({
       options,
       userId,
@@ -182,98 +148,81 @@ export function usePasskeyLogin() {
       userId: string;
     }) => {
       const visitorId = getVisitorId();
-
       const credential = await startAuthentication({ optionsJSON: options });
-
       const verifyRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: credential, userId, visitorId }),
       });
-
       const result = await verifyRes.json();
-      if (result.error) throw new Error(result.error);
-
+      if (!verifyRes.ok || result.error)
+        throw new Error(result.error || 'Sign in failed');
       return result;
     },
-    onSuccess: () => accountChanged(queryClient),
   });
 }
 
 export function useLogin() {
-  const queryClient = useQueryClient();
-
+  const boundary = useAccountChange();
   return useMutation({
+    ...boundary,
     mutationFn: async (email: string) => {
       const visitorId = getVisitorId();
-
       const optionsRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, visitorId }),
       });
-
       const { options, userId, error } = await optionsRes.json();
       if (error) throw new Error(error);
-
       const credential = await startAuthentication({ optionsJSON: options });
-
       const verifyRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: credential, userId, visitorId }),
       });
-
       const result = await verifyRes.json();
-      if (result.error) throw new Error(result.error);
-
+      if (!verifyRes.ok || result.error)
+        throw new Error(result.error || 'Sign in failed');
       return result;
     },
-    onSuccess: () => accountChanged(queryClient),
   });
 }
 
 export function useLogout() {
-  const queryClient = useQueryClient();
-
+  const boundary = useAccountChange();
   return useMutation({
+    ...boundary,
     mutationFn: async () => {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
       if (!response.ok) throw new Error('Unable to sign out');
     },
-    onSuccess: () => accountChanged(queryClient),
   });
 }
 
 export function useDiscoverableLogin() {
-  const queryClient = useQueryClient();
-
+  const boundary = useAccountChange();
   return useMutation({
+    ...boundary,
     mutationFn: async () => {
       const visitorId = getVisitorId();
-
       const optionsRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visitorId, discoverable: true }),
       });
-
       const { options, error } = await optionsRes.json();
       if (error) throw new Error(error);
-
       const credential = await startAuthentication({ optionsJSON: options });
-
       const verifyRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: credential, visitorId }),
       });
-
       const result = await verifyRes.json();
-      if (result.error) throw new Error(result.error);
-
+      if (!verifyRes.ok || result.error)
+        throw new Error(result.error || 'Sign in failed');
       return result;
     },
-    onSuccess: () => accountChanged(queryClient),
   });
 }

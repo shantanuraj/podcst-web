@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { getSecondsFromTimestamp } from '@/shared/player/formatTime';
+import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
 import { getSeekOrStartAt, usePlayer } from '@/shared/player/usePlayer';
 import type { IEpisodeInfo } from '@/types';
 
@@ -11,6 +12,7 @@ interface ShowNotesHandlerProps {
 }
 
 export const ShowNotesHandler = ({ id, episode }: ShowNotesHandlerProps) => {
+  const withAccount = useAccountPlayback();
   const seekTo = usePlayer(getSeekOrStartAt);
   const handleTimestampClick = React.useCallback(
     (e: MouseEvent) => {
@@ -18,10 +20,12 @@ export const ShowNotesHandler = ({ id, episode }: ShowNotesHandlerProps) => {
       if (isTimeStampButton(e.target)) {
         const timestamp = e.target.dataset.timestamp;
         if (!timestamp) return;
-        seekTo(episode, getSecondsFromTimestamp(timestamp));
+        withAccount(episode, () =>
+          seekTo(episode, getSecondsFromTimestamp(timestamp)),
+        );
       }
     },
-    [episode, seekTo],
+    [episode, seekTo, withAccount],
   );
 
   React.useEffect(() => {

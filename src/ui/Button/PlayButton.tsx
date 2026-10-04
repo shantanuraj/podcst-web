@@ -2,6 +2,7 @@
 
 import { forwardRef, memo, useCallback } from 'react';
 import { useTranslation } from '@/shared/i18n';
+import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
 import {
   getCurrentEpisode,
   getPlaybackState,
@@ -24,6 +25,7 @@ export const PlayButton = memo(
     { episode, icon, ...props },
     ref,
   ) {
+    const withAccount = useAccountPlayback();
     const state = usePlayer(getPlaybackState);
     const isCurrentEpisode = usePlayer(
       useCallback(selectIsCurrentEpisode(episode), []),
@@ -42,14 +44,21 @@ export const PlayButton = memo(
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
         e.preventDefault();
-        if (!isCurrentEpisode) return play(episode);
-        if (isPlaying) {
-          return setPlayerState('paused');
-        } else {
-          return resume();
-        }
+        withAccount(episode, () => {
+          if (!isCurrentEpisode) return play(episode);
+          if (isPlaying) setPlayerState('paused');
+          else resume();
+        });
       },
-      [episode, isPlaying, play, resume, setPlayerState, isCurrentEpisode],
+      [
+        episode,
+        isPlaying,
+        play,
+        resume,
+        setPlayerState,
+        isCurrentEpisode,
+        withAccount,
+      ],
     );
 
     return (
