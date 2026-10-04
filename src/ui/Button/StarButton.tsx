@@ -7,7 +7,13 @@ import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './StarButton.module.css';
 
-export function StarButton({ episode }: { episode: IEpisodeInfo }) {
+export function StarButton({
+  episode,
+  className = '',
+}: {
+  episode: IEpisodeInfo;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const { contains, initialized, toggle } = useStars();
   const starred = contains(episode);
@@ -16,7 +22,7 @@ export function StarButton({ episode }: { episode: IEpisodeInfo }) {
   return (
     <button
       type="button"
-      className={styles.button}
+      className={`${styles.button} ${className}`}
       data-starred={starred}
       disabled={!initialized}
       aria-label={`${label} ${episode.title}`}

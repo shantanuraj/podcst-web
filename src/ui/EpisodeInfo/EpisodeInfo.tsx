@@ -68,7 +68,7 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
           {releaseDate && <p className={styles.published}>{releaseDate}</p>}
           <div className={styles.actions}>
             <PlayButton episode={episode} />
-            <StarButton episode={episode} />
+            <StarButton episode={episode} className={styles.star} />
             {!episode.isPrivate && (
               <ShareButton
                 text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
