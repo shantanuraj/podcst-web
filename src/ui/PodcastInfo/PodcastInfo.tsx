@@ -4,6 +4,7 @@ import { translations } from '@/shared/i18n/server';
 import { linkifyText } from '@/shared/link/linkify-text';
 import { stripHost } from '@/shared/link/strip-host';
 import type { IPodcastEpisodesInfo } from '@/types';
+import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { ProxiedImage } from '@/ui/Image';
@@ -30,6 +31,7 @@ export async function PodcastInfo({ info }: PodcastInfoProps) {
 
   return (
     <header className={styles.header}>
+      <ArtworkBackdrop src={cover} privateSource={info.isPrivate} />
       <div className={styles.top}>
         <div className={styles.artwork}>
           <ProxiedImage

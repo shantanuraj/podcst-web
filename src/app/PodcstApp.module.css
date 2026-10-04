@@ -1,5 +1,6 @@
 .main {
   position: relative;
+  isolation: isolate;
   min-height: 100vh;
   padding-bottom: 120px;
 }

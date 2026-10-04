@@ -2,6 +2,7 @@ import { localeForLanguage } from '@/messages';
 import { translations } from '@/shared/i18n/server';
 import { getPodcastHref } from '@/shared/links';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
 import { StarButton } from '@/ui/Button/StarButton';
@@ -35,6 +36,7 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
 
   return (
     <article className={styles.header}>
+      <ArtworkBackdrop src={showArt} privateSource={episode.isPrivate} />
       <div className={styles.top}>
         <div className={styles.artwork}>
           <ProxiedImage

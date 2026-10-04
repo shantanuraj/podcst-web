@@ -1,0 +1,29 @@
+.backdrop {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 40rem;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    light-dark(
+        oklch(from var(--tint-light) max(l, 0.88) c h),
+        oklch(from var(--tint-dark) min(l, 0.35) c h)
+      )
+      0%,
+    var(--color-paper) 56%
+  );
+  animation: reveal 0.4s ease-in-out;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation: none;
+  }
+}
