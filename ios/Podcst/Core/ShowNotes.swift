@@ -66,6 +66,10 @@ enum ShowNotesParser {
         return chapters
     }
 
+    static func timestamps(_ text: String) -> [String] {
+        timestampRegex.matches(in: text, range: NSRange(text.startIndex..., in: text)).map { (text as NSString).substring(with: $0.range) }
+    }
+
     static func timestampURL(_ timestamp: String) -> URL? {
         var components = URLComponents()
         components.scheme = "podcst"
