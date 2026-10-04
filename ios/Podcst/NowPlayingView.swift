@@ -106,8 +106,11 @@ private struct FullPlayer: View {
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                EpisodeMenu(episode: episode) { open(.notes) }
-                    .padding(.top, playback.currentChapterIndex == nil ? 2 : 14)
+                HStack(spacing: 8) {
+                    StarButton(episode: episode)
+                    EpisodeMenu(episode: episode) { open(.notes) }
+                }
+                .padding(.top, playback.currentChapterIndex == nil ? 2 : 14)
             }
             .padding(.top, 26)
             SeekBar()
@@ -350,6 +353,27 @@ private struct UpNextPanel: View {
             }
             .padding(.horizontal, 20)
         }
+    }
+}
+
+private struct StarButton: View {
+    @Environment(StarStore.self) private var stars
+    let episode: Episode
+
+    var body: some View {
+        let starred = stars.contains(episode)
+        Button {
+            stars.toggle(episode)
+        } label: {
+            Image(systemName: starred ? "star.fill" : "star")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(starred ? PodcstPalette.accent : PodcstPalette.ink)
+                .frame(width: 40, height: 40)
+                .background(starred ? PodcstPalette.accentSoft : PodcstPalette.ink.opacity(0.1), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: starred)
+        .accessibilityLabel(starred ? "Unstar" : "Star")
     }
 }
 
