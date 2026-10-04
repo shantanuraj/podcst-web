@@ -1,5 +1,14 @@
 import { describe, expect, test } from 'bun:test';
+import vectors from '../../../contracts/playback/shownotes.json';
 import { linkifyText } from './linkify-text';
+
+for (const vector of vectors.timestamps)
+  test(`contract timestamp links: ${vector.text}`, () => {
+    const html = linkifyText(vector.text);
+    expect(
+      [...html.matchAll(/data-timestamp="([^"]+)"/g)].map((match) => match[1]),
+    ).toEqual(vector.expected);
+  });
 
 describe('untrusted podcast HTML', () => {
   test('strips executable elements, event handlers and unsafe links', () => {

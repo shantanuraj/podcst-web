@@ -32,7 +32,8 @@ export const Chromecast = () => {
     ) => {
       switch (event.field) {
         case 'currentTime':
-          if (event.value) setSeekPosition(event.value);
+          if (typeof event.value === 'number' && Number.isFinite(event.value))
+            setSeekPosition(event.value);
           return;
         case 'mediaInfo': {
           const mediaInfo = event.value as chrome.cast.media.MediaInfo;

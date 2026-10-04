@@ -20,9 +20,9 @@ export const ShowNotesHandler = ({ id, episode }: ShowNotesHandlerProps) => {
       if (isTimeStampButton(e.target)) {
         const timestamp = e.target.dataset.timestamp;
         if (!timestamp) return;
-        withAccount(episode, () =>
-          seekTo(episode, getSecondsFromTimestamp(timestamp)),
-        );
+        const seconds = getSecondsFromTimestamp(timestamp);
+        if (seconds === null) return;
+        withAccount(episode, () => seekTo(episode, seconds));
       }
     },
     [episode, seekTo, withAccount],

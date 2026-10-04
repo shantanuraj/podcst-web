@@ -31,7 +31,7 @@ export function validTimeline(chapters: Chapter[]) {
 }
 
 export function timestampSeconds(timestamp: string): number | null {
-  if (!/^\d{1,2}:\d{1,2}(?::\d{2})?$/.test(timestamp)) return null;
+  if (!/^(?:\d{1,2}:)?\d{1,2}:\d{2}$/.test(timestamp)) return null;
   const parts = timestamp.split(':').map(Number);
   if (parts.slice(1).some((part) => part >= 60)) return null;
   return parts.reduce((seconds, part) => seconds * 60 + part, 0);

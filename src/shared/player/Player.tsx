@@ -80,7 +80,10 @@ export const Player = () => {
               onMouseUp={resetRate}
             >
               <p className={styles.episodeTitle}>{currentEpisode.title}</p>
-              <p className={styles.podcastName}>{currentEpisode.author}</p>
+              <div className={styles.chapterAccess}>
+                <p className={styles.podcastName}>{currentEpisode.author}</p>
+                <ChapterMenu episode={currentEpisode} />
+              </div>
             </div>
             <Duration />
             <div className={styles.controls}>
@@ -97,7 +100,6 @@ export const Player = () => {
             </div>
             <StarButton episode={currentEpisode} />
             <PlaybackRate />
-            <ChapterMenu episode={currentEpisode} />
             <div className={styles.desktopOnly}>
               <VolumeControls />
               <Link href="/queue" aria-label={t('player.queue')}>
