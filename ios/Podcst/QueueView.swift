@@ -29,12 +29,16 @@ struct QueueView: View {
                     }
                     if !playback.upNext.isEmpty {
                         Section {
-                            ForEach(playback.upNext, id: \.identity) { episode in
+                            ForEach(Array(playback.upNext.enumerated()), id: \.element.identity) { offset, episode in
                                 QueueRow(episode: episode)
                                     .listRowBackground(PodcstPalette.paper)
                                     .listRowSeparatorTint(PodcstPalette.rule)
+                                    .swipeActions {
+                                        Button("Remove", systemImage: "trash", role: .destructive) {
+                                            playback.removeUpNext(atOffsets: IndexSet(integer: offset))
+                                        }
+                                    }
                             }
-                            .onDelete { playback.removeUpNext(atOffsets: $0) }
                             .onMove { playback.moveUpNext(fromOffsets: $0, toOffset: $1) }
                         } header: {
                             Text("Up next").eyebrow()
