@@ -87,6 +87,18 @@ export const messages: Messages = {
     downloadOPML: 'Ladda ner OPML',
   },
 
+  chapters: {
+    title: 'Kapitel',
+    loading: 'Läser in inbäddade kapitel…',
+    fallback: 'Kapitel från avsnittsanteckningarna',
+    unavailable: 'Inga kapitel tillgängliga',
+    previous: 'Föregående kapitel',
+    next: 'Nästa kapitel',
+    untitled: 'Kapitel {number}',
+    seek: 'Spela {title} vid {timestamp}',
+    position: 'Uppspelningsposition',
+  },
+
   player: {
     nowPlaying: 'Spelas nu',
     play: 'Spela',
@@ -135,6 +147,11 @@ export const messages: Messages = {
     emptyDescription: 'Prenumerera på poddar för att se dem här',
     recents: 'Senast spelade',
     subscriptions: 'Prenumerationer',
+    starred: 'Stjärnmärkta',
+    star: 'Stjärnmärk',
+    unstar: 'Ta bort stjärna',
+    starredEmpty: 'Inga stjärnmärkta avsnitt ännu',
+    starredEmptyDescription: 'Stjärnmärk avsnitt för att hitta dem här.',
   },
 
   feed: {

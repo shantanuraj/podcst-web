@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { ImportButton } from '@/components/ImportButton/ImportButton';
 import { ItemListSchema } from '@/components/Schema';
 import { useTranslation } from '@/shared/i18n';
+import { useStars } from '@/shared/stars/useStars';
 import {
   getInit,
   type SubscriptionsState,
@@ -20,7 +21,7 @@ import { PodcastsGrid } from '@/ui/PodcastsGrid';
 
 import styles from './Subscriptions.module.css';
 
-type Tab = 'subscriptions' | 'new';
+type Tab = 'subscriptions' | 'new' | 'starred';
 
 const LibraryPage: NextPage = () => {
   const { t } = useTranslation();
@@ -30,6 +31,7 @@ const LibraryPage: NextPage = () => {
   const isSyncing = useSubscriptions(getIsSyncing);
   const syncAllSubscriptions = useSubscriptions(getSyncSubscriptions);
   const podcasts = useSubscriptions(useShallow(getPodcastsList));
+  const starred = useStars();
   const episodes = useSubscriptions(useShallow(getRecents));
   const addSubscriptions = useSubscriptions(getAddSubscriptions);
 
@@ -38,7 +40,7 @@ const LibraryPage: NextPage = () => {
     init().then(syncAllSubscriptions);
   }, [init, syncAllSubscriptions]);
 
-  if (!podcasts.length) {
+  if (!podcasts.length && starred.initialized && !starred.episodes.length) {
     return (
       <div className={styles.empty} suppressHydrationWarning>
         <div className={styles.emptyIcon}>
@@ -91,6 +93,15 @@ const LibraryPage: NextPage = () => {
           >
             {t('feed.newReleases')}
           </button>
+          <button
+            type="button"
+            className={styles.tab}
+            data-active={activeTab === 'starred'}
+            onClick={() => setActiveTab('starred')}
+          >
+            {t('library.starred')}
+            {starred.initialized && ` (${starred.episodes.length})`}
+          </button>
         </nav>
       </header>
       {activeTab === 'subscriptions' && (
@@ -100,6 +111,17 @@ const LibraryPage: NextPage = () => {
         </>
       )}
       {activeTab === 'new' && <EpisodesList episodes={episodes} />}
+      {activeTab === 'starred' &&
+        (starred.episodes.length ? (
+          <EpisodesList episodes={starred.episodes} />
+        ) : (
+          <div className={styles.empty}>
+            <h1 className={styles.emptyTitle}>{t('library.starredEmpty')}</h1>
+            <p className={styles.emptyText}>
+              {t('library.starredEmptyDescription')}
+            </p>
+          </div>
+        ))}
     </>
   );
 };

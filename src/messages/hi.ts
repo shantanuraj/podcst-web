@@ -87,6 +87,18 @@ export const messages: Messages = {
     downloadOPML: 'OPML डाउनलोड करें',
   },
 
+  chapters: {
+    title: 'अध्याय',
+    loading: 'एम्बेड किए गए अध्याय लोड हो रहे हैं…',
+    fallback: 'एपिसोड के नोट्स से अध्याय',
+    unavailable: 'कोई अध्याय उपलब्ध नहीं है',
+    previous: 'पिछला अध्याय',
+    next: 'अगला अध्याय',
+    untitled: 'अध्याय {number}',
+    seek: '{timestamp} पर {title} चलाएँ',
+    position: 'प्लेबैक की स्थिति',
+  },
+
   player: {
     nowPlaying: 'अभी चल रहा है',
     play: 'चलाएं',
@@ -135,6 +147,11 @@ export const messages: Messages = {
     emptyDescription: 'उन्हें यहां देखने के लिए पॉडकास्ट सब्सक्राइब करें',
     recents: 'हाल ही में चलाए गए',
     subscriptions: 'सदस्यताएँ',
+    starred: 'पसंदीदा',
+    star: 'पसंदीदा में जोड़ें',
+    unstar: 'पसंदीदा से हटाएँ',
+    starredEmpty: 'अभी कोई पसंदीदा एपिसोड नहीं है',
+    starredEmptyDescription: 'उन्हें यहाँ देखने के लिए एपिसोड को पसंदीदा में जोड़ें।',
   },
 
   feed: {

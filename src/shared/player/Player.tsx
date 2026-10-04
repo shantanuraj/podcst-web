@@ -7,10 +7,12 @@ import {
   type KeyboardShortcuts,
   useKeydown,
 } from '@/shared/keyboard/useKeydown';
+import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { getEpisodeHref } from '../links';
 import { Airplay } from './Airplay';
+import { ChapterMenu } from './ChapterMenu';
 import { Chromecast } from './Chromecast';
 import { Duration } from './Duration';
 import { PlaybackRate } from './PlaybackRate';
@@ -93,7 +95,9 @@ export const Player = () => {
                 <Icon icon="seek-forward" size={20} />
               </button>
             </div>
+            <StarButton episode={currentEpisode} />
             <PlaybackRate />
+            <ChapterMenu episode={currentEpisode} />
             <div className={styles.desktopOnly}>
               <VolumeControls />
               <Link href="/queue" aria-label={t('player.queue')}>

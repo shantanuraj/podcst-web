@@ -88,6 +88,18 @@ export const messages: Messages = {
     downloadOPML: 'Télécharger OPML',
   },
 
+  chapters: {
+    title: 'Chapitres',
+    loading: 'Chargement des chapitres intégrés…',
+    fallback: 'Chapitres tirés des notes de l’épisode',
+    unavailable: 'Aucun chapitre disponible',
+    previous: 'Chapitre précédent',
+    next: 'Chapitre suivant',
+    untitled: 'Chapitre {number}',
+    seek: 'Lire {title} à {timestamp}',
+    position: 'Position de lecture',
+  },
+
   player: {
     nowPlaying: 'Lecture en cours',
     play: 'Lire',
@@ -136,6 +148,12 @@ export const messages: Messages = {
     emptyDescription: 'Abonnez-vous à des podcasts pour les voir ici',
     recents: 'Écoutés récemment',
     subscriptions: 'Abonnements',
+    starred: 'Favoris',
+    star: 'Ajouter aux favoris',
+    unstar: 'Retirer des favoris',
+    starredEmpty: 'Aucun épisode favori',
+    starredEmptyDescription:
+      'Ajoutez des épisodes aux favoris pour les retrouver ici.',
   },
 
   feed: {

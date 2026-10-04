@@ -4,11 +4,13 @@ import { getPodcastHref } from '@/shared/links';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { ShareButton } from '@/ui/Button/ShareButton';
+import { StarButton } from '@/ui/Button/StarButton';
 import { ExternalLink } from '@/ui/ExternalLink';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { PageLink } from '@/ui/PageLink/PageLink';
 
+import { Chapters } from './Chapters';
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';
 
@@ -66,6 +68,7 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
           {releaseDate && <p className={styles.published}>{releaseDate}</p>}
           <div className={styles.actions}>
             <PlayButton episode={episode} />
+            <StarButton episode={episode} />
             {!episode.isPrivate && (
               <ShareButton
                 text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
@@ -75,6 +78,7 @@ export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
           </div>
         </div>
       </div>
+      <Chapters episode={episode} />
       <ShowNotes className={styles.showNotes} episode={episode} />
     </article>
   );

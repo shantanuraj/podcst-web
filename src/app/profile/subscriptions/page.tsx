@@ -21,20 +21,18 @@ export default async function ProfileSubscriptionsPage() {
   const { t } = await translations();
   const podcasts = await getSubscriptions(session.userId);
 
-  if (!podcasts.length) {
-    return (
-      <AccountContent scope={session.userId} resource="library" privateContent>
-        <EmptyState />
-      </AccountContent>
-    );
-  }
-
   const episodes = getRecents(podcasts);
 
   return (
     <AccountContent scope={session.userId} resource="library" privateContent>
-      <ItemListSchema items={podcasts} title={t('profile.subscriptions')} />
-      <SubscriptionsTabs podcasts={podcasts} episodes={episodes} />
+      {podcasts.length > 0 && (
+        <ItemListSchema items={podcasts} title={t('profile.subscriptions')} />
+      )}
+      <SubscriptionsTabs
+        podcasts={podcasts}
+        episodes={episodes}
+        emptyState={<EmptyState />}
+      />
     </AccountContent>
   );
 }

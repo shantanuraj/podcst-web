@@ -1,0 +1,16 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-ink-secondary);
+}
+
+.button[data-starred="true"] {
+  color: var(--color-accent);
+}
+
+.button:hover {
+  color: var(--color-accent);
+}

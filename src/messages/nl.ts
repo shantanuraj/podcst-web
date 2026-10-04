@@ -87,6 +87,18 @@ export const messages: Messages = {
     downloadOPML: 'Download OPML',
   },
 
+  chapters: {
+    title: 'Hoofdstukken',
+    loading: 'Ingebedde hoofdstukken laden…',
+    fallback: 'Hoofdstukken uit de shownotities',
+    unavailable: 'Geen hoofdstukken beschikbaar',
+    previous: 'Vorig hoofdstuk',
+    next: 'Volgend hoofdstuk',
+    untitled: 'Hoofdstuk {number}',
+    seek: '{title} afspelen op {timestamp}',
+    position: 'Afspeelpositie',
+  },
+
   player: {
     nowPlaying: 'Nu spelend',
     play: 'Afspelen',
@@ -135,6 +147,12 @@ export const messages: Messages = {
     emptyDescription: 'Abonneer je op podcasts om ze hier te zien',
     recents: 'Onlangs gespeeld',
     subscriptions: 'Abonnementen',
+    starred: 'Favorieten',
+    star: 'Aan favorieten toevoegen',
+    unstar: 'Uit favorieten verwijderen',
+    starredEmpty: 'Nog geen favoriete afleveringen',
+    starredEmptyDescription:
+      'Voeg afleveringen toe aan je favorieten om ze hier te vinden.',
   },
 
   feed: {

@@ -86,6 +86,18 @@ export const messages: Messages = {
     downloadOPML: 'OPML 다운로드',
   },
 
+  chapters: {
+    title: '챕터',
+    loading: '내장 챕터 불러오는 중…',
+    fallback: '에피소드 노트의 챕터',
+    unavailable: '사용 가능한 챕터가 없습니다',
+    previous: '이전 챕터',
+    next: '다음 챕터',
+    untitled: '챕터 {number}',
+    seek: '{timestamp}에서 {title} 재생',
+    position: '재생 위치',
+  },
+
   player: {
     nowPlaying: '현재 재생 중',
     play: '재생',
@@ -133,6 +145,11 @@ export const messages: Messages = {
     emptyDescription: '팟캐스트를 구독하면 여기에 표시됩니다',
     recents: '최근 재생',
     subscriptions: '구독 목록',
+    starred: '별표 표시',
+    star: '별표 표시',
+    unstar: '별표 삭제',
+    starredEmpty: '별표 표시한 에피소드가 없습니다',
+    starredEmptyDescription: '에피소드에 별표를 표시하면 여기에 표시됩니다.',
   },
 
   feed: {

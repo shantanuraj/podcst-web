@@ -7,6 +7,7 @@ import { getEpisodeHref } from '@/shared/links';
 import type { IEpisodeInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
+import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { PageLink } from '@/ui/PageLink/PageLink';
 
@@ -55,6 +56,7 @@ function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {
         </div>
       </PageLink>
       <div className={styles.actions}>
+        <StarButton episode={episode} />
         <PlayButton icon episode={episode} />
         <QueueButton episode={episode} />
       </div>
