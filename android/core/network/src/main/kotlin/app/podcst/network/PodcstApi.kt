@@ -246,7 +246,7 @@ class PodcstApi(
     }
 }
 
-internal suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
+suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object : Callback {
         override fun onResponse(call: Call, response: Response) = continuation.resume(response) { _, value, _ -> value.close() }

@@ -1,0 +1,9 @@
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.**
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class app.podcst.**$$serializer { *; }
+-keepclassmembers class app.podcst.** { *** Companion; }
+-keepclasseswithmembers class app.podcst.** { kotlinx.serialization.KSerializer serializer(...); }
+-keepclasseswithmembernames class * { native <methods>; }
+-keep class app.podcst.audio.NativeAudio { *; }

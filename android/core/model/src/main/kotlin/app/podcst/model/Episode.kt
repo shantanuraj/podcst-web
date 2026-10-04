@@ -35,6 +35,7 @@ data class Episode(
     val artwork: String get() = episodeArt?.takeIf { it.isNotBlank() } ?: cover
     val notes: String get() = showNotes.ifEmpty { summary.orEmpty() }
     val shareUrl: String? get() = if (isPrivate) null else shareableWebpage(link, excluding = listOf(feed, file.url))
+    val podcast: Podcast get() = Podcast(id = podcastId, feed = feed, title = podcastTitle.orEmpty(), cover = cover, isPrivate = isPrivate)
 }
 
 @Serializable

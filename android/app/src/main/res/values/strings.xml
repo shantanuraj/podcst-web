@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Podcst</string>
+    <string name="discover">Discover</string>
+    <string name="library">Library</string>
+    <string name="queue">Queue</string>
+    <string name="playing_next">Playing next</string>
+    <string name="added_to_queue">Added to queue</string>
+    <string name="starred">Starred</string>
+    <string name="unstarred">Removed from Starred</string>
+    <string name="add_to_list">Add to list…</string>
+    <string name="undo">Undo</string>
+    <string name="downloading_episode">Downloading</string>
+    <string name="download_removed">Download removed</string>
+    <string name="playback_stopped">Playback stopped</string>
+    <string name="saved_at">Saved at %1$s · %2$d left in queue</string>
+    <string name="imported">Imported %1$d podcasts</string>
+    <string name="import_failed">%1$d could not be added</string>
+</resources>

@@ -69,6 +69,7 @@ class Downloads(
         val cursor = manager.downloadIndex.getDownloads()
         val next = buildMap {
             cursor.use { while (it.moveToNext()) entry(it.download)?.let { entry -> put(it.download.request.id, entry) } }
+            manager.currentDownloads.forEach { download -> entry(download)?.let { put(download.request.id, it) } }
         }
         entries.value = next
         val active = next.values.any { it.state is DownloadState.Downloading || it.state is DownloadState.Queued }

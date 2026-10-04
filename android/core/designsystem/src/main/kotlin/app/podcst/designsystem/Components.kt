@@ -137,6 +137,7 @@ fun PodcstButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     progress: Float? = null,
+    iconTint: Color? = null,
 ) {
     val colors = Podcst.colors
     val (background, content, border) = when (kind) {
@@ -161,7 +162,7 @@ fun PodcstButton(
             if (loading) {
                 CircularProgressIndicator(Modifier.size(16.dp), color = content, strokeWidth = 2.dp)
             } else if (icon != null) {
-                Icon(icon, null, Modifier.size(18.dp), tint = content)
+                Icon(icon, null, Modifier.size(18.dp), tint = iconTint ?: content)
             }
             Text(text, style = Podcst.type.button, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

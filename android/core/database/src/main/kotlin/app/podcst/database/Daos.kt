@@ -50,6 +50,9 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE identity IN (:identities)")
     suspend fun get(identities: List<String>): List<EpisodeEntity>
 
+    @Query("SELECT * FROM episodes WHERE identity IN (:identities)")
+    fun observe(identities: List<String>): Flow<List<EpisodeEntity>>
+
     @Upsert
     suspend fun upsert(episodes: List<EpisodeEntity>)
 

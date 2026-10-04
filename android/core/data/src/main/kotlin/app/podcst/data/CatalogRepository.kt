@@ -45,6 +45,10 @@ class CatalogRepository(
         scope.database.episodes().observe(identity).map { it?.domain() }
     }
 
+    fun episodes(identities: List<String>): Flow<List<Episode>> = scopes.current.flatMapLatest { scope ->
+        scope.database.episodes().observe(identities).map { rows -> rows.map { it.domain() } }
+    }
+
     suspend fun load(podcast: Podcast, force: Boolean = false): Podcast {
         podcast.id?.let { id -> return load(id, force) }
         podcast.itunesId?.let { itunesId ->

@@ -10,6 +10,7 @@ sealed interface DownloadState {
 
     val active: Boolean get() = this is Queued || this is Downloading
     val stored: Boolean get() = this is Available
+    val removable: Boolean get() = this != None && this !is Failed
     val fraction: Float?
         get() = when (this) {
             is Downloading -> total?.takeIf { it > 0 }?.let { received.toFloat() / it }

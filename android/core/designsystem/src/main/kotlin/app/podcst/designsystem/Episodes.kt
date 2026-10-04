@@ -61,6 +61,8 @@ data class EpisodeRowState(
     val fresh: Boolean = false,
 )
 
+data class SwipeAction(val label: String, val run: () -> Unit)
+
 interface EpisodeActions {
     fun open(episode: Episode)
     fun play(episode: Episode)
@@ -116,9 +118,10 @@ fun ArtworkEpisodeRow(
     actions: EpisodeActions,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    remove: SwipeAction? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    EpisodeGestures(state, actions, modifier) {
+    EpisodeGestures(state, actions, modifier, remove) {
         Row(
             Modifier.heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -178,6 +181,7 @@ private fun EpisodeGestures(
     state: EpisodeRowState,
     actions: EpisodeActions,
     modifier: Modifier,
+    remove: SwipeAction? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = Podcst.colors
@@ -185,19 +189,27 @@ private fun EpisodeGestures(
     val swipe = rememberSwipeToDismissBoxState()
     val starLabel = stringResource(if (state.starred) R.string.unstar else R.string.star)
     LaunchedEffect(swipe.currentValue) {
-        if (swipe.currentValue == SwipeToDismissBoxValue.StartToEnd) {
-            actions.star(state.episode, !state.starred)
-            swipe.reset()
+        when (swipe.currentValue) {
+            SwipeToDismissBoxValue.StartToEnd -> actions.star(state.episode, !state.starred)
+            SwipeToDismissBoxValue.EndToStart -> remove?.run?.invoke()
+            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
         }
+        swipe.reset()
     }
     SwipeToDismissBox(
         state = swipe,
-        enableDismissFromEndToStart = false,
+        enableDismissFromEndToStart = remove != null,
         backgroundContent = {
-            Box(Modifier.fillMaxSize().background(colors.accent).padding(start = 24.dp), contentAlignment = Alignment.CenterStart) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(if (state.starred) PodcstIcons.Star else PodcstIcons.StarFilled, null, Modifier.size(20.dp), tint = colors.onAccent)
-                    Text(starLabel, style = Podcst.type.meta, color = colors.onAccent)
+            if (swipe.dismissDirection == SwipeToDismissBoxValue.EndToStart && remove != null) {
+                Box(Modifier.fillMaxSize().background(PodcstColors.Light.accent).padding(end = 18.dp), contentAlignment = Alignment.CenterEnd) {
+                    Text(remove.label, style = Podcst.type.button, color = colors.onAccent)
+                }
+            } else {
+                Box(Modifier.fillMaxSize().background(colors.accent).padding(start = 24.dp), contentAlignment = Alignment.CenterStart) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(if (state.starred) PodcstIcons.Star else PodcstIcons.StarFilled, null, Modifier.size(20.dp), tint = colors.onAccent)
+                        Text(starLabel, style = Podcst.type.meta, color = colors.onAccent)
+                    }
                 }
             }
         },
@@ -210,8 +222,9 @@ private fun EpisodeGestures(
                 .drawBehind { drawLine(colors.rule, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx()) }
                 .pressable(onClick = { actions.open(state.episode) }, onLongClick = { menu = true })
                 .semantics {
-                    customActions = listOf(
+                    customActions = listOfNotNull(
                         CustomAccessibilityAction(starLabel) { actions.star(state.episode, !state.starred); true },
+                        remove?.let { CustomAccessibilityAction(it.label) { it.run(); true } },
                     )
                 },
         ) {
@@ -241,7 +254,7 @@ fun EpisodeMenu(state: EpisodeRowState, actions: EpisodeActions, expanded: Boole
         }
         MenuEntry(stringResource(R.string.add_to_list), PodcstIcons.AddToList) { onDismiss(); actions.addToList(episode) }
         MenuDivider()
-        if (state.download == DownloadState.None || state.download is DownloadState.Failed) {
+        if (!state.download.removable) {
             MenuEntry(stringResource(R.string.download), PodcstIcons.Download) { onDismiss(); actions.download(episode) }
         } else {
             MenuEntry(stringResource(R.string.remove_download), PodcstIcons.Download) { onDismiss(); actions.removeDownload(episode) }

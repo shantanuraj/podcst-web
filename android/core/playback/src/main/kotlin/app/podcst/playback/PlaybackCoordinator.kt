@@ -4,7 +4,9 @@ import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
+import androidx.media3.cast.CastPlayer
 import androidx.media3.common.C
+import androidx.media3.common.DeviceInfo
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -12,6 +14,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import com.google.android.gms.cast.framework.CastContext
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.metadata.Chapter as EmbeddedChapter
 import app.podcst.data.Preferences
@@ -60,7 +63,8 @@ data class PlayerState(
     val buffered: Duration = Duration.ZERO,
     val settings: AudioSettings = AudioSettings(),
     val heldDoubleSpeed: Boolean = false,
-    val effectState: EffectState = EffectState.Inactive,
+    val sinkEffects: EffectState = EffectState.Inactive,
+    val castDevice: String? = null,
     val chapters: List<Chapter> = emptyList(),
     val sleepTimer: SleepTimer? = null,
 ) {
@@ -68,12 +72,16 @@ data class PlayerState(
     val active: Boolean get() = queue.active && episode != null
     val speed: Double get() = settings.options(episode?.feed).speed
     val effects: AudioEffects get() = settings.options(episode?.feed).effects
+    val effectState: EffectState
+        get() = if (castDevice != null && effects.enabled) EffectState.Unavailable(CASTING) else sinkEffects
     val effectiveSpeed: Double get() = if (heldDoubleSpeed) PlaybackRules.HELD_SPEED else speed
     val remaining: Duration get() = (duration - position).coerceAtLeast(Duration.ZERO)
     val progress: Float get() = if (duration.isPositive()) (position / duration).toFloat().coerceIn(0f, 1f) else 0f
     val chapterIndex: Int? get() = chapters.indexAt(position)
     val buffering: Boolean get() = requested && status == PlaybackStatus.Loading
 }
+
+private const val CASTING = "Audio effects play on this device only."
 
 class PlaybackCoordinator(
     private val context: Context,
@@ -87,7 +95,7 @@ class PlaybackCoordinator(
     private val mutable = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = mutable.asStateFlow()
 
-    val player: ExoPlayer = ExoPlayer.Builder(context, renderers)
+    private val local: ExoPlayer = ExoPlayer.Builder(context, renderers)
         .setMediaSourceFactory(DefaultMediaSourceFactory(media.dataSource))
         .setAudioAttributes(
             AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(),
@@ -98,6 +106,8 @@ class PlaybackCoordinator(
         .setSeekBackIncrementMs(PlaybackRules.skipBack.inWholeMilliseconds)
         .setSeekForwardIncrementMs(PlaybackRules.skipForward.inWholeMilliseconds)
         .build()
+
+    val player: Player = CastPlayer.Builder(context).setLocalPlayer(local).build()
 
     private var loaded: String? = null
     private var changingAccount = false
@@ -110,7 +120,7 @@ class PlaybackCoordinator(
     init {
         player.addListener(Listener())
         scope.launch { preferences.audio.collect { settings -> update { it.copy(settings = settings) }; applyAudio() } }
-        scope.launch { renderers.sink.effectState.collect { effect -> update { it.copy(effectState = effect) } } }
+        scope.launch { renderers.sink.effectState.collect { effect -> update { it.copy(sinkEffects = effect) } } }
         scope.launch { restore() }
     }
 
@@ -294,7 +304,7 @@ class PlaybackCoordinator(
     }
 
     suspend fun switchAccount() {
-        update { PlayerState(settings = it.settings, effectState = it.effectState) }
+        update { PlayerState(settings = it.settings, sinkEffects = it.sinkEffects, castDevice = it.castDevice) }
         restore()
         changingAccount = false
     }
@@ -456,7 +466,15 @@ class PlaybackCoordinator(
         }
     }
 
+    private fun castDevice(info: DeviceInfo): String? =
+        if (info.playbackType != DeviceInfo.PLAYBACK_TYPE_REMOTE) null
+        else CastContext.getSharedInstance()?.sessionManager?.currentCastSession?.castDevice?.friendlyName ?: info.routingControllerId ?: ""
+
     private inner class Listener : Player.Listener {
+        override fun onDeviceInfoChanged(deviceInfo: DeviceInfo) {
+            update { it.copy(castDevice = castDevice(deviceInfo)) }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             val now = SystemClock.elapsedRealtime()
             playingSince?.let { playedSinceProgress += now - it }
