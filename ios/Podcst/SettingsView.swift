@@ -91,7 +91,7 @@ struct SettingsView: View {
             .background(PodcstPalette.paper)
             .navigationTitle("Settings")
             .sheet(isPresented: $showingLogin) { LoginView() }
-            .sheet(isPresented: $showingAudio) { AudioSettingsView(defaultsOnly: true) }
+            .sheet(isPresented: $showingAudio) { AudioSettingsView() }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "opml") ?? .xml, .xml, .plainText]) { result in
                 guard case .success(let url) = result else { return }
                 let scoped = url.startAccessingSecurityScopedResource()

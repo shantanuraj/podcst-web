@@ -832,6 +832,26 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(transport.changedRates, [1, 1.25, 2, 1.25])
     }
 
+    func testEffectsWriteToTheOverrideOnlyWhenThePodcastHasOne() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        let first = episode(guid: "first")
+        controller.play(first)
+        transport.becomeReady(duration: 100)
+        let boost = AudioEffects(volumeBoost: true)
+        controller.setEffects(boost)
+        XCTAssertEqual(controller.audioPreferences.defaults.effects, boost)
+        XCTAssertFalse(controller.audioPreferences.hasOverride(for: first.feed))
+        XCTAssertEqual(controller.audioEffectState, .active(boost))
+
+        controller.audioPreferences.set(AudioOptions(), for: first.feed)
+        let trim = AudioEffects(trimSilence: true)
+        controller.setEffects(trim)
+        XCTAssertEqual(controller.audioPreferences.options(for: first.feed).effects, trim)
+        XCTAssertEqual(controller.audioPreferences.defaults.effects, boost)
+        XCTAssertEqual(controller.requestedEffects, trim)
+    }
+
     func testQueueMatchesSharedVectors() throws {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

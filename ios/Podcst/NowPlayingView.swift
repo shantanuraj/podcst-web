@@ -114,13 +114,8 @@ private struct FullPlayer: View {
                 .padding(.top, 20)
             Transport()
                 .padding(.top, 14)
-            HStack(spacing: 6) {
-                AudioControlsButton()
-                Spacer()
-                AirPlayButton()
-                    .frame(width: 44, height: 44)
-            }
-            .padding(.top, 14)
+            AudioChips()
+                .padding(.top, 14)
             Spacer(minLength: 16)
             PanelTabs(panels: panels, selection: nil, height: 40) { panel in
                 if let panel { open(panel) }
@@ -531,6 +526,70 @@ private struct PlayPauseButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(playback.isPlaybackRequested ? "Pause" : "Play")
+    }
+}
+
+private struct AudioChips: View {
+    @Environment(PlaybackController.self) private var playback
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Menu {
+                    Picker("Playback speed", selection: Binding { playback.rate } set: { playback.setRate($0) }) {
+                        ForEach(PlaybackController.supportedRates, id: \.self) { speed in
+                            Text("\(speed, specifier: "%g")×").tag(speed)
+                        }
+                    }
+                } label: {
+                    Text(playback.isDoubleSpeedHeld ? "2×" : "\(playback.rate, specifier: "%g")×")
+                        .monospacedDigit()
+                        .chip(selected: playback.isDoubleSpeedHeld, strong: true)
+                }
+                .accessibilityLabel("Playback speed")
+                .accessibilityValue("\(playback.rate, specifier: "%g") times")
+                effect("Boost", \.volumeBoost)
+                effect("Trim silence", \.trimSilence)
+                Spacer(minLength: 0)
+                AirPlayButton()
+                    .frame(width: 44, height: 44)
+            }
+            if playback.requestedEffects.enabled, case .unavailable(let reason) = playback.audioEffectState {
+                Text(reason)
+                    .font(.sans(.caption))
+                    .foregroundStyle(PodcstPalette.tertiary)
+            }
+        }
+    }
+
+    private func effect(_ title: String, _ effect: WritableKeyPath<AudioEffects, Bool>) -> some View {
+        Toggle(title, isOn: Binding { playback.requestedEffects[keyPath: effect] } set: { on in
+            var effects = playback.requestedEffects
+            effects[keyPath: effect] = on
+            playback.setEffects(effects)
+        })
+        .toggleStyle(ChipToggleStyle())
+    }
+}
+
+private struct ChipToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            configuration.label.chip(selected: configuration.isOn, strong: false)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private extension View {
+    func chip(selected: Bool, strong: Bool) -> some View {
+        font(.sans(.footnote).weight(selected || strong ? .semibold : .medium))
+            .foregroundStyle(selected ? PodcstPalette.accent : strong ? PodcstPalette.ink : PodcstPalette.secondary)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 32)
+            .background(selected ? PodcstPalette.accentSoft : PodcstPalette.ink.opacity(0.07), in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
     }
 }
 

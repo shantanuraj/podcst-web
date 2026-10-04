@@ -321,10 +321,19 @@ public final class PlaybackController {
     }
 
     public func setRate(_ newRate: Double) {
-        guard !isShutdown, Self.supportedRates.contains(where: { abs($0 - newRate) < 0.0001 }) else { return }
+        guard Self.supportedRates.contains(where: { abs($0 - newRate) < 0.0001 }) else { return }
+        updateAudioOptions { $0.speed = newRate }
+    }
+
+    func setEffects(_ effects: AudioEffects) {
+        updateAudioOptions { $0.effects = effects }
+    }
+
+    private func updateAudioOptions(_ change: (inout AudioOptions) -> Void) {
+        guard !isShutdown else { return }
         let feed = currentEpisode?.feed
         var options = audioPreferences.options(for: feed)
-        options.speed = newRate
+        change(&options)
         audioPreferences.set(options, for: feed.flatMap { audioPreferences.hasOverride(for: $0) ? $0 : nil })
     }
 
