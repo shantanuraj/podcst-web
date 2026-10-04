@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="discover">Discover</string>
+    <string name="search_placeholder">Search podcasts or paste a feed</string>
+    <string name="account">Account and settings</string>
+    <string name="number_one">No. 1 in %1$s</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="subscribed">Subscribed</string>
+    <string name="subscribe_to">Subscribe to %1$s</string>
+    <string name="unsubscribe_from">Unsubscribe from %1$s</string>
+    <string name="ranked_description">Number %1$d, %2$s, %3$s</string>
+    <string name="podcast_description">%1$s, %2$s</string>
+    <string name="chart_unavailable">Top podcasts are unavailable right now.</string>
+    <string name="chart_unavailable_detail">Check your connection and try again.</string>
+    <string name="chart_empty">No podcasts in this chart yet.</string>
+    <string name="retry">Try again</string>
+    <string name="subscription_failed">Couldn\'t update subscription</string>
+    <string name="back">Back</string>
+    <string name="clear_search">Clear search</string>
+    <string name="feed_hint">Paste an RSS link to add any feed, including private ones.</string>
+    <string name="feed_hint_ready">Open the feed below to subscribe, including private feeds.</string>
+    <string name="sign_in_feed">Sign in to open an RSS link</string>
+    <string name="podcasts">Podcasts</string>
+    <string name="feed">Feed</string>
+    <plurals name="results">
+        <item quantity="one">%d result</item>
+        <item quantity="other">%d results</item>
+    </plurals>
+    <string name="recent">Recent</string>
+    <string name="clear">Clear</string>
+    <string name="search_failed">Search is unavailable right now.</string>
+</resources>
