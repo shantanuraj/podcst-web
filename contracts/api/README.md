@@ -166,6 +166,26 @@ Errors: 400 `{message: "parameter \`podcastId\` required"}` or `{message: "param
 
 Fixtures: `feed-episodes.first.json` and `feed-episodes.second.json` (captured; the second page follows the first page's `nextCursor`), `feed-episodes.missing-podcast-id.json` (captured), `feed-episodes.not-found.json` (derived from the route).
 
+### `GET /api/episodes/:episodeId/chapters` — optional (web)
+
+Accepts a positive, safe-integer **episode database ID**, never an enclosure URL.
+Visibility is checked before each cache lookup or metadata fetch. An invisible or
+missing episode returns 404; an invalid ID returns 400. Responses, including
+errors and public episodes, carry private-feed headers.
+
+Returns `{ "source": "embedded" | "shownotes" | "none", "chapters": [{ "title": string, "start": number }] }`.
+Starts are original-source seconds, strictly increasing; a usable timeline has at
+least two entries. An empty embedded title requests a localized “Chapter N” label
+from the client. No enclosure URLs or artwork are returned. Metadata failures
+return show-note chapters, or `source: "none"` with an empty list. Unavailable
+retained episode content also returns an empty list without rebuilding the feed.
+Database failures return 503 `{message: "Chapters unavailable"}`.
+
+Native clients continue reading local media metadata; they do not consume this
+endpoint. See web chapter support for limits and
+cache policy, and [synthetic media](../fixtures/media/README.md) for reusable
+fixtures.
+
 ### `POST /api/feed/resolve` — public
 
 Body: `{ "itunes_id": positive integer, "locale"?: two-letter code }` (locale defaults to `us`; matched case-insensitively). Resolves or indexes the public podcast for an iTunes listing (`resolvePodcast` in `src/server/ingest/resolve-podcast.ts`) and returns `ResolvedPodcast` `{ "id": integer }`.
