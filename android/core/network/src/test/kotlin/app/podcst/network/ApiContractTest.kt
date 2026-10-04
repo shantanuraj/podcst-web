@@ -51,8 +51,7 @@ class ApiContractTest {
             if (failure != null) throw AssertionError(name, failure)
         } else {
             assertTrue("$name should fail", failure is ApiException)
-            val error = Json.parseToJsonElement(body).jsonObject
-            val message = (error["message"] ?: error["error"])?.jsonPrimitive?.content
+            val message = Json.parseToJsonElement(body).jsonObject["message"]?.jsonPrimitive?.content
             assertEquals(name, status, (failure as ApiException).status)
             assertEquals(name, message, failure.message)
         }

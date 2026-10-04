@@ -2,7 +2,7 @@
   "auth-email-login.invalid-code.json": {
     "endpoint": "POST /api/auth/email-login",
     "status": 400,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "auth-email-login.verified.json": {
     "endpoint": "POST /api/auth/email-login",
@@ -12,7 +12,7 @@
   "auth-login.challenge-expired.json": {
     "endpoint": "POST /api/auth/login",
     "status": 400,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "auth-login.discoverable.json": {
     "endpoint": "POST /api/auth/login",
@@ -22,7 +22,7 @@
   "auth-login.missing-visitor.json": {
     "endpoint": "POST /api/auth/login",
     "status": 400,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "auth-login.no-account.json": {
     "endpoint": "POST /api/auth/login",
@@ -57,7 +57,7 @@
   "auth-register.unauthenticated.json": {
     "endpoint": "POST /api/auth/register",
     "status": 401,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "auth-register.verified.json": {
     "endpoint": "POST /api/auth/register",
@@ -77,12 +77,12 @@
   "auth-verify.invalid-code.json": {
     "endpoint": "POST /api/auth/verify",
     "status": 400,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "auth-verify.send-failed.json": {
     "endpoint": "POST /api/auth/verify",
     "status": 500,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "auth-verify.sent.json": {
     "endpoint": "POST /api/auth/verify",
@@ -217,7 +217,7 @@
   "progress-save.invalid.json": {
     "endpoint": "PUT /api/progress",
     "status": 400,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "progress-save.success.json": {
     "endpoint": "PUT /api/progress",
@@ -237,7 +237,7 @@
   "progress.unauthorized.json": {
     "endpoint": "GET /api/progress",
     "status": 401,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "search.empty.json": {
     "endpoint": "POST /api/search",
@@ -267,7 +267,7 @@
   "subscriptions-add.not-found.json": {
     "endpoint": "POST /api/subscriptions",
     "status": 404,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "subscriptions-add.success.json": {
     "endpoint": "POST /api/subscriptions",
@@ -292,7 +292,7 @@
   "subscriptions.unauthorized.json": {
     "endpoint": "GET /api/subscriptions",
     "status": 401,
-    "decodesAs": "ErrorField"
+    "decodesAs": "ErrorMessage"
   },
   "top.explicit.json": {
     "endpoint": "GET /api/top",

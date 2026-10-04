@@ -183,14 +183,14 @@ function captures(): Capture[] {
       endpoint: 'GET /api/subscriptions',
       path: '/api/subscriptions',
       status: 401,
-      decodesAs: 'ErrorField',
+      decodesAs: 'ErrorMessage',
     },
     {
       file: 'progress.unauthorized.json',
       endpoint: 'GET /api/progress',
       path: '/api/progress',
       status: 401,
-      decodesAs: 'ErrorField',
+      decodesAs: 'ErrorMessage',
     },
   ];
 }

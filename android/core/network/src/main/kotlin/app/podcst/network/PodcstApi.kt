@@ -225,8 +225,7 @@ class PodcstApi(
         }?.let(cookies::write)
     }
 
-    private fun errorMessage(text: String) = runCatching { json.decodeFromString<WireError>(text) }.getOrNull()
-        ?.let { it.message ?: it.error }
+    private fun errorMessage(text: String) = runCatching { json.decodeFromString<WireError>(text) }.getOrNull()?.message
 
     private fun url(path: String, vararg query: Pair<String, String?>): HttpUrl =
         baseUrl.resolve(path)!!.newBuilder().apply {

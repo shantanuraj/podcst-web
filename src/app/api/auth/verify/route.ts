@@ -2,11 +2,11 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { sendVerificationCode, verifyCode } from '@/server/auth/email';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = (await request.json().catch(() => null)) ?? {};
   const { email, code } = body;
 
   if (!email) {
-    return NextResponse.json({ error: 'Email required' }, { status: 400 });
+    return NextResponse.json({ message: 'Email required' }, { status: 400 });
   }
 
   if (!code) {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('Failed to send verification email:', err);
       return NextResponse.json(
-        { error: 'Failed to send verification email' },
+        { message: 'Failed to send verification email' },
         { status: 500 },
       );
     }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const verified = await verifyCode(email, code);
   if (!verified) {
     return NextResponse.json(
-      { error: 'Invalid or expired code' },
+      { message: 'Invalid or expired code' },
       { status: 400 },
     );
   }

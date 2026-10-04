@@ -11,7 +11,7 @@ import {
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
   const subscriptions = await getSubscriptions(session.userId);
@@ -21,10 +21,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await request.json();
+  const body = (await request.json().catch(() => null)) ?? {};
 
   if (Array.isArray(body.feedUrls)) {
     const result = await importSubscriptions(session.userId, body.feedUrls);
@@ -33,12 +33,15 @@ export async function POST(request: NextRequest) {
 
   const podcastId = body.podcastId;
   if (!podcastId || typeof podcastId !== 'number') {
-    return NextResponse.json({ error: 'podcastId required' }, { status: 400 });
+    return NextResponse.json(
+      { message: 'podcastId required' },
+      { status: 400 },
+    );
   }
 
   const success = await addSubscription(session.userId, podcastId);
   if (!success) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return NextResponse.json({ message: 'Podcast not found' }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });
@@ -47,13 +50,16 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
   const podcastId = searchParams.get('podcastId');
   if (!podcastId) {
-    return NextResponse.json({ error: 'podcastId required' }, { status: 400 });
+    return NextResponse.json(
+      { message: 'podcastId required' },
+      { status: 400 },
+    );
   }
 
   await removeSubscription(session.userId, Number(podcastId));

@@ -4,12 +4,12 @@ import { createSession, generateId } from '@/server/auth/session';
 import { sql } from '@/server/db';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = (await request.json().catch(() => null)) ?? {};
   const { email, code } = body;
 
   if (!email || !code) {
     return NextResponse.json(
-      { error: 'Email and code required' },
+      { message: 'Email and code required' },
       { status: 400 },
     );
   }
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const verified = await verifyCode(email, code);
   if (!verified) {
     return NextResponse.json(
-      { error: 'Invalid or expired code' },
+      { message: 'Invalid or expired code' },
       { status: 400 },
     );
   }

@@ -6,24 +6,27 @@ import {
 import { getSession } from '@/server/auth/session';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = (await request.json().catch(() => null)) ?? {};
   const { email, response, visitorId } = body;
 
   if (!visitorId) {
-    return NextResponse.json({ error: 'Visitor ID required' }, { status: 400 });
+    return NextResponse.json(
+      { message: 'Visitor ID required' },
+      { status: 400 },
+    );
   }
 
   const session = await getSession();
   if (!session) {
     return NextResponse.json(
-      { error: 'Authentication required' },
+      { message: 'Authentication required' },
       { status: 401 },
     );
   }
 
   if (email && email !== session.email) {
     return NextResponse.json(
-      { error: 'Email does not match current user' },
+      { message: 'Email does not match current user' },
       { status: 403 },
     );
   }
@@ -47,6 +50,6 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Passkey registration failed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ message: message }, { status: 400 });
   }
 }

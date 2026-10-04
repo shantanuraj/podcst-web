@@ -18,16 +18,9 @@ This contract describes the HTTP API that the iOS and Android clients use, as im
 
 **Private-feed headers.** Responses that can contain private data carry `Cache-Control: private, no-store` and `Vary: Cookie` (`privateFeedHeaders` in `src/server/podcast-access.ts`). The table below notes which responses carry them. Clients must not place those bodies in shared caches. Podcast visibility is decided only by `podcasts.owner_user_id` (`podcastAccess` in the same file); `isPrivate` in responses is a derived projection, never an authorization input.
 
-**Error bodies.** Routes use two different shapes, and a client must decode both:
+**Error bodies.** Every deliberate error response is `ErrorMessage`, `{ "message": string }`. `/api/top` has no deliberate error response.
 
-| Logical type | Shape | Routes |
-| --- | --- | --- |
-| `ErrorMessage` | `{ "message": string }` | `/api/search`, `/api/feed`, `/api/feed/info`, `/api/feed/episodes`, `/api/feed/resolve`, `/api/feed/refresh` |
-| `ErrorField` | `{ "error": string }` | `/api/auth/*`, `/api/subscriptions`, `/api/progress` |
-
-`/api/top` has no deliberate error response.
-
-The messages are human-readable English, not stable codes; clients branch on the HTTP status. iOS reads only `message` (`APIClient.swift:397`, `RawError`), so for every `{error}` route it falls back to the platform's status-code text. Routes that call `request.json()` without a fallback (`/api/auth/*`, `POST /api/subscriptions`, `PUT /api/progress`) answer a malformed body with an unhandled 500 whose body is not one of these shapes. Unhandled database or upstream failures on any route also produce a 500 without a defined body.
+The messages are human-readable English, not stable codes; clients branch on the HTTP status and show `message`. Routes that read a JSON body treat a malformed or `null` body as an empty object, so it fails their validation with 400 `ErrorMessage` (`src/app/api/errors.test.ts`). Unhandled database or upstream failures on any route produce a 500 without a defined body.
 
 **Numbers and nulls.** Database `bigint` values are parsed to JavaScript numbers (`src/server/db.ts`), so podcast and episode IDs are JSON integers. Timestamps (`published`) are milliseconds since the Unix epoch. `duration` is whole seconds. A key documented as "omitted" is absent from the JSON, which is different from `null`.
 
@@ -217,18 +210,18 @@ Always 200. Returns `Session`: `{ "user": null }` without a valid session, other
 
 Body: `{ "email": string, "code"?: string }`.
 
-- Without `code`: invalidates earlier unused codes for that email, stores a new six-digit code valid for 10 minutes and emails it (`sendVerificationCode` in `src/server/auth/email.ts`). Returns `CodeSent` `{ "sent": true }`, or 500 `{error: "Failed to send verification email"}`. It does not reveal whether an account exists.
-- With `code`: returns `Verified` `{ "verified": true }` or 400 `{error: "Invalid or expired code"}`. **A successful check consumes the code** and creates no session. A client that verifies a code here cannot then use it with `/api/auth/email-login`; native clients send the code only to `email-login`.
+- Without `code`: invalidates earlier unused codes for that email, stores a new six-digit code valid for 10 minutes and emails it (`sendVerificationCode` in `src/server/auth/email.ts`). Returns `CodeSent` `{ "sent": true }`, or 500 `{message: "Failed to send verification email"}`. It does not reveal whether an account exists.
+- With `code`: returns `Verified` `{ "verified": true }` or 400 `{message: "Invalid or expired code"}`. **A successful check consumes the code** and creates no session. A client that verifies a code here cannot then use it with `/api/auth/email-login`; native clients send the code only to `email-login`.
 
-Missing email: 400 `{error: "Email required"}`. Fixtures: `auth-verify.sent.json`, `auth-verify.verified.json`, `auth-verify.invalid-code.json`, `auth-verify.send-failed.json`.
+Missing email: 400 `{message: "Email required"}`. Fixtures: `auth-verify.sent.json`, `auth-verify.verified.json`, `auth-verify.invalid-code.json`, `auth-verify.send-failed.json`.
 
 ### `POST /api/auth/email-login` — public
 
-Body: `{ "email": string, "code": string }`. Consumes the code, creates the user if no account has that email, then creates a session (`Set-Cookie`). Returns `Verified` `{ "verified": true }`. Errors: 400 `{error: "Email and code required"}`, 400 `{error: "Invalid or expired code"}`. Email addresses are compared exactly as sent, so clients send one normalized form everywhere. Fixtures: `auth-email-login.verified.json`, `auth-email-login.invalid-code.json`.
+Body: `{ "email": string, "code": string }`. Consumes the code, creates the user if no account has that email, then creates a session (`Set-Cookie`). Returns `Verified` `{ "verified": true }`. Errors: 400 `{message: "Email and code required"}`, 400 `{message: "Invalid or expired code"}`. Email addresses are compared exactly as sent, so clients send one normalized form everywhere. Fixtures: `auth-email-login.verified.json`, `auth-email-login.invalid-code.json`.
 
 ### `POST /api/auth/login` — public
 
-Every request needs `visitorId`, a client-generated string that keys the pending challenge (400 `{error: "Visitor ID required"}`, `auth-login.missing-visitor.json`). The challenge lives in process memory for five minutes and is removed when read (`setChallenge`, `popChallenge` in `src/server/auth/passkey.ts`), so options and verification must reach the same server process, and a failed verification needs new options.
+Every request needs `visitorId`, a client-generated string that keys the pending challenge (400 `{message: "Visitor ID required"}`, `auth-login.missing-visitor.json`). The challenge lives in process memory for five minutes and is removed when read (`setChallenge`, `popChallenge` in `src/server/auth/passkey.ts`), so options and verification must reach the same server process, and a failed verification needs new options.
 
 Start requests (no `response`):
 
@@ -238,20 +231,20 @@ Start requests (no `response`):
 | `{visitorId, email}`, no account | `{exists: false}` | `auth-login.no-account.json` |
 | `{visitorId, email}`, account without passkey | `{exists: true, hasPasskey: false, userId}` | `auth-login.no-passkey.json` |
 | `{visitorId, email}`, account with passkeys | `{exists: true, hasPasskey: true, options, userId}` | `auth-login.passkey.json` |
-| `{visitorId}` alone | 400 `{error: "Email required"}` | |
+| `{visitorId}` alone | 400 `{message: "Email required"}` | |
 
 `options` is `PublicKeyCredentialRequestOptionsJSON` from `@simplewebauthn/server` 13.3.2 `generateAuthenticationOptions`: `rpId` (the server's `WEBAUTHN_RP_ID`; the fixture value is illustrative), `challenge` (base64url of 32 random bytes), `allowCredentials` (`[{id, type: "public-key"}]`, no `transports`), `timeout` 60000 and `userVerification: "preferred"`. There is no `extensions` key.
 
-Verification body: `{visitorId, response, userId?}`, where `response` is `AuthenticationResponseJSON` (`id`, `rawId` equal to `id`, `type: "public-key"`, `response.clientDataJSON`, `response.authenticatorData`, `response.signature`, optional `response.userHandle`, all base64url; see `PasskeyAssertion` in `APIClient.swift`). Send the `userId` from an email start; omit it for discoverable login. The server requires user verification, an origin in its accepted set and the configured RP ID; the accepted origins are described in the parity specification. Success creates a session and returns `PasskeyLoginResult` `{ "verified": true, "userId": string }` (`auth-login.verified.json`). Every verification failure, including an expired challenge, unknown credential or wrong origin, returns 400 `{error: <message>}` (`auth-login.challenge-expired.json`).
+Verification body: `{visitorId, response, userId?}`, where `response` is `AuthenticationResponseJSON` (`id`, `rawId` equal to `id`, `type: "public-key"`, `response.clientDataJSON`, `response.authenticatorData`, `response.signature`, optional `response.userHandle`, all base64url; see `PasskeyAssertion` in `APIClient.swift`). Send the `userId` from an email start; omit it for discoverable login. The server requires user verification, an origin in its accepted set and the configured RP ID; the accepted origins are described in the parity specification. Success creates a session and returns `PasskeyLoginResult` `{ "verified": true, "userId": string }` (`auth-login.verified.json`). Every verification failure, including an expired challenge, unknown credential or wrong origin, returns 400 `{message: <message>}` (`auth-login.challenge-expired.json`).
 
 ### `POST /api/auth/register` — required
 
-Adds a passkey to the signed-in account. Body: `{visitorId, email?, response?}`. A session is required (401 `{error: "Authentication required"}`); an `email` different from the session's returns 403 `{error: "Email does not match current user"}`.
+Adds a passkey to the signed-in account. Body: `{visitorId, email?, response?}`. A session is required (401 `{message: "Authentication required"}`); an `email` different from the session's returns 403 `{message: "Email does not match current user"}`.
 
 - Without `response`: returns `PasskeyRegistrationStart` `{options}`, from `generateRegistrationOptions`: `challenge`, `rp: {name: "Podcst", id}`, `user: {id: base64url(UTF-8 user ID), name: email, displayName: ""}`, `pubKeyCredParams` for algorithms −8, −7 and −257, `timeout` 60000, `attestation: "none"`, `excludeCredentials` for the account's existing passkeys, `authenticatorSelection: {residentKey: "preferred", userVerification: "preferred", requireResidentKey: false}`, `extensions: {credProps: true}` and `hints: []`.
 - With `response` (`RegistrationResponseJSON`): verifies the attestation against the same origin set and stores the credential. Returns `PasskeyRegistrationResult` `{ "verified": true }`.
 
-Any failure after the session check returns 400 `{error: <message>}`. Fixtures: `auth-register.options.json`, `auth-register.verified.json`, `auth-register.unauthenticated.json`.
+Any failure after the session check returns 400 `{message: <message>}`. Fixtures: `auth-register.options.json`, `auth-register.verified.json`, `auth-register.unauthenticated.json`.
 
 ### `POST /api/auth/logout` — public
 
@@ -259,26 +252,26 @@ Deletes the session if present and clears the cookie. Always returns `Success` `
 
 ### `GET /api/subscriptions` — required
 
-Returns `Podcast[]` ordered by subscription time, newest first, each with at most two episodes (`getSubscriptions`). Private podcasts appear only for their owner. Private-feed headers. 401 `{error: "Unauthorized"}`. Fixtures: `subscriptions.list.json` (derived; includes a private podcast and a podcast with no episodes), `subscriptions.unauthorized.json` (captured).
+Returns `Podcast[]` ordered by subscription time, newest first, each with at most two episodes (`getSubscriptions`). Private podcasts appear only for their owner. Private-feed headers. 401 `{message: "Unauthorized"}`. Fixtures: `subscriptions.list.json` (derived; includes a private podcast and a podcast with no episodes), `subscriptions.unauthorized.json` (captured).
 
 ### `POST /api/subscriptions` — required
 
 Two bodies:
 
-- `{ "podcastId": integer }`: subscribes. Idempotent. Returns `Success`, 400 `{error: "podcastId required"}` for a missing, zero or non-number ID, or 404 `{error: "Podcast not found"}` when not visible. Fixtures: `subscriptions-add.success.json`, `subscriptions-add.not-found.json`.
+- `{ "podcastId": integer }`: subscribes. Idempotent. Returns `Success`, 400 `{message: "podcastId required"}` for a missing, zero or non-number ID, or 404 `{message: "Podcast not found"}` when not visible. Fixtures: `subscriptions-add.success.json`, `subscriptions-add.not-found.json`.
 - `{ "feedUrls": string[] }`: OPML import. For each URL in order, indexes it as with `POST /api/feed` (creating a private podcast if unknown) and subscribes (`importSubscriptions`). Returns `ImportResult` `{ "succeeded": integer, "failed": integer }` with private-feed headers. The response does not identify which URLs failed. The work is sequential and includes feed fetches, so a large import is a long request. Fixture: `subscriptions-import.result.json`.
 
 ### `DELETE /api/subscriptions?podcastId=` — required
 
-Removes the subscription. Always returns `Success` when a session and `podcastId` are present, even if nothing was removed; 400 `{error: "podcastId required"}` otherwise. Fixture: `subscriptions-remove.success.json`.
+Removes the subscription. Always returns `Success` when a session and `podcastId` are present, even if nothing was removed; 400 `{message: "podcastId required"}` otherwise. Fixture: `subscriptions-remove.success.json`.
 
 ### `GET /api/progress` — required
 
-Returns `Progress?`: `null` when nothing qualifies, otherwise `{ "position": integer, "episode": Episode }` for the most recently updated progress row that is not completed and whose podcast is visible (`getCurrentProgress` in `src/server/progress.ts`). Private-feed headers on 200. 401 `{error: "Unauthorized"}`. Fixtures: `progress.empty.json`, `progress.current.json` (derived), `progress.unauthorized.json` (captured).
+Returns `Progress?`: `null` when nothing qualifies, otherwise `{ "position": integer, "episode": Episode }` for the most recently updated progress row that is not completed and whose podcast is visible (`getCurrentProgress` in `src/server/progress.ts`). Private-feed headers on 200. 401 `{message: "Unauthorized"}`. Fixtures: `progress.empty.json`, `progress.current.json` (derived), `progress.unauthorized.json` (captured).
 
 ### `PUT /api/progress` — required
 
-Body: `{ "episodeId": number, "position": number, "completed"?: boolean }`. The position is floored to whole seconds; `completed` is true only for the JSON value `true`. Upserts one row per user and episode; the last write wins regardless of position (`saveProgress`). Returns `Success`, 400 `{error: "episodeId and position required"}`, or 404 `{error: "Episode not found"}` when the episode is not visible. Fixtures: `progress-save.success.json`, `progress-save.invalid.json`.
+Body: `{ "episodeId": number, "position": number, "completed"?: boolean }`. The position is floored to whole seconds; `completed` is true only for the JSON value `true`. Upserts one row per user and episode; the last write wins regardless of position (`saveProgress`). Returns `Success`, 400 `{message: "episodeId and position required"}`, or 404 `{message: "Episode not found"}` when the episode is not visible. Fixtures: `progress-save.success.json`, `progress-save.invalid.json`.
 
 There is no `POST` handler; a `POST` returns 405. The web client's page-exit `navigator.sendBeacon('/api/progress', …)` (`src/shared/player/usePlaybackSync.ts:160`) sends a `POST` and is therefore rejected.
 

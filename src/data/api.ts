@@ -24,10 +24,7 @@ export async function responseData<T>(response: Response): Promise<T> {
     throw new ApiError(response.status, 'Invalid API response');
   });
   if (!response.ok)
-    throw new ApiError(
-      response.status,
-      data.message || data.error || 'Request failed',
-    );
+    throw new ApiError(response.status, data.message || 'Request failed');
   return data as T;
 }
 

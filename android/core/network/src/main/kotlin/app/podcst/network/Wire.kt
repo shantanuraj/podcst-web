@@ -99,7 +99,7 @@ internal data class WireUser(
 @Serializable internal data class WireSent(val sent: Boolean = false)
 @Serializable internal data class WireVerified(val verified: Boolean = false, val userId: String? = null)
 @Serializable internal data class WireRefreshStatus(val status: String)
-@Serializable internal data class WireError(val message: String? = null, val error: String? = null)
+@Serializable internal data class WireError(val message: String? = null)
 
 @Serializable
 internal data class WirePasskeyStart(

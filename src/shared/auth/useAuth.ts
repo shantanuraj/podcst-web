@@ -1,9 +1,13 @@
-import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/browser';
 import {
   startAuthentication,
   startRegistration,
 } from '@simplewebauthn/browser';
 import { useMutation } from '@tanstack/react-query';
+import { post } from '@/data/api';
 import { useAccountSession } from './AccountBoundary';
 
 function useAccountChange() {
@@ -38,14 +42,7 @@ export function useSession() {
 export function useSendCode() {
   return useMutation({
     mutationFn: async (email: string) => {
-      const res = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      return data;
+      return post('/auth/verify', { email });
     },
   });
 }
@@ -53,14 +50,7 @@ export function useSendCode() {
 export function useVerifyCode() {
   return useMutation({
     mutationFn: async ({ email, code }: { email: string; code: string }) => {
-      const res = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      return data;
+      return post('/auth/verify', { email, code });
     },
   });
 }
@@ -70,15 +60,7 @@ export function useEmailLogin() {
   return useMutation({
     ...boundary,
     mutationFn: async ({ email, code }: { email: string; code: string }) => {
-      const res = await fetch('/api/auth/email-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error)
-        throw new Error(data.error || 'Sign in failed');
-      return data;
+      return post('/auth/email-login', { email, code });
     },
   });
 }
@@ -89,23 +71,11 @@ export function useRegister() {
     ...boundary,
     mutationFn: async (email: string) => {
       const visitorId = getVisitorId();
-      const optionsRes = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, visitorId }),
-      });
-      const { options, error } = await optionsRes.json();
-      if (error) throw new Error(error);
+      const { options } = await post<{
+        options: PublicKeyCredentialCreationOptionsJSON;
+      }>('/auth/register', { email, visitorId });
       const credential = await startRegistration({ optionsJSON: options });
-      const verifyRes = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: credential, visitorId }),
-      });
-      const result = await verifyRes.json();
-      if (!verifyRes.ok || result.error)
-        throw new Error(result.error || 'Registration failed');
-      return result;
+      return post('/auth/register', { response: credential, visitorId });
     },
   });
 }
@@ -124,14 +94,7 @@ export function useLoginCheck() {
   return useMutation({
     mutationFn: async (email: string): Promise<LoginCheckResult> => {
       const visitorId = getVisitorId();
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, visitorId }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      return data;
+      return post('/auth/login', { email, visitorId });
     },
   });
 }
@@ -149,15 +112,7 @@ export function usePasskeyLogin() {
     }) => {
       const visitorId = getVisitorId();
       const credential = await startAuthentication({ optionsJSON: options });
-      const verifyRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: credential, userId, visitorId }),
-      });
-      const result = await verifyRes.json();
-      if (!verifyRes.ok || result.error)
-        throw new Error(result.error || 'Sign in failed');
-      return result;
+      return post('/auth/login', { response: credential, userId, visitorId });
     },
   });
 }
@@ -168,23 +123,12 @@ export function useLogin() {
     ...boundary,
     mutationFn: async (email: string) => {
       const visitorId = getVisitorId();
-      const optionsRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, visitorId }),
-      });
-      const { options, userId, error } = await optionsRes.json();
-      if (error) throw new Error(error);
+      const { options, userId } = await post<{
+        options: PublicKeyCredentialRequestOptionsJSON;
+        userId: string;
+      }>('/auth/login', { email, visitorId });
       const credential = await startAuthentication({ optionsJSON: options });
-      const verifyRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: credential, userId, visitorId }),
-      });
-      const result = await verifyRes.json();
-      if (!verifyRes.ok || result.error)
-        throw new Error(result.error || 'Sign in failed');
-      return result;
+      return post('/auth/login', { response: credential, userId, visitorId });
     },
   });
 }
@@ -206,23 +150,11 @@ export function useDiscoverableLogin() {
     ...boundary,
     mutationFn: async () => {
       const visitorId = getVisitorId();
-      const optionsRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visitorId, discoverable: true }),
-      });
-      const { options, error } = await optionsRes.json();
-      if (error) throw new Error(error);
+      const { options } = await post<{
+        options: PublicKeyCredentialRequestOptionsJSON;
+      }>('/auth/login', { visitorId, discoverable: true });
       const credential = await startAuthentication({ optionsJSON: options });
-      const verifyRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: credential, visitorId }),
-      });
-      const result = await verifyRes.json();
-      if (!verifyRes.ok || result.error)
-        throw new Error(result.error || 'Sign in failed');
-      return result;
+      return post('/auth/login', { response: credential, visitorId });
     },
   });
 }

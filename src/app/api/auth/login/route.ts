@@ -8,11 +8,14 @@ import {
 import { createSession } from '@/server/auth/session';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = (await request.json().catch(() => null)) ?? {};
   const { email, response, userId, visitorId, discoverable } = body;
 
   if (!visitorId) {
-    return NextResponse.json({ error: 'Visitor ID required' }, { status: 400 });
+    return NextResponse.json(
+      { message: 'Visitor ID required' },
+      { status: 400 },
+    );
   }
 
   if (!response) {
@@ -22,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!email) {
-      return NextResponse.json({ error: 'Email required' }, { status: 400 });
+      return NextResponse.json({ message: 'Email required' }, { status: 400 });
     }
 
     const check = await checkUserPasskeys(email);
@@ -62,6 +65,6 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Authentication failed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ message: message }, { status: 400 });
   }
 }
