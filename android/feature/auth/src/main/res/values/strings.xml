@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand">Podcst</string>
+    <string name="lede">A beautiful way to discover and listen to podcasts</string>
+    <string name="top_charts_from">Top charts from</string>
+    <string name="chart_region">Chart region</string>
+    <string name="chart_region_value">Chart region, %1$s</string>
+    <string name="sign_in_with_passkey">Sign in with a passkey</string>
+    <string name="start_listening">Start listening</string>
+    <string name="follows_you">Subscriptions and playback progress follow you across devices.</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_in_detail">Sign in to keep subscriptions and listening progress in sync.</string>
+    <string name="use_passkey">Use a passkey</string>
+    <string name="passkey_detail">Use your screen lock. No password to remember.</string>
+    <string name="or_use_email">Or use email</string>
+    <string name="email_placeholder">you@example.com</string>
+    <string name="email">Email</string>
+    <string name="code">Code</string>
+    <string name="code_sent">Code sent</string>
+    <string name="email_code">Email me a code</string>
+    <string name="cancel">Cancel</string>
+    <string name="no_passkey">No passkey found on this device</string>
+</resources>

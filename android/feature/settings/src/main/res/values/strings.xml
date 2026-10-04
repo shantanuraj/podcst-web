@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings">Settings</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_in_detail">Subscriptions and playback progress follow you across devices.</string>
+    <string name="signed_in_passkey">Signed in with a passkey</string>
+    <string name="signed_in_sync">Subscriptions and progress sync across devices</string>
+    <string name="account">Account</string>
+    <string name="passkey">Passkey</string>
+    <string name="passkey_on">On</string>
+    <string name="add_passkey">Add a passkey</string>
+    <string name="sign_out">Sign out</string>
+    <string name="appearance">Appearance</string>
+    <string name="appearance_system">System</string>
+    <string name="appearance_light">Light</string>
+    <string name="appearance_dark">Dark</string>
+    <string name="listening">Listening</string>
+    <string name="chart_region">Chart region</string>
+    <string name="default_speed">Default speed</string>
+    <string name="volume_boost">Volume Boost</string>
+    <string name="volume_boost_detail">Make quiet voices easier to hear</string>
+    <string name="trim_silence">Trim Silence</string>
+    <string name="trim_silence_detail">Shorten pauses</string>
+    <string name="skip">Skip back / forward</string>
+    <string name="skip_value">%1$ds / %2$ds</string>
+    <string name="library">Library</string>
+    <string name="import_opml">Import OPML</string>
+    <string name="export_subscriptions">Export subscriptions</string>
+    <string name="export_name">Podcst Subscriptions.opml</string>
+    <plurals name="imported">
+        <item quantity="one">Imported %1$d podcast</item>
+        <item quantity="other">Imported %1$d podcasts</item>
+    </plurals>
+    <string name="import_failed">%1$d failed</string>
+    <string name="exported">Subscriptions exported</string>
+    <string name="unreadable">Could not read that file</string>
+    <string name="failed">Something went wrong</string>
+    <string name="version">Podcst %1$s ·</string>
+    <string name="website">podcst.app</string>
+    <string name="website_url">https://podcst.app</string>
+</resources>
