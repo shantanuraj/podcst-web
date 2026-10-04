@@ -38,9 +38,9 @@ export function artworkFallback(src?: string) {
   return proxy.toString();
 }
 
-export function artworkSources(src?: string, sizes?: string) {
+function sizedArtworkURL(src?: string) {
   const proxy = src ? remoteURL(src) : undefined;
-  if (!proxy || proxy.origin !== proxyOrigin || !sizes) return { src };
+  if (!proxy || proxy.origin !== proxyOrigin) return undefined;
   const source = proxy.searchParams.get('p');
   const original = source ? remoteURL(source) : undefined;
   if (
@@ -49,8 +49,23 @@ export function artworkSources(src?: string, sizes?: string) {
     !original ||
     original.hostname === proxyHostname
   ) {
-    return { src };
+    return undefined;
   }
+  return proxy;
+}
+
+export function artworkTintSource(src?: string, privateSource = false) {
+  if (privateSource) return undefined;
+  const proxy = sizedArtworkURL(src);
+  if (!proxy) return undefined;
+  proxy.searchParams.set('w', String(widths[0]));
+  proxy.hash = '';
+  return proxy.toString();
+}
+
+export function artworkSources(src?: string, sizes?: string) {
+  const proxy = sizes ? sizedArtworkURL(src) : undefined;
+  if (!proxy) return { src };
   const variants = widths.map((width) => {
     const url = new URL(proxy);
     url.searchParams.set('w', String(width));

@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ProxiedImage } from '@/ui/Image';
-import { artworkFallback, artworkSources, directArtwork } from './artwork';
+import {
+  artworkFallback,
+  artworkSources,
+  artworkTintSource,
+  directArtwork,
+} from './artwork';
 
 const source = 'https://images.example.com/cover.jpg?token=a%2Bb%252Fc&v=1';
 const proxy = `https://assets.podcst.app/?p=${encodeURIComponent(source)}`;
@@ -74,6 +79,43 @@ describe('artwork sources', () => {
     ]) {
       expect(artworkSources(value, '56px')).toEqual({ src: value });
     }
+  });
+});
+
+describe('artwork tint sources', () => {
+  test('normalizes proxy sizes and fragments without changing signed sources', () => {
+    for (const value of [
+      proxy,
+      `${proxy}&w=384`,
+      `${proxy}&w=160&w=1024#cover`,
+    ]) {
+      const result = artworkTintSource(value);
+      expect(result).toBe(`${proxy}&w=160`);
+      expect(new URL(result ?? '').searchParams.get('p')).toBe(source);
+    }
+  });
+
+  test('never requests metadata for private or directly hosted artwork', () => {
+    for (const value of [source, proxy, `${proxy}&w=160`])
+      expect(artworkTintSource(value, true)).toBeUndefined();
+    expect(artworkTintSource(source)).toBeUndefined();
+  });
+
+  test('rejects malformed, nested, credentialed and noncanonical proxy URLs', () => {
+    for (const value of [
+      undefined,
+      '',
+      '/cover.png',
+      'https://assets.podcst.app/',
+      'https://assets.podcst.app/other?p=https://example.com/cover.png',
+      'https://assets.podcst.app/?p=file:///cover.png',
+      'https://assets.podcst.app/?p=https://user:secret@example.com/cover.png',
+      'https://user:secret@assets.podcst.app/?p=https://example.com/cover.png',
+      proxy.replace('https:', 'http:'),
+      `${proxy}&p=ambiguous`,
+      `https://assets.podcst.app/?p=${encodeURIComponent(proxy)}`,
+    ])
+      expect(artworkTintSource(value)).toBeUndefined();
   });
 });
 
