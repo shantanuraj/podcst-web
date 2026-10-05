@@ -31,7 +31,7 @@ export function SubscriptionsTabs({ podcasts, episodes, emptyState }: Props) {
             data-active={activeTab === 'subscriptions'}
             onClick={() => setActiveTab('subscriptions')}
           >
-            {t('profile.subscriptions')}
+            {t('library.subscriptions')}
           </button>
           <button
             type="button"

@@ -14,13 +14,14 @@ export const messages: Messages = {
     discover: 'Descubrir',
     library: 'Biblioteca',
     settings: 'Ajustes',
-    profile: 'Perfil',
     signIn: 'Iniciar sesión',
     signOut: 'Cerrar sesión',
+    queue: 'Cola',
+    account: 'Cuenta',
   },
 
   search: {
-    placeholder: 'Buscar podcasts...',
+    placeholder: 'Busca pódcasts y episodios, o pega la URL de un feed',
     episodesPlaceholder: 'Buscar episodios...',
     noResults: 'No se encontraron podcasts',
     label: 'Buscar podcasts',
@@ -48,43 +49,6 @@ export const messages: Messages = {
     haveAccount: '¿Ya tienes cuenta? Inicia sesión',
     noAccountFound: 'No se encontró la cuenta. Crea una abajo.',
     accountExists: 'La cuenta ya existe. Inicia sesión.',
-  },
-
-  settings: {
-    title: 'Ajustes',
-    language: 'Idioma',
-    languageDescription: 'Idioma de la interfaz',
-    region: 'Región',
-    regionDescription: 'Elige tu región para las listas de éxitos',
-    theme: 'Tema',
-    themeDescription: 'Personaliza la apariencia de Podcst',
-    shortcuts: 'Atajos de teclado',
-    shortcutsDescription: 'Ver y gestionar atajos',
-    export: 'Exportar',
-    exportDescription: 'Descarga tu biblioteca como un archivo OPML',
-    exportDescriptionLong:
-      'Descarga tus suscripciones como un archivo OPML para importarlas en otras aplicaciones.',
-    emptyLibrary: 'Tu biblioteca está vacía',
-    emptyLibraryDescription:
-      'Suscríbete a podcasts para crear tu biblioteca personal, o importa tus suscripciones actuales desde otra aplicación.',
-    browsePopularPodcasts: 'Explorar podcasts populares',
-    exportLibrary: 'Exportar biblioteca',
-    exportLibraryDescription:
-      'Descarga tu biblioteca como un archivo OPML. Puedes usar este archivo para importar tus podcasts en otras aplicaciones.',
-    exportLibraryCta: 'Descargar archivo OPML',
-    exportLibraryCount:
-      '{count} {count, plural, one {podcast} other {podcasts}} en tu biblioteca',
-  },
-
-  profile: {
-    title: 'Perfil',
-    account: 'Cuenta',
-    subscriptions: 'Suscripciones',
-    syncDescription:
-      'Tienes {count} {count, plural, one {podcast} other {podcasts}} guardados en este dispositivo. Impórtalos a tu cuenta para sincronizarlos en todos tus dispositivos.',
-    importFromDevice: 'Importar desde dispositivo',
-    importing: 'Importando...',
-    downloadOPML: 'Descargar OPML',
   },
 
   chapters: {
@@ -166,6 +130,64 @@ export const messages: Messages = {
     starredEmpty: 'Aún no hay episodios favoritos',
     starredEmptyDescription:
       'Añade episodios a favoritos para encontrarlos aquí.',
+    emptyLibrary: 'Tu biblioteca está vacía',
+    emptyLibraryDescription:
+      'Suscríbete a podcasts para crear tu biblioteca personal, o importa tus suscripciones actuales desde otra aplicación.',
+    browsePopular: 'Explorar podcasts populares',
+  },
+
+  account: {
+    title: 'Cuenta',
+    profile: 'Perfil',
+    playback: 'Reproducción',
+    appearance: 'Apariencia',
+    region: 'Región e idioma',
+    library: 'Importar y exportar',
+    shortcuts: 'Atajos de teclado',
+    memberSince: 'Miembro desde {date}',
+    subscriptionCount:
+      '{count, plural, one {# suscripción} other {# suscripciones}}',
+    guestTitle: 'Inicia sesión para sincronizar tu biblioteca',
+    guestBody:
+      'Tus suscripciones y tu progreso te acompañan en la web, iOS y Android.',
+    passkeys: 'Llaves de acceso',
+    passkey: 'Llave de acceso',
+    passkeyAdded: 'Añadida en {date}',
+    passkeyUsed: 'Usada el {date}',
+    passkeyUsedToday: 'Usada hoy',
+    removePasskey: 'Quitar',
+    removePasskeyConfirm:
+      '¿Quitar esta llave de acceso? Podrás seguir entrando con un código por correo.',
+    addPasskey: 'Añadir llave de acceso',
+    noPasskeys: 'Aún no hay llaves de acceso. Entras con un código por correo.',
+    defaultSpeed: 'Velocidad predeterminada',
+    speedSynced: 'Se sincroniza con iOS y Android.',
+    speedLocal: 'Guardada en este dispositivo.',
+    trimSilence: 'Recortar silencios',
+    trimSilenceDescription: 'Acorta las pausas sin cambiar el tono.',
+    volumeBoost: 'Aumento de volumen',
+    volumeBoostDescription: 'Equilibra voces bajas y música fuerte.',
+    effectsNote:
+      'Los efectos de audio se aplican en las apps de iOS y Android.',
+    theme: 'Tema',
+    themeSystem: 'Sistema',
+    themeLight: 'Claro',
+    themeDark: 'Oscuro',
+    chartsRegion: 'Región de las listas',
+    detected: 'Detectada automáticamente',
+    language: 'Idioma',
+    opml: 'OPML',
+    opmlDescription:
+      'Lleva tus suscripciones dentro y fuera de Podcst. Importar solo añade a tu biblioteca, nunca quita nada.',
+    importOpml: 'Importar OPML',
+    importing: 'Importando…',
+    importResult: '{imported} importadas, {failed} fallidas',
+    retryFailed: 'Reintentar fallidas',
+    exportOpml: 'Exportar {count}',
+    thisDevice: 'Este dispositivo',
+    thisDeviceDescription:
+      '{count, plural, one {# pódcast guardado} other {# pódcasts guardados}} en este navegador.',
+    importDevice: 'Añadir a la cuenta',
   },
 
   feed: {
@@ -213,11 +235,9 @@ export const messages: Messages = {
   shortcuts: {
     home: 'Inicio / Éxitos',
     subscriptions: 'Suscripciones',
-    recents: 'Recientes',
     settings: 'Ajustes',
     search: 'Buscar',
     toggleTheme: 'Cambiar tema',
-    previousTheme: 'Tema anterior',
     showEpisodeInfo: 'Ver info. del episodio',
     queue: 'Cola',
     playPause: 'Reproducir / Pausar',
@@ -230,13 +250,6 @@ export const messages: Messages = {
     decreaseSpeed: 'Disminuir velocidad',
     toggleMute: 'Alternar silencio',
     showShortcuts: 'Mostrar atajos',
-  },
-
-  themes: {
-    autumnLight: 'Otoño claro',
-    autumnDark: 'Otoño oscuro',
-    lightBlurb: 'Apariencia limpia y clara',
-    darkBlurb: 'Optimizado para entornos oscuros',
   },
 
   errors: {

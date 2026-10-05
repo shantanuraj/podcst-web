@@ -13,11 +13,9 @@ export interface IShortcutInfo extends IKeyboardShortcut {
 type DisplayableShortcuts =
   | 'home'
   | 'subscriptions'
-  | 'recents'
   | 'settings'
   | 'search'
   | 'theme'
-  | 'previousTheme'
   | 'info'
   | 'queue'
   | 'togglePlayback'
@@ -46,13 +44,6 @@ export const shortcuts: Record<DisplayableShortcuts, IShortcutInfo> = {
     metaKey: false,
     shiftKey: false,
   },
-  recents: {
-    title: 'Recents',
-    key: 'r',
-    displayKey: 'r',
-    metaKey: false,
-    shiftKey: false,
-  },
   settings: {
     title: 'Settings',
     key: ',',
@@ -62,10 +53,17 @@ export const shortcuts: Record<DisplayableShortcuts, IShortcutInfo> = {
   },
   search: {
     title: 'Search',
-    key: '/',
-    displayKey: '/',
-    metaKey: false,
+    key: 'k',
+    displayKey: '⌘K',
+    metaKey: true,
     shiftKey: false,
+    secondary: [
+      {
+        key: '/',
+        metaKey: false,
+        shiftKey: false,
+      },
+    ],
   },
   theme: {
     title: 'Toggle theme',
@@ -73,13 +71,6 @@ export const shortcuts: Record<DisplayableShortcuts, IShortcutInfo> = {
     displayKey: 't',
     metaKey: false,
     shiftKey: false,
-  },
-  previousTheme: {
-    title: 'Previous theme',
-    key: 'T',
-    displayKey: 'T',
-    metaKey: false,
-    shiftKey: true,
   },
   info: {
     title: 'Show episode info',

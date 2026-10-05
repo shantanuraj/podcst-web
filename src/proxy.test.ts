@@ -46,6 +46,22 @@ describe('chart redirects', () => {
     );
   });
 
+  test('the first browser language with a listed region decides', () => {
+    for (const [languages, region] of [
+      ['ko-KR,ko;q=0.9', 'kr'],
+      ['en-GB,sv-SE;q=0.8', 'se'],
+      ['nb-NO', 'no'],
+      ['en-US', 'us'],
+    ])
+      expect(
+        proxy(
+          new NextRequest('https://www.podcst.app/', {
+            headers: { 'accept-language': languages },
+          }),
+        ).headers.get('location'),
+      ).toBe(`https://www.podcst.app/${region}/feed/top`);
+  });
+
   test('unsupported browser languages use the default region', () => {
     const response = proxy(
       new NextRequest('https://www.podcst.app/', {

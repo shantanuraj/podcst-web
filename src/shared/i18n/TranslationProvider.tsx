@@ -3,6 +3,7 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -30,26 +31,24 @@ interface TranslationContextValue {
   language: Language;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   messages: Messages;
+  setLanguage: (language: Language) => void;
 }
 
 const TranslationContext = createContext<TranslationContextValue>({
   language: defaultLanguage,
   t: (key) => key,
   messages: en,
+  setLanguage: () => {},
 });
 
 export function TranslationProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(defaultLanguage);
 
-  useEffect(() => {
-    setLanguage(getStoredLanguage());
+  useEffect(() => setLanguage(getStoredLanguage()), []);
 
-    const handleCookieChange = () => {
-      setLanguage(getStoredLanguage());
-    };
-
-    const interval = setInterval(handleCookieChange, 1000);
-    return () => clearInterval(interval);
+  const chooseLanguage = useCallback((next: Language) => {
+    document.cookie = `${LANGUAGE_COOKIE}=${next};path=/;max-age=31536000;samesite=lax`;
+    setLanguage(next);
   }, []);
 
   const messages = getMessagesForLanguage(language);
@@ -59,8 +58,6 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
     params?: Record<string, string | number>,
   ): string => {
     let value = translateKey(messages, key, params);
-
-    // Fallback to English if translation not found for non-English languages
     if (value === key && language !== 'en') {
       value = translateKey(en, key, params);
     }
@@ -69,7 +66,9 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <TranslationContext.Provider value={{ language, t, messages }}>
+    <TranslationContext.Provider
+      value={{ language, t, messages, setLanguage: chooseLanguage }}
+    >
       {children}
     </TranslationContext.Provider>
   );

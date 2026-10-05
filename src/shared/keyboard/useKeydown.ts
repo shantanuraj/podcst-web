@@ -20,7 +20,7 @@ export function useKeydown(
   const shortcutsOrConfig = typeof arg === 'function' ? arg(router) : arg;
   const safeHandler = React.useCallback(
     (e: KeyboardEvent) => {
-      if (isNotIgnoreElement(e.target)) {
+      if (e.metaKey || e.ctrlKey || isNotIgnoreElement(e.target)) {
         if (Array.isArray(shortcutsOrConfig)) {
           shortcutsOrConfig.forEach(([shortcut, handler]) => {
             if (isMatchingEvent(e, shortcut)) {
@@ -50,11 +50,11 @@ const ignoreKeyboardSelector = 'input,select,textarea,a,button,[role="button"]';
  * Boolean check for ignore selector
  */
 const isNotIgnoreElement = (target: EventTarget | null) =>
-  !!target && !(target as HTMLElement).matches(ignoreKeyboardSelector);
+  target instanceof Element && !target.matches(ignoreKeyboardSelector);
 
 const isMatchingShortcut = (e: KeyboardEvent, config: IKeyboardShortcut) => {
   return (
-    e.metaKey === config.metaKey &&
+    (e.metaKey || e.ctrlKey) === config.metaKey &&
     e.shiftKey === config.shiftKey &&
     (e.key === config.key || config.key === '*')
   );

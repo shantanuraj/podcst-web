@@ -12,13 +12,14 @@ export const messages = {
     discover: 'Discover',
     library: 'Library',
     settings: 'Settings',
-    profile: 'Profile',
     signIn: 'Sign in',
     signOut: 'Sign out',
+    queue: 'Queue',
+    account: 'Account',
   },
 
   search: {
-    placeholder: 'Search podcasts...',
+    placeholder: 'Search podcasts and episodes, or paste a feed URL',
     episodesPlaceholder: 'Search episodes...',
     noResults: 'No podcasts found',
     label: 'Search podcasts',
@@ -46,43 +47,6 @@ export const messages = {
     haveAccount: 'Already have an account? Sign in',
     noAccountFound: 'No account found. Create one below.',
     accountExists: 'Account already exists. Sign in instead.',
-  },
-
-  settings: {
-    title: 'Settings',
-    language: 'Language',
-    languageDescription: 'Interface language',
-    region: 'Region',
-    regionDescription: 'Choose your region for top podcast charts',
-    theme: 'Theme',
-    themeDescription: 'Customize the appearance of Podcst',
-    shortcuts: 'Keyboard Shortcuts',
-    shortcutsDescription: 'View and manage shortcuts',
-    export: 'Export',
-    exportDescription: 'Download your library as an OPML file',
-    exportDescriptionLong:
-      'Download your subscriptions as an OPML file to import into other apps.',
-    emptyLibrary: 'Your Library is Empty',
-    emptyLibraryDescription:
-      'Subscribe to podcasts to build your personal library, or import your existing subscriptions from another app.',
-    browsePopularPodcasts: 'Browse popular podcasts',
-    exportLibrary: 'Export Library',
-    exportLibraryDescription:
-      'Download your library as an OPML file. You can use this file to import your podcasts into other applications',
-    exportLibraryCta: 'Download OPML File',
-    exportLibraryCount:
-      '{count} {count, plural, one {podcast} other {podcasts}} in your library',
-  },
-
-  profile: {
-    title: 'Profile',
-    account: 'Account',
-    subscriptions: 'Subscriptions',
-    syncDescription:
-      'You have {count} {count, plural, one {podcast} other {podcasts}} saved on this device. Import them to your account to sync across all your devices.',
-    importFromDevice: 'Import from Device',
-    importing: 'Importing...',
-    downloadOPML: 'Download OPML',
   },
 
   chapters: {
@@ -163,6 +127,63 @@ export const messages = {
     unstar: 'Unstar',
     starredEmpty: 'No starred episodes yet',
     starredEmptyDescription: 'Star episodes to find them here.',
+    emptyLibrary: 'Your Library is Empty',
+    emptyLibraryDescription:
+      'Subscribe to podcasts to build your personal library, or import your existing subscriptions from another app.',
+    browsePopular: 'Browse popular podcasts',
+  },
+
+  account: {
+    title: 'Account',
+    profile: 'Profile',
+    playback: 'Playback',
+    appearance: 'Appearance',
+    region: 'Region & language',
+    library: 'Import & export',
+    shortcuts: 'Keyboard shortcuts',
+    memberSince: 'Member since {date}',
+    subscriptionCount:
+      '{count, plural, one {# subscription} other {# subscriptions}}',
+    guestTitle: 'Sign in to sync your library',
+    guestBody:
+      'Subscriptions and progress follow you across web, iOS and Android.',
+    passkeys: 'Passkeys',
+    passkey: 'Passkey',
+    passkeyAdded: 'Added {date}',
+    passkeyUsed: 'Used {date}',
+    passkeyUsedToday: 'Used today',
+    removePasskey: 'Remove',
+    removePasskeyConfirm:
+      'Remove this passkey? You can still sign in with an emailed code.',
+    addPasskey: 'Add passkey',
+    noPasskeys: 'No passkeys yet. You sign in with an emailed code.',
+    defaultSpeed: 'Default speed',
+    speedSynced: 'Syncs to iOS and Android.',
+    speedLocal: 'Saved on this device.',
+    trimSilence: 'Trim silence',
+    trimSilenceDescription: 'Shortens pauses without changing pitch.',
+    volumeBoost: 'Volume boost',
+    volumeBoostDescription: 'Evens out quiet voices and loud music.',
+    effectsNote: 'Audio effects play in the iOS and Android apps.',
+    theme: 'Theme',
+    themeSystem: 'System',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    chartsRegion: 'Charts region',
+    detected: 'Detected automatically',
+    language: 'Language',
+    opml: 'OPML',
+    opmlDescription:
+      'Move subscriptions in and out of Podcst. Importing adds to your library and never removes anything.',
+    importOpml: 'Import OPML',
+    importing: 'Importing…',
+    importResult: '{imported} imported, {failed} failed',
+    retryFailed: 'Retry failed',
+    exportOpml: 'Export {count}',
+    thisDevice: 'This device',
+    thisDeviceDescription:
+      '{count, plural, one {# podcast is} other {# podcasts are}} saved in this browser.',
+    importDevice: 'Add to account',
   },
 
   feed: {
@@ -210,11 +231,9 @@ export const messages = {
   shortcuts: {
     home: 'Home / Top',
     subscriptions: 'Subscriptions',
-    recents: 'Recents',
     settings: 'Settings',
     search: 'Search',
     toggleTheme: 'Toggle theme',
-    previousTheme: 'Previous theme',
     showEpisodeInfo: 'Show episode info',
     queue: 'Queue',
     playPause: 'Play / Pause',
@@ -227,13 +246,6 @@ export const messages = {
     decreaseSpeed: 'Lower playback rate',
     toggleMute: 'Toggle mute',
     showShortcuts: 'Show shortcuts',
-  },
-
-  themes: {
-    autumnLight: 'Autumn Light',
-    autumnDark: 'Autumn Dark',
-    lightBlurb: 'Clean and bright appearance',
-    darkBlurb: 'Optimized for low-light environments',
   },
 
   errors: {

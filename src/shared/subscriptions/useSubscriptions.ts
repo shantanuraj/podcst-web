@@ -67,11 +67,9 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
     }
   },
   addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => {
-    const nextSubscriptions: SubscriptionsState['subs'] = {};
-    podcasts.forEach((info) => {
-      if (!info.isPrivate) nextSubscriptions[info.feed] = info;
-    });
-    set({ subs: nextSubscriptions });
+    const subs = { ...get().subs };
+    for (const info of podcasts) if (!info.isPrivate) subs[info.feed] = info;
+    set({ subs });
   },
   syncSubscription: (feed, info) => {
     const state = get();

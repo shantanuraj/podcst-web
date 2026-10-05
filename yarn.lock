@@ -112,18 +112,6 @@
     shell-quote "^1.8.2"
     yargs "^17.7.2"
 
-"@formatjs/fast-memoize@3.1.6":
-  version "3.1.6"
-  resolved "https://registry.yarnpkg.com/@formatjs/fast-memoize/-/fast-memoize-3.1.6.tgz#fca16a7d60f89df48f506f130f58223d7d81c2a2"
-  integrity sha512-H5aexk1Le7T9TPmscacZ+1pR6CTa2n1wq+HDVGXhH8TzUlQQpeXzZs91dRtmFHrbeNbjPFPfQujUqm7MHgVoXQ==
-
-"@formatjs/intl-localematcher@0.8.10":
-  version "0.8.10"
-  resolved "https://registry.yarnpkg.com/@formatjs/intl-localematcher/-/intl-localematcher-0.8.10.tgz#e9bd512178122dd7c7a92d2f145daed7ce598147"
-  integrity sha512-P/IC3qws3jH+1fEs+o0RIFgXKRaQlFehjS5W0FPAqdo6hgzawLl+eD0q0JjheQ3XtoOe5n8WSYfX06KQZI/QJA==
-  dependencies:
-    "@formatjs/fast-memoize" "3.1.6"
-
 "@hexagon/base64@^1.1.27":
   version "1.1.28"
   resolved "https://registry.yarnpkg.com/@hexagon/base64/-/base64-1.1.28.tgz#7d306a97f1423829be5b27c9d388fe50e3099d48"
@@ -962,11 +950,6 @@
   resolved "https://registry.yarnpkg.com/@types/howler/-/howler-2.2.13.tgz#16fe866b3494f5a825041b232ae06de18ec1b2e7"
   integrity sha512-40+EBjqIHHrC4VShlz/7i0lBUsE3QkgzZinQQji74Hd8sBkJZUBaT7LWFLK6rcabsDOOQpoMbEJvtaFQwxOu/g==
 
-"@types/negotiator@0.6.4":
-  version "0.6.4"
-  resolved "https://registry.yarnpkg.com/@types/negotiator/-/negotiator-0.6.4.tgz#d2c0e186cfe1ce2ba38818acce756284ca4d8642"
-  integrity sha512-elf6BsTq+AkyNsb2h5cGNst2Mc7dPliVoAPm1fXglC/BM3f2pFA40BaSSv3E5lyHteEawVKLP+8TwiY1DMNb3A==
-
 "@types/node@*":
   version "20.3.3"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-20.3.3.tgz#329842940042d2b280897150e023e604d11657d6"
@@ -1720,11 +1703,6 @@ nanoid@^3.3.12:
   version "3.3.19"
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.3.19.tgz#336d4aa4bcd4fb24d2cddede7ffeae40bec03f0a"
   integrity sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==
-
-negotiator@1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/negotiator/-/negotiator-1.0.0.tgz#b6c91bb47172d69f93cfd7c357bbb529019b5f6a"
-  integrity sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==
 
 next@16.2.9:
   version "16.2.9"

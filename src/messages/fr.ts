@@ -14,13 +14,15 @@ export const messages: Messages = {
     discover: 'Découvrir',
     library: 'Bibliothèque',
     settings: 'Réglages',
-    profile: 'Profil',
     signIn: 'Se connecter',
     signOut: 'Se déconnecter',
+    queue: 'File d’attente',
+    account: 'Compte',
   },
 
   search: {
-    placeholder: 'Rechercher des podcasts...',
+    placeholder:
+      'Cherchez des podcasts et des épisodes, ou collez l’URL d’un flux',
     episodesPlaceholder: 'Rechercher des épisodes...',
     noResults: 'Aucun podcast trouvé',
     label: 'Rechercher des podcasts',
@@ -48,44 +50,6 @@ export const messages: Messages = {
     haveAccount: 'Déjà un compte ? Connectez-vous',
     noAccountFound: 'Aucun compte trouvé. Créez-en un ci-dessous.',
     accountExists: 'Ce compte existe déjà. Connectez-vous.',
-  },
-
-  settings: {
-    title: 'Réglages',
-    language: 'Langue',
-    languageDescription: 'Langue de l’interface',
-    region: 'Région',
-    regionDescription:
-      'Choisissez votre région pour les classements de podcasts',
-    theme: 'Thème',
-    themeDescription: 'Personnalisez l’apparence de Podcst',
-    shortcuts: 'Raccourcis clavier',
-    shortcutsDescription: 'Voir et gérer les raccourcis',
-    export: 'Exporter',
-    exportDescription: 'Téléchargez votre bibliothèque au format OPML',
-    exportDescriptionLong:
-      'Téléchargez vos abonnements au format OPML pour les importer dans d’autres applications.',
-    emptyLibrary: 'Votre bibliothèque est vide',
-    emptyLibraryDescription:
-      'Abonnez-vous à des podcasts pour construire votre bibliothèque personnelle, ou importez vos abonnements existants depuis une autre application.',
-    browsePopularPodcasts: 'Parcourir les podcasts populaires',
-    exportLibrary: 'Exporter la bibliothèque',
-    exportLibraryDescription:
-      'Téléchargez votre bibliothèque au format OPML. Vous pouvez utiliser ce fichier pour importer vos podcasts dans d’autres applications.',
-    exportLibraryCta: 'Télécharger le fichier OPML',
-    exportLibraryCount:
-      '{count} {count, plural, one {podcast} other {podcasts}} dans votre bibliothèque',
-  },
-
-  profile: {
-    title: 'Profil',
-    account: 'Compte',
-    subscriptions: 'Abonnements',
-    syncDescription:
-      'Vous avez {count} {count, plural, one {podcast enregistré} other {podcasts enregistrés}} sur cet appareil. Importez-les sur votre compte pour les synchroniser sur tous vos appareils.',
-    importFromDevice: 'Importer depuis l’appareil',
-    importing: 'Importation...',
-    downloadOPML: 'Télécharger OPML',
   },
 
   chapters: {
@@ -167,6 +131,64 @@ export const messages: Messages = {
     starredEmpty: 'Aucun épisode favori',
     starredEmptyDescription:
       'Ajoutez des épisodes aux favoris pour les retrouver ici.',
+    emptyLibrary: 'Votre bibliothèque est vide',
+    emptyLibraryDescription:
+      'Abonnez-vous à des podcasts pour construire votre bibliothèque personnelle, ou importez vos abonnements existants depuis une autre application.',
+    browsePopular: 'Parcourir les podcasts populaires',
+  },
+
+  account: {
+    title: 'Compte',
+    profile: 'Profil',
+    playback: 'Lecture',
+    appearance: 'Apparence',
+    region: 'Région et langue',
+    library: 'Importer et exporter',
+    shortcuts: 'Raccourcis clavier',
+    memberSince: 'Membre depuis {date}',
+    subscriptionCount:
+      '{count, plural, one {# abonnement} other {# abonnements}}',
+    guestTitle: 'Connectez-vous pour synchroniser votre bibliothèque',
+    guestBody:
+      'Vos abonnements et votre progression vous suivent sur le web, iOS et Android.',
+    passkeys: 'Clés d’accès',
+    passkey: 'Clé d’accès',
+    passkeyAdded: 'Ajoutée en {date}',
+    passkeyUsed: 'Utilisée le {date}',
+    passkeyUsedToday: 'Utilisée aujourd’hui',
+    removePasskey: 'Retirer',
+    removePasskeyConfirm:
+      'Retirer cette clé d’accès ? Vous pourrez toujours vous connecter avec un code envoyé par e-mail.',
+    addPasskey: 'Ajouter une clé d’accès',
+    noPasskeys:
+      'Aucune clé d’accès. Vous vous connectez avec un code envoyé par e-mail.',
+    defaultSpeed: 'Vitesse par défaut',
+    speedSynced: 'Synchronisée avec iOS et Android.',
+    speedLocal: 'Enregistrée sur cet appareil.',
+    trimSilence: 'Réduire les silences',
+    trimSilenceDescription: 'Raccourcit les pauses sans changer la hauteur.',
+    volumeBoost: 'Amplification du volume',
+    volumeBoostDescription: 'Équilibre les voix faibles et la musique forte.',
+    effectsNote: 'Les effets audio s’appliquent dans les apps iOS et Android.',
+    theme: 'Thème',
+    themeSystem: 'Système',
+    themeLight: 'Clair',
+    themeDark: 'Sombre',
+    chartsRegion: 'Région des classements',
+    detected: 'Détectée automatiquement',
+    language: 'Langue',
+    opml: 'OPML',
+    opmlDescription:
+      'Faites entrer et sortir vos abonnements de Podcst. L’import ajoute à votre bibliothèque sans rien retirer.',
+    importOpml: 'Importer un OPML',
+    importing: 'Import…',
+    importResult: '{imported} importés, {failed} en échec',
+    retryFailed: 'Réessayer les échecs',
+    exportOpml: 'Exporter {count}',
+    thisDevice: 'Cet appareil',
+    thisDeviceDescription:
+      '{count, plural, one {# podcast enregistré} other {# podcasts enregistrés}} dans ce navigateur.',
+    importDevice: 'Ajouter au compte',
   },
 
   feed: {
@@ -215,11 +237,9 @@ export const messages: Messages = {
   shortcuts: {
     home: 'Accueil / Tops',
     subscriptions: 'Abonnements',
-    recents: 'Récents',
     settings: 'Réglages',
     search: 'Recherche',
     toggleTheme: 'Changer de thème',
-    previousTheme: 'Thème précédent',
     showEpisodeInfo: 'Voir les infos de l’épisode',
     queue: 'File d’attente',
     playPause: 'Lecture / Pause',
@@ -232,13 +252,6 @@ export const messages: Messages = {
     decreaseSpeed: 'Diminuer la vitesse',
     toggleMute: 'Couper/Réactiver le son',
     showShortcuts: 'Afficher les raccourcis',
-  },
-
-  themes: {
-    autumnLight: 'Automne Clair',
-    autumnDark: 'Automne Sombre',
-    lightBlurb: 'Apparence propre et lumineuse',
-    darkBlurb: 'Optimisé pour les environnements sombres',
   },
 
   errors: {

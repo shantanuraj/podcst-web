@@ -5,6 +5,7 @@ import { TranslationProvider } from '@/shared/i18n';
 import { Player } from '@/shared/player/Player';
 import { QueryProvider } from '@/shared/query/QueryProvider';
 import { ThemeListener } from '@/shared/theme/ThemeListener';
+import { themeScript } from '@/shared/theme/theme';
 import { Toast } from '@/shared/toast/Toast';
 import { Init } from './Init';
 
@@ -50,7 +51,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   initialScale: 1.0,
   width: 'device-width',
-  themeColor: '#FAF9F7',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#faf9f7' },
+    { media: '(prefers-color-scheme: dark)', color: '#1c1b1a' },
+  ],
 };
 
 export default async function App({ children }: { children: React.ReactNode }) {
@@ -65,8 +69,9 @@ export default async function App({ children }: { children: React.ReactNode }) {
       }
     : null;
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <meta charSet="utf-8" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link

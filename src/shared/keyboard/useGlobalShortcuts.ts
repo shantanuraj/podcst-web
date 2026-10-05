@@ -1,4 +1,4 @@
-import { useTheme } from '@/shared/theme/useTheme';
+import { useThemeStore } from '@/shared/theme/useTheme';
 import { shortcuts } from './shortcuts';
 import { type KeyboardShortcuts, useKeydown } from './useKeydown';
 
@@ -6,39 +6,10 @@ export function useGlobalShortcuts() {
   useKeydown(globalShortcuts);
 }
 
-const { cycleScheme } = useTheme.getState();
-
 const globalShortcuts: KeyboardShortcuts = (router) => [
-  [
-    shortcuts.home,
-    () => {
-      router.push('/feed/top');
-    },
-  ],
-  [
-    shortcuts.subscriptions,
-    () => {
-      router.push('/subs');
-    },
-  ],
-  [
-    shortcuts.recents,
-    () => {
-      router.push('/recents');
-    },
-  ],
-  [
-    shortcuts.settings,
-    () => {
-      router.push('/settings');
-    },
-  ],
-  [
-    shortcuts.shortcuts,
-    () => {
-      router.push('/settings/shortcuts');
-    },
-  ],
-  [shortcuts.previousTheme, () => cycleScheme('left')],
-  [shortcuts.theme, () => cycleScheme('right')],
+  [shortcuts.home, () => router.push('/feed/top')],
+  [shortcuts.subscriptions, () => router.push('/subs')],
+  [shortcuts.settings, () => router.push('/account')],
+  [shortcuts.shortcuts, () => router.push('/account#shortcuts')],
+  [shortcuts.theme, () => useThemeStore.getState().toggle()],
 ];

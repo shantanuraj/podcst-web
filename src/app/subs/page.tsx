@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-import { ImportButton } from '@/components/ImportButton/ImportButton';
+import { OpmlImport } from '@/components/OpmlImport/OpmlImport';
 import { ItemListSchema } from '@/components/Schema';
 import { useTranslation } from '@/shared/i18n';
 import { useStars } from '@/shared/stars/useStars';
@@ -33,7 +33,6 @@ const LibraryPage: NextPage = () => {
   const podcasts = useSubscriptions(useShallow(getPodcastsList));
   const starred = useStars();
   const episodes = useSubscriptions(useShallow(getRecents));
-  const addSubscriptions = useSubscriptions(getAddSubscriptions);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -55,17 +54,14 @@ const LibraryPage: NextPage = () => {
             <path d="M19 11a7 7 0 0 1-7 7m0 0a7 7 0 0 1-7-7m7 7v4m0 0h-3m3 0h3M12 4a7 7 0 0 0-7 7m14 0a7 7 0 0 0-7-7" />
           </svg>
         </div>
-        <h1 className={styles.emptyTitle}>{t('settings.emptyLibrary')}</h1>
+        <h1 className={styles.emptyTitle}>{t('library.emptyLibrary')}</h1>
         <p className={styles.emptyText}>
-          {t('settings.emptyLibraryDescription')}
+          {t('library.emptyLibraryDescription')}
         </p>
         <div className={styles.emptyActions}>
-          <ImportButton
-            onImport={addSubscriptions}
-            className={styles.importButton}
-          />
+          <OpmlImport />
           <Link href="/feed/top" className={styles.browseLink}>
-            {t('settings.browsePopularPodcasts')}
+            {t('library.browsePopular')}
           </Link>
         </div>
       </div>
@@ -133,8 +129,6 @@ const EPISODES_LIMIT = 50;
 
 const getPodcastsList = (state: SubscriptionsState) =>
   Object.values(state.subs);
-const getAddSubscriptions = (state: SubscriptionsState) =>
-  state.addSubscriptions;
 const getSyncSubscriptions = (state: SubscriptionsState) =>
   state.syncAllSubscriptions;
 const getIsSyncing = (state: SubscriptionsState) => state.isSyncing;

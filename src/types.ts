@@ -250,20 +250,6 @@ export interface IPodcastSearchResult {
   title: string;
 }
 
-export type ThemeMode = 'dark' | 'light';
-
-export interface ITheme {
-  accent: string;
-  background: string;
-  backgroundDark: string;
-  backgroundLight: string;
-  backgroundSearch: string;
-  loaderAnimation: string;
-  subTitle: string;
-  text: string;
-  textLight: string;
-}
-
 export interface ISubscriptionsMap {
   [feed: string]: IPodcastEpisodesInfo;
 }

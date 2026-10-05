@@ -75,20 +75,6 @@
   gap: var(--space-4);
 }
 
-.importButton {
-  padding: var(--space-4) var(--space-8);
-  font-size: var(--text-base);
-  font-weight: 500;
-  background-color: var(--color-ink);
-  color: var(--color-surface);
-  border: 1px solid var(--color-ink);
-  transition: all 0.15s ease;
-}
-
-.importButton:hover {
-  background-color: var(--color-ink-secondary);
-}
-
 .browseLink {
   font-size: var(--text-sm);
   color: var(--color-accent);

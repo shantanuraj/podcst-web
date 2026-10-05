@@ -42,7 +42,8 @@ export function Search() {
   } = useSearch(debouncedTerm);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
-  const focusSearchShortcut = React.useCallback(() => {
+  const focusSearchShortcut = React.useCallback((event: KeyboardEvent) => {
+    event.preventDefault();
     requestAnimationFrame(() => {
       searchRef.current?.focus();
     });
@@ -72,14 +73,19 @@ export function Search() {
   });
 
   return (
-    <div className={styles.search}>
+    <div className={styles.search} data-query={inputTerm.length > 0}>
       {isFetching && <LoadBar />}
+      <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-4-4" />
+      </svg>
       <input
         {...getInputProps({ ref: searchRef })}
         aria-label={t('search.label')}
-        type="text"
+        type="search"
         placeholder={t('search.placeholder')}
       />
+      <kbd className={styles.hint}>{shortcuts.search.displayKey}</kbd>
       <ul {...getMenuProps()} className={styles.results}>
         {isOpen && needsSignIn && (
           <li>

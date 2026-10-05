@@ -14,13 +14,14 @@ export const messages: Messages = {
     discover: 'Upptäck',
     library: 'Bibliotek',
     settings: 'Inställningar',
-    profile: 'Profil',
     signIn: 'Logga in',
     signOut: 'Logga ut',
+    queue: 'Kö',
+    account: 'Konto',
   },
 
   search: {
-    placeholder: 'Sök poddar...',
+    placeholder: 'Sök poddar och avsnitt, eller klistra in en flödes-URL',
     episodesPlaceholder: 'Sök avsnitt...',
     noResults: 'Inga poddar hittades',
     label: 'Sök poddar',
@@ -48,43 +49,6 @@ export const messages: Messages = {
     haveAccount: 'Har du redan ett konto? Logga in',
     noAccountFound: 'Inget konto hittades. Skapa ett nedan.',
     accountExists: 'Kontot finns redan. Logga in istället.',
-  },
-
-  settings: {
-    title: 'Inställningar',
-    language: 'Språk',
-    languageDescription: 'Gränssnittsspråk',
-    region: 'Region',
-    regionDescription: 'Välj din region för topplistor',
-    theme: 'Tema',
-    themeDescription: 'Anpassa utseendet på Podcst',
-    shortcuts: 'Kortkommandon',
-    shortcutsDescription: 'Visa och hantera kortkommandon',
-    export: 'Exportera',
-    exportDescription: 'Ladda ner ditt bibliotek som en OPML-fil',
-    exportDescriptionLong:
-      'Ladda ner dina prenumerationer som en OPML-fil för att importera i andra appar.',
-    emptyLibrary: 'Ditt bibliotek är tomt',
-    emptyLibraryDescription:
-      'Prenumerera på poddar för att bygga ditt personliga bibliotek, eller importera dina befintliga prenumerationer från en annan app.',
-    browsePopularPodcasts: 'Bläddra bland populära poddar',
-    exportLibrary: 'Exportera bibliotek',
-    exportLibraryDescription:
-      'Ladda ner ditt bibliotek som en OPML-fil. Du kan använda den här filen för att importera dina poddar i andra appar.',
-    exportLibraryCta: 'Ladda ner OPML-fil',
-    exportLibraryCount:
-      '{count} {count, plural, one {podd} other {poddar}} i ditt bibliotek',
-  },
-
-  profile: {
-    title: 'Profil',
-    account: 'Konto',
-    subscriptions: 'Prenumerationer',
-    syncDescription:
-      'Du har {count} {count, plural, one {podd} other {poddar}} sparade på den här enheten. Importera dem till ditt konto för att synkronisera mellan alla dina enheter.',
-    importFromDevice: 'Importera från enhet',
-    importing: 'Importerar...',
-    downloadOPML: 'Ladda ner OPML',
   },
 
   chapters: {
@@ -165,6 +129,63 @@ export const messages: Messages = {
     unstar: 'Ta bort stjärna',
     starredEmpty: 'Inga stjärnmärkta avsnitt ännu',
     starredEmptyDescription: 'Stjärnmärk avsnitt för att hitta dem här.',
+    emptyLibrary: 'Ditt bibliotek är tomt',
+    emptyLibraryDescription:
+      'Prenumerera på poddar för att bygga ditt personliga bibliotek, eller importera dina befintliga prenumerationer från en annan app.',
+    browsePopular: 'Bläddra bland populära poddar',
+  },
+
+  account: {
+    title: 'Konto',
+    profile: 'Profil',
+    playback: 'Uppspelning',
+    appearance: 'Utseende',
+    region: 'Region och språk',
+    library: 'Importera och exportera',
+    shortcuts: 'Kortkommandon',
+    memberSince: 'Medlem sedan {date}',
+    subscriptionCount:
+      '{count, plural, one {# prenumeration} other {# prenumerationer}}',
+    guestTitle: 'Logga in för att synka ditt bibliotek',
+    guestBody:
+      'Dina prenumerationer och din position följer med på webben, iOS och Android.',
+    passkeys: 'Nycklar',
+    passkey: 'Nyckel',
+    passkeyAdded: 'Tillagd {date}',
+    passkeyUsed: 'Använd {date}',
+    passkeyUsedToday: 'Använd i dag',
+    removePasskey: 'Ta bort',
+    removePasskeyConfirm:
+      'Ta bort den här nyckeln? Du kan fortfarande logga in med en kod via e-post.',
+    addPasskey: 'Lägg till nyckel',
+    noPasskeys: 'Inga nycklar än. Du loggar in med en kod via e-post.',
+    defaultSpeed: 'Standardhastighet',
+    speedSynced: 'Synkas till iOS och Android.',
+    speedLocal: 'Sparas på den här enheten.',
+    trimSilence: 'Korta tystnad',
+    trimSilenceDescription: 'Kortar pauser utan att ändra tonhöjden.',
+    volumeBoost: 'Volymförstärkning',
+    volumeBoostDescription: 'Jämnar ut svaga röster och hög musik.',
+    effectsNote: 'Ljudeffekter används i apparna för iOS och Android.',
+    theme: 'Tema',
+    themeSystem: 'System',
+    themeLight: 'Ljust',
+    themeDark: 'Mörkt',
+    chartsRegion: 'Region för topplistor',
+    detected: 'Identifierad automatiskt',
+    language: 'Språk',
+    opml: 'OPML',
+    opmlDescription:
+      'Flytta prenumerationer till och från Podcst. Import lägger bara till och tar aldrig bort något.',
+    importOpml: 'Importera OPML',
+    importing: 'Importerar…',
+    importResult: '{imported} importerade, {failed} misslyckades',
+    retryFailed: 'Försök igen med misslyckade',
+    exportOpml: 'Exportera {count}',
+    thisDevice: 'Den här enheten',
+    thisDeviceDescription:
+      '{count, plural, one {# podd} other {# poddar}} sparade i den här webbläsaren.',
+    importDevice: 'Lägg till i kontot',
   },
 
   feed: {
@@ -211,11 +232,9 @@ export const messages: Messages = {
   shortcuts: {
     home: 'Hem / Topp',
     subscriptions: 'Prenumerationer',
-    recents: 'Senast spelade',
     settings: 'Inställningar',
     search: 'Sök',
     toggleTheme: 'Växla tema',
-    previousTheme: 'Föregående tema',
     showEpisodeInfo: 'Visa avsnittsinfo',
     queue: 'Kö',
     playPause: 'Spela / Pausa',
@@ -228,13 +247,6 @@ export const messages: Messages = {
     decreaseSpeed: 'Sänk hastighet',
     toggleMute: 'Växla ljud av/på',
     showShortcuts: 'Visa kortkommandon',
-  },
-
-  themes: {
-    autumnLight: 'Höstljus',
-    autumnDark: 'Höstmörker',
-    lightBlurb: 'Rent och ljust utseende',
-    darkBlurb: 'Optimerat för mörka miljöer',
   },
 
   errors: {

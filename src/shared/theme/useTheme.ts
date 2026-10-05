@@ -1,50 +1,42 @@
 import { create } from 'zustand';
 import { getValue } from '@/shared/storage/local';
-import type { ThemeMode } from '@/types';
+import {
+  darkQuery,
+  resolveTheme,
+  type Theme,
+  type ThemePreference,
+  themePreferences,
+} from './theme';
 
-const schemes = ['autumn'] as const;
-
-export type Scheme = (typeof schemes)[number];
-
-export type ThemeConfig = `${Scheme}/${ThemeMode}`;
-
-export interface IThemeInfo {
-  scheme: Scheme;
-  theme: ThemeMode;
+interface ThemeState {
+  preference: ThemePreference;
+  systemDark: boolean;
+  setPreference: (preference: ThemePreference) => void;
+  setSystemDark: (systemDark: boolean) => void;
+  toggle: () => void;
 }
 
-export const themes: readonly IThemeInfo[] = schemes.flatMap((scheme) => [
-  { scheme, theme: 'light' as const },
-  { scheme, theme: 'dark' as const },
-]);
+const stored = getValue('themeMode');
 
-type ThemeState = {
-  currentIndex: number;
-  themes: readonly IThemeInfo[];
-  scheme: Scheme;
-  theme: ThemeMode;
-  changeTheme: (scheme: Scheme, theme: ThemeMode) => void;
-  cycleScheme: (direction: 'left' | 'right') => void;
-  toggleDarkMode: () => void;
-};
-
-const currentIndex = 0;
-const defaultScheme = schemes[currentIndex];
-
-export const useTheme = create<ThemeState>((set, get) => ({
-  currentIndex,
-  themes,
-  scheme: getValue('scheme', defaultScheme),
-  theme: getValue('themeMode', 'light'),
-  changeTheme: (scheme, theme) => set({ scheme, theme }),
-  cycleScheme: (direction) => {
-    const { themes, currentIndex } = get();
-    const tmpIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-    const nextIndex =
-      tmpIndex < 0 ? themes.length - 1 : tmpIndex % themes.length;
-    const { scheme, theme } = themes[nextIndex];
-    set({ scheme, theme, currentIndex: nextIndex });
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  preference: themePreferences.includes(stored as ThemePreference)
+    ? (stored as ThemePreference)
+    : 'system',
+  systemDark:
+    typeof window === 'undefined' || window.matchMedia(darkQuery).matches,
+  setPreference: (preference) => set({ preference }),
+  setSystemDark: (systemDark) => set({ systemDark }),
+  toggle: () => {
+    const { preference, systemDark } = get();
+    set({
+      preference:
+        resolveTheme(preference, systemDark) === 'dark' ? 'light' : 'dark',
+    });
   },
-  toggleDarkMode: () =>
-    set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
 }));
+
+export function useTheme(): { preference: ThemePreference; theme: Theme } {
+  const preference = useThemeStore((state) => state.preference);
+  const systemDark = useThemeStore((state) => state.systemDark);
+  return { preference, theme: resolveTheme(preference, systemDark) };
+}

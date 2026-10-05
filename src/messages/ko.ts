@@ -14,13 +14,14 @@ export const messages: Messages = {
     discover: '둘러보기',
     library: '라이브러리',
     settings: '설정',
-    profile: '프로필',
     signIn: '로그인',
     signOut: '로그아웃',
+    queue: '대기열',
+    account: '계정',
   },
 
   search: {
-    placeholder: '팟캐스트 검색...',
+    placeholder: '팟캐스트와 에피소드를 검색하거나 피드 URL을 붙여넣으세요',
     episodesPlaceholder: '에피소드 검색...',
     noResults: '검색 결과가 없습니다',
     label: '팟캐스트 검색',
@@ -48,42 +49,6 @@ export const messages: Messages = {
     haveAccount: '이미 계정이 있으신가요? 로그인',
     noAccountFound: '계정을 찾을 수 없습니다. 아래에서 만드세요.',
     accountExists: '이미 계정이 있습니다. 로그인하세요.',
-  },
-
-  settings: {
-    title: '설정',
-    language: '언어',
-    languageDescription: '인터페이스 언어',
-    region: '지역',
-    regionDescription: '팟캐스트 순위 차트 지역을 선택하세요',
-    theme: '테마',
-    themeDescription: 'Podcst의 디자인을 설정하세요',
-    shortcuts: '단축키',
-    shortcutsDescription: '단축키 보기 및 관리',
-    export: '내보내기',
-    exportDescription: '라이브러리를 OPML 파일로 다운로드하세요',
-    exportDescriptionLong:
-      '구독 목록을 다른 앱에서 사용할 수 있도록 OPML 파일로 다운로드합니다.',
-    emptyLibrary: '라이브러리가 비어 있습니다',
-    emptyLibraryDescription:
-      '팟캐스트를 구독하여 나만의 라이브러리를 만들거나, 다른 앱에서 구독 목록을 가져오세요.',
-    browsePopularPodcasts: '인기 팟캐스트 둘러보기',
-    exportLibrary: '라이브러리 내보내기',
-    exportLibraryDescription:
-      '라이브러리를 OPML 파일로 다운로드합니다. 이 파일을 사용하여 다른 앱에서 팟캐스트를 가져올 수 있습니다.',
-    exportLibraryCta: 'OPML 파일 다운로드',
-    exportLibraryCount: '라이브러리에 {count}개의 팟캐스트가 있습니다',
-  },
-
-  profile: {
-    title: '프로필',
-    account: '계정',
-    subscriptions: '구독',
-    syncDescription:
-      '이 기기에 {count}개의 팟캐스트가 저장되어 있습니다. 계정에 가져오기하여 모든 기기에서 동기화하세요.',
-    importFromDevice: '기기에서 가져오기',
-    importing: '가져오는 중...',
-    downloadOPML: 'OPML 다운로드',
   },
 
   chapters: {
@@ -163,6 +128,61 @@ export const messages: Messages = {
     unstar: '별표 삭제',
     starredEmpty: '별표 표시한 에피소드가 없습니다',
     starredEmptyDescription: '에피소드에 별표를 표시하면 여기에 표시됩니다.',
+    emptyLibrary: '라이브러리가 비어 있습니다',
+    emptyLibraryDescription:
+      '팟캐스트를 구독하여 나만의 라이브러리를 만들거나, 다른 앱에서 구독 목록을 가져오세요.',
+    browsePopular: '인기 팟캐스트 둘러보기',
+  },
+
+  account: {
+    title: '계정',
+    profile: '프로필',
+    playback: '재생',
+    appearance: '화면',
+    region: '지역 및 언어',
+    library: '가져오기 및 내보내기',
+    shortcuts: '키보드 단축키',
+    memberSince: '{date}부터 회원',
+    subscriptionCount: '구독 {count}개',
+    guestTitle: '로그인하고 보관함을 동기화하세요',
+    guestBody: '구독과 재생 기록이 웹, iOS, Android에서 이어집니다.',
+    passkeys: '패스키',
+    passkey: '패스키',
+    passkeyAdded: '{date}에 추가됨',
+    passkeyUsed: '{date}에 사용됨',
+    passkeyUsedToday: '오늘 사용됨',
+    removePasskey: '삭제',
+    removePasskeyConfirm:
+      '이 패스키를 삭제할까요? 이메일 코드로 계속 로그인할 수 있습니다.',
+    addPasskey: '패스키 추가',
+    noPasskeys: '패스키가 없습니다. 이메일 코드로 로그인합니다.',
+    defaultSpeed: '기본 속도',
+    speedSynced: 'iOS 및 Android와 동기화됩니다.',
+    speedLocal: '이 기기에 저장됩니다.',
+    trimSilence: '무음 줄이기',
+    trimSilenceDescription: '음높이를 바꾸지 않고 멈춤을 줄입니다.',
+    volumeBoost: '볼륨 증폭',
+    volumeBoostDescription: '작은 목소리와 큰 음악의 균형을 맞춥니다.',
+    effectsNote: '오디오 효과는 iOS 및 Android 앱에서 적용됩니다.',
+    theme: '테마',
+    themeSystem: '시스템',
+    themeLight: '라이트',
+    themeDark: '다크',
+    chartsRegion: '차트 지역',
+    detected: '자동으로 감지됨',
+    language: '언어',
+    opml: 'OPML',
+    opmlDescription:
+      'Podcst로 구독을 가져오거나 내보냅니다. 가져오기는 추가만 하고 아무것도 지우지 않습니다.',
+    importOpml: 'OPML 가져오기',
+    importing: '가져오는 중…',
+    importResult: '{imported}개 가져옴, {failed}개 실패',
+    retryFailed: '실패한 항목 다시 시도',
+    exportOpml: '{count}개 내보내기',
+    thisDevice: '이 기기',
+    thisDeviceDescription:
+      '이 브라우저에 팟캐스트 {count}개가 저장되어 있습니다.',
+    importDevice: '계정에 추가',
   },
 
   feed: {
@@ -209,11 +229,9 @@ export const messages: Messages = {
   shortcuts: {
     home: '홈 / 인기',
     subscriptions: '구독 목록',
-    recents: '최근 재생',
     settings: '설정',
     search: '검색',
     toggleTheme: '테마 전환',
-    previousTheme: '이전 테마',
     showEpisodeInfo: '에피소드 정보 보기',
     queue: '대기열',
     playPause: '재생 / 일시정지',
@@ -226,13 +244,6 @@ export const messages: Messages = {
     decreaseSpeed: '재생 속도 낮추기',
     toggleMute: '음소거 전환',
     showShortcuts: '단축키 보기',
-  },
-
-  themes: {
-    autumnLight: '가을 햇살 (밝음)',
-    autumnDark: '가을 밤 (어두움)',
-    lightBlurb: '깔끔하고 밝은 화면',
-    darkBlurb: '어두운 환경에 최적화됨',
   },
 
   errors: {

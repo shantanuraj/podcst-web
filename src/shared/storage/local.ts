@@ -1,13 +1,11 @@
-import type { Scheme } from '@/shared/theme/useTheme';
-import type { ThemeMode } from '@/types';
+import type { ThemePreference } from '@/shared/theme/theme';
 
-const STORE_KEY = 'store@4';
+export const STORE_KEY = 'store@4';
 
 export interface IStoreable {
   volume: number;
   rate: number;
-  themeMode: ThemeMode;
-  scheme: Scheme;
+  themeMode: ThemePreference;
   lastSyncTime: number;
 }
 

@@ -14,13 +14,14 @@ export const messages: Messages = {
     discover: 'टॉप',
     library: 'लाइब्रेरी',
     settings: 'सेटिंग्स',
-    profile: 'प्रोफ़ाइल',
     signIn: 'साइन इन',
     signOut: 'साइन आउट',
+    queue: 'कतार',
+    account: 'खाता',
   },
 
   search: {
-    placeholder: 'पॉडकास्ट खोजें...',
+    placeholder: 'पॉडकास्ट और एपिसोड खोजें, या फ़ीड URL चिपकाएं',
     episodesPlaceholder: 'एपिसोड खोजें...',
     noResults: 'कोई पॉडकास्ट नहीं मिला',
     label: 'पॉडकास्ट खोजें',
@@ -48,43 +49,6 @@ export const messages: Messages = {
     haveAccount: 'पहले से खाता है? साइन इन करें',
     noAccountFound: 'खाता नहीं मिला। नीचे एक बनाएं।',
     accountExists: 'खाता पहले से मौजूद है। साइन इन करें।',
-  },
-
-  settings: {
-    title: 'सेटिंग्स',
-    language: 'भाषा',
-    languageDescription: 'इंटरफ़ेस भाषा',
-    region: 'क्षेत्र',
-    regionDescription: 'टॉप पॉडकास्ट चार्ट के लिए अपना क्षेत्र चुनें',
-    theme: 'थीम',
-    themeDescription: 'Podcst का स्वरूप बदलें',
-    shortcuts: 'कीबोर्ड शॉर्टकट्स',
-    shortcutsDescription: 'शॉर्टकट्स देखें और प्रबंधित करें',
-    export: 'निर्यात करें',
-    exportDescription: 'अपनी लाइब्रेरी को OPML फ़ाइल के रूप में डाउनलोड करें',
-    exportDescriptionLong:
-      'अपनी सदस्यताओं को अन्य ऐप्स में आयात करने के लिए OPML फ़ाइल के रूप में डाउनलोड करें।',
-    emptyLibrary: 'आपकी लाइब्रेरी खाली है',
-    emptyLibraryDescription:
-      'अपनी व्यक्तिगत लाइब्रेरी बनाने के लिए पॉडकास्ट को सब्सक्राइब करें, या किसी अन्य ऐप से अपनी मौजूदा सदस्यताएँ आयात करें।',
-    browsePopularPodcasts: 'लोकप्रिय पॉडकास्ट देखें',
-    exportLibrary: 'लाइब्रेरी निर्यात करें',
-    exportLibraryDescription:
-      'अपनी लाइब्रेरी को OPML फ़ाइल के रूप में डाउनलोड करें। आप इस फ़ाइल का उपयोग अन्य एप्लिकेशन्स में अपने पॉडकास्ट आयात करने के लिए कर सकते हैं।',
-    exportLibraryCta: 'OPML फ़ाइल डाउनलोड करें',
-    exportLibraryCount:
-      'आपकी लाइब्रेरी में {count} {count, plural, one {पॉडकास्ट} other {पॉडकास्ट}} हैं',
-  },
-
-  profile: {
-    title: 'प्रोफ़ाइल',
-    account: 'अकाउंट',
-    subscriptions: 'सदस्यताएँ',
-    syncDescription:
-      'इस डिवाइस पर आपके {count} पॉडकास्ट सुरक्षित हैं। सभी डिवाइसेस पर सिंक करने के लिए उन्हें अपने अकाउंट में आयात करें।',
-    importFromDevice: 'डिवाइस से आयात करें',
-    importing: 'आयात हो रहा है...',
-    downloadOPML: 'OPML डाउनलोड करें',
   },
 
   chapters: {
@@ -165,6 +129,59 @@ export const messages: Messages = {
     unstar: 'पसंदीदा से हटाएँ',
     starredEmpty: 'अभी कोई पसंदीदा एपिसोड नहीं है',
     starredEmptyDescription: 'उन्हें यहाँ देखने के लिए एपिसोड को पसंदीदा में जोड़ें।',
+    emptyLibrary: 'आपकी लाइब्रेरी खाली है',
+    emptyLibraryDescription:
+      'अपनी व्यक्तिगत लाइब्रेरी बनाने के लिए पॉडकास्ट को सब्सक्राइब करें, या किसी अन्य ऐप से अपनी मौजूदा सदस्यताएँ आयात करें।',
+    browsePopular: 'लोकप्रिय पॉडकास्ट देखें',
+  },
+
+  account: {
+    title: 'खाता',
+    profile: 'प्रोफ़ाइल',
+    playback: 'प्लेबैक',
+    appearance: 'रूप',
+    region: 'क्षेत्र और भाषा',
+    library: 'आयात और निर्यात',
+    shortcuts: 'कीबोर्ड शॉर्टकट',
+    memberSince: '{date} से सदस्य',
+    subscriptionCount: '{count} सदस्यताएं',
+    guestTitle: 'अपनी लाइब्रेरी सिंक करने के लिए साइन इन करें',
+    guestBody: 'आपकी सदस्यताएं और प्रगति वेब, iOS और Android पर साथ रहती हैं।',
+    passkeys: 'पासकी',
+    passkey: 'पासकी',
+    passkeyAdded: '{date} को जोड़ी गई',
+    passkeyUsed: '{date} को उपयोग की गई',
+    passkeyUsedToday: 'आज उपयोग की गई',
+    removePasskey: 'हटाएं',
+    removePasskeyConfirm: 'यह पासकी हटाएं? आप ईमेल कोड से साइन इन कर सकते हैं।',
+    addPasskey: 'पासकी जोड़ें',
+    noPasskeys: 'अभी कोई पासकी नहीं। आप ईमेल कोड से साइन इन करते हैं।',
+    defaultSpeed: 'डिफ़ॉल्ट गति',
+    speedSynced: 'iOS और Android पर सिंक होती है।',
+    speedLocal: 'इस डिवाइस पर सहेजी गई।',
+    trimSilence: 'मौन छोटा करें',
+    trimSilenceDescription: 'पिच बदले बिना ठहराव छोटे करता है।',
+    volumeBoost: 'वॉल्यूम बूस्ट',
+    volumeBoostDescription: 'धीमी आवाज़ों और तेज़ संगीत को संतुलित करता है।',
+    effectsNote: 'ऑडियो इफ़ेक्ट iOS और Android ऐप में लागू होते हैं।',
+    theme: 'थीम',
+    themeSystem: 'सिस्टम',
+    themeLight: 'लाइट',
+    themeDark: 'डार्क',
+    chartsRegion: 'चार्ट क्षेत्र',
+    detected: 'अपने आप पहचाना गया',
+    language: 'भाषा',
+    opml: 'OPML',
+    opmlDescription:
+      'Podcst में सदस्यताएं लाएं और ले जाएं। आयात केवल जोड़ता है, कुछ नहीं हटाता।',
+    importOpml: 'OPML आयात करें',
+    importing: 'आयात हो रहा है…',
+    importResult: '{imported} आयात, {failed} विफल',
+    retryFailed: 'विफल फिर से आज़माएं',
+    exportOpml: '{count} निर्यात करें',
+    thisDevice: 'यह डिवाइस',
+    thisDeviceDescription: 'इस ब्राउज़र में {count} पॉडकास्ट सहेजे गए हैं।',
+    importDevice: 'खाते में जोड़ें',
   },
 
   feed: {
@@ -211,11 +228,9 @@ export const messages: Messages = {
   shortcuts: {
     home: 'होम / टॉप',
     subscriptions: 'सदस्यताएँ',
-    recents: 'हालिया',
     settings: 'सेटिंग्स',
     search: 'खोजें',
     toggleTheme: 'थीम बदलें',
-    previousTheme: 'पिछली थीम',
     showEpisodeInfo: 'एपिसोड की जानकारी दिखाएं',
     queue: 'कतार',
     playPause: 'चलाएं / रोकें',
@@ -228,13 +243,6 @@ export const messages: Messages = {
     decreaseSpeed: 'प्लेबैक गति कम करें',
     toggleMute: 'म्यूट बदलें',
     showShortcuts: 'शॉर्टकट्स दिखाएं',
-  },
-
-  themes: {
-    autumnLight: 'ऑटम लाइट',
-    autumnDark: 'ऑटम डार्क',
-    lightBlurb: 'साफ और उज्ज्वल स्वरूप',
-    darkBlurb: 'कम रोशनी वाले वातावरण के लिए अनुकूलित',
   },
 
   errors: {

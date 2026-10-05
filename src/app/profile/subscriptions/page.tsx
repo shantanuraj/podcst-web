@@ -26,7 +26,7 @@ export default async function ProfileSubscriptionsPage() {
   return (
     <AccountContent scope={session.userId} resource="library" privateContent>
       {podcasts.length > 0 && (
-        <ItemListSchema items={podcasts} title={t('profile.subscriptions')} />
+        <ItemListSchema items={podcasts} title={t('library.subscriptions')} />
       )}
       <SubscriptionsTabs
         podcasts={podcasts}

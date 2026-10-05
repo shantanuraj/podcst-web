@@ -6,7 +6,15 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/auth', '/profile', '/queue', '/subs', '/api/', '/s/'],
+        disallow: [
+          '/account',
+          '/auth',
+          '/profile',
+          '/queue',
+          '/subs',
+          '/api/',
+          '/s/',
+        ],
       },
     ],
   };

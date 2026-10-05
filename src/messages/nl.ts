@@ -14,13 +14,14 @@ export const messages: Messages = {
     discover: 'Ontdekken',
     library: 'Bibliotheek',
     settings: 'Instellingen',
-    profile: 'Profiel',
     signIn: 'Inloggen',
     signOut: 'Uitloggen',
+    queue: 'Wachtrij',
+    account: 'Account',
   },
 
   search: {
-    placeholder: 'Zoek podcasts...',
+    placeholder: 'Zoek podcasts en afleveringen, of plak een feed-URL',
     episodesPlaceholder: 'Zoek afleveringen...',
     noResults: 'Geen podcasts gevonden',
     label: 'Zoek podcasts',
@@ -48,43 +49,6 @@ export const messages: Messages = {
     haveAccount: 'Heb je al een account? Log in',
     noAccountFound: 'Account niet gevonden. Maak er hieronder een aan.',
     accountExists: 'Account bestaat al. Log in.',
-  },
-
-  settings: {
-    title: 'Instellingen',
-    language: 'Taal',
-    languageDescription: 'Interfacetaal',
-    region: 'Regio',
-    regionDescription: 'Kies je regio voor podcast-hitlijsten',
-    theme: 'Thema',
-    themeDescription: 'Pas het uiterlijk van Podcst aan',
-    shortcuts: 'Sneltoetsen',
-    shortcutsDescription: 'Bekijk en beheer sneltoetsen',
-    export: 'Exporteren',
-    exportDescription: 'Download je bibliotheek als een OPML-bestand',
-    exportDescriptionLong:
-      'Download je abonnementen als een OPML-bestand om te importeren in andere apps.',
-    emptyLibrary: 'Je bibliotheek is leeg',
-    emptyLibraryDescription:
-      'Abonneer je op podcasts om je persoonlijke bibliotheek op te bouwen, of importeer je bestaande abonnementen uit een andere app.',
-    browsePopularPodcasts: 'Blader door populaire podcasts',
-    exportLibrary: 'Bibliotheek exporteren',
-    exportLibraryDescription:
-      'Download je bibliotheek als een OPML-bestand. Je kunt dit bestand gebruiken om je podcasts in andere applicaties te importeren.',
-    exportLibraryCta: 'OPML-bestand downloaden',
-    exportLibraryCount:
-      '{count} {count, plural, one {podcast} other {podcasts}} in je bibliotheek',
-  },
-
-  profile: {
-    title: 'Profiel',
-    account: 'Account',
-    subscriptions: 'Abonnementen',
-    syncDescription:
-      'Je hebt {count} {count, plural, one {podcast} other {podcasts}} opgeslagen op dit apparaat. Importeer ze naar je account om te synchroniseren tussen al je apparaten.',
-    importFromDevice: 'Importeren van apparaat',
-    importing: 'Importeren...',
-    downloadOPML: 'Download OPML',
   },
 
   chapters: {
@@ -166,6 +130,64 @@ export const messages: Messages = {
     starredEmpty: 'Nog geen favoriete afleveringen',
     starredEmptyDescription:
       'Voeg afleveringen toe aan je favorieten om ze hier te vinden.',
+    emptyLibrary: 'Je bibliotheek is leeg',
+    emptyLibraryDescription:
+      'Abonneer je op podcasts om je persoonlijke bibliotheek op te bouwen, of importeer je bestaande abonnementen uit een andere app.',
+    browsePopular: 'Blader door populaire podcasts',
+  },
+
+  account: {
+    title: 'Account',
+    profile: 'Profiel',
+    playback: 'Afspelen',
+    appearance: 'Weergave',
+    region: 'Regio en taal',
+    library: 'Importeren en exporteren',
+    shortcuts: 'Sneltoetsen',
+    memberSince: 'Lid sinds {date}',
+    subscriptionCount:
+      '{count, plural, one {# abonnement} other {# abonnementen}}',
+    guestTitle: 'Log in om je bibliotheek te synchroniseren',
+    guestBody: 'Je abonnementen en voortgang volgen je op web, iOS en Android.',
+    passkeys: 'Toegangssleutels',
+    passkey: 'Toegangssleutel',
+    passkeyAdded: 'Toegevoegd {date}',
+    passkeyUsed: 'Gebruikt {date}',
+    passkeyUsedToday: 'Vandaag gebruikt',
+    removePasskey: 'Verwijderen',
+    removePasskeyConfirm:
+      'Deze toegangssleutel verwijderen? Je kunt nog steeds inloggen met een code per e-mail.',
+    addPasskey: 'Toegangssleutel toevoegen',
+    noPasskeys:
+      'Nog geen toegangssleutels. Je logt in met een code per e-mail.',
+    defaultSpeed: 'Standaardsnelheid',
+    speedSynced: 'Wordt gesynchroniseerd met iOS en Android.',
+    speedLocal: 'Opgeslagen op dit apparaat.',
+    trimSilence: 'Stiltes inkorten',
+    trimSilenceDescription:
+      'Kort pauzes in zonder de toonhoogte te veranderen.',
+    volumeBoost: 'Volumeversterking',
+    volumeBoostDescription: 'Brengt zachte stemmen en harde muziek in balans.',
+    effectsNote: 'Audio-effecten werken in de iOS- en Android-apps.',
+    theme: 'Thema',
+    themeSystem: 'Systeem',
+    themeLight: 'Licht',
+    themeDark: 'Donker',
+    chartsRegion: 'Regio voor hitlijsten',
+    detected: 'Automatisch gedetecteerd',
+    language: 'Taal',
+    opml: 'OPML',
+    opmlDescription:
+      'Breng abonnementen naar Podcst en weer terug. Importeren voegt alleen toe en verwijdert nooit iets.',
+    importOpml: 'OPML importeren',
+    importing: 'Importeren…',
+    importResult: '{imported} geïmporteerd, {failed} mislukt',
+    retryFailed: 'Mislukte opnieuw proberen',
+    exportOpml: '{count} exporteren',
+    thisDevice: 'Dit apparaat',
+    thisDeviceDescription:
+      '{count, plural, one {# podcast} other {# podcasts}} opgeslagen in deze browser.',
+    importDevice: 'Toevoegen aan account',
   },
 
   feed: {
@@ -214,11 +236,9 @@ export const messages: Messages = {
   shortcuts: {
     home: 'Home / Top',
     subscriptions: 'Abonnementen',
-    recents: 'Onlangs gespeeld',
     settings: 'Instellingen',
     search: 'Zoeken',
     toggleTheme: 'Thema wisselen',
-    previousTheme: 'Vorig thema',
     showEpisodeInfo: 'Toon afleveringsinformatie',
     queue: 'Wachtrij',
     playPause: 'Afspelen / Pauzeren',
@@ -231,13 +251,6 @@ export const messages: Messages = {
     decreaseSpeed: 'Snelheid verlagen',
     toggleMute: 'Dempen aan/uit',
     showShortcuts: 'Toon sneltoetsen',
-  },
-
-  themes: {
-    autumnLight: 'Herfstlicht',
-    autumnDark: 'Herfstnacht',
-    lightBlurb: 'Schoon en helder uiterlijk',
-    darkBlurb: 'Geoptimaliseerd voor donkere omgevingen',
   },
 
   errors: {

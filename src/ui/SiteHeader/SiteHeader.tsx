@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import { Icon } from '@/ui/icons/svg/Icon';
-import { LocaleSwitcher } from '@/ui/LocaleSwitcher';
 import { PageLink } from '@/ui/PageLink/PageLink';
 import { Search } from '@/ui/Search/Search';
 
@@ -16,15 +15,26 @@ export function SiteHeader() {
   const { data: user } = useSession();
   const { t } = useTranslation();
 
-  const libraryHref = user ? '/profile/subscriptions' : '/subs';
-  const isLibraryActive =
-    pathname === '/subs' ||
-    pathname === '/recents' ||
-    pathname === '/profile/subscriptions';
+  const tabs = [
+    {
+      href: '/feed/top',
+      label: t('nav.discover'),
+      active:
+        pathname === '/feed/top' ||
+        /^\/[a-z]{2}\/feed\//.test(pathname) ||
+        pathname.startsWith('/episodes/'),
+    },
+    {
+      href: user ? '/profile/subscriptions' : '/subs',
+      label: t('nav.library'),
+      active: pathname === '/subs' || pathname === '/profile/subscriptions',
+    },
+    { href: '/queue', label: t('nav.queue'), active: pathname === '/queue' },
+  ];
 
   return (
     <header className={styles.header}>
-      <div className={styles.container}>
+      <div className={styles.start}>
         <PageLink
           href="/feed/top"
           className={styles.wordmark}
@@ -33,52 +43,48 @@ export function SiteHeader() {
           {t('common.appName')}
         </PageLink>
         <nav className={styles.nav}>
-          <PageLink
-            href="/feed/top"
-            loading="podcasts"
-            className={styles.navLink}
-            data-active={
-              pathname === '/feed/top' ||
-              pathname.startsWith('/us/') ||
-              pathname.startsWith('/episodes/')
-            }
-          >
-            {t('nav.discover')}
-          </PageLink>
-          <Link
-            href={libraryHref}
-            className={styles.navLink}
-            data-active={isLibraryActive}
-          >
-            {t('nav.library')}
-          </Link>
-        </nav>
-        <div className={styles.actions}>
-          <Search />
-          <LocaleSwitcher />
-          {user ? (
+          {tabs.map((tab) => (
             <Link
-              href="/profile"
-              className={styles.iconLink}
-              title={user.email}
+              key={tab.href}
+              href={tab.href}
+              className={styles.tab}
+              aria-current={tab.active ? 'page' : undefined}
             >
-              <Icon icon="user" size={20} />
+              {tab.label}
             </Link>
-          ) : (
-            <>
-              <Link
-                href="/settings"
-                className={styles.iconLink}
-                title={t('nav.settings')}
-              >
-                <Icon icon="settings" size={20} />
-              </Link>
-              <Link href="/auth" className={styles.authLink}>
-                {t('nav.signIn')}
-              </Link>
-            </>
-          )}
-        </div>
+          ))}
+        </nav>
+      </div>
+      <div className={styles.search}>
+        <Search />
+      </div>
+      <div className={styles.end}>
+        {user ? (
+          <Link
+            href="/account"
+            className={styles.avatar}
+            aria-label={t('nav.account')}
+            title={user.email}
+            aria-current={pathname === '/account' ? 'page' : undefined}
+          >
+            {user.email.charAt(0).toUpperCase()}
+          </Link>
+        ) : (
+          <>
+            <Link
+              href="/account"
+              className={styles.settings}
+              aria-current={pathname === '/account' ? 'page' : undefined}
+              aria-label={t('nav.settings')}
+            >
+              <Icon icon="settings" size={20} />
+              <span>{t('nav.settings')}</span>
+            </Link>
+            <Link href="/auth" className={styles.signIn}>
+              {t('nav.signIn')}
+            </Link>
+          </>
+        )}
       </div>
     </header>
   );

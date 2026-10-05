@@ -23,6 +23,7 @@ import { Timeline } from './Timeline';
 import { PlayPause, Transport } from './Transport';
 import { usePlaybackSync } from './usePlaybackSync';
 import { getCurrentEpisode, usePlayer } from './usePlayer';
+import { usePreferenceSync } from './usePreferenceSync';
 import { useTimeline } from './useTimeline';
 import { VolumeControls } from './VolumeControls';
 
@@ -35,6 +36,7 @@ export const Player = () => {
   const collapse = useCallback(() => setExpanded(false), []);
 
   usePlaybackSync();
+  usePreferenceSync();
   useSpeedShortcuts();
   useKeydown(episode ? playerShortcuts : emptyShortcuts);
   useKeydown(shortcuts.seekTo, seekToPercent);

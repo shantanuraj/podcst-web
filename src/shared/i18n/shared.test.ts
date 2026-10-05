@@ -26,29 +26,31 @@ describe('translateKey', () => {
   });
 
   test('handles plural with count = 1', () => {
-    const result = translateKey(en, 'settings.exportLibraryCount', {
+    const result = translateKey(en, 'account.subscriptionCount', {
       count: 1,
     });
-    expect(result).toBe('1 podcast in your library');
+    expect(result).toBe('1 subscription');
   });
 
   test('handles plural with count = 0', () => {
-    const result = translateKey(en, 'settings.exportLibraryCount', {
+    const result = translateKey(en, 'account.subscriptionCount', {
       count: 0,
     });
-    expect(result).toBe('0 podcasts in your library');
+    expect(result).toBe('0 subscriptions');
   });
 
   test('handles plural with count > 1', () => {
-    const result = translateKey(en, 'settings.exportLibraryCount', {
+    const result = translateKey(en, 'account.subscriptionCount', {
       count: 5,
     });
-    expect(result).toBe('5 podcasts in your library');
+    expect(result).toBe('5 subscriptions');
   });
 
-  test('handles plural in profile.syncDescription', () => {
-    const result = translateKey(en, 'profile.syncDescription', { count: 1 });
-    expect(result).toContain('1 podcast');
+  test('handles plural inside a sentence', () => {
+    const result = translateKey(en, 'account.thisDeviceDescription', {
+      count: 1,
+    });
+    expect(result).toBe('1 podcast is saved in this browser.');
     expect(result).not.toContain('{count, plural');
   });
 

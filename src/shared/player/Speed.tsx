@@ -7,6 +7,7 @@ import {
   type KeyboardShortcuts,
   useKeydown,
 } from '@/shared/keyboard/useKeydown';
+import { useHydrated } from '@/shared/useHydrated';
 import { Menu } from '@/ui/Menu/Menu';
 import { speeds } from '../../../contracts/playback/rules.json';
 import styles from './Speed.module.css';
@@ -67,6 +68,7 @@ export function SpeedMenu() {
 export function SpeedPresets() {
   const { t } = useTranslation();
   const rate = usePlayer(getRate);
+  const hydrated = useHydrated();
   const setRate = usePlayer(getSetRate);
   return (
     <fieldset aria-label={t('player.speed')} className={styles.presets}>
@@ -74,7 +76,7 @@ export function SpeedPresets() {
         <button
           key={speed}
           type="button"
-          aria-pressed={speed === rate}
+          aria-pressed={hydrated && speed === rate}
           onClick={() => setRate(speed)}
         >
           {label(speed)}
