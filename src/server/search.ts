@@ -16,7 +16,9 @@ export async function matchSearchResults(
   );
   const rows = ids.length
     ? await sql`
-        SELECT p.id, apple.itunes_id, p.feed_url FROM (${appleIdentities(sql, ids)}) apple
+        SELECT p.id, apple.itunes_id, p.feed_url,
+          ARRAY(SELECT a.feed_url FROM podcast_feed_aliases a WHERE a.podcast_id=p.id) AS feed_aliases
+        FROM (${appleIdentities(sql, ids)}) apple
         JOIN podcasts p ON p.id = apple.id
       `
     : [];
@@ -28,7 +30,11 @@ export async function matchSearchResults(
   const seen = new Set<string>();
   return results.flatMap((result) => {
     const existing = byItunesId.get(result.itunes_id ?? 0);
-    const match = existing
+    const matchesFeed =
+      existing &&
+      (existing.feed_url === result.feed ||
+        existing.feed_aliases.includes(result.feed));
+    const match = matchesFeed
       ? { ...result, id: Number(existing.id), feed: existing.feed_url }
       : result;
     if (seen.has(match.feed)) return [];

@@ -65,14 +65,14 @@ export function locatorMatches(sql: postgres.ISql, feedUrl: string) {
   return sql`p.id IN (${locatorIds(sql, feedUrl)})`;
 }
 
-export async function findPodcastIdentity(
+export async function findPodcastIdentities(
   sql: postgres.ISql,
   feedUrl: string,
   itunesId?: number,
   podcastIndexId?: number,
   forUpdate = false,
-): Promise<PodcastIdentity | undefined> {
-  const matches = await sql<PodcastIdentity[]>`
+): Promise<PodcastIdentity[]> {
+  return sql<PodcastIdentity[]>`
     SELECT p.id, p.itunes_id, p.podcast_index_id, p.feed_url, p.owner_user_id FROM podcasts p
     WHERE p.id IN (
       ${locatorIds(sql, feedUrl)}
@@ -82,6 +82,22 @@ export async function findPodcastIdentity(
     ORDER BY p.id
     ${forUpdate ? sql`FOR UPDATE OF p` : sql``}
   `;
+}
+
+export async function findPodcastIdentity(
+  sql: postgres.ISql,
+  feedUrl: string,
+  itunesId?: number,
+  podcastIndexId?: number,
+  forUpdate = false,
+): Promise<PodcastIdentity | undefined> {
+  const matches = await findPodcastIdentities(
+    sql,
+    feedUrl,
+    itunesId,
+    podcastIndexId,
+    forUpdate,
+  );
   if (matches.length > 1)
     throw new PodcastIdentityConflict(
       'Feed and provider identify different podcasts',

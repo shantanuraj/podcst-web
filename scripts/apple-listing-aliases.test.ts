@@ -83,18 +83,16 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
       country: 'us',
     });
     expect(alias.evidence_reference).toMatch(/^[a-f0-9]{64}$/);
-    const unavailable = mock(async () => {
-      throw new Error('No network needed');
-    });
-    expect(await resolvePodcast(sql, 303, 'us', unavailable)).toBe(1);
-    expect(unavailable).not.toHaveBeenCalled();
+    const fresh = listing(303);
+    expect(await resolvePodcast(sql, 303, 'us', fresh)).toBe(1);
+    expect(fresh).toHaveBeenCalledTimes(1);
     expect((await findPodcastIdentity(sql, feed, 303))?.id).toBe('1');
     const results = await matchSearchResults(sql, [
       {
         itunes_id: 303,
         title: 'Listing',
         author: 'Publisher',
-        feed: 'https://example.invalid/old',
+        feed,
         cover: '',
         thumbnail: '',
       },
@@ -118,7 +116,6 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
     );
     expect(results.map((p) => ({ id: p.id, itunesId: p.itunes_id }))).toEqual([
       { id: 1, itunesId: 303 },
-      { id: undefined, itunesId: 999 },
     ]);
     expect(
       (await sql`SELECT count(*)::int AS n FROM podcast_apple_aliases`)[0].n,
@@ -223,15 +220,24 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
     ).toBe(feed);
   });
 
-  test('existing records are never merged when a feed and provider disagree', async () => {
+  test('fresh Apple evidence moves only the preferred or secondary association', async () => {
     const sql = cluster.sql;
-    await expect(
-      indexPodcast(sql, feed, 202, undefined, verification()),
-    ).rejects.toThrow('different podcasts');
+    expect(await indexPodcast(sql, feed, 202, undefined, verification())).toBe(
+      1,
+    );
     await resolvePodcast(sql, 303, 'us', listing(303));
-    await expect(
-      indexPodcast(sql, otherFeed, 303, undefined, verification()),
-    ).rejects.toThrow('different podcasts');
+    expect(
+      await indexPodcast(sql, otherFeed, 303, undefined, verification()),
+    ).toBe(2);
+    expect([
+      ...(await sql`SELECT id::int,itunes_id::int,feed_url FROM podcasts WHERE owner_user_id IS NULL ORDER BY id`),
+    ]).toEqual([
+      { id: 1, itunes_id: 101, feed_url: feed },
+      { id: 2, itunes_id: 303, feed_url: otherFeed },
+    ]);
+    expect([
+      ...(await sql`SELECT itunes_id::int,podcast_id::int FROM podcast_apple_aliases`),
+    ]).toEqual([{ itunes_id: 202, podcast_id: 1 }]);
     expect((await sql`SELECT count(*)::int AS n FROM podcasts`)[0].n).toBe(3);
   });
 

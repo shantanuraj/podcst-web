@@ -20,6 +20,7 @@ import {
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseAvailable = Boolean(databaseUrl || process.env.PG_BIN);
+const staleVerification = '2000-01-01T00:00:00.000Z';
 const schema = `chart_test_${randomUUID().replaceAll('-', '')}`;
 const podcast = (itunesId: number, rank = 1): ChartPodcast => ({
   itunesId,
@@ -223,7 +224,11 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     const before = await chart();
     const history =
       await sql`SELECT * FROM chart_history ORDER BY country_id, podcast_id`;
-    const replacement = { ...podcast(6806963519), feed: podcast(101).feed };
+    const replacement = {
+      ...podcast(6806963519),
+      feed: podcast(101).feed,
+      verifiedAt: staleVerification,
+    };
     await expect(storeTopPodcasts(sql, [replacement], 'nl')).rejects.toThrow(
       'no unambiguous podcasts',
     );
@@ -245,9 +250,17 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
         async (locale) =>
           locale === 'my'
             ? [
-                { ...podcast(201), feed: podcast(101).feed },
+                {
+                  ...podcast(201),
+                  feed: podcast(101).feed,
+                  verifiedAt: staleVerification,
+                },
                 podcast(301, 2),
-                { ...podcast(202, 3), feed: podcast(101).feed },
+                {
+                  ...podcast(202, 3),
+                  feed: podcast(101).feed,
+                  verifiedAt: staleVerification,
+                },
                 podcast(302, 4),
               ]
             : [podcast(401)],
@@ -274,10 +287,10 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
       ).toHaveLength(2);
       expect(warning.mock.calls).toEqual([
         [
-          '[my] Skipping Apple podcast 201 at rank 1: Feed and provider identify different podcasts',
+          '[my] Skipping Apple podcast 201 at rank 1: Fresh Apple listing verification required',
         ],
         [
-          '[my] Skipping Apple podcast 202 at rank 3: Feed and provider identify different podcasts',
+          '[my] Skipping Apple podcast 202 at rank 3: Fresh Apple listing verification required',
         ],
       ]);
       const [metric] =
@@ -292,7 +305,7 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     await sql.unsafe(`
       CREATE FUNCTION move_chart_source() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN
-        IF NEW.itunes_id = 201 THEN
+        IF NEW.feed_url = 'https://example.com/201/feed' THEN
           NEW.feed_url := 'https://example.com/moved';
         END IF;
         RETURN NEW;
@@ -325,7 +338,7 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     }
   });
 
-  test('rolls back the country on database errors even after skipping a conflict', async () => {
+  test('rolls back Apple reassignment when a later chart row fails', async () => {
     await storeTopPodcasts(sql, [podcast(201)], 'ca');
     const before = await chart();
     await expect(
@@ -341,8 +354,40 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     ).rejects.toThrow('duplicate key');
     expect(await chart()).toEqual(before);
     expect(
+      (await sql`SELECT feed_url FROM podcasts WHERE itunes_id=201`)[0]
+        .feed_url,
+    ).toBe(podcast(201).feed);
+    expect(
+      await sql`SELECT * FROM podcast_apple_aliases WHERE itunes_id=201`,
+    ).toHaveLength(0);
+    expect(
       await sql`SELECT id FROM podcasts WHERE itunes_id IN (301, 302)`,
     ).toHaveLength(0);
+  });
+
+  test('fresh swapped Apple associations retain sources and original ranks', async () => {
+    await storeTopPodcasts(sql, [podcast(201)], 'ca');
+    const before =
+      await sql`SELECT id::text, feed_url FROM podcasts ORDER BY id`;
+    expect(
+      await storeTopPodcasts(
+        sql,
+        [
+          { ...podcast(101, 2), feed: podcast(201).feed },
+          { ...podcast(201, 4), feed: podcast(101).feed },
+        ],
+        'my',
+      ),
+    ).toEqual({ stored: 2, newPodcasts: 0, skipped: 0 });
+    expect([
+      ...(await sql`SELECT id::text, feed_url FROM podcasts ORDER BY id`),
+    ]).toEqual([...before]);
+    expect(
+      (await chart('my')).map(({ rank, itunes_id }) => [rank, itunes_id]),
+    ).toEqual([
+      [2, '101'],
+      [4, '201'],
+    ]);
   });
 
   test('preserves failure backoff and unrelated genres while replacing a chart', async () => {

@@ -1,12 +1,17 @@
 import type postgres from 'postgres';
 import { ITUNES_API } from '../../data/constants';
+import {
+  type AppleIdentityPlan,
+  claimAppleIdentity,
+  findAppleSource,
+  prepareAppleIdentity,
+} from './apple-identity';
+import { appleFeedForId } from './apple-listing';
 import { sanitize } from './episodes';
 import {
-  claimPublicIdentity,
-  findPodcastIdentity,
   lockPodcastIdentities,
   PodcastIdentityConflict,
-} from './index-podcast';
+} from './podcast-identity';
 
 const TOP_LIMIT = 100;
 
@@ -101,7 +106,7 @@ export async function fetchTopFromItunes(
     }
     const title = sanitize(podcast.collectionName)?.trim();
     const cover = sanitize(podcast.artworkUrl600 || podcast.artworkUrl100);
-    const feed = sanitize(podcast.feedUrl)?.trim();
+    const feed = appleFeedForId(lookup.results, id);
     if (!title || !cover || !feed || !/^https?:\/\//i.test(feed)) {
       throw new Error(`Apple returned invalid metadata for podcast ${id}`);
     }
@@ -146,27 +151,23 @@ export async function storeTopPodcasts(
   if (podcasts.length === 0)
     throw new Error('Refusing to store an empty chart');
 
-  const identities = podcasts.map(({ feed, itunesId }) => ({
-    feedUrl: feed,
-    itunesId,
-  }));
-  for (const podcast of podcasts) {
-    try {
-      const observed = await findPodcastIdentity(
-        sql,
-        podcast.feed,
-        podcast.itunesId,
+  const plans = new Map<number, AppleIdentityPlan>();
+  for (const p of podcasts) {
+    if (plans.has(p.itunesId))
+      throw new PodcastIdentityConflict(
+        'Duplicate verified Apple chart listing',
       );
-      if (observed)
-        identities.push({
-          feedUrl: observed.feed_url,
-          itunesId: podcast.itunesId,
-        });
-    } catch (error) {
-      if (!(error instanceof PodcastIdentityConflict)) throw error;
-    }
+    plans.set(
+      p.itunesId,
+      await prepareAppleIdentity(sql, {
+        itunesId: p.itunesId,
+        feedUrl: p.feed,
+        country: locale,
+        verifiedAt: p.verifiedAt,
+      }),
+    );
   }
-  const lockedLocators = new Set(identities.map(({ feedUrl }) => feedUrl));
+  const identities = [...plans.values()].flatMap((plan) => plan.identities);
   return sql.begin(async (tx) => {
     await lockPodcastIdentities(tx, identities);
     await tx`
@@ -186,11 +187,13 @@ export async function storeTopPodcasts(
     for (const p of [...podcasts].sort((a, b) => a.rank - b.rank)) {
       try {
         const result = await tx.savepoint(async (entry) => {
+          const plan = plans.get(p.itunesId);
+          if (!plan) throw new Error('Missing Apple identity plan');
           const { id, created } = await claimChartPodcast(
             entry,
             p,
-            locale,
-            lockedLocators,
+            plan,
+            identities,
           );
           if (!storedSources.has(id)) {
             await entry`
@@ -229,16 +232,10 @@ export async function storeTopPodcasts(
 async function claimChartPodcast(
   tx: postgres.TransactionSql,
   p: ChartPodcast,
-  locale: string,
-  lockedLocators: Set<string>,
+  plan: AppleIdentityPlan,
+  identities: AppleIdentityPlan['identities'],
 ) {
-  let podcast = await findPodcastIdentity(
-    tx,
-    p.feed,
-    p.itunesId,
-    undefined,
-    true,
-  );
+  let podcast = await findAppleSource(tx, plan.listing, true);
   let created = false;
   if (!podcast) {
     let [author] =
@@ -250,30 +247,17 @@ async function claimChartPodcast(
       INSERT INTO podcasts (
         itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
       ) VALUES (
-        ${p.itunesId}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
+        NULL, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
         ${p.explicit}, ${p.count}
       )
       ON CONFLICT DO NOTHING
       RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
     `;
     created = Boolean(podcast);
-    podcast ??= await findPodcastIdentity(
-      tx,
-      p.feed,
-      p.itunesId,
-      undefined,
-      true,
-    );
+    podcast ??= await findAppleSource(tx, plan.listing, true);
   }
   if (!podcast) throw new Error(`Unable to store Apple podcast ${p.itunesId}`);
-  if (!lockedLocators.has(podcast.feed_url))
-    throw new PodcastIdentityConflict(
-      'Canonical source changed during chart import; retry',
-    );
-  const id = await claimPublicIdentity(tx, podcast, p.feed, p.itunesId, {
-    country: locale,
-    verifiedAt: p.verifiedAt,
-  });
+  const id = await claimAppleIdentity(tx, podcast, plan, identities);
   return { id, created };
 }
 

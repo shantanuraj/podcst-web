@@ -86,12 +86,35 @@ describe.skipIf(!databaseUrl)(
       return row;
     };
 
-    test('known Apple IDs reuse the original podcast without fetching changed feed URLs', async () => {
-      const request = lookup(knownAppleId);
+    test('known Apple IDs are reverified before reusing the original source', async () => {
+      const request = lookup(knownAppleId, 'https://example.com/old-feed');
       expect(await resolvePodcast(sql, knownAppleId, 'us', request)).toBe(152);
-      expect(request).not.toHaveBeenCalled();
+      expect(request).toHaveBeenCalledTimes(1);
       expect(feedRequests).toBe(0);
       expect(await counts()).toEqual({ podcasts: 1, authors: 1, episodes: 0 });
+    });
+
+    test('a known listing at a previously unseen feed creates a distinct source without rewriting the old one', async () => {
+      const id = await resolvePodcast(
+        sql,
+        knownAppleId,
+        'us',
+        lookup(knownAppleId),
+      );
+      expect(id).not.toBe(152);
+      const [old] =
+        await sql`SELECT itunes_id,feed_url FROM podcasts WHERE id=152`;
+      expect(old).toEqual({
+        itunes_id: null,
+        feed_url: 'https://example.com/old-feed',
+      });
+      const [current] =
+        await sql`SELECT itunes_id::text,feed_url FROM podcasts WHERE id=${id}`;
+      expect(current).toEqual({
+        itunes_id: String(knownAppleId),
+        feed_url: server.url.href,
+      });
+      expect((await counts()).podcasts).toBe(2);
     });
 
     test('new Apple results are indexed with both identities and episode content', async () => {

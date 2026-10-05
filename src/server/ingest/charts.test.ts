@@ -125,6 +125,17 @@ describe('Apple chart fetching', () => {
     expect(await fetchTopFromItunes('nl', request)).toHaveLength(1);
   });
 
+  test('rejects contradictory Apple feed associations instead of selecting the last result', async () => {
+    for (const feedUrl of ['https://example.com/different', undefined]) {
+      const request = responses(chart(), {
+        results: [podcast(ids[0]), podcast(ids[0], { feedUrl })],
+      });
+      await expect(fetchTopFromItunes('my', request)).rejects.toThrow(
+        'ambiguous',
+      );
+    }
+  });
+
   test('HTTP failures are reported rather than mistaken for empty charts', async () => {
     const failedChart = mock(async () => new Response(null, { status: 503 }));
     await expect(fetchTopFromItunes('nl', failedChart)).rejects.toThrow(

@@ -1,4 +1,9 @@
 import type postgres from 'postgres';
+import {
+  claimAppleIdentity,
+  findAppleSource,
+  prepareAppleIdentity,
+} from './apple-identity';
 import { upsertEpisodes } from './episodes';
 import { claimPublicAliases } from './feed-aliases';
 import { fetchFeed, savePollState } from './feed-refresh';
@@ -38,7 +43,13 @@ async function index(
   verifyMove = verifyPublicFeedMove,
   verification?: AppleListingVerification,
 ): Promise<number> {
-  const existing = await findPodcastIdentity(sql, feedUrl, itunesId);
+  const applePlan =
+    verification && itunesId !== undefined
+      ? await prepareAppleIdentity(sql, { ...verification, itunesId, feedUrl })
+      : null;
+  const existing = applePlan
+    ? await findAppleSource(sql, applePlan.listing)
+    : await findPodcastIdentity(sql, feedUrl, itunesId);
   if (existing && ownerUserId) return authorizePrivate(existing, ownerUserId);
   if (existing?.owner_user_id && itunesId === undefined)
     throw new PodcastAccessDenied('Feed unavailable');
@@ -65,7 +76,7 @@ async function index(
   const observations = move
     ? await Promise.all(
         requestedLocators.map((locator) =>
-          findPodcastIdentity(sql, locator, itunesId),
+          findPodcastIdentity(sql, locator, applePlan ? undefined : itunesId),
         ),
       )
     : [existing];
@@ -76,17 +87,23 @@ async function index(
     ]),
   ];
 
+  const identities = [
+    ...locators.map((feedUrl) => ({ feedUrl, itunesId })),
+    ...(applePlan?.identities ?? []),
+  ];
+  const claim = (tx: postgres.TransactionSql, source: PodcastIdentity) =>
+    applePlan
+      ? claimAppleIdentity(tx, source, applePlan, identities)
+      : claimPublicIdentity(tx, source, feedUrl, itunesId, verification);
+
   return sql.begin(async (tx) => {
-    await lockPodcastIdentities(
-      tx,
-      locators.map((feedUrl) => ({ feedUrl, itunesId })),
-    );
+    await lockPodcastIdentities(tx, identities);
     let found: PodcastIdentity | undefined;
     for (const locator of locators) {
       const match = await findPodcastIdentity(
         tx,
         locator,
-        itunesId,
+        applePlan ? undefined : itunesId,
         undefined,
         true,
       );
@@ -114,7 +131,7 @@ async function index(
           },
         });
       }
-      return claimPublicIdentity(tx, found, feedUrl, itunesId, verification);
+      return claim(tx, found);
     }
     if (fetched?.status !== 'updated')
       throw new Error('Feed changed during import; retry');
@@ -130,7 +147,7 @@ async function index(
         itunes_id, owner_user_id, feed_url, title, author_id, description, cover,
         website_url, explicit, episode_count, last_published
       ) VALUES (
-        ${itunesId ?? null}, ${ownerUserId}, ${move?.canonicalFeedUrl ?? feedUrl}, ${data.title}, ${author.id},
+        ${applePlan ? null : (itunesId ?? null)}, ${ownerUserId}, ${move?.canonicalFeedUrl ?? feedUrl}, ${data.title}, ${author.id},
         ${data.description}, ${data.cover}, ${data.link}, ${data.explicit},
         ${data.episodes.length}, ${data.published ? new Date(data.published) : null}
       )
@@ -141,7 +158,7 @@ async function index(
       const winner = await findPodcastIdentity(
         tx,
         feedUrl,
-        itunesId,
+        applePlan ? undefined : itunesId,
         undefined,
         true,
       );
@@ -149,7 +166,7 @@ async function index(
         throw new PodcastIdentityConflict('Unable to resolve podcast identity');
       return ownerUserId
         ? authorizePrivate(winner, ownerUserId)
-        : claimPublicIdentity(tx, winner, feedUrl, itunesId, verification);
+        : claim(tx, winner);
     }
     const id = Number(podcast.id);
     if (move)
@@ -163,6 +180,7 @@ async function index(
           details: move.details,
         },
       });
+    if (applePlan) await claim(tx, podcast);
     await upsertEpisodes(tx, id, data.cover, data.episodes);
     await savePollState(tx, id, fetched, getPollInterval(null));
     return id;

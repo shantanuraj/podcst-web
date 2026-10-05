@@ -83,7 +83,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     expect(JSON.parse(JSON.stringify(result))).not.toHaveProperty('itunes_id');
   });
 
-  test('Apple search matches known IDs despite changed feed URLs and preserves ranking', async () => {
+  test('Apple search preserves fresh locators and does not attach a mismatched stored identity', async () => {
     const result = await matchSearchResults(sql, [
       {
         itunes_id: 6806963519,
@@ -114,11 +114,31 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
       result.map(({ id, itunes_id, feed }) => ({ id, itunes_id, feed })),
     ).toEqual([
       { id: 153, itunes_id: 6806963519, feed: largeIdFeed },
-      { id: 152, itunes_id: 1614253637, feed },
+      {
+        id: undefined,
+        itunes_id: 1614253637,
+        feed: 'https://example.com/migrated',
+      },
       { id: undefined, itunes_id: 999, feed: 'https://example.com/new' },
     ]);
     const [count] = await sql`SELECT count(*)::int AS count FROM podcasts`;
     expect(count.count).toBe(3);
+  });
+
+  test('an accepted feed alias can still reuse the canonical source during Apple search', async () => {
+    const alias = 'https://example.com/accepted-search-feed';
+    await sql`INSERT INTO podcast_feed_aliases(feed_url,podcast_id,evidence_type,evidence_reference) VALUES (${alias},152,'reviewed','search fixture')`;
+    const [result] = await matchSearchResults(sql, [
+      {
+        itunes_id: 1614253637,
+        feed: alias,
+        title: 'Apple title',
+        author: '',
+        cover: '',
+        thumbnail: '',
+      },
+    ]);
+    expect(result).toMatchObject({ id: 152, feed, title: 'Apple title' });
   });
 
   test('unassociated feed matches require verification before binding Apple identity', async () => {
