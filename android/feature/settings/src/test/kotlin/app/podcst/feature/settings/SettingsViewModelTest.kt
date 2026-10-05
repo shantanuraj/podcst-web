@@ -5,6 +5,7 @@ import app.podcst.network.testing.FakeServer
 import app.podcst.network.testing.Reply
 
 import app.cash.turbine.test
+import app.podcst.data.AccountRepository
 import app.podcst.data.Appearance
 import app.podcst.data.CatalogRepository
 import app.podcst.data.LibraryRepository
@@ -57,7 +58,7 @@ class SettingsViewModelTest {
     private fun TestScope.viewModel(route: (Call) -> Reply): Triple<SettingsViewModel, SessionRepository, FakeServer> {
         val server = FakeServer(route)
         val session = SessionRepository(application, server.api)
-        val model = SettingsViewModel(session, preferences, LibraryRepository(server.api, scopes, CatalogRepository(server.api, scopes)))
+        val model = SettingsViewModel(session, preferences, LibraryRepository(server.api, scopes, CatalogRepository(server.api, scopes)), AccountRepository(server.api, session, preferences))
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { model.state.collect {} }
         return Triple(model, session, server)
     }
@@ -93,7 +94,7 @@ class SettingsViewModelTest {
 
     @Test
     fun passkeyFailureIsReported() = runTest {
-        val (model, _, _) = viewModel { Reply("""{"error":"Sign in first"}""", code = 401) }
+        val (model, _, _) = viewModel { Reply("""{"message":"Sign in first"}""", code = 401) }
         model.events.test {
             model.addPasskey { error("unreachable") }
             assertEquals(SettingsEvent.Failed("Sign in first"), awaitItem())

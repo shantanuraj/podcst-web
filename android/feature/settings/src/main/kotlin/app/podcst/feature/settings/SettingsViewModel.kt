@@ -2,6 +2,7 @@ package app.podcst.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.podcst.data.AccountRepository
 import app.podcst.data.Appearance
 import app.podcst.data.LibraryRepository
 import app.podcst.data.Preferences
@@ -9,6 +10,7 @@ import app.podcst.data.SessionRepository
 import app.podcst.model.AudioOptions
 import app.podcst.model.ImportResult
 import app.podcst.model.Opml
+import app.podcst.model.Passkey
 import app.podcst.model.Region
 import app.podcst.model.User
 import kotlin.coroutines.cancellation.CancellationException
@@ -28,6 +30,7 @@ data class SettingsState(
     val appearance: Appearance = Appearance.System,
     val region: Region? = null,
     val audio: AudioOptions = AudioOptions(),
+    val passkeys: List<Passkey> = emptyList(),
     val subscribed: Boolean = false,
     val importing: Boolean = false,
 )
@@ -42,6 +45,7 @@ class SettingsViewModel(
     private val session: SessionRepository,
     private val preferences: Preferences,
     private val library: LibraryRepository,
+    private val account: AccountRepository,
 ) : ViewModel() {
     private val importing = MutableStateFlow(false)
     private val channel = Channel<SettingsEvent>(Channel.BUFFERED)
@@ -52,8 +56,9 @@ class SettingsViewModel(
             SettingsState(user, appearance, region, audio)
         },
         library.subscribed.map { it.isNotEmpty() },
+        account.account.map { it?.passkeys.orEmpty() },
         importing,
-    ) { state, subscribed, importing -> state.copy(subscribed = subscribed, importing = importing) }
+    ) { state, subscribed, passkeys, importing -> state.copy(subscribed = subscribed, passkeys = passkeys, importing = importing) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsState(user = session.user))
 
     fun setAppearance(value: Appearance) {
@@ -73,6 +78,18 @@ class SettingsViewModel(
     fun addPasskey(create: suspend (String) -> String) {
         viewModelScope.launch {
             if (!session.registerPasskey(create)) channel.send(SettingsEvent.Failed(session.session.value.error))
+        }
+    }
+
+    fun removePasskey(id: String) {
+        viewModelScope.launch {
+            try {
+                account.removePasskey(id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                channel.send(SettingsEvent.Failed(failure.message))
+            }
         }
     }
 

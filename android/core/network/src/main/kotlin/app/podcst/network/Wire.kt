@@ -1,8 +1,12 @@
 package app.podcst.network
 
+import app.podcst.model.Account
+import app.podcst.model.AudioEffects
+import app.podcst.model.AudioOptions
 import app.podcst.model.Episode
 import app.podcst.model.EpisodeFile
 import app.podcst.model.EpisodePage
+import app.podcst.model.Passkey
 import app.podcst.model.Podcast
 import app.podcst.model.User
 import kotlin.time.Duration.Companion.seconds
@@ -100,6 +104,9 @@ internal data class WireUser(
 @Serializable internal data class WireVerified(val verified: Boolean = false, val userId: String? = null)
 @Serializable internal data class WireRefreshStatus(val status: String)
 @Serializable internal data class WireError(val message: String? = null)
+@Serializable internal data class WirePreferences(val speed: Double, val volumeBoost: Boolean, val trimSilence: Boolean)
+@Serializable internal data class WirePasskey(val id: String, val provider: String? = null, val createdAt: String, val lastUsedAt: String? = null)
+@Serializable internal data class WireAccount(val createdAt: String? = null, val passkeys: List<WirePasskey>, val preferences: WirePreferences? = null)
 
 @Serializable
 internal data class WirePasskeyStart(
@@ -162,3 +169,13 @@ internal fun WireEpisodePage.domain(podcastId: Long) =
     EpisodePage(episodes.map { it.domain(podcastId) }, total, hasMore, nextCursor)
 
 internal fun WireUser.domain() = User(id, email, name, image, hasPasskey)
+
+internal fun WirePreferences.domain() = AudioOptions(speed, AudioEffects(volumeBoost, trimSilence))
+
+internal fun AudioOptions.wire() = WirePreferences(speed, effects.volumeBoost, effects.trimSilence)
+
+internal fun WireAccount.domain() = Account(
+    created = createdAt?.let(Instant::parse),
+    passkeys = passkeys.map { Passkey(it.id, it.provider, Instant.parse(it.createdAt), it.lastUsedAt?.let(Instant::parse)) },
+    preferences = preferences?.domain(),
+)

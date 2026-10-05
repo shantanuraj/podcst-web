@@ -9,6 +9,13 @@
     <string name="passkey">Passkey</string>
     <string name="passkey_on">On</string>
     <string name="add_passkey">Add a passkey</string>
+    <string name="passkey_added">Added %1$s</string>
+    <string name="passkey_used">Used %1$s</string>
+    <string name="passkey_used_today">Used today</string>
+    <string name="remove_passkey">Remove</string>
+    <string name="remove_passkey_title">Remove passkey?</string>
+    <string name="remove_passkey_detail">You can still sign in with an emailed code.</string>
+    <string name="cancel">Cancel</string>
     <string name="sign_out">Sign out</string>
     <string name="appearance">Appearance</string>
     <string name="appearance_system">System</string>

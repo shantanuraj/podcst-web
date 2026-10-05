@@ -1,5 +1,7 @@
 package app.podcst.network
 
+import app.podcst.model.Account
+import app.podcst.model.AudioOptions
 import app.podcst.model.EpisodePage
 import app.podcst.model.EpisodeSort
 import app.podcst.model.ImportResult
@@ -183,6 +185,15 @@ class PodcstApi(
             put("position", position.toLong())
             put("completed", completed)
         })
+    }
+
+    suspend fun account(): Account = get<WireAccount>("api/account").domain()
+
+    suspend fun savePreferences(options: AudioOptions): AudioOptions =
+        send<WirePreferences>("PUT", url("api/account/preferences"), json.encodeToJsonElement(WirePreferences.serializer(), options.wire())).domain()
+
+    suspend fun removePasskey(id: String) {
+        send<WireSuccess>("DELETE", baseUrl.resolve("api/account/passkeys")!!.newBuilder().addPathSegment(id).build(), null)
     }
 
     private suspend inline fun <reified T> get(path: String, vararg query: Pair<String, String?>, session: Boolean = true): T =

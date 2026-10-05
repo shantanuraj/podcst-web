@@ -22,6 +22,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,11 +30,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -73,12 +76,17 @@ import app.podcst.designsystem.PodcstTheme
 import app.podcst.designsystem.R as DesignR
 import app.podcst.designsystem.speed
 import app.podcst.model.AudioOptions
+import app.podcst.model.Passkey
 import app.podcst.model.PlaybackRules
 import app.podcst.model.Region
 import app.podcst.model.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SettingsScreen(
@@ -135,6 +143,7 @@ fun SettingsScreen(
         onBack = onBack,
         onSignIn = onSignIn,
         onAddPasskey = { viewModel.addPasskey(createPasskey) },
+        onRemovePasskey = viewModel::removePasskey,
         onSignOut = viewModel::signOut,
         onAppearance = viewModel::setAppearance,
         onRegion = viewModel::setRegion,
@@ -156,6 +165,7 @@ private fun SettingsContent(
     onBack: () -> Unit,
     onSignIn: () -> Unit,
     onAddPasskey: () -> Unit,
+    onRemovePasskey: (String) -> Unit,
     onSignOut: () -> Unit,
     onAppearance: (Appearance) -> Unit,
     onRegion: (Region) -> Unit,
@@ -168,6 +178,7 @@ private fun SettingsContent(
     val colors = Podcst.colors
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var picker by rememberSaveable { mutableStateOf<Picker?>(null) }
+    var removing by remember { mutableStateOf<Passkey?>(null) }
     Column(Modifier.fillMaxSize().background(colors.paper).nestedScroll(scroll.nestedScrollConnection)) {
         LargeTopAppBar(
             title = { Text(stringResource(R.string.settings)) },
@@ -193,11 +204,11 @@ private fun SettingsContent(
             AccountCard(state.user, onSignIn)
             state.user?.let { user ->
                 Section(stringResource(R.string.account)) {
-                    if (user.hasPasskey) {
+                    if (state.passkeys.isEmpty() && user.hasPasskey) {
                         SettingRow(stringResource(R.string.passkey), value = stringResource(R.string.passkey_on))
-                    } else {
-                        SettingRow(stringResource(R.string.add_passkey), onClick = onAddPasskey, action = true)
                     }
+                    state.passkeys.forEach { passkey -> PasskeyRow(passkey) { removing = passkey } }
+                    SettingRow(stringResource(R.string.add_passkey), onClick = onAddPasskey, action = true)
                     SettingRow(stringResource(R.string.sign_out), onClick = onSignOut, action = true, divider = false)
                 }
             }
@@ -221,6 +232,22 @@ private fun SettingsContent(
             }
             Footer(version)
         }
+    }
+    removing?.let { passkey ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(stringResource(R.string.remove_passkey_title)) },
+            text = { Text(stringResource(R.string.remove_passkey_detail)) },
+            confirmButton = {
+                TextButton(onClick = { removing = null; onRemovePasskey(passkey.id) }) {
+                    Text(stringResource(R.string.remove_passkey), color = colors.accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { removing = null }) { Text(stringResource(R.string.cancel)) }
+            },
+            containerColor = colors.elevated,
+        )
     }
     when (picker) {
         Picker.Region -> state.region?.let { region ->
@@ -305,6 +332,37 @@ private fun SettingRow(
         if (onClick != null && !action) Icon(PodcstIcons.ChevronRight, null, Modifier.size(16.dp), tint = colors.muted)
     }
 }
+
+@Composable
+private fun PasskeyRow(passkey: Passkey, onRemove: () -> Unit) {
+    val colors = Podcst.colors
+    val added = stringResource(R.string.passkey_added, monthYear.format(passkey.created.local()))
+    val used = passkey.lastUsed?.let { last ->
+        if (last.local().toLocalDate() == LocalDate.now()) stringResource(R.string.passkey_used_today)
+        else stringResource(R.string.passkey_used, dayMonth.format(last.local()))
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .hairline(colors.rule)
+            .heightIn(min = 56.dp)
+            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(passkey.provider ?: stringResource(R.string.passkey), style = Podcst.type.body, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(listOfNotNull(added, used).joinToString(" · "), style = Podcst.type.meta, color = colors.secondary)
+        }
+        TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_passkey), color = colors.tertiary) }
+    }
+}
+
+private val monthYear = DateTimeFormatter.ofPattern("MMM yyyy")
+private val dayMonth = DateTimeFormatter.ofPattern("d MMM")
+
+private fun kotlin.time.Instant.local(): LocalDateTime =
+    LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(toEpochMilliseconds()), ZoneId.systemDefault())
 
 @Composable
 private fun SwitchRow(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
@@ -397,6 +455,7 @@ private fun SettingsPreview() {
             onBack = {},
             onSignIn = {},
             onAddPasskey = {},
+            onRemovePasskey = {},
             onSignOut = {},
             onAppearance = {},
             onRegion = {},

@@ -1,5 +1,8 @@
 package app.podcst.network
 
+import app.podcst.model.AudioEffects
+import app.podcst.model.AudioOptions
+
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -79,6 +82,9 @@ class ApiContractTest {
             "DELETE /api/subscriptions" -> api.unsubscribe(1)
             "GET /api/progress" -> api.currentProgress()
             "PUT /api/progress" -> api.saveProgress(1, 12.5, false)
+            "GET /api/account" -> api.account().passkeys.forEach { assertTrue(it.id.isNotEmpty()) }
+            "PUT /api/account/preferences" -> api.savePreferences(AudioOptions(1.5, AudioEffects(volumeBoost = true)))
+            "DELETE /api/account/passkeys/:id" -> api.removePasskey(":id")
             else -> fail("Unmapped endpoint $endpoint")
         }
     }

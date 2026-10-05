@@ -15,6 +15,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.work.runtime)
     testImplementation(libs.robolectric)
+    testImplementation(testFixtures(project(":core:network")))
     testImplementation(libs.turbine)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.work.testing)

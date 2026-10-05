@@ -15,7 +15,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(graph: AppGraph, navigator: Navig
     entry<SettingsRoute> {
         val passkeys = rememberPasskeys()
         SettingsScreen(
-            viewModel { SettingsViewModel(graph.session, graph.preferences, graph.library) },
+            viewModel { SettingsViewModel(graph.session, graph.preferences, graph.library, graph.account) },
             version = BuildConfig.VERSION_NAME,
             onBack = { navigator.back() },
             onSignIn = { navigator.signIn = true },

@@ -3,6 +3,7 @@ package app.podcst
 import android.app.Application
 import app.podcst.artwork.ArtworkStore
 import app.podcst.data.AccountChange
+import app.podcst.data.AccountRepository
 import app.podcst.data.CatalogRepository
 import app.podcst.data.LibraryRepository
 import app.podcst.data.Preferences
@@ -44,6 +45,7 @@ class AppGraph(application: Application) {
     val api = PodcstApi(client, SecureStore(application, "session"))
     val preferences = Preferences(application)
     val session = SessionRepository(application, api)
+    val account = AccountRepository(api, session, preferences)
     val scopes = Scopes(application, session.user?.id)
     val scheduler = WorkManagerScheduler(application)
     val catalog = CatalogRepository(api, scopes)
@@ -64,6 +66,7 @@ class AppGraph(application: Application) {
     )
 
     init {
+        account.start(scope)
         session.accountChange = AccountChange { accountId ->
             playback.beginAccountChange()
             downloads.purge()
