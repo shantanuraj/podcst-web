@@ -357,6 +357,32 @@ public final class APIClient {
         let _: RawSuccess = try await put(path: "/api/progress", body: ProgressBody(episodeId: episodeID, position: Int(position.rounded(.towardZero)), completed: completed))
     }
 
+    func account() async throws -> Account {
+        let raw: RawAccount = try await get(path: "/api/account")
+        return Account(
+            created: raw.createdAt.flatMap(Self.isoDate),
+            passkeys: raw.passkeys.compactMap { passkey in
+                Self.isoDate(passkey.createdAt).map {
+                    Passkey(id: passkey.id, provider: passkey.provider, created: $0, lastUsed: passkey.lastUsedAt.flatMap(Self.isoDate))
+                }
+            },
+            preferences: raw.preferences?.options
+        )
+    }
+
+    func savePreferences(_ options: AudioOptions) async throws -> AudioOptions {
+        let raw: RawPreferences = try await put(path: "/api/account/preferences", body: RawPreferences(options))
+        return raw.options
+    }
+
+    func removePasskey(id: String) async throws {
+        let _: RawSuccess = try await delete(path: "/api/account/passkeys/\(id)", query: [])
+    }
+
+    private nonisolated static func isoDate(_ value: String) -> Date? {
+        try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value)
+    }
+
     private func get<T: Decodable>(path: String, query: [URLQueryItem] = [], usesSession: Bool = true) async throws -> T {
         try await request(method: "GET", path: path, query: query, body: Optional<EmptyBody>.none, usesSession: usesSession)
     }
@@ -781,6 +807,21 @@ private struct RawSearchResult: Decodable {
 }
 private struct RawEpisodePage: Decodable { var episodes: [RawEpisode]; var total: Int; var hasMore: Bool; var nextCursor: Int? }
 private struct RawProgress: Decodable { var episode: RawEpisode; var position: Double }
+private struct RawPreferences: Codable {
+    var speed: Double
+    var volumeBoost: Bool
+    var trimSilence: Bool
+
+    init(_ options: AudioOptions) {
+        speed = options.speed
+        volumeBoost = options.effects.volumeBoost
+        trimSilence = options.effects.trimSilence
+    }
+
+    var options: AudioOptions { AudioOptions(speed: speed, effects: AudioEffects(volumeBoost: volumeBoost, trimSilence: trimSilence)) }
+}
+private struct RawPasskey: Decodable { var id: String; var provider: String?; var createdAt: String; var lastUsedAt: String? }
+private struct RawAccount: Decodable { var createdAt: String?; var passkeys: [RawPasskey]; var preferences: RawPreferences? }
 private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
 
 private struct RawPodcast: Decodable {

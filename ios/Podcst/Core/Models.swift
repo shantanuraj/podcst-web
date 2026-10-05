@@ -158,6 +158,19 @@ public struct SubscriptionImportResult: Codable, Hashable, Sendable {
     public var failed: Int
 }
 
+struct Passkey: Hashable, Sendable, Identifiable {
+    var id: String
+    var provider: String?
+    var created: Date
+    var lastUsed: Date?
+}
+
+struct Account: Equatable, Sendable {
+    var created: Date?
+    var passkeys: [Passkey]
+    var preferences: AudioOptions?
+}
+
 public struct APIError: Error, Codable, LocalizedError, Sendable {
     public var statusCode: Int
     public var message: String

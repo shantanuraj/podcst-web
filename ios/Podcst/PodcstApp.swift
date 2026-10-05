@@ -11,6 +11,7 @@ struct PodcstApp: App {
     @State private var playback: PlaybackController
     @State private var media: MediaStore
     @State private var stars: StarStore
+    @State private var account: AccountStore
 
     init() {
         let testing = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -30,6 +31,7 @@ struct PodcstApp: App {
         let routing = RoutingAudioTransport(media: media)
         let playback = PlaybackController(transport: routing, accountID: session.user?.id, preferences: .persistent(), integratesWithSystem: !testing, chapterLoader: { episode in await media.chapterMetadata(for: episode) })
         _playback = State(initialValue: playback)
+        _account = State(initialValue: AccountStore(api: api, preferences: playback.audioPreferences))
         appDelegate.media = media
         session.prepareAccountChange = { [weak library, weak playback] accountID in
             playback?.beginAccountChange()
@@ -58,6 +60,7 @@ struct PodcstApp: App {
                     .environment(api)
                     .environment(media)
                     .environment(stars)
+                    .environment(account)
                     .task {
                         await session.restore()
                     }

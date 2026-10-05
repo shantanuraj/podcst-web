@@ -61,6 +61,7 @@ final class Router {
 struct RootView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
+    @Environment(AccountStore.self) private var account
     @Environment(PlaybackController.self) private var playback
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Appearance.key) private var appearance = Appearance.system
@@ -101,6 +102,8 @@ struct RootView: View {
         .task(id: session.isLoading) {
             guard !session.isLoading else { return }
             await library.load()
+            guard !Task.isCancelled else { return }
+            await account.load(accountID: session.user?.id)
             guard !Task.isCancelled else { return }
             await playback.restore()
             if playback.currentEpisode == nil, let progress = library.progress {

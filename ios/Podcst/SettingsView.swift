@@ -5,12 +5,15 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
+    @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Appearance.key) private var appearance = Appearance.system
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
     @State private var showingLogin = false
     @State private var importing = false
     @State private var showingAudio = false
+    @State private var removing: Passkey?
+    @State private var removalError: String?
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
@@ -26,7 +29,11 @@ struct SettingsView: View {
                 }
                 if let user = session.user {
                     Section {
-                        if user.hasPasskey {
+                        if let passkeys = account.account?.passkeys, !passkeys.isEmpty {
+                            ForEach(passkeys) { passkey in
+                                PasskeyRow(passkey: passkey) { removing = passkey }
+                            }
+                        } else if user.hasPasskey {
                             LabeledContent("Passkey", value: "On")
                         } else {
                             Button("Add a passkey") {
@@ -92,6 +99,21 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .sheet(isPresented: $showingLogin) { LoginView() }
             .sheet(isPresented: $showingAudio) { AudioSettingsView() }
+            .confirmationDialog("Remove passkey?", isPresented: Binding { removing != nil } set: { if !$0 { removing = nil } }, titleVisibility: .visible, presenting: removing) { passkey in
+                Button("Remove", role: .destructive) {
+                    Task {
+                        do { try await account.removePasskey(passkey) }
+                        catch { removalError = error.localizedDescription }
+                    }
+                }
+            } message: { _ in
+                Text("You can still sign in with an emailed code.")
+            }
+            .alert("Couldn’t remove passkey", isPresented: Binding { removalError != nil } set: { if !$0 { removalError = nil } }) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(removalError ?? "")
+            }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "opml") ?? .xml, .xml, .plainText]) { result in
                 guard case .success(let url) = result else { return }
                 let scoped = url.startAccessingSecurityScopedResource()
@@ -102,6 +124,37 @@ struct SettingsView: View {
         }
         .tint(PodcstPalette.accent)
         .presentationDragIndicator(.visible)
+    }
+}
+
+private struct PasskeyRow: View {
+    let passkey: Passkey
+    let remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(passkey.provider ?? "Passkey")
+                    .font(.sans(.body))
+                Text(detail)
+                    .font(.sans(.caption))
+                    .foregroundStyle(PodcstPalette.tertiary)
+            }
+            Spacer()
+            Button("Remove", action: remove)
+                .font(.sans(.subheadline))
+                .foregroundStyle(PodcstPalette.tertiary)
+                .buttonStyle(.borderless)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAction(named: "Remove") { remove() }
+    }
+
+    private var detail: String {
+        let added = "Added \(passkey.created.formatted(.dateTime.month(.abbreviated).year()))"
+        guard let used = passkey.lastUsed else { return added }
+        let last = Calendar.current.isDateInToday(used) ? "Used today" : "Used \(used.formatted(.dateTime.day().month(.abbreviated)))"
+        return "\(added) · \(last)"
     }
 }
 

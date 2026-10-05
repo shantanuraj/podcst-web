@@ -181,6 +181,9 @@ final class ContractFixtureTests: XCTestCase {
         case "DELETE /api/subscriptions": try await api.unsubscribe(podcastID: 910001)
         case "GET /api/progress": _ = try await api.currentProgress()
         case "PUT /api/progress": try await api.saveProgress(episodeID: 910001, position: 12, completed: false)
+        case "GET /api/account": _ = try await api.account()
+        case "PUT /api/account/preferences": _ = try await api.savePreferences(AudioOptions(speed: 1.5, effects: AudioEffects(volumeBoost: true)))
+        case "DELETE /api/account/passkeys/:id": try await api.removePasskey(id: ":id")
         default: XCTFail("Unmapped endpoint \(fixture.endpoint) in \(name)")
         }
     }
@@ -322,7 +325,7 @@ private struct ReleaseSectionVector: Decodable {
 }
 
 @MainActor
-private final class ContractCredentials: SessionCredentialStore {
+final class ContractCredentials: SessionCredentialStore {
     private var value: String?
 
     init(value: String?) { self.value = value }
@@ -331,12 +334,12 @@ private final class ContractCredentials: SessionCredentialStore {
     func delete() { value = nil }
 }
 
-private struct ContractResponse: Sendable {
+struct ContractResponse: Sendable {
     let status: Int
     let data: Data
 }
 
-private final class ContractURLProtocol: URLProtocol {
+final class ContractURLProtocol: URLProtocol {
     private static let state = ContractURLProtocolState()
 
     static func install(_ responses: [ContractResponse]) {
@@ -380,7 +383,7 @@ private final class ContractURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
-private final class ContractURLProtocolState: @unchecked Sendable {
+final class ContractURLProtocolState: @unchecked Sendable {
     let lock = NSLock()
     var responses: [ContractResponse] = []
     var requests: [URLRequest] = []
