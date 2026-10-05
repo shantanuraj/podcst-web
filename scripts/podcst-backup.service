@@ -7,4 +7,5 @@ Wants=network-online.target
 Type=oneshot
 User=svc-podcst
 Group=svc-podcst
+EnvironmentFile=/etc/podcst/backup.env
 ExecStart=/opt/podcst/scripts/podcst-backup.sh

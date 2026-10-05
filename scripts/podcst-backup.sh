@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RECIPIENT="${BACKUP_RECIPIENT:?Set BACKUP_RECIPIENT}"
-BUCKET="${BACKUP_BUCKET:?Set BACKUP_BUCKET}"
-PROFILE="${AWS_PROFILE:?Set AWS_PROFILE}"
-PGDUMP=/usr/bin/pg_dump
-AGE=/usr/bin/age
-AWS=/usr/local/bin/aws
-
-DATABASE_URL="${BACKUP_DATABASE_URL:?Set BACKUP_DATABASE_URL}"
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib/backup.sh"
 
 TS=$(date -u +%Y-%m-%dT%H%M%SZ)
 KEY="podcst-userdata-${TS}.dump.age"
@@ -21,19 +14,18 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 DUMP="$TMP/dump"
 
-"$PGDUMP" "$DATABASE_URL" -Fc --strict-names --no-owner --no-privileges \
+pg_dump "$BACKUP_DATABASE_URL" -Fc --strict-names --no-owner --no-privileges \
   -t public.users -t public.subscriptions -t public.playback_progress \
   -t public.passkeys -t public.sessions -t public.email_verifications \
   -t public.transcripts -t public.podcast_feed_aliases \
   -t public.podcast_apple_aliases -t public.account_preferences > "$DUMP"
 [ -s "$DUMP" ] || { echo "ERROR: empty pg_dump output" >&2; exit 1; }
 
-"$AGE" -r "$RECIPIENT" -o "$DUMP.age" "$DUMP"
+age -r "$BACKUP_RECIPIENT" -o "$DUMP.age" "$DUMP"
 [ -s "$DUMP.age" ] || { echo "ERROR: empty encrypted output" >&2; exit 1; }
 
-"$AWS" s3api put-object \
-  --bucket "$BUCKET" --key "$KEY" --body "$DUMP.age" \
-  --object-lock-mode GOVERNANCE --object-lock-retain-until-date "$RETAIN_UNTIL" \
-  --profile "$PROFILE" >/dev/null
+aws s3api put-object \
+  --bucket "$BACKUP_BUCKET" --key "$KEY" --body "$DUMP.age" \
+  --object-lock-mode GOVERNANCE --object-lock-retain-until-date "$RETAIN_UNTIL" >/dev/null
 
-echo "OK uploaded s3://${BUCKET}/${KEY} plaintext=$(stat -c%s "$DUMP")B encrypted=$(stat -c%s "$DUMP.age")B retain_until=${RETAIN_UNTIL} (${RETAIN_DAYS}d)"
+echo "OK uploaded s3://${BACKUP_BUCKET}/${KEY} plaintext=$(stat -c%s "$DUMP")B encrypted=$(stat -c%s "$DUMP.age")B retain_until=${RETAIN_UNTIL} (${RETAIN_DAYS}d)"

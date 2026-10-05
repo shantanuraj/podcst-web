@@ -8,8 +8,7 @@ Type=oneshot
 User=svc-podcst
 Group=svc-podcst
 Environment=HOME=/var/lib/podcst
-Environment=DATABASE_URL=postgres://podcst_app@localhost/podcst
-Environment=PGHOST=/var/run/postgresql
+EnvironmentFile=/etc/podcst/app.env
 WorkingDirectory=/opt/podcst
 ExecStart=/usr/local/bin/bun run scripts/refresh-tiers.ts
 NoNewPrivileges=true

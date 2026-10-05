@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RECIPIENT="${BACKUP_RECIPIENT:?Set BACKUP_RECIPIENT}"
-BUCKET="${BACKUP_BUCKET:?Set BACKUP_BUCKET}"
-PROFILE="${AWS_PROFILE:?Set AWS_PROFILE}"
-PSQL=/usr/bin/psql
-ZSTD=/usr/bin/zstd
-AGE=/usr/bin/age
-AWS=/usr/local/bin/aws
-RETAIN_DAYS=90
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib/backup.sh"
 
-DATABASE_URL="${BACKUP_DATABASE_URL:?Set BACKUP_DATABASE_URL}"
+: "${BACKUP_MIN_PODCASTS:?Set BACKUP_MIN_PODCASTS to the minimum expected rows}"
+: "${BACKUP_MIN_EPISODES:?Set BACKUP_MIN_EPISODES to the minimum expected rows}"
+[[ $BACKUP_MIN_PODCASTS =~ ^[1-9][0-9]*$ && $BACKUP_MIN_EPISODES =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: backup row thresholds must be positive integers" >&2
+  exit 1
+}
+RETAIN_DAYS=90
 TS=$(date -u +%Y-%m-%dT%H%M%SZ)
 RETAIN_UNTIL=$(date -u -d "+${RETAIN_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
 
@@ -20,18 +19,17 @@ trap 'rm -rf "$TMP"' EXIT
 snapshot() {
   local name="$1" query="$2" mincount="$3"
   local file="$TMP/${name}.csv.zst"
-  "$PSQL" "$DATABASE_URL" -At -c "\copy ($query) TO STDOUT WITH CSV" | "$ZSTD" -q -o "$file"
+  psql "$BACKUP_DATABASE_URL" -At -c "\copy ($query) TO STDOUT WITH CSV" | zstd -q -o "$file"
   local rows
-  rows=$("$ZSTD" -dc "$file" | wc -l)
+  rows=$(zstd -dc "$file" | wc -l)
   [ "$rows" -ge "$mincount" ] || { echo "ERROR: ${name} produced ${rows} rows (< ${mincount})" >&2; exit 1; }
-  "$AGE" -r "$RECIPIENT" -o "${file}.age" "$file"
+  age -r "$BACKUP_RECIPIENT" -o "${file}.age" "$file"
   local key="podcst-identity-${name}-${TS}.csv.zst.age"
-  "$AWS" s3api put-object --bucket "$BUCKET" --key "$key" --body "${file}.age" \
-    --object-lock-mode GOVERNANCE --object-lock-retain-until-date "$RETAIN_UNTIL" \
-    --profile "$PROFILE" >/dev/null
-  echo "OK ${name} rows=${rows} encrypted=$(stat -c%s "${file}.age")B s3://${BUCKET}/${key}"
+  aws s3api put-object --bucket "$BACKUP_BUCKET" --key "$key" --body "${file}.age" \
+    --object-lock-mode GOVERNANCE --object-lock-retain-until-date "$RETAIN_UNTIL" >/dev/null
+  echo "OK ${name} rows=${rows} encrypted=$(stat -c%s "${file}.age")B s3://${BACKUP_BUCKET}/${key}"
 }
 
-snapshot podcasts "SELECT id, feed_url, itunes_id, podcast_index_id, owner_user_id FROM podcasts" "${BACKUP_MIN_PODCASTS:?Set BACKUP_MIN_PODCASTS}"
-snapshot episodes "SELECT id, podcast_id, guid FROM episodes" "${BACKUP_MIN_EPISODES:?Set BACKUP_MIN_EPISODES}"
+snapshot podcasts "SELECT id, feed_url, itunes_id, podcast_index_id, owner_user_id FROM podcasts" "$BACKUP_MIN_PODCASTS"
+snapshot episodes "SELECT id, podcast_id, guid FROM episodes" "$BACKUP_MIN_EPISODES"
 echo "identity snapshot complete retain_until=${RETAIN_UNTIL} (${RETAIN_DAYS}d)"

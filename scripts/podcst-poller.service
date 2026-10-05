@@ -6,8 +6,7 @@ After=network.target postgresql.service
 User=svc-podcst
 Group=svc-podcst
 Environment=HOME=/var/lib/podcst
-Environment=DATABASE_URL=postgres://podcst_app@localhost/podcst
-Environment=PGHOST=/var/run/postgresql
+EnvironmentFile=/etc/podcst/app.env
 WorkingDirectory=/opt/podcst
 ExecStart=/usr/local/bin/bun run scripts/poll-feeds.ts --daemon
 Restart=on-failure
