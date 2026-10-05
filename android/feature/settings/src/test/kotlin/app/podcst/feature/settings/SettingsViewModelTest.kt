@@ -82,7 +82,7 @@ class SettingsViewModelTest {
 
     @Test
     fun importReportsFailedFeeds() = runTest {
-        val (model, _, server) = viewModel { Reply("""{"error":"Feed unavailable"}""", code = 502) }
+        val (model, _, server) = viewModel { Reply("""{"message":"Feed unavailable"}""", code = 502) }
         val opml = """<opml><body><outline xmlUrl="https://a.example/rss"/><outline xmlUrl='https://b.example/rss?x=1&amp;y=2'/></body></opml>"""
         model.events.test {
             model.import(opml)

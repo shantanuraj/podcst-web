@@ -67,7 +67,7 @@ class SignInViewModelTest {
 
     @Test
     fun failedSendStaysOnEmailWithError() = runTest {
-        val (model, _) = viewModel { Reply("""{"error":"Invalid email"}""", code = 400) }
+        val (model, _) = viewModel { Reply("""{"message":"Invalid email"}""", code = 400) }
         model.setEmail("nobody")
         model.submit()
         val state = model.state.first { it.error != null }
