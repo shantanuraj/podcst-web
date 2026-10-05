@@ -50,6 +50,17 @@ yarn tsc --noEmit
 yarn build
 ```
 
+With Docker running, test the production image and its public HTML against
+throwaway PostgreSQL and Redis instances:
+
+```sh
+docker build -t podcst-local .
+scripts/test-container.sh podcst-local
+```
+
+The image build needs no database credentials. The smoke test uses synthetic data
+and removes its containers afterwards.
+
 Use `yarn format` to format web source with Biome. To run one test file:
 
 ```sh

@@ -2,33 +2,73 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   lint:
     name: Biome Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: yarn
       - run: yarn install --frozen-lockfile
       - run: yarn lint
+      - run: yarn tsc --noEmit
 
   test:
     name: Tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: podcst_test
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       PG_BIN: /usr/lib/postgresql/16/bin
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/podcst_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: yarn install --frozen-lockfile
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-16
+      - run: DATABASE_URL="$TEST_DATABASE_URL" REDIS_URL="$TEST_REDIS_URL" bun --no-env-file test
+
+  build:
+    name: Container and public HTML
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-16
-      - run: bun test
+        with:
+          bun-version: 1.4.2
+      - run: docker build --progress=plain -t podcst-ci .
+      - run: scripts/test-container.sh podcst-ci

@@ -1,22 +1,43 @@
 name: Fly Deploy
+
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy app
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
-    concurrency: deploy-group
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: |
-          flyctl console --dockerfile Dockerfile.builder \
-            -C "/srv/deploy.sh" \
-            --env "FLY_API_TOKEN=${FLY_API_TOKEN}" \
-            --vm-cpu-kind shared \
-            --vm-memory 1024 \
-            --vm-cpus 1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Check the tested revision is still current
+        id: candidate
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$current" == "$CANDIDATE_SHA" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+        if: steps.candidate.outputs.deploy == 'true'
+      - run: ./scripts/deploy-fly.sh
+        if: steps.candidate.outputs.deploy == 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

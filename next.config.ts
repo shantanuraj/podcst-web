@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 import pkg from './package.json' with { type: 'json' };
 
 const config: NextConfig = {
+  output: 'standalone',
   htmlLimitedBots: /.*/,
   env: {
     appVersion: pkg.version,
