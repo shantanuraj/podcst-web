@@ -6,8 +6,11 @@
 _Static_assert(sizeof(PodcstAudioConfig) == 28, "config size");
 _Static_assert(offsetof(PodcstAudioConfig, limiter_enabled) == 12, "config layout");
 _Static_assert(sizeof(PodcstAudioReport) == 8, "report size");
-_Static_assert(sizeof(PodcstAudioInfo) == 16, "info size");
-_Static_assert(offsetof(PodcstAudioInfo, allocated_bytes) == 8, "info layout");
+_Static_assert(sizeof(PodcstAudioInfo) == 24, "info size");
+_Static_assert(offsetof(PodcstAudioInfo, limiter_reduction_db) == 0, "reduction layout");
+_Static_assert(offsetof(PodcstAudioInfo, latency_frames) == 4, "latency layout");
+_Static_assert(offsetof(PodcstAudioInfo, max_block_frames) == 8, "block size layout");
+_Static_assert(offsetof(PodcstAudioInfo, allocated_bytes) == 16, "allocation layout");
 
 _Static_assert(sizeof(PodcstEffectsConfig) == 16, "effects config size");
 _Static_assert(sizeof(PodcstEffectsReport) == 12, "effects report size");
@@ -71,6 +74,7 @@ int main(void) {
     PodcstAudioInfo info;
     assert(podcst_audio_get_info(processor, &info) == PODCST_AUDIO_OK);
     assert(info.latency_frames == 255 && info.max_block_frames == PODCST_AUDIO_MAX_BLOCK_FRAMES);
+    assert(info.limiter_reduction_db == 0.0f);
     assert(info.allocated_bytes < 1048576);
     float loud[600];
     for (size_t index = 0; index < 600; ++index) loud[index] = index % 2 == 0 ? 1.5f : -1.5f;

@@ -14,6 +14,7 @@ func verifyProcessor(channels: UInt32, limiting: Bool) {
     precondition(podcst_audio_get_info(handle, &info) == PODCST_AUDIO_OK)
     precondition(info.max_block_frames == PODCST_AUDIO_MAX_BLOCK_FRAMES)
     precondition(info.allocated_bytes > 0)
+    precondition(info.limiter_reduction_db == 0)
     precondition(limiting ? info.latency_frames > 0 : info.latency_frames == 0)
 
     let frameCount = 1_027
