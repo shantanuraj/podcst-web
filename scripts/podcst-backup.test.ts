@@ -19,10 +19,11 @@ const tables = [...script.matchAll(/-t (public\.[a-z_]+)/g)].map(
   (match) => match[1],
 );
 
-test('user backup explicitly includes aliases and refuses missing selected tables', () => {
+test('user backup explicitly includes aliases and preferences and refuses missing selected tables', () => {
   expect(tables).toContain('public.podcast_feed_aliases');
   expect(tables).toContain('public.podcast_apple_aliases');
-  expect(tables).toHaveLength(9);
+  expect(tables).toContain('public.account_preferences');
+  expect(tables).toHaveLength(10);
   expect(script).toContain('--strict-names');
 });
 
