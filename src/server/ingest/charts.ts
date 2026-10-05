@@ -142,7 +142,7 @@ export async function storeTopPodcasts(
   sql: postgres.Sql,
   podcasts: ChartPodcast[],
   locale: string,
-): Promise<{ stored: number; newPodcasts: number }> {
+): Promise<{ stored: number; newPodcasts: number; skipped: number }> {
   if (podcasts.length === 0)
     throw new Error('Refusing to store an empty chart');
 
@@ -151,16 +151,20 @@ export async function storeTopPodcasts(
     itunesId,
   }));
   for (const podcast of podcasts) {
-    const observed = await findPodcastIdentity(
-      sql,
-      podcast.feed,
-      podcast.itunesId,
-    );
-    if (observed)
-      identities.push({
-        feedUrl: observed.feed_url,
-        itunesId: podcast.itunesId,
-      });
+    try {
+      const observed = await findPodcastIdentity(
+        sql,
+        podcast.feed,
+        podcast.itunesId,
+      );
+      if (observed)
+        identities.push({
+          feedUrl: observed.feed_url,
+          itunesId: podcast.itunesId,
+        });
+    } catch (error) {
+      if (!(error instanceof PodcastIdentityConflict)) throw error;
+    }
   }
   const lockedLocators = new Set(identities.map(({ feedUrl }) => feedUrl));
   return sql.begin(async (tx) => {
@@ -177,72 +181,100 @@ export async function storeTopPodcasts(
     await tx`DELETE FROM top_podcasts WHERE country_id = ${locale} AND genre_id = 0`;
 
     let newPodcasts = 0;
+    let skipped = 0;
     const storedSources = new Set<number>();
     for (const p of [...podcasts].sort((a, b) => a.rank - b.rank)) {
-      let podcast = await findPodcastIdentity(
-        tx,
-        p.feed,
-        p.itunesId,
-        undefined,
-        true,
-      );
-      if (!podcast) {
-        let [author] =
-          await tx`SELECT id FROM authors WHERE name = ${p.author} LIMIT 1`;
-        if (!author) {
-          [author] =
-            await tx`INSERT INTO authors (name) VALUES (${p.author}) RETURNING id`;
-        }
-        [podcast] = await tx`
-          INSERT INTO podcasts (
-            itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
-          ) VALUES (
-            ${p.itunesId}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
-            ${p.explicit}, ${p.count}
-          )
-          ON CONFLICT DO NOTHING
-          RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
-        `;
-        if (podcast) newPodcasts++;
-        else
-          podcast = await findPodcastIdentity(
-            tx,
-            p.feed,
-            p.itunesId,
-            undefined,
-            true,
+      try {
+        const result = await tx.savepoint(async (entry) => {
+          const { id, created } = await claimChartPodcast(
+            entry,
+            p,
+            locale,
+            lockedLocators,
           );
-      }
-      if (!podcast)
-        throw new Error(`Unable to store Apple podcast ${p.itunesId}`);
-
-      if (!lockedLocators.has(podcast.feed_url))
-        throw new PodcastIdentityConflict(
-          'Canonical source changed during chart import; retry',
+          if (!storedSources.has(id)) {
+            await entry`
+              INSERT INTO feed_poll_state (podcast_id) VALUES (${id})
+              ON CONFLICT (podcast_id) DO NOTHING
+            `;
+            await entry`
+              INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
+              VALUES (${locale}, 0, ${p.rank}, ${id}, now())
+            `;
+            await entry`
+              INSERT INTO chart_history (country_id, day, podcast_id, rank)
+              VALUES (${locale}, (now() AT TIME ZONE 'UTC')::date, ${id}, ${p.rank})
+              ON CONFLICT (country_id, day, podcast_id) DO UPDATE SET rank = EXCLUDED.rank
+            `;
+            await storeGenres(entry, id, p.genres);
+          }
+          return { id, created };
+        });
+        storedSources.add(result.id);
+        if (result.created) newPodcasts++;
+      } catch (error) {
+        if (!(error instanceof PodcastIdentityConflict)) throw error;
+        skipped++;
+        console.warn(
+          `[${locale}] Skipping Apple podcast ${p.itunesId} at rank ${p.rank}: ${error.message}`,
         );
-      const id = await claimPublicIdentity(tx, podcast, p.feed, p.itunesId, {
-        country: locale,
-        verifiedAt: p.verifiedAt,
-      });
-      if (storedSources.has(id)) continue;
-      storedSources.add(id);
-      await tx`
-        INSERT INTO feed_poll_state (podcast_id) VALUES (${podcast.id})
-        ON CONFLICT (podcast_id) DO NOTHING
-      `;
-      await tx`
-        INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
-        VALUES (${locale}, 0, ${p.rank}, ${podcast.id}, now())
-      `;
-      await tx`
-        INSERT INTO chart_history (country_id, day, podcast_id, rank)
-        VALUES (${locale}, (now() AT TIME ZONE 'UTC')::date, ${podcast.id}, ${p.rank})
-        ON CONFLICT (country_id, day, podcast_id) DO UPDATE SET rank = EXCLUDED.rank
-      `;
-      await storeGenres(tx, Number(podcast.id), p.genres);
+      }
     }
-    return { stored: storedSources.size, newPodcasts };
+    if (!storedSources.size)
+      throw new Error('Refusing to replace chart: no unambiguous podcasts');
+    return { stored: storedSources.size, newPodcasts, skipped };
   });
+}
+
+async function claimChartPodcast(
+  tx: postgres.TransactionSql,
+  p: ChartPodcast,
+  locale: string,
+  lockedLocators: Set<string>,
+) {
+  let podcast = await findPodcastIdentity(
+    tx,
+    p.feed,
+    p.itunesId,
+    undefined,
+    true,
+  );
+  let created = false;
+  if (!podcast) {
+    let [author] =
+      await tx`SELECT id FROM authors WHERE name = ${p.author} LIMIT 1`;
+    if (!author)
+      [author] =
+        await tx`INSERT INTO authors (name) VALUES (${p.author}) RETURNING id`;
+    [podcast] = await tx`
+      INSERT INTO podcasts (
+        itunes_id, feed_url, title, author_id, cover, thumbnail, explicit, episode_count
+      ) VALUES (
+        ${p.itunesId}, ${p.feed}, ${p.title}, ${author.id}, ${p.cover}, ${p.thumbnail},
+        ${p.explicit}, ${p.count}
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
+    `;
+    created = Boolean(podcast);
+    podcast ??= await findPodcastIdentity(
+      tx,
+      p.feed,
+      p.itunesId,
+      undefined,
+      true,
+    );
+  }
+  if (!podcast) throw new Error(`Unable to store Apple podcast ${p.itunesId}`);
+  if (!lockedLocators.has(podcast.feed_url))
+    throw new PodcastIdentityConflict(
+      'Canonical source changed during chart import; retry',
+    );
+  const id = await claimPublicIdentity(tx, podcast, p.feed, p.itunesId, {
+    country: locale,
+    verifiedAt: p.verifiedAt,
+  });
+  return { id, created };
 }
 
 async function storeGenres(
@@ -276,6 +308,7 @@ export async function refreshTopCharts(
 ) {
   let stored = 0;
   let newPodcasts = 0;
+  let skipped = 0;
   const failedLocales: string[] = [];
 
   for (const locale of locales) {
@@ -285,8 +318,9 @@ export async function refreshTopCharts(
       const result = await storeTopPodcasts(sql, podcasts, locale);
       stored += result.stored;
       newPodcasts += result.newPodcasts;
+      skipped += result.skipped;
       console.log(
-        `[${locale}] Stored ${result.stored} podcasts (${result.newPodcasts} new)`,
+        `[${locale}] Stored ${result.stored} podcasts (${result.newPodcasts} new, ${result.skipped} identity conflicts skipped)`,
       );
     } catch (error) {
       failedLocales.push(locale);
@@ -300,10 +334,11 @@ export async function refreshTopCharts(
     top_charts_stored: stored,
     top_charts_new_podcasts: newPodcasts,
     top_charts_failed: failedLocales.length,
+    top_charts_skipped: skipped,
   })) {
     await sql`
       INSERT INTO poll_metrics (metric_name, metric_value) VALUES (${name}, ${value})
     `;
   }
-  return { stored, newPodcasts, failedLocales };
+  return { stored, newPodcasts, skipped, failedLocales };
 }

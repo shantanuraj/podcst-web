@@ -70,15 +70,17 @@ export async function runChartJob(
   const mode = parseChartJobArgs(args);
   const locales = [...i18n.locales];
   let failedLocales: string[] = [];
+  let exitCode = 0;
   if (mode.charts) {
     const result = await jobs.refreshCharts(sql, locales);
     failedLocales = result.failedLocales;
+    exitCode = result.stored > 0 ? 0 : 1;
     console.log(
-      `Charts: ${result.stored} stored, ${result.newPodcasts} new, ${failedLocales.length} countries failed`,
+      `Charts: ${result.stored} stored, ${result.newPodcasts} new, ${result.skipped} identity conflicts skipped, ${failedLocales.length} countries failed`,
     );
   }
   if (mode.episodes) await jobs.pollEpisodes(sql, locales);
-  return { failedLocales };
+  return { failedLocales, exitCode };
 }
 
 async function main() {
@@ -94,8 +96,8 @@ async function main() {
   });
 
   try {
-    const { failedLocales } = await runChartJob(sql, args);
-    if (failedLocales.length > 0) process.exitCode = 1;
+    const { exitCode } = await runChartJob(sql, args);
+    process.exitCode = exitCode;
   } finally {
     await sql.end();
   }

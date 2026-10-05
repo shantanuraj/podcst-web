@@ -364,7 +364,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
         [chart(303, 2), chart(101, 1), chart(202, 3, otherFeed)],
         'us',
       ),
-    ).toEqual({ stored: 2, newPodcasts: 0 });
+    ).toEqual({ stored: 2, newPodcasts: 0, skipped: 0 });
     expect(
       Array.from(
         await sql`SELECT rank,podcast_id::text FROM top_podcasts ORDER BY rank`,

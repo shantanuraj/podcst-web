@@ -4,11 +4,13 @@ import {
   beforeEach,
   describe,
   expect,
+  spyOn,
   test,
 } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 import {
   type ChartPodcast,
@@ -17,6 +19,7 @@ import {
 } from './charts';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseAvailable = Boolean(databaseUrl || process.env.PG_BIN);
 const schema = `chart_test_${randomUUID().replaceAll('-', '')}`;
 const podcast = (itunesId: number, rank = 1): ChartPodcast => ({
   itunesId,
@@ -32,15 +35,21 @@ const podcast = (itunesId: number, rank = 1): ChartPodcast => ({
   count: 10,
 });
 
-describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
+describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
   let sql: postgres.Sql;
   let admin: postgres.Sql;
+  let cluster: ReturnType<typeof startPostgres> | undefined;
+  let connectionString: string;
 
   beforeAll(async () => {
-    if (!databaseUrl) throw new Error('TEST_DATABASE_URL required');
-    admin = postgres(databaseUrl, { onnotice: () => {} });
+    if (databaseUrl) connectionString = databaseUrl;
+    else {
+      cluster = startPostgres({ tcp: true });
+      connectionString = cluster.url;
+    }
+    admin = postgres(connectionString, { onnotice: () => {} });
     await admin`CREATE SCHEMA ${admin(schema)}`;
-    sql = postgres(databaseUrl, {
+    sql = postgres(connectionString, {
       connection: { search_path: schema },
       onnotice: () => {},
     });
@@ -53,6 +62,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
       await admin`DROP SCHEMA ${admin(schema)} CASCADE`;
       await admin.end();
     }
+    await cluster?.stop();
   });
 
   beforeEach(async () => {
@@ -75,7 +85,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
       [podcast(6806963519), podcast(6812915001, 2)],
       'nl',
     );
-    expect(result).toEqual({ stored: 2, newPodcasts: 2 });
+    expect(result).toEqual({ stored: 2, newPodcasts: 2, skipped: 0 });
     expect((await chart()).map((row) => row.itunes_id)).toEqual([
       '6806963519',
       '6812915001',
@@ -83,6 +93,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
     expect(await storeTopPodcasts(sql, [podcast(6806963519)], 'nl')).toEqual({
       stored: 1,
       newPodcasts: 0,
+      skipped: 0,
     });
     const [state] =
       await sql`SELECT count(*)::int AS count FROM feed_poll_state`;
@@ -97,7 +108,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
       SELECT pg_get_triggerdef(oid) AS definition FROM pg_trigger
       WHERE tgrelid='podcasts'::regclass AND tgname='guard_podcast_apple_claim'
     `;
-    const migration = postgres(databaseUrl ?? '', {
+    const migration = postgres(connectionString, {
       max: 1,
       connection: { search_path: schema },
       onnotice: () => {},
@@ -163,6 +174,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
     expect(result).toEqual({
       stored: 1,
       newPodcasts: 1,
+      skipped: 0,
       failedLocales: ['ca'],
     });
     expect(await chart('ca')).toEqual(before);
@@ -177,6 +189,7 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
       top_charts_stored: 1,
       top_charts_new_podcasts: 1,
       top_charts_failed: 1,
+      top_charts_skipped: 0,
     });
   });
 
@@ -198,20 +211,138 @@ describe.skipIf(!databaseUrl)('chart ingestion with PostgreSQL', () => {
     expect(await storeTopPodcasts(sql, [replacement], 'nl')).toEqual({
       stored: 1,
       newPodcasts: 0,
+      skipped: 0,
     });
     const [row] = await sql`SELECT id, itunes_id::text FROM podcasts`;
     expect(row.id).toBe(existing.id);
     expect(row.itunes_id).toBe('6806963519');
   });
 
-  test('rejects conflicting provider and feed identities without replacing the chart', async () => {
+  test('preserves the last chart and history when every entry conflicts', async () => {
     await storeTopPodcasts(sql, [podcast(6806963519)], 'ca');
     const before = await chart();
+    const history =
+      await sql`SELECT * FROM chart_history ORDER BY country_id, podcast_id`;
     const replacement = { ...podcast(6806963519), feed: podcast(101).feed };
     await expect(storeTopPodcasts(sql, [replacement], 'nl')).rejects.toThrow(
-      'different podcasts',
+      'no unambiguous podcasts',
     );
     expect(await chart()).toEqual(before);
+    expect([
+      ...(await sql`SELECT * FROM chart_history ORDER BY country_id, podcast_id`),
+    ]).toEqual([...history]);
+  });
+
+  test('skips multiple identity conflicts without rewriting identities or chart ranks', async () => {
+    await storeTopPodcasts(sql, [podcast(201), podcast(202, 2)], 'ca');
+    const identities =
+      await sql`SELECT id, itunes_id, feed_url FROM podcasts ORDER BY id`;
+    const warning = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const result = await refreshTopCharts(
+        sql,
+        ['my', 'us'],
+        async (locale) =>
+          locale === 'my'
+            ? [
+                { ...podcast(201), feed: podcast(101).feed },
+                podcast(301, 2),
+                { ...podcast(202, 3), feed: podcast(101).feed },
+                podcast(302, 4),
+              ]
+            : [podcast(401)],
+      );
+      expect(result).toEqual({
+        stored: 3,
+        newPodcasts: 3,
+        skipped: 2,
+        failedLocales: [],
+      });
+      expect(
+        (await chart('my')).map(({ rank, itunes_id }) => [rank, itunes_id]),
+      ).toEqual([
+        [2, '301'],
+        [4, '302'],
+      ]);
+      expect((await chart('us'))[0].itunes_id).toBe('401');
+      expect([
+        ...(await sql`SELECT id, itunes_id, feed_url FROM podcasts WHERE itunes_id IN (101, 201, 202) ORDER BY id`),
+      ]).toEqual([...identities]);
+      expect(await sql`SELECT * FROM podcast_apple_aliases`).toHaveLength(0);
+      expect(
+        await sql`SELECT * FROM chart_history WHERE country_id = 'my'`,
+      ).toHaveLength(2);
+      expect(warning.mock.calls).toEqual([
+        [
+          '[my] Skipping Apple podcast 201 at rank 1: Feed and provider identify different podcasts',
+        ],
+        [
+          '[my] Skipping Apple podcast 202 at rank 3: Feed and provider identify different podcasts',
+        ],
+      ]);
+      const [metric] =
+        await sql`SELECT metric_value FROM poll_metrics WHERE metric_name = 'top_charts_skipped'`;
+      expect(metric.metric_value).toBe(2);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  test('rolls back all writes for an entry that conflicts after insertion', async () => {
+    await sql.unsafe(`
+      CREATE FUNCTION move_chart_source() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.itunes_id = 201 THEN
+          NEW.feed_url := 'https://example.com/moved';
+        END IF;
+        RETURN NEW;
+      END
+      $$;
+      CREATE TRIGGER move_chart_source BEFORE INSERT ON podcasts
+      FOR EACH ROW EXECUTE FUNCTION move_chart_source();
+    `);
+    try {
+      expect(
+        await storeTopPodcasts(sql, [podcast(201), podcast(301, 2)], 'my'),
+      ).toEqual({
+        stored: 1,
+        newPodcasts: 1,
+        skipped: 1,
+      });
+      expect(
+        await sql`SELECT id FROM authors WHERE name = 'Author 201'`,
+      ).toHaveLength(0);
+      expect(
+        await sql`SELECT id FROM podcasts WHERE itunes_id = 201`,
+      ).toHaveLength(0);
+      expect(
+        (await chart('my')).map(({ rank, itunes_id }) => [rank, itunes_id]),
+      ).toEqual([[2, '301']]);
+      expect(await sql`SELECT * FROM feed_poll_state`).toHaveLength(2);
+    } finally {
+      await sql`DROP TRIGGER move_chart_source ON podcasts`;
+      await sql`DROP FUNCTION move_chart_source()`;
+    }
+  });
+
+  test('rolls back the country on database errors even after skipping a conflict', async () => {
+    await storeTopPodcasts(sql, [podcast(201)], 'ca');
+    const before = await chart();
+    await expect(
+      storeTopPodcasts(
+        sql,
+        [
+          { ...podcast(201), feed: podcast(101).feed },
+          podcast(301, 2),
+          podcast(302, 2),
+        ],
+        'nl',
+      ),
+    ).rejects.toThrow('duplicate key');
+    expect(await chart()).toEqual(before);
+    expect(
+      await sql`SELECT id FROM podcasts WHERE itunes_id IN (301, 302)`,
+    ).toHaveLength(0);
   });
 
   test('preserves failure backoff and unrelated genres while replacing a chart', async () => {
