@@ -14,7 +14,7 @@ export interface AccountPasskey {
 export interface AccountDetails {
   createdAt: string | null;
   passkeys: AccountPasskey[];
-  preferences: Preferences;
+  preferences: Preferences | null;
 }
 
 export function useAccountDetails() {

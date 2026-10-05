@@ -31,3 +31,14 @@ test('passkey providers are named from known AAGUIDs only', () => {
   expect(passkeyProvider('00000000-0000-0000-0000-000000000000')).toBeNull();
   expect(passkeyProvider(null)).toBeNull();
 });
+
+test('account fixtures carry preferences the server would accept', () => {
+  for (const name of [
+    'account.details.json',
+    'account-preferences.saved.json',
+  ]) {
+    const body = require(`../../contracts/fixtures/api/${name}`);
+    const preferences = body.preferences ?? body;
+    expect(parsePreferences(preferences)).toEqual(preferences);
+  }
+});

@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
-import { defaultPreferences } from '@/shared/preferences';
 import { createSchemaFixture } from '../../scripts/lib/schema-fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -42,7 +41,7 @@ describe.skipIf(!databaseUrl)('account with PostgreSQL', () => {
     await admin?.end();
   });
 
-  test('reads account details, named passkeys and default preferences', async () => {
+  test('reads account details, named passkeys and unsaved preferences', async () => {
     expect(await account.getAccount('owner')).toEqual({
       createdAt: '2024-03-02T10:00:00.000Z',
       passkeys: [
@@ -59,7 +58,7 @@ describe.skipIf(!databaseUrl)('account with PostgreSQL', () => {
           lastUsedAt: null,
         },
       ],
-      preferences: { speed: 1, volumeBoost: false, trimSilence: false },
+      preferences: null,
     });
   });
 
@@ -79,9 +78,7 @@ describe.skipIf(!databaseUrl)('account with PostgreSQL', () => {
       volumeBoost: false,
       trimSilence: true,
     });
-    expect((await account.getAccount('other')).preferences).toEqual(
-      defaultPreferences,
-    );
+    expect((await account.getAccount('other')).preferences).toBeNull();
   });
 
   test('removes only the account’s own passkeys', async () => {

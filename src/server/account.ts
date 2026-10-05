@@ -1,4 +1,4 @@
-import { defaultPreferences, type Preferences } from '@/shared/preferences';
+import type { Preferences } from '@/shared/preferences';
 import { passkeyProvider } from './auth/passkey-providers';
 import { sql } from './db';
 
@@ -12,7 +12,7 @@ export interface AccountPasskey {
 export interface Account {
   createdAt: string | null;
   passkeys: AccountPasskey[];
-  preferences: Preferences;
+  preferences: Preferences | null;
 }
 
 const iso = (value: Date | null) => (value ? value.toISOString() : null);
@@ -46,7 +46,7 @@ export async function getAccount(userId: string): Promise<Account> {
           volumeBoost: preferences.volume_boost,
           trimSilence: preferences.trim_silence,
         }
-      : defaultPreferences,
+      : null,
   };
 }
 

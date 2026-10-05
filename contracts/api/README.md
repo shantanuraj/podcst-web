@@ -297,7 +297,7 @@ There is no `POST` handler; a `POST` returns 405. The web client saves on page e
 
 ### `GET /api/account` — required
 
-Returns `Account`: `{ "createdAt": ISO-8601 string or null, "passkeys": AccountPasskey[], "preferences": Preferences }` with private-feed headers (`getAccount` in `src/server/account.ts`). `AccountPasskey` is `{ "id": string, "provider": string or null, "createdAt": ISO-8601 string, "lastUsedAt": ISO-8601 string or null }`, ordered by creation. `provider` names the credential manager from the registration AAGUID (`src/server/auth/passkey-providers.ts`) and is null for unknown or unrecorded authenticators; `lastUsedAt` is set by each successful passkey sign-in. `Preferences` is `{ "speed": number, "volumeBoost": boolean, "trimSilence": boolean }`: the account's global audio defaults from the [preference rules](../playback/README.md#preferencesjson), or `rules.json` `speeds.default` with both effects off when none were saved. 401 `{message: "Unauthorized"}`.
+Returns `Account`: `{ "createdAt": ISO-8601 string or null, "passkeys": AccountPasskey[], "preferences": Preferences }` with private-feed headers (`getAccount` in `src/server/account.ts`). `AccountPasskey` is `{ "id": string, "provider": string or null, "createdAt": ISO-8601 string, "lastUsedAt": ISO-8601 string or null }`, ordered by creation. `provider` names the credential manager from the registration AAGUID (`src/server/auth/passkey-providers.ts`) and is null for unknown or unrecorded authenticators; `lastUsedAt` is set by each successful passkey sign-in. `Preferences` is `{ "speed": number, "volumeBoost": boolean, "trimSilence": boolean }`: the account's global audio defaults from the [preference rules](../playback/README.md#preferencesjson), or `null` until the account first saves them. A signed-in client adopts non-null server defaults and uploads its own defaults when the value is `null`. 401 `{message: "Unauthorized"}`.
 
 ### `PUT /api/account/preferences` — required
 
@@ -307,7 +307,7 @@ Body: `Preferences`. Every field is required; `speed` must be one of `rules.json
 
 Removes one of the account's passkeys. Returns `Success`, 404 `{message: "Passkey not found"}` for an unknown ID or another account's passkey, 401 `{message: "Unauthorized"}`. Removing the last passkey leaves email-code sign-in.
 
-The three account routes are used by the web client only. They have no fixtures in `index.json` yet, because both native fixture suites fail on endpoints they do not call; fixtures are added when a native client adopts them.
+Fixtures (derived from the routes): `account.details.json`, `account.unsaved.json`, `account.unauthorized.json`, `account-preferences.saved.json`, `account-preferences.invalid.json`, `account-passkey-remove.success.json`, `account-passkey-remove.not-found.json`.
 
 ## Fixtures
 

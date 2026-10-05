@@ -308,5 +308,40 @@
     "endpoint": "GET /api/top",
     "status": 200,
     "decodesAs": "TopPodcast[]"
+  },
+  "account.details.json": {
+    "endpoint": "GET /api/account",
+    "status": 200,
+    "decodesAs": "Account"
+  },
+  "account.unauthorized.json": {
+    "endpoint": "GET /api/account",
+    "status": 401,
+    "decodesAs": "ErrorMessage"
+  },
+  "account-preferences.saved.json": {
+    "endpoint": "PUT /api/account/preferences",
+    "status": 200,
+    "decodesAs": "Preferences"
+  },
+  "account-preferences.invalid.json": {
+    "endpoint": "PUT /api/account/preferences",
+    "status": 400,
+    "decodesAs": "ErrorMessage"
+  },
+  "account-passkey-remove.success.json": {
+    "endpoint": "DELETE /api/account/passkeys/:id",
+    "status": 200,
+    "decodesAs": "Success"
+  },
+  "account-passkey-remove.not-found.json": {
+    "endpoint": "DELETE /api/account/passkeys/:id",
+    "status": 404,
+    "decodesAs": "ErrorMessage"
+  },
+  "account.unsaved.json": {
+    "endpoint": "GET /api/account",
+    "status": 200,
+    "decodesAs": "Account"
   }
 }
