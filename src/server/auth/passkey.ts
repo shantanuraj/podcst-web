@@ -117,16 +117,17 @@ export async function verifyRegistration(
     throw new Error('Registration verification failed');
   }
 
-  const { credential } = verification.registrationInfo;
+  const { credential, aaguid } = verification.registrationInfo;
 
   await sql`
-    INSERT INTO passkeys (id, user_id, credential_id, public_key, counter)
+    INSERT INTO passkeys (id, user_id, credential_id, public_key, counter, aaguid)
     VALUES (
       ${generateId()},
       ${challenge.userId},
       ${credential.id},
       ${Buffer.from(credential.publicKey)},
-      ${credential.counter}
+      ${credential.counter},
+      ${aaguid}
     )
   `;
 
@@ -257,7 +258,8 @@ export async function verifyAuthentication(
 
   await sql`
     UPDATE passkeys
-    SET counter = ${verification.authenticationInfo.newCounter}
+    SET counter = ${verification.authenticationInfo.newCounter},
+        last_used_at = now()
     WHERE id = ${passkey.id}
   `;
 
