@@ -15,6 +15,18 @@ export function regionFromLanguages(tags: Iterable<string>): Locale | null {
   return null;
 }
 
+export function requestRegion(
+  saved: string | undefined,
+  acceptLanguage: string | null,
+): Locale {
+  if (isRegion(saved)) return saved;
+  const languages = (acceptLanguage ?? '')
+    .split(',')
+    .map((part) => part.split(';')[0].trim())
+    .filter(Boolean);
+  return regionFromLanguages(languages) ?? i18n.defaultLocale;
+}
+
 export function readRegion(): Locale | null {
   const value = document.cookie.match(
     new RegExp(`(?:^|; )${REGION_COOKIE}=([^;]+)`),

@@ -17,6 +17,7 @@ import MenuIcon from './MenuIcon';
 import MuteIcon from './MuteIcon';
 import NightIcon from './NightIcon';
 import OpenInNew from './OpenInNew';
+import PasskeyIcon from './PasskeyIcon';
 import PauseIcon from './PauseIcon';
 import PlayIcon from './PlayIcon';
 import QueueList from './QueueList';
@@ -37,6 +38,7 @@ export type IconType =
   | 'globe'
   | 'play'
   | 'pause'
+  | 'passkey'
   | 'settings'
   | 'night'
   | 'day'
@@ -68,6 +70,7 @@ const IconMap: Record<IconType, React.FC<React.SVGProps<SVGSVGElement>>> = {
   globe: GlobeIcon,
   play: PlayIcon,
   pause: PauseIcon,
+  passkey: PasskeyIcon,
   settings: SettingsIcon,
   night: NightIcon,
   day: DayIcon,

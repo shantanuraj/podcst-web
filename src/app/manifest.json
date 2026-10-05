@@ -61,7 +61,7 @@
     {
       "name": "Your Library",
       "short_name": "Library",
-      "url": "/subs",
+      "url": "/library",
       "icons": [
         {
           "src": "/icons/icon-192.png",

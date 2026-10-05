@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { isFeedUrlInput } from '@/shared/feed-url';
-import type { IPodcastSearchResult } from '@/types';
+import type { IEpisodeInfo, IPodcastSearchResult } from '@/types';
 import { get, post } from './api';
 
 export const useSearch = (input: string) => {
@@ -31,4 +31,16 @@ export const useSearch = (input: string) => {
     data: !url || session.current(token, term) ? query.data : undefined,
     needsSignIn: url && session.getSnapshot().ready && session.scope === null,
   };
+};
+
+export const useEpisodeSearch = (input: string) => {
+  const term = input.trim();
+  return useQuery<IEpisodeInfo[]>({
+    queryKey: ['episode-search', term],
+    queryFn: ({ signal }) =>
+      get<IEpisodeInfo[]>('/search/episodes', { term }, undefined, signal),
+    enabled: !!term && term.length <= 200 && !isFeedUrlInput(term),
+    staleTime: 60_000,
+    retry: false,
+  });
 };

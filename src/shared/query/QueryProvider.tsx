@@ -38,7 +38,7 @@ export function QueryProvider({
       new AccountSession(queryClient, user, {
         resetPlayer: (scope, revision) =>
           usePlayer.getState().setAccount(scope, revision),
-        reload: () => window.location.replace('/'),
+        reload: () => window.location.reload(),
         publish: () => events.current?.publish(),
       }),
   );

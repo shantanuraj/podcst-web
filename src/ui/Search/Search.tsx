@@ -80,7 +80,17 @@ export function Search() {
         <path d="M20 20l-4-4" />
       </svg>
       <input
-        {...getInputProps({ ref: searchRef })}
+        {...getInputProps({
+          ref: searchRef,
+          onKeyDown: (event) => {
+            if (event.key !== 'Enter' || highlightedIndex !== -1) return;
+            const term = inputTerm.trim();
+            if (!term) return;
+            event.preventDefault();
+            searchRef.current?.blur();
+            router.push(`/search?q=${encodeURIComponent(term)}`);
+          },
+        })}
         aria-label={t('search.label')}
         type="search"
         placeholder={t('search.placeholder')}

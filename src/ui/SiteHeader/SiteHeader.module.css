@@ -136,7 +136,7 @@
   }
 
   .start {
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .wordmark {
@@ -144,11 +144,24 @@
   }
 
   .nav {
-    gap: var(--space-4);
+    gap: var(--space-3);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
   .tab {
+    flex: none;
     font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+
+  .end {
+    gap: 10px;
+  }
+
+  .signIn {
+    padding: 7px 10px;
   }
 
   .search {

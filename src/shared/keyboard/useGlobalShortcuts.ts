@@ -8,7 +8,7 @@ export function useGlobalShortcuts() {
 
 const globalShortcuts: KeyboardShortcuts = (router) => [
   [shortcuts.home, () => router.push('/feed/top')],
-  [shortcuts.subscriptions, () => router.push('/subs')],
+  [shortcuts.subscriptions, () => router.push('/library')],
   [shortcuts.settings, () => router.push('/account')],
   [shortcuts.shortcuts, () => router.push('/account#shortcuts')],
   [shortcuts.theme, () => useThemeStore.getState().toggle()],

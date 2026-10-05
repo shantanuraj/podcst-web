@@ -25,9 +25,9 @@ export function SiteHeader() {
         pathname.startsWith('/episodes/'),
     },
     {
-      href: user ? '/profile/subscriptions' : '/subs',
+      href: '/library',
       label: t('nav.library'),
-      active: pathname === '/subs' || pathname === '/profile/subscriptions',
+      active: pathname === '/library',
     },
     { href: '/queue', label: t('nav.queue'), active: pathname === '/queue' },
   ];

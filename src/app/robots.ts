@@ -9,9 +9,9 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           '/account',
           '/auth',
-          '/profile',
           '/queue',
-          '/subs',
+          '/library',
+          '/search',
           '/api/',
           '/s/',
         ],
