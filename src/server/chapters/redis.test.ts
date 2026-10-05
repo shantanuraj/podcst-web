@@ -59,6 +59,7 @@ for (const stalled of [false, true]) {
       expect(fetched).toBe(1);
       expect(redis.options.enableOfflineQueue).toBe(false);
       expect(redis.options.autoResendUnfulfilledCommands).toBe(false);
+      expect(redis.options.disableClientInfo).toBe(true);
     } finally {
       redis.disconnect();
       for (const socket of fixture.sockets) socket.destroy();

@@ -13,6 +13,7 @@ export const chapterRedisOptions: RedisOptions = {
   enableOfflineQueue: false,
   autoResendUnfulfilledCommands: false,
   enableReadyCheck: false,
+  disableClientInfo: true,
   connectTimeout: REDIS_TIMEOUT_MS,
   disconnectTimeout: 0,
   commandTimeout: REDIS_TIMEOUT_MS,
