@@ -137,6 +137,25 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     expect(stored.itunes_id).toBeNull();
   });
 
+  test('Apple listings sharing a feed collapse to the first', async () => {
+    const listing = (itunes_id: number, title: string) => ({
+      itunes_id,
+      feed: 'https://example.com/shared',
+      title,
+      author: '',
+      cover: '',
+      thumbnail: '',
+    });
+    expect(
+      (
+        await matchSearchResults(sql, [
+          listing(7001, 'First'),
+          listing(7002, 'Second'),
+        ])
+      ).map(({ title }) => title),
+    ).toEqual(['First']);
+  });
+
   test('unknown feed URLs return no result', async () => {
     expect(
       await searchPodcastsByFeedUrl(sql, 'https://example.com/missing'),

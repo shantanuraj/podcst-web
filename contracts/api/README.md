@@ -82,7 +82,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 | `thumbnail` | iTunes `artworkUrl100`; omitted if iTunes omits it. |
 | `isPrivate` | Present only for feed-URL results. |
 
-A result without `id` cannot be opened directly. The client calls `POST /api/feed/resolve` with its `itunes_id` and the locale it searched, then loads the podcast by the returned ID (`APIClient.detail(of:)`). A matched result's `feed` is the stored feed URL, not the iTunes value (`matchSearchResults` in `src/server/search.ts`), and results matching an already-listed podcast are dropped.
+A result without `id` cannot be opened directly. The client calls `POST /api/feed/resolve` with its `itunes_id` and the locale it searched, then loads the podcast by the returned ID (`APIClient.detail(of:)`). A matched result's `feed` is the stored feed URL, not the iTunes value (`matchSearchResults` in `src/server/search.ts`), and a result whose feed is already listed is dropped, so no two results share a feed.
 
 No current route emits `feed_url`. The `feed_url` and `count` fallbacks in the iOS `RawPodcast` decoder do not correspond to `Podcast` responses; `count` exists only on `TopPodcast`.
 

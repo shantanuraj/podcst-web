@@ -14,24 +14,26 @@ export async function matchSearchResults(
   const ids = results.flatMap((result) =>
     result.itunes_id === undefined ? [] : [result.itunes_id],
   );
-  if (ids.length === 0) return results;
-  const rows = await sql`
-    SELECT p.id, apple.itunes_id, p.feed_url FROM (${appleIdentities(sql, ids)}) apple
-    JOIN podcasts p ON p.id = apple.id
-  `;
+  const rows = ids.length
+    ? await sql`
+        SELECT p.id, apple.itunes_id, p.feed_url FROM (${appleIdentities(sql, ids)}) apple
+        JOIN podcasts p ON p.id = apple.id
+      `
+    : [];
   const byItunesId = new Map(rows.map((row) => [Number(row.itunes_id), row]));
   if (byItunesId.size !== rows.length)
     throw new PodcastIdentityConflict(
       'Apple identity identifies multiple sources',
     );
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   return results.flatMap((result) => {
     const existing = byItunesId.get(result.itunes_id ?? 0);
-    if (!existing) return [result];
-    const id = Number(existing.id);
-    if (seen.has(id)) return [];
-    seen.add(id);
-    return [{ ...result, id, feed: existing.feed_url }];
+    const match = existing
+      ? { ...result, id: Number(existing.id), feed: existing.feed_url }
+      : result;
+    if (seen.has(match.feed)) return [];
+    seen.add(match.feed);
+    return [match];
   });
 }
 
