@@ -69,4 +69,19 @@ const createSql = () => {
   return postgres(connectionString, commonOptions);
 };
 
-export const sql = createSql();
+let client: ReturnType<typeof createSql> | undefined;
+const getSql = () => (client ??= createSql());
+
+export const sql = new Proxy(
+  createSql as unknown as ReturnType<typeof createSql>,
+  {
+    apply(_target, _thisArg, args) {
+      return Reflect.apply(getSql(), undefined, args);
+    },
+    get(_target, property) {
+      const sql = getSql();
+      const value = Reflect.get(sql, property);
+      return typeof value === 'function' ? value.bind(sql) : value;
+    },
+  },
+);

@@ -10,16 +10,21 @@ export function createRedis(options: RedisOptions = {}) {
     : readEnv('REDIS_HOST', 'KV_REDIS_HOST');
   const url = isVercel
     ? readEnv('KV_REDIS_URL', 'REDIS_URL')
-    : host
-      ? undefined
-      : process.env.REDIS_URL;
+    : readEnv('REDIS_URL', 'KV_REDIS_URL');
   const port = Number.parseInt(
     (isVercel
       ? process.env.KV_REDIS_PORT
       : readEnv('REDIS_PORT', 'KV_REDIS_PORT')) ?? '',
     10,
   );
-  const common = { ...(mtls && { tls: mtls }), ...options };
+  const common = {
+    lazyConnect: true,
+    connectTimeout: 1000,
+    commandTimeout: 1000,
+    maxRetriesPerRequest: 1,
+    ...(mtls && { tls: mtls }),
+    ...options,
+  };
   return url
     ? new Redis(url, common)
     : new Redis({
