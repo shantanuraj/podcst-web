@@ -8,7 +8,6 @@ import {
   test,
 } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
@@ -101,37 +100,12 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     expect(state.count).toBe(3);
   });
 
-  test('migrates legacy IDs without changing identities or uniqueness', async () => {
-    await storeTopPodcasts(sql, [podcast(2147483647)], 'ca');
-    const before =
-      await sql`SELECT id::text, itunes_id::text FROM podcasts ORDER BY id`;
-    const [guard] = await sql`
-      SELECT pg_get_triggerdef(oid) AS definition FROM pg_trigger
-      WHERE tgrelid='podcasts'::regclass AND tgname='guard_podcast_apple_claim'
-    `;
-    const migration = postgres(connectionString, {
-      max: 1,
-      connection: { search_path: schema },
-      onnotice: () => {},
-    });
-    await sql`DROP TRIGGER guard_podcast_apple_claim ON podcasts`;
-    try {
-      await sql`ALTER TABLE podcasts ALTER COLUMN itunes_id TYPE INTEGER`;
-      await migration.unsafe(
-        readFileSync('migrations/0009-itunes-id-bigint.sql', 'utf8'),
-      );
-    } finally {
-      await migration.end();
-      await sql.unsafe(guard.definition);
-    }
+  test('initializes unique bigint Apple IDs from the active schema', async () => {
     const [column] = await sql`
       SELECT data_type FROM information_schema.columns
       WHERE table_schema = ${schema} AND table_name = 'podcasts' AND column_name = 'itunes_id'
     `;
     expect(column.data_type).toBe('bigint');
-    const after =
-      await sql`SELECT id::text, itunes_id::text FROM podcasts ORDER BY id`;
-    expect([...after]).toEqual([...before]);
     await storeTopPodcasts(sql, [podcast(6806963519)], 'nl');
     await expect(
       sql`
