@@ -1,0 +1,14 @@
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 56px;
+  width: min(100% - 2 * var(--dimen-page-padding), 1344px);
+  margin: 44px auto 0;
+}
+
+@media (max-width: 1023px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+  }
+}

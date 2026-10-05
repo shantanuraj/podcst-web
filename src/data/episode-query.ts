@@ -6,4 +6,14 @@ export const episodesQueryKey = (
   search = '',
   sortBy = 'published',
   sortDir = 'desc',
-) => accountQueryKey(scope, 'episodes', podcastId, search, sortBy, sortDir);
+  unplayed = false,
+) =>
+  accountQueryKey(
+    scope,
+    'episodes',
+    podcastId,
+    search,
+    sortBy,
+    sortDir,
+    unplayed,
+  );

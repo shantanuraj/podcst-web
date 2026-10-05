@@ -3,9 +3,11 @@
 import { useId } from 'react';
 import { currentChapterIndex } from '@/shared/chapters';
 import { useTranslation } from '@/shared/i18n';
-import { navigateChapter } from '@/shared/player/chapter-playback';
 import { sameEpisode } from '@/shared/player/episode-identity';
-import { formatSecondsToTimestamp } from '@/shared/player/formatTime';
+import {
+  formatDuration,
+  formatSecondsToTimestamp,
+} from '@/shared/player/formatTime';
 import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
 import { useChapters } from '@/shared/player/useChapters';
 import {
@@ -22,58 +24,67 @@ export function Chapters({ episode }: { episode: IEpisodeInfo }) {
   const { chapters, source, loading } = useChapters(episode);
   const withAccount = useAccountPlayback();
   const seek = usePlayer(getSeekOrStartAt);
-  const playing = usePlayer((state) =>
-    sameEpisode(getCurrentEpisode(state), episode),
+  const position = usePlayer((state) =>
+    sameEpisode(getCurrentEpisode(state), episode) ? state.seekPosition : null,
   );
-  const current = usePlayer((state) =>
-    sameEpisode(getCurrentEpisode(state), episode)
-      ? currentChapterIndex(chapters, state.seekPosition)
-      : -1,
+  const measured = usePlayer((state) =>
+    sameEpisode(getCurrentEpisode(state), episode) ? state.duration : 0,
   );
-  const navigate = (direction: 'previous' | 'next') =>
-    withAccount(episode, () =>
-      navigateChapter(usePlayer.getState(), episode, chapters, direction),
-    );
+  const duration = measured || episode.duration || 0;
+  const current =
+    position === null ? -1 : currentChapterIndex(chapters, position);
+
+  if (!loading && !chapters.length) return null;
 
   return (
     <section aria-labelledby={heading} className={styles.chapters}>
-      <h3 id={heading}>{t('chapters.title')}</h3>
+      <h2 id={heading} className={styles.heading}>
+        <span>{t('chapters.title')}</span>
+        {chapters.length > 0 && <span>{chapters.length}</span>}
+      </h2>
       <p role="status" className={styles.status}>
         {loading
           ? t('chapters.loading')
           : source === 'shownotes'
             ? t('chapters.fallback')
-            : chapters.length
-              ? ''
-              : t('chapters.unavailable')}
+            : ''}
       </p>
-      {playing && (
-        <div className={styles.controls}>
-          <button type="button" onClick={() => navigate('previous')}>
-            {t('chapters.previous')}
-          </button>
-          <button type="button" onClick={() => navigate('next')}>
-            {t('chapters.next')}
-          </button>
-        </div>
-      )}
       <ol className={styles.list}>
         {chapters.map((chapter, index) => {
           const title =
             chapter.title || t('chapters.untitled', { number: index + 1 });
           const timestamp = formatSecondsToTimestamp(chapter.start);
+          const end = chapters[index + 1]?.start ?? duration;
+          const length = end > chapter.start ? end - chapter.start : 0;
+          const played = position !== null && position >= end && end > 0;
+          const meta = [
+            length ? formatDuration(t, length) : null,
+            played
+              ? t('podcast.played')
+              : index === current && position !== null
+                ? t('player.remaining', {
+                    time: formatDuration(t, end - position),
+                  })
+                : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
           return (
             <li key={chapter.start}>
               <button
                 type="button"
                 aria-current={current === index ? 'true' : undefined}
+                data-played={played}
                 aria-label={t('chapters.seek', { title, timestamp })}
                 onClick={() =>
                   withAccount(episode, () => seek(episode, chapter.start))
                 }
               >
                 <span className={styles.timestamp}>{timestamp}</span>
-                <span>{title}</span>
+                <span className={styles.text}>
+                  <span className={styles.title}>{title}</span>
+                  {meta && <span className={styles.meta}>{meta}</span>}
+                </span>
               </button>
             </li>
           );

@@ -102,6 +102,7 @@ interface EpisodesQueryOptions {
   search?: string;
   sortBy?: EpisodeSortField;
   sortDir?: EpisodeSortDir;
+  unplayed?: boolean;
   limit?: number;
 }
 
@@ -117,6 +118,7 @@ const fetchEpisodesPaginated = (
   if (options.search) params.search = options.search;
   if (options.sortBy) params.sortBy = options.sortBy;
   if (options.sortDir) params.sortDir = options.sortDir;
+  if (options.unplayed) params.unplayed = 'true';
   return get<IPaginatedEpisodes>('/feed/episodes', params, undefined, signal);
 };
 
@@ -133,6 +135,7 @@ export const useEpisodesInfinite = (options: EpisodesQueryOptions) => {
       options.search,
       options.sortBy,
       options.sortDir,
+      options.unplayed,
     ),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,

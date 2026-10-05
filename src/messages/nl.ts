@@ -55,7 +55,6 @@ export const messages: Messages = {
     title: 'Hoofdstukken',
     loading: 'Ingebedde hoofdstukken laden…',
     fallback: 'Hoofdstukken uit de shownotities',
-    unavailable: 'Geen hoofdstukken beschikbaar',
     previous: 'Vorig hoofdstuk',
     next: 'Volgend hoofdstuk',
     untitled: 'Hoofdstuk {number}',
@@ -116,6 +115,35 @@ export const messages: Messages = {
     loadError: 'Laden van afleveringen mislukt',
     loadingMore: 'Meer laden...',
     allLoaded: 'Alle afleveringen geladen',
+    played: 'Beluisterd',
+    searchShow: 'Zoeken in deze podcast',
+    unplayed: 'Niet beluisterd',
+    alsoFollow: 'Luisteraars volgen ook',
+    daily: 'Elke dag nieuwe afleveringen',
+    weekly: 'Elke {day} nieuwe afleveringen',
+    since: 'Sinds {year}',
+    shareText: 'Luister naar {title} van {author} op Podcst',
+    linkCopied: 'Link gekopieerd',
+  },
+
+  discover: {
+    dateline: 'Populaire podcasts · {region} · Elke zes uur bijgewerkt',
+    numberOne: 'Nr. 1 vandaag',
+    chart: 'De hitlijst',
+    seeAll: 'Alle {count} bekijken',
+    noteworthy: 'Nieuw en opvallend',
+    all: 'Alles',
+    movedUp: '{count} omhoog',
+    movedDown: '{count} omlaag',
+    unchanged: 'Ongewijzigd',
+    newEntry: 'Nieuw',
+    playLatest: 'Nieuwste afspelen',
+    chartTitle: 'Populaire podcasts in {region}',
+  },
+
+  episode: {
+    playAgain: 'Opnieuw afspelen',
+    queued: 'Toegevoegd aan wachtrij',
   },
 
   library: {

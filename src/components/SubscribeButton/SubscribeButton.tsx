@@ -12,10 +12,10 @@ import {
   isSubscribed,
   useSubscriptions,
 } from '@/shared/subscriptions/useSubscriptions';
+import type { IPodcastEpisodesInfo } from '@/types';
 import { Button } from '@/ui/Button';
-import type { PodcastInfoProps } from '@/ui/PodcastInfo/PodcastInfo';
 
-export function SubscribeButton({ info }: PodcastInfoProps) {
+export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
   const { t } = useTranslation();
   const { data: user } = useSession();
   const { data: serverSubs } = useServerSubscriptions();
@@ -75,6 +75,7 @@ export function SubscribeButton({ info }: PodcastInfoProps) {
   return (
     <Button
       data-is-subscribed={isSubscribedToFeed}
+      data-variant={isSubscribedToFeed ? undefined : 'primary'}
       onClick={onSubscribeClick}
       disabled={isPending || (!!info.isPrivate && !canUseServer)}
       suppressHydrationWarning

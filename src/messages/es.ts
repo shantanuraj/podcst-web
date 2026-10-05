@@ -55,7 +55,6 @@ export const messages: Messages = {
     title: 'Capítulos',
     loading: 'Cargando capítulos integrados…',
     fallback: 'Capítulos de las notas del episodio',
-    unavailable: 'No hay capítulos disponibles',
     previous: 'Capítulo anterior',
     next: 'Capítulo siguiente',
     untitled: 'Capítulo {number}',
@@ -116,6 +115,35 @@ export const messages: Messages = {
     loadError: 'Error al cargar los episodios',
     loadingMore: 'Cargando más...',
     allLoaded: 'Todos los episodios cargados',
+    played: 'Escuchado',
+    searchShow: 'Buscar en este pódcast',
+    unplayed: 'Sin escuchar',
+    alsoFollow: 'Los oyentes también siguen',
+    daily: 'Episodios nuevos cada día',
+    weekly: 'Episodios nuevos cada {day}',
+    since: 'Desde {year}',
+    shareText: 'Escucha {title} de {author} en Podcst',
+    linkCopied: 'Enlace copiado',
+  },
+
+  discover: {
+    dateline: 'Pódcasts populares · {region} · Se actualiza cada seis horas',
+    numberOne: 'N.º 1 hoy',
+    chart: 'La lista',
+    seeAll: 'Ver los {count}',
+    noteworthy: 'Novedades destacadas',
+    all: 'Todo',
+    movedUp: 'Sube {count}',
+    movedDown: 'Baja {count}',
+    unchanged: 'Sin cambios',
+    newEntry: 'Nuevo',
+    playLatest: 'Reproducir el último',
+    chartTitle: 'Pódcasts populares en {region}',
+  },
+
+  episode: {
+    playAgain: 'Volver a reproducir',
+    queued: 'Añadido a la cola',
   },
 
   library: {

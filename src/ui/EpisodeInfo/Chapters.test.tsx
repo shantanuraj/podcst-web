@@ -63,16 +63,14 @@ test('renders accessible embedded chapter buttons as text, with localized missin
   expect(markup).not.toContain('Notes start');
 });
 
-test('shows fallback while loading and no chapters when unavailable', () => {
+test('shows fallback while loading and renders nothing when unavailable', () => {
   const loading = render();
   expect(loading).toContain('Loading embedded chapters');
   expect(loading).toContain('Notes start');
   expect(render(undefined, { ...episode, id: undefined })).toContain(
     'Chapters from show notes',
   );
-  expect(render({ chapters: [], source: 'none' })).toContain(
-    'No chapters available',
-  );
+  expect(render({ chapters: [], source: 'none' })).toBe('');
 });
 
 test('failed refetches discard stale embedded metadata in favor of show notes', () => {

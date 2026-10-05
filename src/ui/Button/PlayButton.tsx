@@ -19,11 +19,12 @@ import styles from './Button.module.css';
 export type PlayButtonProps = ButtonProps & {
   episode: IEpisodeInfo;
   icon?: boolean;
+  label?: string;
 };
 
 export const PlayButton = memo(
   forwardRef<HTMLButtonElement, PlayButtonProps>(function PlayButton(
-    { episode, icon, ...props },
+    { episode, icon, label, ...props },
     ref,
   ) {
     const withAccount = useAccountPlayback();
@@ -61,8 +62,18 @@ export const PlayButton = memo(
         ref={ref}
         onClick={handleClick}
         data-is-current={isCurrentEpisode}
+        data-variant="primary"
       >
-        {children({ isCurrentEpisode, isPlaying })}
+        {icon ? (
+          children({ isCurrentEpisode, isPlaying })
+        ) : (
+          <>
+            <Icon icon={isPlaying ? 'pause' : 'play'} size={16} />
+            {isCurrentEpisode || !label
+              ? children({ isCurrentEpisode, isPlaying })
+              : label}
+          </>
+        )}
       </Button>
     );
   }),

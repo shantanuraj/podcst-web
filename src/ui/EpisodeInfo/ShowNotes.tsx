@@ -1,5 +1,3 @@
-'use server';
-
 import { cache } from 'react';
 import { translations } from '@/shared/i18n/server';
 import { linkifyText } from '@/shared/link/linkify-text';
@@ -8,26 +6,21 @@ import type { IEpisodeInfo } from '@/types';
 import styles from './EpisodeInfo.module.css';
 import { ShowNotesHandler } from './ShowNotesHandler';
 
-interface IShowNotesProps {
-  className?: string;
-  episode: IEpisodeInfo;
-}
+const linkifyNotes = cache((notes: string) => ({ __html: linkifyText(notes) }));
 
-const linkifyNotes = cache((notes: string) => {
-  return { __html: linkifyText(notes) };
-});
-
-export const ShowNotes = async ({
+export async function ShowNotes({
   className = '',
   episode,
-}: IShowNotesProps) => {
+}: {
+  className?: string;
+  episode: IEpisodeInfo;
+}) {
   const { t } = await translations();
-  const showNotes = linkifyNotes(episode.showNotes);
   return (
-    <div id="show-notes" className={`${styles.showNotes} ${className}`}>
-      <h3>{t('podcast.showNotes')}</h3>
-      <div dangerouslySetInnerHTML={showNotes} />
+    <section id="show-notes" className={`${styles.showNotes} ${className}`}>
+      <h2 className={styles.eyebrowHeading}>{t('podcast.showNotes')}</h2>
+      <div dangerouslySetInnerHTML={linkifyNotes(episode.showNotes)} />
       <ShowNotesHandler id="show-notes" episode={episode} />
-    </div>
+    </section>
   );
-};
+}

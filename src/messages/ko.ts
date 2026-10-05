@@ -55,7 +55,6 @@ export const messages: Messages = {
     title: '챕터',
     loading: '내장 챕터 불러오는 중…',
     fallback: '에피소드 노트의 챕터',
-    unavailable: '사용 가능한 챕터가 없습니다',
     previous: '이전 챕터',
     next: '다음 챕터',
     untitled: '챕터 {number}',
@@ -115,6 +114,35 @@ export const messages: Messages = {
     loadError: '에피소드 로드 실패',
     loadingMore: '더 불러오는 중...',
     allLoaded: '모든 에피소드를 불러왔습니다',
+    played: '재생함',
+    searchShow: '이 프로그램에서 검색',
+    unplayed: '안 들은 에피소드',
+    alsoFollow: '청취자들이 함께 구독하는 프로그램',
+    daily: '매일 새 에피소드',
+    weekly: '매주 {day} 새 에피소드',
+    since: '{year}년부터',
+    shareText: 'Podcst에서 {author}의 {title} 듣기',
+    linkCopied: '링크가 복사되었습니다',
+  },
+
+  discover: {
+    dateline: '인기 팟캐스트 · {region} · 6시간마다 업데이트',
+    numberOne: '오늘의 1위',
+    chart: '차트',
+    seeAll: '{count}개 모두 보기',
+    noteworthy: '주목할 신작',
+    all: '전체',
+    movedUp: '{count}단계 상승',
+    movedDown: '{count}단계 하락',
+    unchanged: '변동 없음',
+    newEntry: '신규',
+    playLatest: '최신 에피소드 재생',
+    chartTitle: '{region} 인기 팟캐스트',
+  },
+
+  episode: {
+    playAgain: '다시 재생',
+    queued: '대기열에 추가됨',
   },
 
   library: {

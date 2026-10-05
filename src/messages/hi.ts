@@ -55,7 +55,6 @@ export const messages: Messages = {
     title: 'अध्याय',
     loading: 'एम्बेड किए गए अध्याय लोड हो रहे हैं…',
     fallback: 'एपिसोड के नोट्स से अध्याय',
-    unavailable: 'कोई अध्याय उपलब्ध नहीं है',
     previous: 'पिछला अध्याय',
     next: 'अगला अध्याय',
     untitled: 'अध्याय {number}',
@@ -116,6 +115,35 @@ export const messages: Messages = {
     loadError: 'एपिसोड लोड करने में विफल',
     loadingMore: 'और लोड हो रहा है...',
     allLoaded: 'सभी एपिसोड लोड हो गए',
+    played: 'सुना गया',
+    searchShow: 'इस शो में खोजें',
+    unplayed: 'बिना सुने',
+    alsoFollow: 'श्रोता इन्हें भी फ़ॉलो करते हैं',
+    daily: 'रोज़ नए एपिसोड',
+    weekly: 'हर {day} नए एपिसोड',
+    since: '{year} से',
+    shareText: 'Podcst पर {author} का {title} सुनें',
+    linkCopied: 'लिंक कॉपी हो गया',
+  },
+
+  discover: {
+    dateline: 'लोकप्रिय पॉडकास्ट · {region} · हर छह घंटे में अपडेट',
+    numberOne: 'आज नंबर 1',
+    chart: 'चार्ट',
+    seeAll: 'सभी {count} देखें',
+    noteworthy: 'नए और उल्लेखनीय',
+    all: 'सभी',
+    movedUp: '{count} ऊपर',
+    movedDown: '{count} नीचे',
+    unchanged: 'कोई बदलाव नहीं',
+    newEntry: 'नया',
+    playLatest: 'नवीनतम चलाएं',
+    chartTitle: '{region} में लोकप्रिय पॉडकास्ट',
+  },
+
+  episode: {
+    playAgain: 'फिर से चलाएं',
+    queued: 'कतार में जोड़ा गया',
   },
 
   library: {

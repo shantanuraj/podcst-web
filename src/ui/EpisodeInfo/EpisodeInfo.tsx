@@ -1,87 +1,79 @@
 import { localeForLanguage } from '@/messages';
 import { translations } from '@/shared/i18n/server';
 import { getPodcastHref } from '@/shared/links';
-import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import { formatDuration } from '@/shared/player/formatTime';
+import type { IEpisodeInfo, IPodcastInfo } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
-import { PlayButton } from '@/ui/Button/PlayButton';
-import { ShareButton } from '@/ui/Button/ShareButton';
-import { StarButton } from '@/ui/Button/StarButton';
-import { ExternalLink } from '@/ui/ExternalLink';
 import { ProxiedImage } from '@/ui/Image';
-import { Icon } from '@/ui/icons/svg/Icon';
 import { PageLink } from '@/ui/PageLink/PageLink';
 
 import { Chapters } from './Chapters';
+import { EpisodeActions } from './EpisodeActions';
 import styles from './EpisodeInfo.module.css';
 import { ShowNotes } from './ShowNotes';
 
-type EpisodeInfoProps = {
-  podcast: IPodcastEpisodesInfo;
+export async function EpisodeInfo({
+  podcast,
+  episode,
+}: {
+  podcast: IPodcastInfo;
   episode: IEpisodeInfo;
-};
-
-export async function EpisodeInfo({ podcast, episode }: EpisodeInfoProps) {
-  const { author, cover, episodeArt, published, summary, title } = episode;
-  const { language } = await translations();
+}) {
+  const { t, language } = await translations();
   const locale = localeForLanguage[language];
-  const showArt = episodeArt || cover;
-  const shareTitle = `${podcast.title} - ${title}`;
-  const releaseDate = published
-    ? new Date(published).toLocaleDateString(locale, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : null;
+  const art = episode.episodeArt || episode.cover;
+  const dateline = [
+    episode.published
+      ? new Date(episode.published).toLocaleDateString(locale, {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : null,
+    episode.duration ? formatDuration(t, episode.duration) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <article className={styles.header}>
-      <ArtworkBackdrop src={showArt} privateSource={episode.isPrivate} />
-      <div className={styles.top}>
-        <div className={styles.artwork}>
-          <ProxiedImage
-            loading="eager"
-            fetchPriority="high"
-            alt=""
-            src={showArt}
-            privateSource={episode.isPrivate}
-            sizes="(max-width: 480px) 140px, (max-width: 768px) 180px, 200px"
-          />
-        </div>
-        <div className={styles.meta}>
-          <h1 className={styles.title}>
-            {episode.link ? (
-              <ExternalLink href={episode.link}>{title}</ExternalLink>
-            ) : (
-              title
-            )}
-          </h1>
-          <p className={styles.podcast}>
-            <PageLink href={getPodcastHref(podcast)} loading="podcast">
-              {podcast.title}
-            </PageLink>
-            {podcast.link && (
-              <ExternalLink href={podcast.link}>
-                <Icon icon="external-link" size={14} />
-              </ExternalLink>
-            )}
-          </p>
-          <p className={styles.author}>{author}</p>
-          {releaseDate && <p className={styles.published}>{releaseDate}</p>}
-          <div className={styles.actions}>
-            <PlayButton episode={episode} />
-            <StarButton episode={episode} className={styles.star} />
-            {!episode.isPrivate && (
-              <ShareButton
-                text={(summary && `${shareTitle}\n${summary}`) || shareTitle}
-                title={shareTitle}
-              />
-            )}
+    <article className={styles.episode}>
+      <ArtworkBackdrop
+        src={art}
+        privateSource={episode.isPrivate}
+        className={styles.tint}
+      />
+      <div className={styles.page}>
+        <nav className={styles.crumbs} aria-label={podcast.title}>
+          <PageLink href={getPodcastHref(podcast)} loading="podcast">
+            {podcast.title}
+          </PageLink>
+        </nav>
+        <header className={styles.hero}>
+          <div className={styles.artwork}>
+            <ProxiedImage
+              loading="eager"
+              fetchPriority="high"
+              alt=""
+              src={art}
+              privateSource={episode.isPrivate}
+              sizes="(max-width: 767px) 140px, 200px"
+            />
           </div>
+          <div className={styles.meta}>
+            {dateline && <p className={styles.eyebrow}>{dateline}</p>}
+            <h1 className={styles.title}>{episode.title}</h1>
+            <EpisodeActions
+              episode={episode}
+              shareTitle={`${podcast.title} – ${episode.title}`}
+            />
+          </div>
+        </header>
+        <div className={styles.body}>
+          <ShowNotes className={styles.notes} episode={episode} />
+          <Chapters episode={episode} />
         </div>
       </div>
-      <Chapters episode={episode} />
-      <ShowNotes className={styles.showNotes} episode={episode} />
     </article>
   );
 }

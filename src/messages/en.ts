@@ -53,7 +53,6 @@ export const messages = {
     title: 'Chapters',
     loading: 'Loading embedded chapters…',
     fallback: 'Chapters from show notes',
-    unavailable: 'No chapters available',
     previous: 'Previous chapter',
     next: 'Next chapter',
     untitled: 'Chapter {number}',
@@ -114,6 +113,35 @@ export const messages = {
     loadError: 'Failed to load episodes',
     loadingMore: 'Loading more...',
     allLoaded: 'All episodes loaded',
+    played: 'Played',
+    searchShow: 'Search this show',
+    unplayed: 'Unplayed',
+    alsoFollow: 'Listeners also follow',
+    daily: 'New episodes daily',
+    weekly: 'New episodes every {day}',
+    since: 'Since {year}',
+    shareText: 'Listen to {title} by {author} on Podcst',
+    linkCopied: 'Link copied',
+  },
+
+  discover: {
+    dateline: 'Top podcasts · {region} · Updated every six hours',
+    numberOne: 'No. 1 today',
+    chart: 'The chart',
+    seeAll: 'See all {count}',
+    noteworthy: 'New & noteworthy',
+    all: 'All',
+    movedUp: 'Up {count}',
+    movedDown: 'Down {count}',
+    unchanged: 'No change',
+    newEntry: 'New',
+    playLatest: 'Play latest',
+    chartTitle: 'Top podcasts in {region}',
+  },
+
+  episode: {
+    playAgain: 'Play again',
+    queued: 'Added to queue',
   },
 
   library: {

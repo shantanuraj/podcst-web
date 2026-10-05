@@ -1,19 +1,29 @@
 .button {
-  font-size: var(--text-sm);
-  font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-6);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid color-mix(in oklch, var(--color-ink) 30%, transparent);
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--color-ink);
-  transition: all 0.15s ease;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .button:hover {
   border-color: var(--color-ink);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .button:focus-visible {
@@ -21,50 +31,27 @@
   outline-offset: 2px;
 }
 
-.button[data-is-subscribed="true"],
-.button[data-is-current="true"] {
-  background-color: var(--color-ink);
-  color: var(--color-surface);
+.button[data-variant="primary"] {
   border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
 }
 
-.button[data-is-subscribed="true"]:hover,
-.button[data-is-current="true"]:hover {
-  background-color: var(--color-ink-secondary);
+.button[data-variant="primary"]:hover {
+  opacity: 0.85;
 }
 
 .withIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 42px;
   padding: 0;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--color-rule);
-  background: var(--color-surface);
-}
-
-.withIcon:hover {
-  border-color: var(--color-ink);
 }
 
 .withIcon svg {
   color: currentColor;
-  transition: transform 0.15s ease;
 }
 
-.withIcon:hover svg {
-  transform: scale(1.1);
-}
-
-.withIcon[data-is-subscribed="true"],
 .withIcon[data-is-current="true"] {
-  background-color: var(--color-accent);
   border-color: var(--color-accent);
+  background: var(--color-accent);
   color: white;
-}
-
-.withIcon[data-is-subscribed="true"]:hover,
-.withIcon[data-is-current="true"]:hover {
-  opacity: 0.9;
 }

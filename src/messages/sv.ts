@@ -55,7 +55,6 @@ export const messages: Messages = {
     title: 'Kapitel',
     loading: 'Läser in inbäddade kapitel…',
     fallback: 'Kapitel från avsnittsanteckningarna',
-    unavailable: 'Inga kapitel tillgängliga',
     previous: 'Föregående kapitel',
     next: 'Nästa kapitel',
     untitled: 'Kapitel {number}',
@@ -116,6 +115,35 @@ export const messages: Messages = {
     loadError: 'Misslyckades med att ladda avsnitt',
     loadingMore: 'Laddar fler...',
     allLoaded: 'Alla avsnitt laddade',
+    played: 'Spelad',
+    searchShow: 'Sök i podden',
+    unplayed: 'Ospelade',
+    alsoFollow: 'Lyssnare följer också',
+    daily: 'Nya avsnitt varje dag',
+    weekly: 'Nya avsnitt varje {day}',
+    since: 'Sedan {year}',
+    shareText: 'Lyssna på {title} av {author} på Podcst',
+    linkCopied: 'Länken kopierades',
+  },
+
+  discover: {
+    dateline: 'Populära poddar · {region} · Uppdateras var sjätte timme',
+    numberOne: 'Nr 1 i dag',
+    chart: 'Topplistan',
+    seeAll: 'Visa alla {count}',
+    noteworthy: 'Nytt och värt att lyssna på',
+    all: 'Alla',
+    movedUp: 'Upp {count}',
+    movedDown: 'Ned {count}',
+    unchanged: 'Oförändrad',
+    newEntry: 'Ny',
+    playLatest: 'Spela senaste',
+    chartTitle: 'Populära poddar i {region}',
+  },
+
+  episode: {
+    playAgain: 'Spela igen',
+    queued: 'Tillagd i kön',
   },
 
   library: {

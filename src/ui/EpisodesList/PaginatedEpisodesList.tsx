@@ -1,83 +1,52 @@
 'use client';
 
-import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   type EpisodeSortDir,
   type EpisodeSortField,
   useEpisodesInfinite,
 } from '@/data/feed';
+import { usePodcastProgress } from '@/data/progress';
+import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
-import type { IEpisodeInfo, IPodcastInfo } from '@/types';
-import { EpisodeItem } from './EpisodeItem';
-import styles from './EpisodesList.module.css';
-
-interface PaginatedEpisodesListProps {
-  className?: string;
-  children?: React.ReactNode;
-  podcastId: number;
-  podcast: IPodcastInfo;
-}
+import type { IPodcastInfo } from '@/types';
+import { EpisodeRow } from './EpisodeRow';
+import styles from './PaginatedEpisodesList.module.css';
 
 type SortPreference =
-  | 'releaseAsc'
   | 'releaseDesc'
+  | 'releaseAsc'
   | 'titleAsc'
   | 'titleDesc'
   | 'lengthAsc'
   | 'lengthDesc';
 
-const sortOptions: SortPreference[] = [
-  'releaseDesc',
-  'releaseAsc',
-  'titleAsc',
-  'titleDesc',
-  'lengthAsc',
-  'lengthDesc',
-];
+const sorts: Record<
+  SortPreference,
+  { sortBy: EpisodeSortField; sortDir: EpisodeSortDir }
+> = {
+  releaseDesc: { sortBy: 'published', sortDir: 'desc' },
+  releaseAsc: { sortBy: 'published', sortDir: 'asc' },
+  titleAsc: { sortBy: 'title', sortDir: 'asc' },
+  titleDesc: { sortBy: 'title', sortDir: 'desc' },
+  lengthAsc: { sortBy: 'duration', sortDir: 'asc' },
+  lengthDesc: { sortBy: 'duration', sortDir: 'desc' },
+};
 
-function mapSortPreference(pref: SortPreference): {
-  sortBy: EpisodeSortField;
-  sortDir: EpisodeSortDir;
-} {
-  switch (pref) {
-    case 'releaseDesc':
-      return { sortBy: 'published', sortDir: 'desc' };
-    case 'releaseAsc':
-      return { sortBy: 'published', sortDir: 'asc' };
-    case 'titleAsc':
-      return { sortBy: 'title', sortDir: 'asc' };
-    case 'titleDesc':
-      return { sortBy: 'title', sortDir: 'desc' };
-    case 'lengthAsc':
-      return { sortBy: 'duration', sortDir: 'asc' };
-    case 'lengthDesc':
-      return { sortBy: 'duration', sortDir: 'desc' };
-  }
-}
-
-export function PaginatedEpisodesList({
-  className = '',
-  children,
-  podcastId,
-  podcast,
-}: PaginatedEpisodesListProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+export function PaginatedEpisodesList({ podcast }: { podcast: IPodcastInfo }) {
+  const { t } = useTranslation();
+  const { data: user } = useSession();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const [sortPreference, setSortPreference] =
-    useState<SortPreference>('releaseDesc');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sort, setSort] = useState<SortPreference>('releaseDesc');
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [unplayed, setUnplayed] = useState(false);
+  const progress = usePodcastProgress(podcast.id);
 
-  // Debounce search input
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-    }, 300);
+    const timer = setTimeout(() => setSearch(query.trim()), 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  const { sortBy, sortDir } = mapSortPreference(sortPreference);
+  }, [query]);
 
   const {
     data,
@@ -87,120 +56,97 @@ export function PaginatedEpisodesList({
     isLoading,
     isError,
   } = useEpisodesInfinite({
-    podcastId,
-    search: debouncedSearch || undefined,
-    sortBy,
-    sortDir,
+    podcastId: podcast.id,
+    search: search || undefined,
+    unplayed: !!user && unplayed,
+    ...sorts[sort],
     limit: 20,
   });
 
-  const onSortChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setSortPreference(e.target.value as SortPreference);
-    },
-    [],
-  );
-
-  const onSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchQuery(e.target.value);
-    },
-    [],
-  );
-
-  // Intersection observer for infinite scroll
   useEffect(() => {
     if (!loadMoreRef.current) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage)
+          void fetchNextPage();
       },
-      { threshold: 0.1, rootMargin: '100px' },
+      { rootMargin: '200px' },
     );
-
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const allEpisodes = data?.pages.flatMap((page) => page.episodes) ?? [];
-  const totalCount = data?.pages[0]?.total ?? 0;
-
-  const { t } = useTranslation();
+  const episodes = data?.pages.flatMap((page) => page.episodes) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   return (
-    <div className={`${styles.container} ${className}`} ref={containerRef}>
-      {children}
-      <div className={styles.header}>
-        <div className={styles.count}>
-          {debouncedSearch
-            ? t('podcast.episodeSearchCount', {
-                count: allEpisodes.length,
-                total: podcast.episodeCount,
-              })
-            : t('podcast.episodeCount', {
-                count: podcast.episodeCount,
-              })}
-        </div>
-        <div className={styles.search}>
-          <input
-            onChange={onSearchChange}
-            value={searchQuery}
-            placeholder={t('search.episodesPlaceholder')}
-          />
-        </div>
-        <div className={styles.sort}>
-          <span>{t('podcast.sort')}</span>
-          <select onChange={onSortChange} value={sortPreference}>
-            {sortOptions.map((value) => (
+    <section className={styles.episodes}>
+      <div className={styles.head}>
+        <h2 className={styles.heading}>{t('podcast.episodes')}</h2>
+        <div className={styles.controls}>
+          <label className={styles.search}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-4-4" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder={t('podcast.searchShow')}
+              aria-label={t('podcast.searchShow')}
+            />
+          </label>
+          {user && (
+            <button
+              type="button"
+              className={styles.control}
+              aria-pressed={unplayed}
+              onClick={() => setUnplayed((value) => !value)}
+            >
+              {t('podcast.unplayed')}
+            </button>
+          )}
+          <select
+            className={styles.control}
+            value={sort}
+            onChange={(event) =>
+              setSort(event.currentTarget.value as SortPreference)
+            }
+            aria-label={t('podcast.sort')}
+          >
+            {(Object.keys(sorts) as SortPreference[]).map((value) => (
               <option key={value} value={value}>
-                {t(`podcast.sortOptions.${value}` as any)}
+                {t(`podcast.sortOptions.${value}`)}
               </option>
             ))}
           </select>
         </div>
       </div>
-
-      {isLoading && (
-        <div className={styles.loading}>{t('podcast.loadingEpisodes')}</div>
+      {(search || unplayed) && !isLoading && (
+        <p className={styles.status} role="status">
+          {t('podcast.episodeSearchCount', {
+            count: total,
+            total: podcast.episodeCount,
+          })}
+        </p>
       )}
-
-      {isError && <div className={styles.error}>{t('podcast.loadError')}</div>}
-
-      <ul className={styles.list}>
-        {allEpisodes.map((episode, index) => (
-          <EpisodeListItem
-            key={episode.id || episode.guid || `${index}-${episode.title}`}
+      {isLoading && (
+        <p className={styles.status}>{t('podcast.loadingEpisodes')}</p>
+      )}
+      {isError && <p className={styles.status}>{t('podcast.loadError')}</p>}
+      <ul>
+        {episodes.map((episode) => (
+          <EpisodeRow
+            key={episode.id ?? episode.guid}
             episode={episode}
-            podcastId={podcast.id}
-            index={index}
+            progress={episode.id ? progress.get(episode.id) : undefined}
           />
         ))}
       </ul>
-
-      {/* Load more trigger */}
-      <div ref={loadMoreRef} className={styles.loadMore}>
-        {isFetchingNextPage && <span>{t('podcast.loadingMore')}</span>}
-        {!hasNextPage && allEpisodes.length > 0 && totalCount > 20 && (
-          <span>{t('podcast.allLoaded')}</span>
-        )}
+      <div ref={loadMoreRef} className={styles.status}>
+        {isFetchingNextPage && t('podcast.loadingMore')}
       </div>
-    </div>
-  );
-}
-
-interface EpisodeListItemProps {
-  episode: IEpisodeInfo;
-  podcastId?: number;
-  index: number;
-}
-
-function EpisodeListItem({ episode, podcastId }: EpisodeListItemProps) {
-  return (
-    <li>
-      <EpisodeItem episode={episode} podcastId={podcastId} />
-    </li>
+    </section>
   );
 }

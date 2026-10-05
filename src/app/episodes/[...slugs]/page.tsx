@@ -15,6 +15,8 @@ import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
+import { Related } from '@/ui/PodcastInfo/Related';
+import styles from './Episodes.module.css';
 import { EpisodesNotFound } from './EpisodesNotFound';
 import { FeedRefresh } from './FeedRefresh';
 
@@ -176,7 +178,7 @@ export default async function Page(props: {
               url={url}
             />
           )}
-          <EpisodeInfo podcast={podcastData} episode={episode} />
+          <EpisodeInfo podcast={podcast} episode={episode} />
         </AccountContent>
       );
     }
@@ -191,7 +193,6 @@ export default async function Page(props: {
     }
 
     if (initialEpisodes.episodes.length === 0) {
-      const infoData = { ...podcast, episodes: [] };
       return (
         <AccountContent
           scope={userId}
@@ -204,7 +205,7 @@ export default async function Page(props: {
             initialData={initialEpisodes}
           >
             <FeedRefresh podcastId={parsed.podcastId} empty />
-            <PodcastInfo info={infoData} />
+            <PodcastInfo podcast={podcast} episodes={[]} />
           </EpisodesHydration>
         </AccountContent>
       );
@@ -212,7 +213,6 @@ export default async function Page(props: {
 
     const url = `${baseUrl}/episodes/${parsed.podcastId}`;
     const schemaData = { ...podcast, episodes: initialEpisodes.episodes };
-    const infoData = { ...podcast, episodes: [] };
 
     return (
       <AccountContent
@@ -229,9 +229,11 @@ export default async function Page(props: {
           podcastId={parsed.podcastId}
           initialData={initialEpisodes}
         >
-          <PaginatedEpisodesList podcastId={parsed.podcastId} podcast={podcast}>
-            <PodcastInfo info={infoData} />
-          </PaginatedEpisodesList>
+          <PodcastInfo podcast={podcast} episodes={initialEpisodes.episodes} />
+          <div className={styles.body}>
+            <PaginatedEpisodesList podcast={podcast} />
+            <Related podcastId={podcast.id} />
+          </div>
         </EpisodesHydration>
       </AccountContent>
     );
