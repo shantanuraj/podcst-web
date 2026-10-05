@@ -1,33 +1,39 @@
-# [podcst-web](https://podcst.app)
+# [Podcst](https://podcst.app)
 
-[![code style: biome](https://img.shields.io/badge/code_style-biome-60a5fa?style=flat&logo=biome)](https://biomejs.dev/)
+Podcst is a podcast player for the web, iOS and Android.
 
-Podcst Web is a modern PWA to listen to podcasts.
-
-The aim of this project is to provide an excellent podcast listening experience on all types of devices (desktop, tablets, mobile).
-
-Another major focus is on accessibility, with full keyboard navigation support.
-
-> **Note:** This project only aims to support ever-green browsers.
+The aim is to provide an excellent listening experience across desktop, tablets
+and mobile, with a focus on accessibility and keyboard navigation.
 
 ## Features
 
-- User accounts with passkey authentication
+- Podcast search and regional charts
+- Passkey sign-in
 - Cross-device subscription and playback sync
-- Podcast search and discovery
-- Top podcasts by region
+- Private RSS feeds and OPML import/export
+- Queue, chapters and playback speed controls
 - Chromecast and AirPlay support
-- Private feed support
-- Media session integration
-- Offline PWA capabilities
+- Offline downloads, Volume Boost and Trim Silence in the native apps
 
-## Authors
+[Listen on the web](https://podcst.app). The native apps are being prepared for
+their first public release. The web app targets evergreen browsers.
 
-See the list of [contributors][Contributor List] who participated in this project.
+## Development
 
-[Contributor List]: https://github.com/shantanuraj/podcst-web/contributors
+The web app uses Next.js, React and TypeScript, with PostgreSQL and Redis.
+The iOS app uses SwiftUI; Android uses Kotlin and Compose. Both native apps share
+a Rust audio engine.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, build and test instructions.
+[Technical references](docs/README.md) cover the API, playback and database tools.
+
+## Contributing
+
+Bug reports and pull requests are welcome. For larger changes, open an issue
+first so we can discuss the approach.
+
+Thanks to everyone who has [contributed](https://github.com/shantanuraj/podcst-web/graphs/contributors).
 
 ## License
 
-This project is licensed under the MIT License - see the
-[LICENSE](LICENSE.md) file for details.
+[MIT](LICENSE.md)
