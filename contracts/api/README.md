@@ -1,6 +1,6 @@
 # Podcst API contract for native clients
 
-This contract describes the HTTP API that the iOS and Android clients use, as implemented by the route handlers in `src/app/api/**/route.ts` and the server functions they call. It was derived from source on 4 October 2026 and checked against `https://www.podcst.app` for the public endpoints. The fixture index, [`contracts/fixtures/api/index.json`](../fixtures/api/index.json), is the authoritative list of example bodies; each entry names the endpoint, the HTTP status and the logical type a client decodes. The mobile parity specification explains how clients use these responses.
+This contract describes the API used by the native clients. Route handlers live in `src/app/api/`; the [fixture index](../fixtures/api/index.json) lists example bodies, HTTP statuses and client decoding types. Update fixtures and both clients' tests when changing a response.
 
 ## Conventions
 
@@ -24,7 +24,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 **Numbers and nulls.** Database `bigint` values are parsed to JavaScript numbers (`src/server/db.ts`), so podcast and episode IDs are JSON integers. Timestamps (`published`) are milliseconds since the Unix epoch. `duration` is whole seconds. A key documented as "omitted" is absent from the JSON, which is different from `null`.
 
-**Artwork.** `cover`, `thumbnail` and `episodeArt` are opaque URLs. A URL on `assets.podcst.app` may receive a `w` parameter to request a square WebP variant; the permitted widths live in [`contracts/playback/rules.json`](../playback/rules.json) under `artwork`, and the server behaviour is documented in Artwork sizing and transport. Private artwork is served directly, never through that host.
+**Artwork.** `cover`, `thumbnail` and `episodeArt` are opaque URLs. A URL on `assets.podcst.app` may receive a `w` parameter to request a square WebP variant; the permitted widths live in [`contracts/playback/rules.json`](../playback/rules.json) under `artwork`, and the server behaviour is documented in [Artwork sizing and transport](../../docs/ios-artwork-cache.md#server-contract). Private artwork is served directly, never through that host.
 
 **Titles.** Titles and descriptions are stored as the feed supplied them. Some contain HTML entities, for example the captured `top.nl.json` title `Maarten van Rossem &amp; Tom Jessen`; clients decide how to render them.
 
@@ -132,7 +132,7 @@ Looks up an already-indexed **public** podcast by feed URL or public alias (`get
 
 ### `POST /api/feed` — required
 
-Body: `{ "url": string }` (at most 4,096 characters). Indexes the feed with the caller as owner if it is not already indexed, applying the same ownership rules as feed-URL search (private feed ownership), and returns the full `Podcast`. It does not subscribe.
+Body: `{ "url": string }` (at most 4,096 characters). Indexes the feed with the caller as owner if it is not already indexed, applying the same ownership rules as feed-URL search, and returns the full `Podcast`. It does not subscribe.
 
 | Status | Body |
 | --- | --- |
@@ -185,7 +185,7 @@ retained episode content also returns an empty list without rebuilding the feed.
 Database failures return 503 `{message: "Chapters unavailable"}`.
 
 Native clients continue reading local media metadata; they do not consume this
-endpoint. See web chapter support for limits and
+endpoint. See [web chapter support](../../docs/web-chapters.md) for limits and
 cache policy, and [synthetic media](../fixtures/media/README.md) for reusable
 fixtures.
 
@@ -258,7 +258,7 @@ Start requests (no `response`):
 
 `options` is `PublicKeyCredentialRequestOptionsJSON` from `@simplewebauthn/server` 13.3.2 `generateAuthenticationOptions`: `rpId` (the server's `WEBAUTHN_RP_ID`; the fixture value is illustrative), `challenge` (base64url of 32 random bytes), `allowCredentials` (`[{id, type: "public-key"}]`, no `transports`), `timeout` 60000 and `userVerification: "preferred"`. There is no `extensions` key.
 
-Verification body: `{visitorId, response, userId?}`, where `response` is `AuthenticationResponseJSON` (`id`, `rawId` equal to `id`, `type: "public-key"`, `response.clientDataJSON`, `response.authenticatorData`, `response.signature`, optional `response.userHandle`, all base64url; see `PasskeyAssertion` in `APIClient.swift`). Send the `userId` from an email start; omit it for discoverable login. The server requires user verification, an origin in its accepted set and the configured RP ID; the accepted origins are described in the parity specification. Success creates a session and returns `PasskeyLoginResult` `{ "verified": true, "userId": string }` (`auth-login.verified.json`). Every verification failure, including an expired challenge, unknown credential or wrong origin, returns 400 `{message: <message>}` (`auth-login.challenge-expired.json`).
+Verification body: `{visitorId, response, userId?}`, where `response` is `AuthenticationResponseJSON` (`id`, `rawId` equal to `id`, `type: "public-key"`, `response.clientDataJSON`, `response.authenticatorData`, `response.signature`, optional `response.userHandle`, all base64url; see `PasskeyAssertion` in `APIClient.swift`). Send the `userId` from an email start; omit it for discoverable login. The server requires user verification, an origin in its accepted set and the configured RP ID; accepted origins and native association files are derived from [`native-apps.ts`](../../src/server/auth/native-apps.ts). Success creates a session and returns `PasskeyLoginResult` `{ "verified": true, "userId": string }` (`auth-login.verified.json`). Every verification failure, including an expired challenge, unknown credential or wrong origin, returns 400 `{message: <message>}` (`auth-login.challenge-expired.json`).
 
 ### `POST /api/auth/register` — required
 

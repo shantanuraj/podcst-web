@@ -1,6 +1,6 @@
 # Shared audio behaviour contract
 
-Both native clients must produce the same audible and observable behaviour from the same source. They share one signal-processing implementation, the Rust crate in `audio-engine/`, and each owns its platform's decoding, scheduling, output and system integration. This contract states the behaviour that both platforms' tests assert. It is grounded in the [audio engine README](../../audio-engine/README.md), the audio experience plan, the iPhone validation worksheet and the iOS implementation (`ios/Podcst/Playback/LocalAudioWorker.swift`, `ios/Podcst/Playback/RoutingAudioTransport.swift`). Speeds and other product values live in [`contracts/playback/rules.json`](../playback/rules.json).
+Both native clients must produce the same audible and observable behaviour from the same source. They share one signal-processing implementation, the Rust crate in `audio-engine/`, and each owns its platform's decoding, scheduling, output and system integration. This contract states the behaviour that both platforms' tests assert. See the [audio engine README](../../audio-engine/README.md) for API details and [device testing](../../docs/audio-device-validation.md) for checks beyond automated coverage. Speeds and other product values live in [`contracts/playback/rules.json`](../playback/rules.json).
 
 ## Signal chain
 

@@ -1,6 +1,6 @@
 # Playback contract vectors
 
-These files hold the playback rules and behavioural vectors that the iOS and Android test suites both replay. Values were derived from the iOS sources named below; every queue, show-notes and release-section expectation was recomputed by a throwaway Swift program that copied those algorithms verbatim. The mobile parity specification explains the product meaning; this file defines only the formats.
+These files hold the playback rules and behavioural vectors replayed by both native clients' test suites. Change the shared rules and both clients together; this document describes the vector formats.
 
 | File | Contents | iOS source |
 | --- | --- | --- |

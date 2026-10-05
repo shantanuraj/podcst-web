@@ -2,13 +2,10 @@
 
 This crate is the platform-independent audio-processing core and its
 regression harness. It supplies the bounded speech-effects worker and final
-render limiter used by the native iOS backend, alongside whole-file reference
-tools. The implementation has automated validation; physical listening and
-power release gates remain recorded separately.
-
-Native integration follows the audio experience plan:
-a reusable local iOS player first, followed by production effects and progressive
-playback. The plan owns the work ledger, processing contracts, and release gates.
+render limiter used by the iOS and Android players, alongside whole-file reference
+tools. See the [shared audio contract](../contracts/audio/README.md) for client
+behaviour and [device testing](../docs/audio-device-validation.md) for listening,
+route and power checks.
 
 ## Run the harness
 
@@ -372,7 +369,7 @@ when inspecting an earlier waveform window. True peak is an oversampled estimate
 
 Disable **Measure audio** for engine power comparisons. It is always disabled
 in Podcst. The lab's separate `-AudioLabReference` launch mode uses AVPlayer and
-hides unsupported inspection/effects. See inspection design and validation.
+hides unsupported inspection/effects.
 
 Graph control, refill scheduling and source clocks run on a dedicated serial
 audio executor. The main actor sends ordered commands and consumes coalesced
@@ -430,7 +427,7 @@ unsupported effect controls while keeping speed controls available. Completed
 cached files are reused; uncached episodes stream directly through AVPlayer.
 Remove the argument to return to custom playback and use the Audio control to
 enable effects. This comparison mode exists for the
-physical validation worksheet;
+[physical validation worksheet](../docs/audio-device-validation.md);
 it is not a production playback preference. Test source, route, volume, rate and
 optimized build settings must match when comparing power.
 
