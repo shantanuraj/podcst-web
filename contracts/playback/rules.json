@@ -25,7 +25,7 @@
       },
       "web": {
         "ended": true,
-        "markedPlayed": false,
+        "markedPlayed": true,
         "savedPositionFractionOfKnownDuration": 0.95
       }
     }

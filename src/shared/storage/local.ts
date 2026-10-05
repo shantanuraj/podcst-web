@@ -5,6 +5,7 @@ const STORE_KEY = 'store@4';
 
 export interface IStoreable {
   volume: number;
+  rate: number;
   themeMode: ThemeMode;
   scheme: Scheme;
   lastSyncTime: number;

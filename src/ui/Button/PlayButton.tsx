@@ -2,6 +2,7 @@
 
 import { forwardRef, memo, useCallback } from 'react';
 import { useTranslation } from '@/shared/i18n';
+import { sameEpisode } from '@/shared/player/episode-identity';
 import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
 import {
   getCurrentEpisode,
@@ -35,7 +36,7 @@ export const PlayButton = memo(
 
     const play = usePlayer(selectPlay);
     const resume = usePlayer(selectResume);
-    const setPlayerState = usePlayer(selectSetPlayerState);
+    const pause = usePlayer(selectPause);
 
     const children = icon ? PlayButtonIconContent : PlayButtonContent;
     const className =
@@ -46,19 +47,11 @@ export const PlayButton = memo(
         e.preventDefault();
         withAccount(episode, () => {
           if (!isCurrentEpisode) return play(episode);
-          if (isPlaying) setPlayerState('paused');
+          if (isPlaying) pause();
           else resume();
         });
       },
-      [
-        episode,
-        isPlaying,
-        play,
-        resume,
-        setPlayerState,
-        isCurrentEpisode,
-        withAccount,
-      ],
+      [episode, isPlaying, play, resume, pause, isCurrentEpisode, withAccount],
     );
 
     return (
@@ -104,9 +97,8 @@ const PlayButtonIconContent = ({
 
 const selectIsCurrentEpisode =
   (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
-    getCurrentEpisode(playerState)?.guid === episode.guid &&
+    sameEpisode(getCurrentEpisode(playerState), episode) &&
     playerState.state !== 'idle';
 const selectPlay = (playerState: IPlayerState) => playerState.playEpisode;
 const selectResume = (playerState: IPlayerState) => playerState.resumeEpisode;
-const selectSetPlayerState = (playerState: IPlayerState) =>
-  playerState.setPlayerState;
+const selectPause = (playerState: IPlayerState) => playerState.pause;

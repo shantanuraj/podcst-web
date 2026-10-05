@@ -105,14 +105,27 @@ export const messages: Messages = {
     play: 'Lire',
     pause: 'Pause',
     resume: 'Reprendre',
-    seekBack: 'Retour arrière',
-    seekForward: 'Avancer',
     speed: 'Vitesse de lecture',
     mute: 'Muet',
     unmute: 'Réactiver le son',
     queue: 'Voir la file d’attente',
     airplay: 'AirPlay',
     chromecast: 'Cast',
+    open: 'Ouvrir la lecture en cours',
+    close: 'Fermer la lecture en cours',
+    skipBack: 'Reculer de {seconds} secondes',
+    skipForward: 'Avancer de {seconds} secondes',
+    volume: 'Volume',
+    more: 'Plus',
+    stop: 'Arrêter la lecture',
+    stopHint: 'Garde votre position et la file d’attente',
+    markPlayed: 'Marquer comme écouté',
+    chapterShort: 'Ch. {number}',
+    chapterOf: 'Chapitre {number} sur {total}',
+    remaining: '{time} restantes',
+    upNext: 'À suivre',
+    hours: '{hours} h {minutes} min',
+    minutes: '{minutes} min',
   },
 
   podcast: {
@@ -165,6 +178,15 @@ export const messages: Messages = {
   queue: {
     title: 'File d’attente',
     empty: 'Ajoutez des épisodes à la file d’attente pour les voir ici',
+    summary:
+      '{count, plural, one {# épisode} other {# épisodes}} · {time} restantes',
+    clear: 'Vider la file',
+    nowPlaying: 'Lecture en cours',
+    upNext: 'À suivre',
+    playNext: 'Lire ensuite',
+    remove: 'Retirer',
+    reorder:
+      'Réordonner {title}. Faites glisser ou utilisez Alt et les flèches',
   },
 
   regions: {

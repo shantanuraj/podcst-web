@@ -1,10 +1,7 @@
-/**
- * Howler player
- */
-
 import { Howl } from 'howler/src/howler.core';
 import { getValue } from '@/shared/storage/local';
 import type { IEpisode } from '@/types';
+import { skip } from '../../../contracts/playback/rules.json';
 import { updatePlaybackState } from './mediaUtils';
 
 type AirplayAvailabilityCallback = (isAirplayAvailable: boolean) => void;
@@ -33,12 +30,13 @@ export const defaultVolume = 50;
 export const getInitialVolume = () => getValue('volume', defaultVolume);
 
 export default class AudioUtils {
-  private static playbackInstance: Howl | null;
+  private static playbackInstance: Howl | null = null;
   private static generation = 0;
   private static playbackId: number | undefined = undefined;
   private static airplayAvailabilityListener: AirplayAvailabilityCallback | null =
     null;
   private static volume: number = defaultVolume;
+  private static rate = 1;
 
   private static getAudioElement(): HTMLAudioElement | null {
     try {
@@ -100,9 +98,14 @@ export default class AudioUtils {
     setIsAirplayEnabled: throwError,
   };
 
-  public static init(callbacks: IAudioCallbacks) {
+  public static init(callbacks: IAudioCallbacks, rate: number) {
     AudioUtils.callbacks = callbacks;
     AudioUtils.volume = getInitialVolume();
+    AudioUtils.rate = rate;
+  }
+
+  public static loaded() {
+    return AudioUtils.playbackInstance !== null;
   }
 
   public static play(
@@ -116,6 +119,7 @@ export default class AudioUtils {
     AudioUtils.playbackInstance = new Howl({
       src: [episode.file.url],
       volume: AudioUtils.volume / 100,
+      rate: AudioUtils.rate,
       html5: true,
       onload() {
         if (generation !== AudioUtils.generation) return;
@@ -187,11 +191,6 @@ export default class AudioUtils {
     }
   }
 
-  public static skipTo(episode: IEpisode) {
-    AudioUtils.pause();
-    AudioUtils.play(episode);
-  }
-
   public static seekTo(seconds: number) {
     AudioUtils.playbackInstance?.seek(seconds);
   }
@@ -223,8 +222,8 @@ export default class AudioUtils {
   }
 
   public static setRate(rate: number) {
-    if (!AudioUtils.playbackId) return;
-    AudioUtils.playbackInstance?.rate(rate, AudioUtils.playbackId);
+    AudioUtils.rate = rate;
+    AudioUtils.playbackInstance?.rate(rate);
   }
 
   public static loadAtSeek(episode: IEpisode, seekPosition: number) {
@@ -233,35 +232,15 @@ export default class AudioUtils {
   }
 }
 
-/**
- * Normalize seek value to handle edge-cases
- */
-const normalizeSeek = (seekTo: number, duration: number) => {
-  if (seekTo < 0) {
-    return 0;
-  } else if (seekTo > duration) {
-    return duration;
-  }
-
-  return Math.floor(seekTo);
-};
-
-/**
- * Default Seek jump delta
- */
-export const SEEK_DELTA = 10;
+const clampSeek = (seconds: number, duration: number) =>
+  Math.floor(Math.max(0, duration > 0 ? Math.min(seconds, duration) : seconds));
 
 export const seekUtils = {
-  seekBy: (currentPosition: number, seconds: number, duration: number) => {
-    return normalizeSeek(currentPosition + seconds, duration);
-  },
-  seekForward: (currentPosition: number, duration: number) => {
-    return seekUtils.seekBy(currentPosition, SEEK_DELTA, duration);
-  },
-  seekBackward: (currentPosition: number, duration: number) => {
-    return seekUtils.seekBy(currentPosition, -SEEK_DELTA, duration);
-  },
-  onSeekSuccess: () => {}, // noop
+  seekForward: (position: number, duration: number) =>
+    clampSeek(position + skip.forwardSeconds, duration),
+  seekBackward: (position: number, duration: number) =>
+    clampSeek(position - skip.backwardSeconds, duration),
+  onSeekSuccess: () => {},
   onSeekError: (error: chrome.cast.Error) =>
     console.error('Error seeking', error),
 };

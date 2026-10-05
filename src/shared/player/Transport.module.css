@@ -1,0 +1,95 @@
+.play {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  transition: opacity 0.15s ease;
+}
+
+.play:hover {
+  opacity: 0.85;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  color: var(--color-ink-secondary);
+}
+
+.transport button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: inherit;
+  transition: color 0.15s ease;
+}
+
+.transport button:hover {
+  color: var(--color-ink);
+}
+
+.transport .play {
+  width: 40px;
+  height: 40px;
+  color: var(--color-paper);
+}
+
+.transport svg {
+  width: 18px;
+  height: 18px;
+}
+
+.transport .skip svg {
+  width: 22px;
+  height: 22px;
+}
+
+.transport[data-size="stage"] {
+  justify-content: flex-start;
+  gap: clamp(0.75rem, 2.5vw, 2.25rem);
+  color: var(--color-ink);
+}
+
+.transport[data-size="stage"] button {
+  width: 44px;
+  height: 44px;
+}
+
+.transport[data-size="stage"] svg {
+  width: 26px;
+  height: 26px;
+}
+
+.transport[data-size="stage"] .skip svg {
+  width: 34px;
+  height: 34px;
+}
+
+.transport[data-size="stage"] .play {
+  width: 76px;
+  height: 76px;
+}
+
+.transport[data-size="stage"] .play svg {
+  width: 30px;
+  height: 30px;
+}
+
+@media (max-width: 767px) {
+  .transport[data-size="stage"] {
+    justify-content: space-between;
+    gap: 0;
+  }
+
+  .transport[data-size="stage"] .play {
+    width: 68px;
+    height: 68px;
+  }
+}

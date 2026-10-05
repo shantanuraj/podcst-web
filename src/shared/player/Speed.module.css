@@ -1,0 +1,40 @@
+.chip {
+  min-width: 3.25rem;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in oklch, var(--color-ink) 18%, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+}
+
+.group {
+  border: 0;
+}
+
+.presets {
+  border: 0;
+  min-inline-size: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--color-ink) 8%, transparent);
+}
+
+.presets button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-secondary);
+}
+
+.presets button[aria-pressed="true"] {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-weight: 600;
+}

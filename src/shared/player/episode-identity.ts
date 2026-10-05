@@ -6,3 +6,6 @@ export function sameEpisode(first?: IEpisodeInfo, second?: IEpisodeInfo) {
     ? first.id === second.id
     : first.feed === second.feed && first.guid === second.guid;
 }
+
+export const episodeKey = (episode: IEpisodeInfo) =>
+  episode.id ? `id:${episode.id}` : `${episode.feed}\u001f${episode.guid}`;

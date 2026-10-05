@@ -13,6 +13,7 @@
   --color-accent: #e06b52;
   --color-accent-subtle: #2e1d1a;
   --color-cream: #2a2826;
+  --color-well: #141312;
 }
 
 :root.light {
@@ -28,6 +29,7 @@
   --color-accent: #c84b31;
   --color-accent-subtle: #fdf6f4;
   --color-cream: #f5f3f0;
+  --color-well: #f2f0ec;
 }
 
 @theme {
@@ -43,6 +45,7 @@
   --color-accent: var(--color-accent);
   --color-accent-subtle: var(--color-accent-subtle);
   --color-cream: var(--color-cream);
+  --color-well: var(--color-well);
   --color-ink-muted: var(--color-ink-muted);
   --color-ink-faint: var(--color-ink-faint);
   --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -87,7 +90,7 @@
   --dimen-header-height: 64px;
   --dimen-load-bar-height: 4px;
   --dimen-page-padding: 2rem;
-  --dimen-player-height: 80px;
+  --dimen-player-height: 84px;
   --dimen-player-z-index: 502;
   --dimen-podcast-info-padding: 2rem 2rem 0;
   --dimen-podcast-info-cover: 280px;
@@ -182,7 +185,7 @@ img {
 @media (max-width: 640px) {
   :root {
     --dimen-episode-list-item-size: 100px;
-    --dimen-player-height: 72px;
+    --dimen-player-height: 64px;
     --dimen-podcast-info-padding: 0;
     --dimen-podcast-info-cover: 100vw;
     --dimen-podcast-info-direction: column;

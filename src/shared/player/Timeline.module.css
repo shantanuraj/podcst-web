@@ -1,0 +1,101 @@
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-tertiary);
+}
+
+.time {
+  min-width: 3.25em;
+}
+
+.time:last-child {
+  text-align: right;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  display: flex;
+  gap: 3px;
+  height: 4px;
+}
+
+.segment {
+  flex-basis: 0;
+  min-width: 2px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--color-ink) 16%, transparent);
+}
+
+.segment > span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.track[data-buffering="true"] .segment {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.track input {
+  position: absolute;
+  inset: -10px 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.track input:disabled {
+  cursor: default;
+}
+
+.track:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.track:hover {
+  height: 6px;
+}
+
+.timeline[data-size="stage"] {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3) 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.timeline[data-size="stage"] .track {
+  order: -1;
+  flex-basis: 100%;
+  gap: 4px;
+  height: 6px;
+}
+
+.timeline[data-size="stage"] .segment {
+  border-radius: 3px;
+  background: color-mix(in oklch, var(--color-ink) 18%, transparent);
+}
+
+.timeline[data-size="stage"] .segment > span {
+  background: var(--color-ink);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track[data-buffering="true"] .segment {
+    animation: none;
+  }
+}

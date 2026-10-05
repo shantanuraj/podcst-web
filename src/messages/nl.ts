@@ -104,14 +104,27 @@ export const messages: Messages = {
     play: 'Afspelen',
     pause: 'Pauzeren',
     resume: 'Hervatten',
-    seekBack: 'Terugspoelen',
-    seekForward: 'Vooruitspoelen',
     speed: 'Afspeelsnelheid',
     mute: 'Dempen',
     unmute: 'Dempen opheffen',
     queue: 'Wachtrij bekijken',
     airplay: 'AirPlay',
     chromecast: 'Cast',
+    open: 'Nu spelend openen',
+    close: 'Nu spelend sluiten',
+    skipBack: '{seconds} seconden terug',
+    skipForward: '{seconds} seconden vooruit',
+    volume: 'Volume',
+    more: 'Meer',
+    stop: 'Afspelen stoppen',
+    stopHint: 'Bewaart je plek en de wachtrij',
+    markPlayed: 'Markeren als beluisterd',
+    chapterShort: 'Hfst. {number}',
+    chapterOf: 'Hoofdstuk {number} van {total}',
+    remaining: 'Nog {time}',
+    upNext: 'Hierna',
+    hours: '{hours} u {minutes} min',
+    minutes: '{minutes} min',
   },
 
   podcast: {
@@ -164,6 +177,15 @@ export const messages: Messages = {
   queue: {
     title: 'Wachtrij',
     empty: 'Voeg afleveringen toe aan de wachtrij om ze hier te zien',
+    summary:
+      '{count, plural, one {# aflevering} other {# afleveringen}} · nog {time}',
+    clear: 'Wachtrij wissen',
+    nowPlaying: 'Nu spelend',
+    upNext: 'Hierna',
+    playNext: 'Hierna afspelen',
+    remove: 'Verwijderen',
+    reorder:
+      '{title} verplaatsen. Sleep, of druk op Alt met de pijltjestoetsen',
   },
 
   regions: {

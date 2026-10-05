@@ -58,13 +58,13 @@ test('chapter identity includes feed or database ID, not GUID alone', () => {
 test('selection uses existing seek/start action for local audio and unloaded episodes', () => {
   const state = usePlayer.getState();
   const seek = spyOn(AudioUtils, 'seekTo').mockImplementation(() => {});
+  spyOn(AudioUtils, 'loaded').mockReturnValue(true);
   const start = mock();
   usePlayer.setState({
     queue: [episode],
     currentTrackIndex: 0,
     state: 'paused',
     playEpisode: start,
-    audioInitialised: true,
   });
   getSeekOrStartAt(usePlayer.getState())(episode, 30.5);
   expect(seek).toHaveBeenCalledWith(30.5);
@@ -82,7 +82,6 @@ test('restored paused episodes retain chapter seeks before Howler is initialized
       queue: [episode],
       currentTrackIndex: 0,
       state: 'paused',
-      audioInitialised: false,
       seekPosition: 0,
     });
     getSeekOrStartAt(usePlayer.getState())(episode, 30.5);
@@ -104,7 +103,6 @@ test('chapter selection cannot seek a different episode with a reused GUID', () 
       queue: [episode],
       currentTrackIndex: 0,
       state: 'paused',
-      audioInitialised: true,
     });
     getSeekOrStartAt(usePlayer.getState())(other, 12.25);
     expect(usePlayer.getState().queue).toEqual([episode, other]);

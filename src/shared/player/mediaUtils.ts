@@ -1,15 +1,7 @@
-/**
- * Hook into Chrome for Android's media session
- * https://developers.google.com/web/updates/2015/07/media-notifications
- * https://developers.google.com/web/updates/2017/02/media-session
- */
 import type { IEpisodeInfo } from '@/types';
 import type { IPlayerState } from './usePlayer';
 
-export const updatePlaybackMetadata = (
-  episode: IEpisodeInfo | undefined,
-  podcastTitle?: string,
-) => {
+export const updatePlaybackMetadata = (episode: IEpisodeInfo | undefined) => {
   if (
     typeof window === 'undefined' ||
     typeof window.navigator === 'undefined' ||
@@ -27,7 +19,7 @@ export const updatePlaybackMetadata = (
     return;
   }
 
-  const { title, author, episodeArt, cover } = episode;
+  const { title, author, episodeArt, cover, podcastTitle } = episode;
 
   const artwork = episodeArt || cover;
 
@@ -58,8 +50,8 @@ export const updatePlaybackHandlers = (playerState?: IPlayerState) => {
 
   const actionsAndHandlers = [
     ['play', playerState?.resumeEpisode ?? null],
-    ['pause', playerState ? () => playerState.setPlayerState('paused') : null],
-    ['stop', playerState ? () => playerState.setPlayerState('idle') : null],
+    ['pause', playerState?.pause ?? null],
+    ['stop', playerState?.stop ?? null],
     ['seekbackward', playerState?.seekBackward ?? null],
     ['seekforward', playerState?.seekForward ?? null],
     [
@@ -89,16 +81,16 @@ export const updatePlaybackState = (playbackState: {
 }) => {
   if (
     typeof window === 'undefined' ||
-    typeof window.navigator === 'undefined' ||
-    typeof window.navigator.mediaSession === 'undefined' ||
-    typeof window.navigator.mediaSession.playbackState !== 'function'
-  ) {
+    typeof window.navigator?.mediaSession?.setPositionState !== 'function' ||
+    !Number.isFinite(playbackState.duration) ||
+    playbackState.duration <= 0
+  )
     return;
-  }
-  const { mediaSession } = window.navigator;
   try {
-    // @ts-expect-error Outdated typings
-    mediaSession.playbackState?.(playbackState);
+    window.navigator.mediaSession.setPositionState({
+      ...playbackState,
+      position: Math.min(playbackState.position, playbackState.duration),
+    });
   } catch (err) {
     console.error('Cannot set playback state', err);
   }

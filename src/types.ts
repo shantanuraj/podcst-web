@@ -285,25 +285,6 @@ export interface IOPMLJson {
 
 export type PlayerState = 'playing' | 'paused' | 'idle' | 'buffering';
 
-export interface IPlaybackControls {
-  seekPosition: number;
-  setSeekPosition: (position: number) => void;
-  playEpisode: (episode: IEpisodeInfo, seekPosition?: number) => void;
-  resumeEpisode: () => void;
-  togglePlayback: () => void;
-  setPlayerState: (state: 'playing' | 'paused' | 'idle') => void;
-  seekBackward: () => void;
-  seekForward: () => void;
-  seekTo: (seconds: number) => void;
-  setVolume: (volume: number) => void;
-  mute: (muted: boolean) => void;
-  rate: number;
-  setRate: (rate: number) => void;
-  savedRate: number | undefined;
-  setOverridenRate: (rate: number | undefined) => void;
-  seekOrStartAt: (episode: IEpisodeInfo, seekPosition: number) => void;
-}
-
 export interface IShortUrl {
   feed: string;
   guid: string;

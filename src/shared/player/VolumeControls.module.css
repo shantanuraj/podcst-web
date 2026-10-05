@@ -1,0 +1,42 @@
+.volume {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.volume button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: inherit;
+}
+
+.volume input {
+  width: 80px;
+  height: 3px;
+  border-radius: 2px;
+  appearance: none;
+  background: linear-gradient(
+    to right,
+    var(--color-ink) var(--volume),
+    color-mix(in oklch, var(--color-ink) 18%, transparent) var(--volume)
+  );
+  cursor: pointer;
+}
+
+.volume input::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+}
+
+.volume input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+}
