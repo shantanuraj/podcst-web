@@ -1,0 +1,17 @@
+name: Set up Android
+description: Install the Java, Rust and Android toolchains used by the native client
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: zulu
+        java-version: 17
+    - uses: gradle/actions/setup-gradle@v4
+    - shell: bash
+      run: rustup toolchain install stable --profile minimal --target aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+    - shell: bash
+      run: |
+        set +o pipefail
+        yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+          "ndk;30.0.16248370" "cmake;3.30.3" "platforms;android-37.0"

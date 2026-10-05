@@ -49,7 +49,6 @@ jobs:
           PY
       - name: Exercise the packaged bridge on iOS
         run: |
-          xcrun simctl boot "$PODCST_TEST_DEVICE"
           xcrun simctl bootstatus "$PODCST_TEST_DEVICE" -b
           xcrun simctl spawn "$PODCST_TEST_DEVICE" "$PWD/audio-engine/target/native-tests/swift-simulator-$(uname -m)"
       - name: Test playback integration
