@@ -7,10 +7,11 @@ export interface PlaybackProgress {
   position: number;
 }
 
-export async function getCurrentProgress(
+export async function getRecentProgress(
   userId: string,
-): Promise<PlaybackProgress | null> {
-  const [row] = await sql`
+  limit: number,
+): Promise<PlaybackProgress[]> {
+  const rows = await sql`
     SELECT
       pp.position,
       e.id as episode_id,
@@ -38,12 +39,10 @@ export async function getCurrentProgress(
     WHERE pp.user_id = ${userId} AND ${podcastAccess(sql, userId)}
       AND pp.completed = false
     ORDER BY pp.updated_at DESC
-    LIMIT 1
+    LIMIT ${limit}
   `;
 
-  if (!row) return null;
-
-  return {
+  return rows.map((row) => ({
     position: row.position,
     episode: {
       id: row.episode_id,
@@ -68,7 +67,33 @@ export async function getCurrentProgress(
         type: row.file_type || 'audio/mpeg',
       },
     },
-  };
+  }));
+}
+
+export async function getCurrentProgress(
+  userId: string,
+): Promise<PlaybackProgress | null> {
+  return (await getRecentProgress(userId, 1))[0] ?? null;
+}
+
+export async function getEpisodeProgress(
+  userId: string,
+  episodeIds: number[],
+): Promise<EpisodeProgress[]> {
+  const rows = await sql`
+    SELECT pp.episode_id, pp.position, pp.completed
+    FROM playback_progress pp
+    JOIN episodes e ON e.id = pp.episode_id
+    JOIN podcasts p ON p.id = e.podcast_id
+    WHERE pp.user_id = ${userId} AND pp.episode_id = ANY(${episodeIds}::bigint[])
+      AND ${podcastAccess(sql, userId)}
+    ORDER BY pp.episode_id
+  `;
+  return rows.map((row) => ({
+    episodeId: Number(row.episode_id),
+    position: row.position,
+    completed: row.completed,
+  }));
 }
 
 export async function getPodcastProgress(
@@ -109,21 +134,4 @@ export async function saveProgress(
     RETURNING episode_id
   `;
   return !!saved;
-}
-
-export async function getEpisodeProgress(
-  userId: string,
-  episodeId: number,
-): Promise<{ position: number; completed: boolean } | null> {
-  const [row] = await sql`
-    SELECT pp.position, pp.completed
-    FROM playback_progress pp
-    JOIN episodes e ON e.id = pp.episode_id
-    JOIN podcasts p ON p.id = e.podcast_id
-    WHERE pp.user_id = ${userId} AND pp.episode_id = ${episodeId}
-      AND ${podcastAccess(sql, userId)}
-  `;
-
-  if (!row) return null;
-  return { position: row.position, completed: row.completed };
 }

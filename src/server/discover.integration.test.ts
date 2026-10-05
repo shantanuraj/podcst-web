@@ -205,5 +205,20 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
     expect(await titles()).toEqual(episodes.map(({ id }) => Number(id)));
     expect(await titles('a')).toEqual([Number(episodes[0].id)]);
     expect(await titles('b')).toEqual(episodes.map(({ id }) => Number(id)));
+    expect(
+      (
+        await server.getEpisodeProgress(
+          'a',
+          episodes.map(({ id }) => Number(id)),
+        )
+      ).map(({ completed }) => completed),
+    ).toHaveLength(2);
+    expect(
+      await server.getEpisodeProgress('b', [Number(episodes[0].id)]),
+    ).toEqual([]);
+    const recent = await server.getRecentProgress('a', 3);
+    expect(
+      recent.map(({ episode, position }) => [episode.id, position]),
+    ).toEqual([[Number(episodes[0].id), 120]]);
   });
 });

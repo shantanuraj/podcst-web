@@ -255,9 +255,9 @@ try {
     await (await progress.GET(request('/api/progress'))).json(),
     null,
   );
-  assert.equal(
-    await progressStore.getEpisodeProgress('other', episodeId),
-    null,
+  assert.deepEqual(
+    await progressStore.getEpisodeProgress('other', [episodeId]),
+    [],
   );
   assert.equal(
     (

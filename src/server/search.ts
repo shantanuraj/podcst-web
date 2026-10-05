@@ -1,5 +1,5 @@
 import type postgres from 'postgres';
-import type { IPodcastSearchResult } from '@/types';
+import type { IEpisodeInfo, IPodcastSearchResult } from '@/types';
 import {
   appleIdentities,
   locatorMatches,
@@ -35,16 +35,77 @@ export async function matchSearchResults(
   });
 }
 
+export const prefixQuery = (term: string) =>
+  term
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((word) => `${word}:*`)
+    .join(' & ');
+
+const EPISODE_CANDIDATES = 1000;
+
+export async function searchEpisodes(
+  sql: postgres.ISql,
+  term: string,
+  limit = 20,
+): Promise<IEpisodeInfo[]> {
+  const searchQuery = prefixQuery(term);
+  if (!searchQuery) return [];
+  const rows = await sql`
+    WITH query AS (SELECT to_tsquery('english', ${searchQuery}) AS q),
+    candidates AS (
+      SELECT c.episode_id, c.title, c.summary, c.duration, c.episode_art,
+             c.file_url, c.file_length, c.file_type,
+             ts_rank_cd(to_tsvector('english', c.title), query.q) AS rank
+      FROM episode_content c, query
+      WHERE to_tsvector('english', c.title) @@ query.q
+      LIMIT ${EPISODE_CANDIDATES}
+    )
+    SELECT candidates.*, e.guid, e.published, e.podcast_id,
+           p.feed_url, p.title AS podcast_title, p.cover, p.explicit,
+           a.name AS author
+    FROM candidates
+    JOIN episodes e ON e.id = candidates.episode_id
+    JOIN podcasts p ON p.id = e.podcast_id
+    JOIN authors a ON a.id = p.author_id
+    WHERE p.owner_user_id IS NULL
+    ORDER BY candidates.rank DESC, e.published DESC NULLS LAST
+    LIMIT ${limit}
+  `;
+  return rows.map((row) => ({
+    id: Number(row.episode_id),
+    podcastId: Number(row.podcast_id),
+    isPrivate: false,
+    feed: row.feed_url,
+    podcastTitle: row.podcast_title,
+    guid: row.guid,
+    title: row.title,
+    summary: row.summary,
+    showNotes: row.summary || '',
+    published: row.published?.getTime() ?? null,
+    duration: row.duration,
+    cover: row.cover,
+    episodeArt: row.episode_art,
+    explicit: row.explicit,
+    link: null,
+    author: row.author,
+    file: {
+      url: row.file_url,
+      length: Number(row.file_length) || 0,
+      type: row.file_type || 'audio/mpeg',
+    },
+  }));
+}
+
 export async function searchPodcasts(
   sql: postgres.ISql,
   term: string,
   limit = 20,
 ): Promise<IPodcastSearchResult[]> {
-  const searchQuery = term
-    .trim()
-    .split(/\s+/)
-    .map((word) => word + ':*')
-    .join(' & ');
+  const searchQuery = prefixQuery(term);
+  if (!searchQuery) return [];
 
   const rows = await sql`
     SELECT

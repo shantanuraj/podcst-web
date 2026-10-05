@@ -4,6 +4,8 @@ import postgres from 'postgres';
 import { createSchemaFixture } from '../../scripts/lib/schema-fixture';
 import {
   matchSearchResults,
+  prefixQuery,
+  searchEpisodes,
   searchPodcasts,
   searchPodcastsByFeedUrl,
 } from './search';
@@ -139,5 +141,46 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     expect(
       await searchPodcastsByFeedUrl(sql, 'https://example.com/missing'),
     ).toBeNull();
+  });
+  test('episode search stems words, ranks title matches and hides private feeds', async () => {
+    await sql`INSERT INTO users (id, email) VALUES ('owner', 'owner@example.com') ON CONFLICT DO NOTHING`;
+    await sql`UPDATE podcasts SET owner_user_id = 'owner' WHERE id = 154`;
+    await sql`
+      INSERT INTO episodes (id, podcast_id, guid, published) VALUES
+        (9001, 152, 'magnetic', '2026-09-19'),
+        (9002, 153, 'garlic', '2026-09-12'),
+        (9003, 152, 'unrelated', '2026-09-30'),
+        (9004, 154, 'private', '2026-09-30'),
+        (9005, 153, 'office', '2026-08-30')
+    `;
+    await sql`
+      INSERT INTO episode_content (episode_id, title, file_url) VALUES
+        (9001, 'Magnetic fields and the northern lights', 'https://example.com/1.mp3'),
+        (9002, 'Foraging in a field of wild garlic', 'https://example.com/2.mp3'),
+        (9003, 'Rural broadband', 'https://example.com/3.mp3'),
+        (9004, 'Notes from the field', 'https://example.com/4.mp3'),
+        (9005, 'The field office fire, part one', 'https://example.com/5.mp3')
+    `;
+    const ids = async (term: string) =>
+      (await searchEpisodes(sql, term)).map(({ id }) => id);
+    expect((await ids('field')).sort()).toEqual([9001, 9002, 9005]);
+    expect(await ids('field office')).toEqual([9005]);
+    expect(await ids('fie')).toContain(9001);
+    expect(await ids('&&& !!')).toEqual([]);
+    const [episode] = await searchEpisodes(sql, 'garlic');
+    expect(episode).toMatchObject({
+      id: 9002,
+      podcastId: 153,
+      podcastTitle: 'Search Results',
+      isPrivate: false,
+      file: { url: 'https://example.com/2.mp3' },
+    });
+  });
+
+  test('prefix queries keep only letters and numbers', () => {
+    expect(prefixQuery(" Rock & Roll's 2026! ")).toBe(
+      'rock:* & roll:* & s:* & 2026:*',
+    );
+    expect(prefixQuery('***')).toBe('');
   });
 });

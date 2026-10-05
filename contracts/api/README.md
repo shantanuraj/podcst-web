@@ -292,6 +292,8 @@ Removes the subscription. Always returns `Success` when a session and `podcastId
 
 Returns `Progress?`: `null` when nothing qualifies, otherwise `{ "position": integer, "episode": Episode }` for the most recently updated progress row that is not completed and whose podcast is visible (`getCurrentProgress` in `src/server/progress.ts`). Private-feed headers on 200. 401 `{message: "Unauthorized"}`. Fixtures: `progress.empty.json`, `progress.current.json` (derived), `progress.unauthorized.json` (captured).
 
+Query `recent` (1–10) instead returns `Progress[]`: the account's most recently updated incomplete episodes, newest first, with the same visibility rule (`getRecentProgress`). Query `episodeIds`, 1–200 comma-separated positive integers, returns `EpisodeProgress[]` for those episodes (`getEpisodeProgress`). Either returns 400 `{message: ...}` for an out-of-range value.
+
 Query `podcastId` instead returns `EpisodeProgress[]`, `{ "episodeId": integer, "position": integer, "completed": boolean }` ordered by episode ID, for every progress row the account has in that visible podcast. 400 `{message: "podcastId must be a positive integer"}`.
 
 ### `PUT /api/progress` — required
@@ -299,6 +301,10 @@ Query `podcastId` instead returns `EpisodeProgress[]`, `{ "episodeId": integer, 
 Body: `{ "episodeId": number, "position": number, "completed"?: boolean }`. The position is floored to whole seconds; `completed` is true only for the JSON value `true`. Upserts one row per user and episode; the last write wins regardless of position (`saveProgress`). Returns `Success`, 400 `{message: "episodeId and position required"}`, or 404 `{message: "Episode not found"}` when the episode is not visible. Fixtures: `progress-save.success.json`, `progress-save.invalid.json`.
 
 There is no `POST` handler; a `POST` returns 405. The web client saves on page exit with a keepalive `PUT` (`usePlaybackSync.ts`).
+
+### `GET /api/search/episodes?term=` — public
+
+Searches episode titles of public podcasts whose episode content is stored (`searchEpisodes` in `src/server/search.ts`). Words are reduced to letters and numbers and matched as English prefixes (`prefixQuery`), so `field` also matches `fields`; at most 1,000 matches are ranked, by title rank then newest. Returns up to 20 `Episode` objects with `podcastId` and `podcastTitle`, cacheable for five minutes. Feed URLs, empty terms and terms over 200 characters return 400 `{message: "A search term is required"}`.
 
 ### `GET /api/noteworthy` — public
 
@@ -308,7 +314,7 @@ Query: `locale` (default `us`) and optional `category`, a top-level genre ID. Re
 
 Returns up to four public `TopPodcast` items: podcasts at least three subscribers of `id` also follow, by shared listeners, then shows of the same top-level category from the `locale` chart in rank order (`related` in `src/server/discover.ts`). Private podcasts return 404 `{message: "Podcast not found"}`; 400 `{message: "parameter \`id\` must be a positive integer"}`.
 
-The chart extensions, `unplayed`, podcast progress, noteworthy and related are used by the web client; they have no fixtures in `index.json` until a native client adopts them, because both native fixture suites fail on endpoints they do not call.
+The chart extensions, `unplayed`, the progress variants, episode search, noteworthy and related are used by the web client; they have no fixtures in `index.json` until a native client adopts them, because both native fixture suites fail on endpoints they do not call.
 
 ### `GET /api/account` — required
 
