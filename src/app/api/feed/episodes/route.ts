@@ -59,6 +59,8 @@ export async function GET(request: NextRequest) {
       sortDir: validSortDirs.includes(sortDir as SortDirection)
         ? (sortDir as SortDirection)
         : 'desc',
+      unplayedBy:
+        params.get('unplayed') === 'true' && userId ? userId : undefined,
     },
     userId,
   );

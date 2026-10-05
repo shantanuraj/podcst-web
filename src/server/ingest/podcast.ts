@@ -6,6 +6,7 @@ import type {
   IPodcastInfo,
 } from '@/types';
 import { sql } from '../db';
+import { genreColumns, genreJoin, genresOf } from '../genres';
 import { canAccessPodcast, podcastAccess } from '../podcast-access';
 import {
   type EpisodePageOptions,
@@ -164,9 +165,11 @@ async function readPodcastInfoById(
   userId: string | null = null,
 ): Promise<IPodcastInfo | null> {
   const [podcast] = await sql`
-    SELECT p.*, a.name as author_name
+    SELECT p.*, a.name as author_name, ${genreColumns(sql)},
+      (SELECT min(e.published) FROM episodes e WHERE e.podcast_id = p.id) AS first_published
     FROM podcasts p
     JOIN authors a ON a.id = p.author_id
+    ${genreJoin(sql, 'p')}
     WHERE p.id = ${id} AND ${podcastAccess(sql, userId)}
   `;
 
@@ -185,6 +188,8 @@ async function readPodcastInfoById(
     explicit: podcast.explicit,
     keywords: [],
     episodeCount: podcast.episode_count || 0,
+    ...genresOf(podcast),
+    firstPublished: podcast.first_published?.getTime() ?? null,
   };
 }
 

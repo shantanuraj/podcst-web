@@ -92,6 +92,8 @@ No current route emits `feed_url`. The `feed_url` and `count` fallbacks in the i
 
 Query: `locale` (default `us`), `limit` (parsed as an integer, clamped to 2–200, default 30; `src/app/api/top/route.ts`, `src/data/constants.ts`). Returns `TopPodcast[]` in chart order, served from Redis when every cached podcast is still public (`src/app/api/top/top.ts`). An unknown locale returns `[]`. No private-feed headers.
 
+Each item may carry `genre` and `category`, both `{ "id": integer, "name": string }` or null: the podcast's primary Apple genre and that genre's top-level category (they are equal for a top-level genre). Both come from the chart lookup's `genreIds` (`storeGenres` in `src/server/ingest/charts.ts`). `previousRank` is the podcast's rank on the earliest stored chart day within the week before the latest one (`chart_history`), or `null` when it was not charted that day; the key is absent when no earlier day exists yet. Movement is `previousRank - index - 1`.
+
 Fixtures: `top.us.json`, `top.nl.json` (captured), `top.explicit.json` (derived from `src/server/ingest/top.ts`; shows `itunes_id: null` and `"explicit"`).
 
 ### `POST /api/search` — optional; required for feed URLs
@@ -141,7 +143,7 @@ Body: `{ "url": string }` (at most 4,096 characters). Indexes the feed with the 
 
 ### `GET /api/feed/info?id=` — optional
 
-Returns `PodcastInfo` (`readPodcastInfoById`): the `Podcast` fields without `episodes`, plus `episodeCount` (the stored count). It has no `thumbnail`. Errors: 400 `{message: "parameter \`id\` required"}` or `{message: "parameter \`id\` must be a number"}`; 404 `{message: "podcast not found"}` (lower-case, unlike the other routes). Successful and 404 responses carry private-feed headers.
+Returns `PodcastInfo` (`readPodcastInfoById`): the `Podcast` fields without `episodes`, plus `episodeCount` (the stored count), `genre` and `category` (as in `GET /api/top`) and `firstPublished` (milliseconds of the earliest stored episode, or null). It has no `thumbnail`. Errors: 400 `{message: "parameter \`id\` required"}` or `{message: "parameter \`id\` must be a number"}`; 404 `{message: "podcast not found"}` (lower-case, unlike the other routes). Successful and 404 responses carry private-feed headers.
 
 Fixtures: `feed-info.json`, `feed-info.missing-id.json` (captured), `feed-info.private.json` (derived from `readPodcastInfoById`).
 
@@ -157,6 +159,7 @@ Query (`src/app/api/feed/episodes/route.ts`, `readEpisodePage` in `src/server/in
 | `sortBy` | `published` (default), `title` or `duration`; other values fall back to `published`. |
 | `sortDir` | `desc` (default) or `asc`; other values fall back to `desc`. |
 | `search` | Case-insensitive substring match against title or show notes. |
+| `unplayed` | `true` excludes episodes the signed-in account completed; ignored without a session. |
 
 Ordering is the sort column, then episode ID in the same direction. Only `duration` sorts nulls last.
 
@@ -289,11 +292,23 @@ Removes the subscription. Always returns `Success` when a session and `podcastId
 
 Returns `Progress?`: `null` when nothing qualifies, otherwise `{ "position": integer, "episode": Episode }` for the most recently updated progress row that is not completed and whose podcast is visible (`getCurrentProgress` in `src/server/progress.ts`). Private-feed headers on 200. 401 `{message: "Unauthorized"}`. Fixtures: `progress.empty.json`, `progress.current.json` (derived), `progress.unauthorized.json` (captured).
 
+Query `podcastId` instead returns `EpisodeProgress[]`, `{ "episodeId": integer, "position": integer, "completed": boolean }` ordered by episode ID, for every progress row the account has in that visible podcast. 400 `{message: "podcastId must be a positive integer"}`.
+
 ### `PUT /api/progress` — required
 
 Body: `{ "episodeId": number, "position": number, "completed"?: boolean }`. The position is floored to whole seconds; `completed` is true only for the JSON value `true`. Upserts one row per user and episode; the last write wins regardless of position (`saveProgress`). Returns `Success`, 400 `{message: "episodeId and position required"}`, or 404 `{message: "Episode not found"}` when the episode is not visible. Fixtures: `progress-save.success.json`, `progress-save.invalid.json`.
 
 There is no `POST` handler; a `POST` returns 405. The web client saves on page exit with a keepalive `PUT` (`usePlaybackSync.ts`).
+
+### `GET /api/noteworthy` — public
+
+Query: `locale` (default `us`) and optional `category`, a top-level genre ID. Returns up to 14 `TopPodcast` items from that region's chart, each with `firstPublished`: shows whose first stored episode is at most 180 days old, newest debut first, then charted shows below rank 30 in rank order (`noteworthy` in `src/server/discover.ts`). 400 `{message: "parameter \`category\` must be an integer"}`.
+
+### `GET /api/feed/related?id=` — public
+
+Returns up to four public `TopPodcast` items: podcasts at least three subscribers of `id` also follow, by shared listeners, then shows of the same top-level category from the `locale` chart in rank order (`related` in `src/server/discover.ts`). Private podcasts return 404 `{message: "Podcast not found"}`; 400 `{message: "parameter \`id\` must be a positive integer"}`.
+
+The chart extensions, `unplayed`, podcast progress, noteworthy and related are used by the web client; they have no fixtures in `index.json` until a native client adopts them, because both native fixture suites fail on endpoints they do not call.
 
 ### `GET /api/account` — required
 

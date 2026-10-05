@@ -1,4 +1,4 @@
-import type { IEpisodeInfo } from '@/types';
+import type { EpisodeProgress, IEpisodeInfo } from '@/types';
 import { sql } from './db';
 import { podcastAccess } from './podcast-access';
 
@@ -69,6 +69,26 @@ export async function getCurrentProgress(
       },
     },
   };
+}
+
+export async function getPodcastProgress(
+  userId: string,
+  podcastId: number,
+): Promise<EpisodeProgress[]> {
+  const rows = await sql`
+    SELECT pp.episode_id, pp.position, pp.completed
+    FROM playback_progress pp
+    JOIN episodes e ON e.id = pp.episode_id
+    JOIN podcasts p ON p.id = e.podcast_id
+    WHERE pp.user_id = ${userId} AND e.podcast_id = ${podcastId}
+      AND ${podcastAccess(sql, userId)}
+    ORDER BY pp.episode_id
+  `;
+  return rows.map((row) => ({
+    episodeId: Number(row.episode_id),
+    position: row.position,
+    completed: row.completed,
+  }));
 }
 
 export async function saveProgress(

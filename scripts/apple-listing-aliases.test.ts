@@ -44,6 +44,7 @@ const chart = (itunesId: number, rank: number, url = feed): ChartPodcast => ({
   cover: '',
   thumbnail: null,
   explicit: false,
+  genres: [],
   count: 0,
   verifiedAt: new Date().toISOString(),
 });

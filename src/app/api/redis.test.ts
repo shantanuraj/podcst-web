@@ -52,7 +52,7 @@ describe('Redis cache freshness', () => {
       entity: [podcast],
       timestamp: now - age,
     });
-    expect(get).toHaveBeenCalledWith('top/us');
+    expect(get).toHaveBeenCalledWith('top@2/us');
   });
 
   test('chart data expires after one hour', async () => {

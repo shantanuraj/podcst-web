@@ -1,12 +1,30 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
 import { privateFeedHeaders as headers } from '@/server/podcast-access';
-import { getCurrentProgress, saveProgress } from '@/server/progress';
+import {
+  getCurrentProgress,
+  getPodcastProgress,
+  saveProgress,
+} from '@/server/progress';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const podcast = request.nextUrl.searchParams.get('podcastId');
+  if (podcast !== null) {
+    const podcastId = Number(podcast);
+    if (!Number.isSafeInteger(podcastId) || podcastId <= 0)
+      return NextResponse.json(
+        { message: 'podcastId must be a positive integer' },
+        { status: 400 },
+      );
+    return NextResponse.json(
+      await getPodcastProgress(session.userId, podcastId),
+      { headers },
+    );
   }
 
   const progress = await getCurrentProgress(session.userId);

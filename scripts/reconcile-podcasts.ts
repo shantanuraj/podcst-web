@@ -52,9 +52,11 @@ const tables = {
   feed_poll_state: ['t.podcast_id', 't.podcast_id'],
   podcasts_genres: ['t.podcast_id', 't.podcast_id, t.genre_id'],
   top_podcasts: ['t.podcast_id', 't.country_id, t.genre_id, t.rank'],
+  chart_history: ['t.podcast_id', 't.country_id, t.day, t.podcast_id'],
 } as const;
 
 const expectedForeignKeys = [
+  ['chart_history', 'podcast_id', 'podcasts', 'id'],
   ['episode_content', 'episode_id', 'episodes', 'id'],
   ['episodes', 'podcast_id', 'podcasts', 'id'],
   ['feed_poll_state', 'podcast_id', 'podcasts', 'id'],
@@ -249,6 +251,13 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     if (!prior || row.rank < prior.rank)
       charts.set(key, { ...row, podcast_id: plan.canonicalId });
   }
+  const history = new Map<string, Row>();
+  for (const row of state.chart_history) {
+    const key = stable([row.country_id, row.day]);
+    const prior = history.get(key);
+    if (!prior || row.rank < prior.rank)
+      history.set(key, { ...row, podcast_id: plan.canonicalId });
+  }
   const catalog = {
     podcasts_genres: [...genres.values()].sort(
       (a, b) => a.genre_id - b.genre_id,
@@ -256,6 +265,11 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     top_podcasts: [...charts.values()].sort((a, b) =>
       stable([a.country_id, a.genre_id]).localeCompare(
         stable([b.country_id, b.genre_id]),
+      ),
+    ),
+    chart_history: [...history.values()].sort((a, b) =>
+      stable([a.country_id, a.day]).localeCompare(
+        stable([b.country_id, b.day]),
       ),
     ),
   };

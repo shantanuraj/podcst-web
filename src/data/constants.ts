@@ -26,7 +26,7 @@ export const MAX_PODCASTS_COUNT = 200;
 /**
  * Redis key for Top podcasts
  */
-export const KEY_TOP_PODCASTS = 'top';
+export const KEY_TOP_PODCASTS = 'top@2';
 
 /**
  * Redis key for parsed Feed

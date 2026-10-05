@@ -515,6 +515,7 @@ describe.skipIf(!process.env.PG_BIN)(
             cover: 'art',
             thumbnail: null,
             explicit: false,
+            genres: [],
             count: 0,
             rank: 1,
           },

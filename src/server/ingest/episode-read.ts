@@ -35,6 +35,7 @@ export interface EpisodePageOptions {
   search?: string;
   sortBy?: SortField;
   sortDir?: SortDirection;
+  unplayedBy?: string;
 }
 
 interface EpisodeRow {
@@ -59,11 +60,20 @@ export async function readEpisodePage(
     search,
     sortBy = 'published',
     sortDir = 'desc',
+    unplayedBy,
   }: EpisodePageOptions,
 ) {
-  const filter = search
-    ? sql`AND (c.title ILIKE ${`%${search}%`} OR c.summary ILIKE ${`%${search}%`})`
-    : sql``;
+  const filter = sql`
+    ${search ? sql`AND (c.title ILIKE ${`%${search}%`} OR c.summary ILIKE ${`%${search}%`})` : sql``}
+    ${
+      unplayedBy
+        ? sql`AND NOT EXISTS (
+            SELECT 1 FROM playback_progress pp
+            WHERE pp.user_id = ${unplayedBy} AND pp.episode_id = e.id AND pp.completed
+          )`
+        : sql``
+    }
+  `;
   const sortColumn =
     sortBy === 'title'
       ? sql`c.title`

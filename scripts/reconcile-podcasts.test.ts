@@ -371,6 +371,7 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
       'feed_poll_state',
       'podcasts_genres',
       'top_podcasts',
+      'chart_history',
     ]) {
       const rows = artifact.snapshot[table];
       if (!rows.length) continue;
@@ -668,6 +669,7 @@ CREATE TRIGGER fixture_trigger BEFORE UPDATE ON podcasts FOR EACH ROW EXECUTE FU
     await sql`INSERT INTO countries(id,name) VALUES ('aa','First'),('bb','Second')`;
     await sql`INSERT INTO podcasts_genres VALUES (1,1),(2,1),(2,2)`;
     await sql`INSERT INTO top_podcasts(country_id,genre_id,rank,podcast_id,fetched_at) VALUES ('aa',0,5,1,'2026-01-02'),('aa',0,2,2,'2026-01-01'),('aa',0,9,2,'2026-01-03'),('bb',0,7,2,'2026-01-04'),('aa',0,3,3,'2026-01-05')`;
+    await sql`INSERT INTO chart_history(country_id,day,podcast_id,rank) VALUES ('aa','2026-01-01',1,5),('aa','2026-01-01',2,2),('aa','2026-01-02',1,4),('bb','2026-01-02',2,7),('aa','2026-01-02',3,1)`;
     const { result } = await inspect();
     await expect(apply()).rejects.toThrow(
       'Catalog reference changes require exact review',
@@ -703,6 +705,16 @@ CREATE TRIGGER fixture_trigger BEFORE UPDATE ON podcasts FOR EACH ROW EXECUTE FU
         await sql`SELECT fetched_at='2026-01-01'::timestamptz AS preserved FROM top_podcasts WHERE country_id='aa' AND rank=2`
       )[0].preserved,
     ).toBe(true);
+    expect(
+      Array.from(
+        await sql`SELECT country_id,day::text,podcast_id::int,rank FROM chart_history ORDER BY country_id,day,podcast_id`,
+      ),
+    ).toEqual([
+      { country_id: 'aa', day: '2026-01-01', podcast_id: 1, rank: 2 },
+      { country_id: 'aa', day: '2026-01-02', podcast_id: 1, rank: 4 },
+      { country_id: 'aa', day: '2026-01-02', podcast_id: 3, rank: 1 },
+      { country_id: 'bb', day: '2026-01-02', podcast_id: 1, rank: 7 },
+    ]);
   });
 
   test('does not retire accepted duplicate Apple aliases under primary-ID approval', async () => {

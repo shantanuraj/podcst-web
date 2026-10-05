@@ -21,6 +21,7 @@ export interface ChartPodcast {
   count: number;
   rank: number;
   verifiedAt: string;
+  genres: number[];
 }
 
 interface ITunesFeedResponse {
@@ -37,6 +38,7 @@ interface ITunesPodcast {
   artworkUrl600?: string;
   collectionExplicitness?: string;
   trackCount?: number;
+  genreIds?: string[];
 }
 
 interface ITunesLookupResponse {
@@ -104,7 +106,15 @@ export async function fetchTopFromItunes(
       throw new Error(`Apple returned invalid metadata for podcast ${id}`);
     }
     const count = podcast.trackCount;
+    const genres = [
+      ...new Set(
+        (podcast.genreIds ?? [])
+          .map(Number)
+          .filter((genre) => Number.isSafeInteger(genre) && genre !== 26),
+      ),
+    ];
     podcasts.set(id, {
+      genres,
       itunesId: id,
       rank,
       verifiedAt,
@@ -224,9 +234,39 @@ export async function storeTopPodcasts(
         INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id, fetched_at)
         VALUES (${locale}, 0, ${p.rank}, ${podcast.id}, now())
       `;
+      await tx`
+        INSERT INTO chart_history (country_id, day, podcast_id, rank)
+        VALUES (${locale}, (now() AT TIME ZONE 'UTC')::date, ${podcast.id}, ${p.rank})
+        ON CONFLICT (country_id, day, podcast_id) DO UPDATE SET rank = EXCLUDED.rank
+      `;
+      await storeGenres(tx, Number(podcast.id), p.genres);
     }
     return { stored: storedSources.size, newPodcasts };
   });
+}
+
+async function storeGenres(
+  tx: postgres.TransactionSql,
+  podcastId: number,
+  genres: number[],
+) {
+  if (!genres.length) return;
+  const known = await tx`
+    SELECT id FROM genres WHERE id = ANY(${genres}::int[]) AND id <> 26
+  `;
+  const ids = new Set(known.map(({ id }) => Number(id)));
+  const stored = genres.filter((genre) => ids.has(genre));
+  if (!stored.length) return;
+  await tx`UPDATE podcasts SET primary_genre_id = ${stored[0]} WHERE id = ${podcastId}`;
+  await tx`
+    DELETE FROM podcasts_genres
+    WHERE podcast_id = ${podcastId} AND genre_id <> ALL(${stored}::int[])
+  `;
+  await tx`
+    INSERT INTO podcasts_genres (podcast_id, genre_id)
+    SELECT ${podcastId}, unnest(${stored}::int[])
+    ON CONFLICT DO NOTHING
+  `;
 }
 
 export async function refreshTopCharts(

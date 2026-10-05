@@ -108,6 +108,17 @@ export namespace iTunes {
 /**
  * Adapted Podcast interface
  */
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+export interface EpisodeProgress {
+  episodeId: number;
+  position: number;
+  completed: boolean;
+}
+
 export interface IPodcast {
   isPrivate?: boolean;
   /**
@@ -150,6 +161,9 @@ export interface IPodcast {
    * Podcast's episode count
    */
   count: number;
+  genre?: Genre | null;
+  category?: Genre | null;
+  previousRank?: number | null;
 }
 
 /**
@@ -224,6 +238,9 @@ export interface IPodcastInfo {
   explicit: boolean;
   keywords: string[];
   episodeCount: number;
+  genre: Genre | null;
+  category: Genre | null;
+  firstPublished: number | null;
 }
 
 /**

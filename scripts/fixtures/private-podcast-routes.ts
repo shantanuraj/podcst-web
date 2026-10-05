@@ -145,8 +145,12 @@ try {
     ).status,
     200,
   );
-  assert.equal((await progress.GET()).status, 200);
-  assert.equal((await (await progress.GET()).json()).episode.isPrivate, true);
+  assert.equal((await progress.GET(request('/api/progress'))).status, 200);
+  assert.equal(
+    (await (await progress.GET(request('/api/progress'))).json()).episode
+      .isPrivate,
+    true,
+  );
   assert.equal((await (await subscriptions.GET()).json())[0].isPrivate, true);
   assert.equal(
     (await readers.getEpisodeById(episodeId, 'owner'))?.isPrivate,
@@ -232,7 +236,10 @@ try {
       .status,
     404,
   );
-  assert.equal(await (await progress.GET()).json(), null);
+  assert.equal(
+    await (await progress.GET(request('/api/progress'))).json(),
+    null,
+  );
   assert.deepEqual(
     await (
       await subscriptions.POST(
@@ -244,7 +251,10 @@ try {
   await sql`INSERT INTO subscriptions (user_id, podcast_id) VALUES ('other', ${id})`;
   await sql`INSERT INTO playback_progress (user_id, episode_id, position) VALUES ('other', ${episodeId}, 88)`;
   assert.deepEqual(await (await subscriptions.GET()).json(), []);
-  assert.equal(await (await progress.GET()).json(), null);
+  assert.equal(
+    await (await progress.GET(request('/api/progress'))).json(),
+    null,
+  );
   assert.equal(
     await progressStore.getEpisodeProgress('other', episodeId),
     null,

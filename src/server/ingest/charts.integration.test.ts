@@ -28,6 +28,7 @@ const podcast = (itunesId: number, rank = 1): ChartPodcast => ({
   cover: 'https://example.com/cover.jpg',
   thumbnail: null,
   explicit: false,
+  genres: [],
   count: 10,
 });
 
