@@ -5,6 +5,9 @@ plugins {
 
 android {
     namespace = "app.podcst.data"
+    testOptions.unitTests.all {
+        it.systemProperty("podcst.contracts", rootProject.file("../contracts").absolutePath)
+    }
 }
 
 dependencies {

@@ -196,20 +196,21 @@ final class StarStore {
         stars = []
     }
 
-    func resume() {
+    func resume(accountID: String?) {
+        guard self.accountID == accountID else { return }
         authenticationPaused = false
         Task { await refresh() }
     }
 
-    func switchAccount(to id: String?) throws {
+    func switchAccount(to id: String?, activate: Bool = true) throws {
         suspend()
         var next = root
         if accountID != nil { next[key]?.episodes = [:]; next[key]?.snapshot = nil }
         if let id { Self.mergeGuest(&next, account: id) }
         try commit(next)
         accountID = id
-        ready = readable
-        authenticationPaused = false
+        ready = readable && activate
+        authenticationPaused = !activate
         nextAttempt = .distantPast
         publish()
     }

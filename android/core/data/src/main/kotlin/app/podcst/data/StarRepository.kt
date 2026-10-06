@@ -51,6 +51,7 @@ data class StarsState(
     val pending: Boolean = false,
     val error: String? = null,
     val ready: Boolean = true,
+    val revision: Long = 0,
 )
 
 class StarRepository(
@@ -90,7 +91,7 @@ class StarRepository(
         val token = generation.get()
         val account = state.value.accountId
         if (!state.value.ready || !validStarId(id)) {
-            state.update { it.copy(error = "A canonical episode ID and an active account scope are required.") }
+            view(token) { it.copy(error = "A canonical episode ID and an active account scope are required.") }
             return false
         }
         return try {
@@ -108,15 +109,15 @@ class StarRepository(
             true
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
-            if (generation.get() == token) state.update { it.copy(error = "Unable to save this change on your device.") }
+            view(token) { it.copy(error = "Unable to save this change on your device.") }
             false
         }
     }
 
     fun suspendSync() {
         authenticationPaused = true
-        generation.incrementAndGet()
-        state.update { it.copy(items = emptyList(), ready = false) }
+        val token = generation.incrementAndGet()
+        state.update { it.copy(items = emptyList(), ready = false, revision = token) }
     }
 
     fun resumeSync(accountId: String?) {
@@ -136,7 +137,7 @@ class StarRepository(
                 if (accountId != null) mergeGuest(next, accountId)
                 commit(next)
                 checkCurrent(token)
-                state.value = StarsState(accountId, ready = readable && activate)
+                view(token) { StarsState(accountId, ready = readable && activate, revision = token) }
                 publish(token, accountId, next[Scope.key(accountId)] ?: StarScope())
             }
         }
@@ -152,18 +153,18 @@ class StarRepository(
         val account = state.value.accountId
         try {
             if (account == null) {
-                state.update { it.copy(ready = true) }
+                view(token) { it.copy(ready = true) }
                 change(token, null) {}
                 return
             }
             val confirmed = remote.accountId()
             checkCurrent(token)
             if (confirmed != account) {
-                state.update { it.copy(ready = false, items = emptyList()) }
+                view(token) { it.copy(ready = false, items = emptyList()) }
                 change(token, account) { it.episodes = emptyMap(); it.snapshot = null }
                 throw IOException("Session changed")
             }
-            state.update { it.copy(ready = true, error = null) }
+            view(token) { it.copy(ready = true, error = null) }
             withContext(io) {
                 mutex.withLock {
                     checkCurrent(token)
@@ -216,11 +217,11 @@ class StarRepository(
         catch (failure: Exception) {
             if (generation.get() == token) {
                 if (failure is ApiException && failure.status in listOf(401, 403)) {
-                    state.update { it.copy(ready = false, items = emptyList()) }
+                    view(token) { it.copy(ready = false, items = emptyList()) }
                     runCatching { change(token, account) { it.episodes = emptyMap(); it.snapshot = null } }
                 }
                 nextAttempt = clock() + minOf(60_000L, 1000L shl minOf(attempts++, 6))
-                state.update { it.copy(error = "Star sync paused. Changes remain saved on this device.") }
+                view(token) { it.copy(error = it.error ?: "Star sync paused. Changes remain saved on this device.") }
             }
         } finally { sender.unlock() }
     }
@@ -256,8 +257,7 @@ class StarRepository(
     }
 
     private fun publish(token: Long, account: String?, current: StarScope) {
-        if (generation.get() != token) return
-        state.update { previous -> previous.copy(
+        view(token) { previous -> previous.copy(
             accountId = account,
             items = if (previous.ready) current.project() else emptyList(),
             pending = account != null && (current.flight != null || current.queued.isNotEmpty()),
@@ -268,6 +268,10 @@ class StarRepository(
                 else -> null
             },
         ) }
+    }
+
+    private fun view(token: Long, change: (StarsState) -> StarsState) {
+        state.update { if (it.revision == token) change(it) else it }
     }
 
     private fun checkCurrent(token: Long) { check(generation.get() == token) { "Session changed" } }

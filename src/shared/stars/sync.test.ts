@@ -7,6 +7,7 @@ import type {
   ListSnapshot,
 } from '@/shared/lists';
 import type { IEpisodeInfo } from '@/types';
+import vectors from '../../../contracts/fixtures/sync/star-outbox.json';
 import { browserStorage } from './browser';
 import {
   acknowledge,
@@ -17,10 +18,14 @@ import {
   installSnapshot,
   mergeGuest,
   project,
-  type StarRoot,
   scopeIn,
 } from './state';
 import { type StarAPI, type StarStorage, StarSync } from './sync';
+
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('Missing test state');
+  return value;
+}
 
 const id = '0c339753-cb50-477c-843e-e641b414a060';
 const episode = (id: number) =>
@@ -100,6 +105,32 @@ function fixture(storage: StarStorage = browserStorage()) {
 }
 
 describe('durable web stars', () => {
+  test.each(vectors.scenarios)('$name', async ({ steps }) => {
+    const f = fixture();
+    let sync = f.make();
+    await sync.activate(null);
+    for (const step of steps) {
+      if (step.op === 'restart') {
+        sync = f.make();
+        await sync.activate(step.accountId ?? null);
+      } else if (step.op === 'account')
+        await sync.activate(step.accountId ?? null);
+      else if (step.episodeId !== undefined)
+        await sync.edit(
+          step.episodeId,
+          step.op === 'add' ? 'add' : 'remove',
+          episode(step.episodeId),
+        );
+      const { state, scope } = sync.getSnapshot();
+      if (!state) throw new Error('Missing local state');
+      expect(project(state).map(({ episodeId }) => episodeId)).toEqual(
+        step.ids,
+      );
+      expect(!!scope && (!!state.flight || state.queued.length > 0)).toBe(
+        step.pending,
+      );
+    }
+  });
   test('canonical IDs distinguish identical GUIDs and survive URL changes', () => {
     const state = emptyScope();
     enqueue(state, 1, 'add', 1, episode(1));
@@ -163,7 +194,7 @@ describe('durable web stars', () => {
     await sync.activate(null);
     fail = true;
     await sync.edit(1, 'add', episode(1));
-    expect(project(sync.getSnapshot().state!)).toEqual([]);
+    expect(project(required(sync.getSnapshot().state))).toEqual([]);
     expect(sync.getSnapshot().error).toContain('Unable to save');
   });
 
@@ -208,7 +239,7 @@ describe('durable web stars', () => {
     const restarted = f.make();
     await restarted.activate('owner');
     await restarted.refresh();
-    expect(project(restarted.getSnapshot().state!)).toEqual([]);
+    expect(project(required(restarted.getSnapshot().state))).toEqual([]);
     expect(restarted.getSnapshot().state?.flight).toBeUndefined();
     expect(restarted.getSnapshot().state?.sequence).toBe('1');
   });
@@ -224,7 +255,7 @@ describe('durable web stars', () => {
     f.online();
     await sync.refresh();
     expect(sync.getSnapshot().state?.flight?.ack).toBeDefined();
-    expect(project(sync.getSnapshot().state!)).toHaveLength(1);
+    expect(project(required(sync.getSnapshot().state))).toHaveLength(1);
     f.api.membership = async () => snapshot([1]);
     const restarted = f.make();
     await restarted.activate('owner');
@@ -239,15 +270,15 @@ describe('durable web stars', () => {
     await sync.activate(null);
     await sync.edit(1, 'add', episode(1));
     await sync.activate('owner');
-    expect(project(sync.getSnapshot().state!)).toHaveLength(1);
+    expect(project(required(sync.getSnapshot().state))).toHaveLength(1);
     await sync.activate('other');
-    expect(project(sync.getSnapshot().state!)).toEqual([]);
+    expect(project(required(sync.getSnapshot().state))).toEqual([]);
     const saved = (await f.storage.load())['account:owner'];
     expect(saved.queued).toHaveLength(1);
     expect(saved.episodes).toEqual({});
     await sync.activate('owner');
     expect(sync.getSnapshot().state?.queued).toHaveLength(1);
-    expect(project(sync.getSnapshot().state!)[0].episode).toBeNull();
+    expect(project(required(sync.getSnapshot().state))[0].episode).toBeNull();
   });
 
   test('late reads cannot overwrite another account or start its writes', async () => {
@@ -267,7 +298,7 @@ describe('durable web stars', () => {
     delayed.resolve(snapshot([1]));
     await reading;
     expect(sync.getSnapshot().scope).toBeNull();
-    expect(project(sync.getSnapshot().state!)).toEqual([]);
+    expect(project(required(sync.getSnapshot().state))).toEqual([]);
     expect(f.sent).toEqual([]);
   });
 
@@ -281,7 +312,7 @@ describe('durable web stars', () => {
     };
     f.online();
     await sync.refresh();
-    const before = sync.getSnapshot().state!;
+    const before = required(sync.getSnapshot().state);
     expect(before.blocked).toBe(409);
     const restarted = f.make();
     await restarted.activate('owner');
@@ -293,7 +324,7 @@ describe('durable web stars', () => {
   test('terminal failures retire optimistic success while newer intents survive', () => {
     const state = { ...emptyScope(), listId: id };
     enqueue(state, 1, 'add', 1, episode(1));
-    const flight = freeze(state)!;
+    const flight = required(freeze(state));
     acknowledge(state, {
       ...ack(flight.batch),
       results: [{ episodeId: 1, status: 'not_found' }],
@@ -308,7 +339,7 @@ describe('durable web stars', () => {
   test('rejects stale, malformed and incomplete snapshots without retiring the overlay', () => {
     const state = { ...emptyScope(), listId: id };
     enqueue(state, 1, 'add', 1);
-    acknowledge(state, ack(freeze(state)!.batch, '3'));
+    acknowledge(state, ack(required(freeze(state)).batch, '3'));
     expect(() => installSnapshot(state, snapshot([], '2'))).toThrow();
     expect(() =>
       installSnapshot(state, { ...snapshot([], '3'), items: null as never }),

@@ -5,9 +5,14 @@ extension Router {
     func star(_ episode: Episode, _ starred: Bool, in stars: StarStore) {
         let saved = starred ? stars.star(episode) : stars.unstar(episode)
         guard saved else { toast = Toast(title: stars.error ?? "Unable to save this change"); return }
-        let undo = Toast.Action(title: "Undo", emphasized: false) { [weak self] in self?.star(episode, !starred, in: stars) }
+        let accountID = stars.accountID
+        let undo = Toast.Action(title: "Undo", emphasized: false) { [weak self] in
+            if stars.accountID == accountID && stars.ready { self?.star(episode, !starred, in: stars) }
+        }
         toast = starred
-            ? Toast(title: "Starred", systemImage: "star.fill", actions: [Toast.Action(title: "Add to list…") { [weak self] in self?.listing = episode }, undo])
+            ? Toast(title: "Starred", systemImage: "star.fill", actions: [Toast.Action(title: "Add to list…") { [weak self] in
+                if stars.accountID == accountID && stars.ready { self?.listing = episode }
+            }, undo])
             : Toast(title: "Removed from Starred", systemImage: "star", actions: [undo])
     }
 }

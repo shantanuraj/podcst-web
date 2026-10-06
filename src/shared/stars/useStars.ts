@@ -9,6 +9,7 @@ import { project, validEpisodeId } from './state';
 export function useStars() {
   const session = useAccountSession();
   const { sync } = starRuntime(session);
+  const token = session.token();
   const view = useSyncExternalStore(
     sync.subscribe,
     sync.getSnapshot,
@@ -36,11 +37,11 @@ export function useStars() {
       validEpisodeId(episode.id) &&
       stars.some(({ episodeId }) => episodeId === episode.id),
     toggle: (episode: IEpisodeInfo) => {
-      if (validEpisodeId(episode.id))
+      if (state && session.current(token) && validEpisodeId(episode.id))
         void sync.edit(episode.id, undefined, episode);
     },
     unstar: (episodeId: number) => {
-      void sync.edit(episodeId, 'remove');
+      if (state && session.current(token)) void sync.edit(episodeId, 'remove');
     },
     refresh: sync.refresh,
   };

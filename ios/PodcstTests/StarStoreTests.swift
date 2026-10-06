@@ -5,12 +5,46 @@ import XCTest
 final class StarStoreTests: XCTestCase {
     private var directory: URL!
 
-    override func setUp() {
+    override func setUp() async throws {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    func testSharedOutboxTransitions() throws {
+        struct Vectors: Decodable {
+            struct Scenario: Decodable {
+                struct Step: Decodable {
+                    var op: String
+                    var episodeId: Int?
+                    var accountId: String?
+                    var ids: [Int]
+                    var pending: Bool
+                }
+                var name: String
+                var steps: [Step]
+            }
+            var scenarios: [Scenario]
+        }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("contracts/fixtures/sync/star-outbox.json")
+        let vectors = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        for scenario in vectors.scenarios {
+            let folder = directory.appendingPathComponent(UUID().uuidString)
+            var stars = StarStore(directory: folder)
+            for step in scenario.steps {
+                switch step.op {
+                case "restart": stars = StarStore(accountID: step.accountId, directory: folder)
+                case "account": try stars.switchAccount(to: step.accountId)
+                case "add": XCTAssertTrue(stars.star(starEpisode(try XCTUnwrap(step.episodeId))))
+                case "remove": XCTAssertTrue(stars.remove(id: try XCTUnwrap(step.episodeId)))
+                default: XCTFail("Unknown vector operation")
+                }
+                XCTAssertEqual(stars.stars.map(\.id), step.ids, scenario.name)
+                XCTAssertEqual(stars.pending, step.pending, scenario.name)
+            }
+        }
     }
 
     func testCanonicalStarsPersistOrderAndRejectMissingIDs() {
@@ -226,6 +260,42 @@ final class StarStoreTests: XCTestCase {
         XCTAssertTrue(api.sent.isEmpty)
         XCTAssertFalse(stars.ready)
         XCTAssertEqual(StarStore(directory: directory).stars.map(\.id), [1])
+    }
+
+    func testAuthenticationMustFinishBeforeTheNewScopeIsVisibleOrSends() async throws {
+        let api = StarServer()
+        let stars = StarStore(directory: directory, api: api)
+        stars.star(starEpisode(1))
+        try stars.switchAccount(to: "owner", activate: false)
+        await stars.refresh()
+        XCTAssertFalse(stars.ready)
+        XCTAssertTrue(stars.stars.isEmpty)
+        XCTAssertTrue(api.sent.isEmpty)
+        stars.resume(accountID: "other")
+        await stars.refresh()
+        XCTAssertTrue(api.sent.isEmpty)
+        stars.resume(accountID: "owner")
+        await stars.refresh()
+        XCTAssertTrue(stars.ready)
+        XCTAssertEqual(stars.stars.map(\.id), [1])
+    }
+
+    func testExpiredSessionHidesMetadataButKeepsTheExactAccountBatch() async {
+        StarStore(accountID: "owner", directory: directory).star(starEpisode(1))
+        let api = StarServer()
+        api.status = 401
+        let stars = StarStore(accountID: "owner", directory: directory, api: api)
+        await stars.refresh()
+        XCTAssertFalse(stars.ready)
+        XCTAssertTrue(stars.stars.isEmpty)
+        XCTAssertTrue(stars.pending)
+        XCTAssertTrue(StarStore(directory: directory).stars.isEmpty)
+        api.status = nil
+        let restored = StarStore(accountID: "owner", directory: directory, api: api)
+        await restored.refresh()
+        XCTAssertEqual(api.sent.count, 2)
+        XCTAssertEqual(api.sent[0], api.sent[1])
+        XCTAssertFalse(restored.pending)
     }
 
     func testCorruptOutboxIsNotSilentlyReset() throws {

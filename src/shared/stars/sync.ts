@@ -137,6 +137,7 @@ export class StarSync {
           );
         }
       });
+      this.emit({ error: undefined });
       await this.refresh();
     } catch {
       if (generation === this.generation)

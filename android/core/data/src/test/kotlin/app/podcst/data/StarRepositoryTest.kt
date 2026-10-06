@@ -24,6 +24,12 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.boolean
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -51,6 +57,29 @@ class StarRepositoryTest {
         val state = StarScope()
         ids.forEach { state.enqueue(it, ListChange.Operation.Add, it, episode(it)) }
         file.writeText(json.encodeToString(mapOf(Scope.key("owner") to state)))
+    }
+
+    @Test fun sharedOutboxTransitions() = runTest {
+        val vectors = Json.parseToJsonElement(File(checkNotNull(System.getProperty("podcst.contracts")), "fixtures/sync/star-outbox.json").readText()).jsonObject.getValue("scenarios").jsonArray
+        for (scenario in vectors) {
+            val path = File(directory, UUID.randomUUID().toString())
+            val remote = StarServer().apply { online = false }
+            fun make(accountId: String?) = StarRepository(path, remote, backgroundScope, accountId, io = UnconfinedTestDispatcher(testScheduler))
+            var stars = make(null)
+            for (raw in scenario.jsonObject.getValue("steps").jsonArray) {
+                val step = raw.jsonObject
+                val accountId = step["accountId"]?.jsonPrimitive?.contentOrNull
+                when (step.getValue("op").jsonPrimitive.content) {
+                    "restart" -> stars = make(accountId)
+                    "account" -> stars.switchAccount(accountId)
+                    "add" -> assertTrue(stars.star(episode(step.getValue("episodeId").jsonPrimitive.long)))
+                    "remove" -> assertTrue(stars.remove(step.getValue("episodeId").jsonPrimitive.long))
+                    else -> fail("Unknown vector operation")
+                }
+                assertEquals(step.getValue("ids").jsonArray.map { it.jsonPrimitive.long }, stars.status.value.items.map { it.id })
+                assertEquals(step.getValue("pending").jsonPrimitive.boolean, stars.status.value.pending)
+            }
+        }
     }
 
     @Test fun canonicalIdsPersistAndDoNotDependOnGuidOrFeed() = runTest {

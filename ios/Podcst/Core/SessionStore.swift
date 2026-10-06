@@ -10,7 +10,7 @@ public final class SessionStore {
 
     @ObservationIgnored var prepareAccountChange: ((String?) async throws -> Void)?
     @ObservationIgnored var suspendAccountWork: (() -> Void)?
-    @ObservationIgnored var resumeAccountWork: (() -> Void)?
+    @ObservationIgnored var resumeAccountWork: ((String?) -> Void)?
     private var changingSession = false
     private var restoration: (id: UUID, task: Task<Void, Never>)?
     private let storageURL: URL
@@ -53,7 +53,7 @@ public final class SessionStore {
             guard let self else { return }
             defer {
                 if self.restoration?.id == id { self.restoration = nil }
-                if !self.changingSession { self.isLoading = false; self.resumeAccountWork?() }
+                if !self.changingSession { self.isLoading = false; self.resumeAccountWork?(self.user?.id) }
             }
             do {
                 let value = try await self.api.sessionUser()
@@ -96,7 +96,7 @@ public final class SessionStore {
         suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false; resumeAccountWork?() }
+        defer { changingSession = false; isLoading = false; resumeAccountWork?(user?.id) }
         await cancelRestoration()
         do {
             try await updateUser(api.signIn(email: email, code: code))
@@ -111,7 +111,7 @@ public final class SessionStore {
         suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false; resumeAccountWork?() }
+        defer { changingSession = false; isLoading = false; resumeAccountWork?(user?.id) }
         await cancelRestoration()
         do {
             try await updateUser(api.signInWithPasskey(email: email))
@@ -136,7 +136,7 @@ public final class SessionStore {
         suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false; resumeAccountWork?() }
+        defer { changingSession = false; isLoading = false; resumeAccountWork?(user?.id) }
         await cancelRestoration()
         do {
             try await updateUser(nil)

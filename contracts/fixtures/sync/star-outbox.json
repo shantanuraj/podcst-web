@@ -1,0 +1,41 @@
+{
+  "scenarios": [
+    {
+      "name": "canonical guest membership survives restart",
+      "steps": [
+        { "op": "add", "episodeId": 1, "ids": [1], "pending": false },
+        { "op": "add", "episodeId": 2, "ids": [2, 1], "pending": false },
+        { "op": "add", "episodeId": 1, "ids": [2, 1], "pending": false },
+        { "op": "restart", "accountId": null, "ids": [2, 1], "pending": false },
+        { "op": "remove", "episodeId": 1, "ids": [2], "pending": false }
+      ]
+    },
+    {
+      "name": "new guest intent restores an account removal exactly once",
+      "steps": [
+        { "op": "add", "episodeId": 1, "ids": [1], "pending": false },
+        { "op": "account", "accountId": "owner", "ids": [1], "pending": true },
+        { "op": "remove", "episodeId": 1, "ids": [], "pending": true },
+        { "op": "account", "accountId": null, "ids": [], "pending": false },
+        { "op": "add", "episodeId": 1, "ids": [1], "pending": false },
+        { "op": "account", "accountId": "owner", "ids": [1], "pending": true },
+        { "op": "restart", "accountId": "owner", "ids": [1], "pending": true },
+        { "op": "account", "accountId": "other", "ids": [], "pending": false },
+        { "op": "account", "accountId": null, "ids": [], "pending": false }
+      ]
+    },
+    {
+      "name": "later guest work belongs only to its confirmed destination",
+      "steps": [
+        { "op": "add", "episodeId": 1, "ids": [1], "pending": false },
+        { "op": "account", "accountId": "owner", "ids": [1], "pending": true },
+        { "op": "account", "accountId": null, "ids": [], "pending": false },
+        { "op": "add", "episodeId": 2, "ids": [2], "pending": false },
+        { "op": "account", "accountId": "other", "ids": [2], "pending": true },
+        { "op": "account", "accountId": "owner", "ids": [1], "pending": true },
+        { "op": "account", "accountId": "other", "ids": [2], "pending": true },
+        { "op": "account", "accountId": null, "ids": [], "pending": false }
+      ]
+    }
+  ]
+}
