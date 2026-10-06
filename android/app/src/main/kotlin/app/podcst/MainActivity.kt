@@ -22,6 +22,9 @@ import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
     private var controller: ListenableFuture<MediaController>? = null
@@ -48,6 +51,11 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 graph.session.restore()
+                launch {
+                    graph.session.session.map { it.user?.id to it.loading }.distinctUntilChanged().collectLatest { (account, loading) ->
+                        if (account != null && !loading) graph.playback.restoreProgress()
+                    }
+                }
                 graph.stars.refresh()
                 while (isActive) {
                     delay(5_000)

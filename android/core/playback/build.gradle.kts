@@ -20,6 +20,7 @@ dependencies {
     api(libs.media3.cast)
     implementation(libs.kotlinx.coroutines.guava)
     testImplementation(libs.robolectric)
+    testImplementation(testFixtures(project(":core:network")))
     testImplementation(libs.turbine)
     testImplementation(libs.media3.test.utils)
     testImplementation(libs.androidx.junit)

@@ -3,6 +3,7 @@ package app.podcst.playback
 import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
+import androidx.room.withTransaction
 import androidx.media3.common.AudioAttributes
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.C
@@ -38,6 +39,9 @@ import app.podcst.playback.audio.ProcessingAudioSink
 import app.podcst.playback.media.MediaStore
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -47,6 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -88,31 +93,30 @@ data class PlayerState(
 
 private const val CASTING = "Audio effects play on this device only."
 
-class PlaybackCoordinator(
-    private val context: Context,
-    private val media: MediaStore,
+class PlaybackCoordinator internal constructor(
     private val scopes: Scopes,
     private val progress: ProgressRepository,
     private val preferences: Preferences,
-    private val renderers: PodcstRenderersFactory,
+    private val sink: ProcessingAudioSink,
+    val player: Player,
     private val scope: CoroutineScope,
 ) {
+    constructor(
+        context: Context,
+        media: MediaStore,
+        scopes: Scopes,
+        progress: ProgressRepository,
+        preferences: Preferences,
+        renderers: PodcstRenderersFactory,
+        scope: CoroutineScope,
+    ) : this(scopes, progress, preferences, renderers.sink, createPlayer(context, media, renderers), scope)
+
     private val mutable = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = mutable.asStateFlow()
 
-    private val local: ExoPlayer = ExoPlayer.Builder(context, renderers)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(media.dataSource))
-        .setAudioAttributes(
-            AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(),
-            true,
-        )
-        .setHandleAudioBecomingNoisy(true)
-        .setWakeMode(C.WAKE_MODE_NETWORK)
-        .setSeekBackIncrementMs(PlaybackRules.skipBack.inWholeMilliseconds)
-        .setSeekForwardIncrementMs(PlaybackRules.skipForward.inWholeMilliseconds)
-        .build()
-
-    val player: Player = CastPlayer.Builder(context).setLocalPlayer(local).build()
+    private val restoration: Job
+    private var playbackRevision = 0L
+    private var progressCheckpoint: ProgressCheckpoint? = null
 
     private var loaded: String? = null
     private var changingAccount = false
@@ -125,8 +129,9 @@ class PlaybackCoordinator(
     init {
         player.addListener(Listener())
         scope.launch { preferences.audio.collect { settings -> update { it.copy(settings = settings) }; applyAudio() } }
-        scope.launch { renderers.sink.effectState.collect { effect -> update { it.copy(sinkEffects = effect) } } }
-        scope.launch { restore() }
+        scope.launch { sink.effectState.collect { effect -> update { it.copy(sinkEffects = effect) } } }
+        val revision = playbackRevision
+        restoration = scope.launch { restoreLocal(revision) }
     }
 
     fun play(episode: Episode, at: Duration? = null) {
@@ -141,10 +146,28 @@ class PlaybackCoordinator(
 
     fun restore(episode: Episode, at: Duration) {
         if (changingAccount) return
-        saveOutgoing()
-        update { it.copy(queue = it.queue.playing(episode), position = at, duration = episode.duration ?: Duration.ZERO, status = PlaybackStatus.Paused) }
         unload()
+        update { it.copy(queue = it.queue.playing(episode), position = at, duration = episode.duration ?: Duration.ZERO, status = PlaybackStatus.Paused, requested = false) }
+        progressCheckpoint = progressAt(state.value)
         persist()
+    }
+
+    suspend fun restoreProgress() {
+        restoration.join()
+        if (changingAccount) return
+        val owner = scopes.current.value
+        val revision = ++playbackRevision
+        val wasPlaying = state.value.requested || state.value.status == PlaybackStatus.Playing
+        val latest = runCatching { progress.restoreLatest() }.getOrElse { failure ->
+            if (failure is CancellationException) throw failure
+            return
+        } ?: return
+        coroutineContext.ensureActive()
+        val current = state.value
+        if (changingAccount || scopes.current.value !== owner || playbackRevision != revision ||
+            wasPlaying || current.requested || current.status == PlaybackStatus.Playing) return
+        if (current.episode?.identity == latest.episode.identity && current.position.inWholeSeconds == latest.position.seconds.inWholeSeconds) return
+        restore(latest.episode, latest.position.seconds)
     }
 
     fun toggle() = if (state.value.requested) pause() else resume()
@@ -310,7 +333,8 @@ class PlaybackCoordinator(
 
     suspend fun switchAccount() {
         update { PlayerState(settings = it.settings, sinkEffects = it.sinkEffects, castDevice = it.castDevice) }
-        restore()
+        progressCheckpoint = null
+        restoreLocal(playbackRevision)
         changingAccount = false
     }
 
@@ -386,7 +410,7 @@ class PlaybackCoordinator(
     private fun applyAudio() {
         val current = state.value
         player.playbackParameters = PlaybackParameters(current.effectiveSpeed.toFloat())
-        renderers.sink.setEffects(current.effects)
+        sink.setEffects(current.effects)
     }
 
     private fun parsedChapters(episode: Episode): List<Chapter> = ShowNotes.chapters(episode.notes)
@@ -408,28 +432,44 @@ class PlaybackCoordinator(
         val episode = current.episode ?: return
         playedSinceProgress = 0
         playingSince = if (current.status == PlaybackStatus.Playing) SystemClock.elapsedRealtime() else null
+        val checkpoint = progressAt(current, completed)
+        if (progressCheckpoint == checkpoint) return
+        progressCheckpoint = checkpoint
+        val owner = scopes.current.value
         val position = current.position
-        scope.launch { progress.record(episode.copy(duration = current.duration.takeIf(Duration::isPositive) ?: episode.duration), position, completed) }
+        scope.launch { progress.record(episode.copy(duration = current.duration.takeIf(Duration::isPositive) ?: episode.duration), position, completed, owner) }
     }
+
+    private data class ProgressCheckpoint(val identity: String, val seconds: Long, val completed: Boolean)
+
+    private fun progressAt(current: PlayerState, completed: Boolean = false): ProgressCheckpoint? =
+        current.episode?.let { ProgressCheckpoint(it.identity.value, current.position.inWholeSeconds, completed) }
 
     private fun persist() {
         val current = state.value
         val queue = current.queue
-        val database = scopes.database
+        val owner = scopes.current.value
+        val database = owner.database
         scope.launch {
-            database.episodes().upsert(queue.episodes.map { it.entity() })
-            database.player().save(
-                queue.episodes.map { it.identity.value },
-                PlayerEntity(current = queue.episode?.identity?.value, positionMs = current.position.inWholeMilliseconds, active = queue.active),
-            )
+            if (scopes.current.value !== owner) return@launch
+            database.withTransaction {
+                if (scopes.current.value !== owner) return@withTransaction
+                database.episodes().upsert(queue.episodes.map { it.entity() })
+                database.player().save(
+                    queue.episodes.map { it.identity.value },
+                    PlayerEntity(current = queue.episode?.identity?.value, positionMs = current.position.inWholeMilliseconds, active = queue.active),
+                )
+            }
         }
     }
 
-    private suspend fun restore() {
-        val database = scopes.database
+    private suspend fun restoreLocal(revision: Long) {
+        if (playbackRevision != revision) return
+        val owner = scopes.current.value
+        val database = owner.database
         val player = database.player().player()
         val episodes = database.episodes().queue().map { it.domain() }
-        if (episodes.isEmpty()) return
+        if (scopes.current.value !== owner || playbackRevision != revision || episodes.isEmpty()) return
         val index = player?.current?.let { identity -> episodes.indexOfFirst { it.identity.value == identity } }?.takeIf { it >= 0 } ?: 0
         val queue = PlaybackQueue(episodes, index, player?.active ?: false)
         update {
@@ -441,10 +481,13 @@ class PlaybackCoordinator(
                 chapters = queue.episode?.let(::parsedChapters).orEmpty(),
             )
         }
+        progressCheckpoint = progressAt(state.value)
     }
 
     private fun update(transform: (PlayerState) -> PlayerState) = mutable.update { previous ->
         val next = transform(previous)
+        if (previous.episode?.identity != next.episode?.identity || previous.active != next.active ||
+            previous.position != next.position || previous.requested != next.requested || previous.status != next.status) playbackRevision++
         if (previous.episode?.identity != next.episode?.identity)
             next.copy(chapterMetadata = ChapterMetadata(), chapters = next.episode?.let(::parsedChapters).orEmpty())
         else next
@@ -562,5 +605,20 @@ class PlaybackCoordinator(
     private companion object {
         const val TICK = 250L
         const val NOW_PLAYING_ARTWORK = 1024
+
+        fun createPlayer(context: Context, media: MediaStore, renderers: PodcstRenderersFactory): Player {
+            val local = ExoPlayer.Builder(context, renderers)
+                .setMediaSourceFactory(DefaultMediaSourceFactory(media.dataSource))
+                .setAudioAttributes(
+                    AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(),
+                    true,
+                )
+                .setHandleAudioBecomingNoisy(true)
+                .setWakeMode(C.WAKE_MODE_NETWORK)
+                .setSeekBackIncrementMs(PlaybackRules.skipBack.inWholeMilliseconds)
+                .setSeekForwardIncrementMs(PlaybackRules.skipForward.inWholeMilliseconds)
+                .build()
+            return CastPlayer.Builder(context).setLocalPlayer(local).build()
+        }
     }
 }

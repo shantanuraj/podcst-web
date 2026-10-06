@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.seconds
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.io.File
@@ -88,14 +87,6 @@ class AppGraph(application: Application) {
             combine(library.podcasts, library.newReleases, playback.state.map { it.queue.episodes }.distinctUntilChanged()) { podcasts, releases, queue ->
                 podcasts.map { it.cover }.toSet() + (queue + releases.take(RETAINED_RELEASES)).flatMap { listOf(it.artwork, it.cover) }
             }.distinctUntilChanged().collect(artwork::retain)
-        }
-        scope.launch {
-            session.session.map { it.user?.id to it.loading }.distinctUntilChanged().collect { (account, loading) ->
-                if (account == null || loading || playback.state.value.queue.episodes.isNotEmpty()) return@collect
-                runCatching { progress.restoreLatest() }.getOrNull()?.let { latest ->
-                    if (playback.state.value.queue.episodes.isEmpty()) playback.restore(latest.episode, latest.position.seconds)
-                }
-            }
         }
     }
 
