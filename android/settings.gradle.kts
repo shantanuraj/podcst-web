@@ -19,7 +19,6 @@ rootProject.name = "podcst"
 
 include(
     ":app",
-    ":benchmark",
     ":core:model",
     ":core:network",
     ":core:database",
