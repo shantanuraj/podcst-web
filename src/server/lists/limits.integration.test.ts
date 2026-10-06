@@ -34,12 +34,13 @@ describe.skipIf(!executable)('list limits on disposable Redis', () => {
     redis = new Redis({
       host: '127.0.0.1',
       port,
-      retryStrategy: () => 10,
-      maxRetriesPerRequest: 2,
+      retryStrategy: () => 50,
+      maxRetriesPerRequest: 100,
+      connectTimeout: 1000,
     });
     redis.on('error', () => {});
     await redis.ping();
-  });
+  }, 10_000);
 
   afterAll(async () => {
     redis?.disconnect();
