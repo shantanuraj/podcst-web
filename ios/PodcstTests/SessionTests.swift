@@ -519,6 +519,95 @@ final class SessionTests: XCTestCase {
         XCTAssertNil(library.error)
     }
 
+    func testForegroundProgressRestorationFetchesLatestWithoutLoadingSubscriptions() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let phone = Episode(id: 1, guid: "tal", feed: "https://example.test/tal", title: "TAL", file: EpisodeFile(url: "https://example.test/tal.mp3"))
+        let web = Episode(id: 2, guid: "web", feed: "https://example.test/web", title: "Web", file: EpisodeFile(url: "https://example.test/web.mp3"))
+        var latest = PlaybackProgress(episode: phone, position: 3672)
+        var reads = 0
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.httpMethod, "GET")
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            reads += 1
+            try request.respond(latest)
+        }
+        let launch = await fixture.library.restoreProgress()
+        XCTAssertEqual(launch?.episode.id, 1)
+        latest = PlaybackProgress(episode: web, position: 1271)
+        let foreground = await fixture.library.restoreProgress()
+        XCTAssertEqual(foreground?.episode.id, 2)
+        XCTAssertEqual(foreground?.position, 1271)
+        XCTAssertEqual(reads, 2)
+    }
+
+    func testProgressRestorationFlushesPendingWritesBeforeReadingServer() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "offline", feed: "https://example.test/feed", title: "Offline", file: EpisodeFile(url: "https://example.test/offline.mp3"))
+        GuestLibraryURLProtocol.handler = { request in request.fail(URLError(.notConnectedToInternet)) }
+        fixture.library.saveProgress(.init(episode: episode, position: 123, completed: false))
+        await fixture.library.flushProgress()
+        XCTAssertNotNil(fixture.library.error)
+        var methods: [String] = []
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            let method = try XCTUnwrap(request.request.httpMethod)
+            methods.append(method)
+            if method == "PUT" { try request.respond(["success": true]) }
+            else { try request.respond(PlaybackProgress(episode: episode, position: 123)) }
+        }
+        let latest = await fixture.library.restoreProgress()
+        XCTAssertEqual(methods, ["PUT", "GET"])
+        XCTAssertEqual(latest?.position, 123)
+        XCTAssertNil(fixture.library.error)
+    }
+
+    func testUnsentProgressPreventsRestoringAnOlderServerPosition() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "offline", feed: "https://example.test/feed", title: "Offline", file: EpisodeFile(url: "https://example.test/offline.mp3"))
+        var writes = 0
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.httpMethod, "PUT")
+            writes += 1
+            request.fail(URLError(.notConnectedToInternet))
+        }
+        fixture.library.saveProgress(.init(episode: episode, position: 123, completed: false))
+        await fixture.library.flushProgress()
+        let latest = await fixture.library.restoreProgress()
+        XCTAssertNil(latest)
+        XCTAssertGreaterThan(writes, 0)
+        XCTAssertNotNil(fixture.library.error)
+    }
+
+    func testProgressRestorationCannotCrossAccountChanges() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        fixture.session.prepareAccountChange = { _ in await fixture.library.resetProgressSync() }
+        let started = expectation(description: "Old account progress lookup started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            if request.request.url?.path == "/api/auth/session" {
+                try request.respond(["user": User(id: "other", email: "other@example.test")])
+            } else {
+                pending = request
+                started.fulfill()
+            }
+        }
+        let restore = Task { await fixture.library.restoreProgress() }
+        await fulfillment(of: [started], timeout: 2)
+        await fixture.session.restore()
+        try XCTUnwrap(pending).respond(PlaybackProgress(
+            episode: Episode(id: 42, guid: "private", feed: "https://example.test/private", title: "Private", file: EpisodeFile(url: "https://example.test/private.mp3"), isPrivate: true),
+            position: 123
+        ))
+        let latest = await restore.value
+        XCTAssertNil(latest)
+        XCTAssertEqual(fixture.session.user?.id, "other")
+        XCTAssertNil(fixture.library.error)
+    }
+
     func testProgressFlushCannotReplayRetiredAccountDuringOrAfterSwitch() async throws {
         let fixture = try await guestFixture(podcasts: [])
         defer { fixture.cleanUp() }
@@ -662,6 +751,16 @@ final class SessionTests: XCTestCase {
         return SessionFixture(api: api, keychain: keychain, url: url)
     }
 
+    private func progressFixture() async throws -> GuestLibraryFixture {
+        let fixture = try await guestFixture(podcasts: [])
+        GuestLibraryURLProtocol.handler = { request in
+            try request.respond(["user": User(id: "listener", email: "listener@example.test")])
+        }
+        await fixture.session.restore()
+        let library = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
+        return GuestLibraryFixture(api: fixture.api, session: fixture.session, library: library, defaults: fixture.defaults, defaultsName: fixture.defaultsName, url: fixture.url)
+    }
+
     private func guestFixture(podcasts: [Podcast], restoreSession: Bool = true) async throws -> GuestLibraryFixture {
         let defaultsName = "GuestLibrary-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsName)!
@@ -693,6 +792,7 @@ private struct GuestLibraryFixture {
         GuestLibraryURLProtocol.handler = nil
         defaults.removePersistentDomain(forName: defaultsName)
         try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: url.appendingPathExtension("progress"))
     }
 }
 

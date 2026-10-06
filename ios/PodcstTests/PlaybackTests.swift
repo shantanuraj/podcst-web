@@ -592,10 +592,10 @@ final class PlaybackTests: XCTestCase {
         controller.resume()
         clock.advance(by: 29)
         transport.advance(to: 59)
-        XCTAssertEqual(updates.count, 2)
+        XCTAssertEqual(updates.count, 1)
         clock.advance(by: 1)
         transport.advance(to: 60)
-        XCTAssertEqual(updates.map(\.position), [30, 30, 60])
+        XCTAssertEqual(updates.map(\.position), [30, 60])
     }
 
     func testResumeWhilePlayingPreservesProgressWithoutAnotherTransportEvent() {
@@ -891,6 +891,183 @@ final class PlaybackTests: XCTestCase {
             XCTAssertEqual(controller.currentIndex, vector.expected.current, vector.name)
             XCTAssertEqual(controller.isActive, vector.expected.active, vector.name)
         }
+    }
+
+    func testColdLaunchRestoresNewerServerEpisodeWithoutSavingCachedPlayback() async {
+        let url = temporaryURL()
+        let previous = makeController(persistenceURL: url)
+        previous.restore(episode(guid: "tal-899"), at: 3672)
+        previous.enqueue(episode(guid: "queued"))
+        previous.shutdown()
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport, persistenceURL: url)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        XCTAssertEqual(controller.currentEpisode?.guid, "tal-899")
+
+        await controller.restoreProgress {
+            PlaybackProgress(episode: self.episode(guid: "web-chapter-3"), position: 1271)
+        }
+        transport.becomeReady(duration: 1504)
+        transport.emit(.seeked(1271.1))
+        controller.pause()
+
+        XCTAssertEqual(controller.currentEpisode?.guid, "web-chapter-3")
+        XCTAssertEqual(controller.currentTime, 1271)
+        XCTAssertEqual(controller.queue.map(\.guid), ["tal-899", "queued", "web-chapter-3"])
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertTrue(transport.playedRates.isEmpty)
+        XCTAssertTrue(updates.isEmpty)
+        controller.shutdown()
+        XCTAssertTrue(updates.isEmpty)
+        let relaunched = makeController(persistenceURL: url)
+        XCTAssertEqual(relaunched.currentEpisode?.guid, "web-chapter-3")
+        XCTAssertEqual(relaunched.currentTime, 1271)
+    }
+
+    func testForegroundRestorationReplacesLoadedPausedPlaybackSilently() async {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.play(episode(guid: "phone"), at: 42)
+        transport.becomeReady(duration: 300)
+        controller.pause()
+        XCTAssertEqual(updates.map(\.position), [42])
+        let oldGeneration = transport.generation
+
+        await controller.restoreProgress {
+            PlaybackProgress(episode: self.episode(guid: "web"), position: 123)
+        }
+        transport.emit(.position(99), generation: oldGeneration)
+        transport.emit(.ended, generation: oldGeneration)
+        transport.becomeReady(duration: 300)
+        controller.pause()
+
+        XCTAssertEqual(controller.currentEpisode?.guid, "web")
+        XCTAssertEqual(controller.currentTime, 123)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertEqual(updates.map(\.episode.guid), ["phone"])
+        XCTAssertEqual(transport.playedRates, [1])
+    }
+
+    func testServerRestoresSameEpisodePositionIncludingBackwardSeek() async {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        let item = episode(guid: "same")
+        controller.restore(item, at: 3672)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        for position in [1200.0, 1800.0] {
+            await controller.restoreProgress { PlaybackProgress(episode: item, position: position) }
+            transport.becomeReady(duration: 3725)
+            XCTAssertEqual(controller.currentTime, position)
+            XCTAssertEqual(controller.queue, [item])
+        }
+        XCTAssertTrue(updates.isEmpty)
+    }
+
+    func testUnchangedServerProgressDoesNotReopenStoppedPlaybackOrReloadPausedAudio() async {
+        for stopped in [false, true] {
+            let transport = FakePlaybackTransport()
+            let controller = makeController(transport: transport)
+            let item = episode(guid: "same")
+            controller.play(item, at: 42.5)
+            transport.becomeReady(duration: 300)
+            controller.pause()
+            if stopped { controller.stop() }
+            var updates: [PlaybackUpdate] = []
+            controller.onProgress = { updates.append($0) }
+            await controller.restoreProgress { PlaybackProgress(episode: item, position: 42) }
+            XCTAssertEqual(controller.state, stopped ? .idle : .paused)
+            XCTAssertEqual(controller.currentTime, 42.5)
+            XCTAssertEqual(transport.loadCount, 1)
+            XCTAssertTrue(updates.isEmpty)
+        }
+    }
+
+    func testServerRestorationDoesNotInterruptPlayingLoadingOrInterruptedAudio() async {
+        for state in ["loading", "playing", "interrupted"] {
+            let transport = FakePlaybackTransport()
+            let controller = makeController(transport: transport)
+            controller.play(episode(guid: "phone"), at: 42)
+            if state != "loading" { transport.becomeReady(duration: 300) }
+            if state == "interrupted" { controller.handleInterruption(typeRaw: 1, optionsRaw: nil) }
+            let before = controller.state
+            await controller.restoreProgress {
+                PlaybackProgress(episode: self.episode(guid: "web"), position: 123)
+            }
+            XCTAssertEqual(controller.currentEpisode?.guid, "phone", state)
+            XCTAssertEqual(controller.currentTime, 42, state)
+            XCTAssertEqual(controller.state, before, state)
+            XCTAssertEqual(transport.loadCount, 1, state)
+        }
+    }
+
+    func testLocalActionsFenceDelayedServerRestoration() async {
+        for action in ["resume-pause", "seek", "next", "stop", "clear", "complete", "account"] {
+            let transport = FakePlaybackTransport()
+            let controller = makeController(transport: transport)
+            controller.restore(episode(guid: "phone"), at: 42)
+            controller.enqueue(episode(guid: "queued"))
+            transport.becomeReady(duration: 300)
+            await controller.restoreProgress {
+                switch action {
+                case "resume-pause": controller.resume(); controller.pause()
+                case "seek": controller.seek(to: 90); transport.finishSeek()
+                case "next": controller.next()
+                case "stop": controller.stop()
+                case "clear": controller.clear()
+                case "complete": controller.markPlayed()
+                default: controller.beginAccountChange(); controller.switchAccount(to: "other")
+                }
+                return PlaybackProgress(episode: self.episode(guid: "web"), position: 123)
+            }
+            XCTAssertNotEqual(controller.currentEpisode?.guid, "web", action)
+            XCTAssertNotEqual(controller.currentTime, 123, action)
+        }
+    }
+
+    func testCancelledAndSupersededRestoresCannotReplaceNewerPlayback() async {
+        for cancelled in [true, false] {
+            let controller = makeController()
+            controller.restore(episode(guid: "phone"), at: 42)
+            let started = expectation(description: "Progress lookup started")
+            var release: CheckedContinuation<PlaybackProgress?, Never>?
+            let request = Task {
+                await controller.restoreProgress {
+                    await withCheckedContinuation {
+                        release = $0
+                        started.fulfill()
+                    }
+                }
+            }
+            await fulfillment(of: [started], timeout: 2)
+            if cancelled {
+                request.cancel()
+            } else {
+                await controller.restoreProgress {
+                    PlaybackProgress(episode: self.episode(guid: "newer-web"), position: 180)
+                }
+            }
+            release?.resume(returning: PlaybackProgress(episode: episode(guid: "obsolete-web"), position: 123))
+            await request.value
+            XCTAssertEqual(controller.currentEpisode?.guid, cancelled ? "phone" : "newer-web")
+            XCTAssertEqual(controller.currentTime, cancelled ? 42 : 180)
+        }
+    }
+
+    func testMissingServerProgressPreservesOfflinePlaybackAndQueue() async {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.restore(episode(guid: "phone"), at: 42)
+        controller.enqueue(episode(guid: "queued"))
+        await controller.restoreProgress { nil }
+        XCTAssertEqual(controller.currentEpisode?.guid, "phone")
+        XCTAssertEqual(controller.currentTime, 42)
+        XCTAssertEqual(controller.queue.map(\.guid), ["phone", "queued"])
+        XCTAssertEqual(transport.loadCount, 1)
     }
 
     private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil) -> PlaybackController {

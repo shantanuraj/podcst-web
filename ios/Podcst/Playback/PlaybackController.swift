@@ -104,6 +104,8 @@ public final class PlaybackController {
     @ObservationIgnored private var audioSessionTask: Task<Void, Never>?
     @ObservationIgnored private var systemObservers: SystemPlaybackObservers?
     @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var progressRevision = UUID()
+    @ObservationIgnored private var progressCheckpoint: PlaybackUpdate?
     private var shouldPlay = false
     @ObservationIgnored private var changingAccount = false
     @ObservationIgnored private var wasPlayingBeforeInterruption = false
@@ -182,10 +184,17 @@ public final class PlaybackController {
         nowPlayingInfoSink?(nil)
     }
 
-    public func restore() async {
-        guard !changingAccount, !isShutdown, !transport.hasSource, state != .playing else { return }
-        loadPersistedState()
-        updateNowPlayingInfo()
+    func restoreProgress(using load: @MainActor () async -> PlaybackProgress?) async {
+        guard !changingAccount, !isShutdown, !Task.isCancelled else { return }
+        let revision = UUID()
+        progressRevision = revision
+        let wasPlaying = shouldPlay || state == .playing || wasPlayingBeforeInterruption
+        guard let progress = await load(), !Task.isCancelled,
+              !wasPlaying, !shouldPlay, !wasPlayingBeforeInterruption,
+              !changingAccount, !isShutdown, progressRevision == revision else { return }
+        if progress.episode.identity == currentEpisode?.identity,
+           progress.position.rounded(.towardZero) == currentTime.rounded(.towardZero) { return }
+        restore(progress.episode, at: progress.position)
     }
 
     public func play(_ episode: Episode, at position: TimeInterval = 0) {
@@ -208,7 +217,6 @@ public final class PlaybackController {
 
     public func restore(_ episode: Episode, at position: TimeInterval) {
         guard !changingAccount, !isShutdown else { return }
-        saveOutgoingProgress()
         if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
             currentIndex = existingIndex
             queue[existingIndex] = episode
@@ -218,6 +226,7 @@ public final class PlaybackController {
         }
         currentTime = position.isFinite ? max(0, position) : 0
         duration = episode.duration ?? 0
+        progressCheckpoint = PlaybackUpdate(episode: episode, position: currentTime, completed: false)
         persist()
         replaceCurrentItem(startingAt: currentTime, autoPlay: false)
     }
@@ -229,6 +238,7 @@ public final class PlaybackController {
     public func pause() {
         wasPlayingBeforeInterruption = false
         guard !isShutdown, isActive else { return }
+        progressRevision = UUID()
         shouldPlay = false
         cancelAudioSessionTask()
         transport.pause()
@@ -251,6 +261,7 @@ public final class PlaybackController {
 
     public func reopen() {
         guard !changingAccount, !isShutdown, currentEpisode != nil, !isActive else { return }
+        progressRevision = UUID()
         transition(to: .paused)
         persist()
         updateNowPlayingInfo()
@@ -264,6 +275,7 @@ public final class PlaybackController {
     public func resume() {
         guard !changingAccount, !isShutdown, currentEpisode != nil, state != .playing else { return }
         guard !shouldPlay || audioSessionTask == nil else { return }
+        progressRevision = UUID()
         wasPlayingBeforeInterruption = false
         shouldPlay = true
         if !transport.hasSource || state == .ended || state == .failed {
@@ -280,6 +292,7 @@ public final class PlaybackController {
 
     public func seek(to position: TimeInterval) {
         guard !changingAccount, !isShutdown, currentEpisode != nil, position.isFinite else { return }
+        progressRevision = UUID()
         let clamped = max(0, position)
         currentTime = clamped
         generation = UUID()
@@ -615,6 +628,7 @@ public final class PlaybackController {
     }
 
     private func stopPlayback() {
+        progressRevision = UUID()
         cancelAudioSessionTask()
         shouldPlay = false
         wasPlayingBeforeInterruption = false
@@ -630,7 +644,14 @@ public final class PlaybackController {
         guard let episode = currentEpisode else { return }
         elapsedSinceProgress = 0
         playingSince = state == .playing ? monotonicTime() : nil
-        onProgress?(PlaybackUpdate(episode: episode, position: currentTime, completed: completed))
+        if let checkpoint = progressCheckpoint,
+           checkpoint.episode.identity == episode.identity,
+           checkpoint.position.rounded(.towardZero) == currentTime.rounded(.towardZero),
+           checkpoint.completed == completed { return }
+        progressRevision = UUID()
+        let update = PlaybackUpdate(episode: episode, position: currentTime, completed: completed)
+        progressCheckpoint = update
+        onProgress?(update)
     }
 
     private func withPreparedAudioSession(forPlayback: Bool, perform action: @escaping @MainActor () -> Void) {
@@ -868,6 +889,7 @@ public final class PlaybackController {
         currentTime = max(0, persisted.currentTime)
         duration = currentEpisode?.duration ?? 0
         transition(to: queue.isEmpty || persisted.stopped ? .idle : .paused)
+        progressCheckpoint = currentEpisode.map { PlaybackUpdate(episode: $0, position: currentTime, completed: false) }
     }
 
     static func defaultStorageURL() -> URL {

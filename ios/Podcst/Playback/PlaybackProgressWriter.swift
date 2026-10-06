@@ -27,6 +27,8 @@ final class PlaybackProgressWriter {
 
     deinit { worker?.cancel() }
 
+    var hasPendingUpdates: Bool { inFlight != nil || !pending.isEmpty }
+
     func submit(_ update: Update) {
         guard update.position.isFinite, update.position >= 0 else { return }
         pending.removeAll { $0.episodeID == update.episodeID }

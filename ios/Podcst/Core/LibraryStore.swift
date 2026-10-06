@@ -9,7 +9,6 @@ public final class LibraryStore {
     public private(set) var isLoading = false
     public private(set) var hasLoaded = false
     public private(set) var error: String?
-    public private(set) var progress: PlaybackProgress?
 
     private let api: APIClient
     private let session: SessionStore
@@ -54,19 +53,13 @@ public final class LibraryStore {
             }
         }
         do {
-            if let accountID {
-                await writer(for: accountID).flush()
-                guard session.user?.id == accountID, !Task.isCancelled else { return }
+            if accountID != nil {
                 if let cached = api.cachedSubscriptions() { podcasts = cached }
                 let subscriptions = try await (forceRefresh ? api.refreshSubscriptions() : api.subscriptions())
                 guard session.user?.id == accountID, !Task.isCancelled else { return }
                 podcasts = subscriptions
-                let latest = try? await api.currentProgress()
-                guard session.user?.id == accountID, !Task.isCancelled else { return }
-                progress = latest
             } else {
                 podcasts = loadGuest()
-                progress = nil
                 var refreshError: Error?
                 for podcast in podcasts {
                     do {
@@ -120,16 +113,24 @@ public final class LibraryStore {
         }
     }
 
-    public func restoreProgress() async {
-        guard session.user != nil else {
-            progress = nil
-            return
-        }
+    func restoreProgress() async -> PlaybackProgress? {
+        guard !Task.isCancelled, !session.isLoading,
+              let accountID = session.user?.id, api.accountID == accountID else { return nil }
+        let writer = writer(for: accountID)
+        await writer.flush()
+        guard !Task.isCancelled, !session.isLoading,
+              session.user?.id == accountID, !writer.hasPendingUpdates else { return nil }
         do {
-            progress = try await api.currentProgress()
+            let latest = try await api.currentProgress()
+            guard !Task.isCancelled, !session.isLoading,
+                  session.user?.id == accountID, !writer.hasPendingUpdates else { return nil }
             error = nil
+            return latest
         } catch let failure {
+            guard !Task.isCancelled, !session.isLoading,
+                  session.user?.id == accountID else { return nil }
             error = failure.localizedDescription
+            return nil
         }
     }
 
@@ -152,7 +153,6 @@ public final class LibraryStore {
             do {
                 try await self.api.saveProgress(episodeID: value.episodeID, position: value.position, completed: value.completed)
                 guard self.session.user?.id == accountID, !Task.isCancelled else { return }
-                if value.completed { self.progress = nil }
                 self.error = nil
             } catch {
                 guard self.session.user?.id == accountID, !Task.isCancelled else { return }
@@ -171,7 +171,6 @@ public final class LibraryStore {
         progressAccountID = nil
         await writer?.reset()
         podcasts = []
-        progress = nil
     }
 
     public func importFeeds(_ feeds: [String]) async {

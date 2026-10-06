@@ -104,14 +104,10 @@ struct RootView: View {
             await library.load()
             guard !Task.isCancelled else { return }
             await account.load(accountID: session.user?.id)
-            guard !Task.isCancelled else { return }
-            await playback.restore()
-            if playback.currentEpisode == nil, let progress = library.progress {
-                playback.restore(progress.episode, at: progress.position)
-            }
         }
-        .task(id: scenePhase) {
-            if scenePhase == .active { await library.flushProgress() }
+        .task(id: scenePhase == .active && !session.isLoading) {
+            guard scenePhase == .active, !session.isLoading else { return }
+            await playback.restoreProgress { await library.restoreProgress() }
         }
         .task(id: router.stoppedPlayback?.id) {
             guard router.stoppedPlayback != nil, (try? await Task.sleep(for: .seconds(5))) != nil else { return }
