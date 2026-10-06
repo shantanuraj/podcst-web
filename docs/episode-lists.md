@@ -1,11 +1,10 @@
 # Episode lists and starred-episode sync
 
-Status: implementation in progress for a coordinated pre-release breaking change.
-The schema, HTTP API, content retention/recovery and native transport decoders are
-implemented. Durable client sync, guest transfer and local storage replacement
-remain pending. No local-data
-reset has been performed. The [API contract](../contracts/api/README.md) describes
-the implemented wire format.
+Status: Starred synchronization is implemented on web, iOS and Android for a
+coordinated pre-release breaking change. The schema, HTTP API, content retention,
+durable client outboxes and automatic guest transfer are implemented. Named
+playlist management remains out of scope. The
+[API contract](../contracts/api/README.md) describes the wire format.
 
 ## Decisions
 
@@ -32,25 +31,46 @@ Breaking changes remove compatibility work, not offline-sync correctness.
 Never reconstruct an outbox by uploading a cached account collection: a stale
 cache is not a set of new user actions.
 
-## Existing integration points
+## Client implementation
 
-Current local star stores use feed URL and GUID:
+All star buttons and memberships use canonical numeric episode IDs. Missing IDs
+are rejected rather than resolved through feed URLs/GUIDs. Unrelated media-cache
+and playback identities are unchanged. Normal feed discovery/indexing happens
+before an episode can be starred, including by a guest.
 
-- [Web](../src/shared/stars/useStars.ts): IndexedDB and Zustand.
-- [iOS](../ios/Podcst/Core/StarStore.swift): JSON episode snapshots.
-- [Android](../android/core/data/src/main/kotlin/app/podcst/data/StarRepository.kt):
-  Room memberships joined to cached episodes.
+- [Web state machine](../src/shared/stars/state.ts) and
+  [sender](../src/shared/stars/sync.ts): one atomic IndexedDB root in
+  `podcst-lists`, shared across tabs. Web Locks serialize senders;
+  BroadcastChannel publishes projection changes. Browsers without Web Locks keep
+  local work but cannot send. AccountSession tokens fence requests and UI actions.
+- [iOS](../ios/Podcst/Core/StarStore.swift): one atomically replaced
+  `Podcst/EpisodeLists/lists.json`, protected until first device authentication
+  and excluded from backups. Main-actor serialization covers edits, guest
+  transfer and account changes.
+- [Android state](../android/core/data/src/main/kotlin/app/podcst/data/StarState.kt)
+  and [repository](../android/core/data/src/main/kotlin/app/podcst/data/StarRepository.kt):
+  one mutex-serialized AtomicFile, `episode-lists.json`, in app-private
+  `noBackupFilesDir`. It survives deletion of per-account Room catalogue caches.
+  Flow publications carry generation guards, including storage callbacks from IO.
 
-Replace their membership and star-button identities with required episode IDs.
-The API already supplies them; reject missing IDs at the list boundary rather
-than inventing temporary identities. This need not change unrelated media-cache
-or playback keys. Normal feed discovery/indexing still happens before an episode
-can be starred, including by a guest.
+Each root contains account-scoped membership snapshots, metadata, queued intent,
+one frozen batch, its durable acknowledgement, stream identity/sequence and
+terminal failures. Guest transfer updates the source and destination in the same
+commit. Successful device persistence precedes saved-state publication and toast
+feedback. Snapshots, not hydrated display pages, define membership; missing or
+inaccessible episodes stay visible as removable placeholders.
 
-Native account switches currently delete the previous account's star storage.
-Pending sync work must instead survive securely until that account returns.
-[Content eviction](../src/server/tiering.ts) also needs integration: it currently
-protects subscriptions and recent progress, not saved episodes.
+Authentication changes pause native senders before credential changes and hide
+account data until the new scope is ready. Sign-out removes old account metadata
+but retains minimal account-bound work and stream state. Cached account membership
+is never uploaded as new intent. Reconnect and foreground refresh resume retries;
+foreground polling runs every 60 seconds, with more frequent bounded retries for
+pending work. Protocol errors stop the affected stream without renumbering it.
+
+There is no legacy import: web deletes the obsolete `stars` key, iOS removes the
+old `Podcst/Stars` directory, and Android no longer reads the old Room star table.
+Only the new stores participate in guest merging. Downloads, progress and other
+catalogue storage are not reset.
 
 ## Storage
 
@@ -390,7 +410,8 @@ foreign key but refuses any saved references in either affected source, includin
 ones added after inspection. It locks the membership table during the check;
 unrelated saved episodes do not block a merge. Remapping needs a separate reviewed
 implementation; never cascade away items or choose arbitrary same-list winners.
-Deleted episode IDs currently have no redirects: an old offline add fails explicitly, without
+Deleted episode IDs currently have no redirects: an old offline add fails
+explicitly, without
 a feed/GUID resolver. Transparent continuity across destructive ID merges would
 require a separate catalogue identity decision, not list compatibility machinery.
 
@@ -450,6 +471,25 @@ Required tests:
 - Account deletion, foreign-key safety and reconciliation refusing unhandled
   list dependencies.
 
-Track snapshot sizes/latency, pending-work age, retries, action failures and
-unavailable content. Set mutation/stream-creation rate limits before rollout.
-Do not log private request bodies, episode snapshots, feed URLs or tokens.
+The three clients run the same
+[offline transition vectors](../contracts/fixtures/sync/star-outbox.json), plus
+platform tests for durable acknowledgements, exact lost-response replay, frozen
+batches with newer edits, account isolation, stale reads, storage failures,
+revocation and placeholders. Server mutation and stream-creation limits are in
+place. Production telemetry for snapshot sizes/latency, pending-work age and
+failures remains a follow-up; do not log private payloads, URLs or tokens.
+
+### Release checks
+
+- Deploy the list schema and all server routes before releasing clients. Drain
+  old server instances before native clients begin posting list changes.
+- Verify with a synthetic account on all three clients: guest star/sign-in,
+  another device's add/remove, offline taps followed by process restart, then
+  reconnect. Confirm the pending indicator clears only after a fresh snapshot.
+- Sign out while a request is in flight, sign into another account, then return.
+  Verify pending work resumes only for its original account and guest entries
+  were consumed once.
+- Test unavailable content and failed additions, and confirm unstar remains
+  possible without episode metadata. Check storage-denied/quota-full feedback.
+- Validate real-device foreground/network transitions. Automated simulator and
+  unit tests do not replace this final cross-device smoke test.

@@ -411,8 +411,9 @@ batch. Do not retry a protocol 409 under a new sequence or client ID.
 Fixtures derived from `src/server/lists/service.ts` and `response.ts`:
 `lists.list.json`, `lists.unauthorized.json`, `list-items.membership.json`,
 `list-items.episodes.json`, `list-changes.accepted.json`,
-`list-changes.conflict.json`. Both native transports decode these fixtures;
-client-side durable synchronization is a separate implementation step. See the
+`list-changes.conflict.json`. Both native transports decode these fixtures.
+Web, iOS and Android implement durable outboxes and run the shared
+[offline transition vectors](../fixtures/sync/star-outbox.json). See the
 [episode-list design](../../docs/episode-lists.md) for guest transfer and rollout.
 
 ## Fixtures
