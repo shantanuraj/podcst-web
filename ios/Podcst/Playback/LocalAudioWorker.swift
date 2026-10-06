@@ -998,6 +998,21 @@ private final class LocalAudioBranch {
     }
 }
 
+private final class LocalAudioUnitTransfer: @unchecked Sendable {
+    private var node: AVAudioUnit?
+
+    init(_ node: AVAudioUnit) {
+        self.node = node
+    }
+
+    @LocalAudioActor
+    func take() throws -> AVAudioUnit {
+        guard let node else { throw LocalAudioError.cannotCreateGraph }
+        self.node = nil
+        return node
+    }
+}
+
 @LocalAudioActor
 private final class LocalAudioGraph {
     let engine: AVAudioEngine
@@ -1076,12 +1091,13 @@ private final class LocalAudioGraph {
     }
 
     private static func instantiate(_ description: AudioComponentDescription) async throws -> AVAudioUnit {
-        try await withCheckedThrowingContinuation { continuation in
-            AVAudioUnit.instantiate(with: description, options: []) { node, error in
-                if let node { continuation.resume(returning: node) }
+        let transfer: LocalAudioUnitTransfer = try await withCheckedThrowingContinuation { continuation in
+            AVAudioUnit.instantiate(with: description, options: []) { @Sendable node, error in
+                if let node { continuation.resume(returning: LocalAudioUnitTransfer(node)) }
                 else { continuation.resume(throwing: error ?? LocalAudioError.cannotCreateGraph) }
             }
         }
+        return try transfer.take()
     }
 
     func stop() {
