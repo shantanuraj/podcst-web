@@ -157,7 +157,8 @@ JNIEXPORT jlong JNICALL Java_app_podcst_audio_NativeAudio_effectsCreate(
     config.boost_enabled = boost ? 1 : 0;
     config.trim_enabled = trim ? 1 : 0;
     PodcstEffectsProcessor* handle = nullptr;
-    return create(podcst_effects_create(&config, &handle), handle, channels);
+    const uint32_t status = podcst_effects_create(&config, &handle);
+    return create(status, handle, channels);
 }
 
 JNIEXPORT jint JNICALL Java_app_podcst_audio_NativeAudio_effectsConfigure(
@@ -252,7 +253,8 @@ JNIEXPORT jlong JNICALL Java_app_podcst_audio_NativeAudio_limiterCreate(
     config.channels = static_cast<uint32_t>(channels);
     config.limiter_enabled = 1;
     PodcstAudioProcessor* handle = nullptr;
-    return create(podcst_audio_create(&config, &handle), handle, channels);
+    const uint32_t status = podcst_audio_create(&config, &handle);
+    return create(status, handle, channels);
 }
 
 JNIEXPORT jlong JNICALL Java_app_podcst_audio_NativeAudio_limiterProcess(

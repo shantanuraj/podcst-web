@@ -149,6 +149,7 @@ tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("bui
 }
 
 tasks.withType<Test>().configureEach {
+    testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     dependsOn(buildHostJni)
     inputs.file(hostJniLibrary)
     inputs.dir(bridgeVectors.flatMap { it.outputDirectory })
