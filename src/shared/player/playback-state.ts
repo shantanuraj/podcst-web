@@ -43,7 +43,9 @@ export function restoreAccountProgress(
     !session.current(token, progress.episode.podcastId) ||
     player.accountScope !== token.scope ||
     player.accountRevision !== token.revision ||
-    player.queue.length
+    player.hasPlaybackActivity ||
+    player.state === 'playing' ||
+    player.state === 'buffering'
   )
     return false;
   player.restoreEpisode(progress.episode, progress.position);

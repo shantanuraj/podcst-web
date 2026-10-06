@@ -51,6 +51,7 @@ export function usePlaybackSync() {
     revision: number;
     episodeId: number;
     position: number;
+    completed: boolean;
   } | null>(null);
   const saved = useQuery(playbackQueryOptions(session));
 
@@ -75,26 +76,36 @@ export function usePlaybackSync() {
   );
 
   const save = useCallback(
-    async ({ episode, position }: EpisodePosition, completed: boolean) => {
+    async (
+      { episode, position }: EpisodePosition,
+      completed: boolean,
+      keepalive = false,
+    ) => {
       const episodeId = episode.id;
-      if (!episodeId || !owns(usePlayer.getState())) return;
+      const state = usePlayer.getState();
+      if (
+        !episodeId ||
+        !owns(state) ||
+        (!state.hasPlaybackActivity && !completed)
+      )
+        return;
+      position = Math.floor(position);
+      completed ||= completedAt(episode, position);
       const last = lastSavedRef.current;
       if (
-        !completed &&
         last?.revision === token.revision &&
         last.episodeId === episodeId &&
-        last.position === position
+        last.position === position &&
+        last.completed === completed
       )
         return;
       try {
         await session.run(token, 'playback', async (signal) =>
           responseData(
-            await request(
-              episodeId,
-              position,
-              completed || completedAt(episode, position),
-              { signal },
-            ),
+            await request(episodeId, position, completed, {
+              signal,
+              keepalive,
+            }),
           ),
         );
         if (session.current(token))
@@ -102,6 +113,7 @@ export function usePlaybackSync() {
             revision: token.revision,
             episodeId,
             position,
+            completed,
           };
       } catch {}
     },
@@ -150,20 +162,22 @@ export function usePlaybackSync() {
     );
     const offLeave = onPlayer('leave', (value) => void save(value, false));
     const offComplete = onPlayer('complete', (value) => void save(value, true));
-    let seekedEpisode = getCurrentEpisode(usePlayer.getState());
     const seeked = usePlayer.subscribe(
-      (state) => state.seekPosition,
-      (position, previous) => {
-        const state = usePlayer.getState();
-        const episode = getCurrentEpisode(state);
-        const same = sameEpisode(episode, seekedEpisode);
-        seekedEpisode = episode;
+      (state) => ({
+        episode: getCurrentEpisode(state),
+        position: state.seekPosition,
+      }),
+      ({ episode, position }, previous) => {
         if (
-          same &&
-          state.state !== 'idle' &&
-          Math.abs(position - previous) > SEEK_JUMP_SECONDS
+          sameEpisode(episode, previous.episode) &&
+          usePlayer.getState().state !== 'idle' &&
+          Math.abs(position - previous.position) > SEEK_JUMP_SECONDS
         )
           saveCurrent();
+      },
+      {
+        equalityFn: (a, b) =>
+          a.position === b.position && sameEpisode(a.episode, b.episode),
       },
     );
     return () => {
@@ -181,14 +195,9 @@ export function usePlaybackSync() {
       const state = usePlayer.getState();
       const episode = getCurrentEpisode(state);
       if (!episode?.id || !owns(state) || state.state === 'idle') return;
-      void request(
-        episode.id,
-        state.seekPosition,
-        completedAt(episode, state.seekPosition),
-        { keepalive: true },
-      ).catch(() => {});
+      void save({ episode, position: state.seekPosition }, false, true);
     };
     window.addEventListener('pagehide', leave);
     return () => window.removeEventListener('pagehide', leave);
-  }, [token, owns]);
+  }, [token, owns, save]);
 }

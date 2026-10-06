@@ -26,6 +26,7 @@ export interface IPlayerState {
   rate: number;
   savedRate: number | undefined;
   state: PlayerState;
+  hasPlaybackActivity: boolean;
 
   playEpisode: (episode: IEpisodeInfo, seekPosition?: number) => void;
   enqueueEpisode: (episode: IEpisodeInfo, next: boolean) => void;
@@ -91,18 +92,27 @@ export const usePlayer = create<IPlayerState>()(
         state?: PlayerState;
         completed?: boolean;
         position?: number;
+        restoring?: boolean;
       } = {},
     ) => {
       const previous = get();
       const before = getCurrentEpisode(previous);
       const after = next.queue[next.current];
       const changed = !sameEpisode(before, after);
+      const state = !next.active
+        ? 'idle'
+        : (options.state ??
+          (previous.state === 'idle'
+            ? 'buffering'
+            : changed && previous.state !== 'paused'
+              ? 'buffering'
+              : previous.state));
       if (before && options.completed)
         emitPlayer('complete', {
           episode: before,
           position: previous.duration || before.duration || 0,
         });
-      else if (before && changed)
+      else if (before && changed && !options.restoring)
         emitPlayer('leave', {
           episode: before,
           position: previous.seekPosition,
@@ -110,14 +120,15 @@ export const usePlayer = create<IPlayerState>()(
       set({
         queue: next.queue,
         currentTrackIndex: next.current,
-        state: !next.active
-          ? 'idle'
-          : (options.state ??
-            (previous.state === 'idle'
-              ? 'buffering'
-              : changed && previous.state !== 'paused'
-                ? 'buffering'
-                : previous.state)),
+        hasPlaybackActivity:
+          previous.hasPlaybackActivity ||
+          (!options.restoring &&
+            (changed ||
+              state !== previous.state ||
+              (options.position !== undefined &&
+                options.position !== previous.seekPosition) ||
+              options.completed === true)),
+        state,
         ...(changed ? { seekPosition: 0, duration: after?.duration || 0 } : {}),
         ...(options.position === undefined
           ? {}
@@ -159,6 +170,7 @@ export const usePlayer = create<IPlayerState>()(
           seekPosition: saved?.position ?? 0,
           duration: saved?.queue[saved.current].duration || 0,
           state: saved ? 'paused' : 'idle',
+          hasPlaybackActivity: false,
           rate,
           savedRate: undefined,
           isAirplayEnabled: false,
@@ -176,6 +188,7 @@ export const usePlayer = create<IPlayerState>()(
       rate: supportedRate(getValue('rate')),
       savedRate: undefined,
       state: 'idle',
+      hasPlaybackActivity: false,
       isAirplayEnabled: false,
       isChromecastEnabled: false,
       isChromecastConnecting: false,
@@ -196,18 +209,20 @@ export const usePlayer = create<IPlayerState>()(
         commit(Queue.play(sessionOf(get()), episode, sameEpisode), {
           state: 'paused',
           position: seekPosition,
+          restoring: true,
         }),
 
       togglePlayback: () => {
         const { state, queue, chromecastState } = get();
         if (state === 'playing' || state === 'buffering')
-          return set({ state: 'paused' });
+          return set({ state: 'paused', hasPlaybackActivity: true });
         if (!queue.length) return;
         if (state === 'idle')
           return commit(Queue.reopen(sessionOf(get())), {
             state: 'buffering',
           });
         set({
+          hasPlaybackActivity: true,
           state:
             isChromecastConnected(chromecastState) || AudioUtils.loaded()
               ? 'playing'
@@ -223,7 +238,7 @@ export const usePlayer = create<IPlayerState>()(
       pause: () => {
         const { state } = get();
         if (state === 'playing' || state === 'buffering')
-          set({ state: 'paused' });
+          set({ state: 'paused', hasPlaybackActivity: true });
       },
 
       stop: () => commit(Queue.stop(sessionOf(get()))),
@@ -247,9 +262,19 @@ export const usePlayer = create<IPlayerState>()(
 
       clearQueue: () => commit(Queue.emptySession),
 
-      setPlayerState: (state) => set({ state }),
+      setPlayerState: (state) =>
+        set({
+          state,
+          hasPlaybackActivity:
+            get().hasPlaybackActivity || state !== get().state,
+        }),
 
-      setSeekPosition: (seekPosition) => set({ seekPosition }),
+      setSeekPosition: (seekPosition) =>
+        set({
+          seekPosition,
+          hasPlaybackActivity:
+            get().hasPlaybackActivity || seekPosition !== get().seekPosition,
+        }),
 
       setDuration: (duration) => set({ duration }),
 
