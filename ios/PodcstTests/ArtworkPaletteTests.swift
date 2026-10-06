@@ -61,6 +61,24 @@ final class ArtworkPaletteTests: XCTestCase {
         XCTAssertEqual(swatches.first { $0.population == 30 }?.rgb, 0x306060)
     }
 
+    func testQuantizationPreservesChannelOrderAndDiscardsLowBits() {
+        let pixels: [UInt32] = [
+            0xF80000, 0xFF0707,
+            0x00F800, 0x07FF07,
+            0x0000F8, 0x0707FF,
+            0x3060C8, 0x3767CF,
+            0x3868D0,
+        ]
+        let expected: [ArtworkPalette.Swatch] = [
+            .init(rgb: 0x0000F8, population: 2),
+            .init(rgb: 0x00F800, population: 2),
+            .init(rgb: 0x3060C8, population: 2),
+            .init(rgb: 0x3868D0, population: 1),
+            .init(rgb: 0xF80000, population: 2),
+        ]
+        XCTAssertEqual(ArtworkPalette.quantize(pixels), expected)
+    }
+
     func testQuantizationCutsManyColorsIntoAtMostTheRequestedBoxes() {
         let pixels = (0..<4096).map { (index: Int) -> UInt32 in
             let red = UInt32(index % 64 * 4)

@@ -135,7 +135,11 @@ struct ArtworkPalette {
     static func quantize(_ pixels: [UInt32], maxColors: Int = 16) -> [Swatch] {
         var histogram = [Int](repeating: 0, count: 1 << 15)
         for pixel in pixels {
-            histogram[Int((pixel >> 19 & 0x1F) << 10 | (pixel >> 11 & 0x1F) << 5 | (pixel >> 3 & 0x1F))] += 1
+            let red = Int((pixel >> 19) & 0x1F)
+            let green = Int((pixel >> 11) & 0x1F)
+            let blue = Int((pixel >> 3) & 0x1F)
+            let color = (red << 10) | (green << 5) | blue
+            histogram[color] += 1
         }
         var colors = histogram.indices.filter { histogram[$0] > 0 && HSL(widen($0)).allowed }
         guard colors.count > maxColors else {
