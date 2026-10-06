@@ -3,7 +3,8 @@ import UIKit
 
 extension Router {
     func star(_ episode: Episode, _ starred: Bool, in stars: StarStore) {
-        if starred { stars.star(episode) } else { stars.unstar(episode) }
+        let saved = starred ? stars.star(episode) : stars.unstar(episode)
+        guard saved else { toast = Toast(title: stars.error ?? "Unable to save this change"); return }
         let undo = Toast.Action(title: "Undo", emphasized: false) { [weak self] in self?.star(episode, !starred, in: stars) }
         toast = starred
             ? Toast(title: "Starred", systemImage: "star.fill", actions: [Toast.Action(title: "Add to list…") { [weak self] in self?.listing = episode }, undo])
@@ -77,6 +78,7 @@ struct AddToListSheet: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .disabled(!stars.ready || !StarStore.validID(episode.id))
             .accessibilityAddTraits(starred ? .isSelected : [])
             .padding(.horizontal, 16)
             .padding(.top, 14)

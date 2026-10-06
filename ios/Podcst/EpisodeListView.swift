@@ -55,13 +55,25 @@ struct EpisodeListView: View {
                             .font(.serif(.title))
                             .tracking(-0.4)
                             .accessibilityAddTraits(.isHeader)
-                        Text("^[\(episodes.count) episode](inflect: true)\(extent.map { " · \($0)" } ?? "")")
+                        Text("^[\(list == .starred ? stars.stars.count : episodes.count) episode](inflect: true)\(extent.map { " · \($0)" } ?? "")")
                             .font(.sans(.footnote))
                             .foregroundStyle(PodcstPalette.tertiary)
                     }
                 }
                 .padding(.top, 6)
-                if episodes.isEmpty {
+                if list == .starred {
+                    if let error = stars.error { Text(error).font(.sans(.footnote)).accessibilityAddTraits(.updatesFrequently) }
+                    else if stars.pending { Text("Saved on this device. Waiting to sync…").font(.sans(.footnote)) }
+                    ForEach(stars.stars.filter { $0.episode == nil }) { star in
+                        HStack {
+                            Text(star.membership.availability == .unavailable ? "Episode unavailable" : "Episode details unavailable")
+                            Spacer()
+                            Button("Unstar") { stars.remove(id: star.id) }
+                        }
+                        .padding(.vertical, 12)
+                    }
+                }
+                if episodes.isEmpty && (list != .starred || stars.stars.isEmpty) {
                     Group {
                         switch list {
                         case .starred:
@@ -74,7 +86,7 @@ struct EpisodeListView: View {
                     .padding(.top, 40)
                 } else {
                     switch list {
-                    case .starred: StarredEpisodes(episodes: episodes)
+                    case .starred: if !episodes.isEmpty { StarredEpisodes(episodes: episodes) }
                     case .downloads: DownloadedEpisodes(episodes: episodes)
                     }
                 }
@@ -87,6 +99,8 @@ struct EpisodeListView: View {
         } action: { _, visible in
             withAnimation(.easeInOut(duration: 0.2)) { titleVisible = visible }
         }
+        .refreshable { if list == .starred { await stars.refresh() } }
+        .task { if list == .starred { await stars.refresh() } }
         .podcstPage()
         .navigationTitle(titleVisible ? list.title : "")
         .navigationBarTitleDisplayMode(.inline)

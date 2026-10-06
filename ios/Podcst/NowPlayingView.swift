@@ -372,6 +372,7 @@ private struct StarButton: View {
                 .background(starred ? PodcstPalette.accentSoft : PodcstPalette.ink.opacity(0.1), in: Circle())
         }
         .buttonStyle(.plain)
+        .disabled(!stars.ready || !StarStore.validID(episode.id))
         .sensoryFeedback(.selection, trigger: starred)
         .accessibilityLabel(starred ? "Unstar" : "Star")
     }

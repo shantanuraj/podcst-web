@@ -9,6 +9,8 @@ public final class SessionStore {
     public private(set) var error: String?
 
     @ObservationIgnored var prepareAccountChange: ((String?) async throws -> Void)?
+    @ObservationIgnored var suspendAccountWork: (() -> Void)?
+    @ObservationIgnored var resumeAccountWork: (() -> Void)?
     private var changingSession = false
     private var restoration: (id: UUID, task: Task<Void, Never>)?
     private let storageURL: URL
@@ -51,7 +53,7 @@ public final class SessionStore {
             guard let self else { return }
             defer {
                 if self.restoration?.id == id { self.restoration = nil }
-                if !self.changingSession { self.isLoading = false }
+                if !self.changingSession { self.isLoading = false; self.resumeAccountWork?() }
             }
             do {
                 let value = try await self.api.sessionUser()
@@ -91,9 +93,10 @@ public final class SessionStore {
 
     public func signIn(email: String, code: String) async {
         guard !changingSession else { return }
+        suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false }
+        defer { changingSession = false; isLoading = false; resumeAccountWork?() }
         await cancelRestoration()
         do {
             try await updateUser(api.signIn(email: email, code: code))
@@ -105,9 +108,10 @@ public final class SessionStore {
 
     public func signInWithPasskey(email: String? = nil) async {
         guard !changingSession else { return }
+        suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false }
+        defer { changingSession = false; isLoading = false; resumeAccountWork?() }
         await cancelRestoration()
         do {
             try await updateUser(api.signInWithPasskey(email: email))
@@ -129,9 +133,10 @@ public final class SessionStore {
 
     public func signOut() async {
         guard !changingSession else { return }
+        suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false }
+        defer { changingSession = false; isLoading = false; resumeAccountWork?() }
         await cancelRestoration()
         do {
             try await updateUser(nil)
