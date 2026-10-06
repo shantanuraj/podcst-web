@@ -1,6 +1,11 @@
 package app.podcst.network
 
 import app.podcst.model.Account
+import app.podcst.model.AccountEpisodeList
+import app.podcst.model.ListAcknowledgement
+import app.podcst.model.ListBatch
+import app.podcst.model.ListEpisodePage
+import app.podcst.model.ListSnapshot
 import app.podcst.model.AudioOptions
 import app.podcst.model.EpisodePage
 import app.podcst.model.EpisodeSort
@@ -186,6 +191,16 @@ class PodcstApi(
             put("completed", completed)
         })
     }
+
+    suspend fun lists(): List<AccountEpisodeList> = get<WireEpisodeLists>("api/lists").lists
+
+    suspend fun listMembership(id: String): ListSnapshot = get("api/lists/$id/items", "view" to "membership")
+
+    suspend fun listEpisodes(id: String, cursor: String? = null): ListEpisodePage =
+        get<WireListEpisodePage>("api/lists/$id/items", "view" to "episodes", "cursor" to cursor).domain()
+
+    suspend fun changeList(id: String, batch: ListBatch): ListAcknowledgement =
+        post("api/lists/$id/changes", json.encodeToJsonElement(ListBatch.serializer(), batch))
 
     suspend fun account(): Account = get<WireAccount>("api/account").domain()
 

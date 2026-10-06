@@ -1,8 +1,10 @@
 # Episode lists and starred-episode sync
 
-Status: proposed design, revised for a coordinated pre-release breaking change.
-No endpoints, schema changes or local-data resets described here are implemented.
-The [API contract](../contracts/api/README.md) describes the current API.
+Status: implementation in progress for a coordinated pre-release breaking change.
+The schema, HTTP API and native transport decoders are implemented. Durable client
+sync, guest transfer and local storage replacement remain pending. No local-data
+reset has been performed. The [API contract](../contracts/api/README.md) describes
+the implemented wire format.
 
 ## Decisions
 
@@ -379,11 +381,12 @@ content is absent; recovery must handle an individually missing episode too.
 Do not make a multi-podcast list read wait on upstream feeds. Membership survives
 feed removal, but missing metadata/audio may be unrecoverable.
 
-[Podcast reconciliation](podcast-reconciliation.md) currently refuses unknown
-dependencies. Keep that safe default until its snapshots, locks and reviewed
-membership remapping are extended. Do not silently cascade away saved items or
-choose arbitrary winners for same-list collisions. Deleted episode IDs currently
-have no redirects: an old offline add for such an ID fails explicitly, without
+[Podcast reconciliation](podcast-reconciliation.md) recognizes the membership
+foreign key but refuses any saved references in either affected source, including
+ones added after inspection. It locks the membership table during the check;
+unrelated saved episodes do not block a merge. Remapping needs a separate reviewed
+implementation; never cascade away items or choose arbitrary same-list winners.
+Deleted episode IDs currently have no redirects: an old offline add fails explicitly, without
 a feed/GUID resolver. Transparent continuity across destructive ID merges would
 require a separate catalogue identity decision, not list compatibility machinery.
 

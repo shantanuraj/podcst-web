@@ -49,7 +49,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 `Podcast` has no `thumbnail`, `itunes_id`, `count` or `episodeCount`. A client needing the episode count of a full `Podcast` uses `episodes.length`; for a subscription, where only two episodes are returned, it must call `/api/feed/info`.
 
-`Episode` is `IEpisodeInfo`. The schema keeps episode content in a separate table that can be evicted for podcasts nobody follows (`src/server/tiering.ts`), and an episode dropped from its feed keeps its identity row without content. Every endpoint joins `episode_content` and omits episodes without content (`getPodcastById`, `getEpisodeById`, `readEpisodePage`, `getSubscriptions`, `getCurrentProgress`), so `title` and `file.url` are always present and counts include only returned episodes.
+`Episode` is `IEpisodeInfo`. The schema keeps episode content in a separate table that can be evicted for podcasts nobody follows (`src/server/tiering.ts`), and an episode dropped from its feed keeps its identity row without content. Catalogue and progress endpoints join `episode_content` and omit episodes without content (`getPodcastById`, `getEpisodeById`, `readEpisodePage`, `getSubscriptions`, `getCurrentProgress`), so `title` and `file.url` are always present and their counts include only returned episodes. List responses retain memberships without accessible content as nullable episode entries, described below.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -329,6 +329,88 @@ Body: `Preferences`. Every field is required; `speed` must be one of `rules.json
 Removes one of the account's passkeys. Returns `Success`, 404 `{message: "Passkey not found"}` for an unknown ID or another account's passkey, 401 `{message: "Unauthorized"}`. Removing the last passkey leaves email-code sign-in.
 
 Fixtures (derived from the routes): `account.details.json`, `account.unsaved.json`, `account.unauthorized.json`, `account-preferences.saved.json`, `account-preferences.invalid.json`, `account-passkey-remove.success.json`, `account-passkey-remove.not-found.json`.
+
+### `GET /api/lists` — required
+
+Bootstraps the account's built-in Starred list and returns `{ "lists": EpisodeList[] }`.
+`EpisodeList` contains UUID `id`, `kind` (`starred` or `playlist`), nullable `name`,
+decimal-string `revision` and integer `itemCount`. Starred has no stored name;
+clients localize it by kind. Count includes unavailable memberships. There is no
+playlist creation endpoint yet.
+
+All list responses, including errors, carry private-feed headers. Missing
+sessions return 401; nonexistent and other accounts' lists both return 404.
+Uncaught session/database failures return 503 `{message: "Lists unavailable"}`.
+
+### `GET /api/lists/:id/items` — required
+
+`view=membership` returns `ListSnapshot`: `{ "listId": UUID, "revision": string,
+"items": ListMembership[] }`. This is the **complete** account-owned membership
+snapshot, never a page. `limit` and `cursor` are rejected in this view.
+
+`ListMembership` contains:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `episodeId` | integer | Canonical episode database ID. |
+| `addedAt` | integer | Server addition time in epoch milliseconds. |
+| `availability` | string | `available`, `content_missing` or `unavailable`. |
+
+`view=episodes` (default) returns `ListEpisodePage`: the same envelope and entry
+fields, with `episode: Episode | null` per item and `nextCursor: string | null`.
+Limit defaults to 100 and must be 1–200. The opaque keyset cursor belongs to that
+list; ordering is addition time then episode ID, descending. Concurrent changes
+can move items between display pages, so deduplicate by ID. Never infer removals
+from display pagination: the complete membership snapshot is authoritative.
+
+Missing or revoked content does not delete a membership. Inaccessible private
+metadata is never returned; clients must purge cached private data for
+`unavailable` entries. Revisions track membership/list changes, not episode
+metadata or access changes. Recheck availability even at an unchanged revision.
+
+Invalid UUIDs, views, duplicate/unknown query parameters, limits and cursors return
+400 `{message: ...}`. The endpoint does not fetch upstream feeds while responding.
+
+### `POST /api/lists/:id/changes` — required
+
+Body `ListBatch`: `{ "clientId": UUID, "sequence": decimal string, "changes":
+[{ "op": "add" | "remove", "episodeId": positive safe integer }] }`.
+There must be 1–100 actions and at most 64 KiB of request body. Extra body/action
+fields are rejected. Sequence ranges from 1 through the signed PostgreSQL bigint
+maximum, encoded as a string so it survives JavaScript decoding exactly.
+
+Actions are ordered. Add requires a visible episode identity, not necessarily
+retained content; adding an existing member preserves its time. Remove physically
+deletes the membership and succeeds as a no-op when absent, including for an
+unknown ID. It can remove an owned membership whose episode is now inaccessible.
+No toggle, whole-list replacement, import or source/GUID resolver exists.
+
+Returns `ListAcknowledgement`: `{ "clientId", "sequence", "listId", "revision",
+"results": [{ "episodeId", "status": "applied" | "unchanged" | "not_found" }] }`.
+Results correspond to actions in order. `not_found` covers missing and
+inaccessible adds. Terminal per-action failures can coexist with successful
+ones; the batch effects and its acknowledgement commit together. Revision advances
+once when any action changes membership, not for an entirely no-op batch.
+
+Each client/account stream starts at 1, sends one batch at a time and persists
+its exact in-flight batch. The immediately preceding sequence with the same
+canonical request returns its saved acknowledgement **without replaying actions**.
+Older, skipped or changed-payload sequences return 409. A saved acknowledgement
+is not a current snapshot: refetch membership after acknowledging a batch.
+Explicit actions on different devices use last server-accepted action wins.
+
+400 covers malformed input, 413 oversized bodies and 409 stream protocol errors.
+Mutation requests are limited to 120 per account per minute; new stream
+registrations to 20 per account per hour. Limits return 429 with `Retry-After: 60`;
+Redis failures fail closed with 503. Retry transient failures with the identical
+batch. Do not retry a protocol 409 under a new sequence or client ID.
+
+Fixtures derived from `src/server/lists/service.ts` and `response.ts`:
+`lists.list.json`, `lists.unauthorized.json`, `list-items.membership.json`,
+`list-items.episodes.json`, `list-changes.accepted.json`,
+`list-changes.conflict.json`. Both native transports decode these fixtures;
+client-side durable synchronization is a separate implementation step. See the
+[episode-list design](../../docs/episode-lists.md) for guest transfer and rollout.
 
 ## Fixtures
 

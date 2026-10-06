@@ -80,7 +80,10 @@ async function readItems(
   `;
 }
 
-export function createEpisodeListService(sql: postgres.Sql) {
+export function createEpisodeListService(
+  sql: postgres.Sql,
+  registerClient?: (userId: string) => Promise<void>,
+) {
   return {
     async lists(userId: string): Promise<{ lists: EpisodeList[] }> {
       await sql`
@@ -174,10 +177,12 @@ export function createEpisodeListService(sql: postgres.Sql) {
       return sql.begin(async (tx) => {
         await tx`SET LOCAL lock_timeout = '3s'`;
         await ownedList(tx, userId, listId);
-        await tx`
+        const registered = await tx`
           INSERT INTO episode_list_clients (user_id, client_id)
           VALUES (${userId}, ${batch.clientId}) ON CONFLICT DO NOTHING
+          RETURNING client_id
         `;
+        if (registered.length) await registerClient?.(userId);
         const [client] = await tx`
           SELECT last_sequence::text, last_request_hash, last_result
           FROM episode_list_clients

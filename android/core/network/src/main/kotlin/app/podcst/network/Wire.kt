@@ -1,6 +1,11 @@
 package app.podcst.network
 
 import app.podcst.model.Account
+import app.podcst.model.AccountEpisodeList
+import app.podcst.model.ListAvailability
+import app.podcst.model.ListMembership
+import app.podcst.model.ListEpisodeItem
+import app.podcst.model.ListEpisodePage
 import app.podcst.model.AudioEffects
 import app.podcst.model.AudioOptions
 import app.podcst.model.Episode
@@ -95,6 +100,14 @@ internal data class WireUser(
     val image: String? = null,
     val hasPasskey: Boolean = false,
 )
+
+@Serializable internal data class WireEpisodeLists(val lists: List<AccountEpisodeList>)
+@Serializable internal data class WireListEpisodeItem(val episodeId: Long, val addedAt: Long, val availability: ListAvailability, val episode: WireEpisode? = null)
+@Serializable internal data class WireListEpisodePage(val listId: String, val revision: String, val items: List<WireListEpisodeItem>, val nextCursor: String? = null)
+
+internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, items.map {
+    ListEpisodeItem(ListMembership(it.episodeId, it.addedAt, it.availability), it.episode?.domain())
+}, nextCursor)
 
 @Serializable internal data class WireSession(val user: WireUser? = null)
 @Serializable internal data class WireProgress(val episode: WireEpisode, val position: Double)

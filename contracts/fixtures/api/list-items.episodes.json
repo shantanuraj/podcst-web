@@ -1,0 +1,47 @@
+{
+  "listId": "0c339753-cb50-477c-843e-e641b414a060",
+  "revision": "9007199254740993",
+  "items": [
+    {
+      "episodeId": 910001,
+      "addedAt": 1770000000000,
+      "availability": "available",
+      "episode": {
+        "id": 910001,
+        "podcastId": 900001,
+        "isPrivate": false,
+        "guid": "synthetic-episode",
+        "feed": "https://example.invalid/feed.xml",
+        "podcastTitle": "Synthetic podcast",
+        "title": "Saved episode",
+        "summary": null,
+        "showNotes": "",
+        "published": 1767225600000,
+        "duration": 120,
+        "episodeArt": null,
+        "cover": "https://example.invalid/cover.jpg",
+        "explicit": false,
+        "author": "Synthetic author",
+        "link": null,
+        "file": {
+          "url": "https://example.invalid/audio.mp3",
+          "length": 0,
+          "type": "audio/mpeg"
+        }
+      }
+    },
+    {
+      "episodeId": 910002,
+      "addedAt": 1769000000000,
+      "availability": "content_missing",
+      "episode": null
+    },
+    {
+      "episodeId": 910003,
+      "addedAt": 1768000000000,
+      "availability": "unavailable",
+      "episode": null
+    }
+  ],
+  "nextCursor": null
+}

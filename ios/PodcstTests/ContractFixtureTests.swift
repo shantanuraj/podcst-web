@@ -181,6 +181,24 @@ final class ContractFixtureTests: XCTestCase {
         case "DELETE /api/subscriptions": try await api.unsubscribe(podcastID: 910001)
         case "GET /api/progress": _ = try await api.currentProgress()
         case "PUT /api/progress": try await api.saveProgress(episodeID: 910001, position: 12, completed: false)
+        case "GET /api/lists":
+            let lists = try await api.lists()
+            XCTAssertEqual(lists.first?.revision, "9007199254740993")
+        case "GET /api/lists/:id/items":
+            if fixture.type == "ListSnapshot" {
+                let snapshot = try await api.listMembership(id: ":id")
+                XCTAssertEqual(snapshot.revision, "9007199254740993")
+                XCTAssertEqual(snapshot.items.map(\.availability), [.available, .contentMissing, .unavailable])
+            } else {
+                let page = try await api.listEpisodes(id: ":id")
+                XCTAssertEqual(page.items.first?.episode?.id, 910001)
+                XCTAssertNil(page.items.last?.episode)
+                XCTAssertNil(page.nextCursor)
+            }
+        case "POST /api/lists/:id/changes":
+            let result = try await api.changeList(id: ":id", batch: ListBatch(clientId: "a7a2e014-b64f-4487-9c92-71cd59fc0cf7", sequence: "9007199254740993", changes: [ListChange(op: .add, episodeId: 910001), ListChange(op: .remove, episodeId: 910002), ListChange(op: .add, episodeId: 910003)]))
+            XCTAssertEqual(result.sequence, "9007199254740993")
+            XCTAssertEqual(result.results.map(\.status), [.applied, .unchanged, .notFound])
         case "GET /api/account": _ = try await api.account()
         case "PUT /api/account/preferences": _ = try await api.savePreferences(AudioOptions(speed: 1.5, effects: AudioEffects(volumeBoost: true)))
         case "DELETE /api/account/passkeys/:id": try await api.removePasskey(id: ":id")

@@ -224,6 +224,36 @@
     "status": 200,
     "decodesAs": "Success"
   },
+  "list-changes.accepted.json": {
+    "endpoint": "POST /api/lists/:id/changes",
+    "status": 200,
+    "decodesAs": "ListAcknowledgement"
+  },
+  "list-changes.conflict.json": {
+    "endpoint": "POST /api/lists/:id/changes",
+    "status": 409,
+    "decodesAs": "ErrorMessage"
+  },
+  "list-items.episodes.json": {
+    "endpoint": "GET /api/lists/:id/items",
+    "status": 200,
+    "decodesAs": "ListEpisodePage"
+  },
+  "list-items.membership.json": {
+    "endpoint": "GET /api/lists/:id/items",
+    "status": 200,
+    "decodesAs": "ListSnapshot"
+  },
+  "lists.list.json": {
+    "endpoint": "GET /api/lists",
+    "status": 200,
+    "decodesAs": "EpisodeLists"
+  },
+  "lists.unauthorized.json": {
+    "endpoint": "GET /api/lists",
+    "status": 401,
+    "decodesAs": "ErrorMessage"
+  },
   "progress.current.json": {
     "endpoint": "GET /api/progress",
     "status": 200,

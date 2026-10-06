@@ -357,6 +357,28 @@ public final class APIClient {
         let _: RawSuccess = try await put(path: "/api/progress", body: ProgressBody(episodeId: episodeID, position: Int(position.rounded(.towardZero)), completed: completed))
     }
 
+    func lists() async throws -> [AccountEpisodeList] {
+        let raw: RawEpisodeLists = try await get(path: "/api/lists")
+        return raw.lists
+    }
+
+    func listMembership(id: String) async throws -> ListSnapshot {
+        try await get(path: "/api/lists/\(id)/items", query: [URLQueryItem(name: "view", value: "membership")])
+    }
+
+    func listEpisodes(id: String, cursor: String? = nil) async throws -> ListEpisodePage {
+        var query = [URLQueryItem(name: "view", value: "episodes")]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        let raw: RawListEpisodePage = try await get(path: "/api/lists/\(id)/items", query: query)
+        return ListEpisodePage(listId: raw.listId, revision: raw.revision, items: raw.items.map {
+            ListEpisodeItem(membership: $0.membership, episode: $0.episode.map { mapEpisode($0) })
+        }, nextCursor: raw.nextCursor)
+    }
+
+    func changeList(id: String, batch: ListBatch) async throws -> ListAcknowledgement {
+        try await post(path: "/api/lists/\(id)/changes", body: batch)
+    }
+
     func account() async throws -> Account {
         let raw: RawAccount = try await get(path: "/api/account")
         return Account(
@@ -761,6 +783,24 @@ public struct KeychainStore: SessionCredentialStore, Sendable {
 }
 
 private struct EmptyBody: Encodable {}
+private struct RawEpisodeLists: Decodable { var lists: [AccountEpisodeList] }
+private struct RawListEpisodePage: Decodable {
+    var listId: String
+    var revision: String
+    var items: [RawListEpisodeItem]
+    var nextCursor: String?
+}
+private struct RawListEpisodeItem: Decodable {
+    var membership: ListMembership
+    var episode: RawEpisode?
+
+    private enum CodingKeys: String, CodingKey { case episode }
+
+    init(from decoder: Decoder) throws {
+        membership = try ListMembership(from: decoder)
+        episode = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(RawEpisode.self, forKey: .episode)
+    }
+}
 private struct ProgressBody: Encodable { var episodeId: Int; var position: Int; var completed: Bool }
 private struct PasskeyLoginBody: Encodable {
     var email: String?

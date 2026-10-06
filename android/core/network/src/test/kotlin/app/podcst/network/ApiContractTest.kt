@@ -2,6 +2,10 @@ package app.podcst.network
 
 import app.podcst.model.AudioEffects
 import app.podcst.model.AudioOptions
+import app.podcst.model.ListAvailability
+import app.podcst.model.ListBatch
+import app.podcst.model.ListChange
+import app.podcst.model.ListChangeResult
 
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -82,6 +86,22 @@ class ApiContractTest {
             "DELETE /api/subscriptions" -> api.unsubscribe(1)
             "GET /api/progress" -> api.currentProgress()
             "PUT /api/progress" -> api.saveProgress(1, 12.5, false)
+            "GET /api/lists" -> assertEquals("9007199254740993", api.lists().first().revision)
+            "GET /api/lists/:id/items" -> if (type == "ListSnapshot") {
+                val snapshot = api.listMembership(":id")
+                assertEquals("9007199254740993", snapshot.revision)
+                assertEquals(listOf(ListAvailability.Available, ListAvailability.ContentMissing, ListAvailability.Unavailable), snapshot.items.map { it.availability })
+            } else {
+                val page = api.listEpisodes(":id")
+                assertEquals(910001L, page.items.first().episode?.id)
+                assertEquals(null, page.items.last().episode)
+                assertEquals(null, page.nextCursor)
+            }
+            "POST /api/lists/:id/changes" -> {
+                val result = api.changeList(":id", ListBatch("a7a2e014-b64f-4487-9c92-71cd59fc0cf7", "9007199254740993", listOf(ListChange(ListChange.Operation.Add, 910001), ListChange(ListChange.Operation.Remove, 910002), ListChange(ListChange.Operation.Add, 910003))))
+                assertEquals("9007199254740993", result.sequence)
+                assertEquals(listOf(ListChangeResult.Status.Applied, ListChangeResult.Status.Unchanged, ListChangeResult.Status.NotFound), result.results.map { it.status })
+            }
             "GET /api/account" -> api.account().passkeys.forEach { assertTrue(it.id.isNotEmpty()) }
             "PUT /api/account/preferences" -> api.savePreferences(AudioOptions(1.5, AudioEffects(volumeBoost = true)))
             "DELETE /api/account/passkeys/:id" -> api.removePasskey(":id")

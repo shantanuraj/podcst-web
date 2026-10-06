@@ -186,6 +186,24 @@ describe.skipIf(!process.env.PG_BIN)(
       expect((await service.membership('owner', listId)).items).toHaveLength(1);
     });
 
+    test('limits only new streams and rolls back denied registrations', async () => {
+      let registrations = 0;
+      const limited = createEpisodeListService(sql, async () => {
+        registrations++;
+        if (registrations === 1) throw new Error('Registration refused');
+      });
+      const request = batch([add(101)]);
+      await expect(limited.change('owner', listId, request)).rejects.toThrow(
+        'Registration refused',
+      );
+      expect(await sql`SELECT * FROM episode_list_clients`).toHaveLength(0);
+      expect((await service.membership('owner', listId)).items).toEqual([]);
+      await limited.change('owner', listId, request);
+      await limited.change('owner', listId, request);
+      await limited.change('owner', listId, { ...request, sequence: '2' });
+      expect(registrations).toBe(2);
+    });
+
     test('concurrent retries apply a batch once', async () => {
       const request = batch([add(101)]);
       const results = await Promise.all(

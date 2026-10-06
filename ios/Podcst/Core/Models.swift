@@ -171,6 +171,73 @@ struct Account: Equatable, Sendable {
     var preferences: AudioOptions?
 }
 
+struct AccountEpisodeList: Codable, Equatable, Sendable {
+    var id: String
+    var kind: String
+    var name: String?
+    var revision: String
+    var itemCount: Int
+}
+
+enum ListAvailability: String, Codable, Sendable {
+    case available
+    case contentMissing = "content_missing"
+    case unavailable
+}
+
+struct ListMembership: Codable, Hashable, Sendable {
+    var episodeId: Int
+    var addedAt: Double
+    var availability: ListAvailability
+}
+
+struct ListSnapshot: Codable, Equatable, Sendable {
+    var listId: String
+    var revision: String
+    var items: [ListMembership]
+}
+
+struct ListEpisodeItem: Sendable {
+    var membership: ListMembership
+    var episode: Episode?
+}
+
+struct ListEpisodePage: Sendable {
+    var listId: String
+    var revision: String
+    var items: [ListEpisodeItem]
+    var nextCursor: String?
+}
+
+struct ListChange: Codable, Equatable, Sendable {
+    enum Operation: String, Codable, Sendable { case add, remove }
+    var op: Operation
+    var episodeId: Int
+}
+
+struct ListBatch: Codable, Equatable, Sendable {
+    var clientId: String
+    var sequence: String
+    var changes: [ListChange]
+}
+
+struct ListChangeResult: Codable, Equatable, Sendable {
+    enum Status: String, Codable, Sendable {
+        case applied, unchanged
+        case notFound = "not_found"
+    }
+    var episodeId: Int
+    var status: Status
+}
+
+struct ListAcknowledgement: Codable, Equatable, Sendable {
+    var clientId: String
+    var sequence: String
+    var listId: String
+    var revision: String
+    var results: [ListChangeResult]
+}
+
 public struct APIError: Error, Codable, LocalizedError, Sendable {
     public var statusCode: Int
     public var message: String
