@@ -6,6 +6,7 @@ import app.podcst.model.AudioSettings
 import app.podcst.network.testing.Call
 import app.podcst.network.testing.FakeServer
 import app.podcst.network.testing.Reply
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.flow.first
@@ -13,7 +14,9 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,11 +39,11 @@ class AccountRepositoryTest {
         preferences.updateAudio { AudioSettings(AudioOptions(speed = 0.75), override) }
     }
 
-    private suspend fun TestScope.signedIn(account: String, route: (Call) -> Reply = { Reply() }): Pair<AccountRepository, FakeServer> {
+    private suspend fun TestScope.signedIn(account: () -> String, route: (Call) -> Reply = { Reply() }): Pair<AccountRepository, FakeServer> {
         val server = FakeServer { call ->
             when (call.path) {
                 "/api/auth/session" -> Reply(FakeServer.USER)
-                "/api/account" -> Reply(account)
+                "/api/account" -> Reply(account())
                 else -> route(call)
             }
         }
@@ -53,7 +56,7 @@ class AccountRepositoryTest {
 
     @Test
     fun serverDefaultsReplaceLocalDefaultsAndKeepOverrides() = runTest {
-        val (repository, _) = signedIn(ACCOUNT.replace("PREFERENCES", """{"speed":1.25,"volumeBoost":false,"trimSilence":true}"""))
+        val (repository, _) = signedIn({ ACCOUNT.replace("PREFERENCES", """{"speed":1.25,"volumeBoost":false,"trimSilence":true}""") })
         val expected = AudioOptions(1.25, AudioEffects(trimSilence = true))
         assertEquals(expected, preferences.audio.first { it.defaults == expected }.defaults)
         assertEquals(override, preferences.audioSettings().overrides)
@@ -63,14 +66,14 @@ class AccountRepositoryTest {
 
     @Test
     fun unsavedServerDefaultsReceiveTheLocalDefaults() = runTest {
-        val (_, server) = signedIn(ACCOUNT.replace("PREFERENCES", "null")) { Reply("""{"speed":0.75,"volumeBoost":false,"trimSilence":false}""") }
+        val (_, server) = signedIn({ ACCOUNT.replace("PREFERENCES", "null") }) { Reply("""{"speed":0.75,"volumeBoost":false,"trimSilence":false}""") }
         val saved = server.awaitCall { it.path == "/api/account/preferences" }
         assertEquals(Json.parseToJsonElement("""{"speed":0.75,"volumeBoost":false,"trimSilence":false}"""), Json.parseToJsonElement(saved.body))
     }
 
     @Test
     fun defaultChangesAfterLoadAreUploaded() = runTest {
-        val (repository, server) = signedIn(ACCOUNT.replace("PREFERENCES", """{"speed":0.75,"volumeBoost":false,"trimSilence":false}""")) {
+        val (repository, server) = signedIn({ ACCOUNT.replace("PREFERENCES", """{"speed":0.75,"volumeBoost":false,"trimSilence":false}""") }) {
             Reply("""{"speed":1.5,"volumeBoost":true,"trimSilence":false}""")
         }
         repository.account.first { it != null }
@@ -84,10 +87,18 @@ class AccountRepositoryTest {
 
     @Test
     fun removingAPasskeyDropsItFromTheAccount() = runTest {
-        val (repository, server) = signedIn(ACCOUNT.replace("PREFERENCES", "null")) { Reply("""{"success":true}""") }
+        val removed = AtomicBoolean()
+        val before = Json.parseToJsonElement(ACCOUNT.replace("PREFERENCES", "null")) as JsonObject
+        val after = JsonObject(before + ("passkeys" to JsonArray(before.getValue("passkeys").jsonArray.take(1))))
+        val (repository, server) = signedIn({ (if (removed.get()) after else before).toString() }) { call ->
+            if (call.path == "/api/account/passkeys/pk-legacy") removed.set(true)
+            Reply(if (call.path == "/api/account/preferences") call.body else """{"success":true}""")
+        }
         repository.account.first { it != null }
         repository.removePasskey("pk-legacy")
         server.awaitCall { it.path == "/api/account/passkeys/pk-legacy" }
+        assertTrue(removed.get())
+        assertEquals(2, server.calls.count { it.path == "/api/auth/session" })
         assertEquals(listOf("pk-mac"), repository.account.first { it?.passkeys?.size == 1 }!!.passkeys.map { it.id })
     }
 
