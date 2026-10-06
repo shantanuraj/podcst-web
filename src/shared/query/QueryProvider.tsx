@@ -10,6 +10,7 @@ import {
 } from '@/shared/auth/account-events';
 import { AccountSession } from '@/shared/auth/account-session';
 import { usePlayer } from '@/shared/player/usePlayer';
+import { connectStars } from '@/shared/stars/browser';
 
 export function QueryProvider({
   children,
@@ -54,6 +55,7 @@ export function QueryProvider({
       connection.close();
     };
   }, [session]);
+  useEffect(() => connectStars(session), [session]);
   return (
     <QueryClientProvider client={queryClient}>
       <AccountContext.Provider value={session}>

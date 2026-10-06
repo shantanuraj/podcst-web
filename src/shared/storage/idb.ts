@@ -2,16 +2,10 @@
  * IDB Storage manager
  */
 import { del, get, set } from 'idb-keyval';
-import type { IEpisodeInfo, ISubscriptionsMap } from '@/types';
-
-export type IStarredEpisode = {
-  episode: IEpisodeInfo;
-  starredAt: number;
-};
+import type { ISubscriptionsMap } from '@/types';
 
 export interface IIDBStoreable {
   subscriptions: ISubscriptionsMap;
-  stars: Record<string, IStarredEpisode[]>;
 }
 
 export async function getValue<K extends keyof IIDBStoreable>(

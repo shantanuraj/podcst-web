@@ -67,6 +67,7 @@
     "@types/wicg-mediasession": "1.1.8",
     "@types/xml2js": "0.4.14",
     "autoprefixer": "^10.5.2",
+    "fake-indexeddb": "^6.2.5",
     "husky": "9.1.7",
     "lint-staged": "17.0.8",
     "opentype.js": "^2.0.0",

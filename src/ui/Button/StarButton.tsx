@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslation } from '@/shared/i18n';
+import { validEpisodeId } from '@/shared/stars/state';
 import { useStars } from '@/shared/stars/useStars';
 import type { IEpisodeInfo } from '@/types';
 import { Icon } from '@/ui/icons/svg/Icon';
@@ -24,7 +25,7 @@ export function StarButton({
       type="button"
       className={`${styles.button} ${className}`}
       data-starred={starred}
-      disabled={!initialized}
+      disabled={!initialized || !validEpisodeId(episode.id)}
       aria-label={`${label} ${episode.title}`}
       title={label}
       onClick={(event) => {

@@ -106,20 +106,38 @@ export default function LibraryPage() {
           />
         </div>
       )}
-      {starred.episodes.length > 0 && (
+      {(starred.stars.length > 0 || starred.pending || starred.error) && (
         <section className={styles.starred}>
           <div className={styles.sectionHead}>
             <h2>{t('library.starred')}</h2>
-            <span>{starred.episodes.length}</span>
+            <span>{starred.stars.length}</span>
+            <button type="button" onClick={() => void starred.refresh()}>
+              Refresh
+            </button>
           </div>
+          {(starred.error || starred.pending) && (
+            <p role="status">
+              {starred.error ?? 'Saved on this device. Waiting to sync…'}
+            </p>
+          )}
           <ul>
-            {starred.episodes.map((episode) => (
-              <ReleaseRow
-                key={`${episode.feed}\u001f${episode.guid}`}
-                episode={episode}
-                when={null}
-              />
-            ))}
+            {starred.stars.map(({ episodeId, episode, availability }) =>
+              episode ? (
+                <ReleaseRow key={episodeId} episode={episode} when={null} />
+              ) : (
+                <li key={episodeId}>
+                  {availability === 'unavailable'
+                    ? 'Episode unavailable'
+                    : 'Episode details unavailable'}
+                  <button
+                    type="button"
+                    onClick={() => starred.unstar(episodeId)}
+                  >
+                    {t('library.unstar')}
+                  </button>
+                </li>
+              ),
+            )}
           </ul>
         </section>
       )}
