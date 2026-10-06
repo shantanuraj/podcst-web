@@ -93,6 +93,70 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
     delete plan.reviewedMissingMedia;
   });
 
+  test.each([
+    10, 20,
+  ])('refuses saved episode %s, including additions after inspection', async (episodeId) => {
+    const { expectedPath } = await inspect();
+    await sql`
+      INSERT INTO episode_lists (id, user_id, kind)
+      VALUES ('0c339753-cb50-477c-843e-e641b414a060', 'listener', 'starred')
+    `;
+    await sql`
+      INSERT INTO episode_list_items (list_id, episode_id)
+      VALUES ('0c339753-cb50-477c-843e-e641b414a060', ${episodeId})
+    `;
+    await expect(
+      reconcile(sql, {
+        plan,
+        expectedPath,
+        backupPath: path(),
+        mode: 'apply',
+      }),
+    ).rejects.toThrow(
+      'Saved episode memberships require separate reconciliation',
+    );
+    expect((await sql`SELECT count(*)::int AS n FROM episodes`)[0].n).toBe(6);
+    expect(
+      Number(
+        (await sql`SELECT episode_id FROM episode_list_items`)[0].episode_id,
+      ),
+    ).toBe(episodeId);
+  });
+
+  test('unrelated saved episodes do not prevent a reviewed merge', async () => {
+    await sql`
+      INSERT INTO podcasts (id, feed_url, title, author_id, cover)
+      VALUES (3, 'https://unrelated.example.invalid/rss', 'Unrelated', 1, 'cover')
+    `;
+    await sql`INSERT INTO episodes (id, podcast_id, guid, published) VALUES (30, 3, 'saved', now())`;
+    await sql`
+      INSERT INTO episode_lists (id, user_id, kind)
+      VALUES ('0c339753-cb50-477c-843e-e641b414a060', 'listener', 'starred')
+    `;
+    await sql`
+      INSERT INTO episode_list_items (list_id, episode_id)
+      VALUES ('0c339753-cb50-477c-843e-e641b414a060', 30)
+    `;
+    expect((await apply())?.postconditionsVerified).toBe(true);
+    expect(
+      Number(
+        (await sql`SELECT episode_id FROM episode_list_items`)[0].episode_id,
+      ),
+    ).toBe(30);
+  });
+
+  test('refuses changed saved-reference constraints and row policies', async () => {
+    await sql`ALTER TABLE episode_list_items ALTER CONSTRAINT episode_list_items_episode_id_fkey DEFERRABLE INITIALLY IMMEDIATE`;
+    await expect(inspect()).rejects.toThrow(
+      'Unexpected foreign-key dependencies',
+    );
+    await sql`ALTER TABLE episode_list_items ALTER CONSTRAINT episode_list_items_episode_id_fkey DEFERRABLE INITIALLY DEFERRED`;
+    await sql`ALTER TABLE episode_list_items ENABLE ROW LEVEL SECURITY`;
+    await expect(inspect()).rejects.toThrow(
+      'Relation policies require a tool review',
+    );
+  });
+
   test('the CLI honors the explicitly selected Unix socket instead of app defaults', async () => {
     const planPath = path();
     const backupPath = path();

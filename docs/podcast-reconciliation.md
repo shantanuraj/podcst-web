@@ -22,6 +22,10 @@ when reparented. Canonical-only episodes remain untouched.
   provider-claim retirement require explicit review.
 - Accepted feed aliases survive. Canonical Apple aliases remain unchanged;
   duplicate Apple-alias transfer is not supported.
+- Any saved episode membership in either source aborts the operation, including
+  memberships added after inspection. List remapping requires a separate reviewed
+  implementation. Unrelated saved episodes do not block a merge. The tool locks
+  the membership table while checking this condition.
 - Duplicate transcripts, unknown dependencies, changed guards and unsupported
   schema features abort the operation.
 - Nonempty sources with no shared GUIDs cannot be merged. An empty canonical

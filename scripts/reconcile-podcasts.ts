@@ -58,6 +58,7 @@ const tables = {
 const expectedForeignKeys = [
   ['chart_history', 'podcast_id', 'podcasts', 'id'],
   ['episode_content', 'episode_id', 'episodes', 'id'],
+  ['episode_list_items', 'episode_id', 'episodes', 'id'],
   ['episodes', 'podcast_id', 'podcasts', 'id'],
   ['feed_poll_state', 'podcast_id', 'podcasts', 'id'],
   ['playback_progress', 'episode_id', 'episodes', 'id'],
@@ -414,7 +415,7 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       }
       const keys = await tx`
         SELECT ns.nspname AS schema, child.relname AS child, parent.relname AS parent,
-          c.convalidated, c.condeferrable, c.confdeltype, c.confupdtype,
+          c.convalidated, c.condeferrable, c.condeferred, c.confdeltype, c.confupdtype,
           ARRAY(SELECT attname FROM pg_attribute WHERE attrelid=c.conrelid AND attnum=ANY(c.conkey) ORDER BY attnum) AS child_columns,
           ARRAY(SELECT attname FROM pg_attribute WHERE attrelid=c.confrelid AND attnum=ANY(c.confkey) ORDER BY attnum) AS parent_columns
         FROM pg_constraint c JOIN pg_class child ON child.oid=c.conrelid
@@ -426,9 +427,10 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           (row) =>
             row.schema === 'public' &&
             row.convalidated &&
-            !row.condeferrable &&
-            row.confdeltype === 'c' &&
-            row.confupdtype === 'a',
+            row.confupdtype === 'a' &&
+            (row.child === 'episode_list_items'
+              ? row.condeferrable && row.condeferred && row.confdeltype === 'a'
+              : !row.condeferrable && row.confdeltype === 'c'),
         ) &&
           stable(
             keys
@@ -440,7 +442,20 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           ) === stable(expectedForeignKeys),
         'Unexpected foreign-key dependencies',
       );
-      await verifyReconciliationTriggers(tx, Object.keys(tables));
+      await verifyReconciliationTriggers(tx, [
+        ...Object.keys(tables),
+        'episode_list_items',
+      ]);
+      await tx`LOCK TABLE public.episode_list_items IN SHARE MODE`;
+      const saved = await tx`
+        SELECT 1 FROM public.episode_list_items i
+        JOIN public.episodes e ON e.id = i.episode_id
+        WHERE e.podcast_id IN (${ids[0]}, ${ids[1]}) LIMIT 1
+      `;
+      invariant(
+        saved.length === 0,
+        'Saved episode memberships require separate reconciliation',
+      );
       const conflictingLocator = await tx`
         SELECT 1 FROM public.podcasts WHERE feed_url=${plan.canonicalFeedUrl}
           AND id NOT IN (${ids[0]},${ids[1]})
