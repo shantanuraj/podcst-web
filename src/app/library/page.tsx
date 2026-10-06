@@ -25,6 +25,7 @@ import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { Button } from '@/ui/Button';
+import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { PageLink } from '@/ui/PageLink/PageLink';
@@ -294,6 +295,7 @@ function ReleaseRow({
       <span className={styles.duration}>
         {episode.duration ? formatDuration(t, episode.duration) : ''}
       </span>
+      <StarButton episode={episode} />
       <button
         type="button"
         className={styles.releasePlay}

@@ -11,6 +11,7 @@ import { getCurrentEpisode, usePlayer } from '@/shared/player/usePlayer';
 import type { EpisodeProgress, IEpisodeInfo } from '@/types';
 import { PlayButton } from '@/ui/Button/PlayButton';
 import { QueueButton } from '@/ui/Button/QueueButton';
+import { StarButton } from '@/ui/Button/StarButton';
 import { PageLink } from '@/ui/PageLink/PageLink';
 import styles from './EpisodeRow.module.css';
 
@@ -89,6 +90,7 @@ function EpisodeRow({
         )}
       </div>
       <div className={styles.actions}>
+        <StarButton episode={episode} />
         <QueueButton
           episode={episode}
           className={styles.queue}

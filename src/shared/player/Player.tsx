@@ -9,6 +9,7 @@ import {
   useKeydown,
 } from '@/shared/keyboard/useKeydown';
 import type { IEpisodeInfo } from '@/types';
+import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { speeds } from '../../../contracts/playback/rules.json';
@@ -103,6 +104,7 @@ function PlayerBar({
             {episode.podcastTitle || episode.author}
           </span>
         </button>
+        <StarButton episode={episode} />
         <span className={styles.compact}>
           <PlayPause />
         </span>

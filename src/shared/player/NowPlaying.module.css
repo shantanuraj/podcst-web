@@ -132,7 +132,19 @@
   color: var(--color-ink-secondary);
 }
 
+.heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.heading .star {
+  margin-top: var(--space-3);
+}
+
 .title {
+  flex: 1;
+  min-width: 0;
   margin-top: var(--space-3);
   font-size: clamp(2.25rem, 4.5vw, 4rem);
   line-height: 0.98;

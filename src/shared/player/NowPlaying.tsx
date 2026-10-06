@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { IEpisodeInfo } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
+import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Menu } from '@/ui/Menu/Menu';
 import { getEpisodeHref } from '../links';
@@ -149,11 +150,14 @@ export function NowPlaying({
           <p className={styles.eyebrow}>
             {episode.podcastTitle || episode.author}
           </p>
-          <h2 className={styles.title}>
-            <Link href={getEpisodeHref(episode)} onClick={onClose}>
-              {episode.title}
-            </Link>
-          </h2>
+          <div className={styles.heading}>
+            <h2 className={styles.title}>
+              <Link href={getEpisodeHref(episode)} onClick={onClose}>
+                {episode.title}
+              </Link>
+            </h2>
+            <StarButton episode={episode} className={styles.star} />
+          </div>
           {chapter && (
             <p className={styles.chapter}>
               <span>

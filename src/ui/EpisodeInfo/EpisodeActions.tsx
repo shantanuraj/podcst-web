@@ -12,6 +12,7 @@ import { useToast } from '@/shared/toast/useToast';
 import type { IEpisodeInfo } from '@/types';
 import { Button } from '@/ui/Button';
 import { ShareButton } from '@/ui/Button/ShareButton';
+import { StarButton } from '@/ui/Button/StarButton';
 import { Icon } from '@/ui/icons/svg/Icon';
 import styles from './EpisodeInfo.module.css';
 
@@ -89,6 +90,7 @@ export function EpisodeActions({
       >
         {t('podcast.addToQueue')}
       </Button>
+      <StarButton episode={episode} showLabel />
       {user && episode.id && !saved?.completed && (
         <Button
           type="button"
