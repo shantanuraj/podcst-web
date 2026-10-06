@@ -369,7 +369,10 @@ metadata is never returned; clients must purge cached private data for
 metadata or access changes. Recheck availability even at an unchanged revision.
 
 Invalid UUIDs, views, duplicate/unknown query parameters, limits and cursors return
-400 `{message: ...}`. The endpoint does not fetch upstream feeds while responding.
+400 `{message: ...}`. The endpoint does not wait for upstream feeds. Missing
+content schedules best-effort recovery after the response: at most three feeds,
+with a 15-minute per-feed throttle and existing failure backoff. A saved episode's
+retained content is excluded from eviction without subscribing to its podcast.
 
 ### `POST /api/lists/:id/changes` — required
 

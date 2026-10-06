@@ -1,8 +1,9 @@
 # Episode lists and starred-episode sync
 
 Status: implementation in progress for a coordinated pre-release breaking change.
-The schema, HTTP API and native transport decoders are implemented. Durable client
-sync, guest transfer and local storage replacement remain pending. No local-data
+The schema, HTTP API, content retention/recovery and native transport decoders are
+implemented. Durable client sync, guest transfer and local storage replacement
+remain pending. No local-data
 reset has been performed. The [API contract](../contracts/api/README.md) describes
 the implemented wire format.
 
@@ -367,19 +368,22 @@ Membership pins the corresponding `episode_content` row, not its whole podcast.
 Do not implicitly subscribe, mark the entire podcast essential or increase its
 polling tier because one episode was saved.
 
-Exclude saved references from warm-row counts, eviction candidates and deletion.
-Both list changes and eviction acquire the existing per-podcast advisory
+Saved references are excluded from warm-row counts, eviction candidates and
+deletion. Both list changes and eviction acquire the existing per-podcast advisory
 transaction lock before checking retention. List writers take the stream lock,
 sorted podcast locks, then the list lock; eviction takes the podcast lock and
 rechecks membership. Feed refresh already uses the podcast lock. Retry if the
 required lock set changes through catalogue maintenance.
 
-An episode whose content was already evicted can still be added by ID. Return a
-content-missing placeholder and schedule bounded recovery outside the membership
-transaction. `prepareEpisodeRead` currently rebuilds only when all podcast
-content is absent; recovery must handle an individually missing episode too.
-Do not make a multi-podcast list read wait on upstream feeds. Membership survives
-feed removal, but missing metadata/audio may be unrecoverable.
+An episode whose content was already evicted can still be added by ID. Reads
+return a content-missing placeholder and schedule recovery after the response;
+accepted adds also schedule a check. Recovery considers up to 20 missing-content
+podcasts in least-recently-polled order and rebuilds at most three concurrently.
+A Redis claim throttles each podcast to one attempt per 15 minutes, and existing
+feed failure backoff still applies. Missing individual episodes trigger rebuilds
+even when the rest of a fresh feed remains cached. No upstream feed request is
+awaited by the membership response. Recovery is best-effort; later reads retry.
+Membership survives feed removal, but missing metadata/audio may be unrecoverable.
 
 [Podcast reconciliation](podcast-reconciliation.md) recognizes the membership
 foreign key but refuses any saved references in either affected source, including

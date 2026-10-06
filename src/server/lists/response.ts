@@ -1,3 +1,4 @@
+import type { ListSnapshot } from '@/shared/lists';
 import { privateFeedHeaders as headers } from '../podcast-access';
 import {
   isListId,
@@ -43,7 +44,17 @@ export function createListHandlers(
   service: EpisodeListService,
   authenticate: () => Promise<string | null>,
   beforeChange?: (userId: string) => Promise<void>,
+  scheduleRecovery?: (userId: string, listId: string) => void,
 ) {
+  const recover = <T extends ListSnapshot>(userId: string, result: T) => {
+    if (
+      result.items.some(
+        ({ availability }) => availability === 'content_missing',
+      )
+    )
+      scheduleRecovery?.(userId, result.listId);
+    return result;
+  };
   const respond = async (operation: (userId: string) => Promise<unknown>) => {
     try {
       const userId = await authenticate();
@@ -92,7 +103,7 @@ export function createListHandlers(
               400,
               'Membership snapshots cannot be paginated',
             );
-          return service.membership(userId, listId);
+          return recover(userId, await service.membership(userId, listId));
         }
         if (view !== 'episodes') throw new ListError(400, 'Invalid list view');
         const limit = params.get('limit') ?? '100';
@@ -102,17 +113,29 @@ export function createListHandlers(
           ? parseListCursor(params.get('cursor') ?? '', listId)
           : undefined;
         if (cursor === null) throw new ListError(400, 'Invalid list cursor');
-        return service.episodes(userId, listId, {
-          limit: Number(limit),
-          cursor,
-        });
+        return recover(
+          userId,
+          await service.episodes(userId, listId, {
+            limit: Number(limit),
+            cursor,
+          }),
+        );
       }),
     changes: (request: Request, id: string) =>
       respond(async (userId) => {
         const listId = identify(id);
         const batch = await readBatch(request);
         await beforeChange?.(userId);
-        return service.change(userId, listId, batch);
+        const result = await service.change(userId, listId, batch);
+        if (
+          batch.changes.some(
+            (change, index) =>
+              change.op === 'add' &&
+              result.results[index].status !== 'not_found',
+          )
+        )
+          scheduleRecovery?.(userId, listId);
+        return result;
       }),
   };
 }

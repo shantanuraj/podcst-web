@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test';
+import type { ListSnapshot } from '@/shared/lists';
 import { encodeListCursor, LIST_BODY_LIMIT } from './input';
 import { createListHandlers } from './response';
 import { type EpisodeListService, ListError } from './service';
@@ -16,11 +17,11 @@ const request = (query = '', body?: string) =>
   );
 
 function fixture(user: string | null = 'owner') {
-  const snapshot = { listId: id, revision: '0', items: [] };
+  const snapshot: ListSnapshot = { listId: id, revision: '0', items: [] };
   const service = {
     lists: mock(async () => ({ lists: [] })),
     membership: mock(async () => snapshot),
-    episodes: mock(async () => ({ ...snapshot, nextCursor: null })),
+    episodes: mock(async () => ({ ...snapshot, items: [], nextCursor: null })),
     change: mock(async () => ({
       clientId: batch.clientId,
       sequence: '1',
@@ -124,6 +125,30 @@ describe('episode list HTTP handlers', () => {
       limit: 200,
       cursor,
     });
+  });
+
+  test('schedules missing-content recovery without fetching feeds in the response', async () => {
+    const { service } = fixture();
+    const recover = mock(() => {});
+    const handlers = createListHandlers(
+      service,
+      async () => 'owner',
+      undefined,
+      recover,
+    );
+    service.membership.mockImplementation(async () => ({
+      listId: id,
+      revision: '1',
+      items: [{ episodeId: 123, addedAt: 1, availability: 'content_missing' }],
+    }));
+    expect((await handlers.items(request('?view=membership'), id)).status).toBe(
+      200,
+    );
+    expect(recover).toHaveBeenCalledWith('owner', id);
+    expect(
+      (await handlers.changes(request('', JSON.stringify(batch)), id)).status,
+    ).toBe(200);
+    expect(recover).toHaveBeenCalledTimes(2);
   });
 
   test('rejects invalid list IDs', async () => {
