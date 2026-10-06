@@ -108,7 +108,7 @@ fun QueueScreen(
                     },
             ) {
                 ArtworkEpisodeRow(
-                    EpisodeRowState(episode, starred = episode.identity.value in state.starred, download = state.download(episode)),
+                    EpisodeRowState(episode, starred = episode.id in state.starred, download = state.download(episode)),
                     actions,
                     subtitle = episode.podcastTitle,
                     remove = SwipeAction(stringResource(R.string.remove)) { viewModel.removeUpNext(index) },

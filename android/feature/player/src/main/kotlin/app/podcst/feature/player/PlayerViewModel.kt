@@ -21,11 +21,11 @@ import kotlinx.coroutines.launch
 
 data class PlayerScreenState(
     val player: PlayerState = PlayerState(),
-    val starred: Set<String> = emptySet(),
+    val starred: Set<Long> = emptySet(),
     val downloads: Map<String, DownloadState> = emptyMap(),
 ) {
     val episode: Episode? get() = player.episode
-    val currentStarred: Boolean get() = episode?.identity?.value in starred
+    val currentStarred: Boolean get() = episode?.id in starred
     fun download(episode: Episode): DownloadState = downloads[MediaStore.key(episode)] ?: DownloadState.None
 }
 
@@ -34,7 +34,7 @@ class PlayerViewModel(
     private val stars: StarRepository,
     downloads: Downloads,
 ) : ViewModel() {
-    val state: StateFlow<PlayerScreenState> = combine(playback.state, stars.identities, downloads.states) { player, starred, entries ->
+    val state: StateFlow<PlayerScreenState> = combine(playback.state, stars.episodeIds, downloads.states) { player, starred, entries ->
         PlayerScreenState(player, starred, entries.mapValues { it.value.state })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlayerScreenState(playback.state.value))
 

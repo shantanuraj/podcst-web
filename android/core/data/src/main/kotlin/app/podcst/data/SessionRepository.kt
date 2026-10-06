@@ -32,6 +32,8 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     val session: StateFlow<SessionState> = state.asStateFlow()
     val user: User? get() = state.value.user
     var accountChange: AccountChange? = null
+    var suspendAccountWork: (() -> Unit)? = null
+    var resumeAccountWork: ((String?) -> Unit)? = null
 
     suspend fun restore() = mutex.withLock {
         state.update { it.copy(loading = true) }
@@ -49,6 +51,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             state.update { it.copy(error = failure.message) }
         } finally {
             state.update { it.copy(loading = false) }
+            resumeAccountWork?.invoke(state.value.user?.id)
         }
     }
 
@@ -70,6 +73,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     }
 
     suspend fun signOut() = mutex.withLock {
+        suspendAccountWork?.invoke()
         state.update { it.copy(loading = true) }
         try {
             update(null)
@@ -77,12 +81,14 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             state.update { it.copy(error = null) }
         } finally {
             state.update { it.copy(loading = false) }
+            resumeAccountWork?.invoke(state.value.user?.id)
         }
     }
 
     fun dismissError() = state.update { it.copy(error = null) }
 
     private suspend fun changing(block: suspend () -> User?): Boolean = mutex.withLock {
+        suspendAccountWork?.invoke()
         state.update { it.copy(loading = true) }
         try {
             update(block())
@@ -95,6 +101,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             false
         } finally {
             state.update { it.copy(loading = false) }
+            resumeAccountWork?.invoke(state.value.user?.id)
         }
     }
 

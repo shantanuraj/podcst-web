@@ -1,6 +1,8 @@
 package app.podcst
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import app.podcst.artwork.ArtworkStore
 import app.podcst.data.AccountChange
 import app.podcst.data.AccountRepository
@@ -13,6 +15,7 @@ import app.podcst.data.Scopes
 import app.podcst.data.SecureStore
 import app.podcst.data.SessionRepository
 import app.podcst.data.StarRepository
+import app.podcst.data.starRemote
 import app.podcst.data.WorkManagerScheduler
 import app.podcst.network.PodcstApi
 import app.podcst.playback.PlaybackCoordinator
@@ -51,7 +54,7 @@ class AppGraph(application: Application) {
     val catalog = CatalogRepository(api, scopes)
     val library = LibraryRepository(api, scopes, catalog)
     val progress = ProgressRepository(api, scopes, scheduler)
-    val stars = StarRepository(scopes)
+    val stars = StarRepository(File(application.noBackupFilesDir, "episode-lists.json"), api.starRemote(), scope, session.user?.id)
     val media = MediaStore(application, client)
     val downloads = Downloads(application, media, DownloadsService::class.java, scope)
     val artwork = ArtworkStore(application, client, scopes.current.value.key)
@@ -67,9 +70,16 @@ class AppGraph(application: Application) {
 
     init {
         account.start(scope)
+        session.suspendAccountWork = stars::suspendSync
+        session.resumeAccountWork = stars::resumeSync
+        application.getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { scope.launch { stars.refresh() } }
+        })
         session.accountChange = AccountChange { accountId ->
+            stars.suspendSync()
             playback.beginAccountChange()
             downloads.purge()
+            stars.switchAccount(accountId, activate = false)
             scopes.switch(accountId)
             artwork.switch(Scope.key(accountId))
             playback.switchAccount()

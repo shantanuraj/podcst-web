@@ -39,7 +39,7 @@ data class Current(val identity: String, val playing: Boolean)
 
 data class EpisodeMarks(
     val progress: Map<String, EpisodeProgress> = emptyMap(),
-    val starred: Set<String> = emptySet(),
+    val starred: Set<Long> = emptySet(),
     val downloads: Map<String, DownloadState> = emptyMap(),
     val current: Current? = null,
 ) {
@@ -49,7 +49,7 @@ data class EpisodeMarks(
         return EpisodeRowState(
             episode = episode,
             progress = progress[identity],
-            starred = identity in starred,
+            starred = episode.id in starred,
             download = downloads.takeIf { it.isNotEmpty() }?.get(MediaStore.key(episode)) ?: DownloadState.None,
             playing = current?.playing == true,
             current = current != null,
@@ -107,7 +107,7 @@ class PodcastViewModel(
 
     private val marks: Flow<EpisodeMarks> = combine(
         progress.progress,
-        stars.identities,
+        stars.episodeIds,
         downloads.states,
         playback.state.map { player -> player.episode?.takeIf { player.active }?.let { Current(it.identity.value, player.requested) } }.distinctUntilChanged(),
     ) { progress, starred, entries, current -> EpisodeMarks(progress, starred, entries.mapValues { it.value.state }, current) }

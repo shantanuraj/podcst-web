@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.podcst.data.Appearance
@@ -18,6 +20,8 @@ import app.podcst.designsystem.PodcstTheme
 import app.podcst.playback.PlaybackService
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 class MainActivity : ComponentActivity() {
     private var controller: ListenableFuture<MediaController>? = null
@@ -41,7 +45,16 @@ class MainActivity : ComponentActivity() {
                 PodcstApp(graph)
             }
         }
-        lifecycleScope.launch { graph.session.restore() }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                graph.session.restore()
+                graph.stars.refresh()
+                while (isActive) {
+                    delay(5_000)
+                    graph.stars.poll()
+                }
+            }
+        }
         if (savedInstanceState == null) intent.incoming()?.let(graph.incoming::tryEmit)
     }
 

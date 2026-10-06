@@ -49,20 +49,29 @@ class AppEpisodeActions(
 
     override fun star(episode: Episode, starred: Boolean) {
         graph.scope.launch {
-            if (starred) graph.stars.star(episode) else graph.stars.unstar(episode)
+            val saved = if (starred) graph.stars.star(episode) else graph.stars.unstar(episode)
+            if (!saved) {
+                toaster.show(graph.stars.status.value.error ?: "Unable to save this change")
+                return@launch
+            }
+            val accountId = graph.stars.status.value.accountId
+            val undo = ToastAction(context.getString(R.string.undo), emphasized = false) {
+                if (graph.stars.status.value.accountId == accountId) star(episode, !starred)
+            }
+            toaster.show(
+                if (starred) {
+                    ToastMessage(
+                        context.getString(R.string.starred),
+                        icon = PodcstIcons.StarFilled,
+                        actions = listOf(ToastAction(context.getString(R.string.add_to_list)) {
+                            if (graph.stars.status.value.accountId == accountId) chooseList(episode)
+                        }, undo),
+                    )
+                } else {
+                    ToastMessage(context.getString(R.string.unstarred), icon = PodcstIcons.Star, actions = listOf(undo))
+                },
+            )
         }
-        val undo = ToastAction(context.getString(R.string.undo), emphasized = false) { star(episode, !starred) }
-        toaster.show(
-            if (starred) {
-                ToastMessage(
-                    context.getString(R.string.starred),
-                    icon = PodcstIcons.StarFilled,
-                    actions = listOf(ToastAction(context.getString(R.string.add_to_list)) { chooseList(episode) }, undo),
-                )
-            } else {
-                ToastMessage(context.getString(R.string.unstarred), icon = PodcstIcons.Star, actions = listOf(undo))
-            },
-        )
     }
 
     override fun addToList(episode: Episode) = chooseList(episode)

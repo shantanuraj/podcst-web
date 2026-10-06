@@ -31,7 +31,7 @@ data class Storage(val used: Long, val free: Long, val total: Long)
 
 internal data class Listening(
     val progress: Map<String, EpisodeProgress> = emptyMap(),
-    val starred: Set<String> = emptySet(),
+    val starred: Set<Long> = emptySet(),
     val downloads: Map<String, DownloadEntry> = emptyMap(),
     val current: EpisodeIdentity? = null,
     val playing: Boolean = false,
@@ -43,7 +43,7 @@ internal data class Listening(
         return EpisodeRowState(
             episode = episode,
             progress = progress[identity.value],
-            starred = identity.value in starred,
+            starred = episode.id in starred,
             download = downloads[MediaStore.key(episode)]?.state ?: DownloadState.None,
             playing = current && playing,
             current = current,
@@ -65,7 +65,7 @@ internal fun listening(
     clock: () -> Instant,
 ): Flow<Listening> = combine(
     progress.progress,
-    stars.identities,
+    stars.episodeIds,
     downloads.states,
     playback.state.map { it.episode?.identity to it.requested }.distinctUntilChanged(),
 ) { saved, starred, entries, (current, playing) ->

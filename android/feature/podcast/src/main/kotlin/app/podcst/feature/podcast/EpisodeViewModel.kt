@@ -44,13 +44,13 @@ class EpisodeViewModel(
     val state: StateFlow<EpisodeScreenState> = combine(
         catalog.episode(identity.value).map { it ?: route },
         progress.progress.map { it[identity.value] }.distinctUntilChanged(),
-        stars.identities.map { identity.value in it }.distinctUntilChanged(),
+        stars.episodeIds,
         downloads.states,
         playback.state.map { player ->
             player.takeIf { it.plays(identity) }?.let { Playhead(it.position, it.duration, it.requested) }
         }.distinctUntilChanged(),
     ) { episode, saved, starred, entries, playhead ->
-        EpisodeScreenState(episode, saved, starred, entries[MediaStore.key(episode)]?.state ?: DownloadState.None, playhead)
+        EpisodeScreenState(episode, saved, episode.id in starred, entries[MediaStore.key(episode)]?.state ?: DownloadState.None, playhead)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EpisodeScreenState(route))
 
     fun seek(to: Duration) {

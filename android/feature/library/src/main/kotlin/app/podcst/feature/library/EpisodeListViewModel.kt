@@ -8,6 +8,7 @@ import app.podcst.data.CatalogRepository
 import app.podcst.data.LibraryRepository
 import app.podcst.data.ProgressRepository
 import app.podcst.data.StarRepository
+import app.podcst.data.StarItem
 import app.podcst.designsystem.EpisodeRowState
 import app.podcst.model.Episode
 import app.podcst.playback.PlaybackCoordinator
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class EpisodeListState(
     val list: EpisodeList,
@@ -37,6 +39,9 @@ data class EpisodeListState(
     val storage: Storage? = null,
     val refresh: Refresh = Refresh.Idle,
     val loaded: Boolean = false,
+    val missing: List<StarItem> = emptyList(),
+    val starPending: Boolean = false,
+    val starError: String? = null,
 ) {
     val facets: List<FacetCount> by lazy { facets(rows) }
     val selected: FacetCount? by lazy { facets.firstOrNull { it.filter == filter } ?: facets.firstOrNull() }
@@ -48,7 +53,7 @@ class EpisodeListViewModel(
     catalog: CatalogRepository,
     private val library: LibraryRepository,
     progress: ProgressRepository,
-    stars: StarRepository,
+    private val stars: StarRepository,
     private val downloads: Downloads,
     private val playback: PlaybackCoordinator,
     storage: () -> Storage,
@@ -74,7 +79,7 @@ class EpisodeListViewModel(
     private val storage: Flow<Storage?> =
         if (list == EpisodeList.Downloads) downloads.states.map { storage() }.flowOn(Dispatchers.IO) else flowOf(null)
 
-    val state: StateFlow<EpisodeListState> = combine(
+    private val content = combine(
         source,
         listening(progress, stars, downloads, playback, clock),
         selection,
@@ -82,13 +87,27 @@ class EpisodeListViewModel(
         refresh,
     ) { episodes, listening, selection, storage, refresh ->
         EpisodeListState(list, episodes.map(listening::row), selection.filter, selection.sort, storage, refresh, loaded = true)
+    }
+
+    val state: StateFlow<EpisodeListState> = combine(content, stars.status) { content, stars ->
+        if (list == EpisodeList.Starred) content.copy(
+            missing = stars.items.filter { it.episode == null },
+            starPending = stars.pending,
+            starError = stars.error,
+        ) else content
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EpisodeListState(list))
+
+    init { if (list == EpisodeList.Starred) viewModelScope.launch { stars.refresh() } }
 
     fun select(filter: ListFilter) = selection.update { it.copy(filter = filter) }
 
     fun sort(sort: ListSort) = selection.update { it.copy(sort = sort) }
 
-    fun refresh() = viewModelScope.refresh(refresh) { library.refresh(force = true) }
+    fun refresh() = viewModelScope.refresh(refresh) {
+        if (list == EpisodeList.Starred) stars.refresh() else library.refresh(force = true)
+    }
+
+    fun removeStar(id: Long) = viewModelScope.launch { stars.remove(id) }
 
     fun playAll() {
         val rows = state.value.visible

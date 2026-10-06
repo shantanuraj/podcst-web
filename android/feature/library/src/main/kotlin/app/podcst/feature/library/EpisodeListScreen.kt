@@ -80,9 +80,18 @@ fun EpisodeListScreen(state: EpisodeListState, model: EpisodeListViewModel, acti
     val content = @Composable {
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(state, onBack) }
+            if (state.starError != null || state.starPending) item {
+                Text(state.starError ?: "Saved on this device. Waiting to sync…", Modifier.padding(20.dp), style = Podcst.type.caption, color = Podcst.colors.tertiary)
+            }
+            items(state.missing, key = { "missing:${it.id}" }) { star ->
+                Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Episode details unavailable", Modifier.weight(1f), color = Podcst.colors.ink)
+                    androidx.compose.material3.TextButton(onClick = { model.removeStar(star.id) }) { Text(stringResource(DesignR.string.unstar)) }
+                }
+            }
             when {
                 !state.loaded -> Unit
-                state.rows.isEmpty() -> item { Empty(state.list) }
+                state.rows.isEmpty() -> if (state.missing.isEmpty()) item { Empty(state.list) } else Unit
                 else -> when (state.list) {
                     EpisodeList.Starred -> starred(state, model, actions)
                     EpisodeList.Downloads -> downloads(state, model, actions)
@@ -92,7 +101,7 @@ fun EpisodeListScreen(state: EpisodeListState, model: EpisodeListViewModel, acti
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
-    if (state.list == EpisodeList.NewReleases) {
+    if (state.list != EpisodeList.Downloads) {
         PullToRefreshBox(state.refresh == Refresh.Running, model::refresh, Modifier.fillMaxSize().statusBarsPadding()) { content() }
     } else {
         Box(Modifier.fillMaxSize().statusBarsPadding()) { content() }
@@ -103,7 +112,7 @@ fun EpisodeListScreen(state: EpisodeListState, model: EpisodeListViewModel, acti
 private fun Header(state: EpisodeListState, onBack: () -> Unit) {
     val colors = Podcst.colors
     val context = LocalContext.current
-    val count = pluralStringResource(R.plurals.episodes, state.rows.size, state.rows.size)
+    val count = pluralStringResource(R.plurals.episodes, state.rows.size + state.missing.size, state.rows.size + state.missing.size)
     val extent = when (state.list) {
         EpisodeList.Downloads -> state.rows.sumOf { (it.download as? DownloadState.Available)?.bytes ?: 0L }.takeIf { it > 0 }?.let { Formatter.formatShortFileSize(context, it) }
         else -> state.rows.fold(Duration.ZERO) { total, row -> total + (row.episode.duration ?: Duration.ZERO) }.takeIf { it.isPositive() }?.let(Format::length)

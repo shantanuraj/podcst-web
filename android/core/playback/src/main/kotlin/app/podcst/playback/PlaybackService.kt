@@ -32,8 +32,8 @@ internal fun MediaMetadata.withChapterArtwork(artwork: ChapterArtwork?): MediaMe
 
 interface PlaybackHost {
     val playback: PlaybackCoordinator
-    val starred: kotlinx.coroutines.flow.Flow<Set<String>>
-    fun toggleStar(identity: String)
+    val starred: kotlinx.coroutines.flow.Flow<Set<Long>>
+    fun toggleStar(episode: app.podcst.model.Episode)
     fun sessionActivity(): Intent
 }
 
@@ -58,7 +58,7 @@ class PlaybackService : MediaSessionService() {
             coordinator.state.collect { player.refresh() }
         }
         scope.launch {
-            combine(coordinator.state, host.starred) { state, starred -> state.episode?.identity?.value in starred }
+            combine(coordinator.state, host.starred) { state, starred -> state.episode?.id in starred }
                 .distinctUntilChanged()
                 .collect { starred -> created.setMediaButtonPreferences(buttons(starred)) }
         }
@@ -112,7 +112,7 @@ class PlaybackService : MediaSessionService() {
             customCommand: SessionCommand,
             args: Bundle,
         ): ListenableFuture<SessionResult> {
-            if (customCommand == STAR) host.playback.state.value.episode?.let { host.toggleStar(it.identity.value) }
+            if (customCommand == STAR) host.playback.state.value.episode?.let { host.toggleStar(it) }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
     }

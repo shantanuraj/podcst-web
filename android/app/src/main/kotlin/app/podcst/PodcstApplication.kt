@@ -22,7 +22,7 @@ class PodcstApplication : Application(), PlaybackHost, DownloadsHost, Configurat
 
     override val playback: PlaybackCoordinator get() = graph.playback
     override val media: MediaStore get() = graph.media
-    override val starred: Flow<Set<String>> get() = graph.stars.identities
+    override val starred: Flow<Set<Long>> get() = graph.stars.episodeIds
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(PodcstWorkerFactory({ graph.progress }, { graph.library })).build()
@@ -36,8 +36,8 @@ class PodcstApplication : Application(), PlaybackHost, DownloadsHost, Configurat
         graph.scheduler.refreshFeeds()
     }
 
-    override fun toggleStar(identity: String) {
-        graph.scope.launch { graph.stars.toggle(identity) }
+    override fun toggleStar(episode: app.podcst.model.Episode) {
+        graph.scope.launch { graph.stars.toggle(episode) }
     }
 
     override fun sessionActivity(): Intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)

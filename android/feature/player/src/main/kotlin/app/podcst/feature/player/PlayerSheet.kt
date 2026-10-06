@@ -242,7 +242,7 @@ private fun UpNext(state: PlayerScreenState, viewModel: PlayerViewModel, actions
     LazyColumn(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         itemsIndexed(upNext, key = { _, episode -> episode.identity.value }) { _, episode ->
             ArtworkEpisodeRow(
-                EpisodeRowState(episode, starred = episode.identity.value in state.starred, download = state.download(episode)),
+                EpisodeRowState(episode, starred = episode.id in state.starred, download = state.download(episode)),
                 actions,
                 subtitle = episode.podcastTitle,
             )

@@ -57,10 +57,10 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
 
 @Composable
 fun AddToListSheet(graph: AppGraph, episode: Episode, onDismiss: () -> Unit) {
-    val starred by graph.stars.identities.collectAsStateWithLifecycle(emptySet())
+    val starred by graph.stars.episodeIds.collectAsStateWithLifecycle(emptySet())
     ListSheet(
         episode,
-        starred = episode.identity.value in starred,
+        starred = episode.id in starred,
         starredCount = starred.size,
         onStar = { star -> graph.scope.launch { if (star) graph.stars.star(episode) else graph.stars.unstar(episode) } },
         onDismiss = onDismiss,
