@@ -177,6 +177,9 @@ interface OutboxDao {
     @Query("SELECT * FROM progress_outbox ORDER BY queuedAt")
     suspend fun pending(): List<OutboxEntity>
 
+    @Query("SELECT * FROM progress_outbox WHERE episodeId = :episodeId")
+    suspend fun get(episodeId: Long): OutboxEntity?
+
     @Upsert
     suspend fun enqueue(update: OutboxEntity)
 
