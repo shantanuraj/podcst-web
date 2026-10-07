@@ -1,5 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type postgres from 'postgres';
+import { compareCanonicalIds } from '@/shared/canonical-id';
 import type {
   EpisodeList,
   ListAcknowledgement,
@@ -10,8 +11,11 @@ import type {
   ListMembership,
   ListSnapshot,
 } from '@/shared/lists';
+import type { StateScope } from '@/shared/state-contract';
 import { podcastAccess } from '../podcast-access';
+import { assertStateScope, StateError } from '../state/protocol';
 import { encodeListCursor, type ListCursor } from './input';
+import { legacyListHash } from './legacy';
 
 export class ListError extends Error {
   constructor(
@@ -160,22 +164,23 @@ export function createEpisodeListService(
       userId: string,
       listId: string,
       batch: ListBatch,
+      migration?: StateScope,
     ): Promise<ListAcknowledgement> {
-      const hash = createHash('sha256')
-        .update(
-          JSON.stringify({
-            listId,
-            clientId: batch.clientId,
-            sequence: batch.sequence,
-            changes: batch.changes.map(({ op, episodeId }) => ({
-              op,
-              episodeId,
-            })),
-          }),
-        )
-        .digest('hex');
+      const hash = legacyListHash(listId, batch);
       return sql.begin(async (tx) => {
         await tx`SET LOCAL lock_timeout = '3s'`;
+        if (migration) {
+          const [state] = await tx`
+            SELECT generation, legacy_generation FROM state_generation WHERE singleton FOR SHARE
+          `;
+          if (!state) throw new StateError('unavailable', 'State unavailable');
+          assertStateScope(userId, state.generation, migration);
+          if (state.generation !== state.legacy_generation)
+            throw new StateError(
+              'recovery_required',
+              'Legacy work requires reconciliation',
+            );
+        }
         await ownedList(tx, userId, listId);
         const registered = await tx`
           INSERT INTO episode_list_clients (user_id, client_id)
@@ -204,8 +209,8 @@ export function createEpisodeListService(
         `;
         const before = await references();
         const podcastIds = [
-          ...new Set(before.map((row) => Number(row.podcast_id))),
-        ].sort((a, b) => a - b);
+          ...new Set(before.map((row) => String(row.podcast_id))),
+        ].sort(compareCanonicalIds);
         for (const id of podcastIds)
           await tx`SELECT pg_advisory_xact_lock(${id}::bigint)`;
         if (JSON.stringify(before) !== JSON.stringify(await references()))

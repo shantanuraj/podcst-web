@@ -127,6 +127,3 @@ export async function saveStateAcknowledgement(
     WHERE user_id = ${result.accountId} AND client_id = ${result.clientId}
   `;
 }
-
-export const compareStateIds = (a: string, b: string) =>
-  BigInt(a) < BigInt(b) ? -1 : BigInt(a) > BigInt(b) ? 1 : 0;

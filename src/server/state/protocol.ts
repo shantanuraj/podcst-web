@@ -4,6 +4,7 @@ import {
   type ProgressBatch,
   STATE_BODY_LIMIT,
   type StateErrorCode,
+  type StateScope,
   stateErrorStatus,
   stateValidator,
 } from '@/shared/state-contract';
@@ -57,7 +58,7 @@ export function stateRequestHash(
 export function assertStateScope(
   accountId: string,
   generation: string,
-  batch: ProgressBatch | FollowBatch,
+  batch: Pick<StateScope, 'accountId' | 'generation'>,
 ) {
   if (batch.accountId !== accountId)
     throw new StateError('account_mismatch', 'Account changed');

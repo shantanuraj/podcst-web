@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { compareCanonicalIds } from '@/shared/canonical-id';
 import type {
   FollowAcknowledgement,
   FollowBatch,
@@ -7,7 +8,6 @@ import type {
 import { stateValidator } from '@/shared/state-contract';
 import { podcastAccess } from '../podcast-access';
 import {
-  compareStateIds,
   lockStateChange,
   nextStateRevision,
   readStateScope,
@@ -35,7 +35,7 @@ export function createFollowStateService(
         if (state.replay) return state.replay as FollowAcknowledgement;
         const ids = [
           ...new Set(batch.changes.map(({ podcastId }) => podcastId)),
-        ].sort(compareStateIds);
+        ].sort(compareCanonicalIds);
         for (const id of ids)
           await tx`SELECT pg_advisory_xact_lock(${id}::bigint)`;
         const visible = await tx<{ id: string }[]>`

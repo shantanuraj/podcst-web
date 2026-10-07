@@ -4,7 +4,7 @@ This is the executable contract for the next progress/follow protocol. Validator
 HTTP change-handler factories, transactional PostgreSQL services and native wire
 models are implemented; the existing API routes and client stores have **not**
 switched to this protocol. See
-[the current API](../api/README.md) for deployed request shapes.
+[the current API](../api/README.md) for current request shapes.
 
 [`schema.json`](schema.json) is ordinary JSON Schema draft-07. Definitions are
 validated with Ajv without coercion, defaults or removal of unknown properties.
@@ -128,6 +128,19 @@ restored traffic is admitted, the recovery procedure must rotate the generation
 and fence old writers. Clients must never automatically replace a persisted
 batch's generation, renumber it, or upload cached collections after a mismatch.
 
-Generation persistence/rotation, post-restore reconciliation, obsolete-writer
-fencing and preserving existing frozen Starred requests must be proven before
-activation. This contract does not implement or authorize a restore procedure.
+The schema also retains the initial `legacy_generation`. Numeric Starred flights
+predate generation fencing. The migration service checks the authenticated account
+and current generation, then refuses legacy replay if the current generation has
+changed since migration. Fetching a new generation cannot make an old ambiguous
+flight safe. The original numeric Starred hash and stored acknowledgement remain
+unchanged; converting that frozen request to strings is not a retry.
+
+The migration service hook is tested against accepted and unaccepted legacy
+batches with an intervening opposite action. The migration HTTP path and local
+conversion journals are not yet wired. Stored numeric IDs outside the safe integer
+range remain unresolved rather than being guessed. Ambiguous old progress writes
+remain local until explicit reapply creates new intent.
+
+Generation rotation, post-restore reconciliation, obsolete-writer fencing and
+client storage conversion must be proven before activation. This contract does
+not implement or authorize a restore procedure.

@@ -15,6 +15,8 @@ import fixtures from '../../../contracts/state/fixtures.json';
 import transitions from '../../../contracts/state/transitions.json';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+import { legacyListHash } from '../lists/legacy';
+import { createEpisodeListService } from '../lists/service';
 import { createFollowStateService } from './follows';
 import { createProgressStateService } from './progress';
 
@@ -103,7 +105,7 @@ describe.skipIf(!process.env.PG_BIN)(
 
     beforeEach(async () => {
       await sql`TRUNCATE users, authors RESTART IDENTITY CASCADE`;
-      await sql`UPDATE state_generation SET generation = ${generation}`;
+      await sql`UPDATE state_generation SET generation = ${generation}, legacy_generation = ${generation}`;
       await seed(sql);
     });
 
@@ -421,6 +423,63 @@ describe.skipIf(!process.env.PG_BIN)(
         { code: 'invalid_request' },
       );
       expect(await sql`SELECT * FROM progress_clients`).toHaveLength(0);
+    });
+
+    test.each([
+      true,
+      false,
+    ])('preserves a frozen numeric Starred batch when already accepted is %s', async (accepted) => {
+      await sql`INSERT INTO episodes (id, podcast_id, guid, published) VALUES (101, ${first}, 'legacy', '2025-01-01')`;
+      const lists = createEpisodeListService(sql);
+      const listId = (await lists.lists(accountId)).lists[0].id;
+      const frozen = {
+        clientId: randomUUID(),
+        sequence: '1',
+        changes: [{ op: 'add' as const, episodeId: 101 }],
+      };
+      const source = JSON.stringify(frozen);
+      const originalHash = legacyListHash(listId, frozen);
+      const scope = { protocol: 1 as const, accountId, generation };
+      const originalAck = await lists.change(
+        accountId,
+        listId,
+        frozen,
+        accepted ? undefined : scope,
+      );
+      await lists.change(accountId, listId, {
+        clientId: randomUUID(),
+        sequence: '1',
+        changes: [{ op: 'remove', episodeId: 101 }],
+      });
+      const replay = await lists.change(
+        accountId,
+        listId,
+        JSON.parse(source),
+        scope,
+      );
+      expect(replay).toEqual(originalAck);
+      expect(replay.results[0].episodeId).toBe(101);
+      expect((await lists.membership(accountId, listId)).items).toEqual([]);
+      const [stored] =
+        await sql`SELECT last_sequence::text, last_request_hash, last_result FROM episode_list_clients WHERE user_id = ${accountId} AND client_id = ${frozen.clientId}`;
+      expect(stored.last_sequence).toBe('1');
+      expect(stored.last_request_hash).toBe(originalHash);
+      expect(stored.last_result).toEqual(originalAck);
+      const converted = JSON.parse(source);
+      converted.changes[0].episodeId = '101';
+      expect(legacyListHash(listId, converted)).not.toBe(originalHash);
+      expect(JSON.stringify(frozen)).toBe(source);
+      await expect(
+        lists.change('other', listId, frozen, scope),
+      ).rejects.toMatchObject({ code: 'account_mismatch' });
+      const restoredGeneration = randomUUID();
+      await sql`UPDATE state_generation SET generation = ${restoredGeneration}`;
+      await expect(
+        lists.change(accountId, listId, frozen, {
+          ...scope,
+          generation: restoredGeneration,
+        }),
+      ).rejects.toMatchObject({ code: 'recovery_required' });
     });
 
     test('upgrades populated state without dropping positions, completion or ordering', async () => {

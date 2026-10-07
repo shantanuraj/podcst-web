@@ -1,9 +1,12 @@
 CREATE TABLE state_generation (
   singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
-  generation UUID NOT NULL UNIQUE
+  generation UUID NOT NULL UNIQUE,
+  legacy_generation UUID NOT NULL
 );
 
-INSERT INTO state_generation (generation) VALUES (gen_random_uuid());
+WITH initial AS (SELECT gen_random_uuid() AS generation)
+INSERT INTO state_generation (generation, legacy_generation)
+SELECT generation, generation FROM initial;
 
 CREATE TABLE progress_revision_heads (
   user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
