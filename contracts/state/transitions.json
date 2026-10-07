@@ -1,0 +1,19 @@
+{
+  "progress": [
+    { "name": "A saves with lost acknowledgement", "client": "a", "sequence": "1", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 90, "completed": false }], "ackRevision": "1", "headRevision": "1", "positionSeconds": 90, "completed": false, "currentEpisodeId": "9007199254740993" },
+    { "name": "B rewinds offline and reconnects", "client": "b", "sequence": "1", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 12, "completed": false }], "ackRevision": "2", "headRevision": "2", "positionSeconds": 12, "completed": false, "currentEpisodeId": "9007199254740993" },
+    { "name": "B listens to another episode", "client": "b", "sequence": "2", "changes": [{ "episodeId": "9007199254740994", "positionSeconds": 25, "completed": false }], "ackRevision": "3", "headRevision": "3", "positionSeconds": 12, "completed": false, "currentEpisodeId": "9007199254740994" },
+    { "name": "A retries without promoting its episode", "client": "a", "sequence": "1", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 90, "completed": false }], "ackRevision": "1", "headRevision": "3", "positionSeconds": 12, "completed": false, "currentEpisodeId": "9007199254740994" },
+    { "name": "A deliberately marks played at zero", "client": "a", "sequence": "2", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 0, "completed": true }], "ackRevision": "4", "headRevision": "4", "positionSeconds": 0, "completed": true, "currentEpisodeId": "9007199254740994" },
+    { "name": "A deliberately relistens", "client": "a", "sequence": "3", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 3, "completed": false }], "ackRevision": "5", "headRevision": "5", "positionSeconds": 3, "completed": false, "currentEpisodeId": "9007199254740993" },
+    { "name": "B marks unplayed", "client": "b", "sequence": "3", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 0, "completed": false }], "ackRevision": "6", "headRevision": "6", "positionSeconds": 0, "completed": false, "currentEpisodeId": "9007199254740993" },
+    { "name": "A retry cannot undo unplayed", "client": "a", "sequence": "3", "changes": [{ "episodeId": "9007199254740993", "positionSeconds": 3, "completed": false }], "ackRevision": "5", "headRevision": "6", "positionSeconds": 0, "completed": false, "currentEpisodeId": "9007199254740993" }
+  ],
+  "follows": [
+    { "name": "A follows with lost acknowledgement", "client": "a", "sequence": "1", "changes": [{ "podcastId": "9007199254740993", "followed": true }], "ackRevision": "1", "headRevision": "1", "followed": true },
+    { "name": "B unfollows offline and reconnects", "client": "b", "sequence": "1", "changes": [{ "podcastId": "9007199254740993", "followed": false }], "ackRevision": "2", "headRevision": "2", "followed": false },
+    { "name": "A retry cannot resurrect membership", "client": "a", "sequence": "1", "changes": [{ "podcastId": "9007199254740993", "followed": true }], "ackRevision": "1", "headRevision": "2", "followed": false },
+    { "name": "A explicitly follows again", "client": "a", "sequence": "2", "changes": [{ "podcastId": "9007199254740993", "followed": true }], "ackRevision": "3", "headRevision": "3", "followed": true },
+    { "name": "B retry cannot undo a new follow", "client": "b", "sequence": "1", "changes": [{ "podcastId": "9007199254740993", "followed": false }], "ackRevision": "2", "headRevision": "3", "followed": true }
+  ]
+}

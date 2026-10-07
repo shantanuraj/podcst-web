@@ -84,7 +84,7 @@ data class StateAcknowledgement<Result>(
 )
 
 @Serializable
-data class StateProgress(val positionSeconds: Int, val completed: Boolean, val revision: StateID, val updatedAtMs: Long)
+data class StateProgress(val positionSeconds: Int, val completed: Boolean, val revision: StateID, val updatedAtMs: Long?)
 
 @Serializable
 data class StateProgressItem(val episodeId: StateID, val progress: StateProgress?)
@@ -93,7 +93,7 @@ data class StateProgressItem(val episodeId: StateID, val progress: StateProgress
 enum class StateAvailability { available, unavailable }
 
 @Serializable
-data class StateFollowItem(val podcastId: StateID, val revision: StateID, val followedAtMs: Long, val availability: StateAvailability)
+data class StateFollowItem(val podcastId: StateID, val revision: StateID, val followedAtMs: Long?, val availability: StateAvailability)
 
 @Serializable
 data class StateSnapshot<Item>(

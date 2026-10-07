@@ -11,7 +11,7 @@
     "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])" },
     "accountId": { "type": "string", "minLength": 1, "maxLength": 128 },
     "seconds": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
-    "timestamp": { "type": "integer", "minimum": 0, "maximum": 8640000000000000 },
+    "timestamp": { "type": ["integer", "null"], "minimum": 0, "maximum": 8640000000000000 },
     "progressChange": {
       "type": "object",
       "additionalProperties": false,

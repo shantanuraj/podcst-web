@@ -51,7 +51,7 @@ export interface ProgressSnapshot extends StateScope {
       positionSeconds: number;
       completed: boolean;
       revision: string;
-      updatedAtMs: number;
+      updatedAtMs: number | null;
     } | null;
   }[];
 }
@@ -61,7 +61,7 @@ export interface FollowSnapshot extends StateScope {
   items: {
     podcastId: string;
     revision: string;
-    followedAtMs: number;
+    followedAtMs: number | null;
     availability: 'available' | 'unavailable';
   }[];
 }

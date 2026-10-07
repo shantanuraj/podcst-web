@@ -83,7 +83,7 @@
     "revision": "9007199254740994",
     "items": [
       { "podcastId": "9007199254740993", "revision": "9007199254740994", "followedAtMs": 1791360000000, "availability": "available" },
-      { "podcastId": "9223372036854775807", "revision": "9007199254740992", "followedAtMs": 1791350000000, "availability": "unavailable" }
+      { "podcastId": "9223372036854775807", "revision": "9007199254740992", "followedAtMs": null, "availability": "unavailable" }
     ]
   },
   "error": { "code": "recovery_required", "message": "State reconciliation required" },

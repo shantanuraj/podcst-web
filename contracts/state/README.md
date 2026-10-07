@@ -1,15 +1,22 @@
 # Durable state protocol
 
 This is the executable contract for the next progress/follow protocol. Validators,
-HTTP change-handler factories and native wire models are implemented; the existing
-API routes and client stores have **not** switched to this protocol. See
+HTTP change-handler factories, transactional PostgreSQL services and native wire
+models are implemented; the existing API routes and client stores have **not**
+switched to this protocol. See
 [the current API](../api/README.md) for deployed request shapes.
 
 [`schema.json`](schema.json) is ordinary JSON Schema draft-07. Definitions are
 validated with Ajv without coercion, defaults or removal of unknown properties.
 [`fixtures.json`](fixtures.json) is synthetic and shared by web/server, Swift and
-Kotlin tests. Request/response shape validation is not database, storage, device or
-recovery acceptance evidence.
+Kotlin tests. [`transitions.json`](transitions.json) supplies lost-ack/opposite-action
+vectors executed against disposable PostgreSQL. Neither these tests nor schema
+validation establish client-storage, physical-device or operational recovery proof.
+
+`migrations/staged/0010-durable-state.sql` is exercised by the service tests but is
+intentionally outside the active migration chain until the routes and client
+adapters switch together. Its required revisions reject obsolete inserts. Do not
+activate that schema while old progress/follow writers remain.
 
 ## Values and bounds
 
@@ -21,8 +28,9 @@ recovery acceptance evidence.
   exactly one account **and** one resource; progress and follows are independent.
 - `positionSeconds` is an integer in `0...2147483647`, measured on the original
   source timeline, never speed-adjusted or silence-trimmed elapsed time.
-- `updatedAtMs` and `followedAtMs` are server epoch-millisecond integers. They are
-  presentation data, not conflict clocks. Revisions determine accepted order.
+- `updatedAtMs` and `followedAtMs` are server epoch-millisecond integers, or explicit
+  `null` for an unknown legacy timestamp. They are presentation data, not conflict
+  clocks. Revisions determine accepted order.
 - A batch contains 1–100 ordered desired-state actions, up to 64 KiB UTF-8, with a
   five-second body deadline. The array index identifies an action within a batch.
   Duplicate resource IDs are permitted: actions execute in array order.

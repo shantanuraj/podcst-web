@@ -44,7 +44,7 @@ struct StateRevision: Codable, Hashable, Sendable {
 }
 
 enum StateContractError: Error {
-    case invalidDecimal, invalidPosition
+    case invalidDecimal, invalidPosition, invalidTimestamp
 }
 
 struct StateProgressChange: Codable, Equatable, Sendable {
@@ -92,11 +92,28 @@ struct StateAcknowledgement<Result: Codable & Equatable & Sendable>: Codable, Eq
     var results: [Result]
 }
 
+struct StateTimestamp: Codable, Equatable, Sendable {
+    var milliseconds: Int64?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        milliseconds = try container.decode(Int64?.self)
+        if let milliseconds, !(0...8_640_000_000_000_000).contains(milliseconds) {
+            throw StateContractError.invalidTimestamp
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(milliseconds)
+    }
+}
+
 struct StateProgress: Codable, Equatable, Sendable {
     var positionSeconds: Int
     var completed: Bool
     var revision: StateID
-    var updatedAtMs: Int64
+    var updatedAtMs: StateTimestamp
 }
 
 struct StateProgressItem: Codable, Equatable, Sendable {
@@ -122,7 +139,7 @@ struct StateFollowItem: Codable, Equatable, Sendable {
     enum Availability: String, Codable, Sendable { case available, unavailable }
     var podcastId: StateID
     var revision: StateID
-    var followedAtMs: Int64
+    var followedAtMs: StateTimestamp
     var availability: Availability
 }
 
