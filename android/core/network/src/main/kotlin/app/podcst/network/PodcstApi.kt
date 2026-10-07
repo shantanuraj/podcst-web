@@ -11,6 +11,7 @@ import app.podcst.model.EpisodePage
 import app.podcst.model.EpisodeSort
 import app.podcst.model.ImportResult
 import app.podcst.model.PlaybackProgress
+import app.podcst.model.SavedEpisodeProgress
 import app.podcst.model.Podcast
 import app.podcst.model.SortDirection
 import app.podcst.model.User
@@ -183,6 +184,14 @@ class PodcstApi(
 
     suspend fun currentProgress(): PlaybackProgress? =
         get<WireProgress?>("api/progress")?.let { PlaybackProgress(it.episode.domain(), it.position) }
+
+    suspend fun episodeProgress(episodeIds: List<Long>): List<SavedEpisodeProgress> {
+        val token = revision.get()
+        return episodeIds.distinct().sorted().chunked(200).flatMap { batch ->
+            if (revision.get() != token) throw CancellationException("Session changed")
+            get<List<SavedEpisodeProgress>>("api/progress", "episodeIds" to batch.joinToString(","))
+        }
+    }
 
     suspend fun saveProgress(episodeId: Long, position: Double, completed: Boolean) {
         send<WireSuccess>("PUT", url("api/progress"), body {

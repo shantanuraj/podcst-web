@@ -29,6 +29,14 @@ final class PlaybackProgressWriter {
 
     var hasPendingUpdates: Bool { inFlight != nil || !pending.isEmpty }
 
+    var pendingUpdates: [Update] {
+        var updates = pending
+        if let inFlight, !updates.contains(where: { $0.episodeID == inFlight.episodeID }) {
+            updates.insert(inFlight, at: 0)
+        }
+        return updates
+    }
+
     func submit(_ update: Update) {
         guard update.position.isFinite, update.position >= 0 else { return }
         pending.removeAll { $0.episodeID == update.episodeID }
@@ -86,11 +94,7 @@ final class PlaybackProgressWriter {
 
     private func persist() {
         guard let storageURL else { return }
-        var updates = pending
-        if let inFlight, !updates.contains(where: { $0.episodeID == inFlight.episodeID }) {
-            updates.insert(inFlight, at: 0)
-        }
-        guard let data = try? JSONEncoder().encode(updates) else { return }
+        guard let data = try? JSONEncoder().encode(pendingUpdates) else { return }
         try? FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: storageURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }

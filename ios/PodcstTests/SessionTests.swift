@@ -734,6 +734,102 @@ final class SessionTests: XCTestCase {
         XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [episode], isActive: false))
     }
 
+    func testLibraryReadsCompletedAndUnfinishedEpisodesInBoundedBatches() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episodes = (1...201).map { id in
+            Episode(id: id, guid: String(id), feed: "https://example.test/feed", title: "Episode \(id)", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        }
+        var batches: [[Int]] = []
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            XCTAssertEqual(request.request.httpMethod, "GET")
+            let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+            let ids = try XCTUnwrap(query.first { $0.name == "episodeIds" }?.value).split(separator: ",").compactMap { Int($0) }
+            batches.append(ids)
+            try request.respond(ids.map { EpisodeProgress(episodeId: $0, position: 0, completed: $0 == 201) })
+        }
+        await fixture.library.loadProgress(for: episodes + [episodes[0]])
+        XCTAssertEqual(batches.map(\.count), [200, 1])
+        XCTAssertEqual(fixture.library.progress(for: episodes[200])?.completed, true)
+        XCTAssertEqual(fixture.library.progress(for: episodes[0])?.completed, false)
+    }
+
+    func testLibraryRefreshDoesNotOverwriteALocalCompletion() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "done", feed: "https://example.test/feed", title: "Done", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let started = expectation(description: "Progress read started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            if request.request.httpMethod == "GET" {
+                pending = request
+                started.fulfill()
+            } else {
+                try request.respond(["success": true])
+            }
+        }
+        let refresh = Task { await fixture.library.loadProgress(for: [episode]) }
+        await fulfillment(of: [started], timeout: 2)
+        fixture.library.saveProgress(.init(episode: episode, position: 0, completed: true))
+        await fixture.library.flushProgress()
+        try XCTUnwrap(pending).respond([EpisodeProgress(episodeId: 42, position: 12, completed: false)])
+        await refresh.value
+        XCTAssertEqual(fixture.library.progress(for: episode)?.completed, true)
+    }
+
+    func testLibraryLoadsPendingOfflineCompletionBeforeServerProgress() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "done", feed: "https://example.test/feed", title: "Done", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        GuestLibraryURLProtocol.handler = { request in request.fail(URLError(.notConnectedToInternet)) }
+        fixture.library.saveProgress(.init(episode: episode, position: 0, completed: true))
+        await fixture.library.flushProgress()
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
+        GuestLibraryURLProtocol.handler = { request in
+            try request.respond([EpisodeProgress(episodeId: 42, position: 12, completed: false)])
+        }
+        await restored.loadProgress(for: [episode])
+        XCTAssertEqual(restored.progress(for: episode)?.completed, true)
+    }
+
+    func testLibraryProgressIsClearedAndLateReadsAreRejectedOnAccountChange() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        fixture.session.prepareAccountChange = { _ in await fixture.library.resetProgressSync() }
+        let episode = Episode(id: 42, guid: "done", feed: "https://example.test/feed", title: "Done", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        GuestLibraryURLProtocol.handler = { request in
+            try request.respond([EpisodeProgress(episodeId: 42, position: 0, completed: true)])
+        }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.progress(for: episode)?.completed, true)
+        let started = expectation(description: "Old account release progress started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in
+            if request.request.url?.path == "/api/auth/session" {
+                try request.respond(["user": User(id: "another", email: "another@example.test")])
+            } else {
+                pending = request
+                started.fulfill()
+            }
+        }
+        let refresh = Task { await fixture.library.loadProgress(for: [episode]) }
+        await fulfillment(of: [started], timeout: 2)
+        await fixture.session.restore()
+        try XCTUnwrap(pending).respond([EpisodeProgress(episodeId: 42, position: 0, completed: true)])
+        await refresh.value
+        XCTAssertNil(fixture.library.progress(for: episode))
+    }
+
+    func testLibraryGuestProgressDoesNotReadAccountHistory() async throws {
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Guest must not request progress") }
+        let episode = Episode(id: 42, guid: "guest", feed: "https://example.test/feed", title: "Guest", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertNil(fixture.library.progress(for: episode))
+    }
+
     private func release(_ number: Int, podcast: Podcast) -> Episode {
         Episode(podcastId: podcast.id, guid: "episode-\(number)", feed: podcast.feed, podcastTitle: podcast.title, title: "Episode \(number)", published: Date(timeIntervalSince1970: Double(number) * 86400), file: EpisodeFile(url: "https://example.test/\(number).mp3"))
     }

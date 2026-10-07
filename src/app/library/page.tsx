@@ -22,14 +22,18 @@ import { newReleases, releaseSections } from '@/shared/releases';
 import { useStars } from '@/shared/stars/useStars';
 import { useServerSubscriptions } from '@/shared/subscriptions/useServerSubscriptions';
 import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
-import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
+import type {
+  EpisodeProgress,
+  IEpisodeInfo,
+  IPodcastEpisodesInfo,
+} from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { Button } from '@/ui/Button';
-import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { PageLink } from '@/ui/PageLink/PageLink';
 import styles from './Library.module.css';
+import { ReleaseRow } from './ReleaseRow';
 
 const CONTINUE = 3;
 const RELEASES = 8;
@@ -53,14 +57,12 @@ export default function LibraryPage() {
     [user, recent, playing, started],
   );
   const releases = useMemo(() => newReleases(podcasts), [podcasts]);
+  const starred = useStars();
   const progress = useEpisodeProgress(
     user
-      ? podcasts.flatMap(({ episodes }) =>
-          episodes.slice(0, 1).flatMap(({ id }) => (id ? [id] : [])),
-        )
+      ? [...releases, ...starred.episodes].flatMap(({ id }) => (id ? [id] : []))
       : [],
   );
-  const starred = useStars();
 
   if (isLoading) return null;
   return (
@@ -97,7 +99,7 @@ export default function LibraryPage() {
         <Empty />
       ) : (
         <div className={styles.columns}>
-          <Releases episodes={releases} />
+          <Releases episodes={releases} progress={progress} />
           <Subscriptions
             podcasts={podcasts}
             played={(episode) => {
@@ -124,7 +126,12 @@ export default function LibraryPage() {
           <ul>
             {starred.stars.map(({ episodeId, episode, availability }) =>
               episode ? (
-                <ReleaseRow key={episodeId} episode={episode} when={null} />
+                <ReleaseRow
+                  key={episodeId}
+                  episode={episode}
+                  when={null}
+                  progress={progress.get(episodeId)}
+                />
               ) : (
                 <li key={episodeId}>
                   {availability === 'unavailable'
@@ -226,7 +233,13 @@ function ContinueCard({ episode, position }: RecentProgress) {
   );
 }
 
-function Releases({ episodes }: { episodes: IEpisodeInfo[] }) {
+function Releases({
+  episodes,
+  progress,
+}: {
+  episodes: IEpisodeInfo[];
+  progress: ReadonlyMap<number, EpisodeProgress>;
+}) {
   const { t, language } = useTranslation();
   const [now] = useState(() => Date.now());
   const sections = releaseSections(episodes, now, localeForLanguage[language], {
@@ -252,6 +265,7 @@ function Releases({ episodes }: { episodes: IEpisodeInfo[] }) {
               key={episode.id ?? episode.guid}
               episode={episode}
               when={when}
+              progress={episode.id ? progress.get(episode.id) : undefined}
             />
           ))}
         </ul>
@@ -259,54 +273,6 @@ function Releases({ episodes }: { episodes: IEpisodeInfo[] }) {
         <p className={styles.quiet}>{t('library.noNewEpisodes')}</p>
       )}
     </section>
-  );
-}
-
-function ReleaseRow({
-  episode,
-  when,
-}: {
-  episode: IEpisodeInfo;
-  when: string | null;
-}) {
-  const { t } = useTranslation();
-  const withAccount = useAccountPlayback();
-  return (
-    <li className={styles.release}>
-      <ProxiedImage
-        alt=""
-        src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
-        sizes="44px"
-        loading="lazy"
-      />
-      <div className={styles.releaseText}>
-        <PageLink
-          href={getEpisodeHref(episode)}
-          loading="podcast"
-          className={styles.releaseTitle}
-        >
-          {episode.title}
-        </PageLink>
-        <span className={styles.meta}>
-          {[episode.podcastTitle, when].filter(Boolean).join(' · ')}
-        </span>
-      </div>
-      <span className={styles.duration}>
-        {episode.duration ? formatDuration(t, episode.duration) : ''}
-      </span>
-      <StarButton episode={episode} />
-      <button
-        type="button"
-        className={styles.releasePlay}
-        aria-label={`${t('player.play')} ${episode.title}`}
-        onClick={() =>
-          withAccount(episode, () => usePlayer.getState().playEpisode(episode))
-        }
-      >
-        <Icon icon="play" size={12} />
-      </button>
-    </li>
   );
 }
 

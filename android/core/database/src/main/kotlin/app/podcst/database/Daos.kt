@@ -170,6 +170,9 @@ interface ProgressDao {
 
     @Upsert
     suspend fun upsert(progress: List<ProgressEntity>)
+
+    @Query("DELETE FROM progress WHERE identity = :identity")
+    suspend fun delete(identity: String)
 }
 
 @Dao

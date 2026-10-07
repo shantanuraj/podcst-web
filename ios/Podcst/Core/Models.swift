@@ -149,6 +149,12 @@ public struct PlaybackProgress: Codable, Hashable, Sendable {
     }
 }
 
+struct EpisodeProgress: Codable, Equatable, Sendable {
+    var episodeId: Int
+    var position: Double
+    var completed: Bool
+}
+
 public struct ProgressSaveResponse: Codable, Hashable, Sendable {
     public var success: Bool
 }

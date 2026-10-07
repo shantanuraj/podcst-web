@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -52,7 +53,7 @@ class EpisodeListViewModel(
     private val list: EpisodeList,
     catalog: CatalogRepository,
     private val library: LibraryRepository,
-    progress: ProgressRepository,
+    private val progress: ProgressRepository,
     private val stars: StarRepository,
     private val downloads: Downloads,
     private val playback: PlaybackCoordinator,
@@ -105,6 +106,11 @@ class EpisodeListViewModel(
 
     fun refresh() = viewModelScope.refresh(refresh) {
         if (list == EpisodeList.Starred) stars.refresh() else library.refresh(force = true)
+        progress.refresh(source.first())
+    }
+
+    fun refreshProgress() = viewModelScope.refresh(refresh) {
+        progress.refresh(source.first())
     }
 
     fun removeStar(id: Long) = viewModelScope.launch { stars.remove(id) }

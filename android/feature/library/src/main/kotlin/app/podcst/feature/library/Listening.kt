@@ -73,7 +73,7 @@ internal fun listening(
 }
 
 internal fun continueAndNew(unfinished: List<Episode>, releases: List<Episode>, progress: Map<String, EpisodeProgress>): List<Episode> =
-    (unfinished + releases.filterNot { progress[it.identity.value]?.completed == true })
+    (unfinished.filterNot { progress[it.identity.value]?.completed == true } + releases)
         .distinctBy { it.identity }
         .take(CONTINUE_LIMIT)
 

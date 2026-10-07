@@ -149,6 +149,92 @@ class ProgressRepositoryTest {
     }
 
     @Test
+    fun releaseProgressIncludesCompletionsBeyondTheFirstBatch() = runTest {
+        val episodes = (1L..201L).map(::episode)
+        val server = FakeServer { call ->
+            assertEquals("/api/progress", call.path)
+            assertTrue(call.body.isEmpty())
+            val ids = call.query!!.substringAfter("episodeIds=").split(',').map(String::toLong)
+            assertTrue(ids.size <= 200)
+            Reply(ids.joinToString(prefix = "[", postfix = "]") { id ->
+                """{"episodeId":$id,"position":0,"completed":${id == 201L}}"""
+            })
+        }
+        repository(server).refresh(episodes + episodes.first())
+        assertEquals(2, server.calls.size)
+        assertTrue(scopes.database.progress().get(episodes.last().identity.value)!!.completed)
+        assertFalse(scopes.database.progress().get(episodes.first().identity.value)!!.completed)
+        assertTrue(scopes.database.outbox().pending().isEmpty())
+    }
+
+    @Test
+    fun remoteRefreshPreservesPendingLocalCompletionEvenAfterRestart() = runTest {
+        val server = FakeServer { Reply("""[{"episodeId":1,"position":12,"completed":false}]""") }
+        repository(server).record(phone, 0.seconds, true)
+        repository(server).refresh(listOf(phone))
+        assertTrue(scopes.database.progress().get(phone.identity.value)!!.completed)
+        assertEquals(1, scopes.database.outbox().pending().size)
+        assertEquals(1, server.calls.size)
+    }
+
+    @Test
+    fun aLocalCompletionDuringReleaseLookupWinsOverTheRemoteResponse() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val repository = repository(FakeServer {
+            started.complete(Unit)
+            runBlocking { release.await() }
+            Reply("""[{"episodeId":1,"position":12,"completed":false}]""")
+        })
+        val lookup = async { repository.refresh(listOf(phone)) }
+        try {
+            started.await()
+            repository.record(phone, 0.seconds, true)
+        } finally { release.complete(Unit) }
+        lookup.await()
+        assertTrue(scopes.database.progress().get(phone.identity.value)!!.completed)
+    }
+
+    @Test
+    fun releaseLookupCannotCrossAccountChanges() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val repository = repository(FakeServer {
+            started.complete(Unit)
+            runBlocking { release.await() }
+            Reply("""[{"episodeId":1,"position":0,"completed":true}]""")
+        })
+        val lookup = async { repository.refresh(listOf(phone)) }
+        try {
+            started.await()
+            scopes.switch("another")
+        } finally { release.complete(Unit) }
+        lookup.await()
+        assertNull(scopes.database.progress().get(phone.identity.value))
+    }
+
+    @Test
+    fun releaseRefreshClearsMissingRemoteProgressButRetainsStateOnFailure() = runTest {
+        val local = ProgressEntity(phone.identity.value, 0, 4000000, true, 1)
+        scopes.database.progress().upsert(local)
+        try {
+            repository(FakeServer { throw IOException("offline") }).refresh(listOf(phone))
+            fail("Expected network failure")
+        } catch (_: IOException) { }
+        assertEquals(local, scopes.database.progress().get(phone.identity.value))
+        repository(FakeServer { Reply("[]") }).refresh(listOf(phone))
+        assertNull(scopes.database.progress().get(phone.identity.value))
+    }
+
+    @Test
+    fun guestsDoNotRequestAccountProgress() = runTest {
+        scopes.switch(null)
+        val server = FakeServer { error("Guest progress request") }
+        repository(server).refresh(listOf(phone))
+        assertTrue(server.calls.isEmpty())
+    }
+
+    @Test
     fun concurrentSyncsDoNotReplayAnAcknowledgedPausedPosition() = runTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()

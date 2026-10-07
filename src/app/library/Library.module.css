@@ -181,6 +181,10 @@
     color-mix(in oklch, var(--color-rule) 75%, transparent);
 }
 
+:where(.release[data-played="true"]) > :where(img, .releaseText, .duration) {
+  opacity: 0.55;
+}
+
 .release img {
   flex: none;
   width: 44px;

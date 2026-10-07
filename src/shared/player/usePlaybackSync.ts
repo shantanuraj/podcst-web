@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { responseData } from '@/data/api';
+import { invalidateProgress } from '@/data/progress';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import type { IEpisodeInfo } from '@/types';
 import { completion, progress } from '../../../contracts/playback/rules.json';
@@ -108,13 +109,15 @@ export function usePlaybackSync() {
             }),
           ),
         );
-        if (session.current(token))
+        if (session.current(token)) {
           lastSavedRef.current = {
             revision: token.revision,
             episodeId,
             position,
             completed,
           };
+          invalidateProgress(session);
+        }
       } catch {}
     },
     [session, token, owns],

@@ -182,19 +182,29 @@ struct EpisodeRow: View {
     @Environment(MediaStore.self) private var media
     @Environment(DownloadAlertState.self) private var alerts
     @Environment(Router.self) private var router
+    @Environment(LibraryStore.self) private var library
     let episode: Episode
     var context: Context = .podcast
     var showsSeparator = true
 
     private var duration: TimeInterval? { episode.duration.flatMap { $0 > 0 ? $0 : nil } }
 
+    private var completed: Bool {
+        library.progress(for: episode)?.completed == true && !(playback.position(of: episode) != nil && playback.isPlaybackRequested)
+    }
+
+    private var position: TimeInterval? { playback.position(of: episode) ?? library.progress(for: episode)?.position }
+
     private var fraction: Double? {
-        guard let position = playback.position(of: episode), position > 0, let duration else { return nil }
+        guard !completed, let position, position > 0, let duration else { return nil }
         return min(1, position / duration)
     }
 
     private var metadata: [String] {
-        let remaining = playback.position(of: episode).flatMap { position in
+        if completed {
+            return [context == .podcast || context == .library ? nil : episode.podcastTitle, duration.map(Duration.seconds), "Played"].compactMap { $0 }
+        }
+        let remaining = position.flatMap { position in
             duration.flatMap { position > 0 ? "\(Duration.seconds(max(0, $0 - position))) left" : nil }
         }
         switch context {
@@ -254,10 +264,11 @@ struct EpisodeRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .opacity(completed ? 0.5 : 1)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(([episode.title] + (context == .podcast || context == .library ? [episode.dateline] : metadata) + (starred ? ["Starred"] : [])).joined(separator: ", "))
+            .accessibilityLabel(([episode.title] + metadata + (starred ? ["Starred"] : [])).joined(separator: ", "))
             .accessibilityAction(named: starred ? "Unstar" : "Star") { router.star(episode, !starred, in: stars) }
             trailing(isCurrent: isCurrent)
         }
@@ -301,7 +312,7 @@ struct EpisodeRow: View {
             }
         case .podcast, .library, .releases:
             Button {
-                if isCurrent { playback.toggle() } else { playback.play(episode) }
+                if isCurrent && !completed { playback.toggle() } else { playback.play(episode, at: completed ? 0 : position ?? 0) }
             } label: {
                 RoundIcon(systemName: isCurrent && playback.isPlaybackRequested ? "pause.fill" : "play.fill")
             }

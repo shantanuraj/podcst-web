@@ -1,7 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { accountQueryKey } from '@/shared/auth/account';
+import type { AccountSession } from '@/shared/auth/account-session';
 import type { EpisodeProgress, IEpisodeInfo } from '@/types';
 import { get, responseData } from './api';
 
@@ -47,13 +48,7 @@ export function useMarkPlayed(podcastId: number | undefined) {
       ),
     onSuccess: () => {
       if (!session.current(token)) return;
-      void session.client.invalidateQueries({
-        queryKey: accountQueryKey(
-          token.scope,
-          'podcast-progress',
-          podcastId ?? 0,
-        ),
-      });
+      invalidateProgress(session);
       void session.client.invalidateQueries({
         queryKey: accountQueryKey(token.scope, 'episodes', podcastId ?? 0),
       });
@@ -86,27 +81,51 @@ export function useRecentProgress(limit: number) {
   return session.current(token, 'playback') ? (query.data ?? []) : [];
 }
 
+export function episodeProgressQueries(
+  session: AccountSession,
+  episodeIds: readonly number[],
+) {
+  const ids = [...new Set(episodeIds)].sort((a, b) => a - b);
+  return Array.from({ length: Math.ceil(ids.length / 200) }, (_, index) => {
+    const batch = ids.slice(index * 200, (index + 1) * 200).join(',');
+    const options = session.query('episode-progress', 'playback', (signal) =>
+      get<EpisodeProgress[]>(
+        '/progress',
+        { episodeIds: batch },
+        undefined,
+        signal,
+      ),
+    );
+    return {
+      ...options,
+      queryKey: [...options.queryKey, batch],
+      enabled: options.enabled && session.scope !== null,
+      staleTime: 30_000,
+    };
+  });
+}
+
 export function useEpisodeProgress(episodeIds: readonly number[]) {
   const session = useAccountSession();
   const token = session.token();
-  const ids = [...new Set(episodeIds)].sort((a, b) => a - b).slice(0, 200);
-  const options = session.query('episode-progress', 'playback', (signal) =>
-    get<EpisodeProgress[]>(
-      '/progress',
-      { episodeIds: ids.join(',') },
-      undefined,
-      signal,
-    ),
-  );
-  const query = useQuery({
-    ...options,
-    queryKey: [...options.queryKey, ids.join(',')],
-    enabled: options.enabled && token.scope !== null && ids.length > 0,
-    staleTime: 30_000,
+  const queries = useQueries({
+    queries: episodeProgressQueries(session, episodeIds),
   });
-  const rows = session.current(token, 'playback') ? query.data : undefined;
-  return useMemo(
-    () => new Map((rows ?? []).map((row) => [row.episodeId, row])),
-    [rows],
+  return new Map(
+    (session.current(token, 'playback')
+      ? queries.flatMap((query) => query.data ?? [])
+      : []
+    ).map((row) => [row.episodeId, row]),
   );
+}
+
+export function invalidateProgress(session: AccountSession) {
+  for (const kind of [
+    'episode-progress',
+    'podcast-progress',
+    'recent-progress',
+  ])
+    void session.client.invalidateQueries({
+      queryKey: accountQueryKey(session.scope, kind),
+    });
 }

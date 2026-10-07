@@ -29,12 +29,30 @@ class EpisodeListsTest {
     private fun Episode.key() = identity.value
 
     @Test
-    fun continueAndNewPlacesUnfinishedFirstAndSkipsCompletedReleases() {
+    fun continueAndNewPlacesUnfinishedFirstAndRetainsCompletedReleases() {
         val unfinished = episode("a")
         val done = episode("b")
         val fresh = episode("c")
         val result = continueAndNew(listOf(unfinished), listOf(done, unfinished, fresh), mapOf(unfinished.key() to progress(10), done.key() to progress(60, completed = true)))
-        assertEquals(listOf("a", "c"), result.map { it.guid })
+        assertEquals(listOf("a", "b", "c"), result.map { it.guid })
+    }
+
+    @Test
+    fun completedReleaseIsPlayedNotFreshAndReplayRestoresEmphasis() {
+        val done = episode("done")
+        val listening = Listening(progress = mapOf(done.key() to progress(0, completed = true)), now = now)
+        val state = library(emptyList(), listOf(done), emptyList(), listening, Refresh.Idle)
+        assertEquals(listOf(done), state.episodes.map { it.episode })
+        assertTrue(state.episodes.single().played)
+        assertFalse(state.episodes.single().fresh)
+        assertFalse(listening.copy(current = done.identity, playing = true).row(done).played)
+    }
+
+    @Test
+    fun aCompletedEpisodeLeavesContinueWithoutChangingItsReleasePosition() {
+        val done = episode("done")
+        val fresh = episode("fresh")
+        assertEquals(listOf(fresh, done), continueAndNew(listOf(done), listOf(fresh, done), mapOf(done.key() to progress(0, completed = true))))
     }
 
     @Test

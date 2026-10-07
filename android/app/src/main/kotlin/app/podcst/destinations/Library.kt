@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
@@ -27,6 +28,10 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
     entry<LibraryRoute> {
         val model = viewModel { LibraryViewModel(graph.library, graph.progress, graph.stars, graph.downloads, graph.playback) }
         val state by model.state.collectAsStateWithLifecycle()
+        LifecycleResumeEffect(model) {
+            model.refreshProgress()
+            onPauseOrDispose { }
+        }
         LibraryScreen(
             state,
             actions,
@@ -51,6 +56,10 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
             )
         }
         val state by model.state.collectAsStateWithLifecycle()
+        LifecycleResumeEffect(model) {
+            model.refreshProgress()
+            onPauseOrDispose { }
+        }
         EpisodeListScreen(state, model, actions, onBack = { navigator.back() })
     }
 }

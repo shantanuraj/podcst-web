@@ -17,7 +17,10 @@ public final class LibraryStore {
     private let guestKey = "guest.library.podcasts"
     private static let releasesPerPodcast = 2
     @ObservationIgnored private var progressWriter: PlaybackProgressWriter?
-    @ObservationIgnored private var progressAccountID: String?
+    private var progressAccountID: String?
+    private var savedProgress: [Int: EpisodeProgress] = [:]
+    @ObservationIgnored private var progressEdits: [Int: UUID] = [:]
+    @ObservationIgnored private var progressRead = UUID()
 
     public init(api: APIClient, session: SessionStore, defaults: UserDefaults = .standard, progressDirectory: URL? = nil) {
         self.api = api
@@ -36,6 +39,36 @@ public final class LibraryStore {
                 .prefix(Self.releasesPerPodcast)
         }
         .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+    }
+
+    func progress(for episode: Episode) -> EpisodeProgress? {
+        guard !session.isLoading, let accountID = session.user?.id,
+              progressAccountID == accountID, let id = episode.id else { return nil }
+        return savedProgress[id]
+    }
+
+    func loadProgress(for episodes: [Episode]) async {
+        guard !Task.isCancelled, !session.isLoading, let accountID = session.user?.id,
+              api.accountID == accountID else { return }
+        let ids = Set(episodes.compactMap(\.id))
+        guard !ids.isEmpty else { return }
+        let writer = writer(for: accountID)
+        let edits = progressEdits
+        let pending = Set(writer.pendingUpdates.map(\.episodeID))
+        let read = UUID()
+        progressRead = read
+        do {
+            let rows = try await api.episodeProgress(episodeIDs: Array(ids))
+            guard !Task.isCancelled, !session.isLoading, session.user?.id == accountID,
+                  api.accountID == accountID, progressWriter === writer, progressRead == read else { return }
+            let protected = pending.union(writer.pendingUpdates.map(\.episodeID))
+            let remote = Dictionary(uniqueKeysWithValues: rows.map { ($0.episodeId, $0) })
+            for id in ids where edits[id] == progressEdits[id] && !protected.contains(id) {
+                savedProgress[id] = remote[id]
+            }
+        } catch {
+            return
+        }
     }
 
     public func isSubscribed(_ podcast: Podcast) -> Bool {
@@ -136,7 +169,10 @@ public final class LibraryStore {
 
     public func saveProgress(_ update: PlaybackUpdate) {
         guard let accountID = session.user?.id, let episodeID = update.episode.id else { return }
-        writer(for: accountID).submit(.init(episodeID: episodeID, position: update.position, completed: update.completed))
+        let writer = writer(for: accountID)
+        savedProgress[episodeID] = EpisodeProgress(episodeId: episodeID, position: update.position, completed: update.completed)
+        progressEdits[episodeID] = UUID()
+        writer.submit(.init(episodeID: episodeID, position: update.position, completed: update.completed))
     }
 
     func flushProgress() async {
@@ -160,6 +196,10 @@ public final class LibraryStore {
                 throw error
             }
         }
+        savedProgress = Dictionary(uniqueKeysWithValues: writer.pendingUpdates.map {
+            ($0.episodeID, EpisodeProgress(episodeId: $0.episodeID, position: $0.position, completed: $0.completed))
+        })
+        progressEdits = [:]
         progressAccountID = accountID
         progressWriter = writer
         return writer
@@ -169,8 +209,11 @@ public final class LibraryStore {
         let writer = progressWriter
         progressWriter = nil
         progressAccountID = nil
-        await writer?.reset()
+        progressRead = UUID()
+        savedProgress = [:]
+        progressEdits = [:]
         podcasts = []
+        await writer?.reset()
     }
 
     public func importFeeds(_ feeds: [String]) async {

@@ -353,6 +353,20 @@ public final class APIClient {
         return PlaybackProgress(episode: mapEpisode(raw.episode), position: raw.position)
     }
 
+    func episodeProgress(episodeIDs: [Int]) async throws -> [EpisodeProgress] {
+        let ids = Array(Set(episodeIDs)).sorted()
+        var rows: [EpisodeProgress] = []
+        let revision = sessionRevision
+        for offset in stride(from: 0, to: ids.count, by: 200) {
+            try Task.checkCancellation()
+            guard revision == sessionRevision else { throw CancellationError() }
+            let batch = ids[offset..<min(offset + 200, ids.count)]
+            let page: [EpisodeProgress] = try await get(path: "/api/progress", query: [URLQueryItem(name: "episodeIds", value: batch.map(String.init).joined(separator: ","))])
+            rows.append(contentsOf: page)
+        }
+        return rows
+    }
+
     public func saveProgress(episodeID: Int, position: Double, completed: Bool) async throws {
         let _: RawSuccess = try await put(path: "/api/progress", body: ProgressBody(episodeId: episodeID, position: Int(position.rounded(.towardZero)), completed: completed))
     }

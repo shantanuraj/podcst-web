@@ -53,6 +53,20 @@ Each case starts from an empty preference store and applies `steps`. Options are
 
 The iOS patterns use ICU semantics. `\s`, `\p{P}`, `\p{S}` and `\p{Pd}` are Unicode classes, line splitting accepts every Unicode newline, and title trimming removes Unicode spaces but not newlines. A Java or Kotlin port needs `Pattern.UNICODE_CHARACTER_CLASS` or equivalent explicit classes to match.
 
+## Library listening state
+
+New episodes/releases means recently published, not unplayed. Completion does not
+remove or reorder a release, including in the combined Continue & new preview.
+Only unfinished episodes belong in the Continue portion of that preview.
+
+Completed rows show **Played**, never **New**, with chapter-like dimming of artwork
+and text. Playback, navigation and other actions remain enabled and undimmed.
+Actively replaying an episode restores its emphasis. Use the account's saved
+`completed` flag, including manual completion at position zero, rather than
+inferring completion from the feed duration. Pending local progress takes
+precedence over a remote read, and account changes discard the prior account's
+presentation state.
+
 ## `releases.json`
 
 `newReleases[]` lists subscribed podcasts and the expected episode IDs, using `releases.perPodcast` from `rules.json`. An episode with a null `published` sorts as the earliest possible date. The cases contain no ties; tie order is unspecified.

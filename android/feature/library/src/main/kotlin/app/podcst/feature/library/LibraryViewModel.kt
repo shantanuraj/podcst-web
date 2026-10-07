@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 
 data class LibraryState(
@@ -30,7 +31,7 @@ data class LibraryState(
 
 class LibraryViewModel(
     private val library: LibraryRepository,
-    progress: ProgressRepository,
+    private val progress: ProgressRepository,
     stars: StarRepository,
     downloads: Downloads,
     playback: PlaybackCoordinator,
@@ -51,7 +52,14 @@ class LibraryViewModel(
         refresh(force = false)
     }
 
-    fun refresh(force: Boolean = true) = viewModelScope.refresh(refresh) { library.refresh(force) }
+    fun refresh(force: Boolean = true) = viewModelScope.refresh(refresh) {
+        library.refresh(force)
+        progress.refresh(library.newReleases.first())
+    }
+
+    fun refreshProgress() = viewModelScope.refresh(refresh) {
+        progress.refresh(library.newReleases.first())
+    }
 }
 
 internal fun library(

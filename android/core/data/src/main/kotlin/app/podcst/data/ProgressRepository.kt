@@ -84,6 +84,43 @@ class ProgressRepository(
         }
     }
 
+    suspend fun refresh(episodes: List<Episode>) {
+        val owner = scopes.current.value
+        if (owner.accountId == null) return
+        val selected = episodes.filter { it.id != null }.distinctBy { it.identity }
+        if (selected.isEmpty()) return
+        syncMutex.withLock {
+            if (scopes.current.value !== owner) return@withLock
+            val database = owner.database
+            val before = database.withTransaction {
+                selected.associate { it.identity.value to database.progress().get(it.identity.value) }
+            }
+            val pending = database.outbox().pending().mapTo(mutableSetOf()) { it.episodeId }
+            val remote = api.episodeProgress(selected.mapNotNull { it.id }).associateBy { it.episodeId }
+            if (scopes.current.value !== owner) return@withLock
+            database.withTransaction {
+                if (scopes.current.value !== owner) return@withTransaction
+                pending += database.outbox().pending().map { it.episodeId }
+                for (episode in selected) {
+                    val identity = episode.identity.value
+                    if (episode.id in pending || database.progress().get(identity) != before[identity]) continue
+                    val saved = remote[episode.id]
+                    if (saved == null) {
+                        database.progress().delete(identity)
+                    } else {
+                        database.progress().upsert(ProgressEntity(
+                            identity,
+                            saved.position.seconds.inWholeMilliseconds,
+                            episode.duration?.inWholeMilliseconds,
+                            saved.completed,
+                            before[identity]?.updatedAt ?: clock(),
+                        ))
+                    }
+                }
+            }
+        }
+    }
+
     suspend fun sync(): SyncOutcome {
         val owner = scopes.current.value
         return syncMutex.withLock { syncPending(owner) }

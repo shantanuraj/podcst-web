@@ -3,11 +3,14 @@ import SwiftUI
 struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(PlaybackController.self) private var playback
     @State private var showingLogin = false
 
     private var continueAndNew: [Episode] {
-        let current = playback.currentEpisode.flatMap { playback.currentTime > 0 ? $0 : nil }
+        let current = playback.currentEpisode.flatMap {
+            playback.currentTime > 0 && library.progress(for: $0)?.completed != true ? $0 : nil
+        }
         return (current.map { [$0] } ?? []) + library.newReleases.filter { $0.identity != current?.identity }
     }
 
@@ -59,7 +62,13 @@ struct LibraryView: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
-        .refreshable { await library.load(forceRefresh: true) }
+        .refreshable {
+            await library.load(forceRefresh: true)
+            await library.loadProgress(for: library.newReleases)
+        }
+        .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
+            if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
+        }
         .podcstPage()
         .screenHeader("Library") {
             HStack(spacing: 14) {
@@ -114,7 +123,9 @@ private struct LibraryLists: View {
 
 struct ReleasesView: View {
     @Environment(LibraryStore.self) private var library
+    @Environment(SessionStore.self) private var session
     @Environment(\.locale) private var locale
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TimelineView(.periodic(from: ReleaseSection.calendar.startOfDay(for: .now), by: 86400)) { timeline in
@@ -144,7 +155,13 @@ struct ReleasesView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
-            .refreshable { await library.load(forceRefresh: true) }
+            .refreshable {
+                await library.load(forceRefresh: true)
+                await library.loadProgress(for: library.newReleases)
+            }
+        }
+        .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
+            if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
         }
         .podcstPage()
         .navigationTitle("New releases")

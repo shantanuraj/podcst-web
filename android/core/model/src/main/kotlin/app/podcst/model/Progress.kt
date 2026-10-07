@@ -2,6 +2,10 @@ package app.podcst.model
 
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class SavedEpisodeProgress(val episodeId: Long, val position: Double, val completed: Boolean)
 
 data class EpisodeProgress(
     val position: Duration,

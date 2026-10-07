@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -59,7 +60,9 @@ data class EpisodeRowState(
     val playing: Boolean = false,
     val current: Boolean = false,
     val fresh: Boolean = false,
-)
+) {
+    val played: Boolean get() = progress?.completed == true && !playing
+}
 
 data class SwipeAction(val label: String, val run: () -> Unit)
 
@@ -83,7 +86,7 @@ fun episodeMeta(state: EpisodeRowState, includeLength: Boolean = true): String {
     val parts = buildList {
         if (includeLength && duration != null && duration.isPositive()) add(Format.length(duration))
         when {
-            progress?.completed == true -> add(stringResource(R.string.played))
+            state.played -> add(stringResource(R.string.played))
             progress?.started == true -> progress.remaining?.let { add(Format.left(it)) }
         }
     }
@@ -102,8 +105,8 @@ fun DatedEpisodeRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            DateBlock(state.episode.published)
-            Column(Modifier.weight(1f)) {
+            Box(Modifier.alpha(if (state.played) 0.5f else 1f)) { DateBlock(state.episode.published) }
+            Column(Modifier.weight(1f).alpha(if (state.played) 0.5f else 1f)) {
                 Text(state.episode.title, style = Podcst.type.episodeTitle, color = Podcst.colors.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 MetaLine(state, Modifier.padding(top = 3.dp))
             }
@@ -127,8 +130,8 @@ fun ArtworkEpisodeRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Artwork(state.episode.artwork, 48.dp)
-            Column(Modifier.weight(1f)) {
+            Artwork(state.episode.artwork, 48.dp, modifier = Modifier.alpha(if (state.played) 0.5f else 1f))
+            Column(Modifier.weight(1f).alpha(if (state.played) 0.5f else 1f)) {
                 Text(state.episode.title, style = Podcst.type.compactTitle, color = Podcst.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 MetaLine(state, Modifier.padding(top = 4.dp), subtitle)
             }
