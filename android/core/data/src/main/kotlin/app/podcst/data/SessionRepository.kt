@@ -3,7 +3,6 @@ package app.podcst.data
 import android.content.Context
 import app.podcst.model.User
 import app.podcst.network.ApiException
-import app.podcst.network.PasskeyChallenge
 import app.podcst.network.PodcstApi
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
@@ -60,15 +59,13 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     suspend fun signIn(email: String, code: String): Boolean = changing { api.signIn(email, code) }
 
     suspend fun signInWithPasskey(email: String?, authenticate: suspend (String) -> String): Boolean = changing {
-        when (val challenge = api.passkeyChallenge(email?.trim()?.ifEmpty { null })) {
-            is PasskeyChallenge.Ready -> api.signInWithPasskey(authenticate(challenge.requestJson), challenge.userId)
-            PasskeyChallenge.NoAccount -> throw ApiException(404, "No account found for this email")
-            PasskeyChallenge.NoPasskey -> throw ApiException(400, "No passkey is registered for this account")
-        }
+        val challenge = api.passkeyChallenge()
+        api.signInWithPasskey(authenticate(challenge.requestJson), challenge)
     }
 
     suspend fun registerPasskey(create: suspend (String) -> String): Boolean = attempt {
-        api.registerPasskey(create(api.passkeyRegistration()))
+        val challenge = api.passkeyRegistration()
+        api.registerPasskey(create(challenge.requestJson), challenge)
         mutex.withLock { update(api.sessionUser()) }
     }
 

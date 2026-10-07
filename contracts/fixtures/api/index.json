@@ -19,25 +19,10 @@
     "status": 200,
     "decodesAs": "PasskeyLoginStart"
   },
-  "auth-login.missing-visitor.json": {
+  "auth-login.missing-flow.json": {
     "endpoint": "POST /api/auth/login",
     "status": 400,
     "decodesAs": "ErrorMessage"
-  },
-  "auth-login.no-account.json": {
-    "endpoint": "POST /api/auth/login",
-    "status": 200,
-    "decodesAs": "PasskeyLoginStart"
-  },
-  "auth-login.no-passkey.json": {
-    "endpoint": "POST /api/auth/login",
-    "status": 200,
-    "decodesAs": "PasskeyLoginStart"
-  },
-  "auth-login.passkey.json": {
-    "endpoint": "POST /api/auth/login",
-    "status": 200,
-    "decodesAs": "PasskeyLoginStart"
   },
   "auth-login.verified.json": {
     "endpoint": "POST /api/auth/login",

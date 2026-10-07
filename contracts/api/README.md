@@ -6,7 +6,7 @@ This contract describes the API used by the native clients. Route handlers live 
 
 **Base URL.** Production is `https://www.podcst.app` (`ios/Podcst/Core/APIClient.swift:10`). All bodies are JSON. Request bodies are sent with `Content-Type: application/json`.
 
-**Session.** Successful email-code login and passkey verification call `createSession` (`src/server/auth/session.ts`), which inserts a 40-character hexadecimal session ID and sets the cookie `session=<id>` with `Path=/`, `HttpOnly`, `SameSite=lax`, `Secure` in production and an expiry 30 days after creation. Nothing extends the expiry. Native clients do not use a cookie jar: they read `session=` from the first `Set-Cookie` header of any response, store the value in secure storage and send `Cookie: session=<value>` on authenticated requests (`APIClient.persistCookie`, `APIClient.request`). Logout deletes the server row and clears the cookie. An expired or unknown session is indistinguishable from no session.
+**Session.** Successful email-code login and passkey verification insert a 40-character hexadecimal session ID in their verification transaction, revoke the previously presented session, and set the cookie `session=<id>` with `Path=/`, `HttpOnly`, `SameSite=lax`, `Secure` in production and an expiry 30 days after creation. Nothing extends the expiry. Native clients do not use a cookie jar: they read `session=` from the first `Set-Cookie` header of any response, store the value in secure storage and send `Cookie: session=<value>` on authenticated requests (`APIClient.persistCookie`, `APIClient.request`). Logout deletes the server row and clears the cookie. An expired or unknown session is indistinguishable from no session. All authentication responses are private/no-store, including errors. API mutations require the configured browser Origin (with same-origin Fetch Metadata when supplied), or the explicit native path: `X-Podcst-Client: native` without Origin/Fetch Metadata. Native clients send that header, including on logout. The native marker is a CSRF request-shape check, not an authentication credential; session and ownership checks still apply.
 
 **Authorization classes.**
 
@@ -246,34 +246,24 @@ Body: `{ "email": string, "code": string }`. Consumes the code, creates the user
 
 ### `POST /api/auth/login` — public
 
-Every request needs `visitorId`, a client-generated string that keys the pending challenge (400 `{message: "Visitor ID required"}`, `auth-login.missing-visitor.json`). The challenge lives in process memory for five minutes and is removed when read (`setChallenge`, `popChallenge` in `src/server/auth/passkey.ts`), so options and verification must reach the same server process, and a failed verification needs new options.
+Start body: `{ "discoverable": true }`. Returns `PasskeyLoginStart` `{ "flowId": string, "options": PublicKeyCredentialRequestOptionsJSON }`. Options contain `rpId`, a random challenge, `allowCredentials: []`, timeout 60000 and `userVerification: "required"`. There is no email/account/passkey discovery response; clients offer email-code login independently. A missing start discriminator returns 400 `{message: "Passkey flow required"}`. Fixtures: `auth-login.discoverable.json`, `auth-login.missing-flow.json`.
 
-Start requests (no `response`):
+`flowId` is a server-issued 256-bit opaque base64url value. Shared Redis storage expires it after five minutes and atomically consumes it before verification, including failed verification. Start and finish can reach different processes. Flows bind purpose; registration additionally binds account and issuing session. A failed/cancelled/expired flow requires new options. Issuance allows 20/hour/trusted source; verification shares the authentication source budget. Redis/configuration outages fail closed with 503.
 
-| Body | Response (`PasskeyLoginStart`) | Fixture |
-| --- | --- | --- |
-| `{visitorId, discoverable: true}` | `{options}` with `allowCredentials: []` | `auth-login.discoverable.json` |
-| `{visitorId, email}`, no account | `{exists: false}` | `auth-login.no-account.json` |
-| `{visitorId, email}`, account without passkey | `{exists: true, hasPasskey: false, userId}` | `auth-login.no-passkey.json` |
-| `{visitorId, email}`, account with passkeys | `{exists: true, hasPasskey: true, options, userId}` | `auth-login.passkey.json` |
-| `{visitorId}` alone | 400 `{message: "Email required"}` | |
-
-`options` is `PublicKeyCredentialRequestOptionsJSON` from `@simplewebauthn/server` 13.3.2 `generateAuthenticationOptions`: `rpId` (the server's `WEBAUTHN_RP_ID`; the fixture value is illustrative), `challenge` (base64url of 32 random bytes), `allowCredentials` (`[{id, type: "public-key"}]`, no `transports`), `timeout` 60000 and `userVerification: "preferred"`. There is no `extensions` key.
-
-Verification body: `{visitorId, response, userId?}`, where `response` is `AuthenticationResponseJSON` (`id`, `rawId` equal to `id`, `type: "public-key"`, `response.clientDataJSON`, `response.authenticatorData`, `response.signature`, optional `response.userHandle`, all base64url; see `PasskeyAssertion` in `APIClient.swift`). Send the `userId` from an email start; omit it for discoverable login. The server requires user verification, an origin in its accepted set and the configured RP ID; accepted origins and native association files are derived from [`native-apps.ts`](../../src/server/auth/native-apps.ts). Success creates a session and returns `PasskeyLoginResult` `{ "verified": true, "userId": string }` (`auth-login.verified.json`). Every verification failure, including an expired challenge, unknown credential or wrong origin, returns 400 `{message: <message>}` (`auth-login.challenge-expired.json`).
+Verification body: `{flowId, response}`, where `response` is `AuthenticationResponseJSON`. The server derives identity from the credential, requires user verification and the unchanged accepted RP/origin set ([native associations](../../src/server/auth/native-apps.ts)), serializes credential counter changes, and creates a session in the same transaction. Success returns `PasskeyLoginResult` `{ "verified": true, "userId": string }` (`auth-login.verified.json`). Bad credentials/origin/RP/signature return generic 400 `{message: "Passkey verification failed"}`. Missing, replayed, expired or misbound flows return 400 `{message: "Invalid or expired passkey flow"}` (`auth-login.challenge-expired.json`).
 
 ### `POST /api/auth/register` — required
 
-Adds a passkey to the signed-in account. Body: `{visitorId, email?, response?}`. A session is required (401 `{message: "Authentication required"}`); an `email` different from the session's returns 403 `{message: "Email does not match current user"}`.
+Adds a passkey to the signed-in account. Start body: `{}`. A session is required (401 `{message: "Authentication required"}`). Identity and email come only from that session.
 
-- Without `response`: returns `PasskeyRegistrationStart` `{options}`, from `generateRegistrationOptions`: `challenge`, `rp: {name: "Podcst", id}`, `user: {id: base64url(UTF-8 user ID), name: email, displayName: ""}`, `pubKeyCredParams` for algorithms −8, −7 and −257, `timeout` 60000, `attestation: "none"`, `excludeCredentials` for the account's existing passkeys, `authenticatorSelection: {residentKey: "preferred", userVerification: "preferred", requireResidentKey: false}`, `extensions: {credProps: true}` and `hints: []`.
-- With `response` (`RegistrationResponseJSON`): verifies the attestation against the same origin set and stores the credential. Returns `PasskeyRegistrationResult` `{ "verified": true }`.
+- Start returns `PasskeyRegistrationStart` `{flowId, options}`, from `generateRegistrationOptions`: `challenge`, `rp: {name: "Podcst", id}`, `user: {id: base64url(UTF-8 user ID), name: email, displayName: ""}`, `pubKeyCredParams` for algorithms −8, −7 and −257, timeout 60000, `attestation: "none"`, existing `excludeCredentials`, `authenticatorSelection: {residentKey: "required", userVerification: "required", requireResidentKey: true}`, `extensions: {credProps: true}` and `hints: []`.
+- Finish body: `{flowId, response: RegistrationResponseJSON}`. The flow must match both account and session. The session is rechecked under lock before insertion, so revocation during the platform prompt refuses registration. Returns `PasskeyRegistrationResult` `{ "verified": true }`.
 
-Any failure after the session check returns 400 `{message: <message>}`. Fixtures: `auth-register.options.json`, `auth-register.verified.json`, `auth-register.unauthenticated.json`.
+Web, iOS AuthenticationServices and Android Credential Manager implement this flow. Native clients fence prompt results against account changes and do not submit cancelled prompts. Error/cache/limiter semantics match passkey login. Fixtures: `auth-register.options.json`, `auth-register.verified.json`, `auth-register.unauthenticated.json`.
 
 ### `POST /api/auth/logout` — public
 
-Deletes the session if present and clears the cookie. Always returns `Success` `{ "success": true }` (`auth-logout.success.json`).
+Deletes the session if present and clears the cookie. Does not depend on Redis. On success returns `Success` `{ "success": true }` (`auth-logout.success.json`).
 
 ### `GET /api/subscriptions` — required
 

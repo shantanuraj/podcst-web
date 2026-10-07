@@ -11,7 +11,6 @@ public final class APIClient {
 
     private let baseURL: URL
     private let session: URLSession
-    private let visitorId: String
     private var sessionCookie: String?
     private var currentUserID: String?
     private var sessionRevision = UUID()
@@ -30,7 +29,6 @@ public final class APIClient {
         self.baseURL = baseURL
         self.session = session
         self.keychain = keychain
-        self.visitorId = UUID().uuidString
         self.sessionCookie = keychain.read()
     }
 
@@ -188,32 +186,13 @@ public final class APIClient {
 
     public func signInWithPasskey(email: String? = nil) async throws -> User? {
         beginAuthentication()
-        let normalizedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let start: RawPasskeyLogin = try await post(
-            path: "/api/auth/login",
-            body: PasskeyLoginBody(
-                email: normalizedEmail?.isEmpty == true ? nil : normalizedEmail,
-                visitorId: visitorId,
-                discoverable: normalizedEmail?.isEmpty != false
-            )
-        )
-        guard let options = start.options else {
-            if start.exists == false {
-                throw APIError(statusCode: 404, message: "No account found for this email")
-            }
-            if start.hasPasskey == false {
-                throw APIError(statusCode: 400, message: "No passkey is registered for this account")
-            }
-            throw APIError(statusCode: 400, message: "Passkey sign-in is unavailable")
-        }
-        let assertion = try await authorizePasskey(options: options)
+        let revision = sessionRevision
+        let start: RawPasskeyLogin = try await post(path: "/api/auth/login", body: ["discoverable": true])
+        let assertion = try await authorizePasskey(options: start.options)
+        guard sessionRevision == revision else { throw CancellationError() }
         let result: RawPasskeyResult = try await post(
             path: "/api/auth/login",
-            body: PasskeyLoginVerification(
-                response: assertion,
-                userId: start.userId,
-                visitorId: visitorId
-            )
+            body: PasskeyVerification(response: assertion, flowId: start.flowId)
         )
         guard result.verified else {
             throw APIError(statusCode: 400, message: "Passkey verification failed")
@@ -226,12 +205,29 @@ public final class APIClient {
     }
 
     public func registerPasskey() async throws {
-        throw APIError(statusCode: 501, message: "Passkey registration is not configured for this client")
+        guard hasSession, let account = currentUserID else { throw APIError(statusCode: 401, message: "Authentication required") }
+        let revision = sessionRevision
+        let start: RawPasskeyRegistration = try await post(path: "/api/auth/register", body: EmptyBody())
+        let options = start.options
+        guard let challenge = Data(base64URL: options.challenge), let userID = Data(base64URL: options.user.id), !options.rp.id.isEmpty else {
+            throw APIError(statusCode: 400, message: "Invalid passkey registration options")
+        }
+        let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: options.rp.id)
+        let request = provider.createCredentialRegistrationRequest(challenge: challenge, name: options.user.name, userID: userID)
+        request.userVerificationPreference = .required
+        request.excludedCredentials = (options.excludeCredentials ?? []).compactMap {
+            Data(base64URL: $0.id).map { ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0) }
+        }
+        let credential = try await authorizePasskey(request: request)
+        guard sessionRevision == revision, currentUserID == account else { throw CancellationError() }
+        let result: RawPasskeyResult = try await post(path: "/api/auth/register", body: PasskeyVerification(response: credential, flowId: start.flowId))
+        guard result.verified else { throw APIError(statusCode: 400, message: "Passkey registration failed") }
     }
 
     private var authorizationCoordinator: PasskeyAuthorizationCoordinator?
+    var passkeyAuthorizer: ((ASAuthorizationRequest) async throws -> PasskeyCredential)?
 
-    private func authorizePasskey(options: RawPasskeyOptions) async throws -> PasskeyAssertion {
+    private func authorizePasskey(options: RawPasskeyOptions) async throws -> PasskeyCredential {
         guard let challenge = Data(base64URL: options.challenge) else {
             throw APIError(statusCode: 400, message: "Invalid passkey challenge")
         }
@@ -246,19 +242,33 @@ public final class APIClient {
                 return ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: credentialID)
             }
         }
+        request.userVerificationPreference = .required
+        return try await authorizePasskey(request: request)
+    }
+
+    private func authorizePasskey(request: ASAuthorizationRequest) async throws -> PasskeyCredential {
+        if let passkeyAuthorizer { return try await passkeyAuthorizer(request) }
+        guard authorizationCoordinator == nil else { throw APIError(statusCode: 409, message: "Passkey request already active") }
+        let coordinator = PasskeyAuthorizationCoordinator()
+        authorizationCoordinator = coordinator
         defer { authorizationCoordinator = nil }
-        return try await withCheckedThrowingContinuation { continuation in
-            let coordinator = PasskeyAuthorizationCoordinator(continuation: continuation)
-            authorizationCoordinator = coordinator
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            controller.delegate = coordinator
-            controller.presentationContextProvider = coordinator
-            coordinator.controller = controller
-            controller.performRequests()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                coordinator.continuation = continuation
+                let controller = ASAuthorizationController(authorizationRequests: [request])
+                controller.delegate = coordinator
+                controller.presentationContextProvider = coordinator
+                coordinator.controller = controller
+                controller.performRequests()
+            }
+        } onCancel: {
+            Task { @MainActor in coordinator.cancel() }
         }
     }
 
     func beginAuthentication() {
+        authorizationCoordinator?.cancel()
         sessionRevision = UUID()
         subscriptionRequest?.cancel()
         subscriptionRequest = nil
@@ -268,12 +278,14 @@ public final class APIClient {
         var request = URLRequest(url: baseURL.appendingPathComponent("/api/auth/logout"))
         request.httpMethod = "POST"
         request.httpShouldHandleCookies = false
+        request.setValue("native", forHTTPHeaderField: "X-Podcst-Client")
         if let sessionCookie { request.setValue("session=\(sessionCookie)", forHTTPHeaderField: "Cookie") }
         clearSession()
         _ = try? await session.data(for: request)
     }
 
     func clearSession() {
+        authorizationCoordinator?.cancel()
         sessionRevision = UUID()
         sessionCookie = nil
         currentUserID = nil
@@ -443,6 +455,7 @@ public final class APIClient {
         request.httpMethod = method
         request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("native", forHTTPHeaderField: "X-Podcst-Client")
         if let body {
             request.httpBody = try JSONEncoder().encode(body)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -816,15 +829,9 @@ private struct RawListEpisodeItem: Decodable {
     }
 }
 private struct ProgressBody: Encodable { var episodeId: Int; var position: Int; var completed: Bool }
-private struct PasskeyLoginBody: Encodable {
-    var email: String?
-    var visitorId: String
-    var discoverable: Bool
-}
-private struct PasskeyLoginVerification: Encodable {
-    var response: PasskeyAssertion
-    var userId: String?
-    var visitorId: String
+private struct PasskeyVerification: Encodable {
+    var response: PasskeyCredential
+    var flowId: String
 }
 private struct RawError: Decodable { var message: String? }
 private struct RawSuccess: Decodable { var success: Bool }
@@ -832,10 +839,20 @@ private struct RawSent: Decodable { var sent: Bool }
 private struct RawVerified: Decodable { var verified: Bool }
 private struct RawPasskeyResult: Decodable { var verified: Bool }
 private struct RawPasskeyLogin: Decodable {
-    var exists: Bool?
-    var hasPasskey: Bool?
-    var options: RawPasskeyOptions?
-    var userId: String?
+    var flowId: String
+    var options: RawPasskeyOptions
+}
+private struct RawPasskeyRegistration: Decodable {
+    var flowId: String
+    var options: Options
+    struct Options: Decodable {
+        var challenge: String
+        var rp: RP
+        var user: User
+        var excludeCredentials: [RawPasskeyDescriptor]?
+        struct RP: Decodable { var id: String }
+        struct User: Decodable { var id: String; var name: String }
+    }
 }
 private struct RawPasskeyOptions: Decodable {
     var challenge: String
@@ -934,27 +951,37 @@ private struct BoolOrString: Decodable {
     }
 }
 
-private struct PasskeyAssertion: Encodable, Sendable {
+struct PasskeyCredential: Encodable, Sendable {
     var id: String
     var rawId: String
-    var response: PasskeyAssertionResponse
+    var response: PasskeyCredentialResponse
     var type = "public-key"
+    var clientExtensionResults: [String: String] = [:]
 }
 
-private struct PasskeyAssertionResponse: Encodable, Sendable {
+struct PasskeyCredentialResponse: Encodable, Sendable {
     var clientDataJSON: String
-    var authenticatorData: String
-    var signature: String
+    var authenticatorData: String?
+    var signature: String?
     var userHandle: String?
+    var attestationObject: String?
 }
 
 @MainActor
 private final class PasskeyAuthorizationCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
-    let continuation: CheckedContinuation<PasskeyAssertion, Error>
+    var continuation: CheckedContinuation<PasskeyCredential, Error>?
     var controller: ASAuthorizationController?
 
-    init(continuation: CheckedContinuation<PasskeyAssertion, Error>) {
-        self.continuation = continuation
+    func finish(_ result: Result<PasskeyCredential, Error>) {
+        let pending = continuation
+        continuation = nil
+        controller = nil
+        pending?.resume(with: result)
+    }
+
+    func cancel() {
+        controller?.cancel()
+        finish(.failure(CancellationError()))
     }
 
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
@@ -965,27 +992,29 @@ private final class PasskeyAuthorizationCoordinator: NSObject, ASAuthorizationCo
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        guard let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion else {
-            continuation.resume(throwing: APIError(statusCode: 400, message: "Unsupported passkey credential"))
-            return
+        if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion {
+            finish(.success(PasskeyCredential(
+                id: credential.credentialID.base64URL, rawId: credential.credentialID.base64URL,
+                response: PasskeyCredentialResponse(clientDataJSON: credential.rawClientDataJSON.base64URL,
+                    authenticatorData: credential.rawAuthenticatorData.base64URL, signature: credential.signature.base64URL,
+                    userHandle: credential.userID.isEmpty ? nil : credential.userID.base64URL)
+            )))
+        } else if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration,
+                  let attestation = credential.rawAttestationObject {
+            finish(.success(PasskeyCredential(
+                id: credential.credentialID.base64URL, rawId: credential.credentialID.base64URL,
+                response: PasskeyCredentialResponse(clientDataJSON: credential.rawClientDataJSON.base64URL, attestationObject: attestation.base64URL)
+            )))
+        } else {
+            finish(.failure(APIError(statusCode: 400, message: "Unsupported passkey credential")))
         }
-        continuation.resume(returning: PasskeyAssertion(
-            id: credential.credentialID.base64URL,
-            rawId: credential.credentialID.base64URL,
-            response: PasskeyAssertionResponse(
-                clientDataJSON: credential.rawClientDataJSON.base64URL,
-                authenticatorData: credential.rawAuthenticatorData.base64URL,
-                signature: credential.signature.base64URL,
-                userHandle: credential.userID.isEmpty ? nil : credential.userID.base64URL
-            )
-        ))
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         if let authorizationError = error as? ASAuthorizationError, authorizationError.code == .canceled {
-            continuation.resume(throwing: APIError(statusCode: 499, message: "Passkey sign-in was canceled"))
+            finish(.failure(APIError(statusCode: 499, message: "Passkey request was canceled")))
         } else {
-            continuation.resume(throwing: error)
+            finish(.failure(error))
         }
     }
 }

@@ -28,6 +28,29 @@ class ApiContractTest {
     private lateinit var api: PodcstApi
 
     @Test
+    fun passkeyFlowsAreForwardedAndAccountChangesCancelSubmission() = runTest {
+        val server = MockWebServer().apply { start() }
+        try {
+            val api = PodcstApi(client, MemoryCookies().apply { write("token") }, server.url("/"))
+            server.enqueue(MockResponse.Builder().code(200).body(File(fixtures, "auth-register.options.json").readText()).build())
+            val challenge = api.passkeyRegistration()
+            assertTrue(challenge.flowId.isNotBlank())
+            server.enqueue(MockResponse.Builder().code(200).body("""{"verified":true}""").build())
+            api.registerPasskey("{}", challenge)
+            server.takeRequest()
+            val verified = server.takeRequest()
+            assertEquals("native", verified.headers["X-Podcst-Client"])
+            val payload = Json.parseToJsonElement(verified.body!!.utf8()).jsonObject
+            assertEquals(challenge.flowId, payload.getValue("flowId").jsonPrimitive.content)
+            assertTrue("visitorId" !in payload)
+            api.clearSession()
+            val failure = runCatching { api.registerPasskey("{}", challenge) }.exceptionOrNull()
+            assertTrue(failure is kotlinx.coroutines.CancellationException)
+            assertEquals(2, server.requestCount)
+        } finally { server.close() }
+    }
+
+    @Test
     fun everyFixtureDecodesThroughTheClient() = runTest {
         val index = Json.parseToJsonElement(File(fixtures, "index.json").readText()).jsonObject
         val listed = index.keys
@@ -54,6 +77,7 @@ class ApiContractTest {
         val (method, path) = endpoint.split(' ')
         assertEquals(name, method, request.method)
         assertEquals(name, path, request.url.encodedPath)
+        assertEquals(name, "native", request.headers["X-Podcst-Client"])
         if (status in 200..299) {
             if (failure != null) throw AssertionError(name, failure)
         } else {
@@ -78,8 +102,8 @@ class ApiContractTest {
             "GET /api/auth/session" -> api.sessionUser()
             "POST /api/auth/verify" -> api.sendCode("someone@example.com")
             "POST /api/auth/email-login" -> api.signIn("someone@example.com", "123456")
-            "POST /api/auth/login" -> if (type == "PasskeyLoginResult") api.signInWithPasskey("{}", null) else api.passkeyChallenge(null)
-            "POST /api/auth/register" -> if (type == "PasskeyRegistrationResult") api.registerPasskey("{}") else api.passkeyRegistration()
+            "POST /api/auth/login" -> if (type == "PasskeyLoginResult") api.signInWithPasskey("{}", PasskeyChallenge("{}", "fixture-flow", 0)) else api.passkeyChallenge()
+            "POST /api/auth/register" -> if (type == "PasskeyRegistrationResult") api.registerPasskey("{}", PasskeyChallenge("{}", "fixture-flow", 0)) else api.passkeyRegistration()
             "POST /api/auth/logout" -> api.signOut()
             "GET /api/subscriptions" -> api.subscriptions().forEach { assertTrue(it.id != null) }
             "POST /api/subscriptions" -> if (type == "ImportResult") api.importSubscriptions(listOf("https://example.com/feed.xml")) else api.subscribe(1)

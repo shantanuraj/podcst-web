@@ -1,4 +1,5 @@
 {
+  "flowId": "ZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5_gIGCg4Q",
   "options": {
     "challenge": "ZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5_gIGCg4Q",
     "rp": {
@@ -33,9 +34,9 @@
       }
     ],
     "authenticatorSelection": {
-      "residentKey": "preferred",
-      "userVerification": "preferred",
-      "requireResidentKey": false
+      "residentKey": "required",
+      "userVerification": "required",
+      "requireResidentKey": true
     },
     "extensions": {
       "credProps": true

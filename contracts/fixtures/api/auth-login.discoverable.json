@@ -1,9 +1,10 @@
 {
+  "flowId": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY",
   "options": {
     "rpId": "www.podcst.app",
     "challenge": "BwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSY",
     "allowCredentials": [],
     "timeout": 60000,
-    "userVerification": "preferred"
+    "userVerification": "required"
   }
 }

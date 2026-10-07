@@ -123,10 +123,8 @@ internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, it
 
 @Serializable
 internal data class WirePasskeyStart(
-    val exists: Boolean? = null,
-    val hasPasskey: Boolean? = null,
-    val options: JsonObject? = null,
-    val userId: String? = null,
+    val options: JsonObject,
+    val flowId: String,
 )
 
 private fun instant(milliseconds: Double?) = milliseconds?.let { Instant.fromEpochMilliseconds(it.toLong()) }

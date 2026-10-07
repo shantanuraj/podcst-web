@@ -1,8 +1,14 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { permitsMutation } from './server/auth/request';
 import { REGION_COOKIE, requestRegion } from './shared/region';
 
 export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  if (pathname.startsWith('/api/') && !permitsMutation(request))
+    return NextResponse.json(
+      { message: 'Request origin refused' },
+      { status: 403, headers: { 'Cache-Control': 'private, no-store' } },
+    );
   if (pathname !== '/' && pathname !== '/feed/top') {
     return NextResponse.next();
   }
@@ -16,5 +22,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/feed/top'],
+  matcher: ['/', '/feed/top', '/api/:path*'],
 };

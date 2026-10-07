@@ -1,70 +1,34 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
+import { limitAuth } from '@/server/auth/backend';
+import { AuthError } from '@/server/auth/error';
+import { authResponse, readAuthBody } from '@/server/auth/http';
 import {
-  checkUserPasskeys,
-  getAuthenticationOptions,
   getDiscoverableAuthOptions,
   verifyAuthentication,
 } from '@/server/auth/passkey';
-import { createSession } from '@/server/auth/session';
+import { setSessionCookie } from '@/server/auth/session';
 
-export async function POST(request: NextRequest) {
-  const body = (await request.json().catch(() => null)) ?? {};
-  const { email, response, userId, visitorId, discoverable } = body;
-
-  if (!visitorId) {
-    return NextResponse.json(
-      { message: 'Visitor ID required' },
-      { status: 400 },
+export const POST = (request: Request) =>
+  authResponse(async () => {
+    const { discoverable, response, flowId } = await readAuthBody(request);
+    if (response === undefined) {
+      if (discoverable !== true)
+        throw new AuthError(400, 'Passkey flow required');
+      await limitAuth(request, 'challenge', '');
+      return getDiscoverableAuthOptions();
+    }
+    if (
+      typeof flowId !== 'string' ||
+      !response ||
+      typeof response !== 'object' ||
+      Array.isArray(response)
+    )
+      throw new AuthError(400, 'Invalid or expired passkey flow');
+    await limitAuth(request, 'verify', `passkey:${flowId}`);
+    const result = await verifyAuthentication(
+      flowId,
+      response as AuthenticationResponseJSON,
     );
-  }
-
-  if (!response) {
-    if (discoverable) {
-      const { options } = await getDiscoverableAuthOptions(visitorId);
-      return NextResponse.json({ options });
-    }
-
-    if (!email) {
-      return NextResponse.json({ message: 'Email required' }, { status: 400 });
-    }
-
-    const check = await checkUserPasskeys(email);
-
-    if (!check.exists) {
-      return NextResponse.json({ exists: false });
-    }
-
-    if (!check.hasPasskey) {
-      return NextResponse.json({
-        exists: true,
-        hasPasskey: false,
-        userId: check.userId,
-      });
-    }
-
-    const { options, userId: uid } = await getAuthenticationOptions(
-      email,
-      visitorId,
-    );
-    return NextResponse.json({
-      exists: true,
-      hasPasskey: true,
-      options,
-      userId: uid,
-    });
-  }
-
-  try {
-    const result = await verifyAuthentication(visitorId, response, userId);
-
-    if (result.verified && result.userId) {
-      await createSession(result.userId);
-    }
-
-    return NextResponse.json(result);
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Authentication failed';
-    return NextResponse.json({ message: message }, { status: 400 });
-  }
-}
+    await setSessionCookie(result.session);
+    return { verified: true, userId: result.userId };
+  });

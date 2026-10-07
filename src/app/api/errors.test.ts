@@ -14,7 +14,7 @@ describe('error responses', () => {
   for (const [name, handler, message] of [
     ['verify', verify, 'Email required'],
     ['email login', emailLogin, 'Email and code required'],
-    ['passkey login', login, 'Visitor ID required'],
+    ['passkey login', login, 'Passkey flow required'],
   ] as const) {
     for (const body of ['not json', 'null', '{}']) {
       test(`${name} answers ${body} with a 400 message`, async () => {
@@ -22,9 +22,7 @@ describe('error responses', () => {
         expect(response.status).toBe(400);
         expect(await response.json()).toEqual({
           message:
-            body === 'not json' && name !== 'passkey login'
-              ? 'Invalid authentication request'
-              : message,
+            body === 'not json' ? 'Invalid authentication request' : message,
         });
       });
     }

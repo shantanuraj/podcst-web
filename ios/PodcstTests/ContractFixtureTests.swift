@@ -247,10 +247,8 @@ private struct VerifiedFixture: Decodable { let verified: Bool }
 private struct PasskeyLoginResultFixture: Decodable { let verified: Bool; let userId: String? }
 private struct PasskeyRegistrationResultFixture: Decodable { let verified: Bool }
 private struct PasskeyLoginStartFixture: Decodable {
-    let exists: Bool?
-    let hasPasskey: Bool?
-    let options: PasskeyLoginOptionsFixture?
-    let userId: String?
+    let flowId: String
+    let options: PasskeyLoginOptionsFixture
 }
 private struct PasskeyLoginOptionsFixture: Decodable {
     let rpId: String?
@@ -259,7 +257,7 @@ private struct PasskeyLoginOptionsFixture: Decodable {
     let timeout: Int?
     let userVerification: String?
 }
-private struct PasskeyRegistrationStartFixture: Decodable { let options: PasskeyRegistrationOptionsFixture? }
+private struct PasskeyRegistrationStartFixture: Decodable { let flowId: String; let options: PasskeyRegistrationOptionsFixture }
 private struct PasskeyRegistrationOptionsFixture: Decodable {
     let challenge: String
     let rp: RegistrationRelyingPartyFixture

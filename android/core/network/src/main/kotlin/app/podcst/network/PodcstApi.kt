@@ -16,7 +16,6 @@ import app.podcst.model.Podcast
 import app.podcst.model.SortDirection
 import app.podcst.model.User
 import java.io.IOException
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
@@ -48,11 +47,7 @@ interface SessionCookieStore {
 
 class ApiException(val status: Int, message: String) : IOException(message)
 
-sealed interface PasskeyChallenge {
-    data class Ready(val requestJson: String, val userId: String?) : PasskeyChallenge
-    data object NoAccount : PasskeyChallenge
-    data object NoPasskey : PasskeyChallenge
-}
+data class PasskeyChallenge(val requestJson: String, val flowId: String, internal val revision: Long)
 
 class PodcstApi(
     private val client: OkHttpClient,
@@ -60,7 +55,6 @@ class PodcstApi(
     private val baseUrl: HttpUrl = PRODUCTION,
 ) {
     private val revision = AtomicLong()
-    private val visitorId = UUID.randomUUID().toString()
 
     val hasSession: Boolean get() = !cookies.read().isNullOrEmpty()
 
@@ -114,46 +108,47 @@ class PodcstApi(
         return sessionUser()
     }
 
-    suspend fun passkeyChallenge(email: String?): PasskeyChallenge {
+    suspend fun passkeyChallenge(): PasskeyChallenge {
         beginAuthentication()
-        val start = post<WirePasskeyStart>("api/auth/login", body {
-            email?.let { put("email", it) }
-            put("visitorId", visitorId)
-            put("discoverable", email == null)
-        })
-        return when {
-            start.options != null -> PasskeyChallenge.Ready(start.options.toString(), start.userId)
-            start.exists == false -> PasskeyChallenge.NoAccount
-            else -> PasskeyChallenge.NoPasskey
-        }
+        val expected = revision.get()
+        val start = post<WirePasskeyStart>("api/auth/login", body { put("discoverable", true) })
+        return PasskeyChallenge(start.options.toString(), start.flowId, expected)
     }
 
-    suspend fun signInWithPasskey(responseJson: String, userId: String?): User? {
+    suspend fun signInWithPasskey(responseJson: String, challenge: PasskeyChallenge): User? {
+        checkPasskeyScope(challenge)
         val result = post<WireVerified>("api/auth/login", body {
             put("response", Json.parseToJsonElement(responseJson))
-            userId?.let { put("userId", it) }
-            put("visitorId", visitorId)
+            put("flowId", challenge.flowId)
         })
         if (!result.verified) throw ApiException(400, "Passkey verification failed")
         return sessionUser()
     }
 
-    suspend fun passkeyRegistration(): String =
-        post<WirePasskeyStart>("api/auth/register", body { put("visitorId", visitorId) }).options?.toString()
-            ?: throw ApiException(400, "Passkey registration is unavailable")
+    suspend fun passkeyRegistration(): PasskeyChallenge {
+        val expected = revision.get()
+        val start = post<WirePasskeyStart>("api/auth/register", body {})
+        return PasskeyChallenge(start.options.toString(), start.flowId, expected)
+    }
 
-    suspend fun registerPasskey(responseJson: String) {
+    suspend fun registerPasskey(responseJson: String, challenge: PasskeyChallenge) {
+        checkPasskeyScope(challenge)
         val result = post<WireVerified>("api/auth/register", body {
             put("response", Json.parseToJsonElement(responseJson))
-            put("visitorId", visitorId)
+            put("flowId", challenge.flowId)
         })
         if (!result.verified) throw ApiException(400, "Passkey registration failed")
+    }
+
+    private fun checkPasskeyScope(challenge: PasskeyChallenge) {
+        if (revision.get() != challenge.revision) throw kotlinx.coroutines.CancellationException("Account changed")
     }
 
     suspend fun signOut() {
         val cookie = cookies.read()
         clearSession()
         val request = Request.Builder().url(baseUrl.resolve("api/auth/logout")!!)
+            .header("X-Podcst-Client", "native")
             .post(ByteArray(0).toRequestBody())
             .apply { cookie?.let { header("Cookie", "session=$it") } }
             .build()
@@ -238,6 +233,7 @@ class PodcstApi(
         val token = revision.get()
         val request = Request.Builder().url(url)
             .header("Accept", "application/json")
+            .header("X-Podcst-Client", "native")
             .method(method, body?.toString()?.toRequestBody(JSON))
             .apply { if (session) cookies.read()?.let { header("Cookie", "session=$it") } }
             .build()

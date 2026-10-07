@@ -109,7 +109,7 @@ class SignInViewModelTest {
         val (model, server) = viewModel { call ->
             when {
                 call.path == "/api/auth/login" && call.body.contains("\"response\"") -> Reply("""{"verified":true}""", cookie = "token")
-                call.path == "/api/auth/login" -> Reply("""{"options":{"challenge":"c"},"userId":"u1"}""")
+                call.path == "/api/auth/login" -> Reply("""{"options":{"challenge":"c"},"flowId":"flow"}""")
                 else -> Reply(FakeServer.USER)
             }
         }
@@ -125,7 +125,7 @@ class SignInViewModelTest {
 
     @Test
     fun cancelledPasskeyIsQuiet() = runTest {
-        val (model, _) = viewModel { Reply("""{"options":{"challenge":"c"}}""") }
+        val (model, _) = viewModel { Reply("""{"options":{"challenge":"c"},"flowId":"flow"}""") }
         model.passkey { throw CancellationException("cancelled") }
         runCurrent()
         val state = model.state.first { !it.working }

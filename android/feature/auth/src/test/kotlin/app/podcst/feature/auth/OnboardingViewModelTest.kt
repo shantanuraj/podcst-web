@@ -65,7 +65,7 @@ class OnboardingViewModelTest {
         val (model, _) = viewModel { call ->
             when {
                 call.path == "/api/auth/login" && call.body.contains("\"response\"") -> Reply("""{"verified":true}""", cookie = "token")
-                call.path == "/api/auth/login" -> Reply("""{"options":{"challenge":"c"}}""")
+                call.path == "/api/auth/login" -> Reply("""{"options":{"challenge":"c"},"flowId":"flow"}""")
                 call.path == "/api/auth/session" -> Reply(FakeServer.USER)
                 else -> Reply("[]")
             }

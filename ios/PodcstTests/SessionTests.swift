@@ -1,9 +1,69 @@
+import AuthenticationServices
 import Foundation
 import XCTest
 @testable import Podcst
 
 @MainActor
 final class SessionTests: XCTestCase {
+    func testPasskeyRegistrationBindsFlowAndRetiresCancelledOrChangedAccounts() async throws {
+        for outcome in ["success", "cancel", "switch"] {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GuestLibraryURLProtocol.self]
+            let credentials = MemorySessionCredentials()
+            credentials.write("synthetic-session")
+            let api = APIClient(baseURL: URL(string: "https://passkeys.example.test")!, session: URLSession(configuration: config), keychain: credentials)
+            api.restoreAccount("listener")
+            var requests = 0
+            GuestLibraryURLProtocol.handler = { pending in
+                requests += 1
+                XCTAssertEqual(pending.request.value(forHTTPHeaderField: "X-Podcst-Client"), "native")
+                XCTAssertEqual(pending.request.url?.path, "/api/auth/register")
+                var body = pending.request.httpBody ?? Data()
+                if let stream = pending.request.httpBodyStream {
+                    stream.open()
+                    defer { stream.close() }
+                    var buffer = [UInt8](repeating: 0, count: 1024)
+                    while stream.hasBytesAvailable {
+                        let count = stream.read(&buffer, maxLength: buffer.count)
+                        if count <= 0 { break }
+                        body.append(buffer, count: count)
+                    }
+                }
+                let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+                if requests == 1 {
+                    XCTAssertTrue(payload.isEmpty)
+                    let data = Data(#"{"flowId":"synthetic-flow","options":{"challenge":"Y2hhbGxlbmdl","rp":{"id":"passkeys.example.test"},"user":{"id":"bGlzdGVuZXI","name":"listener@example.test"},"excludeCredentials":[]}}"#.utf8)
+                    pending.complete(.success((data, ["Content-Type": "application/json"])))
+                } else {
+                    XCTAssertEqual(payload["flowId"] as? String, "synthetic-flow")
+                    XCTAssertNil(payload["visitorId"])
+                    let response = try XCTUnwrap(payload["response"] as? [String: Any])
+                    let attestation = try XCTUnwrap(response["response"] as? [String: Any])
+                    XCTAssertEqual(attestation["attestationObject"] as? String, "YXR0ZXN0YXRpb24")
+                    try pending.respond(["verified": true])
+                }
+            }
+            defer { GuestLibraryURLProtocol.handler = nil }
+            api.passkeyAuthorizer = { request in
+                let registration = try XCTUnwrap(request as? ASAuthorizationPlatformPublicKeyCredentialRegistrationRequest)
+                XCTAssertEqual(registration.relyingPartyIdentifier, "passkeys.example.test")
+                XCTAssertEqual(registration.challenge, Data("challenge".utf8))
+                XCTAssertEqual(registration.userID, Data("listener".utf8))
+                XCTAssertEqual(registration.userVerificationPreference, .required)
+                if outcome == "cancel" { throw CancellationError() }
+                if outcome == "switch" { api.clearSession() }
+                return PasskeyCredential(id: "aWQ", rawId: "aWQ", response: PasskeyCredentialResponse(clientDataJSON: "e30", attestationObject: "YXR0ZXN0YXRpb24"))
+            }
+            do {
+                try await api.registerPasskey()
+                XCTAssertEqual(outcome, "success")
+            } catch is CancellationError {
+                XCTAssertNotEqual(outcome, "success")
+            }
+            XCTAssertEqual(requests, outcome == "success" ? 2 : 1)
+        }
+    }
+
     func testOnboardingChartsSurviveGuestSessionRestoration() async throws {
         let fixture = try await guestFixture(podcasts: [], restoreSession: false)
         defer { fixture.cleanUp() }

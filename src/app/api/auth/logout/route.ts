@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { authResponse } from '@/server/auth/http';
 import { deleteSession } from '@/server/auth/session';
 
-export async function POST() {
-  await deleteSession();
-  return NextResponse.json({ success: true });
-}
+export const POST = () =>
+  authResponse(async () => {
+    await deleteSession();
+    return { success: true };
+  });

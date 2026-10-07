@@ -19,16 +19,6 @@ function useAccountChange() {
   };
 }
 
-const getVisitorId = () => {
-  if (typeof window === 'undefined') return '';
-  let id = sessionStorage.getItem('visitorId');
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem('visitorId', id);
-  }
-  return id;
-};
-
 export function useSession() {
   const session = useAccountSession();
   const state = session.getSnapshot();
@@ -69,66 +59,13 @@ export function useRegister() {
   const boundary = useAccountChange();
   return useMutation({
     ...boundary,
-    mutationFn: async (email: string) => {
-      const visitorId = getVisitorId();
-      const { options } = await post<{
+    mutationFn: async (_email: string) => {
+      const { options, flowId } = await post<{
         options: PublicKeyCredentialCreationOptionsJSON;
-      }>('/auth/register', { email, visitorId });
+        flowId: string;
+      }>('/auth/register', {});
       const credential = await startRegistration({ optionsJSON: options });
-      return post('/auth/register', { response: credential, visitorId });
-    },
-  });
-}
-
-type LoginCheckResult =
-  | { exists: false }
-  | { exists: true; hasPasskey: false; userId: string }
-  | {
-      exists: true;
-      hasPasskey: true;
-      options: PublicKeyCredentialRequestOptionsJSON;
-      userId: string;
-    };
-
-export function useLoginCheck() {
-  return useMutation({
-    mutationFn: async (email: string): Promise<LoginCheckResult> => {
-      const visitorId = getVisitorId();
-      return post('/auth/login', { email, visitorId });
-    },
-  });
-}
-
-export function usePasskeyLogin() {
-  const boundary = useAccountChange();
-  return useMutation({
-    ...boundary,
-    mutationFn: async ({
-      options,
-      userId,
-    }: {
-      options: PublicKeyCredentialRequestOptionsJSON;
-      userId: string;
-    }) => {
-      const visitorId = getVisitorId();
-      const credential = await startAuthentication({ optionsJSON: options });
-      return post('/auth/login', { response: credential, userId, visitorId });
-    },
-  });
-}
-
-export function useLogin() {
-  const boundary = useAccountChange();
-  return useMutation({
-    ...boundary,
-    mutationFn: async (email: string) => {
-      const visitorId = getVisitorId();
-      const { options, userId } = await post<{
-        options: PublicKeyCredentialRequestOptionsJSON;
-        userId: string;
-      }>('/auth/login', { email, visitorId });
-      const credential = await startAuthentication({ optionsJSON: options });
-      return post('/auth/login', { response: credential, userId, visitorId });
+      return post('/auth/register', { response: credential, flowId });
     },
   });
 }
@@ -149,12 +86,12 @@ export function useDiscoverableLogin() {
   return useMutation({
     ...boundary,
     mutationFn: async () => {
-      const visitorId = getVisitorId();
-      const { options } = await post<{
+      const { options, flowId } = await post<{
         options: PublicKeyCredentialRequestOptionsJSON;
-      }>('/auth/login', { visitorId, discoverable: true });
+        flowId: string;
+      }>('/auth/login', { discoverable: true });
       const credential = await startAuthentication({ optionsJSON: options });
-      return post('/auth/login', { response: credential, visitorId });
+      return post('/auth/login', { response: credential, flowId });
     },
   });
 }

@@ -1,8 +1,5 @@
 import { cookies } from 'next/headers';
 import { sql } from '../db';
-import { insertSession } from './session-record';
-
-export { generateId } from './session-record';
 
 const SESSION_COOKIE = 'session';
 
@@ -14,6 +11,9 @@ export async function setSessionCookie({
   expiresAt: Date;
 }) {
   const cookieStore = await cookies();
+  const previous = cookieStore.get(SESSION_COOKIE)?.value;
+  if (previous && previous !== id)
+    await sql`DELETE FROM sessions WHERE id = ${previous}`;
   cookieStore.set(SESSION_COOKIE, id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -21,12 +21,6 @@ export async function setSessionCookie({
     expires: expiresAt,
     path: '/',
   });
-}
-
-export async function createSession(userId: string): Promise<string> {
-  const session = await insertSession(sql, userId);
-  await setSessionCookie(session);
-  return session.id;
 }
 
 export async function getSession() {

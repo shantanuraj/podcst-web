@@ -39,30 +39,38 @@ export function createAuthLimiter(redis: Pick<Redis, 'eval'>, secret: string) {
     throw new AuthError(503, 'Authentication unavailable');
   const key = (scope: string, value: string) =>
     `auth:limit:${scope}:${createHmac('sha256', secret).update(value).digest('hex')}`;
-  return async (kind: 'send' | 'verify', email: string, source: string) => {
+  return async (
+    kind: 'send' | 'verify' | 'challenge',
+    email: string,
+    source: string,
+  ) => {
     const policies =
-      kind === 'send'
+      kind === 'challenge'
         ? ([
-            [key('cooldown', email.toLowerCase()), 60_000, 1],
-            [
-              key('send-email', email.toLowerCase()),
-              3_600_000,
-              SENDS_PER_EMAIL,
-            ],
-            [key('send-source', source), 3_600_000, SENDS_PER_SOURCE],
+            [key('challenge-source', source), 3_600_000, SENDS_PER_SOURCE],
           ] as const)
-        : ([
-            [
-              key('verify-email', email.toLowerCase()),
-              3_600_000,
-              SENDS_PER_EMAIL * CODE_ATTEMPTS,
-            ],
-            [
-              key('verify-source', source),
-              3_600_000,
-              SENDS_PER_SOURCE * CODE_ATTEMPTS,
-            ],
-          ] as const);
+        : kind === 'send'
+          ? ([
+              [key('cooldown', email.toLowerCase()), 60_000, 1],
+              [
+                key('send-email', email.toLowerCase()),
+                3_600_000,
+                SENDS_PER_EMAIL,
+              ],
+              [key('send-source', source), 3_600_000, SENDS_PER_SOURCE],
+            ] as const)
+          : ([
+              [
+                key('verify-email', email.toLowerCase()),
+                3_600_000,
+                SENDS_PER_EMAIL * CODE_ATTEMPTS,
+              ],
+              [
+                key('verify-source', source),
+                3_600_000,
+                SENDS_PER_SOURCE * CODE_ATTEMPTS,
+              ],
+            ] as const);
     let retry: unknown;
     try {
       retry = await redis.eval(

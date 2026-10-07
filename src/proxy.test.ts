@@ -83,7 +83,7 @@ describe('chart redirects', () => {
   });
 
   test('localized charts and unrelated routes do not run the proxy', () => {
-    expect(config.matcher).toEqual(['/', '/feed/top']);
+    expect(config.matcher).toEqual(['/', '/feed/top', '/api/:path*']);
     for (const pathname of [
       ...i18n.locales.map((locale) => `/${locale}/feed/top`),
       '/episodes/1',

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { Redis } from 'ioredis';
+import { createChallengeStore } from './challenges';
 import { createAuthLimiter, trustedAuthSource } from './limits';
 
 const executable = Bun.which('redis-server');
@@ -142,6 +143,60 @@ describe.skipIf(!executable)('auth limits on disposable Redis', () => {
     expect(results.filter(({ status }) => status === 'rejected')).toHaveLength(
       10,
     );
+  });
+
+  test('shared passkey flows are single-use, purpose/account/session bound and expire', async () => {
+    const first = createChallengeStore(redis);
+    const second = createChallengeStore(redis);
+    const binding = {
+      purpose: 'registration',
+      userId: 'owner',
+      sessionId: 'session',
+    } as const;
+    const issue = () =>
+      first.issue({ ...binding, challenge: 'synthetic-challenge' });
+    const flowId = await issue();
+    expect(flowId).toHaveLength(43);
+    expect(await redis.ttl(`auth:flow:${flowId}`)).toBeGreaterThan(0);
+    const results = await Promise.allSettled(
+      Array.from({ length: 10 }, () => second.consume(flowId, binding)),
+    );
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(
+      1,
+    );
+    for (const wrong of [
+      { purpose: 'authentication' } as const,
+      { ...binding, userId: 'other' },
+      { ...binding, sessionId: 'other' },
+    ]) {
+      const id = await issue();
+      await expect(second.consume(id, wrong)).rejects.toMatchObject({
+        status: 400,
+      });
+      await expect(first.consume(id, binding)).rejects.toMatchObject({
+        status: 400,
+      });
+    }
+    const expired = await issue();
+    await redis.pexpire(`auth:flow:${expired}`, 1);
+    await Bun.sleep(5);
+    await expect(second.consume(expired, binding)).rejects.toMatchObject({
+      status: 400,
+    });
+    const unavailable = createChallengeStore({
+      set: async () => {
+        throw new Error('private');
+      },
+      getdel: async () => {
+        throw new Error('private');
+      },
+    } as unknown as Redis);
+    await expect(
+      unavailable.issue({ ...binding, challenge: 'x' }),
+    ).rejects.toMatchObject({ status: 503 });
+    await expect(
+      unavailable.consume(await issue(), binding),
+    ).rejects.toMatchObject({ status: 503 });
   });
 
   test('bounds verification independently of issuance', async () => {

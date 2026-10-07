@@ -77,4 +77,4 @@ export const isEmail = (value: unknown): value is string =>
   /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);
 
 export const isCode = (value: unknown): value is string =>
-  typeof value === 'string' && /^\d{6}$/.test(value);
+  typeof value === 'string' && value.length === 6 && /^\d{6}$/.test(value);
