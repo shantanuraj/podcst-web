@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { validEtag, validLastModified } from '@/server/http/validators';
 import {
   type Chapter,
   normalizeChapterTitle,
@@ -90,23 +91,6 @@ export function needsRefresh(entry: ChapterCacheEntry, now: number) {
     (!entry.retryAt ||
       entry.retryAt <= now ||
       entry.retryAt > now + FAILURE_TTL_MS)
-  );
-}
-
-export function validEtag(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length <= 1024 &&
-    /^(?:W\/)?"[\x21\x23-\x7e\x80-\xff]*"$/.test(value)
-  );
-}
-
-export function validLastModified(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length <= 64 &&
-    new Date(value).toUTCString() === value &&
-    Number.isFinite(Date.parse(value))
   );
 }
 

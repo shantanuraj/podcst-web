@@ -33,6 +33,11 @@ import { createSchemaFixture } from './lib/schema-fixture';
 
 const canonical = 'https://feeds.example.invalid/current';
 const old = 'http://feeds.example.invalid/old';
+
+import { installFeedTransportFixture } from './fixtures/feed-transport';
+
+installFeedTransportFixture();
+
 const xml = readFileSync(
   new URL('../src/server/ingest/__fixtures__/refresh.xml', import.meta.url),
   'utf8',

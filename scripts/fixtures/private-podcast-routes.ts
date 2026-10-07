@@ -4,6 +4,9 @@ import { lstatSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { NextRequest } from 'next/server';
+import { mockFeedTransport } from './feed-transport';
+
+mockFeedTransport();
 
 const socket = process.env.PODCST_TEST_SOCKET;
 const feed = process.env.PODCST_TEST_FEED;

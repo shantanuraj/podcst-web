@@ -1,7 +1,10 @@
 import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
 import { fetchFeed } from './feed-refresh';
+
+installFeedTransportFixture();
 
 const xml = readFileSync(
   new URL('./__fixtures__/refresh.xml', import.meta.url),

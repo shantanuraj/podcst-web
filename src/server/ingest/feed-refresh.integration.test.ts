@@ -9,7 +9,11 @@ import {
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+
+installFeedTransportFixture();
+
 import { refreshFeed } from './feed-refresh';
 import { getDuePodcasts } from './feed-schedule';
 

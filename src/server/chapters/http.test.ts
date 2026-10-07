@@ -7,7 +7,7 @@ import {
 import {
   isPublicAddress,
   resolvePublicAddress,
-} from '@/server/ingest/public-feed-http';
+} from '@/server/http/public-destination';
 import {
   fixtureMp3,
   fixtureTag,

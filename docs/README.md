@@ -19,6 +19,7 @@ For setup and tests, start with [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 - [Migrations](database-migrations.md)
 - [Schema comparison](schema-inventory.md)
+- [Feed fetching](feed-fetching.md)
 - [Public feed aliases](public-feed-aliases.md)
 - [Apple listing associations](apple-authoritative-associations.md)
 - [Podcast reconciliation](podcast-reconciliation.md)

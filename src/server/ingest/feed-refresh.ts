@@ -4,6 +4,7 @@ import { adaptFeed } from '../../app/api/feed/parser';
 import type { IEpisodeListing } from '../../types';
 import { FOLLOWED_IDS_SQL } from '../tiering';
 import { sanitize, upsertEpisodes } from './episodes';
+import { fetchFeedResponse } from './feed-http';
 import {
   getPollInterval,
   getRetryInterval,
@@ -48,19 +49,7 @@ export async function fetchFeed(
   previous?: FeedMeta,
   privateFeed = false,
 ): Promise<FeedFetchResult> {
-  if (!/^https?:\/\//i.test(feedUrl)) throw new Error('Invalid feed protocol');
-
-  const headers: Record<string, string> = { 'User-Agent': 'Podcst/1.0' };
-  if (previous?.etag) headers['If-None-Match'] = previous.etag;
-  if (previous?.lastModified) {
-    headers['If-Modified-Since'] = previous.lastModified;
-  }
-
-  const res = await fetch(feedUrl, {
-    headers,
-    cache: 'no-store',
-    signal: AbortSignal.timeout(30_000),
-  });
+  const res = await fetchFeedResponse(feedUrl, previous);
 
   const movement =
     res.redirected && !privateFeed ? { publicRedirect: true as const } : {};
@@ -68,17 +57,17 @@ export async function fetchFeed(
     return {
       ...movement,
       status: 'not_modified',
-      etag: res.headers.get('etag') ?? previous.etag,
-      lastModified: res.headers.get('last-modified') ?? previous.lastModified,
+      etag: res.etag ?? previous.etag,
+      lastModified: res.lastModified ?? previous.lastModified,
       hash: previous.hash,
     };
   }
-  if (!res.ok) throw new Error(`Feed returned HTTP ${res.status}`);
+  if (res.status !== 200) throw new Error(`Feed returned HTTP ${res.status}`);
 
-  const body = await res.text();
+  const body = res.body;
   const meta: FeedMeta = {
-    etag: res.headers.get('etag'),
-    lastModified: res.headers.get('last-modified'),
+    etag: res.etag,
+    lastModified: res.lastModified,
     hash: createHash('sha256').update(body).digest('hex'),
   };
   if (previous?.hash && previous.hash === meta.hash) {

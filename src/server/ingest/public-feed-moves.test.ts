@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { isPublicAddress, requestPublicFeed } from './public-feed-http';
+import { isPublicAddress } from '../http/public-destination';
+import { requestPublicFeed } from './public-feed-http';
 import { verifyPublicFeedMove } from './public-feed-moves';
 
 const xml = readFileSync(

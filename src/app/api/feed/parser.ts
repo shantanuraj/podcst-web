@@ -4,6 +4,7 @@
  */
 
 import { Parser } from 'xml2js';
+import { validateFeedXml } from '@/server/ingest/feed-xml';
 import { artworkFallback, directArtwork } from '@/shared/artwork';
 import type { IEpisode, IEpisodeListing, IFileInfo } from '@/types';
 import { reformatShowNotes, showNotesSorter } from './format';
@@ -322,15 +323,17 @@ const adaptEpisode = (
 /**
  * Parse XML string to JSON using xml2js
  */
-const xmlToJSON = (xml: string) => {
-  return new Promise((resolve, reject) => {
-    const { parseString } = new Parser({
+const xmlToJSON = async (xml: string) => {
+  validateFeedXml(xml);
+  try {
+    return await new Parser({
       trim: true,
       explicitArray: true,
       normalize: true,
-    });
-    parseString(xml, (err, res) => (err ? reject(err) : resolve(res)));
-  });
+    }).parseStringPromise(xml);
+  } catch {
+    throw new Error('Invalid or unsafe feed XML');
+  }
 };
 
 /**
@@ -386,8 +389,8 @@ const adaptJSON = (
             .filter(validEpisode)
         : [],
     };
-  } catch (err) {
-    console.error('Error adapting podcast JSON:', err);
+  } catch {
+    console.error('Error adapting podcast JSON');
     return null;
   }
 };

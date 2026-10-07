@@ -8,8 +8,12 @@ import {
 } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
+import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+
+installFeedTransportFixture();
+
 import { evictWarm } from '../tiering';
 import { recoverListContent } from './recovery';
 import { createEpisodeListService, type EpisodeListService } from './service';

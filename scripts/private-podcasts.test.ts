@@ -24,8 +24,11 @@ import {
   matchSearchResults,
   searchPodcastsByFeedUrl,
 } from '../src/server/search';
+import { installFeedTransportFixture } from './fixtures/feed-transport';
 import { startPostgres } from './lib/postgres-sandbox';
 import { createSchemaFixture } from './lib/schema-fixture';
+
+installFeedTransportFixture();
 
 const xml = readFileSync(
   new URL('../src/server/ingest/__fixtures__/refresh.xml', import.meta.url),

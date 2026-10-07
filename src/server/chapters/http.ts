@@ -1,44 +1,19 @@
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import {
   isPublicAddress,
+  pinnedAddress,
+  pinnedRequest,
   resolvePublicAddress,
-} from '@/server/ingest/public-feed-http';
+} from '@/server/http/public-destination';
+import { validEtag, validLastModified } from '@/server/http/validators';
 import type { Chapter } from '@/shared/chapters';
-import {
-  fingerprint,
-  type HttpValidators,
-  validEtag,
-  validLastModified,
-} from './cache';
+import { fingerprint, type HttpValidators } from './cache';
 import { id3TagSize, MAX_TAG_BYTES, parseMp3Chapters } from './mp3';
 
 export const METADATA_TIMEOUT_MS = 8000;
 export const MAX_REDIRECTS = 4;
 
 type Resolver = (hostname: string) => Promise<string>;
-
-async function pinnedAddress(
-  hostname: string,
-  signal: AbortSignal,
-  resolve: Resolver,
-) {
-  signal.throwIfAborted();
-  let abort: (() => void) | undefined;
-  try {
-    return await Promise.race([
-      resolve(hostname),
-      new Promise<never>((_, reject) => {
-        abort = () => reject(new Error('Metadata lookup cancelled'));
-        signal.addEventListener('abort', abort, { once: true });
-        if (signal.aborted) abort();
-      }),
-    ]);
-  } finally {
-    if (abort) signal.removeEventListener('abort', abort);
-  }
-}
 
 function enclosureUrl(input: string) {
   const url = new URL(input);
@@ -106,24 +81,16 @@ async function requestPrefix(
   const address = await pinnedAddress(hostname, signal, resolve);
   signal.throwIfAborted();
   return new Promise((accept, reject) => {
-    const request = url.protocol === 'https:' ? httpsRequest : httpRequest;
     const fail = () => reject(new Error('Metadata request failed'));
-    const connection = request(
+    const connection = pinnedRequest(
       url,
+      address,
+      signal,
       {
-        hostname: address,
-        ...(url.protocol === 'https:'
-          ? { servername: isIP(hostname) ? '' : hostname }
-          : {}),
-        signal,
-        agent: false,
-        headers: {
-          Host: url.host,
-          'User-Agent': 'Podcst/1.0',
-          'Accept-Encoding': 'identity',
-          Range: `bytes=0-${bytes - 1}`,
-          ...conditional,
-        },
+        'User-Agent': 'Podcst/1.0',
+        'Accept-Encoding': 'identity',
+        Range: `bytes=0-${bytes - 1}`,
+        ...conditional,
       },
       (response) => {
         response.on('error', fail);
