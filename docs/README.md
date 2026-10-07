@@ -5,6 +5,7 @@ For setup and tests, start with [CONTRIBUTING.md](../CONTRIBUTING.md).
 ## Clients and audio
 
 - [API contract and fixtures](../contracts/api/README.md)
+- [Email authentication](email-authentication.md)
 - [Episode lists and starred-episode sync proposal](episode-lists.md)
 - [Playback rules and test vectors](../contracts/playback/README.md)
 - [Shared audio behaviour](../contracts/audio/README.md)

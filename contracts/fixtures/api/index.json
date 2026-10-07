@@ -81,7 +81,7 @@
   },
   "auth-verify.send-failed.json": {
     "endpoint": "POST /api/auth/verify",
-    "status": 500,
+    "status": 503,
     "decodesAs": "ErrorMessage"
   },
   "auth-verify.sent.json": {

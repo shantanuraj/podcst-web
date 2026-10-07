@@ -20,7 +20,12 @@ describe('error responses', () => {
       test(`${name} answers ${body} with a 400 message`, async () => {
         const response = await handler(request(body));
         expect(response.status).toBe(400);
-        expect(await response.json()).toEqual({ message });
+        expect(await response.json()).toEqual({
+          message:
+            body === 'not json' && name !== 'passkey login'
+              ? 'Invalid authentication request'
+              : message,
+        });
       });
     }
   }

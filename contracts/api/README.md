@@ -233,14 +233,16 @@ Always 200. Returns `Session`: `{ "user": null }` without a valid session, other
 
 Body: `{ "email": string, "code"?: string }`.
 
-- Without `code`: invalidates earlier unused codes for that email, stores a new six-digit code valid for 10 minutes and emails it (`sendVerificationCode` in `src/server/auth/email.ts`). Returns `CodeSent` `{ "sent": true }`, or 500 `{message: "Failed to send verification email"}`. It does not reveal whether an account exists.
+- Without `code`: replaces earlier codes for that exact email with a cryptographically generated six-digit code valid for 10 minutes. Only a keyed digest is stored; redemption is enabled only after provider acknowledgement. Returns `CodeSent` `{ "sent": true }`, or 503 `{message: "Authentication unavailable"}`. It does not reveal whether an account exists.
 - With `code`: returns `Verified` `{ "verified": true }` or 400 `{message: "Invalid or expired code"}`. **A successful check consumes the code** and creates no session. A client that verifies a code here cannot then use it with `/api/auth/email-login`; native clients send the code only to `email-login`.
 
-Missing email: 400 `{message: "Email required"}`. Fixtures: `auth-verify.sent.json`, `auth-verify.verified.json`, `auth-verify.invalid-code.json`, `auth-verify.send-failed.json`.
+Missing/invalid email: 400 `{message: "Email required"}`. An explicitly supplied empty/non-string code is invalid, not a send request. Fixtures: `auth-verify.sent.json`, `auth-verify.verified.json`, `auth-verify.invalid-code.json`, `auth-verify.send-failed.json`.
+
+Both email endpoints bound UTF-8 JSON bodies to 16 KiB and five seconds (413/408), reject malformed JSON (400), and return `Cache-Control: private, no-store` on success and errors. Codes permit five guesses, with atomic expiry/attempt/one-time checks. Sends allow one per 60 seconds and five per rolling hour per email, and 20 per rolling hour per trusted source. Verification requests allow 25/hour/email and 100/hour/source; these budgets are shared across both endpoints. Email limiter keys are case-folded without changing account identity. A 429 includes `Retry-After` in seconds. Redis, database, configuration and provider failures return a generic 503, without issuing a usable code or bypassing verification. See [email authentication](../../docs/email-authentication.md) for source trust and activation requirements.
 
 ### `POST /api/auth/email-login` — public
 
-Body: `{ "email": string, "code": string }`. Consumes the code, creates the user if no account has that email, then creates a session (`Set-Cookie`). Returns `Verified` `{ "verified": true }`. Errors: 400 `{message: "Email and code required"}`, 400 `{message: "Invalid or expired code"}`. Email addresses are compared exactly as sent, so clients send one normalized form everywhere. Fixtures: `auth-email-login.verified.json`, `auth-email-login.invalid-code.json`.
+Body: `{ "email": string, "code": string }`. Consumes the code, creates the user if absent, and inserts a session in one database transaction; the cookie is set only after commit. Concurrent redemption produces at most one session. Returns `Verified` `{ "verified": true }`. Errors: 400 `{message: "Email and code required"}`, 400 `{message: "Invalid or expired code"}`, plus the shared limits/outages above. Email identity is compared exactly as sent: no trimming, case-folding or automatic account merges. Codes must be six-digit strings, including leading zeros. A lost success response requires a new code, not replay of the consumed code. Fixtures: `auth-email-login.verified.json`, `auth-email-login.invalid-code.json`.
 
 ### `POST /api/auth/login` — public
 

@@ -1,36 +1,32 @@
 import { cookies } from 'next/headers';
 import { sql } from '../db';
+import { insertSession } from './session-record';
+
+export { generateId } from './session-record';
 
 const SESSION_COOKIE = 'session';
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function generateId(): string {
-  const bytes = new Uint8Array(20);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-export async function createSession(userId: string): Promise<string> {
-  const sessionId = generateId();
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-
-  await sql`
-    INSERT INTO sessions (id, user_id, expires_at)
-    VALUES (${sessionId}, ${userId}, ${expiresAt})
-  `;
-
+export async function setSessionCookie({
+  id,
+  expiresAt,
+}: {
+  id: string;
+  expiresAt: Date;
+}) {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, sessionId, {
+  cookieStore.set(SESSION_COOKIE, id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     expires: expiresAt,
     path: '/',
   });
+}
 
-  return sessionId;
+export async function createSession(userId: string): Promise<string> {
+  const session = await insertSession(sql, userId);
+  await setSessionCookie(session);
+  return session.id;
 }
 
 export async function getSession() {

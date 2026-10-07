@@ -191,7 +191,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await cluster.sql`INSERT INTO playback_progress (user_id,episode_id,position,completed) VALUES ('owner',101,123,true)`;
       await cluster.sql`INSERT INTO passkeys (id,user_id,credential_id,public_key,counter) VALUES ('passkey','owner','credential',decode('1234','hex'),7)`;
       await cluster.sql`INSERT INTO sessions (id,user_id,expires_at) VALUES ('session','owner','2030-01-01')`;
-      await cluster.sql`INSERT INTO email_verifications (id,email,code,expires_at) VALUES ('verification','owner@example.invalid','123456','2030-01-01')`;
+      await cluster.sql`INSERT INTO email_verifications (id,email,code_digest,expires_at) VALUES ('verification','owner@example.invalid',${'a'.repeat(64)},'2030-01-01')`;
       await cluster.sql`INSERT INTO transcripts (episode_id,content,segments,source) VALUES (101,'Synthetic','[{"start":0,"text":"Synthetic"}]','synthetic')`;
       const starred = randomUUID();
       const playlist = randomUUID();
