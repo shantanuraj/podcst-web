@@ -10,9 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -32,7 +34,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class SignInViewModelTest {
     @Before
-    fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
+    fun setUp() = Dispatchers.setMain(StandardTestDispatcher())
 
     @After
     fun tearDown() = Dispatchers.resetMain()
@@ -48,11 +50,14 @@ class SignInViewModelTest {
     fun submitRequiresTrimmedEmailThenCode() = runTest {
         val (model, server) = viewModel { Reply("""{"sent":true}""") }
         model.setEmail("   ")
+        runCurrent()
         assertFalse(model.state.value.canSubmit)
         model.submit()
+        runCurrent()
         assertTrue(server.calls.isEmpty())
 
         model.setEmail("  you@podcst.app ")
+        runCurrent()
         assertTrue(model.state.value.canSubmit)
         model.submit()
         val sent = model.state.first { it.codeSent && !it.working }
@@ -61,6 +66,7 @@ class SignInViewModelTest {
         assertTrue(server.calls.single().body.contains("\"you@podcst.app\""))
         assertFalse(sent.canSubmit)
         model.setCode("12a34567")
+        runCurrent()
         assertEquals("123456", model.state.value.code)
         assertTrue(model.state.value.canSubmit)
     }
@@ -91,7 +97,7 @@ class SignInViewModelTest {
         model.state.first { it.codeSent && !it.working }
         model.setCode("482913")
         model.submit()
-        val state = model.state.first { it.signedIn }
+        val state = model.state.first { it.signedIn && !it.working }
 
         assertFalse(state.working)
         assertNull(state.error)
@@ -111,7 +117,7 @@ class SignInViewModelTest {
             assertTrue(request.contains("\"challenge\""))
             """{"id":"credential"}"""
         }
-        val state = model.state.first { it.signedIn }
+        val state = model.state.first { it.signedIn && !it.working }
 
         assertNull(state.error)
         assertTrue(server.calls.any { it.body.contains("\"credential\"") && it.body.contains("\"discoverable\"").not() })
@@ -121,6 +127,7 @@ class SignInViewModelTest {
     fun cancelledPasskeyIsQuiet() = runTest {
         val (model, _) = viewModel { Reply("""{"options":{"challenge":"c"}}""") }
         model.passkey { throw CancellationException("cancelled") }
+        runCurrent()
         val state = model.state.first { !it.working }
 
         assertNull(state.error)
