@@ -61,6 +61,57 @@ final class ContractFixtureTests: XCTestCase {
         }
     }
 
+    func testStateWireFixturesRoundTripExactly() throws {
+        let data = try contractData("state/fixtures.json")
+        let fixtures = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        func roundTrip<T: Codable>(_ key: String, _ type: T.Type) throws -> T {
+            let original = try XCTUnwrap(fixtures[key])
+            let value = try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: original))
+            let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? NSDictionary)
+            XCTAssertEqual(encoded, original as? NSDictionary, key)
+            return value
+        }
+        let progress = try roundTrip("progressBatch", StateBatch<StateProgressChange>.self)
+        XCTAssertEqual(progress.changes.first?.episodeId.value, "9007199254740993")
+        XCTAssertEqual(progress.changes.last?.episodeId.value, "9223372036854775807")
+        _ = try roundTrip("followBatch", StateBatch<StateFollowChange>.self)
+        let acknowledgement = try roundTrip("progressAcknowledgement", StateAcknowledgement<StateProgressResult>.self)
+        XCTAssertEqual(acknowledgement.sequence.value, "9007199254740993")
+        XCTAssertEqual(acknowledgement.revision.value, "9007199254740994")
+        _ = try roundTrip("followAcknowledgement", StateAcknowledgement<StateFollowResult>.self)
+        let snapshot = try roundTrip("progressSnapshot", StateSnapshot<StateProgressItem>.self)
+        XCTAssertNil(snapshot.items.last?.progress)
+        _ = try roundTrip("followSnapshot", StateSnapshot<StateFollowItem>.self)
+        _ = try roundTrip("error", StateErrorBody.self)
+        for scalar in try XCTUnwrap(fixtures["scalars"] as? [[String: Any]]) {
+            let value = try JSONSerialization.data(withJSONObject: scalar["value"]!, options: .fragmentsAllowed)
+            XCTAssertEqual((try? JSONDecoder().decode(StateID.self, from: value)) != nil, scalar["id"] as? Bool)
+            XCTAssertEqual((try? JSONDecoder().decode(StateRevision.self, from: value)) != nil, scalar["revision"] as? Bool)
+        }
+        let missing = Data(#"{"episodeId":"1"}"#.utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(StateProgressItem.self, from: missing))
+    }
+
+    func testStateCompletionVectorsMatch() throws {
+        struct Vector: Decodable {
+            var name: String
+            var event: StateProgressEvent
+            var positionSeconds: Int
+            var previousCompleted: Bool
+            var expectedCompleted: Bool
+            var expectedPositionSeconds: Int
+        }
+        struct Vectors: Decodable { var completion: [Vector] }
+        let vectors = try JSONDecoder().decode(Vectors.self, from: contractData("state/fixtures.json"))
+        for vector in vectors.completion {
+            let intent = try vector.event.intent(positionSeconds: vector.positionSeconds, previousCompleted: vector.previousCompleted)
+            XCTAssertEqual(intent.positionSeconds, vector.expectedPositionSeconds, vector.name)
+            XCTAssertEqual(intent.completed, vector.expectedCompleted, vector.name)
+        }
+        XCTAssertThrowsError(try StateProgressEvent.checkpoint.intent(positionSeconds: -1, previousCompleted: false))
+        XCTAssertThrowsError(try StateProgressEvent.checkpoint.intent(positionSeconds: Int(Int32.max) + 1, previousCompleted: false))
+    }
+
     func testPreferenceVectorsMatch() throws {
         let vectors = try JSONDecoder().decode(PreferenceVectors.self, from: contractData("playback/preferences.json"))
         for vector in vectors.cases {

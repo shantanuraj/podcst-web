@@ -306,7 +306,9 @@ Query: `locale` (default `us`) and optional `category`, a top-level genre ID. Re
 
 Returns up to four public `TopPodcast` items: podcasts at least three subscribers of `id` also follow, by shared listeners, then shows of the same top-level category from the `locale` chart in rank order (`related` in `src/server/discover.ts`). Private podcasts return 404 `{message: "Podcast not found"}`; 400 `{message: "parameter \`id\` must be a positive integer"}`.
 
-The chart extensions, `unplayed`, the progress variants, episode search, noteworthy and related are used by the web client; they have no fixtures in `index.json` until a native client adopts them, because both native fixture suites fail on endpoints they do not call.
+Both native clients consume per-episode progress reads to reconcile completed releases, and restore current playback on launch/foreground. The progress query variants are not yet represented in `index.json`; that is a fixture-coverage gap, not an indication that they are web-only. The chart extensions, `unplayed`, episode search, noteworthy and related are web consumers.
+
+The [next durable state contract](../state/README.md) defines exact identities and retry-safe progress/follow batches. Its schemas and handler factories are tested separately; these routes have not switched to that protocol.
 
 ### `GET /api/account` — required
 

@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://www.podcst.app/contracts/state/v1",
+  "definitions": {
+    "id": {
+      "type": "string",
+      "maxLength": 19,
+      "pattern": "^(?:[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807)$(?![\\s\\S])"
+    },
+    "revision": { "anyOf": [{ "const": "0" }, { "$ref": "#/definitions/id" }] },
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])" },
+    "accountId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "seconds": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+    "timestamp": { "type": "integer", "minimum": 0, "maximum": 8640000000000000 },
+    "progressChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episodeId", "positionSeconds", "completed"],
+      "properties": {
+        "episodeId": { "$ref": "#/definitions/id" },
+        "positionSeconds": { "$ref": "#/definitions/seconds" },
+        "completed": { "type": "boolean" }
+      }
+    },
+    "followChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["podcastId", "followed"],
+      "properties": {
+        "podcastId": { "$ref": "#/definitions/id" },
+        "followed": { "type": "boolean" }
+      }
+    },
+    "progressBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "accountId", "generation", "clientId", "sequence", "changes"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "accountId": { "$ref": "#/definitions/accountId" },
+        "generation": { "$ref": "#/definitions/uuid" },
+        "clientId": { "$ref": "#/definitions/uuid" },
+        "sequence": { "$ref": "#/definitions/id" },
+        "changes": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/definitions/progressChange" } }
+      }
+    },
+    "followBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "accountId", "generation", "clientId", "sequence", "changes"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "accountId": { "$ref": "#/definitions/accountId" },
+        "generation": { "$ref": "#/definitions/uuid" },
+        "clientId": { "$ref": "#/definitions/uuid" },
+        "sequence": { "$ref": "#/definitions/id" },
+        "changes": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/definitions/followChange" } }
+      }
+    },
+    "result": { "enum": ["applied", "unchanged", "not_found"] },
+    "progressAcknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "accountId", "generation", "clientId", "sequence", "revision", "results"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "accountId": { "$ref": "#/definitions/accountId" },
+        "generation": { "$ref": "#/definitions/uuid" },
+        "clientId": { "$ref": "#/definitions/uuid" },
+        "sequence": { "$ref": "#/definitions/id" },
+        "revision": { "$ref": "#/definitions/revision" },
+        "results": {
+          "type": "array", "minItems": 1, "maxItems": 100,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["episodeId", "status"],
+            "properties": { "episodeId": { "$ref": "#/definitions/id" }, "status": { "$ref": "#/definitions/result" } }
+          }
+        }
+      }
+    },
+    "followAcknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "accountId", "generation", "clientId", "sequence", "revision", "results"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "accountId": { "$ref": "#/definitions/accountId" },
+        "generation": { "$ref": "#/definitions/uuid" },
+        "clientId": { "$ref": "#/definitions/uuid" },
+        "sequence": { "$ref": "#/definitions/id" },
+        "revision": { "$ref": "#/definitions/revision" },
+        "results": {
+          "type": "array", "minItems": 1, "maxItems": 100,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["podcastId", "status"],
+            "properties": { "podcastId": { "$ref": "#/definitions/id" }, "status": { "$ref": "#/definitions/result" } }
+          }
+        }
+      }
+    },
+    "progressSnapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol", "accountId", "generation", "revision", "items"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "accountId": { "$ref": "#/definitions/accountId" },
+        "generation": { "$ref": "#/definitions/uuid" },
+        "revision": { "$ref": "#/definitions/revision" },
+        "items": {
+          "type": "array", "maxItems": 200,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["episodeId", "progress"],
+            "properties": {
+              "episodeId": { "$ref": "#/definitions/id" },
+              "progress": {
+                "anyOf": [
+                  { "type": "null" },
+                  {
+                    "type": "object", "additionalProperties": false,
+                    "required": ["positionSeconds", "completed", "revision", "updatedAtMs"],
+                    "properties": {
+                      "positionSeconds": { "$ref": "#/definitions/seconds" },
+                      "completed": { "type": "boolean" },
+                      "revision": { "$ref": "#/definitions/id" },
+                      "updatedAtMs": { "$ref": "#/definitions/timestamp" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "followSnapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol", "accountId", "generation", "revision", "items"],
+      "properties": {
+        "protocol": { "const": 1 },
+        "accountId": { "$ref": "#/definitions/accountId" },
+        "generation": { "$ref": "#/definitions/uuid" },
+        "revision": { "$ref": "#/definitions/revision" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["podcastId", "revision", "followedAtMs", "availability"],
+            "properties": {
+              "podcastId": { "$ref": "#/definitions/id" },
+              "revision": { "$ref": "#/definitions/id" },
+              "followedAtMs": { "$ref": "#/definitions/timestamp" },
+              "availability": { "enum": ["available", "unavailable"] }
+            }
+          }
+        }
+      }
+    },
+    "error": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "enum": ["invalid_request", "unauthenticated", "request_forbidden", "account_mismatch", "sequence_conflict", "recovery_required", "update_required", "request_too_large", "request_timeout", "rate_limited", "unavailable"] },
+        "message": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    }
+  }
+}

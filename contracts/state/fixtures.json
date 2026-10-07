@@ -1,0 +1,113 @@
+{
+  "scalars": [
+    { "value": "1", "id": true, "revision": true },
+    { "value": "9007199254740993", "id": true, "revision": true },
+    { "value": "9223372036854775807", "id": true, "revision": true },
+    { "value": "0", "id": false, "revision": true },
+    { "value": "9223372036854775808", "id": false, "revision": false },
+    { "value": "10000000000000000000", "id": false, "revision": false },
+    { "value": "01", "id": false, "revision": false },
+    { "value": "-1", "id": false, "revision": false },
+    { "value": "1.0", "id": false, "revision": false },
+    { "value": "1e3", "id": false, "revision": false },
+    { "value": "+1", "id": false, "revision": false },
+    { "value": " 1", "id": false, "revision": false },
+    { "value": "1\n", "id": false, "revision": false },
+    { "value": "١", "id": false, "revision": false },
+    { "value": "", "id": false, "revision": false },
+    { "value": 1, "id": false, "revision": false },
+    { "value": 9007199254740992, "id": false, "revision": false },
+    { "value": null, "id": false, "revision": false },
+    { "value": true, "id": false, "revision": false }
+  ],
+  "progressBatch": {
+    "protocol": 1,
+    "accountId": "fixture-account-a",
+    "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+    "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
+    "sequence": "9007199254740993",
+    "changes": [
+      { "episodeId": "9007199254740993", "positionSeconds": 0, "completed": true },
+      { "episodeId": "9223372036854775807", "positionSeconds": 2147483647, "completed": false }
+    ]
+  },
+  "followBatch": {
+    "protocol": 1,
+    "accountId": "fixture-account-a",
+    "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+    "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
+    "sequence": "9007199254740993",
+    "changes": [
+      { "podcastId": "9007199254740993", "followed": true },
+      { "podcastId": "9223372036854775807", "followed": false }
+    ]
+  },
+  "progressAcknowledgement": {
+    "protocol": 1,
+    "accountId": "fixture-account-a",
+    "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+    "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
+    "sequence": "9007199254740993",
+    "revision": "9007199254740994",
+    "results": [
+      { "episodeId": "9007199254740993", "status": "applied" },
+      { "episodeId": "9223372036854775807", "status": "not_found" }
+    ]
+  },
+  "followAcknowledgement": {
+    "protocol": 1,
+    "accountId": "fixture-account-a",
+    "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+    "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
+    "sequence": "9007199254740993",
+    "revision": "9007199254740994",
+    "results": [
+      { "podcastId": "9007199254740993", "status": "applied" },
+      { "podcastId": "9223372036854775807", "status": "unchanged" }
+    ]
+  },
+  "progressSnapshot": {
+    "protocol": 1,
+    "accountId": "fixture-account-a",
+    "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+    "revision": "9007199254740994",
+    "items": [
+      { "episodeId": "9007199254740993", "progress": { "positionSeconds": 0, "completed": true, "revision": "9007199254740994", "updatedAtMs": 1791360000000 } },
+      { "episodeId": "9223372036854775807", "progress": null }
+    ]
+  },
+  "followSnapshot": {
+    "protocol": 1,
+    "accountId": "fixture-account-a",
+    "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+    "revision": "9007199254740994",
+    "items": [
+      { "podcastId": "9007199254740993", "revision": "9007199254740994", "followedAtMs": 1791360000000, "availability": "available" },
+      { "podcastId": "9223372036854775807", "revision": "9007199254740992", "followedAtMs": 1791350000000, "availability": "unavailable" }
+    ]
+  },
+  "error": { "code": "recovery_required", "message": "State reconciliation required" },
+  "hashes": {
+    "progress": "596b76f41b8e0667427e1104b7f0186a1b451ea90a9ff9ba8fa09c435912c57f",
+    "follows": "5142f029aeddccc8d944cad7c1cb69bc2fce8018526bc7c3256cf0d07c8ae674"
+  },
+  "replay": [
+    { "name": "first batch", "previousSequence": "0", "previousHash": null, "sequence": "1", "hash": "a", "expected": "new" },
+    { "name": "lost acknowledgement", "previousSequence": "1", "previousHash": "a", "sequence": "1", "hash": "a", "expected": "replay" },
+    { "name": "next action", "previousSequence": "1", "previousHash": "a", "sequence": "2", "hash": "b", "expected": "new" },
+    { "name": "changed payload", "previousSequence": "1", "previousHash": "a", "sequence": "1", "hash": "b", "expected": "sequence_conflict" },
+    { "name": "old sequence", "previousSequence": "2", "previousHash": "b", "sequence": "1", "hash": "a", "expected": "sequence_conflict" },
+    { "name": "skipped sequence", "previousSequence": "1", "previousHash": "a", "sequence": "3", "hash": "c", "expected": "sequence_conflict" },
+    { "name": "exact large sequence", "previousSequence": "9007199254740992", "previousHash": "a", "sequence": "9007199254740993", "hash": "b", "expected": "new" }
+  ],
+  "completion": [
+    { "name": "94 percent checkpoint", "event": "checkpoint", "positionSeconds": 94, "previousCompleted": false, "expectedCompleted": false, "expectedPositionSeconds": 94 },
+    { "name": "95 percent checkpoint", "event": "checkpoint", "positionSeconds": 95, "previousCompleted": false, "expectedCompleted": false, "expectedPositionSeconds": 95 },
+    { "name": "100 percent is not ended", "event": "checkpoint", "positionSeconds": 100, "previousCompleted": false, "expectedCompleted": false, "expectedPositionSeconds": 100 },
+    { "name": "ended", "event": "ended", "positionSeconds": 100, "previousCompleted": false, "expectedCompleted": true, "expectedPositionSeconds": 100 },
+    { "name": "played at zero", "event": "played", "positionSeconds": 0, "previousCompleted": false, "expectedCompleted": true, "expectedPositionSeconds": 0 },
+    { "name": "unplayed resets", "event": "unplayed", "positionSeconds": 100, "previousCompleted": true, "expectedCompleted": false, "expectedPositionSeconds": 0 },
+    { "name": "deliberate replay clears completion", "event": "replay", "positionSeconds": 12, "previousCompleted": true, "expectedCompleted": false, "expectedPositionSeconds": 12 },
+    { "name": "passive checkpoint preserves completion", "event": "checkpoint", "positionSeconds": 0, "previousCompleted": true, "expectedCompleted": true, "expectedPositionSeconds": 0 }
+  ]
+}

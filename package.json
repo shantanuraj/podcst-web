@@ -34,6 +34,7 @@
     "@simplewebauthn/server": "^13.3.2",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-virtual": "^3.14.3",
+    "ajv": "^8.17.1",
     "downshift": "9.3.6",
     "howler": "2.2.4",
     "htmlparser2": "10.1.0",
