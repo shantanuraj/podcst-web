@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { get, post, responseData } from '@/data/api';
+import { get } from '@/data/api';
+import { stateRuntime, useDurableState } from '@/data/state-browser';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { accountQueryKey } from '@/shared/auth/account';
 import type { IPodcastEpisodesInfo } from '@/types';
@@ -7,6 +8,7 @@ import type { IPodcastEpisodesInfo } from '@/types';
 export function useServerSubscriptions() {
   const session = useAccountSession();
   const token = session.token();
+  const durable = useDurableState();
   const options = session.query('subscriptions', 'library', (signal) =>
     get<IPodcastEpisodesInfo[]>('/subscriptions', {}, undefined, signal),
   );
@@ -16,69 +18,41 @@ export function useServerSubscriptions() {
   });
   return {
     ...query,
-    data: session.current(token, 'library') ? query.data : undefined,
+    membership: durable.follows,
+    syncError: durable.error,
+    pending: durable.pending,
+    data: session.current(token, 'library')
+      ? query.data?.filter(
+          (podcast) =>
+            podcast.id && durable.follows.get(podcast.id) === 'available',
+        )
+      : undefined,
   };
 }
-
-export function useSubscribe() {
+function useFollowChange(followed: boolean) {
   const session = useAccountSession();
   const token = session.token();
   return useMutation({
-    mutationKey: accountQueryKey(token.scope, 'subscribe'),
-    mutationFn: (podcastId: number) =>
-      session.run(token, podcastId, (signal) =>
-        post('/subscriptions', { podcastId }, signal),
-      ),
-    onSuccess: () => {
-      if (session.current(token))
-        void session.client.invalidateQueries({
-          queryKey: accountQueryKey(token.scope, 'subscriptions'),
-        });
+    mutationKey: accountQueryKey(
+      token.scope,
+      followed ? 'subscribe' : 'unsubscribe',
+    ),
+    mutationFn: (podcastId: string) => {
+      if (!session.current(token)) throw new Error('Session changed');
+      return stateRuntime(session).sync.follow(podcastId, followed);
     },
   });
 }
-
-export function useUnsubscribe() {
-  const session = useAccountSession();
-  const token = session.token();
-  return useMutation({
-    mutationKey: accountQueryKey(token.scope, 'unsubscribe'),
-    mutationFn: (podcastId: number) =>
-      session.run(token, podcastId, async (signal) =>
-        responseData(
-          await fetch(`/api/subscriptions?podcastId=${podcastId}`, {
-            method: 'DELETE',
-            signal,
-          }),
-        ),
-      ),
-    onSuccess: () => {
-      if (session.current(token))
-        void session.client.invalidateQueries({
-          queryKey: accountQueryKey(token.scope, 'subscriptions'),
-        });
-    },
-  });
-}
-
+export const useSubscribe = () => useFollowChange(true);
+export const useUnsubscribe = () => useFollowChange(false);
 export function useSyncToCloud() {
   const session = useAccountSession();
   const token = session.token();
   return useMutation({
     mutationKey: accountQueryKey(token.scope, 'sync-subscriptions'),
-    mutationFn: (feedUrls: string[]) =>
-      session.run(token, 'library', (signal) =>
-        post<{ succeeded: number; failed: number }>(
-          '/subscriptions',
-          { feedUrls },
-          signal,
-        ),
-      ),
-    onSuccess: () => {
-      if (session.current(token))
-        void session.client.invalidateQueries({
-          queryKey: accountQueryKey(token.scope, 'subscriptions'),
-        });
+    mutationFn: (feedUrls: string[]) => {
+      if (!session.current(token)) throw new Error('Session changed');
+      return stateRuntime(session).sync.resolveFeeds(feedUrls);
     },
   });
 }

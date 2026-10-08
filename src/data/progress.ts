@@ -3,10 +3,12 @@ import { useMemo } from 'react';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { accountQueryKey } from '@/shared/auth/account';
 import type { AccountSession } from '@/shared/auth/account-session';
+import { compareCanonicalIds } from '@/shared/canonical-id';
 import type { EpisodeProgress, IEpisodeInfo } from '@/types';
-import { get, responseData } from './api';
+import { get } from './api';
+import { stateRuntime, useDurableState } from './state-browser';
 
-export function usePodcastProgress(podcastId: number | undefined) {
+export function usePodcastProgress(podcastId: string | undefined) {
   const session = useAccountSession();
   const token = session.token();
   const resource = podcastId ?? 0;
@@ -23,29 +25,35 @@ export function usePodcastProgress(podcastId: number | undefined) {
     enabled: options.enabled && token.scope !== null && !!podcastId,
     staleTime: 30_000,
   });
+  const durable = useDurableState();
   const rows = session.current(token, resource) ? query.data : undefined;
   return useMemo(
-    () => new Map((rows ?? []).map((row) => [row.episodeId, row])),
-    [rows],
+    () =>
+      new Map([
+        ...(rows ?? []).map((row) => [row.episodeId, row] as const),
+        ...[...durable.progress.values()].map(
+          (row) =>
+            [
+              row.episodeId,
+              {
+                episodeId: row.episodeId,
+                position: row.positionSeconds,
+                completed: row.completed,
+              },
+            ] as const,
+        ),
+      ]),
+    [rows, durable.progress],
   );
 }
 
-export function useMarkPlayed(podcastId: number | undefined) {
+export function useMarkPlayed(podcastId: string | undefined) {
   const session = useAccountSession();
   const token = session.token();
   return useMutation({
     mutationKey: accountQueryKey(token.scope, 'mark-played'),
-    mutationFn: (episodeId: number) =>
-      session.run(token, 'playback', async (signal) =>
-        responseData(
-          await fetch('/api/progress', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ episodeId, position: 0, completed: true }),
-            signal,
-          }),
-        ),
-      ),
+    mutationFn: (episodeId: string) =>
+      stateRuntime(session).sync.progress(episodeId, 'played', 0),
     onSuccess: () => {
       if (!session.current(token)) return;
       invalidateProgress(session);
@@ -83,18 +91,13 @@ export function useRecentProgress(limit: number) {
 
 export function episodeProgressQueries(
   session: AccountSession,
-  episodeIds: readonly number[],
+  episodeIds: readonly string[],
 ) {
-  const ids = [...new Set(episodeIds)].sort((a, b) => a - b);
+  const ids = [...new Set(episodeIds)].sort(compareCanonicalIds);
   return Array.from({ length: Math.ceil(ids.length / 200) }, (_, index) => {
     const batch = ids.slice(index * 200, (index + 1) * 200).join(',');
-    const options = session.query('episode-progress', 'playback', (signal) =>
-      get<EpisodeProgress[]>(
-        '/progress',
-        { episodeIds: batch },
-        undefined,
-        signal,
-      ),
+    const options = session.query('episode-progress', 'playback', () =>
+      stateRuntime(session).sync.readProgress(batch.split(',')),
     );
     return {
       ...options,
@@ -105,18 +108,26 @@ export function episodeProgressQueries(
   });
 }
 
-export function useEpisodeProgress(episodeIds: readonly number[]) {
+export function useEpisodeProgress(episodeIds: readonly string[]) {
   const session = useAccountSession();
   const token = session.token();
   const queries = useQueries({
     queries: episodeProgressQueries(session, episodeIds),
   });
-  return new Map(
+  const durable = useDurableState();
+  const rows = new Map(
     (session.current(token, 'playback')
       ? queries.flatMap((query) => query.data ?? [])
       : []
     ).map((row) => [row.episodeId, row]),
   );
+  for (const row of durable.progress.values())
+    rows.set(row.episodeId, {
+      episodeId: row.episodeId,
+      position: row.positionSeconds,
+      completed: row.completed,
+    });
+  return rows;
 }
 
 export function invalidateProgress(session: AccountSession) {

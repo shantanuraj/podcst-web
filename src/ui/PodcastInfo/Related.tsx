@@ -10,7 +10,7 @@ import { ProxiedImage } from '@/ui/Image';
 import { PageLink } from '@/ui/PageLink/PageLink';
 import styles from './Related.module.css';
 
-export function Related({ podcastId }: { podcastId: number }) {
+export function Related({ podcastId }: { podcastId: string }) {
   const { t } = useTranslation();
   const [region, setRegion] = useState<string | null>(null);
   useEffect(() => setRegion(readRegion() ?? i18n.defaultLocale), []);

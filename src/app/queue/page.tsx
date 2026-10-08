@@ -22,6 +22,7 @@ import styles from './Queue.module.css';
 export default function QueuePage() {
   const { t } = useTranslation();
   const queue = usePlayer((state) => state.queue);
+  const storageError = usePlayer((state) => state.storageError);
   const current = usePlayer((state) => state.currentTrackIndex);
   const episode = queue[current];
   const next = useMemo(
@@ -46,6 +47,7 @@ export default function QueuePage() {
           </button>
         )}
       </header>
+      {storageError && <p role="alert">{storageError}</p>}
       {episode ? (
         <>
           <Current episode={episode} />

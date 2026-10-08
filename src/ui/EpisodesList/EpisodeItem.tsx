@@ -15,7 +15,7 @@ import styles from './EpisodeItem.module.css';
 
 type EpisodeItemProps = {
   episode: IEpisodeInfo;
-  podcastId?: number;
+  podcastId?: string;
 };
 
 function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {

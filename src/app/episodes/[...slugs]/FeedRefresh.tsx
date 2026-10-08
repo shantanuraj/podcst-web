@@ -7,7 +7,7 @@ import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { useTranslation } from '@/shared/i18n';
 
 interface Props {
-  podcastId: number;
+  podcastId: string;
   empty?: boolean;
 }
 

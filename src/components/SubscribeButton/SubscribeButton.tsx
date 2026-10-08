@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import {
@@ -18,7 +18,8 @@ import { Button } from '@/ui/Button';
 export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
   const { t } = useTranslation();
   const { data: user } = useSession();
-  const { data: serverSubs } = useServerSubscriptions();
+  const { membership, syncError, pending } = useServerSubscriptions();
+  const localError = useSubscriptions((state) => state.error);
   const { mutate: serverSubscribe, isPending: isSubscribing } = useSubscribe();
   const { mutate: serverUnsubscribe, isPending: isUnsubscribing } =
     useUnsubscribe();
@@ -33,10 +34,7 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
     (state) => state.removeSubscription,
   );
 
-  const isServerSubscribed = useMemo(
-    () => serverSubs?.some((sub) => sub.id === podcastId) ?? false,
-    [serverSubs, podcastId],
-  );
+  const isServerSubscribed = !!podcastId && membership.has(podcastId);
 
   const canUseServer = user && podcastId;
   const isSubscribedToFeed = canUseServer
@@ -54,9 +52,9 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
     } else {
       if (info.isPrivate) return;
       if (isLocalSubscribed) {
-        removeSubscription(feed);
+        void removeSubscription(feed).catch(() => {});
       } else {
-        addSubscription(feed, info);
+        void addSubscription(feed, info).catch(() => {});
       }
     }
   }, [
@@ -73,14 +71,21 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
   ]);
 
   return (
-    <Button
-      data-is-subscribed={isSubscribedToFeed}
-      data-variant={isSubscribedToFeed ? undefined : 'primary'}
-      onClick={onSubscribeClick}
-      disabled={isPending || (!!info.isPrivate && !canUseServer)}
-      suppressHydrationWarning
-    >
-      {isSubscribedToFeed ? t('podcast.unsubscribe') : t('podcast.subscribe')}
-    </Button>
+    <>
+      <Button
+        data-is-subscribed={isSubscribedToFeed}
+        data-variant={isSubscribedToFeed ? undefined : 'primary'}
+        onClick={onSubscribeClick}
+        disabled={isPending || (!!info.isPrivate && !canUseServer)}
+        suppressHydrationWarning
+      >
+        {isSubscribedToFeed ? t('podcast.unsubscribe') : t('podcast.subscribe')}
+      </Button>
+      {(syncError || localError || pending) && (
+        <span role="status">
+          {syncError ?? localError ?? 'Saved on this device. Waiting to sync…'}
+        </span>
+      )}
+    </>
   );
 }

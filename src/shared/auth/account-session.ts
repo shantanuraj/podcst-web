@@ -37,6 +37,37 @@ export class AccountSession {
   private checking?: { controller: AbortController; promise: Promise<void> };
   private tokenState?: AccountSnapshot;
   private cachedToken?: AccountToken;
+  private lifecycle = new Set<{
+    suspend: () => Promise<void>;
+    erase: (account: string) => Promise<void>;
+  }>();
+  private checkpoints = new Set<() => Promise<void>>();
+
+  registerCheckpoint(checkpoint: () => Promise<void>) {
+    this.checkpoints.add(checkpoint);
+    return () => {
+      this.checkpoints.delete(checkpoint);
+    };
+  }
+
+  registerLifecycle(hooks: {
+    suspend: () => Promise<void>;
+    erase: (account: string) => Promise<void>;
+  }) {
+    this.lifecycle.add(hooks);
+    return () => {
+      this.lifecycle.delete(hooks);
+    };
+  }
+
+  async checkpointAndSuspend() {
+    await Promise.all([...this.checkpoints].map((checkpoint) => checkpoint()));
+    await Promise.all([...this.lifecycle].map((hooks) => hooks.suspend()));
+  }
+
+  async eraseConfirmedAccount(account: string) {
+    await Promise.all([...this.lifecycle].map((hooks) => hooks.erase(account)));
+  }
 
   constructor(
     readonly client: QueryClient,

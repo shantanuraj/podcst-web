@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
-import { responseData } from '@/data/api';
 import { invalidateProgress } from '@/data/progress';
+import { stateRuntime } from '@/data/state-browser';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
-import type { IEpisodeInfo } from '@/types';
-import { completion, progress } from '../../../contracts/playback/rules.json';
+import { progress } from '../../../contracts/playback/rules.json';
 import { sameEpisode } from './episode-identity';
 import { playbackQueryOptions, restoreAccountProgress } from './playback-state';
 import { type EpisodePosition, onPlayer } from './player-events';
@@ -18,39 +17,13 @@ import {
 const SYNC_INTERVAL_MS = progress.periodicPlayingSeconds * 1000;
 const SEEK_JUMP_SECONDS = 2;
 
-const completedAt = (episode: IEpisodeInfo, position: number) => {
-  const duration =
-    sameEpisode(getCurrentEpisode(usePlayer.getState()), episode) &&
-    usePlayer.getState().duration
-      ? usePlayer.getState().duration
-      : episode.duration || 0;
-  return (
-    duration > 0 &&
-    position / duration >=
-      completion.parity.savedPositionFractionOfKnownDuration
-  );
-};
-
-const request = (
-  episodeId: number,
-  position: number,
-  completed: boolean,
-  init: RequestInit,
-) =>
-  fetch('/api/progress', {
-    ...init,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ episodeId, position, completed }),
-  });
-
 export function usePlaybackSync() {
   const session = useAccountSession();
   const token = session.token();
   const restoredRef = useRef<number | null>(null);
   const lastSavedRef = useRef<{
     revision: number;
-    episodeId: number;
+    episodeId: string;
     position: number;
     completed: boolean;
   } | null>(null);
@@ -69,7 +42,6 @@ export function usePlaybackSync() {
 
   const owns = useCallback(
     (state: IPlayerState) =>
-      token.scope !== null &&
       session.current(token) &&
       state.accountScope === token.scope &&
       state.accountRevision === token.revision,
@@ -77,11 +49,7 @@ export function usePlaybackSync() {
   );
 
   const save = useCallback(
-    async (
-      { episode, position }: EpisodePosition,
-      completed: boolean,
-      keepalive = false,
-    ) => {
+    async ({ episode, position }: EpisodePosition, completed: boolean) => {
       const episodeId = episode.id;
       const state = usePlayer.getState();
       if (
@@ -91,7 +59,7 @@ export function usePlaybackSync() {
       )
         return;
       position = Math.floor(position);
-      completed ||= completedAt(episode, position);
+
       const last = lastSavedRef.current;
       if (
         last?.revision === token.revision &&
@@ -100,25 +68,20 @@ export function usePlaybackSync() {
         last.completed === completed
       )
         return;
-      try {
-        await session.run(token, 'playback', async (signal) =>
-          responseData(
-            await request(episodeId, position, completed, {
-              signal,
-              keepalive,
-            }),
-          ),
-        );
-        if (session.current(token)) {
-          lastSavedRef.current = {
-            revision: token.revision,
-            episodeId,
-            position,
-            completed,
-          };
-          invalidateProgress(session);
-        }
-      } catch {}
+      await stateRuntime(session).sync.progress(
+        episodeId,
+        completed ? 'ended' : 'checkpoint',
+        position,
+      );
+      if (session.current(token)) {
+        lastSavedRef.current = {
+          revision: token.revision,
+          episodeId,
+          position,
+          completed,
+        };
+        invalidateProgress(session);
+      }
     },
     [session, token, owns],
   );
@@ -126,11 +89,14 @@ export function usePlaybackSync() {
   const saveCurrent = useCallback(() => {
     const state = usePlayer.getState();
     const episode = getCurrentEpisode(state);
-    if (episode) void save({ episode, position: state.seekPosition }, false);
+    if (episode)
+      void save({ episode, position: state.seekPosition }, false).catch(
+        () => {},
+      );
   }, [save]);
 
   useEffect(() => {
-    if (token.scope === null || !session.current(token)) return;
+    if (!session.current(token)) return;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     const startInterval = () => {
       intervalId ??= setInterval(saveCurrent, SYNC_INTERVAL_MS);
@@ -163,8 +129,20 @@ export function usePlaybackSync() {
           sameEpisode(a.episode, b.episode),
       },
     );
-    const offLeave = onPlayer('leave', (value) => void save(value, false));
-    const offComplete = onPlayer('complete', (value) => void save(value, true));
+    const offLeave = onPlayer(
+      'leave',
+      (value) => void save(value, false).catch(() => {}),
+    );
+    const offReplay = onPlayer('replay', ({ episode, position }) => {
+      if (episode.id && owns(usePlayer.getState()))
+        void stateRuntime(session)
+          .sync.progress(episode.id, 'replay', Math.floor(position))
+          .catch(() => {});
+    });
+    const offComplete = onPlayer(
+      'complete',
+      (value) => void save(value, true).catch(() => {}),
+    );
     const seeked = usePlayer.subscribe(
       (state) => ({
         episode: getCurrentEpisode(state),
@@ -187,10 +165,22 @@ export function usePlaybackSync() {
       unsubscribe();
       offLeave();
       offComplete();
+      offReplay();
       seeked();
       stopInterval();
     };
   }, [session, token, owns, save, saveCurrent]);
+
+  useEffect(
+    () =>
+      session.registerCheckpoint(async () => {
+        const state = usePlayer.getState();
+        const episode = getCurrentEpisode(state);
+        if (episode && owns(state))
+          await save({ episode, position: state.seekPosition }, false);
+      }),
+    [session, owns, save],
+  );
 
   useEffect(() => {
     if (token.scope === null) return;
@@ -198,7 +188,9 @@ export function usePlaybackSync() {
       const state = usePlayer.getState();
       const episode = getCurrentEpisode(state);
       if (!episode?.id || !owns(state) || state.state === 'idle') return;
-      void save({ episode, position: state.seekPosition }, false, true);
+      void save({ episode, position: state.seekPosition }, false).catch(
+        () => {},
+      );
     };
     window.addEventListener('pagehide', leave);
     return () => window.removeEventListener('pagehide', leave);

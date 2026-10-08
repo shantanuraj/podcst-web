@@ -28,7 +28,7 @@ export function OpmlImport({ className }: { className?: string }) {
       if (info && !info.isPrivate) imported.push({ ...info, feed });
       else failed.push(feed);
     }
-    useSubscriptions.getState().addSubscriptions(imported);
+    await useSubscriptions.getState().addSubscriptions(imported);
     return { imported: imported.length, failed };
   };
 
@@ -47,7 +47,7 @@ export function OpmlImport({ className }: { className?: string }) {
           : await importGuest(feeds),
       );
     } catch {
-      setResult({ imported: 0, failed: user ? feeds.length : [...feeds] });
+      setResult({ imported: 0, failed: [...feeds] });
     } finally {
       setBusy(false);
     }

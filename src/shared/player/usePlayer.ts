@@ -15,6 +15,7 @@ import * as Queue from './queue';
 type Session = Queue.QueueSession<IEpisodeInfo>;
 
 export interface IPlayerState {
+  storageError?: string;
   accountScope: AccountScope | undefined;
   accountRevision: number;
   setAccount: (scope: AccountScope | undefined, revision: number) => void;
@@ -158,13 +159,19 @@ export const usePlayer = create<IPlayerState>()(
               .getCurrentSession()
               ?.endSession(true);
         } catch {}
-        const saved =
-          accountScope === undefined ? null : readSession(accountScope);
+        let saved: ReturnType<typeof readSession> = null;
+        let storageError: string | undefined;
+        try {
+          saved = accountScope === undefined ? null : readSession(accountScope);
+        } catch {
+          storageError = 'Saved queue could not be opened. Source retained.';
+        }
         const rate = state.savedRate ?? state.rate;
         AudioUtils.setRate(rate);
         set({
           accountScope,
           accountRevision,
+          storageError: storageError ?? saved?.recoveryNotice,
           queue: saved?.queue ?? [],
           currentTrackIndex: saved?.current ?? 0,
           seekPosition: saved?.position ?? 0,
@@ -196,11 +203,13 @@ export const usePlayer = create<IPlayerState>()(
       remotePlayer: undefined,
       remotePlayerController: undefined,
 
-      playEpisode: (episode, seekPosition = 0) =>
+      playEpisode: (episode, seekPosition = 0) => {
         commit(Queue.play(sessionOf(get()), episode, sameEpisode), {
           state: 'buffering',
           position: seekPosition,
-        }),
+        });
+        emitPlayer('replay', { episode, position: seekPosition });
+      },
 
       enqueueEpisode: (episode, next) =>
         commit(Queue.enqueue(sessionOf(get()), episode, next, sameEpisode)),
@@ -489,13 +498,20 @@ usePlayer.subscribe((currentState, previousState) => {
       currentState.state !== previousState.state ||
       Math.floor(currentState.seekPosition / PERSISTED_SECONDS) !==
         Math.floor(previousState.seekPosition / PERSISTED_SECONDS))
-  )
-    writeSession({
-      scope: currentState.accountScope,
-      queue: currentState.queue,
-      current: currentState.currentTrackIndex,
-      position: currentState.seekPosition,
-    });
+  ) {
+    try {
+      writeSession({
+        scope: currentState.accountScope,
+        queue: currentState.queue,
+        current: currentState.currentTrackIndex,
+        position: currentState.seekPosition,
+      });
+    } catch {
+      usePlayer.setState({
+        storageError: 'Queue changes could not be saved. Source retained.',
+      });
+    }
+  }
 
   if (
     currentState.accountScope !== previousState.accountScope ||

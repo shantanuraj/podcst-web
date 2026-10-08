@@ -141,7 +141,7 @@ export function EpisodesList({
 
 interface EpisodeListItemProps {
   episode: IEpisodeInfo;
-  podcastId?: number;
+  podcastId?: string;
   index: number;
   start?: number;
 }

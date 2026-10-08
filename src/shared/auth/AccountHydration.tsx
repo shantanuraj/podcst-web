@@ -12,7 +12,7 @@ export function AccountHydration({
   children,
 }: {
   scope: AccountScope;
-  resource: number;
+  resource: string;
   state: DehydratedState;
   children: ReactNode;
 }) {

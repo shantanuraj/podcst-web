@@ -1,3 +1,5 @@
+import { validateCatalogue } from './catalogue';
+
 function getBaseUrl() {
   if (typeof window !== 'undefined') return '';
   if (process.env.APP_URL) return process.env.APP_URL;
@@ -11,6 +13,8 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
+    public readonly retryAfter?: number,
   ) {
     super(message);
   }
@@ -24,7 +28,18 @@ export async function responseData<T>(response: Response): Promise<T> {
     throw new ApiError(response.status, 'Invalid API response');
   });
   if (!response.ok)
-    throw new ApiError(response.status, data.message || 'Request failed');
+    throw new ApiError(
+      response.status,
+      data.message || 'Request failed',
+      data.code,
+      Number(response.headers.get('Retry-After')) || undefined,
+    );
+  if (
+    /\/api\/(?:feed|progress|subscriptions|search|noteworthy)(?:[/?]|$)/.test(
+      response.url,
+    )
+  )
+    validateCatalogue(data);
   return data as T;
 }
 

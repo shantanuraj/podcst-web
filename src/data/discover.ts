@@ -24,7 +24,7 @@ export function useNoteworthy(
   });
 }
 
-export function useRelated(podcastId: number, locale: string | null) {
+export function useRelated(podcastId: string, locale: string | null) {
   return useQuery({
     queryKey: ['related', podcastId, locale],
     queryFn: ({ signal }) =>

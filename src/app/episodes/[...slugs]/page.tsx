@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-
 import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 import { getSession } from '@/server/auth/session';
 import {
@@ -11,6 +10,7 @@ import {
   getPodcastInfoById,
 } from '@/server/ingest/podcast';
 import { AccountContent } from '@/shared/auth/AccountBoundary';
+import { isCanonicalId } from '@/shared/canonical-id';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
@@ -21,20 +21,19 @@ import { EpisodesNotFound } from './EpisodesNotFound';
 import { FeedRefresh } from './FeedRefresh';
 
 function isNumeric(str: string): boolean {
-  return /^\d+$/.test(str);
+  return isCanonicalId(str);
 }
 
 type ParsedSlugs =
-  | { type: 'id'; podcastId: number; episodeId: number | null }
+  | { type: 'id'; podcastId: string; episodeId: string | null }
   | { type: 'legacy'; feedUrl: string; guid: string | null };
 
 function parseSlugs(slugs: string[]): ParsedSlugs {
   const first = slugs[0] || '';
 
   if (isNumeric(first)) {
-    const podcastId = parseInt(first, 10);
-    const episodeId =
-      slugs[1] && isNumeric(slugs[1]) ? parseInt(slugs[1], 10) : null;
+    const podcastId = first;
+    const episodeId = slugs[1] && isNumeric(slugs[1]) ? slugs[1] : null;
     return { type: 'id', podcastId, episodeId };
   }
 
@@ -43,7 +42,7 @@ function parseSlugs(slugs: string[]): ParsedSlugs {
   return { type: 'legacy', feedUrl, guid: null };
 }
 
-function buildCleanUrl(podcastId: number, episodeId?: number | null): string {
+function buildCleanUrl(podcastId: string, episodeId?: string | null): string {
   if (episodeId) {
     return `/episodes/${podcastId}/${episodeId}`;
   }
@@ -258,7 +257,7 @@ export default async function Page(props: {
     return <EpisodesNotFound type="podcast" />;
   }
 
-  let episodeId: number | null = null;
+  let episodeId: string | null = null;
   if (guid) {
     const episode = info.episodes.find((ep) => ep.guid === guid);
     episodeId = episode?.id ?? null;

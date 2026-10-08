@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { connectState } from '@/data/state-browser';
 import { AccountContext } from '@/shared/auth/AccountBoundary';
 import type { AccountUser } from '@/shared/auth/account';
 import {
@@ -56,6 +57,7 @@ export function QueryProvider({
     };
   }, [session]);
   useEffect(() => connectStars(session), [session]);
+  useEffect(() => connectState(session), [session]);
   return (
     <QueryClientProvider client={queryClient}>
       <AccountContext.Provider value={session}>

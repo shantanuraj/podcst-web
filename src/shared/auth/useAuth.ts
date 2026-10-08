@@ -13,7 +13,10 @@ import { useAccountSession } from './AccountBoundary';
 function useAccountChange() {
   const session = useAccountSession();
   return {
-    onMutate: () => session.beginAuthChange(),
+    onMutate: async () => {
+      await session.checkpointAndSuspend();
+      session.beginAuthChange();
+    },
     onSuccess: () => session.finishAuthChange(true),
     onError: () => session.finishAuthChange(false),
   };

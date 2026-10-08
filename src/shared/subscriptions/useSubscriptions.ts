@@ -1,110 +1,110 @@
+import { get as readLegacy } from 'idb-keyval';
 import { create } from 'zustand';
 import { fetchEpisodesInfo } from '@/data/episodes';
-import { getValue, setValue } from '@/shared/storage/idb';
-import {
-  getValue as getLocalStorageValue,
-  setValue as setLocalStorageValue,
-} from '@/shared/storage/local';
+import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
+import { isCanonicalId } from '@/shared/canonical-id';
 import type { IPodcastEpisodesInfo, ISubscriptionsMap } from '@/types';
 
 export type SubscriptionsState = {
   subs: ISubscriptionsMap;
+  error?: string;
   init: () => Promise<void>;
-  addSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
-  removeSubscription: (feed: string) => void;
-  toggleSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
-  addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => void;
-  syncSubscription: (feed: string, info: IPodcastEpisodesInfo) => void;
+  addSubscription: (feed: string, info: IPodcastEpisodesInfo) => Promise<void>;
+  removeSubscription: (feed: string) => Promise<void>;
+  toggleSubscription: (
+    feed: string,
+    info: IPodcastEpisodesInfo,
+  ) => Promise<void>;
+  addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => Promise<void>;
+  syncSubscription: (feed: string, info: IPodcastEpisodesInfo) => Promise<void>;
   isSyncing: boolean;
-  syncAllSubscriptions: () => void;
+  syncAllSubscriptions: () => Promise<void>;
 };
-
-// 1 hour in milliseconds
-const CACHE_STALE_DELTA = 60 * 60 * 1000;
-const isCacheStale = (lastSyncTime: number) =>
-  Date.now() - lastSyncTime > CACHE_STALE_DELTA;
-
-const getLastSyncTime = () => getLocalStorageValue('lastSyncTime', 0);
-const updateLastSyncTime = () =>
-  setLocalStorageValue('lastSyncTime', Date.now());
-
+const storage = browserStateStorage();
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) =>
   !!state.subs[feed];
-
-const emptySubs: ISubscriptionsMap = {};
-
-export const useSubscriptions = create<SubscriptionsState>((set, get) => ({
-  subs: emptySubs,
-  init: async () => {
-    const subscriptions = await getValue('subscriptions');
-    if (subscriptions) {
+export const useSubscriptions = create<SubscriptionsState>((set, get) => {
+  const persist = async (change: Parameters<typeof storage.update>[0]) => {
+    try {
+      const root = await storage.update(change);
       set({
         subs: Object.fromEntries(
-          Object.entries(subscriptions).filter(([, info]) => !info.isPrivate),
+          Object.entries(root.guest.catalog ?? {}).filter(
+            ([, item]) => item.id && root.guest.follows.includes(item.id),
+          ),
         ),
+        error: undefined,
       });
-    }
-  },
-  addSubscription: (feed: string, info: IPodcastEpisodesInfo) => {
-    if (info.isPrivate) return;
-    set({ subs: { ...get().subs, [feed]: info } });
-  },
-  removeSubscription: (feed: string) => {
-    set({
-      subs: Object.fromEntries(
-        Object.entries(get().subs).filter(
-          ([subbedFeed]) => subbedFeed !== feed,
-        ),
-      ),
-    });
-  },
-  toggleSubscription: (feed: string, info: IPodcastEpisodesInfo) => {
-    const state = get();
-    if (isSubscribed(feed)(state)) {
-      state.removeSubscription(feed);
-    } else {
-      state.addSubscription(feed, info);
-    }
-  },
-  addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => {
-    const subs = { ...get().subs };
-    for (const info of podcasts) if (!info.isPrivate) subs[info.feed] = info;
-    set({ subs });
-  },
-  syncSubscription: (feed, info) => {
-    const state = get();
-    if (info.isPrivate) {
-      state.removeSubscription(feed);
-    } else if (isSubscribed(feed)(state)) {
-      state.addSubscription(feed, info);
-    }
-  },
-  isSyncing: false,
-  syncAllSubscriptions: async () => {
-    const lastSyncTime = getLastSyncTime();
-    if (!isCacheStale(lastSyncTime)) return;
-
-    set({ isSyncing: true });
-
-    const feeds = Object.keys(get().subs);
-
-    for (const feed of feeds) {
-      await fetchEpisodesInfo(feed).catch(() => {
-        console.warn('Unable to refresh subscription');
-
-        // Wait a second in likely case of rate-limit from iTunes
-        return new Promise((resolve) => setTimeout(resolve, 1000));
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('podcst-durable-state');
+        channel.postMessage('changed');
+        channel.close();
+      }
+    } catch (error) {
+      set({
+        error:
+          'Guest follows could not be saved or read. Source data retained.',
       });
+      throw error;
     }
-
-    set({ isSyncing: false });
-    updateLastSyncTime();
-  },
-}));
-
-useSubscriptions.subscribe(({ subs }) => {
-  // Sync subscriptions to storage
-  setValue('subscriptions', subs);
+  };
+  return {
+    subs: {},
+    isSyncing: false,
+    init: async () => {
+      try {
+        const source = await readLegacy('subscriptions');
+        await persist((root) => {
+          if (source !== undefined) convertGuestFollows(root, source);
+        });
+      } catch {
+        set({
+          error: 'Guest follows could not be opened. Source data retained.',
+        });
+      }
+    },
+    addSubscription: async (feed, info) => {
+      if (info.isPrivate) return;
+      await get().addSubscriptions([{ ...info, feed }]);
+    },
+    addSubscriptions: (podcasts) =>
+      persist((root) => {
+        root.guest.catalog ??= {};
+        for (const info of podcasts) {
+          if (info.isPrivate) continue;
+          if (!isCanonicalId(info.id))
+            throw new Error('Resolve this podcast before following');
+          root.guest.catalog[info.feed] = info;
+          if (!root.guest.follows.includes(info.id))
+            root.guest.follows.push(info.id);
+        }
+      }),
+    removeSubscription: (feed) =>
+      persist((root) => {
+        const id = root.guest.catalog?.[feed]?.id;
+        root.guest.follows = root.guest.follows.filter((item) => item !== id);
+        if (root.guest.catalog) delete root.guest.catalog[feed];
+      }),
+    toggleSubscription: (feed, info) =>
+      isSubscribed(feed)(get())
+        ? get().removeSubscription(feed)
+        : get().addSubscription(feed, info),
+    syncSubscription: (feed, info) =>
+      persist((root) => {
+        if (root.guest.catalog?.[feed] && !info.isPrivate)
+          root.guest.catalog[feed] = info;
+      }),
+    syncAllSubscriptions: async () => {
+      set({ isSyncing: true });
+      try {
+        for (const feed of Object.keys(get().subs))
+          await fetchEpisodesInfo(feed);
+      } catch {
+        set({ error: 'Some followed podcasts could not be refreshed.' });
+      } finally {
+        set({ isSyncing: false });
+      }
+    },
+  };
 });
-
 export const getInit = (state: SubscriptionsState) => state.init;

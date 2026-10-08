@@ -2,7 +2,7 @@ import { type AccountScope, accountQueryKey } from '@/shared/auth/account';
 
 export const episodesQueryKey = (
   scope: AccountScope,
-  podcastId: number,
+  podcastId: string,
   search = '',
   sortBy = 'published',
   sortDir = 'desc',

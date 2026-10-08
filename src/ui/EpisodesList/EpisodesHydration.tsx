@@ -12,7 +12,7 @@ export function EpisodesHydration({
   children,
 }: {
   scope: AccountScope;
-  podcastId: number;
+  podcastId: string;
   initialData: IPaginatedEpisodes;
   children: ReactNode;
 }) {

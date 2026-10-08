@@ -9,6 +9,7 @@ import {
   useEpisodeProgress,
   useRecentProgress,
 } from '@/data/progress';
+import { DurableStateStatus, useDurableState } from '@/data/state-browser';
 import { localeForLanguage } from '@/messages';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
@@ -44,7 +45,10 @@ export default function LibraryPage() {
   const { data: user, isLoading } = useSession();
   const podcasts = usePodcasts(!!user);
   const recent = useRecentProgress(CONTINUE);
+  const subscriptions = useServerSubscriptions();
+  const localError = useSubscriptions((state) => state.error);
   const playing = usePlayer(getCurrentEpisode);
+  const queueError = usePlayer((state) => state.storageError);
   const started = usePlayer((state) => state.seekPosition > 0);
   const continuing = useMemo(
     () =>
@@ -58,6 +62,7 @@ export default function LibraryPage() {
   );
   const releases = useMemo(() => newReleases(podcasts), [podcasts]);
   const starred = useStars();
+  const durable = useDurableState();
   const progress = useEpisodeProgress(
     user
       ? [...releases, ...starred.episodes].flatMap(({ id }) => (id ? [id] : []))
@@ -82,6 +87,33 @@ export default function LibraryPage() {
           </Button>
         </div>
       </header>
+      <p role="status">
+        <DurableStateStatus />
+        {queueError}
+      </p>
+      {user && durable.unresolvedFollows.length > 0 && (
+        <ul>
+          {durable.unresolvedFollows.map((feed) => (
+            <li key={feed}>
+              {feed}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  void durable.sync.resolveFeeds([feed], true).catch(() => {});
+                }}
+              >
+                Resolve and follow
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(subscriptions.isError || localError) && (
+        <p role="alert">
+          {localError ??
+            'Unable to read your library. This is not an empty library.'}
+        </p>
+      )}
       {continuing.length > 0 && (
         <section>
           <h2 className={styles.eyebrow}>{t('library.continue')}</h2>
@@ -95,7 +127,13 @@ export default function LibraryPage() {
           </div>
         </section>
       )}
-      {podcasts.length === 0 ? (
+      {podcasts.length === 0 &&
+      (!user ||
+        (subscriptions.isSuccess &&
+          durable.initialized &&
+          subscriptions.membership.size === 0)) &&
+      !subscriptions.isError &&
+      !localError ? (
         <Empty />
       ) : (
         <div className={styles.columns}>
@@ -108,6 +146,27 @@ export default function LibraryPage() {
             }}
           />
         </div>
+      )}
+      {user && (
+        <ul>
+          {[...subscriptions.membership]
+            .filter(([id]) => !podcasts.some((podcast) => podcast.id === id))
+            .map(([id, availability]) => (
+              <li key={id}>
+                {availability === 'unavailable'
+                  ? 'Podcast unavailable'
+                  : 'Podcast details unavailable'}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void durable.sync.follow(id, false).catch(() => {});
+                  }}
+                >
+                  Unfollow
+                </button>
+              </li>
+            ))}
+        </ul>
       )}
       {(starred.stars.length > 0 || starred.pending || starred.error) && (
         <section className={styles.starred}>
@@ -238,7 +297,7 @@ function Releases({
   progress,
 }: {
   episodes: IEpisodeInfo[];
-  progress: ReadonlyMap<number, EpisodeProgress>;
+  progress: ReadonlyMap<string, EpisodeProgress>;
 }) {
   const { t, language } = useTranslation();
   const [now] = useState(() => Date.now());

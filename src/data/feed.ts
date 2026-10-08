@@ -14,7 +14,7 @@ import { patchEpisodesResponse } from './episodes';
 
 export const feedQueryKey = (scope: AccountScope, url: string) =>
   accountQueryKey(scope, 'feed', url);
-export const podcastQueryKey = (scope: AccountScope, id: number) =>
+export const podcastQueryKey = (scope: AccountScope, id: string) =>
   accountQueryKey(scope, 'podcast', id);
 
 export const useFeed = (feedUrl: string | null) => {
@@ -30,7 +30,7 @@ export const useFeed = (feedUrl: string | null) => {
     );
     const patched = patchEpisodesResponse(feedUrl)(response);
     if (patched && session.current(token, feedUrl))
-      useSubscriptions.getState().syncSubscription(feedUrl, patched);
+      await useSubscriptions.getState().syncSubscription(feedUrl, patched);
     return patched;
   });
   const query = useQuery({
@@ -45,7 +45,7 @@ export const useFeed = (feedUrl: string | null) => {
   };
 };
 
-export const usePodcast = (podcastId: number) => {
+export const usePodcast = (podcastId: string) => {
   const session = useAccountSession();
   const token = session.token();
   const options = session.query('podcast', podcastId, async (signal) => {
@@ -56,7 +56,9 @@ export const usePodcast = (podcastId: number) => {
       signal,
     );
     if (response && session.current(token, podcastId))
-      useSubscriptions.getState().syncSubscription(response.feed, response);
+      await useSubscriptions
+        .getState()
+        .syncSubscription(response.feed, response);
     return response;
   });
   const query = useQuery({
@@ -71,7 +73,7 @@ export const usePodcast = (podcastId: number) => {
   };
 };
 
-export const usePodcastInfo = (podcastId: number) => {
+export const usePodcastInfo = (podcastId: string) => {
   const session = useAccountSession();
   const token = session.token();
   const options = session.query('podcast-info', podcastId, (signal) =>
@@ -98,7 +100,7 @@ export type EpisodeSortField = 'published' | 'title' | 'duration';
 export type EpisodeSortDir = 'asc' | 'desc';
 
 interface EpisodesQueryOptions {
-  podcastId: number;
+  podcastId: string;
   search?: string;
   sortBy?: EpisodeSortField;
   sortDir?: EpisodeSortDir;

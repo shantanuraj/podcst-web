@@ -7,7 +7,7 @@ class FeedRefreshBusy extends Error {}
 
 export function feedRefreshOptions(
   session: AccountSession,
-  podcastId: number,
+  podcastId: string,
   refreshRoute: () => void,
   empty = false,
 ) {

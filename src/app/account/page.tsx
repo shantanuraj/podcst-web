@@ -495,7 +495,7 @@ function Library({ signedIn }: { signedIn: boolean }) {
             sync.data
               ? t('account.importResult', {
                   imported: sync.data.succeeded,
-                  failed: sync.data.failed,
+                  failed: sync.data.failed.length,
                 })
               : t('account.thisDeviceDescription', {
                   count: deviceFeeds.length,

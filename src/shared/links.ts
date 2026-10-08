@@ -21,7 +21,7 @@ export function getPodcastHref(
 
 export function getEpisodeHref(
   episode: IEpisodeInfo,
-  podcastId?: number,
+  podcastId?: string,
 ): string {
   const episodePodcastId = podcastId ?? episode.podcastId;
   if (episodePodcastId && episode.id) {

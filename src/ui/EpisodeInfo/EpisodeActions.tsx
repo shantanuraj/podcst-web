@@ -1,6 +1,7 @@
 'use client';
 
 import { useMarkPlayed, usePodcastProgress } from '@/data/progress';
+import { useDurableState } from '@/data/state-browser';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import { getEpisodeHref } from '@/shared/links';
@@ -26,7 +27,8 @@ export function EpisodeActions({
   const { t } = useTranslation();
   const { data: user } = useSession();
   const withAccount = useAccountPlayback();
-  const saved = usePodcastProgress(episode.podcastId).get(episode.id ?? 0);
+  const durable = useDurableState();
+  const saved = usePodcastProgress(episode.podcastId).get(episode.id ?? '');
   const markPlayed = useMarkPlayed(episode.podcastId);
   const current = usePlayer((state) =>
     sameEpisode(getCurrentEpisode(state), episode) && state.state !== 'idle'
@@ -106,6 +108,24 @@ export function EpisodeActions({
         >
           {t('player.markPlayed')}
         </Button>
+      )}
+      {user && episode.id && saved?.completed && (
+        <Button
+          type="button"
+          onClick={() => {
+            if (episode.id)
+              void durable.sync
+                .progress(episode.id, 'unplayed', 0)
+                .catch(() => {});
+          }}
+        >
+          Mark unplayed
+        </Button>
+      )}
+      {(durable.error || durable.pending) && (
+        <span role="status">
+          {durable.error ?? 'Saved on this device. Waiting to sync…'}
+        </span>
       )}
       {!episode.isPrivate && (
         <ShareButton

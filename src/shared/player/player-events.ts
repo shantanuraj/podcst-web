@@ -5,11 +5,12 @@ export interface EpisodePosition {
   position: number;
 }
 
-type Kind = 'complete' | 'leave';
+type Kind = 'complete' | 'leave' | 'replay';
 type Listener = (value: EpisodePosition) => void;
 
 const listeners: Record<Kind, Set<Listener>> = {
   complete: new Set(),
+  replay: new Set(),
   leave: new Set(),
 };
 

@@ -13,7 +13,7 @@ export const fetchEpisodesInfo = async (feed: string) => {
     const res = await get<IEpisodeListing | null>(`/feed`, { url: feed });
     const patchedResponse = patchRes(res);
     if (patchedResponse)
-      useSubscriptions.getState().syncSubscription(feed, patchedResponse);
+      await useSubscriptions.getState().syncSubscription(feed, patchedResponse);
     return patchedResponse;
   } catch (err) {
     console.error(`Api.episodes`, `Couldn't fetch episodes from feed`, err);

@@ -42,7 +42,7 @@ export namespace iTunes {
     /**
      * Podcast ID
      */
-    collectionId: number;
+    collectionId: string;
     /**
      * Podcast name
      */
@@ -114,7 +114,7 @@ export interface Genre {
 }
 
 export interface EpisodeProgress {
-  episodeId: number;
+  episodeId: string;
   position: number;
   completed: boolean;
 }
@@ -124,11 +124,11 @@ export interface IPodcast {
   /**
    * Database id of the podcast
    */
-  id: number;
+  id: string;
   /**
    * iTunes id of the podcast
    */
-  itunes_id?: number;
+  itunes_id?: string;
   /**
    * Podcast author
    */
@@ -189,8 +189,8 @@ export interface IEpisode {
  * Adapted Episode with feed info
  */
 export interface IEpisodeInfo extends IEpisode {
-  id?: number;
-  podcastId?: number;
+  id?: string;
+  podcastId?: string;
   feed: string;
   podcastTitle?: string;
 }
@@ -215,7 +215,7 @@ export interface IEpisodeListing {
  * Episode info listing
  */
 export interface IPodcastEpisodesInfo extends IEpisodeListing {
-  id?: number;
+  id?: string;
   episodes: IEpisodeInfo[];
   feed: string;
 }
@@ -227,7 +227,7 @@ export type RenderablePodcast = IPodcast | IPodcastEpisodesInfo;
  */
 export interface IPodcastInfo {
   isPrivate?: boolean;
-  id: number;
+  id: string;
   feed: string;
   title: string;
   author: string;
@@ -258,8 +258,8 @@ export interface IPaginatedEpisodes {
  */
 export interface IPodcastSearchResult {
   isPrivate?: boolean;
-  id?: number;
-  itunes_id?: number;
+  id?: string;
+  itunes_id?: string;
   author: string;
   feed: string;
   cover: string;
