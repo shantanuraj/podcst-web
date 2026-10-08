@@ -96,9 +96,7 @@ function starControl(markup: string) {
 const surfaces = [
   {
     name: 'episode detail actions',
-    render: (item: IEpisodeInfo) => (
-      <EpisodeActions episode={item} shareTitle={item.title} />
-    ),
+    render: (item: IEpisodeInfo) => <EpisodeActions episode={item} />,
   },
   {
     name: 'current podcast episode rows',
@@ -151,7 +149,7 @@ describe('star controls on current web surfaces', () => {
     try {
       await f.sync.activate(null);
       const render = (item: IEpisodeInfo) =>
-        f.render(<EpisodeActions episode={item} shareTitle={item.title} />);
+        f.render(<EpisodeActions episode={item} />);
       expect(starControl(render(episode))).toContain('Star</button>');
       const unresolved = starControl(render({ ...episode, id: undefined }));
       expect(unresolved).toContain('Star</button>');
@@ -167,17 +165,13 @@ describe('star controls on current web surfaces', () => {
     try {
       await f.sync.activate('owner');
       await f.sync.edit(item.id as string, 'add', item);
-      const markup = f.render(
-        <EpisodeActions episode={item} shareTitle={item.title} />,
-      );
+      const markup = f.render(<EpisodeActions episode={item} />);
       const control = starControl(markup);
       expect(control).toContain('aria-pressed="true"');
       expect(control).not.toContain('disabled=""');
       expect(markup).not.toContain('aria-label="Share"');
       f.session.beginAuthChange();
-      const retired = starControl(
-        f.render(<EpisodeActions episode={item} shareTitle={item.title} />),
-      );
+      const retired = starControl(f.render(<EpisodeActions episode={item} />));
       expect(retired).toContain('aria-pressed="false"');
       expect(retired).toContain('disabled=""');
     } finally {

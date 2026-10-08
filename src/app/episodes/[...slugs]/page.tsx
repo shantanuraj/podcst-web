@@ -11,6 +11,9 @@ import {
 } from '@/server/ingest/podcast';
 import { AccountContent } from '@/shared/auth/AccountBoundary';
 import { isCanonicalId } from '@/shared/canonical-id';
+import { translations } from '@/shared/i18n/server';
+import { formatSecondsToTimestamp } from '@/shared/player/formatTime';
+import { type Moment, parseMoment } from '@/shared/share-link';
 import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
@@ -42,6 +45,41 @@ function parseSlugs(slugs: string[]): ParsedSlugs {
   return { type: 'legacy', feedUrl, guid: null };
 }
 
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+const all = (value: string | string[] | undefined) =>
+  value === undefined ? [] : Array.isArray(value) ? value : [value];
+
+async function sharedMoment(
+  searchParams: SearchParams,
+  duration: number | null,
+) {
+  const query = await searchParams;
+  const times = all(query.t);
+  const chapters = all(query.ch);
+  if (!times.length && !chapters.length)
+    return { moment: null, invalid: false };
+  const moment = parseMoment(times, chapters);
+  const playable = moment && (!duration || moment.start < duration);
+  return playable
+    ? { moment, invalid: false }
+    : { moment: null, invalid: true };
+}
+
+async function momentTitle(moment: Moment | null, title: string) {
+  if (!moment) return title;
+  const { t } = await translations();
+  const start = formatSecondsToTimestamp(moment.start);
+  return `${
+    moment.kind === 'time'
+      ? t('share.listenFrom', { time: start })
+      : t('share.listenClip', {
+          start,
+          end: formatSecondsToTimestamp(moment.end),
+        })
+  } · ${title}`;
+}
+
 function buildCleanUrl(podcastId: string, episodeId?: string | null): string {
   if (episodeId) {
     return `/episodes/${podcastId}/${episodeId}`;
@@ -58,6 +96,7 @@ async function getBaseUrl(): Promise<string> {
 
 export async function generateMetadata(props: {
   params: Promise<{ slugs: string[] }>;
+  searchParams: SearchParams;
 }): Promise<Partial<Metadata>> {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
@@ -69,13 +108,19 @@ export async function generateMetadata(props: {
     ]);
     if (episode && podcast && episode.podcastId === parsed.podcastId) {
       const url = `/episodes/${parsed.podcastId}/${parsed.episodeId}`;
+      const { moment } = await sharedMoment(
+        props.searchParams,
+        episode.duration,
+      );
+      const title = await momentTitle(moment, episode.title);
       return {
-        title: episode.title,
+        title,
         description:
           episode.summary ||
           `Listen to ${episode.title} from ${podcast?.title || 'podcast'}`,
         openGraph: {
           url,
+          title,
           images: podcast?.cover || episode.cover,
         },
         alternates: {
@@ -143,6 +188,7 @@ export async function generateMetadata(props: {
 
 export default async function Page(props: {
   params: Promise<{ slugs: string[] }>;
+  searchParams: SearchParams;
 }) {
   const params = await props.params;
   const parsed = parseSlugs(params.slugs);
@@ -162,6 +208,9 @@ export default async function Page(props: {
 
       const url = `${baseUrl}/episodes/${parsed.podcastId}/${parsed.episodeId}`;
       const podcastData = { ...podcast, episodes: [episode] };
+      const shared = podcast.isPrivate
+        ? { moment: null, invalid: false }
+        : await sharedMoment(props.searchParams, episode.duration);
 
       return (
         <AccountContent
@@ -177,7 +226,12 @@ export default async function Page(props: {
               url={url}
             />
           )}
-          <EpisodeInfo podcast={podcast} episode={episode} />
+          <EpisodeInfo
+            podcast={podcast}
+            episode={episode}
+            moment={shared.moment}
+            invalidMoment={shared.invalid}
+          />
         </AccountContent>
       );
     }

@@ -56,6 +56,31 @@
   color: var(--color-ink-secondary);
 }
 
+.eyebrow[data-shared] {
+  color: var(--color-accent);
+}
+
+.byline {
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--color-ink-secondary);
+}
+
+.unavailable {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--color-ink-secondary);
+}
+
+.range {
+  align-self: center;
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-secondary);
+}
+
 .title {
   max-width: 980px;
   margin-top: 12px;

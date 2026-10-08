@@ -6,7 +6,7 @@ import { sameEpisode } from './episode-identity';
 import { formatSecondsToTimestamp } from './formatTime';
 import styles from './Timeline.module.css';
 import { useAccountPlayback } from './useAccountPlayback';
-import { getCurrentEpisode, usePlayer } from './usePlayer';
+import { getCurrentEpisode, isClipping, usePlayer } from './usePlayer';
 import { useTimeline } from './useTimeline';
 
 export function Timeline({
@@ -17,7 +17,25 @@ export function Timeline({
   size: 'bar' | 'stage';
 }) {
   const { t } = useTranslation();
-  const { position, duration, segments } = useTimeline(episode);
+  const timeline = useTimeline(episode);
+  const { position } = timeline;
+  const clip = usePlayer((state) =>
+    isClipping(state, episode) ? state.clip : undefined,
+  );
+  const min = clip?.start ?? 0;
+  const max = clip?.end ?? timeline.duration;
+  const segments = clip
+    ? [
+        {
+          start: clip.start,
+          length: clip.end - clip.start,
+          fill: Math.min(
+            Math.max((position - clip.start) / (clip.end - clip.start), 0),
+            1,
+          ),
+        },
+      ]
+    : timeline.segments;
   const buffering = usePlayer((state) => state.state === 'buffering');
   const withAccount = useAccountPlayback();
   const seek = (seconds: number) =>
@@ -42,18 +60,20 @@ export function Timeline({
         ))}
         <input
           type="range"
-          min={0}
-          max={duration || 1}
+          min={min}
+          max={max || 1}
           step={1}
           value={position}
-          disabled={!duration}
+          disabled={!max}
           aria-label={t('chapters.position')}
           aria-valuetext={formatSecondsToTimestamp(position)}
           onChange={(event) => seek(event.currentTarget.valueAsNumber)}
         />
       </div>
       <span className={styles.time}>
-        −{formatSecondsToTimestamp(Math.max(duration - position, 0))}
+        {clip
+          ? formatSecondsToTimestamp(clip.end)
+          : `−${formatSecondsToTimestamp(Math.max(max - position, 0))}`}
       </span>
     </div>
   );

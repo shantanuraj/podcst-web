@@ -7,6 +7,7 @@ import { QueryProvider } from '@/shared/query/QueryProvider';
 import { ThemeListener } from '@/shared/theme/ThemeListener';
 import { themeScript } from '@/shared/theme/theme';
 import { Toast } from '@/shared/toast/Toast';
+import { ShareDialog } from '@/ui/Share/ShareDialog';
 import { Init } from './Init';
 
 import '@/styles/global.css';
@@ -97,6 +98,7 @@ export default async function App({ children }: { children: React.ReactNode }) {
             </main>
             <Player />
             <Toast />
+            <ShareDialog />
             <CastManager />
           </TranslationProvider>
         </QueryProvider>

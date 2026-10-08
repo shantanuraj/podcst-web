@@ -1,0 +1,97 @@
+.strip {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-cream);
+}
+
+.range,
+.played {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+
+.range {
+  background: color-mix(in oklch, var(--color-accent) 45%, transparent);
+}
+
+.played {
+  background: var(--color-accent);
+}
+
+.saved {
+  font-size: 12px;
+  color: var(--color-ink-tertiary);
+}
+
+.end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.end button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid color-mix(in oklch, var(--color-ink) 14%, transparent);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.end svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.end svg[data-fill] {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.end .primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.primary small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgb(255 255 255 / 0.85);
+  text-align: left;
+}
+
+.primary > span {
+  text-align: left;
+}
+
+.end .close {
+  border-color: transparent;
+  color: var(--color-ink-secondary);
+}
+
+.full {
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklch, var(--color-ink) 14%, transparent);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}

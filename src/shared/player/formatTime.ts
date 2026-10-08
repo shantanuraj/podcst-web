@@ -26,4 +26,12 @@ export const formatDuration = (t: Translate, seconds: number): string => {
     : t('player.minutes', { minutes });
 };
 
+export const formatLength = (t: Translate, seconds: number): string => {
+  const total = Math.max(0, Math.round(seconds));
+  return t('share.seconds', {
+    minutes: Math.floor(total / 60),
+    seconds: total % 60,
+  });
+};
+
 export { timestampSeconds as getSecondsFromTimestamp } from '@/shared/chapters';

@@ -1,10 +1,10 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useMarkPlayed, usePodcastProgress } from '@/data/progress';
 import { useDurableState } from '@/data/state-browser';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
-import { getEpisodeHref } from '@/shared/links';
 import { sameEpisode } from '@/shared/player/episode-identity';
 import { formatDuration } from '@/shared/player/formatTime';
 import { useAccountPlayback } from '@/shared/player/useAccountPlayback';
@@ -20,10 +20,10 @@ import { GuestProgressTransfer } from './GuestProgressTransfer';
 
 export function EpisodeActions({
   episode,
-  shareTitle,
+  leading,
 }: {
   episode: IEpisodeInfo;
-  shareTitle: string;
+  leading?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { data: user } = useSession();
@@ -54,6 +54,7 @@ export function EpisodeActions({
 
   return (
     <div className={styles.actions}>
+      {leading}
       <Button
         type="button"
         data-variant="primary"
@@ -129,13 +130,7 @@ export function EpisodeActions({
           {durable.error ?? 'Saved on this device. Waiting to sync…'}
         </span>
       )}
-      {!episode.isPrivate && (
-        <ShareButton
-          title={shareTitle}
-          text={shareTitle}
-          path={getEpisodeHref(episode)}
-        />
-      )}
+      <ShareButton request={{ mode: 'episode', episode }} />
     </div>
   );
 }

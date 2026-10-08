@@ -9,7 +9,9 @@ import {
   type KeyboardShortcuts,
   useKeydown,
 } from '@/shared/keyboard/useKeydown';
+import { episodeShareUrl, useShare } from '@/shared/share/useShare';
 import type { IEpisodeInfo } from '@/types';
+import { ShareIcon } from '@/ui/Button/ShareButton';
 import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
@@ -17,6 +19,14 @@ import { speeds } from '../../../contracts/playback/rules.json';
 import { getEpisodeHref } from '../links';
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';
+import {
+  ClipEnd,
+  ClipStrip,
+  clipLabel,
+  PlayFull,
+  SavedPlace,
+  useClip,
+} from './ClipControls';
 import { Equalizer } from './Equalizer';
 import { NowPlaying } from './NowPlaying';
 import styles from './Player.module.css';
@@ -71,6 +81,7 @@ function PlayerBar({
   const playing = usePlayer((state) => state.state === 'playing');
   const hold = useHold(onExpand);
   const durable = useDurableState();
+  const clip = useClip(episode);
 
   return (
     <div className={styles.bar}>
@@ -79,6 +90,7 @@ function PlayerBar({
         style={{ width: duration ? `${(position / duration) * 100}%` : 0 }}
         aria-hidden="true"
       />
+      {clip && <ClipStrip clip={clip} />}
       <div className={styles.now}>
         <button
           type="button"
@@ -94,12 +106,18 @@ function PlayerBar({
           />
         </button>
         <button type="button" className={styles.info} {...hold}>
-          {chapter && (
-            <span className={styles.chapter}>
-              <Equalizer active={playing} />
-              {t('player.chapterShort', { number: chapter.index + 1 })}
-              {chapter.title ? ` · ${chapter.title}` : ''}
+          {clip ? (
+            <span className={styles.chapter} data-ended={clip.ended}>
+              {clipLabel(t, clip)}
             </span>
+          ) : (
+            chapter && (
+              <span className={styles.chapter}>
+                <Equalizer active={playing} />
+                {t('player.chapterShort', { number: chapter.index + 1 })}
+                {chapter.title ? ` · ${chapter.title}` : ''}
+              </span>
+            )
           )}
           <span className={styles.title}>{episode.title}</span>
           <span className={styles.podcast}>
@@ -117,23 +135,64 @@ function PlayerBar({
         </span>
       </div>
       <div className={styles.center}>
-        <Transport episode={episode} size="bar" />
-        <Timeline episode={episode} size="bar" />
+        {clip?.ended ? (
+          <ClipEnd clip={clip} />
+        ) : (
+          <>
+            <Transport episode={episode} size="bar" />
+            <Timeline episode={episode} size="bar" />
+          </>
+        )}
       </div>
-      <div className={styles.tools}>
-        <SpeedMenu />
-        <VolumeControls />
-        <Link href="/queue" aria-label={t('player.queue')}>
-          <Icon icon="queue-list" size={20} />
-        </Link>
-        <Airplay />
-        <Chromecast />
-        <button type="button" onClick={onExpand} aria-label={t('player.open')}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
-          </svg>
+      {clip ? (
+        <div className={styles.clipTools}>
+          {clip.ended ? (
+            <SavedPlace episode={episode} />
+          ) : (
+            <>
+              <SpeedMenu />
+              <PlayFull />
+            </>
+          )}
+        </div>
+      ) : (
+        <Tools episode={episode} onExpand={onExpand} />
+      )}
+    </div>
+  );
+}
+
+function Tools({
+  episode,
+  onExpand,
+}: {
+  episode: IEpisodeInfo;
+  onExpand: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.tools}>
+      <SpeedMenu />
+      <VolumeControls />
+      <Link href="/queue" aria-label={t('player.queue')}>
+        <Icon icon="queue-list" size={20} />
+      </Link>
+      <Airplay />
+      <Chromecast />
+      {episodeShareUrl(episode) && (
+        <button
+          type="button"
+          onClick={() => useShare.getState().open({ episode, mode: 'time' })}
+          aria-label={t('share.title')}
+        >
+          <ShareIcon />
         </button>
-      </div>
+      )}
+      <button type="button" onClick={onExpand} aria-label={t('player.open')}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
+        </svg>
+      </button>
     </div>
   );
 }

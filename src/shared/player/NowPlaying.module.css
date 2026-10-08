@@ -132,6 +132,10 @@
   color: var(--color-ink-secondary);
 }
 
+.eyebrow[data-clip="true"] {
+  color: var(--color-accent);
+}
+
 .heading {
   display: flex;
   align-items: flex-start;
@@ -231,6 +235,34 @@
   margin-top: 14px;
   overflow-x: auto;
   scrollbar-width: thin;
+}
+
+.cards li {
+  position: relative;
+}
+
+.cards .shareChapter {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-ink-tertiary);
+}
+
+.cards .shareChapter:hover,
+.cards .shareChapter:focus-visible {
+  color: var(--color-ink);
+}
+
+.cards .shareChapter svg {
+  width: 14px;
+  height: 14px;
 }
 
 .cards button {
@@ -380,4 +412,8 @@
   .title {
     font-size: 2rem;
   }
+}
+
+.cards li:has(.shareChapter) > button:first-child {
+  padding-right: 36px;
 }

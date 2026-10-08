@@ -5,12 +5,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { IEpisodeInfo } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
+import { ShareIcon } from '@/ui/Button/ShareButton';
 import { StarButton } from '@/ui/Button/StarButton';
 import { ProxiedImage } from '@/ui/Image';
 import { Menu } from '@/ui/Menu/Menu';
 import { getEpisodeHref } from '../links';
+import { episodeShareUrl, useShare } from '../share/useShare';
 import { Airplay } from './Airplay';
 import { Chromecast } from './Chromecast';
+import {
+  ClipEnd,
+  clipLabel,
+  PlayFull,
+  SavedPlace,
+  useClip,
+} from './ClipControls';
 import { episodeKey } from './episode-identity';
 import { formatDuration, formatSecondsToTimestamp } from './formatTime';
 import styles from './NowPlaying.module.css';
@@ -38,6 +47,8 @@ export function NowPlaying({
   const queue = usePlayer((state) => state.queue);
   const current = usePlayer((state) => state.currentTrackIndex);
   const active = usePlayer((state) => state.state !== 'idle');
+  const clip = useClip(episode);
+  const shareable = episodeShareUrl(episode) !== null;
   const next = useMemo(
     () => upNext({ queue, current, active: true }),
     [queue, current],
@@ -110,6 +121,17 @@ export function NowPlaying({
           >
             {(close) => (
               <>
+                {shareable && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      useShare.getState().open({ episode, mode: 'time' });
+                    }}
+                  >
+                    {t('share.title')}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={!active}
@@ -147,8 +169,8 @@ export function NowPlaying({
           />
         </div>
         <div className={styles.details}>
-          <p className={styles.eyebrow}>
-            {episode.podcastTitle || episode.author}
+          <p className={styles.eyebrow} data-clip={!!clip}>
+            {clip ? clipLabel(t, clip) : episode.podcastTitle || episode.author}
           </p>
           <div className={styles.heading}>
             <h2 className={styles.title}>
@@ -175,12 +197,20 @@ export function NowPlaying({
           <div className={styles.timeline}>
             <Timeline episode={episode} size="stage" />
           </div>
-          <div className={styles.transport}>
-            <Transport episode={episode} size="stage" />
-          </div>
+          {clip?.ended ? (
+            <div className={styles.transport}>
+              <ClipEnd clip={clip} queueable />
+              <SavedPlace episode={episode} />
+            </div>
+          ) : (
+            <div className={styles.transport}>
+              <Transport episode={episode} size="stage" />
+            </div>
+          )}
           <div className={styles.audio}>
             <SpeedPresets />
             <VolumeControls />
+            {clip && !clip.ended && <PlayFull />}
           </div>
         </div>
       </div>
@@ -214,7 +244,7 @@ export function NowPlaying({
         </div>
         <div role="tabpanel">
           {shown === 'chapters' ? (
-            <ChapterCards episode={episode} />
+            <ChapterCards episode={episode} shareable={shareable} />
           ) : (
             <UpNextList episodes={next} />
           )}
@@ -224,7 +254,13 @@ export function NowPlaying({
   );
 }
 
-function ChapterCards({ episode }: { episode: IEpisodeInfo }) {
+function ChapterCards({
+  episode,
+  shareable,
+}: {
+  episode: IEpisodeInfo;
+  shareable: boolean;
+}) {
   const { t } = useTranslation();
   const withAccount = useAccountPlayback();
   const { chapters, chapter, segments } = useTimeline(episode);
@@ -254,6 +290,20 @@ function ChapterCards({ episode }: { episode: IEpisodeInfo }) {
                 <span style={{ width: `${fill * 100}%` }} />
               </span>
             </button>
+            {shareable && (
+              <button
+                type="button"
+                className={styles.shareChapter}
+                aria-label={t('share.shareChapter', { title })}
+                onClick={() =>
+                  useShare
+                    .getState()
+                    .open({ episode, mode: 'chapter', chapter: index })
+                }
+              >
+                <ShareIcon />
+              </button>
+            )}
           </li>
         );
       })}

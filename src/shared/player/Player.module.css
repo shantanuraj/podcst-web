@@ -91,6 +91,10 @@
   color: var(--color-accent);
 }
 
+.chapter[data-ended="true"] {
+  color: var(--color-ink-tertiary);
+}
+
 .title {
   font-family: var(--font-serif);
   font-size: 17px;
@@ -118,6 +122,15 @@
   justify-content: flex-end;
   gap: var(--space-4);
   color: var(--color-ink-secondary);
+}
+
+.clipTools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  min-width: 0;
+  text-align: right;
 }
 
 .tools > a,
@@ -180,7 +193,8 @@
   }
 
   .center,
-  .tools {
+  .tools,
+  .clipTools {
     display: none;
   }
 }

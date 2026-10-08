@@ -110,3 +110,9 @@ export function chapterTarget(
       : index - 1
   ].start;
 }
+
+export const chapterEnd = (
+  chapters: readonly Chapter[],
+  index: number,
+  duration: number,
+) => chapters[index + 1]?.start ?? duration;

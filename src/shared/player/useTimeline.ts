@@ -26,14 +26,20 @@ export function segments(
   });
 }
 
+export function playableChapters(
+  chapters: readonly Chapter[],
+  duration: number,
+) {
+  const playable =
+    duration > 0 ? chapters.filter(({ start }) => start < duration) : [];
+  return playable.length > 1 ? playable : [];
+}
+
 export function useTimeline(episode: IEpisodeInfo) {
   const seekPosition = usePlayer(getSeekPosition);
   const measured = usePlayer((state) => state.duration);
   const duration = measured || episode.duration || 0;
-  const { chapters: all } = useChapters(episode);
-  const chapters =
-    duration > 0 ? all.filter(({ start }) => start < duration) : [];
-  const timeline = chapters.length > 1 ? chapters : [];
+  const timeline = playableChapters(useChapters(episode).chapters, duration);
   const position = Math.max(
     0,
     duration > 0 ? Math.min(seekPosition, duration) : seekPosition,

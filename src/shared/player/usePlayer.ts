@@ -14,6 +14,19 @@ import * as Queue from './queue';
 
 type Session = Queue.QueueSession<IEpisodeInfo>;
 
+export interface ClipRange {
+  start: number;
+  end: number;
+  chapter?: { number: number; title: string };
+}
+
+export interface Clip extends ClipRange {
+  episode: IEpisodeInfo;
+  ended: boolean;
+  borrowed: boolean;
+  previous?: { episode: IEpisodeInfo; position: number };
+}
+
 export interface IPlayerState {
   storageError?: string;
   accountScope: AccountScope | undefined;
@@ -28,6 +41,15 @@ export interface IPlayerState {
   savedRate: number | undefined;
   state: PlayerState;
   hasPlaybackActivity: boolean;
+  clip: Clip | undefined;
+
+  playClip: (episode: IEpisodeInfo, range: ClipRange) => void;
+  retargetClip: (range: ClipRange) => void;
+  replayClip: () => void;
+  keepListening: () => void;
+  playFullEpisode: () => void;
+  queueClipEpisode: () => void;
+  closeClip: () => void;
 
   playEpisode: (episode: IEpisodeInfo, seekPosition?: number) => void;
   enqueueEpisode: (episode: IEpisodeInfo, next: boolean) => void;
@@ -94,6 +116,7 @@ export const usePlayer = create<IPlayerState>()(
         completed?: boolean;
         position?: number;
         restoring?: boolean;
+        clip?: Clip;
       } = {},
     ) => {
       const previous = get();
@@ -130,12 +153,53 @@ export const usePlayer = create<IPlayerState>()(
                 options.position !== previous.seekPosition) ||
               options.completed === true)),
         state,
+        ...('clip' in options ? { clip: options.clip } : {}),
         ...(changed ? { seekPosition: 0, duration: after?.duration || 0 } : {}),
         ...(options.position === undefined
           ? {}
           : { seekPosition: options.position }),
       });
     };
+
+    const release = (session: Session, clip: Clip): Session => {
+      const previous = clip.previous
+        ? session.queue.findIndex((queued) =>
+            sameEpisode(queued, clip.previous?.episode),
+          )
+        : -1;
+      return previous === -1
+        ? session
+        : { ...session, current: previous, active: true };
+    };
+
+    const leave = (clip: Clip, queued: (session: Session) => Session) => {
+      const next = release(queued(sessionOf(get())), clip);
+      const previous = getCurrentEpisode({
+        ...get(),
+        queue: next.queue,
+        currentTrackIndex: next.current,
+      });
+      commit(next, {
+        state: 'paused',
+        restoring: true,
+        clip: undefined,
+        position: sameEpisode(previous, clip.previous?.episode)
+          ? clip.previous?.position
+          : undefined,
+      });
+    };
+
+    const withoutClip = () => {
+      const { clip } = get();
+      if (!clip) return;
+      leave(clip, (session) =>
+        clip.borrowed ? Queue.remove(session, [session.current]) : session,
+      );
+    };
+
+    const clipEnded = (clip: Clip, position: number) =>
+      sameEpisode(getCurrentEpisode(get()), clip.episode) &&
+      position >= clip.end;
 
     return {
       accountScope: undefined,
@@ -178,6 +242,7 @@ export const usePlayer = create<IPlayerState>()(
           duration: saved?.queue[saved.current].duration || 0,
           state: saved ? 'paused' : 'idle',
           hasPlaybackActivity: false,
+          clip: undefined,
           rate,
           savedRate: undefined,
           isAirplayEnabled: false,
@@ -196,6 +261,7 @@ export const usePlayer = create<IPlayerState>()(
       savedRate: undefined,
       state: 'idle',
       hasPlaybackActivity: false,
+      clip: undefined,
       isAirplayEnabled: false,
       isChromecastEnabled: false,
       isChromecastConnecting: false,
@@ -203,7 +269,77 @@ export const usePlayer = create<IPlayerState>()(
       remotePlayer: undefined,
       remotePlayerController: undefined,
 
+      playClip: (episode, range) => {
+        withoutClip();
+        const state = get();
+        const session = sessionOf(state);
+        const current = getCurrentEpisode(state);
+        const index = session.queue.findIndex((queued) =>
+          sameEpisode(queued, episode),
+        );
+        commit(
+          index === -1
+            ? {
+                queue: session.queue.toSpliced(session.current, 0, episode),
+                current: session.current,
+                active: true,
+              }
+            : { ...session, current: index, active: true },
+          {
+            state: 'buffering',
+            position: range.start,
+            clip: {
+              ...range,
+              episode,
+              ended: false,
+              borrowed: index === -1,
+              previous:
+                current && !sameEpisode(current, episode)
+                  ? { episode: current, position: state.seekPosition }
+                  : undefined,
+            },
+          },
+        );
+      },
+
+      retargetClip: (range) => {
+        const { clip, seekTo, resumeEpisode } = get();
+        if (!clip) return;
+        set({ clip: { ...clip, ...range, chapter: range.chapter } });
+        seekTo(range.start);
+        resumeEpisode();
+      },
+
+      replayClip: () => {
+        const { clip, retargetClip } = get();
+        if (clip) retargetClip(clip);
+      },
+
+      keepListening: () => {
+        set({ clip: undefined });
+        get().resumeEpisode();
+      },
+
+      playFullEpisode: () => set({ clip: undefined }),
+
+      queueClipEpisode: () => {
+        const { clip } = get();
+        if (!clip) return;
+        leave(clip, (session) => {
+          const rest = Queue.remove(session, [session.current]);
+          return {
+            ...rest,
+            queue: [...rest.queue, clip.episode],
+            current: rest.queue.length ? rest.current : 0,
+          };
+        });
+      },
+
+      closeClip: withoutClip,
+
       playEpisode: (episode, seekPosition = 0) => {
+        if (sameEpisode(get().clip?.episode, episode)) set({ clip: undefined });
+        else withoutClip();
         commit(Queue.play(sessionOf(get()), episode, sameEpisode), {
           state: 'buffering',
           position: seekPosition,
@@ -222,7 +358,8 @@ export const usePlayer = create<IPlayerState>()(
         }),
 
       togglePlayback: () => {
-        const { state, queue, chromecastState } = get();
+        const { state, queue, chromecastState, clip } = get();
+        if (clip?.ended) return get().keepListening();
         if (state === 'playing' || state === 'buffering')
           return set({ state: 'paused', hasPlaybackActivity: true });
         if (!queue.length) return;
@@ -250,18 +387,32 @@ export const usePlayer = create<IPlayerState>()(
           set({ state: 'paused', hasPlaybackActivity: true });
       },
 
-      stop: () => commit(Queue.stop(sessionOf(get()))),
+      stop: () => {
+        withoutClip();
+        commit(Queue.stop(sessionOf(get())));
+      },
 
       markPlayed: () => {
+        set({ clip: undefined });
         if (get().state !== 'idle')
           commit(Queue.finish(sessionOf(get())), { completed: true });
       },
 
-      onPlaybackEnd: () => get().markPlayed(),
+      onPlaybackEnd: () => {
+        const { clip, markPlayed } = get();
+        if (!clip) return markPlayed();
+        set({ clip: { ...clip, ended: true }, state: 'paused' });
+      },
 
-      skipToNextEpisode: () => commit(Queue.step(sessionOf(get()), 1)),
+      skipToNextEpisode: () => {
+        withoutClip();
+        commit(Queue.step(sessionOf(get()), 1));
+      },
 
-      skipToPreviousEpisode: () => commit(Queue.step(sessionOf(get()), -1)),
+      skipToPreviousEpisode: () => {
+        withoutClip();
+        commit(Queue.step(sessionOf(get()), -1));
+      },
 
       removeUpNext: (offsets) =>
         commit(Queue.removeUpNext(sessionOf(get()), offsets)),
@@ -278,12 +429,21 @@ export const usePlayer = create<IPlayerState>()(
             get().hasPlaybackActivity || state !== get().state,
         }),
 
-      setSeekPosition: (seekPosition) =>
+      setSeekPosition: (seekPosition) => {
+        const { clip, hasPlaybackActivity, state } = get();
+        const ending = !!clip && !clip.ended && clipEnded(clip, seekPosition);
         set({
           seekPosition,
           hasPlaybackActivity:
-            get().hasPlaybackActivity || seekPosition !== get().seekPosition,
-        }),
+            hasPlaybackActivity || seekPosition !== get().seekPosition,
+          ...(ending
+            ? {
+                clip: { ...clip, ended: true },
+                state: state === 'idle' ? state : 'paused',
+              }
+            : {}),
+        });
+      },
 
       setDuration: (duration) => set({ duration }),
 
@@ -384,8 +544,15 @@ export const usePlayer = create<IPlayerState>()(
         seekTo(seekUtils.seekForward(seekPosition, duration));
       },
 
-      seekTo: (seconds) => {
-        const { chromecastState, setSeekPosition } = get();
+      seekTo: (target) => {
+        const { chromecastState, setSeekPosition, clip } = get();
+        const clipped =
+          clip && sameEpisode(getCurrentEpisode(get()), clip.episode);
+        const seconds = clipped
+          ? Math.min(Math.max(target, clip.start), clip.end)
+          : target;
+        if (clipped && clip.ended && seconds < clip.end)
+          set({ clip: { ...clip, ended: false } });
         if (!isChromecastConnected(chromecastState)) {
           if (!AudioUtils.loaded()) return setSeekPosition(seconds);
           return AudioUtils.seekTo(seconds);
@@ -492,7 +659,9 @@ const PERSISTED_SECONDS = 5;
 usePlayer.subscribe((currentState, previousState) => {
   if (
     currentState.accountScope !== undefined &&
+    !currentState.clip &&
     (currentState.accountScope !== previousState.accountScope ||
+      currentState.clip !== previousState.clip ||
       currentState.queue !== previousState.queue ||
       currentState.currentTrackIndex !== previousState.currentTrackIndex ||
       currentState.state !== previousState.state ||
@@ -574,6 +743,9 @@ usePlayer.subscribe((currentState, previousState) => {
 
 export const getPlaybackState = (state: IPlayerState) => state.state;
 export const getSetPlayerState = (state: IPlayerState) => state.setPlayerState;
+export const getClip = (state: IPlayerState) => state.clip;
+export const isClipping = (state: IPlayerState, episode: IEpisodeInfo) =>
+  sameEpisode(state.clip?.episode, episode);
 export const getCurrentEpisode = (
   state: IPlayerState,
 ): IEpisodeInfo | undefined => state.queue[state.currentTrackIndex];

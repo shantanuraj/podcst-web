@@ -2,6 +2,7 @@ import { localeForLanguage } from '@/messages';
 import { translations } from '@/shared/i18n/server';
 import { getPodcastHref } from '@/shared/links';
 import { formatDuration } from '@/shared/player/formatTime';
+import type { Moment } from '@/shared/share-link';
 import type { IEpisodeInfo, IPodcastInfo } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { ProxiedImage } from '@/ui/Image';
@@ -10,14 +11,19 @@ import { PageLink } from '@/ui/PageLink/PageLink';
 import { Chapters } from './Chapters';
 import { EpisodeActions } from './EpisodeActions';
 import styles from './EpisodeInfo.module.css';
+import { ClipActions, PlayFromTime, SharedEyebrow } from './SharedMoment';
 import { ShowNotes } from './ShowNotes';
 
 export async function EpisodeInfo({
   podcast,
   episode,
+  moment = null,
+  invalidMoment = false,
 }: {
   podcast: IPodcastInfo;
   episode: IEpisodeInfo;
+  moment?: Moment | null;
+  invalidMoment?: boolean;
 }) {
   const { t, language } = await translations();
   const locale = localeForLanguage[language];
@@ -61,17 +67,42 @@ export async function EpisodeInfo({
             />
           </div>
           <div className={styles.meta}>
-            {dateline && <p className={styles.eyebrow}>{dateline}</p>}
+            {moment ? (
+              <SharedEyebrow episode={episode} moment={moment} />
+            ) : (
+              dateline && <p className={styles.eyebrow}>{dateline}</p>
+            )}
             <h1 className={styles.title}>{episode.title}</h1>
-            <EpisodeActions
-              episode={episode}
-              shareTitle={`${podcast.title} – ${episode.title}`}
-            />
+            {moment && <p className={styles.byline}>{dateline}</p>}
+            {invalidMoment && (
+              <p className={styles.unavailable} role="status">
+                {t('share.unavailable')}
+              </p>
+            )}
+            {moment && moment.kind !== 'time' ? (
+              <ClipActions
+                podcast={podcast}
+                episode={episode}
+                moment={moment}
+              />
+            ) : (
+              <EpisodeActions
+                episode={episode}
+                leading={
+                  moment && (
+                    <PlayFromTime episode={episode} start={moment.start} />
+                  )
+                }
+              />
+            )}
           </div>
         </header>
         <div className={styles.body}>
           <ShowNotes className={styles.notes} episode={episode} />
-          <Chapters episode={episode} />
+          <Chapters
+            episode={episode}
+            shared={moment?.kind === 'time' ? undefined : (moment ?? undefined)}
+          />
         </div>
       </div>
     </article>

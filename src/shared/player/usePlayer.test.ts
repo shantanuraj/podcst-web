@@ -165,3 +165,172 @@ test('a persisted session is restored only for its account and survives A to B t
     Reflect.deleteProperty(globalThis, 'window');
   }
 });
+
+function clipBehind(start = 60, end = 120) {
+  const player = usePlayer.getState();
+  player.playEpisode(a, 30);
+  player.enqueueEpisode(b, false);
+  usePlayer.setState({ state: 'playing', seekPosition: 45 });
+  usePlayer.getState().playClip(c, { start, end });
+}
+
+test('a clip borrows the current slot and the previous episode tops up next', () => {
+  const left = listen('leave');
+  clipBehind();
+  left.off();
+  const state = usePlayer.getState();
+  expect(state.queue).toEqual([c, a, b]);
+  expect(getCurrentEpisode(state)).toBe(c);
+  expect(state).toMatchObject({ state: 'buffering', seekPosition: 60 });
+  expect(state.clip).toMatchObject({
+    start: 60,
+    end: 120,
+    borrowed: true,
+    ended: false,
+    previous: { episode: a, position: 45 },
+  });
+  expect(left.seen).toEqual([{ episode: a, position: 45 }]);
+  expect(AudioUtils.play).toHaveBeenLastCalledWith(c, true, 60);
+});
+
+test('a clip pauses once at its end without completing or advancing', () => {
+  const completed = listen('complete');
+  clipBehind();
+  usePlayer.setState({ state: 'playing' });
+  usePlayer.getState().setSeekPosition(119.5);
+  expect(usePlayer.getState().clip?.ended).toBe(false);
+  usePlayer.getState().setSeekPosition(120.2);
+  usePlayer.getState().onPlaybackEnd();
+  completed.off();
+  const state = usePlayer.getState();
+  expect(state.clip?.ended).toBe(true);
+  expect(state.state).toBe('paused');
+  expect(getCurrentEpisode(state)).toBe(c);
+  expect(completed.seen).toEqual([]);
+});
+
+test('seeking inside a clip stays within its range', () => {
+  clipBehind();
+  spyOn(AudioUtils, 'loaded').mockImplementation(() => true);
+  usePlayer.getState().seekTo(10);
+  expect(AudioUtils.seekTo).toHaveBeenLastCalledWith(60);
+  usePlayer.getState().seekTo(500);
+  expect(AudioUtils.seekTo).toHaveBeenLastCalledWith(120);
+});
+
+test('keep listening leaves clip mode in place and keeps the episode current', () => {
+  clipBehind();
+  usePlayer.getState().setSeekPosition(120);
+  usePlayer.getState().keepListening();
+  const state = usePlayer.getState();
+  expect(state.clip).toBeUndefined();
+  expect(getCurrentEpisode(state)).toBe(c);
+  expect(state.state).toBe('buffering');
+  expect(state.seekPosition).toBe(120);
+});
+
+test('closing a borrowed clip returns the queue and the previous place', () => {
+  clipBehind();
+  usePlayer.getState().closeClip();
+  const state = usePlayer.getState();
+  expect(state.clip).toBeUndefined();
+  expect(state.queue).toEqual([a, b]);
+  expect(getCurrentEpisode(state)).toBe(a);
+  expect(state).toMatchObject({ state: 'paused', seekPosition: 45 });
+});
+
+test('closing a clip of an already queued episode keeps it queued', () => {
+  const player = usePlayer.getState();
+  player.playEpisode(a);
+  player.enqueueEpisode(c, false);
+  usePlayer.getState().playClip(c, { start: 5, end: 10 });
+  expect(usePlayer.getState().clip?.borrowed).toBe(false);
+  usePlayer.getState().closeClip();
+  expect(usePlayer.getState().queue).toEqual([a, c]);
+  expect(getCurrentEpisode(usePlayer.getState())).toBe(a);
+});
+
+test('queueing a clip episode moves it to the end and restores the previous episode', () => {
+  clipBehind();
+  usePlayer.getState().queueClipEpisode();
+  const state = usePlayer.getState();
+  expect(state.clip).toBeUndefined();
+  expect(state.queue).toEqual([a, b, c]);
+  expect(getCurrentEpisode(state)).toBe(a);
+  expect(state).toMatchObject({ state: 'paused', seekPosition: 45 });
+});
+
+test('playing another episode leaves clip mode and returns the borrowed slot', () => {
+  clipBehind();
+  usePlayer.getState().playEpisode(b);
+  const state = usePlayer.getState();
+  expect(state.clip).toBeUndefined();
+  expect(state.queue).toEqual([a, b]);
+  expect(getCurrentEpisode(state)).toBe(b);
+});
+
+test('playing the clip episode itself keeps it and leaves clip mode', () => {
+  clipBehind();
+  usePlayer.getState().playEpisode(c, 70);
+  const state = usePlayer.getState();
+  expect(state.clip).toBeUndefined();
+  expect(state.queue).toEqual([c, a, b]);
+  expect(getCurrentEpisode(state)).toBe(c);
+});
+
+test('replaying and retargeting a clip seek to its new start', () => {
+  clipBehind();
+  spyOn(AudioUtils, 'loaded').mockImplementation(() => true);
+  usePlayer.getState().setSeekPosition(120);
+  usePlayer.getState().replayClip();
+  expect(usePlayer.getState().clip?.ended).toBe(false);
+  expect(AudioUtils.seekTo).toHaveBeenLastCalledWith(60);
+  usePlayer.getState().retargetClip({
+    start: 120,
+    end: 200,
+    chapter: { number: 4, title: 'Four' },
+  });
+  expect(usePlayer.getState().clip).toMatchObject({
+    start: 120,
+    end: 200,
+    chapter: { number: 4, title: 'Four' },
+    ended: false,
+  });
+  expect(AudioUtils.seekTo).toHaveBeenLastCalledWith(120);
+});
+
+test('the persisted session is not rewritten while a clip borrows the queue', async () => {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => store.set(key, value),
+      },
+    },
+  });
+  try {
+    usePlayer.getState().setAccount('owner', 1);
+    usePlayer.getState().playEpisode(a, 30);
+    await Promise.resolve();
+    usePlayer.getState().playClip(c, { start: 60, end: 120 });
+    await Promise.resolve();
+    expect(readSession('owner')?.queue).toEqual([a]);
+    usePlayer.getState().closeClip();
+    await Promise.resolve();
+    expect(readSession('owner')?.queue).toEqual([a]);
+  } finally {
+    Reflect.deleteProperty(globalThis, 'window');
+  }
+});
+
+test('playing after a clip ends keeps listening with progress resumed', () => {
+  clipBehind();
+  usePlayer.getState().setSeekPosition(120);
+  usePlayer.getState().togglePlayback();
+  const state = usePlayer.getState();
+  expect(state.clip).toBeUndefined();
+  expect(getCurrentEpisode(state)).toBe(c);
+  expect(state.state).toBe('buffering');
+});

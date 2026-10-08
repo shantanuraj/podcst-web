@@ -11,6 +11,7 @@ import {
   getCurrentEpisode,
   getPlaybackState,
   type IPlayerState,
+  isClipping,
   usePlayer,
 } from './usePlayer';
 
@@ -55,6 +56,7 @@ export function usePlaybackSync() {
       if (
         !episodeId ||
         !owns(state) ||
+        isClipping(state, episode) ||
         (!state.hasPlaybackActivity && !completed)
       )
         return;

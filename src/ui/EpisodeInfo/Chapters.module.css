@@ -88,3 +88,18 @@
     position: static;
   }
 }
+
+.list button[data-shared="true"] {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+[data-shared="true"] > .timestamp {
+  color: var(--color-accent);
+}
+
+.shared {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}

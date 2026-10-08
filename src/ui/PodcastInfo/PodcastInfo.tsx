@@ -4,7 +4,6 @@ import { cadence } from '@/shared/discovery';
 import { translations } from '@/shared/i18n/server';
 import { linkifyText } from '@/shared/link/linkify-text';
 import { stripHost } from '@/shared/link/strip-host';
-import { getPodcastHref } from '@/shared/links';
 import type { IEpisodeInfo, IPodcastInfo } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { PlayButton } from '@/ui/Button/PlayButton';
@@ -72,13 +71,18 @@ export async function PodcastInfo({
             {latest && (
               <PlayButton episode={latest} label={t('discover.playLatest')} />
             )}
-            {!podcast.isPrivate && (
-              <ShareButton
-                title={title}
-                text={t('podcast.shareText', { title, author })}
-                path={getPodcastHref(podcast)}
-              />
-            )}
+            <ShareButton
+              request={{
+                mode: 'show',
+                podcast: {
+                  id: podcast.id,
+                  title,
+                  author,
+                  cover,
+                  isPrivate: podcast.isPrivate,
+                },
+              }}
+            />
           </div>
         </div>
         <div className={styles.about}>
