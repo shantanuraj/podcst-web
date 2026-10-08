@@ -162,14 +162,35 @@ class LibraryRepository(
             if (succeeded != feeds.distinct().size) durable.error(account, "Some imported feeds are unavailable. Retry import to resolve retained failures.")
             return ImportResult(succeeded, feeds.distinct().size - succeeded)
         }
-        for (feed in feeds.distinct()) {
-            val podcast = api.podcast(feed)
-            if (scopes.current.value !== owner) break
-            if (!podcast.isPrivate) { toggle(podcast, false); succeeded++ }
+        val epoch = scopes.epoch
+        val selected = feeds.distinct()
+        durable.importGuestSource(owner.database.podcasts().subscribed().map { it.domain() })
+        durable.queueGuestImports(selected)
+        var cacheFailure: Exception? = null
+        for (feed in selected) {
+            if (scopes.current.value !== owner || scopes.epoch != epoch) break
+            try {
+                val podcast = api.podcast(feed)
+                if (scopes.current.value !== owner || scopes.epoch != epoch) break
+                if (podcast.isPrivate) continue
+                durable.completeGuestImport(feed, podcast)
+                succeeded++
+                try {
+                    catalog.store(listOf(podcast), owner = owner)
+                    owner.database.subscriptions().insert(SubscriptionEntity(podcast.feed, clock()))
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Exception) { cacheFailure = failure }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { durable.error(null, "A feed could not be imported: ${failure.message}. It is retained for retry.") }
         }
-        return ImportResult(succeeded, feeds.distinct().size - succeeded)
+        when {
+            succeeded != selected.size -> durable.error(null, "Some imported feeds could not be followed. Remaining feeds are kept for retry.")
+            cacheFailure != null -> durable.error(null, "Imported follows are saved; their local cache needs retry.")
+            else -> durable.clearError(null)
+        }
+        return ImportResult(succeeded, selected.size - succeeded)
     }
-    suspend fun retryImports(): ImportResult = scopes.current.value.accountId?.let { import(durable.account(it).importFeeds) } ?: ImportResult(0, 0)
+    suspend fun retryImports(): ImportResult = scopes.current.value.accountId?.let { import(durable.account(it).importFeeds) } ?: import(durable.guestImportFeeds())
     suspend fun opml(): String = Opml.document(scopes.database.podcasts().subscribed().map { it.domain() })
 
     private suspend fun refreshGuest(podcast: Podcast, force: Boolean) {

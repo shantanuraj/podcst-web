@@ -7,6 +7,9 @@ import app.podcst.model.*
 import app.podcst.network.testing.FakeServer
 import app.podcst.network.testing.Reply
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -80,6 +83,57 @@ class LibraryRepositoryTest {
         scopes.durable.installFollows("owner", StateSnapshot(1, "owner", generation, StateRevision("1"), listOf(StateFollowItem(StateID(guest.id.toString()), StateID("1"), null, StateAvailability.unavailable))))
         assertTrue(failed.podcasts.first().isEmpty())
         assertEquals(listOf(guest.id), failed.unavailable.first())
+    }
+
+    @Test fun guestImportContinuesAfterFailureAndRetriesOnlyRemainingFeedsAfterRestart() = runTest {
+        val bad = "https://bad.test/rss"
+        val good = "https://good.test/rss"
+        val private = "https://private.test/rss"
+        val server = FakeServer { call ->
+            when (call.query?.substringAfter("url=")) {
+                bad -> Reply("""{"message":"Feed unavailable"}""", 502)
+                good -> Reply("""{"id":"9007199254740993","feed":"$good","title":"Good","episodes":[]}""")
+                private -> Reply("""{"id":"2","feed":"$private","title":"Private","isPrivate":true}""")
+                else -> error("Unexpected import request")
+            }
+        }
+        assertEquals(ImportResult(1, 2), library(server).import(listOf(bad, good, private, good)))
+        assertEquals(listOf(bad, good, private), server.calls.map { it.query?.substringAfter("url=") })
+        assertEquals(listOf(bad, private), scopes.durable.guestImportFeeds())
+        assertEquals(listOf(good), scopes.durable.guestFollows().map { it.feed })
+        assertEquals(listOf(good), scopes.database.podcasts().subscribed().map { it.feed })
+        scopes.close()
+        val restarted = Scopes(context, null)
+        try {
+            val retry = FakeServer { call ->
+                val feed = call.query!!.substringAfter("url=")
+                Reply("""{"id":"${if (feed == bad) 3 else 2}","feed":"$feed","title":"Recovered","episodes":[]}""")
+            }
+            val library = LibraryRepository(retry.api, restarted, CatalogRepository(retry.api, restarted))
+            assertEquals(ImportResult(2, 0), library.retryImports())
+            assertEquals(listOf(bad, private), retry.calls.map { it.query?.substringAfter("url=") })
+            assertTrue(restarted.durable.guestImportFeeds().isEmpty())
+            assertEquals(setOf(bad, good, private), restarted.database.podcasts().subscribed().map { it.feed }.toSet())
+        } finally { restarted.close() }
+    }
+
+    @Test fun guestImportScopeChangeKeepsUnprocessedSourcesInsteadOfFollowingIntoAnotherAccount() = runTest {
+        val arrived = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val feeds = listOf("https://first.test/rss", "https://second.test/rss")
+        val server = FakeServer {
+            arrived.complete(Unit)
+            runBlocking { release.await() }
+            Reply("""{"id":"1","feed":"${feeds.first()}","title":"Late","episodes":[]}""")
+        }
+        val importing = async { library(server).import(feeds) }
+        arrived.await()
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        release.complete(Unit)
+        assertEquals(ImportResult(0, 2), importing.await())
+        assertEquals(feeds, scopes.durable.guestImportFeeds())
+        assertTrue(scopes.durable.guestFollows().isEmpty())
+        assertTrue(scopes.durable.account("owner").followQueued.isEmpty())
+        assertEquals(1, server.calls.size)
     }
 
     @Test fun opmlResolutionQueuesOnlySuccessfulIdsAndRetainsFailuresForRetry() = runTest {

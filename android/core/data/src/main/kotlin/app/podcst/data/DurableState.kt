@@ -62,7 +62,7 @@ internal data class DurableAccount(
 }
 
 @Serializable
-private data class DurableRoot(val version: Int = 1, val accounts: Map<String, DurableAccount> = emptyMap(), val guestFollows: Map<String, Podcast> = emptyMap(), val guestImported: Boolean = false)
+private data class DurableRoot(val version: Int = 1, val accounts: Map<String, DurableAccount> = emptyMap(), val guestFollows: Map<String, Podcast> = emptyMap(), val guestImported: Boolean = false, val guestImportFeeds: List<String> = emptyList())
 
 data class DurableStatus(val pending: Boolean = false, val error: String? = null, val blocked: Boolean = false)
 
@@ -99,6 +99,15 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
         if (!root.guestImported) commit(root.copy(guestImported = true, guestFollows = podcasts.associateBy { it.feed } + root.guestFollows))
     }
     @Synchronized fun guestFollows(): List<Podcast> { check(readable); return root.guestFollows.values.toList() }
+
+    @Synchronized fun guestImportFeeds(): List<String> { check(readable); return root.guestImportFeeds }
+    @Synchronized fun queueGuestImports(feeds: List<String>) {
+        commit(root.copy(guestImportFeeds = (root.guestImportFeeds + feeds).distinct()))
+    }
+    @Synchronized fun completeGuestImport(feed: String, podcast: Podcast) {
+        check(!podcast.isPrivate)
+        commit(root.copy(guestFollows = root.guestFollows + (podcast.feed to podcast), guestImportFeeds = root.guestImportFeeds - feed))
+    }
 
     @Synchronized fun unionGuest(account: String, resolved: List<Podcast>) {
         var target = account(account)
@@ -259,6 +268,7 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
     }
     private fun publish() {
         val account = visible?.let { root.accounts[it] }
-        state.value = DurableStatus(account?.pending == true, if (!readable) "Saved state cannot be opened; source retained." else errors[visible] ?: account?.progressBlocked ?: account?.followBlocked ?: account?.failures?.firstOrNull() ?: account?.importFeeds?.takeIf { it.isNotEmpty() }?.let { "${it.size} imported feeds need resolution — Retry" }, !readable || account?.progressBlocked != null || account?.followBlocked != null)
+        val importFeeds = if (visible == null) root.guestImportFeeds else account?.importFeeds.orEmpty()
+        state.value = DurableStatus(account?.pending == true, if (!readable) "Saved state cannot be opened; source retained." else errors[visible] ?: account?.progressBlocked ?: account?.followBlocked ?: account?.failures?.firstOrNull() ?: importFeeds.takeIf { it.isNotEmpty() }?.let { "${it.size} imported feeds need resolution — Retry" }, !readable || account?.progressBlocked != null || account?.followBlocked != null)
     }
 }

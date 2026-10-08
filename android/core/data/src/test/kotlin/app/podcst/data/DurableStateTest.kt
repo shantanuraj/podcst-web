@@ -196,6 +196,18 @@ class DurableStateTest {
         assertEquals(malformed, file.readText())
     }
 
+    @Test fun guestImportWriteFailureCannotConsumeItsFailedSource() {
+        val feed = "https://guest.test/rss"
+        val store = open()
+        store.queueGuestImports(listOf(feed))
+        val bytes = file.readBytes()
+        val failing = DurableState(file) { throw IOException("storage denied") }
+        assertTrue(runCatching { failing.completeGuestImport(feed, Podcast(id = 1, feed = feed, title = "Guest")) }.isFailure)
+        assertArrayEquals(bytes, file.readBytes())
+        assertEquals(listOf(feed), open().guestImportFeeds())
+        assertTrue(open().guestFollows().isEmpty())
+    }
+
     @Test fun corruptSourceStaysBlockedAndByteIdentical() {
         file.writeText("{}")
         val store = open()

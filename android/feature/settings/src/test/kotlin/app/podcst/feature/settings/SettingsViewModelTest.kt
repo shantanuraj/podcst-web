@@ -89,6 +89,8 @@ class SettingsViewModelTest {
             assertEquals(SettingsEvent.Imported(ImportResult(0, 2)), awaitItem())
         }
         assertTrue(server.calls.any { it.query.orEmpty().contains("y=2") })
+        assertEquals(2, server.calls.size)
+        assertEquals(listOf("https://a.example/rss", "https://b.example/rss?x=1&y=2"), scopes.durable.guestImportFeeds())
         assertFalse(model.state.value.importing)
     }
 
