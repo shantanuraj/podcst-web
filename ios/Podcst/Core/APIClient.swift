@@ -128,7 +128,15 @@ public final class APIClient {
 
     public func podcastInfo(id: Int) async throws -> Podcast {
         let raw: RawPodcastInfo = try await get(path: "/api/feed/info", query: [URLQueryItem(name: "id", value: String(id))])
-        return Podcast(id: raw.id, feed: raw.feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.cover, description: raw.description, link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords, episodeCount: raw.episodeCount, isPrivate: raw.isPrivate ?? false)
+        return mapPodcastInfo(raw)
+    }
+
+    func publicEpisode(podcastID: Int, episodeID: Int) async throws -> Episode {
+        let raw: RawPublicEpisode = try await get(path: "/api/episodes/\(episodeID)", query: [URLQueryItem(name: "podcastId", value: String(podcastID))])
+        let podcast = mapPodcastInfo(raw.podcast)
+        let episode = mapEpisode(raw.episode, podcastId: podcast.id, feedFallback: podcast.feed, coverFallback: podcast.cover, titleFallback: podcast.title)
+        guard podcast.id == podcastID, episode.id == episodeID, episode.podcastId == podcastID else { throw DurableStateFailure.protocolViolation }
+        return episode
     }
 
     public func episodes(podcastID: Int, cursor: Int? = nil, search: String? = nil, sortBy: String = "published", sortDirection: String = "desc", limit: Int = 20) async throws -> EpisodePage {
@@ -505,6 +513,10 @@ public final class APIClient {
     private func date(_ milliseconds: Double?) -> Date? {
         guard let milliseconds else { return nil }
         return Date(timeIntervalSince1970: milliseconds / 1000)
+    }
+
+    private func mapPodcastInfo(_ raw: RawPodcastInfo) -> Podcast {
+        Podcast(id: raw.id, feed: raw.feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.cover, description: raw.description, link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords, episodeCount: raw.episodeCount, isPrivate: raw.isPrivate ?? false)
     }
 
     private func mapPodcast(_ raw: RawPodcast, feedFallback: String? = nil) -> Podcast {
@@ -910,6 +922,7 @@ private struct RawPreferences: Codable {
 }
 private struct RawPasskey: Decodable { var id: String; var provider: String?; var createdAt: String; var lastUsedAt: String? }
 private struct RawAccount: Decodable { var createdAt: String?; var passkeys: [RawPasskey]; var preferences: RawPreferences? }
+private struct RawPublicEpisode: Decodable { var podcast: RawPodcastInfo; var episode: RawEpisode }
 private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; @CatalogueID var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
 
 private struct RawPodcast: Decodable {

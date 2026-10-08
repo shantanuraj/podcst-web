@@ -136,6 +136,11 @@
 		AC2800000000000000000012 = {isa = PBXBuildFile; fileRef = AC2800000000000000000001; };
 		AC2800000000000000000013 = {isa = PBXBuildFile; fileRef = AC2800000000000000000002; };
 		AC2800000000000000000014 = {isa = PBXBuildFile; fileRef = AC2800000000000000000003; };
+		AC5000000000000000000011 = {isa = PBXBuildFile; fileRef = AC5000000000000000000001; };
+		AC5000000000000000000012 = {isa = PBXBuildFile; fileRef = AC5000000000000000000001; };
+		AC5000000000000000000013 = {isa = PBXBuildFile; fileRef = AC5000000000000000000002; };
+		AC5000000000000000000014 = {isa = PBXBuildFile; fileRef = AC5000000000000000000002; };
+		AC5000000000000000000015 = {isa = PBXBuildFile; fileRef = AC5000000000000000000003; };
 		AC3100000000000000000011 = {isa = PBXBuildFile; fileRef = AC3100000000000000000001; };
 		AC3100000000000000000012 = {isa = PBXBuildFile; fileRef = AC3100000000000000000001; };
 		AC3100000000000000000013 = {isa = PBXBuildFile; fileRef = AC3100000000000000000003; };
@@ -275,6 +280,9 @@
 		AC2800000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStore.swift; sourceTree = "<group>"; };
 		AC2800000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkRetention.swift; sourceTree = "<group>"; };
 		AC2800000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStoreTests.swift; sourceTree = "<group>"; };
+		AC5000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/PublicLink.swift; sourceTree = "<group>"; };
+		AC5000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		AC5000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicLinkTests.swift; sourceTree = "<group>"; };
 		AC3100000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/StarStore.swift; sourceTree = "<group>"; };
 		AC3100000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Starring.swift; sourceTree = "<group>"; };
 		AC3100000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarStoreTests.swift; sourceTree = "<group>"; };
@@ -315,6 +323,8 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				AC5000000000000000000001,
+				AC5000000000000000000002,
 				AC3200000000000000000001,
 				AC3200000000000000000002,
 				D5A7AB1D8FBB932075787C3E,
@@ -406,6 +416,7 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				AC5000000000000000000003,
 				AC3200000000000000000003,
 				11A8DCAAA6B9BD4AA43F0DEC,
 				AC2900000000000000000002,
@@ -644,6 +655,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC5000000000000000000015,
 				AC3200000000000000000013,
 				4E7E521EC7785029944A6534,
 				AC2900000000000000000013,
@@ -678,6 +690,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC5000000000000000000011,
+				AC5000000000000000000013,
 				AC3200000000000000000011,
 				AC3200000000000000000012,
 				F86D521B642B788319196312,
@@ -739,6 +753,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC5000000000000000000012,
+				AC5000000000000000000014,
 				AC3200000000000000000014,
 				AC3200000000000000000015,
 				6B3FCD8A93C1FF724498BA7B,

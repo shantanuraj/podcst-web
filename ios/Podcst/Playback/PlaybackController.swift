@@ -35,10 +35,20 @@ public struct PlaybackUpdate: Codable, Hashable, Sendable {
     }
 }
 
+public struct Clip: Equatable, Sendable {
+    public let start: TimeInterval
+    public let end: TimeInterval
+    public let chapter: Int?
+    public fileprivate(set) var ended = false
+    fileprivate let wasQueued: Bool
+    fileprivate let returning: PlaybackProgress?
+}
+
 @MainActor
 @Observable
 public final class PlaybackController {
     public private(set) var queue: [Episode]
+    public private(set) var clip: Clip?
     public private(set) var currentIndex: Int
     public private(set) var currentTime: TimeInterval
     public private(set) var duration: TimeInterval
@@ -205,12 +215,12 @@ public final class PlaybackController {
     }
 
     func restoreProgress(using load: @MainActor () async -> PlaybackProgress?) async {
-        guard !queueStorageBlocked, !changingAccount, !isShutdown, !Task.isCancelled else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, !Task.isCancelled, clip == nil else { return }
         let revision = UUID()
         progressRevision = revision
         let wasPlaying = shouldPlay || state == .playing || wasPlayingBeforeInterruption
         guard let progress = await load(), !Task.isCancelled,
-              !wasPlaying, !shouldPlay, !wasPlayingBeforeInterruption,
+              !wasPlaying, !shouldPlay, !wasPlayingBeforeInterruption, clip == nil,
               !queueStorageBlocked, !changingAccount, !isShutdown, progressRevision == revision else { return }
         if progress.episode.identity == currentEpisode?.identity,
            progress.position.rounded(.towardZero) == currentTime.rounded(.towardZero) { return }
@@ -219,6 +229,7 @@ public final class PlaybackController {
 
     public func play(_ episode: Episode, at position: TimeInterval = 0) {
         guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
+        leaveClip()
         saveOutgoingProgress()
         let targetIndex: Int
         if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
@@ -234,6 +245,102 @@ public final class PlaybackController {
         persist()
         emitReplay()
         replaceCurrentItem(startingAt: currentTime, autoPlay: true)
+    }
+
+    public func playShared(_ episode: Episode, at position: TimeInterval) {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, position.isFinite else { return }
+        borrow(episode)
+        currentTime = max(0, position)
+        duration = episode.duration ?? 0
+        persist()
+        emitReplay()
+        replaceCurrentItem(startingAt: currentTime, autoPlay: true)
+    }
+
+    public func playClip(_ episode: Episode, from start: TimeInterval, to end: TimeInterval, chapter: Int? = nil) {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, start.isFinite, end.isFinite, start >= 0, start < end else { return }
+        let borrowed = borrow(episode)
+        clip = Clip(start: start, end: end, chapter: chapter, wasQueued: borrowed.wasQueued, returning: borrowed.returning)
+        currentTime = start
+        duration = episode.duration ?? 0
+        persist()
+        replaceCurrentItem(startingAt: start, autoPlay: true)
+    }
+
+    public func playFullEpisode() {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, clip != nil else { return }
+        clip = nil
+        persist()
+        updateNowPlayingInfo()
+    }
+
+    public func replayClip() {
+        guard let clip else { return }
+        seek(to: clip.start)
+        resume()
+    }
+
+    public var nextClipChapter: Int? {
+        guard let number = clip?.chapter, chapters.indices.contains(number),
+              chapters.end(of: number, duration: effectiveDuration) > chapters[number].start else { return nil }
+        return number
+    }
+
+    public func playNextClipChapter() {
+        guard let clip, let index = nextClipChapter else { return }
+        self.clip = Clip(start: chapters[index].start, end: chapters.end(of: index, duration: effectiveDuration), chapter: index + 1, wasQueued: clip.wasQueued, returning: clip.returning)
+        replayClip()
+    }
+
+    public func closeClip(enqueueing: Bool = false) {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, clip != nil else { return }
+        leaveClip(enqueueing: enqueueing)
+        guard currentEpisode != nil else { return }
+        replaceCurrentItem(startingAt: currentTime, autoPlay: false)
+    }
+
+    @discardableResult private func borrow(_ episode: Episode) -> (wasQueued: Bool, returning: PlaybackProgress?) {
+        leaveClip()
+        saveOutgoingProgress()
+        let returning = currentEpisode.map { PlaybackProgress(episode: $0, position: currentTime) }
+        let existing = queue.firstIndex { $0.identity == episode.identity }
+        if let existing {
+            queue.remove(at: existing)
+            if existing < currentIndex { currentIndex -= 1 }
+        }
+        currentIndex = min(currentIndex, queue.count)
+        queue.insert(episode, at: currentIndex)
+        return (existing != nil, returning)
+    }
+
+    private func settledQueue(enqueueing: Bool = false) -> (queue: [Episode], index: Int, time: TimeInterval) {
+        guard let clip, let borrowed = currentEpisode else { return (queue, currentIndex, currentTime) }
+        var settled = queue
+        if !clip.wasQueued || enqueueing { settled.remove(at: currentIndex) }
+        if enqueueing { settled.append(borrowed) }
+        if let returning = clip.returning, let index = settled.firstIndex(where: { $0.identity == returning.episode.identity }) {
+            return (settled, index, returning.position)
+        }
+        return (settled, settled.indices.contains(currentIndex) ? currentIndex : 0, 0)
+    }
+
+    private func leaveClip(enqueueing: Bool = false) {
+        guard clip != nil else { return }
+        let settled = settledQueue(enqueueing: enqueueing)
+        stopPlayback()
+        clip = nil
+        queue = settled.queue
+        currentIndex = settled.index
+        currentTime = settled.time
+        duration = currentEpisode?.duration ?? 0
+        progressCheckpoint = currentEpisode.map { PlaybackUpdate(episode: $0, position: currentTime, completed: false) }
+        persist()
+        updateNowPlayingInfo()
+    }
+
+    private func reachClipEnd() {
+        clip?.ended = true
+        pause()
     }
 
     public func restore(_ episode: Episode, at position: TimeInterval) {
@@ -272,6 +379,7 @@ public final class PlaybackController {
 
     public func stop() {
         guard isActive else { return }
+        leaveClip()
         if transport.hasSource { currentTime = transport.position }
         stopPlayback()
         persist()
@@ -290,12 +398,14 @@ public final class PlaybackController {
 
     public func markPlayed() {
         guard !queueStorageBlocked, !changingAccount, !isShutdown, isActive else { return }
+        clip = nil
         finishCurrentEpisode()
     }
 
     public func resume() {
         guard !queueStorageBlocked, !changingAccount, !isShutdown, currentEpisode != nil, state != .playing else { return }
         guard !shouldPlay || audioSessionTask == nil else { return }
+        if clip?.ended == true { playFullEpisode() }
         progressRevision = UUID()
         wasPlayingBeforeInterruption = false
         shouldPlay = true
@@ -314,7 +424,8 @@ public final class PlaybackController {
     public func seek(to position: TimeInterval) {
         guard !queueStorageBlocked, !changingAccount, !isShutdown, currentEpisode != nil, position.isFinite else { return }
         progressRevision = UUID()
-        let clamped = max(0, position)
+        let clamped = clip.map { min($0.end, max($0.start, position)) } ?? max(0, position)
+        clip?.ended = false
         currentTime = clamped
         emitReplay()
         generation = UUID()
@@ -393,7 +504,9 @@ public final class PlaybackController {
     }
 
     public func next() {
-        guard !queueStorageBlocked, !changingAccount, !isShutdown, !queue.isEmpty else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
+        leaveClip()
+        guard !queue.isEmpty else { return }
         saveOutgoingProgress()
         let nextIndex = currentIndex + 1 < queue.count ? currentIndex + 1 : 0
         currentIndex = nextIndex
@@ -405,7 +518,9 @@ public final class PlaybackController {
     }
 
     public func previous() {
-        guard !queueStorageBlocked, !changingAccount, !isShutdown, !queue.isEmpty else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
+        leaveClip()
+        guard !queue.isEmpty else { return }
         saveOutgoingProgress()
         let previousIndex = currentIndex > 0 ? currentIndex - 1 : queue.count - 1
         currentIndex = previousIndex
@@ -438,7 +553,10 @@ public final class PlaybackController {
         guard !offsets.isEmpty, !queue.isEmpty else { return }
         let wasActive = isActive
         let removedCurrent = offsets.contains(currentIndex)
-        if removedCurrent { saveOutgoingProgress() }
+        if removedCurrent {
+            saveOutgoingProgress()
+            clip = nil
+        }
         offsets.sorted(by: >).forEach { index in
             if queue.indices.contains(index) { queue.remove(at: index) }
         }
@@ -504,6 +622,7 @@ public final class PlaybackController {
     }
 
     func beginAccountChange() {
+        leaveClip()
         pause()
         changingAccount = true
         onProgress = nil
@@ -554,6 +673,7 @@ public final class PlaybackController {
     public func clear() {
         guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         saveOutgoingProgress()
+        clip = nil
         stopPlayback()
         queue.removeAll(keepingCapacity: false)
         currentIndex = 0
@@ -610,6 +730,10 @@ public final class PlaybackController {
         case .position(let position):
             guard position.isFinite, position >= 0 else { return }
             currentTime = position
+            if let clip, !clip.ended, shouldPlay, position >= clip.end {
+                reachClipEnd()
+                return
+            }
             if let playingSince, elapsedSinceProgress + monotonicTime() - playingSince >= 30 {
                 emitProgress(completed: false)
                 persist()
@@ -624,7 +748,12 @@ public final class PlaybackController {
             emitProgress(completed: false)
             persist()
         case .ended:
-            finishCurrentEpisode()
+            if clip != nil {
+                currentTime = effectiveDuration
+                reachClipEnd()
+            } else {
+                finishCurrentEpisode()
+            }
         case .failed:
             cancelAudioSessionTask()
             shouldPlay = false
@@ -702,12 +831,12 @@ public final class PlaybackController {
     }
 
     private func emitReplay() {
-        guard let episode = currentEpisode else { return }
+        guard clip == nil, let episode = currentEpisode else { return }
         onProgress?(PlaybackUpdate(episode: episode, position: currentTime, completed: false, event: .replay))
     }
 
     private func emitProgress(completed: Bool) {
-        guard let episode = currentEpisode else { return }
+        guard clip == nil, let episode = currentEpisode else { return }
         elapsedSinceProgress = 0
         playingSince = state == .playing ? monotonicTime() : nil
         if let checkpoint = progressCheckpoint,
@@ -954,8 +1083,9 @@ public final class PlaybackController {
                 installErasedQueue(cleanupPending: existing?.eraseCleanupPending == true)
                 throw QueueStorageFailure.erased
             }
-            let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex,
-                                          currentTime: currentTime, stopped: state == .idle)
+            let settled = settledQueue()
+            let snapshot = PersistedState(accountID: accountID, queue: settled.queue, currentIndex: settled.index,
+                                          currentTime: settled.time, stopped: state == .idle)
             let data = try JSONEncoder().encode(snapshot)
             try DurableStateStore.protectedWrite(data, scopedStorageURL(accountID: accountID))
             queueStorageError = nil
@@ -1020,6 +1150,7 @@ public final class PlaybackController {
 
     private func installQueue(_ saved: PersistedState?) {
         hasActivatedQueue = true
+        clip = nil
         if saved?.erased == true { installErasedQueue(cleanupPending: saved?.eraseCleanupPending == true); return }
         queue = saved?.queue ?? []
         currentIndex = saved?.currentIndex ?? 0
@@ -1031,6 +1162,7 @@ public final class PlaybackController {
 
     private func installErasedQueue(cleanupPending: Bool) {
         queueErased = true
+        clip = nil
         stopPlayback()
         artworkTask?.cancel()
         artworkTask = nil

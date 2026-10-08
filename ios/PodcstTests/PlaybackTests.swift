@@ -1391,6 +1391,228 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(transport.loadCount, 1)
     }
 
+    func testSharedClipBorrowsTheQueueWithoutProgressAndPausesAtItsEnd() async {
+        let url = temporaryURL()
+        let transport = FakePlaybackTransport()
+        let clock = FakePlaybackClock()
+        let controller = makeController(transport: transport, clock: clock, persistenceURL: url)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.enqueue(episode(guid: "earlier"))
+        controller.play(episode(guid: "current"), at: 40)
+        controller.enqueue(episode(guid: "later"))
+        transport.becomeReady(duration: 600)
+        updates.removeAll()
+
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        XCTAssertEqual(updates.map(\.episode.guid), ["current"])
+        updates.removeAll()
+        XCTAssertEqual(controller.queue.map(\.guid), ["earlier", "shared", "current", "later"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "shared")
+        XCTAssertEqual(controller.upNext.first?.guid, "current")
+        XCTAssertEqual(transport.position, 100)
+
+        transport.emit(.seeked(100))
+        transport.becomeReady(duration: 600)
+        XCTAssertEqual(controller.state, .playing)
+        clock.advance(by: 45)
+        transport.advance(to: 145)
+        controller.seek(to: 10)
+        XCTAssertEqual(controller.currentTime, 100)
+        controller.seek(to: 900)
+        XCTAssertEqual(controller.currentTime, 160)
+        transport.finishSeek()
+        transport.advance(to: 159)
+        XCTAssertEqual(controller.clip?.ended, false)
+        transport.advance(to: 160.4)
+        XCTAssertEqual(controller.clip?.ended, true)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        transport.emit(.ended)
+        controller.pause()
+        await controller.restoreProgress { PlaybackProgress(episode: self.episode(guid: "web"), position: 5) }
+
+        XCTAssertTrue(updates.isEmpty)
+        XCTAssertEqual(controller.currentEpisode?.guid, "shared")
+        XCTAssertEqual(controller.queue.map(\.guid), ["earlier", "shared", "current", "later"])
+        let relaunched = makeController(persistenceURL: url)
+        XCTAssertEqual(relaunched.queue.map(\.guid), ["earlier", "current", "later"])
+        XCTAssertEqual(relaunched.currentEpisode?.guid, "current")
+        XCTAssertEqual(relaunched.currentTime, 40)
+    }
+
+    func testKeepListeningOrPlayingAfterTheEndLeavesClipAndSavesProgressAgain() {
+        let transport = FakePlaybackTransport()
+        let clock = FakePlaybackClock()
+        let controller = makeController(transport: transport, clock: clock)
+        controller.play(episode(guid: "current"), at: 40)
+        transport.becomeReady(duration: 600)
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        transport.becomeReady(duration: 600)
+        transport.advance(to: 160)
+        XCTAssertEqual(controller.clip?.ended, true)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+
+        controller.resume()
+        XCTAssertNil(controller.clip)
+        XCTAssertEqual(controller.currentTime, 160)
+        XCTAssertEqual(transport.position, 160)
+        XCTAssertEqual(controller.state, .playing)
+        clock.advance(by: 30)
+        transport.advance(to: 190)
+
+        XCTAssertEqual(updates.map(\.episode.guid), ["shared"])
+        XCTAssertEqual(updates.map(\.position), [190])
+        XCTAssertEqual(updates.map(\.completed), [false])
+        XCTAssertEqual(controller.queue.map(\.guid), ["shared", "current"])
+    }
+
+    func testReplayRestartsTheClipWithoutLeavingClipMode() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.onProgress = { updates.append($0) }
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160, chapter: 2)
+        transport.becomeReady(duration: 600)
+        transport.advance(to: 161)
+        XCTAssertEqual(controller.clip?.ended, true)
+
+        controller.replayClip()
+
+        XCTAssertEqual(controller.currentTime, 100)
+        XCTAssertEqual(controller.clip?.ended, false)
+        XCTAssertEqual(controller.clip?.chapter, 2)
+        XCTAssertTrue(controller.isPlaybackRequested)
+        transport.finishSeek()
+        transport.advance(to: 130)
+        XCTAssertTrue(updates.isEmpty)
+    }
+
+    func testClosingClipRemovesBorrowedEpisodeAndPausesThePreviousOne() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.play(episode(guid: "current"), at: 40)
+        controller.enqueue(episode(guid: "later"))
+        transport.becomeReady(duration: 600)
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        transport.becomeReady(duration: 600)
+        controller.onProgress = { updates.append($0) }
+
+        controller.closeClip()
+        transport.becomeReady(duration: 600)
+
+        XCTAssertNil(controller.clip)
+        XCTAssertEqual(controller.queue.map(\.guid), ["current", "later"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "current")
+        XCTAssertEqual(controller.currentTime, 40)
+        XCTAssertEqual(transport.position, 40)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertTrue(updates.isEmpty)
+    }
+
+    func testClosingClipKeepsAnEpisodeThatWasAlreadyQueued() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "current"), at: 40)
+        controller.enqueue(episode(guid: "later"))
+        controller.enqueue(episode(guid: "shared"))
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        XCTAssertEqual(controller.queue.map(\.guid), ["shared", "current", "later"])
+
+        controller.closeClip()
+
+        XCTAssertEqual(controller.queue.map(\.guid), ["shared", "current", "later"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "current")
+        XCTAssertEqual(controller.currentTime, 40)
+        XCTAssertFalse(controller.isPlaybackRequested)
+    }
+
+    func testAddingClipToQueueMovesItToTheEndAndPausesThePreviousOne() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var updates: [PlaybackUpdate] = []
+        controller.play(episode(guid: "current"), at: 40)
+        controller.enqueue(episode(guid: "later"))
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        controller.onProgress = { updates.append($0) }
+
+        controller.closeClip(enqueueing: true)
+
+        XCTAssertNil(controller.clip)
+        XCTAssertEqual(controller.queue.map(\.guid), ["current", "later", "shared"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "current")
+        XCTAssertEqual(controller.currentTime, 40)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertTrue(updates.isEmpty)
+    }
+
+    func testPlayingSomethingElseOrSkippingLeavesClipByItsBorrowingRules() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        controller.play(episode(guid: "current"), at: 40)
+        controller.enqueue(episode(guid: "later"))
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        controller.next()
+        XCTAssertNil(controller.clip)
+        XCTAssertEqual(controller.queue.map(\.guid), ["current", "later"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "later")
+
+        controller.playClip(episode(guid: "shared"), from: 100, to: 160)
+        XCTAssertEqual(controller.queue.map(\.guid), ["current", "shared", "later"])
+        controller.play(episode(guid: "other"))
+        XCTAssertNil(controller.clip)
+        XCTAssertEqual(controller.queue.map(\.guid), ["current", "later", "other"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "other")
+    }
+
+    func testSharedChapterAdvancesToTheNextChapterWithinClipMode() {
+        let transport = FakePlaybackTransport()
+        let controller = makeController(transport: transport)
+        var chaptered = episode(guid: "chaptered")
+        chaptered.showNotes = "<p>00:00 Opening</p><p>01:40 Middle</p><p>05:00 Closing</p>"
+        controller.playClip(chaptered, from: 100, to: 300, chapter: 2)
+        transport.becomeReady(duration: 600)
+        transport.advance(to: 300)
+        XCTAssertEqual(controller.nextClipChapter, 2)
+
+        controller.playNextClipChapter()
+
+        XCTAssertEqual(controller.clip?.chapter, 3)
+        XCTAssertEqual(controller.clip?.start, 300)
+        XCTAssertEqual(controller.clip?.end, 600)
+        XCTAssertEqual(controller.clip?.ended, false)
+        XCTAssertNil(controller.nextClipChapter)
+        XCTAssertTrue(controller.isPlaybackRequested)
+    }
+
+    func testTimeLinkInsertsBeforeCurrentAndPlaysWithNormalProgress() {
+        let transport = FakePlaybackTransport()
+        let clock = FakePlaybackClock()
+        let controller = makeController(transport: transport, clock: clock)
+        var updates: [PlaybackUpdate] = []
+        controller.enqueue(episode(guid: "earlier"))
+        controller.play(episode(guid: "current"), at: 40)
+        controller.enqueue(episode(guid: "later"))
+        transport.becomeReady(duration: 600)
+        controller.onProgress = { updates.append($0) }
+
+        controller.playShared(episode(guid: "shared"), at: 1092)
+        transport.becomeReady(duration: 3000)
+        clock.advance(by: 30)
+        transport.advance(to: 1122)
+
+        XCTAssertNil(controller.clip)
+        XCTAssertEqual(controller.queue.map(\.guid), ["earlier", "shared", "current", "later"])
+        XCTAssertEqual(controller.currentEpisode?.guid, "shared")
+        XCTAssertEqual(controller.state, .playing)
+        XCTAssertEqual(updates.map(\.episode.guid), ["current", "shared", "shared"])
+        XCTAssertEqual(updates.map(\.position), [40, 1092, 1122])
+        XCTAssertEqual(updates.map(\.event), [nil, .replay, nil])
+    }
+
     private func makeController(transport: FakePlaybackTransport = FakePlaybackTransport(), clock: FakePlaybackClock = FakePlaybackClock(), persistenceURL: URL? = nil, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil) -> PlaybackController {
         let url = persistenceURL ?? temporaryURL()
         let controller = PlaybackController(transport: transport, persistenceURL: url, monotonicTime: { clock.time }, prepareAudioSession: prepareAudioSession)

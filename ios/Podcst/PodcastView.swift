@@ -4,6 +4,7 @@ struct PodcastDetailView: View {
     @Environment(APIClient.self) private var api
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackController.self) private var playback
+    @Environment(Router.self) private var router
     let podcast: Podcast
     @State private var detail: Podcast?
     @State private var isLoading = false
@@ -76,8 +77,8 @@ struct PodcastDetailView: View {
                     }
                     .buttonStyle(PodcstButtonStyle(kind: .surface, height: 44))
                     .disabled(content.episodes.isEmpty)
-                    if let url = content.shareURL {
-                        ShareLink(item: url) {
+                    if content.publicLink != nil {
+                        Button { router.sharing = .podcast(content) } label: {
                             Image(systemName: "square.and.arrow.up")
                                 .frame(width: 20)
                         }
@@ -338,6 +339,9 @@ struct EpisodeMenuActions: View {
         Divider()
         Button(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star") { router.star(episode, !starred, in: stars) }
         Button("Add to list…", systemImage: "text.badge.plus") { router.listing = episode }
+        if episode.publicLink != nil {
+            Button("Share…", systemImage: "square.and.arrow.up") { router.sharing = .episode(episode) }
+        }
         Divider()
         DownloadMenuActions(episode: episode)
     }
@@ -410,9 +414,9 @@ struct EpisodeDetailView: View {
         .podcstPage()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let url = episode.shareURL {
+            if episode.publicLink != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(item: url)
+                    Button("Share", systemImage: "square.and.arrow.up") { router.sharing = .episode(episode) }
                 }
             }
         }

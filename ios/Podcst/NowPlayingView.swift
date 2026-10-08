@@ -11,6 +11,7 @@ enum PlayerPanel: String, CaseIterable, Identifiable {
 
 struct NowPlayingView: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(Router.self) private var router
     @State private var panel: PlayerPanel?
     @State private var tint: ArtworkTint?
 
@@ -21,7 +22,10 @@ struct NowPlayingView: View {
     var body: some View {
         Group {
             if let episode = playback.currentEpisode {
-                if let panel {
+                if let clip = playback.clip {
+                    ClipPlayer(episode: episode, clip: clip)
+                        .transition(.opacity)
+                } else if let panel {
                     VStack(spacing: 0) {
                         CompactPlayer(episode: episode) { self.panel = nil }
                         PanelTabs(panels: panels, selection: panel, height: 36) { self.panel = $0 }
@@ -53,10 +57,23 @@ struct NowPlayingView: View {
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.4), value: tint)
         }
+        .overlay(alignment: .bottom) {
+            if let clip = playback.clip, clip.ended, let episode = playback.currentEpisode {
+                ClipEndPanel(episode: episode, clip: clip)
+            } else if let toast = router.toast {
+                ToastView(toast: toast) { router.toast = nil }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .foregroundStyle(PodcstPalette.ink)
         .presentationBackground(PodcstPalette.paper)
         .downloadAlerts()
+        .shareSheet(Binding { router.sharing } set: { router.sharing = $0 })
         .animation(.snappy(duration: 0.3), value: panel)
+        .animation(.snappy, value: playback.clip)
+        .animation(.snappy, value: router.toast)
         .onChange(of: panels) { _, available in
             if let panel, !available.contains(panel) { self.panel = available.first }
         }
@@ -134,6 +151,209 @@ private struct FullPlayer: View {
         .onChange(of: holdingTitle) { _, holding in
             playback.holdDoubleSpeed(holding)
         }
+    }
+}
+
+private struct ClipPlayer: View {
+    @Environment(PlaybackController.self) private var playback
+    @Environment(LibraryStore.self) private var library
+    let episode: Episode
+    let clip: Clip
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(clip.chapter == nil ? "Shared clip" : "Shared chapter")
+                .eyebrow(PodcstPalette.accent)
+                .padding(.horizontal, 10)
+                .frame(height: 26)
+                .background(PodcstPalette.accent.opacity(0.18), in: Capsule())
+            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), chapterArtwork: playback.currentChapterArtwork)
+                .frame(maxWidth: 270)
+                .shadow(color: .black.opacity(0.4), radius: 30, y: 22)
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+                .frame(minHeight: 140)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(episode.title)
+                    .font(.serif(.title2))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(episode.podcastTitle ?? "Podcst")
+                    .font(.sans(.subheadline))
+                    .foregroundStyle(PodcstPalette.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 26)
+            if let number = clip.chapter {
+                Text("Chapter \(number) · \(playback.chapterTitle(number))")
+                    .eyebrow(PodcstPalette.accent)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 18)
+            }
+            SeekBar()
+                .padding(.top, clip.chapter == nil ? 22 : 8)
+            ClipPlacement(clip: clip, duration: playback.duration > 0 ? playback.duration : episode.duration ?? 0)
+                .padding(.top, 12)
+            HStack {
+                Button { playback.replayClip() } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 24, weight: .medium))
+                        .frame(width: 48, height: 48)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(clip.chapter == nil ? "Replay clip" : "Replay chapter")
+                Spacer()
+                PlayPauseButton(diameter: 72)
+                Spacer()
+                SpeedMenu()
+                    .frame(width: 48)
+            }
+            .padding(.top, 16)
+            Spacer(minLength: 16)
+            HStack(spacing: 10) {
+                Button("Play full episode") { playback.playFullEpisode() }
+                    .buttonStyle(PodcstButtonStyle(kind: .surface))
+                if !library.isSubscribed(episode.podcast) {
+                    Button("Subscribe") { Task { await library.toggleSubscription(episode.podcast) } }
+                        .buttonStyle(PodcstButtonStyle(kind: .surface))
+                }
+            }
+            .padding(.bottom, 12)
+        }
+        .padding(.horizontal, 28)
+    }
+}
+
+private struct ClipPlacement: View {
+    let clip: Clip
+    let duration: TimeInterval
+
+    var body: some View {
+        let total = max(duration, clip.end)
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(PodcstPalette.ink.opacity(0.12)).frame(height: 2)
+                    Capsule()
+                        .fill(PodcstPalette.accent)
+                        .frame(width: max(4, geometry.size.width * (clip.end - clip.start) / total), height: 4)
+                        .offset(x: geometry.size.width * clip.start / total)
+                }
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 4)
+            Text("\(Duration.clock(clip.start)) – \(Duration.clock(clip.end)) of \(Duration.seconds(total))")
+                .font(.sans(.caption2))
+                .monospacedDigit()
+                .foregroundStyle(PodcstPalette.muted)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ClipEndPanel: View {
+    @Environment(PlaybackController.self) private var playback
+    @Environment(LibraryStore.self) private var library
+    @Environment(Router.self) private var router
+    let episode: Episode
+    let clip: Clip
+
+    private var eyebrow: String {
+        guard let number = clip.chapter else { return "Clip ended · \(Duration.clock(clip.start)) – \(Duration.clock(clip.end))" }
+        let count = playback.chapters.count
+        return count >= number ? "End of chapter \(number) of \(count)" : "End of chapter \(number)"
+    }
+
+    private var saved: TimeInterval? {
+        guard let progress = library.progress(for: episode), !progress.completed, progress.position > 0 else { return nil }
+        return progress.position
+    }
+
+    var body: some View {
+        let chapters = playback.chapters
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+            VStack(spacing: 10) {
+                Text(eyebrow)
+                    .eyebrow()
+                Text(clip.chapter.map(playback.chapterTitle) ?? episode.title)
+                    .font(.serif(.title2))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 12)
+                if let saved {
+                    Text("Your saved place in this episode is still \(Duration.clock(saved))")
+                        .font(.sans(.footnote))
+                        .foregroundStyle(PodcstPalette.tertiary)
+                        .multilineTextAlignment(.center)
+                }
+                Group {
+                    if let next = playback.nextClipChapter {
+                        Button { playback.playNextClipChapter() } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 14))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Next chapter")
+                                        .font(.sans(.callout).weight(.semibold))
+                                    Text("\(chapters[next].title) · \(Duration.seconds(chapters.end(of: next, duration: playback.duration) - chapters[next].start))")
+                                        .font(.sans(.caption))
+                                        .opacity(0.85)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 18)
+                            .frame(maxWidth: .infinity, minHeight: 60)
+                            .background(PodcstPalette.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button { playback.resume() } label: {
+                            Label("Keep listening from \(Duration.clock(clip.end))", systemImage: "play.fill")
+                        }
+                        .buttonStyle(PodcstButtonStyle(kind: .accent, height: 52))
+                    }
+                }
+                .padding(.top, 10)
+                Button(clip.chapter == nil ? "Replay clip" : "Replay chapter") { playback.replayClip() }
+                    .buttonStyle(PodcstButtonStyle(kind: .surface, height: 52))
+                Button("Add episode to queue") {
+                    router.showingPlayer = false
+                    playback.closeClip(enqueueing: true)
+                }
+                .buttonStyle(PodcstButtonStyle(kind: .surface, height: 52))
+                Button {
+                    router.showingPlayer = false
+                    playback.closeClip()
+                } label: {
+                    Text("Close")
+                        .font(.sans(.callout).weight(.medium))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 22)
+            .background(PodcstPalette.surface, in: RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .accessibilityAddTraits(.isModal)
+            .padding(8)
+            .transition(.move(edge: .bottom))
+        }
+        .transition(.opacity)
+    }
+}
+
+private extension PlaybackController {
+    func chapterTitle(_ number: Int) -> String {
+        chapters.indices.contains(number - 1) ? chapters[number - 1].title : "Chapter \(number)"
     }
 }
 
@@ -260,6 +480,7 @@ private struct ChaptersPanel: View {
 
 private struct ChapterRow: View {
     @Environment(PlaybackController.self) private var playback
+    @Environment(Router.self) private var router
     let chapters: [Chapter]
     let index: Int
     let isCurrent: Bool
@@ -307,6 +528,13 @@ private struct ChapterRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Jump to chapter")
+        .contextMenu {
+            if let episode = playback.currentEpisode, episode.publicLink != nil {
+                Button("Share chapter", systemImage: "square.and.arrow.up") {
+                    router.sharing = .episode(episode, mode: .chapter, chapter: index)
+                }
+            }
+        }
     }
 }
 
@@ -390,8 +618,8 @@ private struct EpisodeMenu: View {
             Button("Show notes", systemImage: "doc.text", action: showNotes)
             Button("Episode page", systemImage: "info.circle") { router.open(.episode(episode)) }
             Button("Go to podcast", systemImage: "square.stack") { router.open(.podcast(episode.podcast)) }
-            if let url = episode.shareURL {
-                ShareLink(item: url)
+            if episode.publicLink != nil {
+                Button("Share", systemImage: "square.and.arrow.up") { router.sharing = .episode(episode, mode: .time) }
             }
             Section {
                 Button { router.stop(playback) } label: {
@@ -428,10 +656,13 @@ private struct SeekBar: View {
 
     var body: some View {
         let duration = playback.duration
-        let position = scrub.map { $0 * duration } ?? playback.currentTime
-        let chapters = playback.chapters
-        let segments = chapters.isEmpty || duration <= 0
-            ? [Segment(start: 0, length: max(duration, 1))]
+        let clip = playback.clip
+        let lower = clip?.start ?? 0
+        let span = (clip?.end ?? duration) - lower
+        let position = scrub.map { lower + $0 * span } ?? playback.currentTime
+        let chapters = clip == nil ? playback.chapters : []
+        let segments = chapters.isEmpty || span <= 0
+            ? [Segment(start: lower, length: max(span, 1))]
             : chapters.indices.map { Segment(start: chapters[$0].start, length: max(0, chapters.end(of: $0, duration: duration) - chapters[$0].start)) }
         let current = chapters.index(at: position)
         VStack(spacing: 6) {
@@ -459,7 +690,7 @@ private struct SeekBar: View {
                         Circle()
                             .fill(PodcstPalette.ink)
                             .frame(width: 14, height: 14)
-                            .offset(x: geometry.size.width * (duration > 0 ? position / duration : 0) - 7)
+                            .offset(x: geometry.size.width * (span > 0 ? (position - lower) / span : 0) - 7)
                             .scaleEffect(scrub == nil ? 1 : 1.3)
                     }
                 }
@@ -471,7 +702,7 @@ private struct SeekBar: View {
                             scrub = min(1, max(0, value.location.x / geometry.size.width))
                         }
                         .onEnded { value in
-                            playback.seek(to: min(1, max(0, value.location.x / geometry.size.width)) * duration)
+                            playback.seek(to: lower + min(1, max(0, value.location.x / geometry.size.width)) * span)
                             scrub = nil
                         }
                 )
@@ -481,7 +712,7 @@ private struct SeekBar: View {
                 HStack {
                     Text(Duration.clock(position))
                     Spacer()
-                    Text("−\(Duration.clock(max(0, duration - position)))")
+                    Text(clip.map { "Clip ends \(Duration.clock($0.end))" } ?? "−\(Duration.clock(max(0, duration - position)))")
                 }
                 .font(.sans(.caption).weight(.medium))
                 .monospacedDigit()
@@ -490,7 +721,7 @@ private struct SeekBar: View {
         }
         .accessibilityElement()
         .accessibilityLabel("Playback position")
-        .accessibilityValue("\(Duration.clock(position)) of \(Duration.clock(duration))")
+        .accessibilityValue(clip.map { "\(Duration.clock(position)), clip ends \(Duration.clock($0.end))" } ?? "\(Duration.clock(position)) of \(Duration.clock(duration))")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: playback.skipForward()
@@ -560,19 +791,7 @@ private struct AudioChips: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Menu {
-                    Picker("Playback speed", selection: Binding { playback.rate } set: { playback.setRate($0) }) {
-                        ForEach(PlaybackController.supportedRates, id: \.self) { speed in
-                            Text("\(speed, specifier: "%g")×").tag(speed)
-                        }
-                    }
-                } label: {
-                    Text(playback.isDoubleSpeedHeld ? "2×" : "\(playback.rate, specifier: "%g")×")
-                        .monospacedDigit()
-                        .chip(selected: playback.isDoubleSpeedHeld, strong: true)
-                }
-                .accessibilityLabel("Playback speed")
-                .accessibilityValue("\(playback.rate, specifier: "%g") times")
+                SpeedMenu()
                 effect("Boost", \.volumeBoost)
                 effect("Trim silence", \.trimSilence)
                 Spacer(minLength: 0)
@@ -594,6 +813,26 @@ private struct AudioChips: View {
             playback.setEffects(effects)
         })
         .toggleStyle(ChipToggleStyle())
+    }
+}
+
+private struct SpeedMenu: View {
+    @Environment(PlaybackController.self) private var playback
+
+    var body: some View {
+        Menu {
+            Picker("Playback speed", selection: Binding { playback.rate } set: { playback.setRate($0) }) {
+                ForEach(PlaybackController.supportedRates, id: \.self) { speed in
+                    Text("\(speed, specifier: "%g")×").tag(speed)
+                }
+            }
+        } label: {
+            Text(playback.isDoubleSpeedHeld ? "2×" : "\(playback.rate, specifier: "%g")×")
+                .monospacedDigit()
+                .chip(selected: playback.isDoubleSpeedHeld, strong: true)
+        }
+        .accessibilityLabel("Playback speed")
+        .accessibilityValue("\(playback.rate, specifier: "%g") times")
     }
 }
 

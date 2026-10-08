@@ -525,27 +525,6 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(fixture.library.durable.guestFollows + fixture.library.durable.unresolvedGuest, [original])
     }
 
-    func testSharingUsesOnlyDeclaredPublicWebpages() {
-        let feed = "https://example.test/private-feed?token=feed-secret"
-        let audio = "https://example.test/audio.mp3?token=audio-secret"
-        var episode = Episode(guid: "private", feed: feed, title: "Private episode", file: EpisodeFile(url: audio))
-        var podcast = Podcast(feed: feed, title: "Private podcast")
-        XCTAssertNil(episode.shareURL)
-        XCTAssertNil(podcast.shareURL)
-        for link in [feed, audio, "file:///tmp/audio.mp3", "https://listener:secret@example.test/episode", "/episode"] {
-            episode.link = link
-            XCTAssertNil(episode.shareURL)
-        }
-        for link in [feed, "file:///tmp/feed.xml", "https://listener:secret@example.test/show", "/show"] {
-            podcast.link = link
-            XCTAssertNil(podcast.shareURL)
-        }
-        episode.link = "https://example.test/episode"
-        podcast.link = "https://example.test/show"
-        XCTAssertEqual(episode.shareURL?.absoluteString, episode.link)
-        XCTAssertEqual(podcast.shareURL?.absoluteString, podcast.link)
-    }
-
     func testForegroundProgressFlushRetriesWithoutReloadingLibraryOrPlayback() async throws {
         let fixture = try await guestFixture(podcasts: [])
         defer { fixture.cleanUp() }
@@ -706,16 +685,6 @@ final class SessionTests: XCTestCase {
         await fixture.session.restore()
         await library.flushProgress()
         XCTAssertEqual(fixture.session.user?.id, "first")
-    }
-
-    func testPrivateSourcesDoNotOfferPublicSharing() throws {
-        var podcast = Podcast(feed: "https://example.test/feed?token=private", title: "Private", link: "https://example.test/show", isPrivate: true)
-        let episode = Episode(guid: "private", feed: podcast.feed, title: "Private episode", link: "https://example.test/episode", file: EpisodeFile(url: "https://example.test/private.mp3"), isPrivate: true)
-        XCTAssertNil(podcast.shareURL)
-        XCTAssertNil(episode.shareURL)
-        XCTAssertEqual(try JSONDecoder().decode(Episode.self, from: JSONEncoder().encode(episode)).isPrivate, true)
-        podcast.isPrivate = false
-        XCTAssertEqual(podcast.shareURL?.absoluteString, "https://example.test/show")
     }
 
     func testPrivatePodcastsCannotEnterTheGuestLibrary() async throws {

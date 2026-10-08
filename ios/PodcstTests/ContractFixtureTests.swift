@@ -57,7 +57,9 @@ final class ContractFixtureTests: XCTestCase {
             let request = try XCTUnwrap(ContractURLProtocol.requests().first, name)
             let parts = fixture.endpoint.split(separator: " ", maxSplits: 1).map(String.init)
             XCTAssertEqual(request.httpMethod, parts[0], name)
-            XCTAssertEqual(request.url?.path, parts[1], name)
+            let path = (request.url?.path ?? "").split(separator: "/", omittingEmptySubsequences: false)
+            let template = parts[1].split(separator: "/", omittingEmptySubsequences: false)
+            XCTAssertTrue(path.count == template.count && zip(path, template).allSatisfy { $1.hasPrefix(":") || $0 == $1 }, "\(name): \(request.url?.path ?? "")")
         }
     }
 
@@ -305,6 +307,20 @@ final class ContractFixtureTests: XCTestCase {
         case "GET /api/account": _ = try await api.account()
         case "PUT /api/account/preferences": _ = try await api.savePreferences(AudioOptions(speed: 1.5, effects: AudioEffects(volumeBoost: true)))
         case "DELETE /api/account/passkeys/:id": try await api.removePasskey(id: ":id")
+        case "GET /api/episodes/:episodeId":
+            let lookup = Task { try await api.publicEpisode(podcastID: 301, episodeID: 262004164) }
+            let result = await lookup.result
+            let request = try XCTUnwrap(ContractURLProtocol.requests().first)
+            XCTAssertEqual(request.url?.path, "/api/episodes/262004164")
+            XCTAssertEqual(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems, [URLQueryItem(name: "podcastId", value: "301")])
+            let episode = try result.get()
+            XCTAssertEqual(episode.id, 262004164)
+            XCTAssertEqual(episode.podcastId, 301)
+            XCTAssertEqual(episode.podcastTitle, "Lex Fridman Podcast")
+            XCTAssertEqual(episode.feed, "https://lexfridman.com/feed/podcast/")
+            XCTAssertEqual(episode.file.url, "https://media.blubrry.com/takeituneasy/ins.blubrry.com/takeituneasy/lex_ai_andrew_scull.mp3")
+            XCTAssertNil(episode.duration)
+            XCTAssertEqual(episode.publicLink?.url?.absoluteString, "https://www.podcst.app/episodes/301/262004164")
         default: XCTFail("Unmapped endpoint \(fixture.endpoint) in \(name)")
         }
     }

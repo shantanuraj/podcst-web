@@ -28,6 +28,7 @@ final class Router {
     var stoppedPlayback: StoppedPlayback?
     var toast: Toast?
     var listing: Episode?
+    var sharing: ShareRequest?
     private var paths: [AppTab: [Route]] = [:]
 
     func path(_ tab: AppTab) -> Binding<[Route]> {
@@ -59,6 +60,12 @@ final class Router {
 }
 
 struct RootView: View {
+    private struct IncomingLink: Equatable {
+        let id = UUID()
+        let link: PublicLink
+    }
+
+    @Environment(APIClient.self) private var api
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
     @Environment(AccountStore.self) private var account
@@ -69,6 +76,7 @@ struct RootView: View {
     @State private var router = Router()
     @State private var initialTabConfigured = false
     @State private var queueRetryError: String?
+    @State private var incoming: IncomingLink?
 
     var body: some View {
         @Bindable var router = router
@@ -106,6 +114,7 @@ struct RootView: View {
         .sheet(item: $router.listing) { episode in
             AddToListSheet(episode: episode)
         }
+        .shareSheet(Binding { router.showingPlayer ? nil : router.sharing } set: { router.sharing = $0 })
         .fullScreenCover(isPresented: onboarding) {
             OnboardingView { onboarded = true }
         }
@@ -130,6 +139,14 @@ struct RootView: View {
             guard router.stoppedPlayback != nil, (try? await Task.sleep(for: .seconds(5))) != nil else { return }
             router.stoppedPlayback = nil
         }
+        .onOpenURL { receive($0) }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL { receive(url) }
+        }
+        .task(id: incoming?.id) {
+            guard let link = incoming?.link else { return }
+            await open(link)
+        }
         .task(id: router.toast?.id) {
             guard let toast = router.toast,
                   (try? await Task.sleep(for: .seconds(toast.actions.isEmpty ? 2.5 : 5))) != nil,
@@ -150,6 +167,51 @@ struct RootView: View {
         }
         .downloadAlerts()
         .font(.sans(.body))
+    }
+
+    private func receive(_ url: URL) {
+        guard let link = PublicLink(url) else { return }
+        incoming = IncomingLink(link: link)
+    }
+
+    private func open(_ link: PublicLink) async {
+        let unavailable = Toast(title: "That moment isn't available", systemImage: "clock.badge.exclamationmark")
+        guard let episodeID = link.episodeId else {
+            router.open(.podcast(Podcast(id: link.podcastId, feed: "", title: "")))
+            if link.invalidMoment { router.toast = unavailable }
+            return
+        }
+        let episode: Episode
+        do {
+            episode = try await api.publicEpisode(podcastID: link.podcastId, episodeID: episodeID)
+        } catch {
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            router.toast = Toast(title: "Couldn't open that link", systemImage: "exclamationmark.triangle")
+            return
+        }
+        guard !Task.isCancelled else { return }
+        let measured = playback.position(of: episode) != nil && playback.duration > 0 ? playback.duration : nil
+        let duration = measured ?? episode.duration.flatMap { $0 > 0 ? $0 : nil } ?? .infinity
+        guard let moment = link.moment, moment.start < duration else {
+            router.open(.episode(episode))
+            if link.invalidMoment || link.moment != nil { router.toast = unavailable }
+            return
+        }
+        switch moment {
+        case .time(let start):
+            playback.playShared(episode, at: start)
+            router.toast = Toast(title: "Started at \(Duration.clock(start))", detail: "From a shared link", systemImage: "link", actions: [
+                Toast.Action(title: "Start over") {
+                    if playback.position(of: episode) != nil { playback.seek(to: 0) }
+                }
+            ])
+        case .clip(let start, let end):
+            playback.playClip(episode, from: start, to: end)
+            router.showingPlayer = true
+        case .chapter(let chapter, let start, let end):
+            playback.playClip(episode, from: start, to: end, chapter: chapter)
+            router.showingPlayer = true
+        }
     }
 
     private func retryProgressWhenConnected() async {
