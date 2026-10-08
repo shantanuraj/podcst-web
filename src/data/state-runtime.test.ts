@@ -12,7 +12,11 @@ import type {
 import { followProjection } from '@/shared/subscriptions/follow-outbox';
 import vectors from '../../contracts/state/fixtures.json';
 import { ApiError } from './api';
-import { progressProjection } from './progress-outbox';
+import {
+  freezeProgress,
+  progressProjection,
+  queueProgress,
+} from './progress-outbox';
 import { StateRuntime, type StateTransport } from './state-runtime';
 import {
   accountState,
@@ -471,4 +475,214 @@ test('OPML preserves per-URL failures across restart without retrying successful
   expect(
     restart.getSnapshot().state?.accounts.a.follows.importFailures,
   ).toEqual([bad]);
+});
+
+async function guestSelectionFixture() {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate(null);
+  await sync.progress(id, 'replay', 37);
+  await sync.progress('9007199254740994', 'played', 0);
+  await f.storage.update((root) => {
+    accountState(root, 'a').progress.scope = scope;
+  });
+  await sync.activate('a');
+  return {
+    ...f,
+    sync,
+    selection: { episodeId: id, positionSeconds: 37, completed: false },
+  };
+}
+
+test('selected guest position becomes NEW account intent exactly once, never on account activation', async () => {
+  const f = await guestSelectionFixture();
+  expect((await f.storage.load()).accounts.a.progress.queued).toEqual([]);
+  const before = (await f.storage.load()).accounts.a.progress;
+  await f.sync.transferGuestProgress('a', f.selection);
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toEqual([f.selection]);
+  expect(root.accounts.a.progress.clientId).toBe(before.clientId);
+  expect(progressProjection(root.guest.progress).get(id)).toBeUndefined();
+  expect(
+    progressProjection(root.guest.progress).get('9007199254740994'),
+  ).toEqual({
+    episodeId: '9007199254740994',
+    positionSeconds: 0,
+    completed: true,
+  });
+  await expect(f.sync.transferGuestProgress('a', f.selection)).rejects.toThrow(
+    'selection changed',
+  );
+  expect((await f.storage.load()).accounts.a.progress.queued).toHaveLength(1);
+});
+test('selected played-at-zero tuple is transferred exactly, without changing other guest positions', async () => {
+  const f = await guestSelectionFixture();
+  const selected = {
+    episodeId: '9007199254740994',
+    positionSeconds: 0,
+    completed: true,
+  };
+  await f.sync.transferGuestProgress('a', selected);
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toEqual([selected]);
+  expect(progressProjection(root.guest.progress).get(id)).toEqual(f.selection);
+});
+test('guest-transfer transaction failure rolls back both consumption and new account intent', async () => {
+  const f = await guestSelectionFixture();
+  let fail = false;
+  const storage = {
+    load: f.storage.load,
+    update: (change: Parameters<typeof f.storage.update>[0]) =>
+      f.storage.update((root) => {
+        change(root);
+        if (fail) throw new Error('Disk full');
+      }),
+  };
+  const sync = f.make(storage);
+  await sync.activate('a');
+  const before = await f.storage.load();
+  fail = true;
+  const error = await sync.transferGuestProgress('a', f.selection).then(
+    () => null,
+    (error: Error) => error.message,
+  );
+  expect(error).toBe('Disk full');
+  expect(await f.storage.load()).toEqual(before);
+  expect(sync.getSnapshot().error).toContain('not transferred');
+  fail = false;
+  await sync.transferGuestProgress('a', f.selection);
+  expect((await f.storage.load()).accounts.a.progress.queued).toEqual([
+    f.selection,
+  ]);
+});
+test('guest transfer rejects an edited guest tuple and leaves its newer value untouched', async () => {
+  const f = await guestSelectionFixture();
+  const guestTab = f.make();
+  await guestTab.activate(null);
+  await guestTab.progress(id, 'replay', 12);
+  await expect(f.sync.transferGuestProgress('a', f.selection)).rejects.toThrow(
+    'selection changed',
+  );
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toEqual([]);
+  expect(progressProjection(root.guest.progress).get(id)?.positionSeconds).toBe(
+    12,
+  );
+});
+test('guest transfer requires the selected verified account, not a fresh or changed target', async () => {
+  const f = await guestSelectionFixture();
+  await expect(f.sync.transferGuestProgress('b', f.selection)).rejects.toThrow(
+    'Verified account',
+  );
+  await f.sync.activate('b');
+  await expect(f.sync.transferGuestProgress('b', f.selection)).rejects.toThrow(
+    'Verified account',
+  );
+  const root = await f.storage.load();
+  expect(progressProjection(root.guest.progress).get(id)).toEqual(f.selection);
+  expect(root.accounts.b).toBeUndefined();
+});
+test('retiring an account before the queued transfer transaction runs cannot consume guest work', async () => {
+  const f = await guestSelectionFixture();
+  const gate = Promise.withResolvers<void>();
+  let delay = false;
+  const storage = {
+    load: f.storage.load,
+    update: (change: Parameters<typeof f.storage.update>[0]) => {
+      if (delay) {
+        delay = false;
+        return gate.promise.then(() => f.storage.update(change));
+      }
+      return f.storage.update(change);
+    },
+  };
+  const sync = f.make(storage);
+  await sync.activate('a');
+  delay = true;
+  const transfer = sync.transferGuestProgress('a', f.selection);
+  await sync.activate('b');
+  gate.resolve();
+  await expect(transfer).rejects.toThrow('Session retired');
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toEqual([]);
+  expect(root.accounts.b).toBeUndefined();
+  expect(progressProjection(root.guest.progress).get(id)).toEqual(f.selection);
+});
+test('two tabs selecting the same guest tuple cannot upload it twice', async () => {
+  const f = await guestSelectionFixture();
+  const second = f.make(browserStateStorage());
+  await second.activate('a');
+  const results = await Promise.allSettled([
+    f.sync.transferGuestProgress('a', f.selection),
+    second.transferGuestProgress('a', f.selection),
+  ]);
+  expect(
+    results.filter((result) => result.status === 'fulfilled'),
+  ).toHaveLength(1);
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toEqual([f.selection]);
+  expect(progressProjection(root.guest.progress).has(id)).toBe(false);
+});
+
+test('selected guest transfer restarts as the same new action and reaches the ordinary progress endpoint', async () => {
+  const f = await guestSelectionFixture();
+  await f.sync.transferGuestProgress('a', f.selection);
+  const restart = f.make(browserStateStorage());
+  await restart.activate('a');
+  expect(restart.getSnapshot().state?.accounts.a.progress.queued).toEqual([
+    f.selection,
+  ]);
+  await f.online();
+  await restart.refresh();
+  expect(f.sent).toHaveLength(1);
+  expect((f.sent[0] as ProgressBatch).changes).toEqual([f.selection]);
+  expect((f.sent[0] as ProgressBatch).sequence).toBe('1');
+  expect(
+    progressProjection((await f.storage.load()).guest.progress).has(id),
+  ).toBe(false);
+});
+test('a generation change between guest selection and its transaction preserves both guest source and target', async () => {
+  const f = await guestSelectionFixture();
+  const gate = Promise.withResolvers<void>();
+  let delay = false;
+  const storage = {
+    load: f.storage.load,
+    update: (change: Parameters<typeof f.storage.update>[0]) => {
+      if (delay) {
+        delay = false;
+        return gate.promise.then(() => f.storage.update(change));
+      }
+      return f.storage.update(change);
+    },
+  };
+  const sync = f.make(storage);
+  await sync.activate('a');
+  delay = true;
+  const transfer = sync.transferGuestProgress('a', f.selection);
+  await f.storage.update((root) => {
+    accountState(root, 'a').progress.scope = {
+      ...scope,
+      generation: crypto.randomUUID(),
+    };
+  });
+  gate.resolve();
+  await expect(transfer).rejects.toThrow('scope is unavailable');
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toEqual([]);
+  expect(progressProjection(root.guest.progress).get(id)).toEqual(f.selection);
+});
+
+test('selected guest intent stays behind an existing frozen account batch without relabeling it', async () => {
+  const f = await guestSelectionFixture();
+  await f.storage.update((root) => {
+    const progress = accountState(root, 'a').progress;
+    queueProgress(progress, id, 'played', 0);
+    freezeProgress(progress);
+  });
+  const frozen = (await f.storage.load()).accounts.a.progress.flight;
+  await f.sync.transferGuestProgress('a', f.selection);
+  const progress = (await f.storage.load()).accounts.a.progress;
+  expect(progress.flight).toEqual(frozen);
+  expect(progress.sequence).toBe('1');
+  expect(progress.queued).toEqual([f.selection]);
 });

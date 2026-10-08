@@ -30,6 +30,7 @@ import type {
 } from '@/types';
 import { ArtworkBackdrop } from '@/ui/ArtworkBackdrop/ArtworkBackdrop';
 import { Button } from '@/ui/Button';
+import { GuestProgressTransfer } from '@/ui/EpisodeInfo/GuestProgressTransfer';
 import { ProxiedImage } from '@/ui/Image';
 import { Icon } from '@/ui/icons/svg/Icon';
 import { PageLink } from '@/ui/PageLink/PageLink';
@@ -131,6 +132,7 @@ export default function LibraryPage() {
             'Unable to read your library. This is not an empty library.'}
         </p>
       )}
+      <GuestProgressTransfer />
       {continuing.length > 0 && (
         <section>
           <h2 className={styles.eyebrow}>{t('library.continue')}</h2>

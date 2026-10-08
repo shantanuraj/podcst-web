@@ -16,6 +16,7 @@ import { ShareButton } from '@/ui/Button/ShareButton';
 import { StarButton } from '@/ui/Button/StarButton';
 import { Icon } from '@/ui/icons/svg/Icon';
 import styles from './EpisodeInfo.module.css';
+import { GuestProgressTransfer } from './GuestProgressTransfer';
 
 export function EpisodeActions({
   episode,
@@ -93,6 +94,7 @@ export function EpisodeActions({
         {t('podcast.addToQueue')}
       </Button>
       <StarButton episode={episode} showLabel />
+      {episode.id && <GuestProgressTransfer episodeId={episode.id} />}
       {user && episode.id && !saved?.completed && (
         <Button
           type="button"

@@ -3,7 +3,9 @@ import {
   acknowledgeProgress,
   freezeProgress,
   installProgress,
+  progressProjection,
   queueProgress,
+  sameScope,
 } from '@/data/progress-outbox';
 import {
   accountState,
@@ -11,7 +13,7 @@ import {
   unionGuestFollows,
 } from '@/data/state-storage';
 import type { ProgressEvent } from '@/shared/player/progress-intent';
-import type { StateScope } from '@/shared/state-contract';
+import type { ProgressChange, StateScope } from '@/shared/state-contract';
 import { stateValidator } from '@/shared/state-contract';
 import type { DurableStorage } from '@/shared/storage/durable';
 import {
@@ -163,6 +165,57 @@ export class StateRuntime {
     } catch (error) {
       if (epoch === this.epoch)
         this.emit({ error: 'Progress could not be saved on this device.' });
+      throw error;
+    }
+  }
+  async transferGuestProgress(account: string, selection: ProgressChange) {
+    const epoch = this.epoch;
+    const scope =
+      this.view.account === account
+        ? this.view.state?.accounts[account]?.progress?.scope
+        : undefined;
+    const chosen = { ...selection };
+    if (!scope || scope.accountId !== account)
+      throw new Error('Verified account required to select guest progress');
+    try {
+      await this.update(epoch, (root) => {
+        const target = accountState(root, account).progress;
+        if (!target.scope || !sameScope(scope, target.scope) || target.blocked)
+          throw new Error('Selected account scope is unavailable');
+        const guest = root.guest.progress;
+        const current = progressProjection(guest).get(chosen.episodeId);
+        if (
+          !current ||
+          current.positionSeconds !== chosen.positionSeconds ||
+          current.completed !== chosen.completed ||
+          guest.needsCompletion.includes(chosen.episodeId) ||
+          guest.flight?.batch.changes.some(
+            (item) => item.episodeId === chosen.episodeId,
+          )
+        )
+          throw new Error(
+            'Guest selection changed; select the current position again',
+          );
+        queueProgress(
+          target,
+          chosen.episodeId,
+          chosen.completed ? 'played' : 'replay',
+          chosen.positionSeconds,
+        );
+        guest.queued = guest.queued.filter(
+          (item) => item.episodeId !== chosen.episodeId,
+        );
+        delete guest.saved[chosen.episodeId];
+        guest.failures = guest.failures.filter((id) => id !== chosen.episodeId);
+      });
+      this.emit({ error: undefined });
+      void this.refresh();
+    } catch (error) {
+      if (epoch === this.epoch)
+        this.emit({
+          error:
+            'Guest position was not transferred. Select it again or retry saving.',
+        });
       throw error;
     }
   }
