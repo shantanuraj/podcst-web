@@ -90,6 +90,11 @@ class PodcstApi(
         "search" to search?.takeIf { it.isNotEmpty() },
     ).domain(podcastId)
 
+    suspend fun publicEpisode(episodeId: Long, podcastId: Long): Episode =
+        get<WirePublicEpisode>("api/episodes/$episodeId", "podcastId" to "$podcastId", session = false).let { found ->
+            found.episode.domain(found.podcast.id, found.podcast.feed, found.podcast.cover, found.podcast.title)
+        }
+
     suspend fun resolve(itunesId: Long, locale: String): Long =
         post<WireIdentity>("api/feed/resolve", body { put("itunes_id", itunesId.toString()); put("locale", locale) }).id
 

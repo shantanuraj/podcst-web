@@ -37,7 +37,8 @@ data class Episode(
     val identity: EpisodeIdentity get() = id?.let { EpisodeIdentity("episode:$it") } ?: EpisodeIdentity(localIdentity ?: "local:$feed\u001F$guid")
     val artwork: String get() = episodeArt?.takeIf { it.isNotBlank() } ?: cover
     val notes: String get() = showNotes.ifEmpty { summary.orEmpty() }
-    val shareUrl: String? get() = if (isPrivate) null else shareableWebpage(link, excluding = listOf(feed, file.url))
+    fun shareUrl(moment: Moment? = null): String? =
+        if (isPrivate || podcastId == null || id == null) null else ShareLinks.url(ShareTarget(podcastId, id, moment))
     val podcast: Podcast get() = Podcast(id = podcastId, feed = feed, title = podcastTitle.orEmpty(), cover = cover, isPrivate = isPrivate)
 }
 

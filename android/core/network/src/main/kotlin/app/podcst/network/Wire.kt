@@ -110,6 +110,7 @@ internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, it
     ListEpisodeItem(ListMembership(it.episodeId, it.addedAt, it.availability), it.episode?.domain())
 }, nextCursor, protocol, accountId, generation)
 
+@Serializable internal data class WirePublicEpisode(val podcast: WirePodcast, val episode: WireEpisode)
 @Serializable internal data class WireSession(val user: WireUser? = null)
 @Serializable internal data class WireProgress(val episode: WireEpisode, val position: Double)
 @Serializable internal data class WireIdentity(@Serializable(CatalogueId::class) val id: Long)

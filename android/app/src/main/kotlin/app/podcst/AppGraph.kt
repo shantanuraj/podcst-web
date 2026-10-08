@@ -18,6 +18,7 @@ import app.podcst.data.StarRepository
 import app.podcst.data.starRemote
 import app.podcst.data.WorkManagerScheduler
 import app.podcst.network.PodcstApi
+import app.podcst.playback.ClipPreview
 import app.podcst.playback.PlaybackCoordinator
 import app.podcst.playback.PodcstRenderersFactory
 import app.podcst.playback.audio.RustAudioStages
@@ -67,6 +68,7 @@ class AppGraph(application: Application) {
         PodcstRenderersFactory(application, RustAudioStages),
         scope,
     )
+    val preview = ClipPreview(application, media, scope)
 
     init {
         scopes.retainedMediaIdentities = { downloads.states.value.values.mapTo(mutableSetOf()) { it.identity } }

@@ -148,7 +148,7 @@ fun DateBlock(published: Instant?, modifier: Modifier = Modifier) {
     }
 }
 
-enum class ButtonKind { Accent, Ink, Outline, Surface }
+enum class ButtonKind { Accent, Tonal, Ink, Outline, Surface }
 
 @Composable
 fun PodcstButton(
@@ -167,6 +167,7 @@ fun PodcstButton(
     val colors = Podcst.colors
     val (background, content, border) = when (kind) {
         ButtonKind.Accent -> Triple(colors.accent, colors.onAccent, null)
+        ButtonKind.Tonal -> Triple(colors.accentSubtle, colors.accent, null)
         ButtonKind.Ink -> Triple(colors.ink, colors.paper, null)
         ButtonKind.Outline -> Triple(Color.Transparent, colors.ink, BorderStroke(1.dp, colors.rule))
         ButtonKind.Surface -> Triple(colors.surface, colors.ink, BorderStroke(1.dp, colors.rule))

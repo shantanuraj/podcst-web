@@ -1,6 +1,7 @@
 package app.podcst.playback.media
 
 import android.content.Context
+import androidx.media3.common.MediaItem
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.CacheDataSource
@@ -49,6 +50,11 @@ class MediaStore(context: Context, client: OkHttpClient) {
 
     companion object {
         private const val DOWNLOAD_THREADS = 2
+
+        fun item(episode: Episode): MediaItem.Builder = MediaItem.Builder()
+            .setUri(episode.file.url)
+            .setCustomCacheKey(key(episode))
+            .setMimeType(episode.file.type.takeIf { it.startsWith("audio/") && it != "audio/mpeg3" })
 
         fun key(episode: Episode): String {
             val identity = episode.mediaIdentity ?: episode.id?.let { "episode:$it" }

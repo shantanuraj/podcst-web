@@ -84,8 +84,12 @@ class ApiContractTest {
         val request = server.takeRequest()
         val (method, path) = endpoint.split(' ')
         assertEquals(name, method, request.method)
-        assertEquals(name, path, request.url.encodedPath)
+        assertTrue(name, Regex(path.replace(Regex(":[A-Za-z]+"), "[^/]+")).matches(request.url.encodedPath))
         assertEquals(name, "native", request.headers["X-Podcst-Client"])
+        if (endpoint == "GET /api/episodes/:episodeId") {
+            assertEquals(name, "301", request.url.queryParameter("podcastId"))
+            assertEquals(name, null, request.headers["Cookie"])
+        }
         if (status in 200..299) {
             if (failure != null) throw AssertionError(name, failure)
         } else {
@@ -105,6 +109,13 @@ class ApiContractTest {
             "POST /api/feed" -> api.podcast("https://example.com/feed.xml")
             "GET /api/feed/info" -> api.podcastInfo(1)
             "GET /api/feed/episodes" -> api.episodes(1).episodes.forEach { assertTrue(it.guid.isNotEmpty() && it.podcastId != null) }
+            "GET /api/episodes/:episodeId" -> {
+                val episode = api.publicEpisode(262004164, 301)
+                assertEquals(262004164L, episode.id)
+                assertEquals(301L, episode.podcastId)
+                assertEquals("Lex Fridman Podcast", episode.podcastTitle)
+                assertEquals("https://www.podcst.app/episodes/301/262004164", episode.shareUrl())
+            }
             "POST /api/feed/resolve" -> assertTrue(api.resolve(1, "us") > 0)
             "POST /api/feed/refresh" -> api.refresh(1)
             "GET /api/auth/session" -> api.sessionUser()

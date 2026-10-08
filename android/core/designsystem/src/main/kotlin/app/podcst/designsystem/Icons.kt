@@ -61,6 +61,8 @@ object PodcstIcons {
     val StarFilled = icon("StarFilled", Fill(STAR), Stroke(STAR, 1.6f))
     val Person = icon("Person", Stroke(circle(12f, 8f, 4f), 2f), Stroke("M4 20c0-4 4-6 8-6s8 2 8 6", 2f))
     val Download = icon("Download", Stroke("M12 4v11M7 10.5l5 5 5-5M5 20h14", 1.8f))
+    val Link = icon("Link", Stroke("M10 14a4 4 0 005.6 0l3-3a4 4 0 00-5.6-5.6l-1 1M14 10a4 4 0 00-5.6 0l-3 3a4 4 0 005.6 5.6l1-1", 2f))
+    val Replay = icon("Replay", Stroke("M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4", 1.8f))
     val Share = icon("Share", Stroke("M12 3v12M7 8l5-5 5 5M5 14v6h14v-6", 1.6f))
     val Plus = icon("Plus", Stroke("M12 5v14M5 12h14", 1.8f))
     val Check = icon("Check", Stroke("M5 12.5l4.5 4.5L19 7.5", 2.4f))

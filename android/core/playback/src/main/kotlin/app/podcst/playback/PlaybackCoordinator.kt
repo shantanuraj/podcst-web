@@ -30,9 +30,12 @@ import app.podcst.model.Chapter
 import app.podcst.model.ChapterArtwork
 import app.podcst.model.ChapterMetadata
 import app.podcst.model.Episode
+import app.podcst.model.EpisodeIdentity
+import app.podcst.model.Moment
 import app.podcst.model.PlaybackQueue
 import app.podcst.model.PlaybackRules
 import app.podcst.model.ShowNotes
+import app.podcst.model.endOf
 import app.podcst.model.indexAt
 import app.podcst.playback.audio.EffectState
 import app.podcst.playback.audio.ProcessingAudioSink
@@ -62,6 +65,18 @@ sealed interface SleepTimer {
     data class At(val deadline: Long) : SleepTimer
 }
 
+data class Resume(val episode: EpisodeIdentity, val position: Duration)
+
+data class SharedClip(
+    val episode: EpisodeIdentity,
+    val start: Duration,
+    val end: Duration,
+    val chapter: Int?,
+    val queued: Boolean,
+    val previous: Resume?,
+    val ended: Boolean = false,
+)
+
 data class PlayerState(
     val queue: PlaybackQueue = PlaybackQueue(),
     val status: PlaybackStatus = PlaybackStatus.Idle,
@@ -76,6 +91,7 @@ data class PlayerState(
     val chapters: List<Chapter> = emptyList(),
     val chapterMetadata: ChapterMetadata = ChapterMetadata(),
     val sleepTimer: SleepTimer? = null,
+    val clip: SharedClip? = null,
 ) {
     val episode: Episode? get() = queue.episode
     val active: Boolean get() = queue.active && episode != null
@@ -89,6 +105,13 @@ data class PlayerState(
     val chapterIndex: Int? get() = chapters.indexAt(position)
     val chapterArtwork: ChapterArtwork? get() = chapterMetadata.artworkAt(position, duration)
     val buffering: Boolean get() = requested && status == PlaybackStatus.Loading
+    val clipChapter: Chapter? get() = clip?.chapter?.let { chapters.getOrNull(it - 1) }
+    val followingChapter: Moment.Chapter?
+        get() {
+            val number = clip?.chapter ?: return null
+            val chapter = chapters.getOrNull(number) ?: return null
+            return Moment.Chapter(number + 1, chapter.start, chapters.endOf(number, duration))
+        }
 }
 
 private const val CASTING = "Audio effects play on this device only."
@@ -139,16 +162,107 @@ class PlaybackCoordinator internal constructor(
         restoration = scope.launch { restoreLocal(revision) }
     }
 
-    fun play(episode: Episode, at: Duration? = null) {
+    fun play(episode: Episode, at: Duration? = null) = begin(episode, at ?: Duration.ZERO) { it.playing(episode) }
+
+    suspend fun open(episode: Episode, moment: Moment) {
+        restoration.join()
+        when (moment) {
+            is Moment.Time -> begin(episode, moment.start) { it.borrowing(episode) }
+            is Moment.Range -> borrow(episode, moment)
+        }
+    }
+
+    fun replayClip() {
+        val clip = state.value.clip ?: return
+        seek(clip.start)
+        resume()
+    }
+
+    fun nextClipChapter() {
+        val current = state.value
+        val clip = current.clip ?: return
+        val next = current.followingChapter ?: return
+        update { it.copy(clip = clip.copy(start = next.start, end = next.end, chapter = next.number, ended = false)) }
+        seek(next.start)
+        resume()
+    }
+
+    fun keepClip(play: Boolean) {
+        if (state.value.clip == null) return
+        update { it.copy(clip = null) }
+        if (play && player.playbackState == Player.STATE_ENDED) return finishCurrent()
+        if (play) resume()
+        capturePosition()
+        emitProgress(completed = false)
+        persist()
+    }
+
+    fun queueClip() {
+        val clip = state.value.clip ?: return
+        val queue = state.value.queue
+        val moved = queue.index(clip.episode)?.let { queue.moving(it, queue.episodes.size) } ?: queue
+        returnFromClip(clip, moved)
+    }
+
+    fun closeClip() {
+        val clip = state.value.clip ?: return
+        val queue = state.value.queue
+        returnFromClip(clip, queue.index(clip.episode)?.takeUnless { clip.queued }?.let { queue.removing(setOf(it)) } ?: queue)
+    }
+
+    private fun returnFromClip(clip: SharedClip, queue: PlaybackQueue) {
+        unload()
+        val previous = clip.previous?.takeIf { queue.index(it.episode) != null }
+        val restored = previous?.let { queue.selecting(it.episode) } ?: queue
+        update {
+            it.copy(
+                queue = restored,
+                clip = null,
+                position = previous?.position ?: it.position.takeIf { restored.episode?.identity == clip.episode } ?: Duration.ZERO,
+                duration = restored.episode?.duration ?: Duration.ZERO,
+                status = if (restored.episode != null) PlaybackStatus.Paused else PlaybackStatus.Idle,
+                requested = false,
+            )
+        }
+        progressCheckpoint = progressAt(state.value)
+        persist()
+    }
+
+    private fun begin(episode: Episode, start: Duration, arrange: (PlaybackQueue) -> PlaybackQueue) {
         if (changingAccount) return
+        closeClip()
         saveOutgoing()
-        val queue = state.value.queue.playing(episode)
-        val start = at ?: Duration.ZERO
+        val queue = arrange(state.value.queue)
         update { it.copy(queue = queue, position = start, duration = episode.duration ?: Duration.ZERO) }
         load(episode, start, autoplay = true)
         val owner = scopes.current.value
         queueProgress(PendingProgress(episode, start, app.podcst.model.StateProgressEvent.replay, owner))
         persist()
+    }
+
+    private fun borrow(episode: Episode, range: Moment.Range) {
+        if (changingAccount) return
+        closeClip()
+        saveOutgoing()
+        val current = state.value
+        val clip = SharedClip(
+            episode = episode.identity,
+            start = range.start,
+            end = range.end,
+            chapter = (range as? Moment.Chapter)?.number,
+            queued = current.queue.index(episode.identity) != null,
+            previous = current.episode?.let { Resume(it.identity, current.position) },
+        )
+        update { it.copy(queue = it.queue.borrowing(episode), clip = clip, position = range.start, duration = episode.duration ?: Duration.ZERO) }
+        load(episode, range.start, autoplay = true)
+    }
+
+    private fun endClip() {
+        val clip = state.value.clip?.takeUnless { it.ended } ?: return
+        update { it.copy(clip = clip.copy(ended = true), requested = false) }
+        if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING) player.seekTo(clip.end.inWholeMilliseconds)
+        player.playWhenReady = false
+        update { it.copy(position = clip.end, status = PlaybackStatus.Paused) }
     }
 
     fun restore(episode: Episode, at: Duration) {
@@ -171,7 +285,7 @@ class PlaybackCoordinator internal constructor(
         } ?: return
         coroutineContext.ensureActive()
         val current = state.value
-        if (changingAccount || scopes.current.value !== owner || playbackRevision != revision ||
+        if (changingAccount || scopes.current.value !== owner || playbackRevision != revision || current.clip != null ||
             wasPlaying || current.requested || current.status == PlaybackStatus.Playing) return
         if (current.episode?.identity == latest.episode.identity && current.position.inWholeSeconds == latest.position.seconds.inWholeSeconds) return
         restore(latest.episode, latest.position.seconds)
@@ -192,6 +306,7 @@ class PlaybackCoordinator internal constructor(
         val current = state.value
         val episode = current.episode ?: return
         if (changingAccount) return
+        if (current.clip?.ended == true) return keepClip(play = true)
         if (loaded != episode.identity.value || player.playbackState == Player.STATE_IDLE || current.status == PlaybackStatus.Failed) {
             load(episode, current.position, autoplay = true)
         } else {
@@ -205,8 +320,10 @@ class PlaybackCoordinator internal constructor(
     fun seek(to: Duration) {
         val current = state.value
         if (current.episode == null) return
-        val target = to.coerceAtLeast(Duration.ZERO).let { if (current.duration.isPositive()) it.coerceAtMost(current.duration) else it }
-        update { it.copy(position = target) }
+        val clip = current.clip
+        val target = if (clip != null) to.coerceIn(clip.start, clip.end)
+        else to.coerceAtLeast(Duration.ZERO).let { if (current.duration.isPositive()) it.coerceAtMost(current.duration) else it }
+        update { it.copy(position = target, clip = clip?.copy(ended = clip.ended && target >= clip.end)) }
         if (loaded == current.episode?.identity?.value && player.playbackState != Player.STATE_IDLE) {
             player.seekTo(target.inWholeMilliseconds)
         } else {
@@ -231,9 +348,9 @@ class PlaybackCoordinator internal constructor(
         current.chapters.firstOrNull { it.start > current.position + PlaybackRules.chapterLookahead }?.let { seek(it.start) } ?: next()
     }
 
-    fun next() = advance { it.next() }
+    fun next() = if (state.value.clip != null) closeClip() else advance { it.next() }
 
-    fun previous() = advance { it.previous() }
+    fun previous() = if (state.value.clip != null) closeClip() else advance { it.previous() }
 
     fun enqueue(episode: Episode, next: Boolean = false) {
         update { it.copy(queue = it.queue.enqueue(episode, next)) }
@@ -241,6 +358,7 @@ class PlaybackCoordinator internal constructor(
     }
 
     fun remove(indices: Set<Int>) {
+        if (state.value.clip != null && state.value.queue.current in indices) return closeClip()
         val before = state.value.queue
         if (before.current in indices) saveOutgoing()
         val after = before.removing(indices)
@@ -263,6 +381,7 @@ class PlaybackCoordinator internal constructor(
     }
 
     fun stop() {
+        closeClip()
         val current = state.value
         if (!current.active) return
         capturePosition()
@@ -282,13 +401,14 @@ class PlaybackCoordinator internal constructor(
 
     fun markPlayed() {
         if (changingAccount || !state.value.active) return
+        keepClip(play = false)
         finishCurrent()
     }
 
     fun clear() {
         saveOutgoing()
         unload()
-        update { it.copy(queue = PlaybackQueue(), position = Duration.ZERO, duration = Duration.ZERO, status = PlaybackStatus.Idle, requested = false) }
+        update { it.copy(queue = PlaybackQueue(), clip = null, position = Duration.ZERO, duration = Duration.ZERO, status = PlaybackStatus.Idle, requested = false) }
         persist()
     }
 
@@ -410,11 +530,8 @@ class PlaybackCoordinator internal constructor(
         stopTicker()
     }
 
-    private fun item(episode: Episode): MediaItem = MediaItem.Builder()
+    private fun item(episode: Episode): MediaItem = MediaStore.item(episode)
         .setMediaId(episode.identity.value)
-        .setUri(episode.file.url)
-        .setCustomCacheKey(MediaStore.key(episode))
-        .setMimeType(episode.file.type.takeIf { it.startsWith("audio/") && it != "audio/mpeg3" })
         .setMediaMetadata(
             MediaMetadata.Builder()
                 .setTitle(episode.title)
@@ -453,6 +570,7 @@ class PlaybackCoordinator internal constructor(
         val episode = current.episode ?: return
         playedSinceProgress = 0
         playingSince = if (current.status == PlaybackStatus.Playing) SystemClock.elapsedRealtime() else null
+        if (current.clip != null) return
         val checkpoint = progressAt(current, completed)
         if (progressCheckpoint == checkpoint) return
         val owner = scopes.current.value
@@ -505,6 +623,7 @@ class PlaybackCoordinator internal constructor(
 
     private fun persist() {
         val current = state.value
+        if (current.clip != null) return
         val queue = current.queue
         val owner = scopes.current.value
         val database = owner.database
@@ -579,6 +698,7 @@ class PlaybackCoordinator internal constructor(
         val position = player.currentPosition.coerceAtLeast(0).milliseconds
         val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }?.milliseconds
         update { it.copy(position = position, duration = duration ?: it.duration, buffered = player.bufferedPosition.milliseconds) }
+        if (state.value.clip?.let { position >= it.end } == true) endClip()
         val since = playingSince ?: return
         if (playedSinceProgress + SystemClock.elapsedRealtime() - since >= PlaybackRules.progressInterval.inWholeMilliseconds) {
             emitProgress(completed = false)
@@ -617,7 +737,7 @@ class PlaybackCoordinator internal constructor(
                     tick()
                     if (!player.playWhenReady) update { it.copy(status = PlaybackStatus.Paused) }
                 }
-                Player.STATE_ENDED -> if (loaded != null) finishCurrent()
+                Player.STATE_ENDED -> if (loaded == null) Unit else if (state.value.clip != null) endClip() else finishCurrent()
                 else -> Unit
             }
         }

@@ -16,6 +16,8 @@ private fun stateDecimal(value: String, allowsZero: Boolean): Boolean =
     value.length in 1..19 && value.all { it in '0'..'9' } &&
         value.toLongOrNull()?.let { it >= (if (allowsZero) 0 else 1) && it.toString() == value } == true
 
+internal fun canonicalId(value: String): Long? = value.takeIf { stateDecimal(it, false) }?.toLong()
+
 private fun decimalString(decoder: Decoder): String {
     if (decoder is JsonDecoder) {
         val value = decoder.decodeJsonElement().jsonPrimitive

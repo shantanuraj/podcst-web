@@ -24,6 +24,16 @@ data class PlaybackQueue(
         }
     }
 
+    fun borrowing(episode: Episode): PlaybackQueue {
+        val current = this.episode ?: return playing(episode)
+        if (current.identity == episode.identity) return playing(episode)
+        val others = episodes.filterNot { it.identity == episode.identity }
+        val anchor = others.indexOfFirst { it.identity == current.identity }
+        return copy(episodes = others.toMutableList().apply { add(anchor, episode) }, current = anchor, active = true)
+    }
+
+    fun selecting(identity: EpisodeIdentity): PlaybackQueue = index(identity)?.let { copy(current = it, active = true) } ?: this
+
     fun enqueue(episode: Episode, next: Boolean = false): PlaybackQueue {
         if (index(episode.identity) != null) return this
         val inserted = if (next && episodes.isNotEmpty()) {

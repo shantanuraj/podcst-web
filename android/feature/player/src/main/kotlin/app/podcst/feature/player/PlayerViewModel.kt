@@ -2,9 +2,12 @@ package app.podcst.feature.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.podcst.data.LibraryRepository
+import app.podcst.data.ProgressRepository
 import app.podcst.data.StarRepository
 import app.podcst.model.AudioEffects
 import app.podcst.model.Episode
+import app.podcst.model.EpisodeProgress
 import app.podcst.model.PlaybackRules
 import app.podcst.playback.PlaybackCoordinator
 import app.podcst.playback.PlayerState
@@ -12,6 +15,7 @@ import app.podcst.playback.SleepTimer
 import app.podcst.model.DownloadState
 import app.podcst.playback.media.Downloads
 import app.podcst.playback.media.MediaStore
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,8 +27,12 @@ data class PlayerScreenState(
     val player: PlayerState = PlayerState(),
     val starred: Set<Long> = emptySet(),
     val downloads: Map<String, DownloadState> = emptyMap(),
+    val progress: Map<String, EpisodeProgress> = emptyMap(),
+    val subscribed: Set<String> = emptySet(),
 ) {
     val episode: Episode? get() = player.episode
+    val saved: EpisodeProgress? get() = episode?.let { progress[it.identity.value] }?.takeIf { it.started }
+    val following: Boolean get() = episode?.podcast?.identity in subscribed
     val currentStarred: Boolean get() = episode?.id in starred
     fun download(episode: Episode): DownloadState = downloads[MediaStore.key(episode)] ?: DownloadState.None
 }
@@ -33,9 +41,11 @@ class PlayerViewModel(
     private val playback: PlaybackCoordinator,
     private val stars: StarRepository,
     downloads: Downloads,
+    progress: ProgressRepository,
+    private val library: LibraryRepository,
 ) : ViewModel() {
-    val state: StateFlow<PlayerScreenState> = combine(playback.state, stars.episodeIds, downloads.states) { player, starred, entries ->
-        PlayerScreenState(player, starred, entries.mapValues { it.value.state })
+    val state: StateFlow<PlayerScreenState> = combine(playback.state, stars.episodeIds, downloads.states, progress.progress, library.subscribed) { player, starred, entries, saved, subscribed ->
+        PlayerScreenState(player, starred, entries.mapValues { it.value.state }, saved, subscribed)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlayerScreenState(playback.state.value))
 
     fun toggle() = playback.toggle()
@@ -56,6 +66,24 @@ class PlayerViewModel(
     fun removeUpNext(offset: Int) = playback.removeUpNext(setOf(offset))
     fun moveUpNext(from: Int, to: Int) = playback.moveUpNext(from, to)
     fun clear() = playback.clear()
+    fun replayClip() = playback.replayClip()
+    fun nextClipChapter() = playback.nextClipChapter()
+    fun keepClip(play: Boolean) = playback.keepClip(play)
+    fun queueClip() = playback.queueClip()
+    fun closeClip() = playback.closeClip()
+
+    fun subscribe(onFailure: (Exception) -> Unit) {
+        val podcast = state.value.episode?.podcast ?: return
+        viewModelScope.launch {
+            try {
+                library.toggle(podcast, subscribed = false)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onFailure(error)
+            }
+        }
+    }
 
     fun cycleSpeed() {
         val speeds = PlaybackRules.speeds

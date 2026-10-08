@@ -23,7 +23,7 @@ data class Podcast(
     val isPrivate: Boolean = false,
 ) {
     val identity: String get() = id?.let { "podcast:$it" } ?: "local:$feed"
-    val shareUrl: String? get() = if (isPrivate) null else shareableWebpage(link, excluding = listOf(feed))
+    val shareUrl: String? get() = if (isPrivate || id == null) null else ShareLinks.url(ShareTarget(id))
 }
 
 @Serializable

@@ -2,6 +2,7 @@ package app.podcst.feature.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,7 @@ fun PlayerSheetHost(
     onDismiss: () -> Unit,
     onOpenEpisode: (Episode) -> Unit,
     onOpenPodcast: (Episode) -> Unit,
+    onShareChapter: ((Int) -> Unit)?,
 ) {
     val episode = state.episode ?: return
     val colors = Podcst.colors
@@ -86,7 +88,7 @@ fun PlayerSheetHost(
             )
             Tabs(state.player.chapters.isNotEmpty(), selected, onSelect, Modifier.padding(horizontal = 20.dp).padding(top = 10.dp))
             when (selected) {
-                PlayerSheet.Chapters -> Chapters(state, viewModel)
+                PlayerSheet.Chapters -> Chapters(state, viewModel, onShareChapter)
                 PlayerSheet.Notes -> Notes(episode, viewModel, onOpenEpisode, onOpenPodcast)
                 PlayerSheet.UpNext -> UpNext(state, viewModel, actions)
             }
@@ -160,7 +162,7 @@ private fun Tabs(hasChapters: Boolean, selected: PlayerSheet, onSelect: (PlayerS
 }
 
 @Composable
-private fun Chapters(state: PlayerScreenState, viewModel: PlayerViewModel) {
+private fun Chapters(state: PlayerScreenState, viewModel: PlayerViewModel, onShare: ((Int) -> Unit)?) {
     val colors = Podcst.colors
     val player = state.player
     val chapters = player.chapters
@@ -183,7 +185,10 @@ private fun Chapters(state: PlayerScreenState, viewModel: PlayerViewModel) {
                 Modifier
                     .fillMaxWidth()
                     .alpha(if (played) 0.5f else 1f)
-                    .clickable { viewModel.seek(chapter.start) }
+                    .combinedClickable(
+                        onLongClickLabel = onShare?.let { stringResource(R.string.share_chapter_action) },
+                        onLongClick = onShare?.let { { it(index) } },
+                    ) { viewModel.seek(chapter.start) }
                     .drawBehind {
                         drawLine(colors.rule, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
                     },

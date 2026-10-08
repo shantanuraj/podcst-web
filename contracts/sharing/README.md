@@ -62,7 +62,7 @@ In clip mode:
   - Replay.
   - Next chapter, which is the first choice for a chapter link when a next chapter exists.
   - Add episode to queue.
-- Play full episode leaves clip mode where the playhead is.
+- Play full episode leaves clip mode where the playhead is. Pressing play after the end is Keep listening.
 - Stopping, or playing another episode, also leaves clip mode.
 
 The linked episode only borrows the queue while in clip mode:

@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -63,7 +62,7 @@ import app.podcst.designsystem.MenuEntry
 import app.podcst.designsystem.Podcst
 import app.podcst.designsystem.PodcstIcons
 import app.podcst.designsystem.RoundIcon
-import app.podcst.designsystem.share
+import app.podcst.designsystem.R as DesignR
 import app.podcst.designsystem.speed
 import app.podcst.model.Episode
 import app.podcst.model.PlaybackRules
@@ -82,9 +81,11 @@ fun NowPlayingScreen(
     onDismiss: () -> Unit,
     onStop: () -> Unit,
     onOpenPodcast: (Episode) -> Unit,
+    onShare: (ShareRequest) -> Unit,
 ) {
     val episode = state.episode ?: return
     val player = state.player
+    val clip = player.clip
     val colors = Podcst.colors
     val tint = rememberArtworkTint(episode.artwork) ?: colors.surface
     var sheet by remember { mutableStateOf<PlayerSheet?>(null) }
@@ -98,7 +99,7 @@ fun NowPlayingScreen(
             .navigationBarsPadding(),
     ) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(state, actions, onDismiss, onStop, onOpenPodcast, viewModel)
+            TopBar(state, actions, onDismiss, onStop, onOpenPodcast, onShare, viewModel)
             BoxWithConstraints(Modifier.weight(1f)) {
                 val compact = maxHeight < 640.dp
                 val width = maxWidth
@@ -119,7 +120,7 @@ fun NowPlayingScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     Column(Modifier.fillMaxWidth().widthIn(max = 560.dp).padding(top = if (compact) 18.dp else 26.dp)) {
-                        if (chapterIndex != null) {
+                        if (chapterIndex != null && clip == null) {
                             Eyebrow(
                                 stringResource(R.string.chapter_of, chapterIndex + 1, player.chapters.size) + " · " + player.chapters[chapterIndex].title,
                                 color = colors.accent,
@@ -157,16 +158,22 @@ fun NowPlayingScreen(
                                 modifier = Modifier.padding(top = 8.dp),
                             )
                         }
-                        SeekBar(
-                            player.position,
-                            player.duration,
-                            player.chapters,
-                            onSeek = viewModel::seek,
-                            label = stringResource(R.string.position),
-                            modifier = Modifier.padding(top = 14.dp),
-                        )
-                        Transport(state, viewModel, Modifier.padding(top = 12.dp))
-                        AudioChips(state, viewModel, onQueue = { sheet = PlayerSheet.UpNext }, modifier = Modifier.padding(top = 22.dp))
+                        if (clip != null) {
+                            ClipProgress(player, clip, onSeek = viewModel::seek, modifier = Modifier.padding(top = 14.dp))
+                            ClipTransport(state, viewModel, Modifier.padding(top = 16.dp))
+                            ClipActions(state, viewModel, Modifier.padding(top = 20.dp))
+                        } else {
+                            SeekBar(
+                                player.position,
+                                player.duration,
+                                player.chapters,
+                                onSeek = viewModel::seek,
+                                label = stringResource(R.string.position),
+                                modifier = Modifier.padding(top = 14.dp),
+                            )
+                            Transport(state, viewModel, Modifier.padding(top = 12.dp))
+                            AudioChips(state, viewModel, onQueue = { sheet = PlayerSheet.UpNext }, modifier = Modifier.padding(top = 22.dp))
+                        }
                         if (player.heldDoubleSpeed) {
                             Text(stringResource(R.string.double_speed_held), style = Podcst.type.meta, color = colors.accent, modifier = Modifier.padding(top = 10.dp))
                         }
@@ -174,11 +181,13 @@ fun NowPlayingScreen(
                     }
                 }
             }
-            SheetTabs(
-                hasChapters = player.chapters.isNotEmpty(),
-                onSelect = { sheet = it },
-                modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp),
-            )
+            if (clip == null) {
+                SheetTabs(
+                    hasChapters = player.chapters.isNotEmpty(),
+                    onSelect = { sheet = it },
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp),
+                )
+            }
         }
         sheet?.let { selected ->
             PlayerSheetHost(
@@ -190,6 +199,7 @@ fun NowPlayingScreen(
                 onDismiss = { sheet = null },
                 onOpenEpisode = { onDismiss(); actions.open(it) },
                 onOpenPodcast = { onDismiss(); onOpenPodcast(it) },
+                onShareChapter = episode.shareUrl()?.let { { index: Int -> onShare(ShareRequest(episode.podcast, episode, ShareMode.Chapter, index)) } },
             )
         }
     }
@@ -202,19 +212,25 @@ private fun TopBar(
     onDismiss: () -> Unit,
     onStop: () -> Unit,
     onOpenPodcast: (Episode) -> Unit,
+    onShare: (ShareRequest) -> Unit,
     viewModel: PlayerViewModel,
 ) {
     val episode = state.episode ?: return
     val colors = Podcst.colors
-    val context = LocalContext.current
+    val clip = state.player.clip
     var menu by remember { mutableStateOf(false) }
     var sleep by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         RoundIcon(PodcstIcons.ChevronDown, stringResource(R.string.close_player), onDismiss, size = 48.dp, iconSize = 24.dp, background = Color.Transparent)
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Eyebrow(
-                if (state.player.queue.episodes.size > 1) stringResource(R.string.from_your_queue) else stringResource(R.string.now_playing),
-                color = colors.secondary,
+                when {
+                    clip?.chapter != null -> stringResource(R.string.shared_chapter)
+                    clip != null -> stringResource(R.string.shared_clip)
+                    state.player.queue.episodes.size > 1 -> stringResource(R.string.from_your_queue)
+                    else -> stringResource(R.string.now_playing)
+                },
+                color = if (clip != null) colors.accent else colors.secondary,
             )
         }
         Box {
@@ -222,12 +238,10 @@ private fun TopBar(
             DropdownMenu(menu, { menu = false }, shape = RoundedCornerShape(14.dp), containerColor = colors.elevated) {
                 MenuEntry(stringResource(R.string.go_to_episode), PodcstIcons.Info) { menu = false; onDismiss(); actions.open(episode) }
                 MenuEntry(stringResource(R.string.go_to, episode.podcastTitle ?: ""), PodcstIcons.Library) { menu = false; onDismiss(); onOpenPodcast(episode) }
-                episode.shareUrl?.let { url ->
-                    val at = Format.clock(state.player.position)
-                    MenuEntry(stringResource(R.string.share_from, at), PodcstIcons.Share) {
+                if (episode.shareUrl() != null) {
+                    MenuEntry(stringResource(DesignR.string.share), PodcstIcons.Share) {
                         menu = false
-                        val text = context.getString(R.string.share_text, episode.title, at, url)
-                        context.share(text)
+                        onShare(ShareRequest(episode.podcast, episode, ShareMode.Time))
                     }
                 }
                 MenuDivider()

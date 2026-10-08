@@ -126,7 +126,7 @@ private fun Overflow(state: EpisodeScreenState, actions: EpisodeActions, onOpenP
     Box {
         IconButton(onClick = { open = true }) { Icon(PodcstIcons.MoreVertical, stringResource(DesignR.string.more)) }
         DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(14.dp), containerColor = Podcst.colors.elevated) {
-            if (episode.shareUrl != null) MenuEntry(stringResource(DesignR.string.share), PodcstIcons.Share) { open = false; actions.share(episode) }
+            if (episode.shareUrl() != null) MenuEntry(stringResource(DesignR.string.share), PodcstIcons.Share) { open = false; actions.share(episode) }
             if (!state.download.removable) {
                 MenuEntry(stringResource(DesignR.string.download), PodcstIcons.Download) { open = false; actions.download(episode) }
             } else {

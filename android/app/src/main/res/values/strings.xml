@@ -16,4 +16,8 @@
     <string name="saved_at">Saved at %1$s · %2$d left in queue</string>
     <string name="imported">Imported %1$d podcasts</string>
     <string name="import_failed">%1$d could not be added</string>
+    <string name="started_from_link">Started at %1$s from a shared link</string>
+    <string name="start_over">Start over</string>
+    <string name="moment_unavailable">That moment isn\'t available</string>
+    <string name="link_failed">Couldn\'t open that link</string>
 </resources>

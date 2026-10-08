@@ -11,7 +11,7 @@ import app.podcst.designsystem.PodcstIcons
 import app.podcst.designsystem.ToastAction
 import app.podcst.designsystem.ToastMessage
 import app.podcst.designsystem.Toaster
-import app.podcst.designsystem.share
+import app.podcst.feature.player.ShareRequest
 import app.podcst.model.Episode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -22,6 +22,7 @@ class AppEpisodeActions(
     private val navigator: Navigator,
     private val toaster: Toaster,
     private val chooseList: (Episode) -> Unit,
+    private val share: (ShareRequest) -> Unit,
 ) : EpisodeActions {
     override fun open(episode: Episode) = navigator.episode(episode)
 
@@ -117,14 +118,11 @@ class AppEpisodeActions(
         }
     }
 
-    override fun share(episode: Episode) {
-        val url = episode.shareUrl ?: return
-        context.share(url, episode.title)
-    }
+    override fun share(episode: Episode) = share(ShareRequest(episode.podcast, episode))
 }
 
 @Composable
-fun rememberEpisodeActions(graph: AppGraph, navigator: Navigator, toaster: Toaster, chooseList: (Episode) -> Unit): EpisodeActions {
+fun rememberEpisodeActions(graph: AppGraph, navigator: Navigator, toaster: Toaster, chooseList: (Episode) -> Unit, share: (ShareRequest) -> Unit): EpisodeActions {
     val context = LocalContext.current
-    return remember(graph, navigator, toaster) { AppEpisodeActions(context, graph, navigator, toaster, chooseList) }
+    return remember(graph, navigator, toaster) { AppEpisodeActions(context, graph, navigator, toaster, chooseList, share) }
 }

@@ -44,12 +44,14 @@ fun SeekBar(
     height: Dp = 16.dp,
     showTimes: Boolean = true,
     label: String,
+    start: Duration = Duration.ZERO,
+    endLabel: String? = null,
 ) {
     val colors = Podcst.colors
     var dragging by remember { mutableStateOf<Float?>(null) }
-    val total = duration.takeIf { it.isPositive() }
-    val fraction = dragging ?: total?.let { (position / it).toFloat().coerceIn(0f, 1f) } ?: 0f
-    val shown = total?.let { it * fraction.toDouble() } ?: position
+    val total = (duration - start).takeIf { it.isPositive() }
+    val fraction = dragging ?: total?.let { ((position - start) / it).toFloat().coerceIn(0f, 1f) } ?: 0f
+    val shown = total?.let { start + it * fraction.toDouble() } ?: position
     val active = colors.accent
     val inactive = if (colors.dark) colors.accentSubtle else colors.track
     Column(modifier) {
@@ -60,21 +62,21 @@ fun SeekBar(
                 .semantics {
                     contentDescription = label
                     setProgress { target ->
-                        total?.let { onSeek(it * target.toDouble()) }
+                        total?.let { onSeek(start + it * target.toDouble()) }
                         total != null
                     }
                 }
                 .progressSemantics(fraction, 0f..1f)
-                .pointerInput(total) {
+                .pointerInput(start, total) {
                     if (total == null) return@pointerInput
-                    detectTapGestures { offset -> onSeek(total * (offset.x / size.width).coerceIn(0f, 1f).toDouble()) }
+                    detectTapGestures { offset -> onSeek(start + total * (offset.x / size.width).coerceIn(0f, 1f).toDouble()) }
                 }
-                .pointerInput(total) {
+                .pointerInput(start, total) {
                     if (total == null) return@pointerInput
                     detectHorizontalDragGestures(
                         onDragStart = { offset -> dragging = (offset.x / size.width).coerceIn(0f, 1f) },
                         onDragEnd = {
-                            dragging?.let { onSeek(total * it.toDouble()) }
+                            dragging?.let { onSeek(start + total * it.toDouble()) }
                             dragging = null
                         },
                         onDragCancel = { dragging = null },
@@ -96,7 +98,7 @@ fun SeekBar(
         if (showTimes) {
             Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
                 Text(Format.clock(shown), style = Podcst.type.tabular, color = colors.tertiary, modifier = Modifier.weight(1f))
-                Text(total?.let(Format::clock) ?: "", style = Podcst.type.tabular, color = colors.tertiary)
+                Text(endLabel ?: total?.let { Format.clock(duration) } ?: "", style = Podcst.type.tabular, color = colors.tertiary)
             }
         }
     }

@@ -85,7 +85,7 @@ fun PodcastScreen(
     viewModel: PodcastViewModel,
     actions: EpisodeActions,
     onBack: () -> Unit,
-    onShare: (String) -> Unit,
+    onShare: () -> Unit,
 ) {
     val colors = Podcst.colors
     val list = rememberLazyListState()
@@ -103,8 +103,8 @@ fun PodcastScreen(
                 IconButton(onClick = onBack) { Icon(PodcstIcons.Back, stringResource(DesignR.string.back)) }
             },
             actions = {
-                state.podcast.shareUrl?.let { url ->
-                    IconButton(onClick = { onShare(url) }) { Icon(PodcstIcons.Share, stringResource(R.string.share_podcast)) }
+                if (state.podcast.shareUrl != null) {
+                    IconButton(onClick = onShare) { Icon(PodcstIcons.Share, stringResource(R.string.share_podcast)) }
                 }
                 Overflow(state, viewModel)
             },

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -58,9 +59,13 @@ import app.podcst.destinations.libraryEntries
 import app.podcst.destinations.podcastEntries
 import app.podcst.destinations.playerEntries
 import app.podcst.destinations.settingsEntries
+import app.podcst.feature.player.ClipEndSheet
 import app.podcst.feature.player.MiniPlayer
 import app.podcst.feature.player.NowPlayingScreen
 import app.podcst.feature.player.PlayerViewModel
+import app.podcst.feature.player.ShareRequest
+import app.podcst.feature.player.ShareSheet
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import app.podcst.model.Episode
 
@@ -83,8 +88,10 @@ private fun Shell(graph: AppGraph) {
     val navigator = rememberNavigator()
     val toaster = remember { Toaster() }
     var listTarget by remember { mutableStateOf<Episode?>(null) }
-    val actions = rememberEpisodeActions(graph, navigator, toaster) { listTarget = it }
-    val player: PlayerViewModel = viewModel { PlayerViewModel(graph.playback, graph.stars, graph.downloads) }
+    var shareRequest by remember { mutableStateOf<ShareRequest?>(null) }
+    val share: (ShareRequest) -> Unit = { shareRequest = it }
+    val actions = rememberEpisodeActions(graph, navigator, toaster, chooseList = { listTarget = it }, share = share)
+    val player: PlayerViewModel = viewModel { PlayerViewModel(graph.playback, graph.stars, graph.downloads, graph.progress, graph.library) }
     val playerState by player.state.collectAsStateWithLifecycle()
     val durableStatus by graph.scopes.durable.status.collectAsStateWithLifecycle()
     val unresolved by graph.retained.count.collectAsStateWithLifecycle(0)
@@ -108,7 +115,7 @@ private fun Shell(graph: AppGraph) {
 
     val handler = remember(graph) { IncomingHandler(context, graph) }
     LaunchedEffect(graph) {
-        graph.incoming.collect { incoming ->
+        graph.incoming.collectLatest { incoming ->
             graph.incoming.resetReplayCache()
             handler.handle(incoming, navigator, toaster)
         }
@@ -141,7 +148,7 @@ private fun Shell(graph: AppGraph) {
                         ),
                         entryProvider = entryProvider<NavKey> {
                             discoverEntries(graph, navigator)
-                            podcastEntries(graph, navigator, actions)
+                            podcastEntries(graph, navigator, actions, share)
                             libraryEntries(graph, navigator, actions)
                             playerEntries(graph, navigator, actions, player)
                             settingsEntries(graph, navigator)
@@ -161,13 +168,24 @@ private fun Shell(graph: AppGraph) {
                 }
                 AnimatedVisibility(!typing) { Bar(navigator) }
             }
-            ToastHost(toaster, Modifier.align(Alignment.BottomCenter).padding(bottom = if (playerState.player.active) 160.dp else 96.dp))
+            val nowPlaying = navigator.nowPlaying && playerState.episode != null
             AnimatedVisibility(
-                navigator.nowPlaying && playerState.episode != null,
+                nowPlaying,
                 enter = slideInVertically(tween(320)) { it } + fadeIn(),
                 exit = slideOutVertically(tween(260)) { it } + fadeOut(),
             ) {
-                NowPlayingScreen(playerState, player, actions, onDismiss = { navigator.nowPlaying = false }, onStop = stop, onOpenPodcast = openPodcast)
+                NowPlayingScreen(playerState, player, actions, onDismiss = { navigator.nowPlaying = false }, onStop = stop, onOpenPodcast = openPodcast, onShare = share)
+            }
+            ToastHost(
+                toaster,
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .then(if (nowPlaying) Modifier.navigationBarsPadding() else Modifier)
+                    .padding(bottom = if (nowPlaying) 72.dp else if (playerState.player.active) 160.dp else 96.dp),
+            )
+            ClipEndSheet(playerState, player)
+            shareRequest?.let { request ->
+                ShareSheet(request, playerState, graph.preview, onPause = graph.playback::pause, onDismiss = { shareRequest = null })
             }
             listTarget?.let { episode -> AddToListSheet(graph, episode, onDismiss = { listTarget = null }) }
             if (navigator.signIn) SignIn(graph, onDismiss = { navigator.signIn = false })

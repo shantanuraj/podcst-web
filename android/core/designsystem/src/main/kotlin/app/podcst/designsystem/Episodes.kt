@@ -267,7 +267,7 @@ fun EpisodeMenu(state: EpisodeRowState, actions: EpisodeActions, expanded: Boole
         MenuEntry("Reapply saved progress", PodcstIcons.CheckCircle) { onDismiss(); actions.reapplyProgress(episode) }
         if (state.progress?.completed == true) MenuEntry("Mark unplayed", PodcstIcons.CheckCircle) { onDismiss(); actions.markUnplayed(episode) }
         if (state.progress?.completed != true) MenuEntry(stringResource(R.string.mark_played), PodcstIcons.CheckCircle) { onDismiss(); actions.markPlayed(episode) }
-        if (episode.shareUrl != null) MenuEntry(stringResource(R.string.share), PodcstIcons.Share) { onDismiss(); actions.share(episode) }
+        if (episode.shareUrl() != null) MenuEntry(stringResource(R.string.share), PodcstIcons.Share) { onDismiss(); actions.share(episode) }
     }
 }
 
