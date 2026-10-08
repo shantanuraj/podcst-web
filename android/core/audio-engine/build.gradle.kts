@@ -29,7 +29,7 @@ abstract class BridgeVectors : DefaultTask() {
     }
 }
 
-val abis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+val abis = providers.gradleProperty("podcst.androidAbis").get().split(",")
 val cmakeVersion = "3.30.3"
 val engineDirectory = rootProject.layout.projectDirectory.dir("../audio-engine")
 val rustTargetDirectory = engineDirectory.dir("target")
@@ -48,7 +48,7 @@ val cmakeArguments = listOf(
 
 android {
     namespace = "app.podcst.audio"
-    ndkVersion = "30.0.16248370"
+    ndkVersion = libs.versions.ndk.get()
     defaultConfig {
         ndk.abiFilters += abis
         externalNativeBuild.cmake.arguments += cmakeArguments

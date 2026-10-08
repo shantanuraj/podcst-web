@@ -1,5 +1,6 @@
 [versions]
 agp = "9.4.1"
+ndk = "30.0.16248370"
 kotlin = "2.4.20"
 ksp = "2.3.12"
 coroutines = "1.11.0"

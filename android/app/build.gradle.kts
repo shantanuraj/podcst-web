@@ -7,13 +7,17 @@ plugins {
 android {
     namespace = "app.podcst"
     compileSdk = 37
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         applicationId = "app.podcst.android"
+        ndk.abiFilters += providers.gradleProperty("podcst.androidAbis").get().split(",")
         minSdk = 33
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = providers.gradleProperty("podcst.release.versionCode")
+            .map { it.toInt().also { code -> require(code > 0) } }.getOrElse(1)
+        versionName = providers.gradleProperty("podcst.release.versionName")
+            .map { it.also { name -> require(name.isNotBlank()) } }.getOrElse("1.0")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -30,6 +34,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            ndk.debugSymbolLevel = "FULL"
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = release
         }
