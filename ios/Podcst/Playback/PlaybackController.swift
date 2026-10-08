@@ -120,6 +120,21 @@ public final class PlaybackController {
     @ObservationIgnored private var nowPlayingArtwork: MPMediaItemArtwork?
 
     private var accountID: String?
+    public private(set) var queueStorageError: String?
+    private var unreadableQueueSource: URL?
+    private var queueWriteFailed = false
+    private var queueErased = false
+    private var hasActivatedQueue = false
+    public var queueStorageBlocked: Bool { unreadableQueueSource != nil || queueWriteFailed || queueErased }
+    var canRetryQueueStorage: Bool { !queueErased && (unreadableQueueSource != nil || queueWriteFailed) }
+
+    private enum QueueStorageFailure: Error {
+        case invalidSource, blocked, erased, missingSource
+    }
+
+    private struct QueueOwner: Decodable {
+        var accountID: String?
+    }
 
     private struct PersistedState: Codable {
         var accountID: String?
@@ -127,6 +142,8 @@ public final class PlaybackController {
         var currentIndex: Int
         var currentTime: TimeInterval
         var stopped: Bool
+        var erased: Bool?
+        var eraseCleanupPending: Bool?
     }
 
     init(transport: any PlaybackTransport, persistenceURL: URL = PlaybackController.defaultStorageURL(), accountID: String? = nil, preferences: AudioPreferences? = nil, monotonicTime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, integratesWithSystem: Bool = false, prepareAudioSession: (@Sendable (Bool) async throws -> Void)? = nil, nowPlayingInfoSink: (@MainActor ([String: Any]?) -> Void)? = nil, chapterLoader: (@MainActor (Episode) async -> ChapterMetadata?)? = nil) {
@@ -150,7 +167,8 @@ public final class PlaybackController {
         self.duration = 0
         self.state = .idle
         self.audioPreferences = preferences ?? AudioPreferences(storageURL: persistenceURL.appendingPathExtension("audio"))
-        loadPersistedState()
+        do { installQueue(try readQueue(accountID: accountID)) }
+        catch { queueStorageError = "Saved queue could not be opened. Original data is preserved; queue storage is blocked." }
         transport.onUpdate = { [weak self] update in self?.handleTransport(update) }
         audioPreferences.onChange = { [weak self] in self?.applyAudioOptions() }
         if integratesWithSystem {
@@ -187,20 +205,20 @@ public final class PlaybackController {
     }
 
     func restoreProgress(using load: @MainActor () async -> PlaybackProgress?) async {
-        guard !changingAccount, !isShutdown, !Task.isCancelled else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, !Task.isCancelled else { return }
         let revision = UUID()
         progressRevision = revision
         let wasPlaying = shouldPlay || state == .playing || wasPlayingBeforeInterruption
         guard let progress = await load(), !Task.isCancelled,
               !wasPlaying, !shouldPlay, !wasPlayingBeforeInterruption,
-              !changingAccount, !isShutdown, progressRevision == revision else { return }
+              !queueStorageBlocked, !changingAccount, !isShutdown, progressRevision == revision else { return }
         if progress.episode.identity == currentEpisode?.identity,
            progress.position.rounded(.towardZero) == currentTime.rounded(.towardZero) { return }
         restore(progress.episode, at: progress.position)
     }
 
     public func play(_ episode: Episode, at position: TimeInterval = 0) {
-        guard !changingAccount, !isShutdown else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         saveOutgoingProgress()
         let targetIndex: Int
         if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
@@ -219,7 +237,7 @@ public final class PlaybackController {
     }
 
     public func restore(_ episode: Episode, at position: TimeInterval) {
-        guard !changingAccount, !isShutdown else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         if let existingIndex = queue.firstIndex(where: { $0.identity == episode.identity }) {
             currentIndex = existingIndex
             queue[existingIndex] = episode
@@ -263,7 +281,7 @@ public final class PlaybackController {
     }
 
     public func reopen() {
-        guard !changingAccount, !isShutdown, currentEpisode != nil, !isActive else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, currentEpisode != nil, !isActive else { return }
         progressRevision = UUID()
         transition(to: .paused)
         persist()
@@ -271,12 +289,12 @@ public final class PlaybackController {
     }
 
     public func markPlayed() {
-        guard !changingAccount, !isShutdown, isActive else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, isActive else { return }
         finishCurrentEpisode()
     }
 
     public func resume() {
-        guard !changingAccount, !isShutdown, currentEpisode != nil, state != .playing else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, currentEpisode != nil, state != .playing else { return }
         guard !shouldPlay || audioSessionTask == nil else { return }
         progressRevision = UUID()
         wasPlayingBeforeInterruption = false
@@ -294,7 +312,7 @@ public final class PlaybackController {
     }
 
     public func seek(to position: TimeInterval) {
-        guard !changingAccount, !isShutdown, currentEpisode != nil, position.isFinite else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, currentEpisode != nil, position.isFinite else { return }
         progressRevision = UUID()
         let clamped = max(0, position)
         currentTime = clamped
@@ -375,7 +393,7 @@ public final class PlaybackController {
     }
 
     public func next() {
-        guard !changingAccount, !isShutdown, !queue.isEmpty else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, !queue.isEmpty else { return }
         saveOutgoingProgress()
         let nextIndex = currentIndex + 1 < queue.count ? currentIndex + 1 : 0
         currentIndex = nextIndex
@@ -387,7 +405,7 @@ public final class PlaybackController {
     }
 
     public func previous() {
-        guard !changingAccount, !isShutdown, !queue.isEmpty else { return }
+        guard !queueStorageBlocked, !changingAccount, !isShutdown, !queue.isEmpty else { return }
         saveOutgoingProgress()
         let previousIndex = currentIndex > 0 ? currentIndex - 1 : queue.count - 1
         currentIndex = previousIndex
@@ -399,6 +417,7 @@ public final class PlaybackController {
     }
 
     public func enqueue(_ episode: Episode, next: Bool = false) {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         if queue.contains(where: { $0.identity == episode.identity }) { return }
         if next, !queue.isEmpty {
             let insertion = min(currentIndex + 1, queue.count)
@@ -415,6 +434,7 @@ public final class PlaybackController {
     }
 
     public func remove(atOffsets offsets: IndexSet) {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         guard !offsets.isEmpty, !queue.isEmpty else { return }
         let wasActive = isActive
         let removedCurrent = offsets.contains(currentIndex)
@@ -464,6 +484,7 @@ public final class PlaybackController {
     }
 
     public func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         guard let source = offsets.first, offsets.count == 1, queue.indices.contains(source) else { return }
         let oldCurrentIndex = currentIndex
         let boundedDestination = max(0, min(destination, queue.count))
@@ -492,22 +513,46 @@ public final class PlaybackController {
 
     func cancelAccountChange() { changingAccount = false }
 
-    func switchAccount(to id: String?) {
-        defer { changingAccount = false }
-        guard accountID != id else { return }
+    func checkpointQueueForAccountChange(to accountID: String?) throws {
+        if !queueErased { try checkpointQueue() }
+        try validateQueueStorage(accountID: accountID)
+    }
+
+    func validateQueueStorage(accountID: String?) throws {
+        do { _ = try readQueue(accountID: accountID, fenceCurrentScope: false) }
+        catch {
+            queueStorageError = "The requested account's queue could not be opened. Original data is preserved."
+            throw error
+        }
+    }
+
+    func switchAccount(to id: String?) throws {
+        guard accountID != id else {
+            try checkpointQueue()
+            changingAccount = false
+            return
+        }
+        if !queueErased { try checkpointQueue() }
+        let saved: PersistedState?
+        do { saved = try readQueue(accountID: id, fenceCurrentScope: false) }
+        catch {
+            queueStorageError = "The requested account's queue could not be opened. Account change was not completed."
+            throw error
+        }
         onProgress = nil
-        persist()
         stopPlayback()
-        queue = []
-        currentIndex = 0
-        currentTime = 0
-        duration = 0
         accountID = id
-        loadPersistedState()
-        persist()
+        unreadableQueueSource = nil
+        queueWriteFailed = false
+        queueErased = false
+        queueStorageError = nil
+        installQueue(saved)
+        changingAccount = false
+        updateNowPlayingInfo()
     }
 
     public func clear() {
+        guard !queueStorageBlocked, !changingAccount, !isShutdown else { return }
         saveOutgoingProgress()
         stopPlayback()
         queue.removeAll(keepingCapacity: false)
@@ -524,6 +569,7 @@ public final class PlaybackController {
     }
 
     private func replaceCurrentItem(startingAt position: TimeInterval, autoPlay: Bool) {
+        guard !queueStorageBlocked else { return }
         stopPlayback()
         guard let episode = currentEpisode, episode.audioURL != nil else {
             transition(to: .failed)
@@ -548,7 +594,7 @@ public final class PlaybackController {
     }
 
     private func handleTransport(_ update: PlaybackTransportUpdate) {
-        guard !isShutdown, update.generation == generation, currentEpisode != nil else { return }
+        guard !queueStorageBlocked, !isShutdown, update.generation == generation, currentEpisode != nil else { return }
         switch update.event {
         case .effects(let state):
             audioEffectState = state
@@ -684,11 +730,11 @@ public final class PlaybackController {
             do {
                 try Task.checkCancellation()
                 try await prepareAudioSession(forPlayback)
-                guard !Task.isCancelled, let self, !self.isShutdown, !self.changingAccount else { return }
+                guard !Task.isCancelled, let self, !self.queueStorageBlocked, !self.isShutdown, !self.changingAccount else { return }
                 self.audioSessionTask = nil
                 action()
             } catch {
-                guard !Task.isCancelled, let self, !self.isShutdown, !self.changingAccount else { return }
+                guard !Task.isCancelled, let self, !self.queueStorageBlocked, !self.isShutdown, !self.changingAccount else { return }
                 self.audioSessionTask = nil
                 self.shouldPlay = false
                 self.transition(to: .failed)
@@ -886,36 +932,138 @@ public final class PlaybackController {
         }
     }
 
-    private var scopedStorageURL: URL {
+    private func scopedStorageURL(accountID: String?) -> URL {
         storageURL.appendingPathExtension("scopes").appendingPathComponent(MediaKey.scope(accountID) + ".json")
     }
 
-    private func persist() {
-        let storageURL = scopedStorageURL
-        let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex, currentTime: currentTime, stopped: state == .idle)
-        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+    @discardableResult private func persist() -> Bool {
+        do { try persistQueue(); return true }
+        catch { return false }
+    }
+
+    func checkpointQueue() throws {
+        if !queueStorageBlocked { saveOutgoingProgress() }
+        try persistQueue()
+    }
+
+    private func persistQueue() throws {
         do {
-            try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: storageURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-            var file = storageURL
-            var values = URLResourceValues()
-            values.isExcludedFromBackup = true
-            try file.setResourceValues(values)
+            guard !queueStorageBlocked else { throw QueueStorageFailure.blocked }
+            let existing = try readQueue(accountID: accountID)
+            if existing?.erased == true {
+                installErasedQueue(cleanupPending: existing?.eraseCleanupPending == true)
+                throw QueueStorageFailure.erased
+            }
+            let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex,
+                                          currentTime: currentTime, stopped: state == .idle)
+            let data = try JSONEncoder().encode(snapshot)
+            try DurableStateStore.protectedWrite(data, scopedStorageURL(accountID: accountID))
+            queueStorageError = nil
         } catch {
-            return
+            if !queueErased {
+                queueWriteFailed = unreadableQueueSource == nil
+                queueStorageError = unreadableQueueSource == nil
+                    ? "Queue changes could not be saved. Queue storage is blocked; retry before changing accounts."
+                    : "Saved queue could not be opened. Original data is preserved; queue storage is blocked."
+                stopPlayback()
+            }
+            throw error
         }
     }
 
-    private func loadPersistedState() {
-        let source = FileManager.default.fileExists(atPath: scopedStorageURL.path) ? scopedStorageURL : storageURL
-        guard let data = try? Data(contentsOf: source), let persisted = try? JSONDecoder().decode(PersistedState.self, from: data) else { return }
-        guard persisted.accountID == accountID else { return }
-        queue = persisted.queue
-        currentIndex = queue.isEmpty ? 0 : min(max(0, persisted.currentIndex), queue.count - 1)
-        currentTime = max(0, persisted.currentTime)
+    func retryQueueStorage() throws {
+        guard !queueErased else { throw QueueStorageFailure.erased }
+        do {
+            if let source = unreadableQueueSource, try readPreservedState(source) == nil { throw QueueStorageFailure.missingSource }
+            let saved = try readQueue(accountID: accountID)
+            if saved?.erased == true {
+                installErasedQueue(cleanupPending: saved?.eraseCleanupPending == true)
+                return
+            }
+            let reload = !hasActivatedQueue
+            unreadableQueueSource = nil
+            queueWriteFailed = false
+            if reload { installQueue(saved) }
+            try persistQueue()
+            updateNowPlayingInfo()
+        } catch {
+            queueStorageError = "Queue storage could not be recovered. Original data has not been replaced."
+            throw error
+        }
+    }
+
+    private func readQueue(accountID: String?, fenceCurrentScope: Bool = true) throws -> PersistedState? {
+        var source = scopedStorageURL(accountID: accountID)
+        do {
+            var data = try readPreservedState(source)
+            let scoped = data != nil
+            if data == nil {
+                source = storageURL
+                data = try readPreservedState(source)
+            }
+            guard let data else { return nil }
+            if !scoped, try JSONDecoder().decode(QueueOwner.self, from: data).accountID != accountID { return nil }
+            let saved = try JSONDecoder().decode(PersistedState.self, from: data)
+            if saved.accountID != accountID {
+                guard !scoped else { throw QueueStorageFailure.invalidSource }
+                return nil
+            }
+            guard saved.currentTime.isFinite, saved.currentTime >= 0,
+                  (saved.queue.isEmpty ? saved.currentIndex == 0 : saved.queue.indices.contains(saved.currentIndex)),
+                  saved.erased != true || (saved.queue.isEmpty && saved.currentTime == 0) else { throw QueueStorageFailure.invalidSource }
+            return saved
+        } catch {
+            if fenceCurrentScope { unreadableQueueSource = source }
+            throw error
+        }
+    }
+
+    private func installQueue(_ saved: PersistedState?) {
+        hasActivatedQueue = true
+        if saved?.erased == true { installErasedQueue(cleanupPending: saved?.eraseCleanupPending == true); return }
+        queue = saved?.queue ?? []
+        currentIndex = saved?.currentIndex ?? 0
+        currentTime = saved?.currentTime ?? 0
         duration = currentEpisode?.duration ?? 0
-        transition(to: queue.isEmpty || persisted.stopped ? .idle : .paused)
+        transition(to: queue.isEmpty || saved?.stopped == true ? .idle : .paused)
         progressCheckpoint = currentEpisode.map { PlaybackUpdate(episode: $0, position: currentTime, completed: false) }
+    }
+
+    private func installErasedQueue(cleanupPending: Bool) {
+        queueErased = true
+        stopPlayback()
+        artworkTask?.cancel()
+        artworkTask = nil
+        artworkKey = nil
+        nowPlayingArtwork = nil
+        queue = []
+        currentIndex = 0
+        currentTime = 0
+        duration = 0
+        progressCheckpoint = nil
+        queueStorageError = cleanupPending
+            ? "Queue writes are disabled for this account. Erasure source cleanup is incomplete and must be retried."
+            : "This account's retained queue has been erased. Queue writes are disabled for this account."
+        updateNowPlayingInfo()
+    }
+
+    func terminalEraseQueue(accountID: String) throws {
+        do {
+            var tombstone = PersistedState(accountID: accountID, queue: [], currentIndex: 0, currentTime: 0, stopped: true, erased: true, eraseCleanupPending: true)
+            try DurableStateStore.protectedWrite(JSONEncoder().encode(tombstone), scopedStorageURL(accountID: accountID))
+            if self.accountID == accountID { installErasedQueue(cleanupPending: true) }
+            if let legacy = try readPreservedState(storageURL) {
+                let owner = try JSONDecoder().decode(QueueOwner.self, from: legacy)
+                if owner.accountID == accountID { try FileManager.default.removeItem(at: storageURL) }
+            }
+            tombstone.eraseCleanupPending = false
+            try DurableStateStore.protectedWrite(JSONEncoder().encode(tombstone), scopedStorageURL(accountID: accountID))
+            if self.accountID == accountID { installErasedQueue(cleanupPending: false) }
+            else if !queueStorageBlocked { queueStorageError = nil }
+        } catch {
+            queueStorageError = "Queue erasure could not be completed. Unattributed or inaccessible source data has been preserved; retry erasure."
+            throw error
+        }
     }
 
     static func defaultStorageURL() -> URL {

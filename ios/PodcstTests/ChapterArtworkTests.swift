@@ -82,7 +82,7 @@ final class ChapterArtworkTests: XCTestCase {
         await controller.releaseChapterMetadata()
         XCTAssertNil(controller.currentChapterArtwork)
         XCTAssertTrue(controller.chapters.isEmpty)
-        controller.switchAccount(to: "other")
+        try controller.switchAccount(to: "other")
         XCTAssertNil(infos.last.flatMap { $0 })
     }
 

@@ -68,6 +68,7 @@ struct RootView: View {
     @AppStorage("onboarded") private var onboarded = false
     @State private var router = Router()
     @State private var initialTabConfigured = false
+    @State private var queueRetryError: String?
 
     var body: some View {
         @Bindable var router = router
@@ -76,6 +77,22 @@ struct RootView: View {
                 tabs
             } else {
                 StartupView()
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            if let error = playback.queueStorageError {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(error).font(.footnote).foregroundStyle(.red)
+                    if playback.canRetryQueueStorage {
+                        Button("Retry queue storage") {
+                            do { try playback.retryQueueStorage() }
+                            catch { queueRetryError = error.localizedDescription }
+                        }.font(.footnote)
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(PodcstPalette.paper)
             }
         }
         .tint(PodcstPalette.accent)
@@ -125,6 +142,11 @@ struct RootView: View {
         .task(id: session.user?.id) {
             guard session.user != nil else { return }
             await retryProgressWhenConnected()
+        }
+        .alert("Queue storage remains blocked", isPresented: Binding(get: { queueRetryError != nil }, set: { if !$0 { queueRetryError = nil } })) {
+            Button("OK", role: .cancel) { queueRetryError = nil }
+        } message: {
+            Text(playback.queueStorageError ?? queueRetryError ?? "Queue recovery failed")
         }
         .downloadAlerts()
         .font(.sans(.body))

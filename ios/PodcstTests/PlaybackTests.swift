@@ -225,7 +225,7 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(session.activations, [false, true])
     }
 
-    func testRetiringPlaybackRejectsPendingActivation() async {
+    func testRetiringPlaybackRejectsPendingActivation() async throws {
         for retirement in ["clear", "account", "shutdown", "remove"] {
             let session = ControlledAudioSession()
             let activation = session.request()
@@ -238,7 +238,7 @@ final class PlaybackTests: XCTestCase {
             case "clear": controller.clear()
             case "account":
                 controller.beginAccountChange()
-                controller.switchAccount(to: "another-account")
+                try controller.switchAccount(to: "another-account")
             case "shutdown": controller.shutdown()
             default: controller.remove(atOffsets: IndexSet(integer: 0))
             }
@@ -365,7 +365,313 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(replayPositions, [90, 12, 0, 0])
     }
 
-    func testPlaybackStateBelongsToItsAccountAndSwitchingRetainsIt() {
+    func testCorruptScopedQueueCannotOverwriteSourceAndExplicitRetryReloadsIt() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacy = root.appendingPathComponent("playback.json")
+        let scoped = queueStorageURL(legacy, accountID: "a")
+        let legacyBytes = try queueStorageBytes(accountID: "a", guid: "legacy")
+        let corrupt = Data("meaningful but corrupt queue".utf8)
+        try DurableStateStore.protectedWrite(legacyBytes, legacy)
+        try DurableStateStore.protectedWrite(corrupt, scoped)
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertTrue(controller.queueStorageBlocked)
+        XCTAssertNotNil(controller.queueStorageError)
+        controller.enqueue(episode(guid: "replacement"))
+        controller.play(episode(guid: "replacement"))
+        controller.clear()
+        XCTAssertTrue(controller.queue.isEmpty)
+        XCTAssertThrowsError(try controller.checkpointQueue())
+        XCTAssertThrowsError(try controller.switchAccount(to: "b"))
+        controller.shutdown()
+        XCTAssertEqual(try Data(contentsOf: scoped), corrupt)
+        XCTAssertEqual(try Data(contentsOf: legacy), legacyBytes)
+        let restarted = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertThrowsError(try restarted.retryQueueStorage())
+        XCTAssertEqual(try Data(contentsOf: scoped), corrupt)
+        try FileManager.default.removeItem(at: scoped)
+        XCTAssertThrowsError(try restarted.retryQueueStorage())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scoped.path))
+        try DurableStateStore.protectedWrite(queueStorageBytes(accountID: "a", guid: "repaired"), scoped)
+        try restarted.retryQueueStorage()
+        XCTAssertFalse(restarted.queueStorageBlocked)
+        XCTAssertNil(restarted.queueStorageError)
+        XCTAssertEqual(restarted.currentEpisode?.guid, "repaired")
+        XCTAssertEqual(restarted.currentTime, 37)
+        XCTAssertEqual(try Data(contentsOf: legacy), legacyBytes)
+        restarted.shutdown()
+    }
+
+    func testUnreadableScopedQueueAndInvalidOwnerBlockActivation() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacy = root.appendingPathComponent("playback.json")
+        let scoped = queueStorageURL(legacy, accountID: "a")
+        try FileManager.default.createDirectory(at: scoped, withIntermediateDirectories: true)
+        let sentinel = scoped.appendingPathComponent("source")
+        try Data("retain".utf8).write(to: sentinel)
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertTrue(controller.queueStorageBlocked)
+        XCTAssertThrowsError(try controller.checkpointQueue())
+        XCTAssertThrowsError(try controller.retryQueueStorage())
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("retain".utf8))
+        try FileManager.default.removeItem(at: scoped)
+        let wrongOwner = try queueStorageBytes(accountID: "b", guid: "foreign")
+        try DurableStateStore.protectedWrite(wrongOwner, scoped)
+        XCTAssertThrowsError(try controller.retryQueueStorage())
+        XCTAssertEqual(try Data(contentsOf: scoped), wrongOwner)
+        let restarted = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertTrue(restarted.queueStorageBlocked)
+        XCTAssertTrue(restarted.queue.isEmpty)
+        XCTAssertThrowsError(try restarted.switchAccount(to: "b"))
+        controller.shutdown(); restarted.shutdown()
+        XCTAssertEqual(try Data(contentsOf: scoped), wrongOwner)
+    }
+
+    func testQueueWriteFailurePreservesSavedFileAndBlocksCheckpointAndAccountSwitch() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let legacy = root.appendingPathComponent("playback.json")
+        let scoped = queueStorageURL(legacy, accountID: "a")
+        let directory = scoped.deletingLastPathComponent()
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path); try? FileManager.default.removeItem(at: root) }
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        controller.enqueue(episode(guid: "saved"))
+        let saved = try Data(contentsOf: scoped)
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+        controller.enqueue(episode(guid: "unsaved"))
+        XCTAssertTrue(controller.queueStorageBlocked)
+        XCTAssertNotNil(controller.queueStorageError)
+        XCTAssertEqual(controller.queue.map(\.guid), ["saved", "unsaved"])
+        XCTAssertThrowsError(try controller.checkpointQueue())
+        XCTAssertThrowsError(try controller.switchAccount(to: "b"))
+        XCTAssertEqual(try Data(contentsOf: scoped), saved)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: queueStorageURL(legacy, accountID: "b").path))
+        let restarted = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertEqual(restarted.queue.map(\.guid), ["saved"])
+        restarted.shutdown()
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        XCTAssertThrowsError(try controller.checkpointQueue())
+        try controller.retryQueueStorage()
+        XCTAssertNil(controller.queueStorageError)
+        XCTAssertFalse(controller.queueStorageBlocked)
+        let recovered = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertEqual(recovered.queue.map(\.guid), ["saved", "unsaved"])
+        recovered.shutdown(); controller.shutdown()
+    }
+
+    func testQueueAccountRoundTripAndFailedTargetActivationPreserveBothSources() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacy = root.appendingPathComponent("playback.json")
+        let guest = try queueStorageBytes(accountID: nil, guid: "guest")
+        try DurableStateStore.protectedWrite(guest, legacy)
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        controller.restore(episode(guid: "a"), at: 12)
+        try controller.switchAccount(to: "b")
+        XCTAssertTrue(controller.queue.isEmpty)
+        controller.restore(episode(guid: "b"), at: 90)
+        try controller.switchAccount(to: "a")
+        XCTAssertEqual(controller.currentEpisode?.guid, "a")
+        XCTAssertEqual(controller.currentTime, 12)
+        let b = queueStorageURL(legacy, accountID: "b")
+        let originalB = try Data(contentsOf: b)
+        let broken = Data("broken target".utf8)
+        try broken.write(to: b, options: .atomic)
+        XCTAssertThrowsError(try controller.validateQueueStorage(accountID: "b"))
+        XCTAssertThrowsError(try controller.switchAccount(to: "b"))
+        XCTAssertEqual(controller.currentEpisode?.guid, "a")
+        XCTAssertNotNil(controller.queueStorageError)
+        XCTAssertEqual(try Data(contentsOf: b), broken)
+        try originalB.write(to: b, options: .atomic)
+        try controller.switchAccount(to: "b")
+        XCTAssertEqual(controller.currentEpisode?.guid, "b")
+        XCTAssertEqual(controller.currentTime, 90)
+        try controller.switchAccount(to: "a")
+        XCTAssertEqual(controller.currentEpisode?.guid, "a")
+        XCTAssertEqual(try Data(contentsOf: legacy), guest)
+        controller.shutdown()
+    }
+
+    func testTerminalQueueErasureIsTargetedDurableAndRejectsStaleControllerWrites() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacy = root.appendingPathComponent("playback.json")
+        try DurableStateStore.protectedWrite(queueStorageBytes(accountID: "a", guid: "a"), legacy)
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        try controller.checkpointQueue()
+        let stale = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        let guestURL = queueStorageURL(legacy, accountID: nil)
+        let otherURL = queueStorageURL(legacy, accountID: "b")
+        let guest = try queueStorageBytes(accountID: nil, guid: "guest")
+        let other = try queueStorageBytes(accountID: "b", guid: "b")
+        try DurableStateStore.protectedWrite(guest, guestURL)
+        try DurableStateStore.protectedWrite(other, otherURL)
+        try controller.terminalEraseQueue(accountID: "a")
+        let scoped = queueStorageURL(legacy, accountID: "a")
+        let marker = try Data(contentsOf: scoped)
+        XCTAssertEqual((try JSONSerialization.jsonObject(with: marker) as? [String: Any])?["erased"] as? Bool, true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+        XCTAssertTrue(controller.queue.isEmpty)
+        XCTAssertTrue(controller.queueStorageBlocked)
+        XCTAssertFalse(controller.canRetryQueueStorage)
+        XCTAssertThrowsError(try controller.retryQueueStorage())
+        controller.play(episode(guid: "late")); controller.enqueue(episode(guid: "late"))
+        stale.enqueue(episode(guid: "stale"))
+        XCTAssertTrue(stale.queue.isEmpty)
+        XCTAssertThrowsError(try stale.checkpointQueue())
+        controller.shutdown(); stale.shutdown()
+        XCTAssertEqual(try Data(contentsOf: scoped), marker)
+        let restarted = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertTrue(restarted.queueStorageBlocked)
+        XCTAssertTrue(restarted.queue.isEmpty)
+        restarted.shutdown()
+        XCTAssertEqual(try Data(contentsOf: scoped), marker)
+        XCTAssertEqual(try Data(contentsOf: guestURL), guest)
+        XCTAssertEqual(try Data(contentsOf: otherURL), other)
+        let transition = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        try transition.checkpointQueueForAccountChange(to: "b")
+        try transition.switchAccount(to: "b")
+        XCTAssertEqual(transition.currentEpisode?.guid, "b")
+        try transition.switchAccount(to: "a")
+        XCTAssertTrue(transition.queue.isEmpty)
+        XCTAssertTrue(transition.queueStorageBlocked)
+        transition.shutdown()
+        XCTAssertEqual(try Data(contentsOf: scoped), marker)
+    }
+
+    func testQueueErasePreservesForeignLegacyAndRetriesUnattributedCleanup() throws {
+        for owner in [nil, "b"] as [String?] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let legacy = root.appendingPathComponent("playback.json")
+            let source = try queueStorageBytes(accountID: owner, guid: "foreign")
+            try DurableStateStore.protectedWrite(source, legacy)
+            let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "b")
+            try controller.terminalEraseQueue(accountID: "a")
+            XCTAssertEqual(try Data(contentsOf: legacy), source)
+            let corrupt = Data("unattributed queue source".utf8)
+            try corrupt.write(to: legacy, options: .atomic)
+            XCTAssertThrowsError(try controller.terminalEraseQueue(accountID: "a"))
+            XCTAssertNotNil(controller.queueStorageError)
+            XCTAssertEqual(try Data(contentsOf: legacy), corrupt)
+            let tombstone = try Data(contentsOf: queueStorageURL(legacy, accountID: "a"))
+            XCTAssertEqual((try JSONSerialization.jsonObject(with: tombstone) as? [String: Any])?["erased"] as? Bool, true)
+            let restarted = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+            XCTAssertTrue(restarted.queueStorageError?.contains("cleanup is incomplete") == true)
+            XCTAssertThrowsError(try restarted.terminalEraseQueue(accountID: "a"))
+            XCTAssertEqual(try Data(contentsOf: legacy), corrupt)
+            try Data(#"{"accountID":"a","queue":"damaged but attributable"}"#.utf8).write(to: legacy, options: .atomic)
+            try restarted.terminalEraseQueue(accountID: "a")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+            let completed = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: queueStorageURL(legacy, accountID: "a"))) as? [String: Any])
+            XCTAssertEqual(completed["erased"] as? Bool, true)
+            XCTAssertEqual(completed["eraseCleanupPending"] as? Bool, false)
+            controller.shutdown(); restarted.shutdown()
+        }
+    }
+
+    func testQueueEraseWriteFailureDoesNotClaimSuccessOrRemoveLegacy() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let legacy = root.appendingPathComponent("playback.json")
+        let scoped = queueStorageURL(legacy, accountID: "a")
+        let directory = scoped.deletingLastPathComponent()
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path); try? FileManager.default.removeItem(at: root) }
+        let source = try queueStorageBytes(accountID: "a", guid: "a")
+        try DurableStateStore.protectedWrite(source, legacy)
+        try DurableStateStore.protectedWrite(source, scoped)
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+        XCTAssertThrowsError(try controller.terminalEraseQueue(accountID: "a"))
+        XCTAssertNotNil(controller.queueStorageError)
+        XCTAssertEqual(try Data(contentsOf: scoped), source)
+        XCTAssertEqual(try Data(contentsOf: legacy), source)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        try controller.terminalEraseQueue(accountID: "a")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+        controller.shutdown()
+    }
+
+    func testDelayedProgressAndTransportCannotRepopulateErasedQueue() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacy = root.appendingPathComponent("playback.json")
+        let transport = FakePlaybackTransport()
+        let controller = PlaybackController(transport: transport, persistenceURL: legacy, accountID: "a")
+        controller.restore(episode(guid: "a"), at: 12)
+        let oldGeneration = transport.generation
+        let arrived = expectation(description: "Pending restore")
+        var release: CheckedContinuation<PlaybackProgress?, Never>?
+        let loading = Task {
+            await controller.restoreProgress {
+                arrived.fulfill()
+                return await withCheckedContinuation { release = $0 }
+            }
+        }
+        await fulfillment(of: [arrived], timeout: 2)
+        let eraser = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "b")
+        try eraser.terminalEraseQueue(accountID: "a")
+        let marker = try Data(contentsOf: queueStorageURL(legacy, accountID: "a"))
+        release?.resume(returning: PlaybackProgress(episode: episode(guid: "late"), position: 90))
+        await loading.value
+        transport.emit(.seeked(55), generation: oldGeneration)
+        transport.emit(.ended, generation: oldGeneration)
+        XCTAssertTrue(controller.queue.isEmpty)
+        XCTAssertFalse(transport.hasSource)
+        XCTAssertEqual(try Data(contentsOf: queueStorageURL(legacy, accountID: "a")), marker)
+        controller.shutdown(); eraser.shutdown()
+    }
+
+    private var queueProcessDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("SyntheticQueueRestart")
+    }
+
+    func testQueueProcessRestartWrite() throws {
+        let root = queueProcessDirectory
+        try? FileManager.default.removeItem(at: root)
+        let legacy = root.appendingPathComponent("playback.json")
+        try DurableStateStore.protectedWrite(queueStorageBytes(accountID: "a", guid: "a"), legacy)
+        try DurableStateStore.protectedWrite(Data("corrupt preserved queue".utf8), queueStorageURL(legacy, accountID: "a"))
+        try DurableStateStore.protectedWrite(queueStorageBytes(accountID: "b", guid: "b"), queueStorageURL(legacy, accountID: "b"))
+        try DurableStateStore.protectedWrite(queueStorageBytes(accountID: nil, guid: "guest"), queueStorageURL(legacy, accountID: nil))
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertThrowsError(try controller.checkpointQueue())
+        controller.shutdown()
+        XCTAssertEqual(try Data(contentsOf: queueStorageURL(legacy, accountID: "a")), Data("corrupt preserved queue".utf8))
+        try Data(String(ProcessInfo.processInfo.processIdentifier).utf8).write(to: root.appendingPathComponent("pid"))
+    }
+
+    func testQueueProcessRestartRead() throws {
+        let root = queueProcessDirectory
+        let pid = root.appendingPathComponent("pid")
+        guard FileManager.default.fileExists(atPath: pid.path) else { throw XCTSkip("Run the queue process write test in a separate invocation first") }
+        XCTAssertNotEqual(try String(contentsOf: pid, encoding: .utf8), String(ProcessInfo.processInfo.processIdentifier))
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacy = root.appendingPathComponent("playback.json")
+        let other = try Data(contentsOf: queueStorageURL(legacy, accountID: "b"))
+        let guest = try Data(contentsOf: queueStorageURL(legacy, accountID: nil))
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: legacy, accountID: "a")
+        XCTAssertTrue(controller.queueStorageBlocked)
+        XCTAssertTrue(controller.queue.isEmpty)
+        controller.clear()
+        XCTAssertThrowsError(try controller.checkpointQueue())
+        XCTAssertEqual(try Data(contentsOf: queueStorageURL(legacy, accountID: "a")), Data("corrupt preserved queue".utf8))
+        try controller.terminalEraseQueue(accountID: "a")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+        XCTAssertEqual(try Data(contentsOf: queueStorageURL(legacy, accountID: "b")), other)
+        XCTAssertEqual(try Data(contentsOf: queueStorageURL(legacy, accountID: nil)), guest)
+        controller.shutdown()
+    }
+
+    private func queueStorageURL(_ legacy: URL, accountID: String?) -> URL {
+        legacy.appendingPathExtension("scopes").appendingPathComponent(MediaKey.scope(accountID) + ".json")
+    }
+
+    private func queueStorageBytes(accountID: String?, guid: String) throws -> Data {
+        let value: [String: Any] = ["accountID": accountID as Any? ?? NSNull(), "queue": [try JSONSerialization.jsonObject(with: JSONEncoder().encode(episode(guid: guid)))], "currentIndex": 0, "currentTime": 37, "stopped": true]
+        return try JSONSerialization.data(withJSONObject: value, options: .sortedKeys)
+    }
+
+    func testPlaybackStateBelongsToItsAccountAndSwitchingRetainsIt() throws {
         let url = temporaryURL()
         let transport = FakePlaybackTransport()
         let first = PlaybackController(transport: transport, persistenceURL: url, accountID: "first")
@@ -374,7 +680,7 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(sameAccount.currentEpisode?.guid, "private")
         let otherAccount = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: url, accountID: "second")
         XCTAssertNil(otherAccount.currentEpisode)
-        first.switchAccount(to: "second")
+        try first.switchAccount(to: "second")
         XCTAssertFalse(transport.hasSource)
         XCTAssertTrue(first.queue.isEmpty)
         XCTAssertEqual(first.state, .idle)
@@ -402,7 +708,7 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(transport.playedRates.count, 1)
     }
 
-    func testAccountRetirementRejectsPlayRequestsUntilScopeChanges() {
+    func testAccountRetirementRejectsPlayRequestsUntilScopeChanges() throws {
         let transport = FakePlaybackTransport()
         let controller = PlaybackController(transport: transport, persistenceURL: temporaryURL(), accountID: "first")
         controller.play(episode(guid: "private"))
@@ -412,7 +718,7 @@ final class PlaybackTests: XCTestCase {
         controller.play(episode(guid: "replacement"))
         XCTAssertFalse(transport.hasSource)
         XCTAssertFalse(controller.isPlaybackRequested)
-        controller.switchAccount(to: "second")
+        try controller.switchAccount(to: "second")
         XCTAssertTrue(controller.queue.isEmpty)
         controller.play(episode(guid: "new-account"))
         XCTAssertTrue(transport.hasSource)
@@ -1032,7 +1338,10 @@ final class PlaybackTests: XCTestCase {
                 case "stop": controller.stop()
                 case "clear": controller.clear()
                 case "complete": controller.markPlayed()
-                default: controller.beginAccountChange(); controller.switchAccount(to: "other")
+                default:
+                    controller.beginAccountChange()
+                    do { try controller.switchAccount(to: "other") }
+                    catch { XCTFail("Account switch failed: \(error)") }
                 }
                 return PlaybackProgress(episode: self.episode(guid: "web"), position: 123)
             }

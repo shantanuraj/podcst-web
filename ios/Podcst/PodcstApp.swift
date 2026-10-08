@@ -44,6 +44,7 @@ struct PodcstApp: App {
             stars.suspend()
             playback?.beginAccountChange()
             do {
+                try playback?.checkpointQueueForAccountChange(to: accountID)
                 try library?.checkpointAndSuspend()
                 try stars.checkpointAndSuspend()
             } catch {
@@ -56,7 +57,7 @@ struct PodcstApp: App {
             await playback?.releaseChapterMetadata()
             do { try await media.switchAccount(to: accountID) }
             catch { if media.accountID != accountID { throw error } }
-            playback?.switchAccount(to: accountID)
+            try playback?.switchAccount(to: accountID)
             try stars.switchAccount(to: accountID, activate: false)
             await ArtworkStore.shared.switchAccount(to: accountID)
             playback?.onProgress = { [weak library] update in library?.saveProgress(update) }
