@@ -7,6 +7,7 @@ import type { IPodcastEpisodesInfo, ISubscriptionsMap } from '@/types';
 
 export type SubscriptionsState = {
   subs: ISubscriptionsMap;
+  initialized: boolean;
   error?: string;
   init: () => Promise<void>;
   addSubscription: (feed: string, info: IPodcastEpisodesInfo) => Promise<void>;
@@ -28,6 +29,7 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => {
     try {
       const root = await storage.update(change);
       set({
+        initialized: true,
         subs: Object.fromEntries(
           Object.entries(root.guest.catalog ?? {}).filter(
             ([, item]) => item.id && root.guest.follows.includes(item.id),
@@ -50,6 +52,7 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => {
   };
   return {
     subs: {},
+    initialized: false,
     isSyncing: false,
     init: async () => {
       try {
@@ -59,6 +62,7 @@ export const useSubscriptions = create<SubscriptionsState>((set, get) => {
         });
       } catch {
         set({
+          initialized: true,
           error: 'Guest follows could not be opened. Source data retained.',
         });
       }

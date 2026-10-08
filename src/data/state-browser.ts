@@ -1,7 +1,8 @@
 import { get } from 'idb-keyval';
 import { useSyncExternalStore } from 'react';
 import { responseData } from '@/data/api';
-import { StateRuntime } from '@/data/state-runtime';
+import { type StateFailures, StateRuntime } from '@/data/state-runtime';
+import { progressSyncStatus } from '@/data/state-status';
 import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import type { AccountSession } from '@/shared/auth/account-session';
@@ -135,6 +136,7 @@ export function useDurableState() {
     account?.progress ??
     (session.scope === null ? state?.guest.progress : undefined);
   const follows = account?.follows;
+  const followsPending = !!(follows?.flight || follows?.queued.length);
   const token = session.token();
   return {
     guestProgress: state
@@ -153,22 +155,31 @@ export function useDurableState() {
       ? followProjection(follows)
       : new Map((state?.guest.follows ?? []).map((id) => [id, 'available'])),
     initialized: !!state,
+    followsInitialized:
+      current && !!(session.scope === null ? state : follows?.snapshot),
+    failedProgress: [...new Set(progress?.failures)],
+    failedFollows: [...new Set(follows?.failures)],
+    dismissFailures: (selection: StateFailures) => {
+      if (!session.current(token))
+        return Promise.reject(new Error('Verified account changed'));
+      return sync.dismissFailures(selection);
+    },
+    progressStatus: (episodeId: string | undefined) =>
+      progressSyncStatus(
+        session.scope === null ? undefined : progress,
+        episodeId,
+        current ? view.error : undefined,
+      ),
     unresolvedFollows: state?.legacyFollows?.unresolved ?? [],
     unresolvedImports: follows?.importFailures ?? [],
+    followsPending,
     pending:
-      session.scope !== null &&
-      !!(
-        progress?.flight ||
-        progress?.queued.length ||
-        follows?.flight ||
-        follows?.queued.length
-      ),
+      followsPending ||
+      (session.scope !== null &&
+        !!(progress?.flight || progress?.queued.length)),
     error: current
       ? (progress?.blocked ??
         follows?.blocked ??
-        (progress?.failures.length || follows?.failures.length
-          ? 'Some changes could not be applied.'
-          : undefined) ??
         (state?.legacyFollows?.unresolved.length
           ? 'Some older follows need resolution; source data retained.'
           : undefined) ??

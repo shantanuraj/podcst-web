@@ -81,6 +81,7 @@ function PlayerBar({
   const playing = usePlayer((state) => state.state === 'playing');
   const hold = useHold(onExpand);
   const durable = useDurableState();
+  const progressStatus = durable.progressStatus(episode.id);
   const clip = useClip(episode);
 
   return (
@@ -123,9 +124,9 @@ function PlayerBar({
           <span className={styles.podcast}>
             {episode.podcastTitle || episode.author}
           </span>
-          {(durable.error || durable.pending) && (
+          {progressStatus && (
             <span className={styles.podcast} role="status">
-              {durable.error ?? 'Saved on this device. Waiting to sync…'}
+              {progressStatus}
             </span>
           )}
         </button>

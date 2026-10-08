@@ -34,6 +34,10 @@ export interface StateView {
 export interface StateTransport {
   request(path: string, method?: string, body?: unknown): Promise<unknown>;
 }
+export interface StateFailures {
+  progress?: readonly string[];
+  follows?: readonly string[];
+}
 export class StateRuntime {
   private epoch = 0;
   private running?: Promise<void>;
@@ -237,6 +241,32 @@ export class StateRuntime {
     } catch (error) {
       if (epoch === this.epoch)
         this.emit({ error: 'Follow could not be saved on this device.' });
+      throw error;
+    }
+  }
+  async dismissFailures(selection: StateFailures) {
+    const account = this.view.account;
+    const epoch = this.epoch;
+    if (account === undefined) throw new Error('Account not verified');
+    const progress = new Set(selection.progress);
+    const follows = new Set(selection.follows);
+    try {
+      await this.update(epoch, (root) => {
+        const state =
+          account === null
+            ? root.guest.progress
+            : accountState(root, account).progress;
+        state.failures = state.failures.filter((id) => !progress.has(id));
+        if (account !== null) {
+          const state = accountState(root, account).follows;
+          state.failures = state.failures.filter((id) => !follows.has(id));
+        }
+      });
+    } catch (error) {
+      if (epoch === this.epoch)
+        this.emit({
+          error: 'This notice could not be dismissed on this device.',
+        });
       throw error;
     }
   }

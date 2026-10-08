@@ -18,9 +18,10 @@ export function useServerSubscriptions() {
   });
   return {
     ...query,
+    initialized: durable.followsInitialized,
     membership: durable.follows,
     syncError: durable.error,
-    pending: durable.pending,
+    pending: durable.followsPending,
     data: session.current(token, 'library')
       ? query.data?.filter(
           (podcast) =>

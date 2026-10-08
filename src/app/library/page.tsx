@@ -44,10 +44,11 @@ type Order = 'title' | 'updated' | 'added';
 export default function LibraryPage() {
   const { t } = useTranslation();
   const { data: user, isLoading } = useSession();
-  const podcasts = usePodcasts(!!user);
-  const recent = useRecentProgress(CONTINUE);
   const subscriptions = useServerSubscriptions();
+  const podcasts = usePodcasts(!!user, subscriptions.data);
+  const recent = useRecentProgress(CONTINUE);
   const localError = useSubscriptions((state) => state.error);
+  const localInitialized = useSubscriptions((state) => state.initialized);
   const playing = usePlayer(getCurrentEpisode);
   const queueError = usePlayer((state) => state.storageError);
   const started = usePlayer((state) => state.seekPosition > 0);
@@ -64,6 +65,12 @@ export default function LibraryPage() {
   const releases = useMemo(() => newReleases(podcasts), [podcasts]);
   const starred = useStars();
   const durable = useDurableState();
+  const loading = user
+    ? !subscriptions.isError &&
+      !durable.error &&
+      (!subscriptions.initialized || subscriptions.isPending)
+    : !localInitialized && !localError && !durable.error;
+  const pending = !!user && (subscriptions.isFetching || subscriptions.pending);
   const progress = useEpisodeProgress(
     user
       ? [...releases, ...starred.episodes].flatMap(({ id }) => (id ? [id] : []))
@@ -79,19 +86,57 @@ export default function LibraryPage() {
           <OpmlImport />
           <Button
             type="button"
-            disabled={!podcasts.length}
+            disabled={loading || !podcasts.length}
             onClick={() =>
               downloadOpml(podcasts.map(({ title, feed }) => ({ title, feed })))
             }
           >
-            {t('account.exportOpml', { count: podcasts.length })}
+            {t('account.exportOpml', {
+              count: loading ? '…' : podcasts.length,
+            })}
           </Button>
         </div>
       </header>
-      <p role="status">
+      <p role="status" className={styles.status}>
         <DurableStateStatus />
         {queueError}
       </p>
+      {(durable.failedProgress.length > 0 ||
+        durable.failedFollows.length > 0) && (
+        <div role="status" className={styles.notice}>
+          <div>
+            {durable.failedProgress.length > 0 && (
+              <p>
+                Listening progress could not be saved for{' '}
+                {durable.failedProgress.length} unavailable{' '}
+                {durable.failedProgress.length === 1 ? 'episode' : 'episodes'}.
+              </p>
+            )}
+            {durable.failedFollows.length > 0 && (
+              <p>
+                {durable.failedFollows.length}{' '}
+                {durable.failedFollows.length === 1 ? 'podcast' : 'podcasts'}{' '}
+                could not be followed because{' '}
+                {durable.failedFollows.length === 1 ? 'it is' : 'they are'}{' '}
+                unavailable.
+              </p>
+            )}
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              void durable
+                .dismissFailures({
+                  progress: durable.failedProgress,
+                  follows: durable.failedFollows,
+                })
+                .catch(() => {});
+            }}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
       {user && durable.unresolvedFollows.length > 0 && (
         <ul>
           {durable.unresolvedFollows.map((feed) => (
@@ -146,46 +191,39 @@ export default function LibraryPage() {
           </div>
         </section>
       )}
-      {podcasts.length === 0 &&
+      {!loading &&
+      podcasts.length === 0 &&
       (!user ||
         (subscriptions.isSuccess &&
-          durable.initialized &&
+          subscriptions.initialized &&
           subscriptions.membership.size === 0)) &&
       !subscriptions.isError &&
+      !durable.error &&
       !localError ? (
         <Empty />
       ) : (
         <div className={styles.columns}>
-          <Releases episodes={releases} progress={progress} />
+          <Releases
+            episodes={releases}
+            progress={progress}
+            loading={loading || (pending && podcasts.length === 0)}
+            failed={subscriptions.isError || !!localError || !!durable.error}
+          />
           <Subscriptions
             podcasts={podcasts}
+            membership={user ? subscriptions.membership : undefined}
+            loading={loading}
+            pending={pending}
+            detailsAvailable={!user || subscriptions.isSuccess}
+            unfollow={(id) => {
+              void durable.sync.follow(id, false).catch(() => {});
+            }}
             played={(episode) => {
               const saved = episode.id ? progress.get(episode.id) : undefined;
               return !!saved && (saved.completed || saved.position > 0);
             }}
           />
         </div>
-      )}
-      {user && (
-        <ul>
-          {[...subscriptions.membership]
-            .filter(([id]) => !podcasts.some((podcast) => podcast.id === id))
-            .map(([id, availability]) => (
-              <li key={id}>
-                {availability === 'unavailable'
-                  ? 'Podcast unavailable'
-                  : 'Podcast details unavailable'}{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    void durable.sync.follow(id, false).catch(() => {});
-                  }}
-                >
-                  Unfollow
-                </button>
-              </li>
-            ))}
-        </ul>
       )}
       {(starred.stars.length > 0 || starred.pending || starred.error) && (
         <section className={styles.starred}>
@@ -231,8 +269,10 @@ export default function LibraryPage() {
   );
 }
 
-function usePodcasts(signedIn: boolean): IPodcastEpisodesInfo[] {
-  const { data: remote } = useServerSubscriptions();
+function usePodcasts(
+  signedIn: boolean,
+  remote: IPodcastEpisodesInfo[] | undefined,
+): IPodcastEpisodesInfo[] {
   const local = useSubscriptions(
     useShallow((state) => Object.values(state.subs)),
   );
@@ -314,9 +354,13 @@ function ContinueCard({ episode, position }: RecentProgress) {
 function Releases({
   episodes,
   progress,
+  loading,
+  failed,
 }: {
   episodes: IEpisodeInfo[];
   progress: ReadonlyMap<string, EpisodeProgress>;
+  loading: boolean;
+  failed: boolean;
 }) {
   const { t, language } = useTranslation();
   const [now] = useState(() => Date.now());
@@ -331,11 +375,12 @@ function Releases({
     )
     .slice(0, RELEASES);
   return (
-    <section>
+    <section aria-busy={loading}>
       <div className={styles.sectionHead}>
         <h2>{t('library.newEpisodes')}</h2>
         <span>{t('library.lastWeek')}</span>
       </div>
+      {loading && <LoadingStatus />}
       {rows.length ? (
         <ul>
           {rows.map(({ episode, when }) => (
@@ -347,7 +392,19 @@ function Releases({
             />
           ))}
         </ul>
-      ) : (
+      ) : loading ? (
+        <ul aria-hidden="true">
+          {Array.from({ length: RELEASES }, (_, index) => (
+            <li className={styles.release} key={index}>
+              <span className={styles.loadingArt} />
+              <div className={styles.releaseText}>
+                <span className={styles.loadingTitle} />
+                <span className={styles.loadingMeta} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : failed ? null : (
         <p className={styles.quiet}>{t('library.noNewEpisodes')}</p>
       )}
     </section>
@@ -356,15 +413,33 @@ function Releases({
 
 function Subscriptions({
   podcasts,
+  membership,
+  loading,
+  pending,
+  detailsAvailable,
+  unfollow,
   played,
 }: {
   podcasts: IPodcastEpisodesInfo[];
+  membership?: ReadonlyMap<string, string>;
+  loading: boolean;
+  pending: boolean;
+  detailsAvailable: boolean;
+  unfollow: (id: string) => void;
   played: (episode: IEpisodeInfo) => boolean;
 }) {
   const { t } = useTranslation();
   const [order, setOrder] = useState<Order>('added');
   const [now] = useState(() => Date.now());
   const current = usePlayer(getCurrentEpisode);
+  const ids = new Set(podcasts.map(({ id }) => id));
+  const missing = [...(membership ?? [])].filter(([id]) => !ids.has(id));
+  const placeholders = loading
+    ? missing.length || RELEASES
+    : pending
+      ? missing.length
+      : 0;
+  const count = membership?.size ?? podcasts.length;
   const sorted = useMemo(() => {
     const latest = (podcast: IPodcastEpisodesInfo) =>
       podcast.episodes[0]?.published ?? 0;
@@ -375,11 +450,11 @@ function Subscriptions({
         : podcasts;
   }, [podcasts, order]);
   return (
-    <section>
+    <section aria-busy={loading || placeholders > 0}>
       <div className={styles.sectionHead}>
         <h2>{t('library.subscriptions')}</h2>
         <label className={styles.order}>
-          <span>{podcasts.length} ·</span>
+          <span>{loading && !count ? '…' : count} ·</span>
           <select
             value={order}
             onChange={(event) => setOrder(event.currentTarget.value as Order)}
@@ -390,6 +465,7 @@ function Subscriptions({
           </select>
         </label>
       </div>
+      {(loading || placeholders > 0) && <LoadingStatus />}
       <ul className={styles.grid}>
         {sorted.map((podcast) => {
           const latest = podcast.episodes[0];
@@ -423,8 +499,40 @@ function Subscriptions({
             </li>
           );
         })}
+        {Array.from({ length: placeholders }, (_, index) => (
+          <li
+            className={styles.loadingTile}
+            aria-hidden="true"
+            key={`loading-${index}`}
+          />
+        ))}
       </ul>
+      {!loading && !pending && detailsAvailable && missing.length > 0 && (
+        <ul className={styles.unavailable}>
+          {missing.map(([id, availability]) => (
+            <li key={id}>
+              <span>
+                {availability === 'unavailable'
+                  ? 'Podcast unavailable'
+                  : 'Podcast details unavailable'}
+              </span>
+              <Button type="button" onClick={() => unfollow(id)}>
+                Unfollow
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
+  );
+}
+
+function LoadingStatus() {
+  const { t } = useTranslation();
+  return (
+    <span className="sr-only" role="status">
+      {t('common.loading')}
+    </span>
   );
 }
 

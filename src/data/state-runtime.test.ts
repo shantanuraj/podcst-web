@@ -451,6 +451,53 @@ test('denied storage remains visible and is never treated as empty saved state',
   await expect(sync.follow(id, true)).rejects.toThrow();
 });
 
+test('dismissing shown failures persists without removing newer failures or pending work', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'checkpoint', 20);
+  await sync.follow(id, true);
+  await f.storage.update((root) => {
+    const state = accountState(root, 'a');
+    state.progress.failures = [id, '2'];
+    state.follows.failures = [id, '3'];
+    state.progress.blocked = 'Progress needs recovery';
+  });
+  const before = (await f.storage.load()).accounts.a;
+  await sync.dismissFailures({ progress: [id], follows: [id] });
+  const restarted = f.make();
+  await restarted.activate('a');
+  const after = (await f.storage.load()).accounts.a;
+  expect(restarted.getSnapshot().state?.accounts.a).toEqual(after);
+  expect(after.progress.failures).toEqual(['2']);
+  expect(after.follows.failures).toEqual(['3']);
+  expect(after.progress.queued).toEqual(before.progress.queued);
+  expect(after.follows.queued).toEqual(before.follows.queued);
+  expect(after.progress.blocked).toBe(before.progress.blocked);
+  expect(f.sent).toEqual([]);
+});
+
+test('failed notice dismissal preserves source failures and reports the device error', async () => {
+  const f = fixture();
+  await f.storage.update((root) => {
+    accountState(root, 'a').progress.failures = [id];
+  });
+  const sync = f.make({
+    load: f.storage.load,
+    update: async () => {
+      throw new Error('Disk full');
+    },
+  });
+  await sync.activate('a');
+  await expect(sync.dismissFailures({ progress: [id] })).rejects.toThrow(
+    'Disk full',
+  );
+  expect((await f.storage.load()).accounts.a.progress.failures).toEqual([id]);
+  expect(sync.getSnapshot().error).toBe(
+    'This notice could not be dismissed on this device.',
+  );
+});
+
 test('OPML preserves per-URL failures across restart without retrying successful resolutions', async () => {
   const f = fixture();
   const sync = f.make();
