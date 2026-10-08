@@ -89,5 +89,5 @@ export async function getDuePodcasts(sql: postgres.Sql, limit: number) {
       s.last_polled_at ASC NULLS FIRST
     LIMIT ${limit}
   `;
-  return rows.map(({ id }) => ({ id: Number(id) }));
+  return rows.map(({ id }) => ({ id: String(id) }));
 }

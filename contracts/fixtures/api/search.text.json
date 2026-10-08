@@ -1,15 +1,15 @@
 [
   {
-    "itunes_id": 1434243584,
+    "itunes_id": "1434243584",
     "author": "Lex Fridman",
     "cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts115/v4/3e/e3/9c/3ee39c89-de08-47a6-7f3d-3849cef6d255/mza_16657851278549137484.png/600x600bb.jpg",
     "feed": "https://lexfridman.com/feed/podcast/",
     "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts115/v4/3e/e3/9c/3ee39c89-de08-47a6-7f3d-3849cef6d255/mza_16657851278549137484.png/100x100bb.jpg",
     "title": "Lex Fridman Podcast",
-    "id": 301
+    "id": "301"
   },
   {
-    "itunes_id": 6797394108,
+    "itunes_id": "6797394108",
     "author": "Fridman Podcast",
     "cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/46/38/43/46384313-b94e-47b4-a354-41f2121814bd/mza_1317671298181005980.jpg/600x600bb.jpg",
     "feed": "https://feeds.acast.com/public/shows/6a701c1688c5585c85e3a157",
@@ -17,25 +17,25 @@
     "title": "Lex Fridman Podcast"
   },
   {
-    "itunes_id": 1567129969,
+    "itunes_id": "1567129969",
     "author": "5 minute podcast summaries",
     "cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts211/v4/94/fa/ee/94faeed7-5e68-346f-93d7-0cbc826b3db1/mza_10627702303048624925.jpg/600x600bb.jpg",
     "feed": "https://www.spreaker.com/show/4920847/episodes/feed",
     "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts211/v4/94/fa/ee/94faeed7-5e68-346f-93d7-0cbc826b3db1/mza_10627702303048624925.jpg/100x100bb.jpg",
     "title": "Lex Fridman Podcast | 5 minute podcast summaries",
-    "id": 106631
+    "id": "106631"
   },
   {
-    "itunes_id": 1569535757,
+    "itunes_id": "1569535757",
     "author": "5 minute podcast summaries",
     "cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts211/v4/34/d6/e6/34d6e650-e997-9bf8-f9f1-0ae7bee76b1d/mza_11746220845823984591.jpg/600x600bb.jpg",
     "feed": "https://www.spreaker.com/show/4927606/episodes/feed",
     "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts211/v4/34/d6/e6/34d6e650-e997-9bf8-f9f1-0ae7bee76b1d/mza_11746220845823984591.jpg/100x100bb.jpg",
     "title": "5 minute podcast summaries of: Tim Ferriss, Hidden Brain, Sam Harris, Lex Fridman, Jordan Peterson",
-    "id": 49264
+    "id": "49264"
   },
   {
-    "itunes_id": 6814008109,
+    "itunes_id": "6814008109",
     "author": "gtesd",
     "cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/9d/07/2b/9d072baa-2415-33d8-be47-c8ce5bc9e674/mza_2329130824698987089.jpg/600x600bb.jpg",
     "feed": "https://www.spreaker.com/show/7373683/episodes/feed",

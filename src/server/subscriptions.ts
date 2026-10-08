@@ -1,7 +1,5 @@
-import { feedUrl } from '@/shared/feed-url';
 import type { IPodcastEpisodesInfo } from '@/types';
 import { sql } from './db';
-import { ingestPodcast } from './ingest/podcast';
 import { podcastAccess } from './podcast-access';
 
 export async function getSubscriptions(
@@ -80,55 +78,4 @@ export async function getSubscriptions(
   }
 
   return podcasts;
-}
-
-export async function addSubscription(
-  userId: string,
-  podcastId: number,
-): Promise<boolean> {
-  const [podcast] = await sql`
-    SELECT p.id FROM podcasts p
-    WHERE p.id = ${podcastId} AND ${podcastAccess(sql, userId)}
-  `;
-  if (!podcast) return false;
-  await sql`
-    INSERT INTO subscriptions (user_id, podcast_id)
-    SELECT ${userId}, p.id FROM podcasts p
-    WHERE p.id = ${podcastId} AND ${podcastAccess(sql, userId)}
-    ON CONFLICT (user_id, podcast_id) DO NOTHING
-  `;
-  return true;
-}
-
-export async function removeSubscription(
-  userId: string,
-  podcastId: number,
-): Promise<boolean> {
-  await sql`
-    DELETE FROM subscriptions
-    WHERE user_id = ${userId} AND podcast_id = ${podcastId}
-  `;
-
-  return true;
-}
-
-export async function importSubscriptions(
-  userId: string,
-  feedUrls: string[],
-): Promise<{ succeeded: number; failed: number }> {
-  let succeeded = 0;
-  let failed = 0;
-
-  for (const input of feedUrls) {
-    try {
-      const podcast = await ingestPodcast(feedUrl(input), userId);
-      if (podcast?.id && (await addSubscription(userId, podcast.id)))
-        succeeded++;
-      else failed++;
-    } catch {
-      failed++;
-    }
-  }
-
-  return { succeeded, failed };
 }

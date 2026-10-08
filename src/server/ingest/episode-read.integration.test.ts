@@ -10,16 +10,41 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
+import {
+  fixtureId,
+  fixtureLabel,
+  withFixtureId,
+} from '../../../scripts/lib/identity-fixture';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 
 installFeedTransportFixture();
 
 import {
-  prepareEpisodeRead,
-  readEpisodePage,
+  prepareEpisodeRead as prepareCanonicalEpisodeRead,
+  readEpisodePage as readCanonicalEpisodePage,
   type SortDirection,
   type SortField,
 } from './episode-read';
+
+const prepareEpisodeRead = withFixtureId(prepareCanonicalEpisodeRead);
+const readEpisodePage = async (
+  sql: postgres.Sql,
+  options: Omit<Parameters<typeof readCanonicalEpisodePage>[1], 'podcastId'> & {
+    podcastId: string | number;
+  },
+) => {
+  const page = await readCanonicalEpisodePage(sql, {
+    ...options,
+    podcastId: fixtureId(options.podcastId),
+  });
+  return {
+    ...page,
+    episodes: page.episodes.map((episode) => ({
+      ...episode,
+      id: fixtureLabel(episode.id),
+    })),
+  };
+};
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schema = `episode_read_test_${randomUUID().replaceAll('-', '')}`;
@@ -44,14 +69,6 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
       connection: { search_path: schema },
       onnotice: () => {},
       debug: (_connection, query) => statements?.push(query),
-      types: {
-        bigint: {
-          to: 20,
-          from: [20],
-          serialize: (value: number) => String(value),
-          parse: Number,
-        },
-      },
     });
     await createSchemaFixture(sql);
     server = Bun.serve({

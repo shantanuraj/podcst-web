@@ -1,3 +1,4 @@
 {
-  "message": "Invalid list synchronization sequence"
+  "code": "sequence_conflict",
+  "message": "State stream is blocked"
 }

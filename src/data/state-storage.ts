@@ -28,10 +28,13 @@ export interface BrowserState {
 export function accountState(root: BrowserState, account: string) {
   if (root.erased.includes(account))
     throw new Error('Account was terminally erased');
-  root.accounts[account] ??= {
-    progress: emptyProgress(),
-    follows: emptyFollows(),
-  };
+  if (!Object.hasOwn(root.accounts, account))
+    Object.defineProperty(root.accounts, account, {
+      value: { progress: emptyProgress(), follows: emptyFollows() },
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   return root.accounts[account];
 }
 export function convertGuestFollows(root: BrowserState, source: unknown) {
@@ -77,7 +80,15 @@ export const browserStateStorage = () =>
         !!root &&
         root.version === 1 &&
         !!root.accounts &&
+        typeof root.accounts === 'object' &&
+        !Array.isArray(root.accounts) &&
         Array.isArray(root.erased) &&
+        root.erased.every(
+          (account) =>
+            typeof account === 'string' &&
+            account.length > 0 &&
+            account.length <= 128,
+        ) &&
         !!root.guest &&
         Array.isArray(root.guest.follows) &&
         root.guest.follows.every(isCanonicalId) &&

@@ -152,12 +152,24 @@ test.skipIf(!process.env.PG_BIN)(
       const [tagged] = await sql\`SELECT 41 + \${1} AS value\`;
       const [transaction] = await sql.begin(tx => tx\`SELECT 7 AS value\`);
       const [unsafe] = await sql.unsafe('SELECT 9 AS value');
+      const [identity] = await sql\`SELECT 9007199254740993::bigint AS id,
+        9223372036854775807::bigint AS maximum,
+        ARRAY[9007199254740993,9223372036854775807]::bigint[] AS ids\`;
       await sql.end({ timeout: 1 });
-      console.log(JSON.stringify([tagged.value, transaction.value, unsafe.value]));
+      console.log(JSON.stringify([tagged.value, transaction.value, unsafe.value, identity]));
     `,
           { DATABASE_URL: cluster.url },
         ),
-      ).toEqual([42, 7, 9]);
+      ).toEqual([
+        42,
+        7,
+        9,
+        {
+          id: '9007199254740993',
+          maximum: '9223372036854775807',
+          ids: ['9007199254740993', '9223372036854775807'],
+        },
+      ]);
     } finally {
       await cluster.stop();
     }

@@ -12,23 +12,10 @@
     "periodicPlayingSeconds": 30
   },
   "completion": {
-    "parity": {
-      "ended": true,
-      "markedPlayed": true,
-      "savedPositionFractionOfKnownDuration": 0.95
-    },
-    "current": {
-      "ios": {
-        "ended": true,
-        "markedPlayed": true,
-        "savedPositionFractionOfKnownDuration": null
-      },
-      "web": {
-        "ended": true,
-        "markedPlayed": true,
-        "savedPositionFractionOfKnownDuration": 0.95
-      }
-    }
+    "ended": true,
+    "markedPlayed": true,
+    "unplayedResetsPosition": true,
+    "deliberateReplayClearsCompletion": true
   },
   "chapters": {
     "minimumCount": 2,

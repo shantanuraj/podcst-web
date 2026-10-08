@@ -42,7 +42,7 @@ export namespace iTunes {
     /**
      * Podcast ID
      */
-    collectionId: string;
+    collectionId: number | string;
     /**
      * Podcast name
      */

@@ -5,6 +5,7 @@ import { ListError } from './service';
 const policies = {
   changes: { limit: 120, seconds: 60 },
   clients: { limit: 20, seconds: 60 * 60 },
+  imports: { limit: 6, seconds: 60 },
 };
 
 const consume = `

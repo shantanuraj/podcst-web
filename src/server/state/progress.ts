@@ -90,10 +90,11 @@ export function createProgressStateService(
             SELECT position, completed FROM playback_progress
             WHERE user_id = ${accountId} AND episode_id = ${change.episodeId}
           `;
+          const completed = change.completed ?? previous?.completed ?? false;
           revision = nextStateRevision(revision);
           await tx`
             INSERT INTO playback_progress (user_id, episode_id, position, completed, revision, updated_at)
-            VALUES (${accountId}, ${change.episodeId}, ${change.positionSeconds}, ${change.completed}, ${revision}::bigint, clock_timestamp())
+            VALUES (${accountId}, ${change.episodeId}, ${change.positionSeconds}, ${completed}, ${revision}::bigint, clock_timestamp())
             ON CONFLICT (user_id, episode_id) DO UPDATE SET
               position = EXCLUDED.position, completed = EXCLUDED.completed,
               revision = EXCLUDED.revision, updated_at = EXCLUDED.updated_at
@@ -102,7 +103,7 @@ export function createProgressStateService(
             episodeId: change.episodeId,
             status:
               previous?.position === change.positionSeconds &&
-              previous.completed === change.completed
+              previous.completed === completed
                 ? 'unchanged'
                 : 'applied',
           });

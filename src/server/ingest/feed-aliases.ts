@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { isCanonicalId } from '@/shared/canonical-id';
 import { feedUrl } from '../../shared/feed-url';
 import {
   findPodcastIdentity,
@@ -10,7 +11,7 @@ import {
 } from './podcast-identity';
 
 export interface PublicAliasClaim {
-  podcastId: number;
+  podcastId: string;
   expectedFeedUrl: string;
   aliases: string[];
   canonicalFeedUrl?: string;
@@ -32,7 +33,7 @@ export async function claimPublicAliases(
   tx: postgres.TransactionSql,
   claim: PublicAliasClaim,
 ) {
-  if (!Number.isSafeInteger(claim.podcastId) || claim.podcastId <= 0)
+  if (!isCanonicalId(claim.podcastId))
     throw new TypeError('Invalid podcast ID');
   if (
     !['reviewed', 'permanent_redirect'].includes(claim.evidence.type) ||
@@ -67,7 +68,7 @@ export async function claimPublicAliases(
     );
   for (const locator of locators) {
     const match = await findPodcastIdentity(tx, locator);
-    if (match && Number(match.id) !== claim.podcastId)
+    if (match && String(match.id) !== claim.podcastId)
       throw new PodcastIdentityConflict(
         'Alias identifies another existing source',
       );

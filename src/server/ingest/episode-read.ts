@@ -3,7 +3,7 @@ import { refreshFeed } from './feed-refresh';
 
 export async function prepareEpisodeRead(
   sql: postgres.Sql,
-  podcastId: number,
+  podcastId: string,
 ): Promise<void> {
   const [{ has_episodes, has_content }] = await sql`
     WITH accessed AS (
@@ -29,7 +29,7 @@ export type SortField = 'published' | 'title' | 'duration';
 export type SortDirection = 'asc' | 'desc';
 
 export interface EpisodePageOptions {
-  podcastId: number;
+  podcastId: string;
   limit?: number;
   cursor?: number;
   search?: string;
@@ -39,7 +39,7 @@ export interface EpisodePageOptions {
 }
 
 interface EpisodeRow {
-  id: number;
+  id: string;
   guid: string;
   published: Date | null;
   title: string;

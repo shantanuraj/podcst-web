@@ -1,5 +1,5 @@
 {
-  "id": 301,
+  "id": "301",
   "isPrivate": false,
   "feed": "https://lexfridman.com/feed/podcast/",
   "title": "Lex Fridman Podcast",
@@ -12,8 +12,8 @@
   "keywords": [],
   "episodes": [
     {
-      "id": 262004164,
-      "podcastId": 301,
+      "id": "262004164",
+      "podcastId": "301",
       "isPrivate": false,
       "feed": "https://lexfridman.com/feed/podcast/",
       "podcastTitle": "Lex Fridman Podcast",
@@ -35,8 +35,8 @@
       }
     },
     {
-      "id": 241423217,
-      "podcastId": 301,
+      "id": "241423217",
+      "podcastId": "301",
       "isPrivate": false,
       "feed": "https://lexfridman.com/feed/podcast/",
       "podcastTitle": "Lex Fridman Podcast",
@@ -58,8 +58,8 @@
       }
     },
     {
-      "id": 229899766,
-      "podcastId": 301,
+      "id": "229899766",
+      "podcastId": "301",
       "isPrivate": false,
       "feed": "https://lexfridman.com/feed/podcast/",
       "podcastTitle": "Lex Fridman Podcast",

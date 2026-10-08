@@ -10,6 +10,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createEpisodeListService } from '@/server/lists/service';
+import { createFollowStateService } from '@/server/state/follows';
+import { createProgressStateService } from '@/server/state/progress';
 import type { ListBatch } from '@/shared/lists';
 import { startPostgres } from './lib/postgres-sandbox';
 import { createSchemaFixture } from './lib/schema-fixture';
@@ -30,11 +32,16 @@ test('selected backup covers durable account, alias, list and chart state exactl
     'public.episode_list_clients',
     'public.episode_list_items',
     'public.episode_lists',
+    'public.follow_clients',
+    'public.follow_revision_heads',
     'public.passkeys',
     'public.playback_progress',
     'public.podcast_apple_aliases',
     'public.podcast_feed_aliases',
+    'public.progress_clients',
+    'public.progress_revision_heads',
     'public.sessions',
+    'public.state_generation',
     'public.subscriptions',
     'public.transcripts',
     'public.users',
@@ -87,12 +94,14 @@ describe.skipIf(!process.env.PG_BIN)(
           ),
         ),
       );
-    const roundTrip = async () => {
-      const result = dump();
-      expect({
-        code: result.exitCode,
-        stderr: result.stderr.toString(),
-      }).toEqual({ code: 0, stderr: '' });
+    const roundTrip = async (capture = true) => {
+      if (capture) {
+        const result = dump();
+        expect({
+          code: result.exitCode,
+          stderr: result.stderr.toString(),
+        }).toEqual({ code: 0, stderr: '' });
+      }
       const contents = run('pg_restore', [
         '--list',
         join(cluster.directory, 'selected.dump'),
@@ -187,8 +196,23 @@ describe.skipIf(!process.env.PG_BIN)(
 
     test('selected dump restores exact rows with required parent identities present', async () => {
       await cluster.sql`INSERT INTO account_preferences (user_id,speed,volume_boost,trim_silence) VALUES ('owner',1.5,true,false)`;
-      await cluster.sql`INSERT INTO subscriptions (user_id,podcast_id) VALUES ('owner',1)`;
-      await cluster.sql`INSERT INTO playback_progress (user_id,episode_id,position,completed) VALUES ('owner',101,123,true)`;
+      const [{ generation }] =
+        await cluster.sql`SELECT generation FROM state_generation`;
+      const scope = {
+        protocol: 1 as const,
+        accountId: 'owner',
+        generation,
+        clientId: randomUUID(),
+        sequence: '1',
+      };
+      await createFollowStateService(cluster.sql).change('owner', {
+        ...scope,
+        changes: [{ podcastId: '1', followed: true }],
+      });
+      await createProgressStateService(cluster.sql).change('owner', {
+        ...scope,
+        changes: [{ episodeId: '101', positionSeconds: 123, completed: true }],
+      });
       await cluster.sql`INSERT INTO passkeys (id,user_id,credential_id,public_key,counter) VALUES ('passkey','owner','credential',decode('1234','hex'),7)`;
       await cluster.sql`INSERT INTO sessions (id,user_id,expires_at) VALUES ('session','owner','2030-01-01')`;
       await cluster.sql`INSERT INTO email_verifications (id,email,code_digest,expires_at) VALUES ('verification','owner@example.invalid',${'a'.repeat(64)},'2030-01-01')`;
@@ -226,17 +250,25 @@ describe.skipIf(!process.env.PG_BIN)(
 
     test('restored client state deduplicates a lost-response retry after a removal', async () => {
       const service = createEpisodeListService(cluster.sql);
-      const listId = (await service.lists('owner')).lists[0].id;
+      const collection = await service.lists('owner');
+      const listId = collection.lists[0].id;
+      const scope = {
+        protocol: 1 as const,
+        accountId: 'owner',
+        generation: collection.generation,
+      };
       const request: ListBatch = {
+        ...scope,
         clientId: randomUUID(),
         sequence: '1',
-        changes: [{ op: 'add', episodeId: 101 }],
+        changes: [{ op: 'add', episodeId: '101' }],
       };
       const acknowledgement = await service.change('owner', listId, request);
       await service.change('owner', listId, {
+        ...scope,
         clientId: randomUUID(),
         sequence: '1',
-        changes: [{ op: 'remove', episodeId: 101 }],
+        changes: [{ op: 'remove', episodeId: '101' }],
       });
       const before = await snapshot();
       await roundTrip();
@@ -244,11 +276,96 @@ describe.skipIf(!process.env.PG_BIN)(
         acknowledgement,
       );
       expect(await service.membership('owner', listId)).toEqual({
+        ...scope,
         listId,
         revision: '2',
         items: [],
       });
       expect(await snapshot()).toEqual(before);
+    });
+
+    test('restores progress and follow acknowledgements without replaying opposite actions', async () => {
+      const progress = createProgressStateService(cluster.sql);
+      const follows = createFollowStateService(cluster.sql);
+      const [{ generation }] =
+        await cluster.sql`SELECT generation FROM state_generation`;
+      const stream = {
+        protocol: 1 as const,
+        accountId: 'owner',
+        generation,
+        clientId: randomUUID(),
+        sequence: '1',
+      };
+      const progressBatch = {
+        ...stream,
+        changes: [{ episodeId: '101', positionSeconds: 90, completed: false }],
+      };
+      const followBatch = {
+        ...stream,
+        changes: [{ podcastId: '1', followed: true }],
+      };
+      const progressAck = await progress.change('owner', progressBatch);
+      const followAck = await follows.change('owner', followBatch);
+      await progress.change('owner', {
+        ...stream,
+        clientId: randomUUID(),
+        changes: [{ episodeId: '101', positionSeconds: 12, completed: false }],
+      });
+      await follows.change('owner', {
+        ...stream,
+        clientId: randomUUID(),
+        changes: [{ podcastId: '1', followed: false }],
+      });
+      const before = await snapshot();
+      await roundTrip();
+      expect(await progress.change('owner', progressBatch)).toEqual(
+        progressAck,
+      );
+      expect(await follows.change('owner', followBatch)).toEqual(followAck);
+      expect(
+        (await progress.read('owner', ['101'])).items[0].progress
+          ?.positionSeconds,
+      ).toBe(12);
+      expect((await follows.read('owner')).items).toEqual([]);
+      expect(await snapshot()).toEqual(before);
+    });
+
+    test('fences clients ahead of a restored checkpoint even when their sequence would fit', async () => {
+      const progress = createProgressStateService(cluster.sql);
+      const [{ generation }] =
+        await cluster.sql`SELECT generation FROM state_generation`;
+      const request = {
+        protocol: 1 as const,
+        accountId: 'owner',
+        generation,
+        clientId: randomUUID(),
+        sequence: '1',
+        changes: [{ episodeId: '101', positionSeconds: 30, completed: false }],
+      };
+      await progress.change('owner', request);
+      expect(dump().exitCode).toBe(0);
+      const later = {
+        ...request,
+        sequence: '2',
+        changes: [{ episodeId: '101', positionSeconds: 60, completed: false }],
+      };
+      await progress.change('owner', later);
+      await roundTrip(false);
+      const restored = (
+        await cluster.sql`SELECT last_sequence::text FROM progress_clients`
+      )[0];
+      expect(restored.last_sequence).toBe('1');
+      await cluster.sql`UPDATE state_generation SET generation = ${randomUUID()}`;
+      await expect(progress.change('owner', later)).rejects.toMatchObject({
+        code: 'recovery_required',
+      });
+      const snapshot = await progress.read('owner', ['101']);
+      expect(snapshot.items[0].progress?.positionSeconds).toBe(30);
+      expect(snapshot.revision).toBe('1');
+      expect(
+        (await cluster.sql`SELECT legacy_generation FROM state_generation`)[0]
+          .legacy_generation,
+      ).toBe(generation);
     });
 
     test('temporary tables cannot shadow either alias guard', async () => {

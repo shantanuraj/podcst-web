@@ -22,14 +22,6 @@ const commonOptions = {
   idle_timeout: 20,
   connect_timeout: 10,
   ssl: mtls,
-  types: {
-    bigint: {
-      to: 20,
-      from: [20],
-      serialize: (n: number) => n.toString(),
-      parse: (s: string) => Number(s),
-    },
-  },
 };
 
 const createSql = () => {

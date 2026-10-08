@@ -29,10 +29,13 @@ playback, transcripts, feed/Apple aliases, preferences, and:
 - `episode_list_items`: membership and ordering timestamps, even for evicted content
 - `episode_list_clients`: sequence, request hash and saved result for retry deduplication
 - `chart_history`: historical daily ranks, not reconstructible from current charts
+- `state_generation`: current recovery fence and immutable initial legacy generation
+- `progress_revision_heads`, `follow_revision_heads`: independent accepted-action heads
+- `progress_clients`, `follow_clients`: stream sequences, hashes and saved acknowledgements
 
 All selected tables share one `pg_dump` snapshot. `--strict-names` refuses missing
 tables; a dump failure prevents encryption/upload. Activate this selection only
-with migrations through `0008` applied and the backup role able to read every
+with migrations through `0010` applied and the backup role able to read every
 selected table. Encryption, object naming and retention are unchanged.
 
 This is **not a complete database backup**. The separate identity snapshots cover
@@ -48,10 +51,25 @@ parent-first `pg_restore --use-list` order: a full archive's default data-only
 order need not satisfy existing foreign keys. Do not disable constraints or
 invent missing production identities to make a restore pass.
 
-Restore client deduplication rows together with list state from the same snapshot;
-omitting them can replay acknowledged requests and resurrect removed stars.
-Account for newer writes before any real recovery. Keep credentials, dumps and
-recovery records outside the repository.
+Restore resource rows, revision heads, generation and client deduplication records
+from the same snapshot. Omitting retry state can reapply acknowledged progress,
+resurrect removed follows/stars or change latest playback. The schema seeds a
+generation row; remove that disposable bootstrap row before restoring the captured
+one, under a reviewed restore procedure with no writers admitted.
+
+Before restored traffic opens, rotate only the current generation, keeping
+`legacy_generation` unchanged, and enforce the separately required post-checkpoint
+erasure/revocation obligations. Old clients must remain blocked for explicit
+reconciliation; never renumber streams or upload cached libraries. A client can be
+ahead of the checkpoint even if its next sequence appears acceptable. Account for
+newer activity before recovery; do not blindly restore over it. Keep credentials,
+dumps and recovery records outside the repository.
+
+Runtime access to the generation row needs SELECT and enough column-level UPDATE
+privilege to take a row share lock (for example UPDATE on `singleton` only). It does
+not need permission to rotate either generation or delete that row. Review the
+runtime and backup grants when activating new tables; never broaden them merely to
+silence a refusal.
 
 ## Backup tests
 
@@ -63,6 +81,7 @@ PG_BIN=/path/to/postgresql-16/bin bun --no-env-file test scripts/backup-config.t
 With `PG_BIN`, tests create disposable local clusters using all active migrations.
 They require every public table to be selected or explicitly excluded with a
 reason, verify archive table coverage and exact row restoration, exercise restored
-retry deduplication, and reject each missing selected table. New migrations must
+retry deduplication for lists/progress/follows, fence clients ahead of a restored
+checkpoint, and reject each missing selected table. New migrations must
 update this coverage decision. These synthetic tests do not prove production
 backup recovery, encryption-key availability or recovery time objectives.

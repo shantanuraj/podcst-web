@@ -42,7 +42,7 @@ describe.skipIf(!databaseUrl)('chapter authorization with PostgreSQL', () => {
   });
   test('authorizes public, private and cold episodes before cache access', async () => {
     let fetched = 0;
-    const service = createChapterService(
+    const exactService = createChapterService(
       (id, user) => readChapterEpisode(sql, id, user),
       {
         cache: new MemoryChapterCache(),
@@ -60,6 +60,8 @@ describe.skipIf(!databaseUrl)('chapter authorization with PostgreSQL', () => {
         },
       },
     );
+    const service = (id: number | string, user: string | null) =>
+      exactService(String(id), user);
     expect((await service(101, null))?.source).toBe('embedded');
     expect((await service(101, 'stranger'))?.source).toBe('embedded');
     expect(await service(102, null)).toBeNull();

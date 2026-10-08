@@ -1,7 +1,7 @@
 [
   {
-    "id": 95,
-    "itunes_id": 1513807137,
+    "id": "95",
+    "itunes_id": "1513807137",
     "author": "Tom Jessen en Maarten van Rossem",
     "feed": "https://anchor.fm/s/21c734c4/podcast/rss",
     "title": "Maarten van Rossem &amp; Tom Jessen",
@@ -12,8 +12,8 @@
     "count": 1179
   },
   {
-    "id": 102,
-    "itunes_id": 1076289388,
+    "id": "102",
+    "itunes_id": "1076289388",
     "author": "BNR Nieuwsradio",
     "feed": "https://www.omnycontent.com/d/playlist/8257a063-6be9-42fa-b892-acd4013b1255/183dc0a5-9b77-48f3-9970-acef00cf8471/790dd6fa-cb55-4956-ba88-acef00cfc0f6/podcast.rss",
     "title": "Boekestijn en De Wijk",
@@ -24,8 +24,8 @@
     "count": 1658
   },
   {
-    "id": 4691955,
-    "itunes_id": 6806963519,
+    "id": "4691955",
+    "itunes_id": "6806963519",
     "author": "NPO Luister / AVROTROS",
     "feed": "https://podcast.npo.nl/feed/de-rolstoelrovers.xml",
     "title": "De Rolstoelrovers",

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type postgres from 'postgres';
+import { isCanonicalId } from '@/shared/canonical-id';
 
 export class PodcastIdentityConflict extends Error {}
 export class PodcastAccessDenied extends Error {}
@@ -10,7 +11,7 @@ export interface AppleListingVerification {
   verifiedAt: string;
 }
 
-export function appleIdentities(sql: postgres.ISql, ids: number[]) {
+export function appleIdentities(sql: postgres.ISql, ids: readonly string[]) {
   return sql`
     SELECT id, itunes_id FROM podcasts
     WHERE itunes_id = ANY(${ids}::bigint[]) AND owner_user_id IS NULL
@@ -22,7 +23,7 @@ export function appleIdentities(sql: postgres.ISql, ids: number[]) {
 }
 
 export interface PodcastIdentity {
-  id: string | number;
+  id: string;
   itunes_id: string | number | null;
   podcast_index_id: string | number | null;
   feed_url: string;
@@ -31,7 +32,7 @@ export interface PodcastIdentity {
 
 export async function lockPodcastIdentities(
   sql: postgres.ISql,
-  identities: { feedUrl: string; itunesId?: number; podcastIndexId?: number }[],
+  identities: { feedUrl: string; itunesId?: string; podcastIndexId?: number }[],
 ) {
   const keys = identities.flatMap(({ feedUrl, itunesId, podcastIndexId }) => [
     { namespace: 'podcast:feed', value: feedUrl },
@@ -68,7 +69,7 @@ export function locatorMatches(sql: postgres.ISql, feedUrl: string) {
 export async function findPodcastIdentities(
   sql: postgres.ISql,
   feedUrl: string,
-  itunesId?: number,
+  itunesId?: string,
   podcastIndexId?: number,
   forUpdate = false,
 ): Promise<PodcastIdentity[]> {
@@ -87,7 +88,7 @@ export async function findPodcastIdentities(
 export async function findPodcastIdentity(
   sql: postgres.ISql,
   feedUrl: string,
-  itunesId?: number,
+  itunesId?: string,
   podcastIndexId?: number,
   forUpdate = false,
 ): Promise<PodcastIdentity | undefined> {
@@ -109,9 +110,9 @@ export async function claimPublicIdentity(
   sql: postgres.TransactionSql,
   podcast: PodcastIdentity,
   feedUrl: string,
-  itunesId?: number,
+  itunesId?: string,
   verification?: AppleListingVerification,
-): Promise<number> {
+): Promise<string> {
   if (
     podcast.owner_user_id !== null &&
     (itunesId === undefined || podcast.feed_url !== feedUrl)
@@ -119,18 +120,18 @@ export async function claimPublicIdentity(
     throw new PodcastAccessDenied('Feed unavailable');
   }
   if (itunesId !== undefined) {
-    if (!Number.isSafeInteger(itunesId) || itunesId <= 0)
+    if (!isCanonicalId(itunesId))
       throw new PodcastIdentityConflict('Invalid public provider identity');
-    if (podcast.itunes_id !== null && Number(podcast.itunes_id) !== itunesId) {
+    if (podcast.itunes_id !== null && String(podcast.itunes_id) !== itunesId) {
       const [accepted] = await sql`
         SELECT podcast_id FROM podcast_apple_aliases WHERE itunes_id = ${itunesId}
       `;
       if (accepted) {
-        if (Number(accepted.podcast_id) !== Number(podcast.id))
+        if (String(accepted.podcast_id) !== podcast.id)
           throw new PodcastIdentityConflict(
             'Apple alias belongs to another source',
           );
-        return Number(podcast.id);
+        return podcast.id;
       }
       const verifiedAt = Date.parse(verification?.verifiedAt ?? '');
       const age = Date.now() - verifiedAt;
@@ -165,18 +166,18 @@ export async function claimPublicIdentity(
       const [claimed] = await sql`
         SELECT podcast_id FROM podcast_apple_aliases WHERE itunes_id = ${itunesId}
       `;
-      if (!claimed || Number(claimed.podcast_id) !== Number(podcast.id))
+      if (!claimed || String(claimed.podcast_id) !== podcast.id)
         throw new PodcastIdentityConflict(
           'Apple alias belongs to another source',
         );
-      return Number(podcast.id);
+      return podcast.id;
     }
     if (
       podcast.owner_user_id === null &&
       podcast.itunes_id !== null &&
-      Number(podcast.itunes_id) === itunesId
+      String(podcast.itunes_id) === itunesId
     )
-      return Number(podcast.id);
+      return podcast.id;
     const [claimed] = await sql`
       UPDATE podcasts p SET itunes_id = ${itunesId}, owner_user_id = NULL, updated_at = now()
       WHERE p.id = ${podcast.id} AND ${locatorMatches(sql, feedUrl)}
@@ -189,5 +190,5 @@ export async function claimPublicIdentity(
         'Source changed during public verification',
       );
   }
-  return Number(podcast.id);
+  return podcast.id;
 }

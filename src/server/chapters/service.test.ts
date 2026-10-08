@@ -22,7 +22,7 @@ import {
 } from './service';
 
 const episode: ChapterEpisode = {
-  id: 42,
+  id: '42',
   owner_user_id: null,
   file_url: 'https://media.example.invalid/synthetic.mp3?secret=token',
   file_length: 1000,
@@ -58,7 +58,7 @@ function fixture() {
   const cache = new MemoryChapterCache(now);
   const jobs: (() => Promise<void>)[] = [];
   const resolve = mock(
-    async (id: number, _user: string | null) =>
+    async (id: string, _user: string | null) =>
       ({ ...current, id }) as ChapterEpisode | null,
   );
   const fetch = mock(
@@ -70,8 +70,8 @@ function fixture() {
   );
   const instance = (
     options: Partial<Parameters<typeof createChapterService>[1]> = {},
-  ) =>
-    createChapterService(resolve, {
+  ) => {
+    const service = createChapterService(resolve, {
       cache,
       now,
       fetchChapters: fetch,
@@ -80,6 +80,9 @@ function fixture() {
       },
       ...options,
     });
+    return (id: number | string, user: string | null) =>
+      service(String(id), user);
+  };
   const flush = async () => {
     await Promise.all(jobs.splice(0).map((work) => work()));
   };
@@ -596,7 +599,7 @@ test('responses expose no validators or URLs and retain private/no-store for eve
     '0',
     '1.2',
     '1x',
-    '9007199254740992',
+    '9223372036854775808',
   ])
     expect((await chapterResponse(id, null, service)).status).toBe(400);
   expect(h.resolve).not.toHaveBeenCalled();

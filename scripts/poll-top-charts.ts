@@ -42,7 +42,7 @@ async function pollMissingEpisodes(sql: postgres.Sql, locales: string[]) {
     const results = await Promise.all(
       batch.map(async ({ id }) => {
         try {
-          return await refreshFeed(sql, Number(id), 'rebuild');
+          return await refreshFeed(sql, String(id), 'rebuild');
         } catch (error) {
           console.error(
             `[episodes:${id}] ${error instanceof Error ? error.message : String(error)}`,

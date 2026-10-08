@@ -4,6 +4,11 @@
 reviewed pair of duplicate **public** sources. It is not an automatic identity
 resolver and never classifies ownership or merges private feeds.
 
+The helper refuses databases with the durable-state generation/revision schema.
+Changing canonical IDs there requires an explicit episode-reference and retry-stream
+reconciliation contract, including offline clients. Do not bypass that refusal or
+edit its schema checks to reuse the older merge procedure.
+
 Plans, source-equivalence evidence, snapshots and receipts may contain account
 records and credential-bearing URLs. Keep them outside Git in private storage.
 

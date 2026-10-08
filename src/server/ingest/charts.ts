@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { isCanonicalId, migrateStoredId } from '@/shared/canonical-id';
 import { ITUNES_API } from '../../data/constants';
 import {
   type AppleIdentityPlan,
@@ -16,7 +17,7 @@ import {
 const TOP_LIMIT = 100;
 
 export interface ChartPodcast {
-  itunesId: number;
+  itunesId: string;
   author: string;
   feed: string;
   title: string;
@@ -35,7 +36,7 @@ interface ITunesFeedResponse {
 
 interface ITunesPodcast {
   kind?: string;
-  collectionId?: number;
+  collectionId?: number | string;
   artistName?: string;
   collectionName?: string;
   feedUrl?: string;
@@ -72,9 +73,9 @@ export async function fetchTopFromItunes(
     throw new Error('Apple returned an empty or invalid chart');
   }
 
-  const ids = entries.map((entry) => Number(entry?.id?.attributes?.['im:id']));
+  const ids = entries.map((entry) => entry?.id?.attributes?.['im:id'] ?? '');
   if (
-    ids.some((id) => !Number.isSafeInteger(id) || id <= 0) ||
+    ids.some((id) => !isCanonicalId(id)) ||
     new Set(ids).size !== ids.length
   ) {
     throw new Error('Apple returned invalid or duplicate chart IDs');
@@ -92,9 +93,10 @@ export async function fetchTopFromItunes(
 
   const verifiedAt = new Date().toISOString();
   const ranks = new Map(ids.map((id, i) => [id, i + 1]));
-  const podcasts = new Map<number, ChartPodcast>();
+  const podcasts = new Map<string, ChartPodcast>();
   for (const podcast of lookup.results) {
-    const id = podcast.collectionId;
+    const identity = migrateStoredId(podcast.collectionId);
+    const id = 'canonicalId' in identity ? identity.canonicalId : undefined;
     const rank = id === undefined ? undefined : ranks.get(id);
     if (
       id === undefined ||
@@ -151,7 +153,7 @@ export async function storeTopPodcasts(
   if (podcasts.length === 0)
     throw new Error('Refusing to store an empty chart');
 
-  const plans = new Map<number, AppleIdentityPlan>();
+  const plans = new Map<string, AppleIdentityPlan>();
   for (const p of podcasts) {
     if (plans.has(p.itunesId))
       throw new PodcastIdentityConflict(
@@ -183,7 +185,7 @@ export async function storeTopPodcasts(
 
     let newPodcasts = 0;
     let skipped = 0;
-    const storedSources = new Set<number>();
+    const storedSources = new Set<string>();
     for (const p of [...podcasts].sort((a, b) => a.rank - b.rank)) {
       try {
         const result = await tx.savepoint(async (entry) => {
@@ -263,7 +265,7 @@ async function claimChartPodcast(
 
 async function storeGenres(
   tx: postgres.TransactionSql,
-  podcastId: number,
+  podcastId: string,
   genres: number[],
 ) {
   if (!genres.length) return;

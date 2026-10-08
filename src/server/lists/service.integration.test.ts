@@ -9,22 +9,32 @@ import {
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import type { ListBatch, ListChange } from '@/shared/lists';
+import { fixtureId } from '../../../scripts/lib/identity-fixture';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 import { parseListCursor } from './input';
 import { createEpisodeListService, type EpisodeListService } from './service';
 
+let generation = '';
+const scope = () => ({ protocol: 1 as const, accountId: 'owner', generation });
 const batch = (
   changes: ListChange[],
   clientId: string = randomUUID(),
   sequence = '1',
 ): ListBatch => ({
+  ...scope(),
   clientId,
   sequence,
   changes,
 });
-const add = (episodeId: number): ListChange => ({ op: 'add', episodeId });
-const remove = (episodeId: number): ListChange => ({ op: 'remove', episodeId });
+const add = (episodeId: number | string): ListChange => ({
+  op: 'add',
+  episodeId: fixtureId(episodeId),
+});
+const remove = (episodeId: number | string): ListChange => ({
+  op: 'remove',
+  episodeId: fixtureId(episodeId),
+});
 
 describe.skipIf(!process.env.PG_BIN)(
   'episode lists on isolated PostgreSQL',
@@ -76,7 +86,9 @@ describe.skipIf(!process.env.PG_BIN)(
         (201, 'Private episode', 'https://owner.example.invalid/secret.mp3'),
         (301, 'Hidden episode', 'https://other.example.invalid/secret.mp3')
     `;
-      listId = (await service.lists('owner')).lists[0].id;
+      const collection = await service.lists('owner');
+      listId = collection.lists[0].id;
+      generation = collection.generation;
     });
 
     test('bootstraps one built-in list concurrently and isolates accounts', async () => {
@@ -102,7 +114,10 @@ describe.skipIf(!process.env.PG_BIN)(
         service.episodes('other', listId, { limit: 10 }),
       ).rejects.toMatchObject({ status: 404 });
       await expect(
-        service.change('other', listId, batch([add(101)])),
+        service.change('other', listId, {
+          ...batch([add(101)]),
+          accountId: 'other',
+        }),
       ).rejects.toMatchObject({ status: 404 });
       expect(await sql`SELECT * FROM episode_list_clients`).toHaveLength(0);
     });
@@ -174,6 +189,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await service.change('owner', listId, batch([remove(101)]));
       expect(await service.change('owner', listId, request)).toEqual(original);
       expect(await service.membership('owner', listId)).toEqual({
+        ...scope(),
         listId,
         revision: '2',
         items: [],
@@ -266,7 +282,7 @@ describe.skipIf(!process.env.PG_BIN)(
       const page = await service.episodes('owner', listId, { limit: 10 });
       expect(page.items).toHaveLength(1);
       expect(page.items[0]).toMatchObject({
-        episodeId: 102,
+        episodeId: '102',
         availability: 'content_missing',
         episode: null,
       });
@@ -280,7 +296,7 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(snapshot.items[0].availability).toBe('unavailable');
       const page = await service.episodes('owner', listId, { limit: 10 });
       expect(page.items[0]).toMatchObject({
-        episodeId: 101,
+        episodeId: '101',
         availability: 'unavailable',
         episode: null,
       });
@@ -304,7 +320,7 @@ describe.skipIf(!process.env.PG_BIN)(
       );
       const first = await service.episodes('owner', listId, { limit: 200 });
       expect(first.items).toHaveLength(200);
-      expect(first.items[0].episodeId).toBe(1204);
+      expect(first.items[0].episodeId).toBe('1204');
       const cursor = parseListCursor(first.nextCursor ?? '', listId);
       if (!cursor) throw new Error('Expected next page cursor');
       expect(cursor.addedAt).toBe(Date.parse('2026-01-01T00:00:00.123Z'));
@@ -314,10 +330,39 @@ describe.skipIf(!process.env.PG_BIN)(
         cursor,
       });
       expect(second.items.map(({ episodeId }) => episodeId)).toEqual([
-        1004, 1003, 1001, 1000,
+        '1004',
+        '1003',
+        '1001',
+        '1000',
       ]);
       expect(second.nextCursor).toBeNull();
       expect(second.revision).toBe('1');
+    });
+
+    test('round-trips bigint identities through membership, hydration and moves', async () => {
+      const episodeId = '9007199254740993';
+      const podcastId = '9223372036854775807';
+      await sql`INSERT INTO podcasts (id, author_id, feed_url, title, cover) VALUES (${podcastId}, 1, 'https://exact.example.invalid/rss', 'Exact', 'cover')`;
+      await sql`INSERT INTO episodes (id, podcast_id, guid, published) VALUES (${episodeId}, ${podcastId}, 'shared', now())`;
+      await sql`INSERT INTO episode_content (episode_id, title, file_url) VALUES (${episodeId}, 'Exact episode', 'https://exact.example.invalid/audio')`;
+      const ack = await service.change(
+        'owner',
+        listId,
+        batch([add(episodeId)]),
+      );
+      expect(ack.results[0].episodeId).toBe(episodeId);
+      expect(
+        (await service.membership('owner', listId)).items[0].episodeId,
+      ).toBe(episodeId);
+      await sql`UPDATE podcasts SET feed_url = 'https://moved.example.invalid/rss' WHERE id = ${podcastId}`;
+      await sql`UPDATE episode_content SET file_url = 'https://moved.example.invalid/audio' WHERE episode_id = ${episodeId}`;
+      const item = (await service.episodes('owner', listId, { limit: 1 }))
+        .items[0];
+      expect(item.episode?.id).toBe(episodeId);
+      expect(item.episode?.podcastId).toBe(podcastId);
+      expect(item.episode?.file.url).toBe(
+        'https://moved.example.invalid/audio',
+      );
     });
 
     test('hydrates the existing episode contract', async () => {
@@ -326,8 +371,8 @@ describe.skipIf(!process.env.PG_BIN)(
         (await service.episodes('owner', listId, { limit: 1 })).items[0]
           .episode,
       ).toEqual({
-        id: 201,
-        podcastId: 2,
+        id: '201',
+        podcastId: '2',
         isPrivate: true,
         guid: 'shared',
         feed: 'https://owner.example.invalid/secret',

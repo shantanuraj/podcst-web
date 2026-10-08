@@ -1,0 +1,18 @@
+{
+  "protocol": 1,
+  "accountId": "3f9a6c2e8b1d4f7a0c5e9b2d6a8f1c3e7b4d0a92",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+  "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
+  "sequence": "9007199254740993",
+  "revision": "9007199254740994",
+  "results": [
+    {
+      "episodeId": "9007199254740993",
+      "status": "applied"
+    },
+    {
+      "episodeId": "9223372036854775807",
+      "status": "not_found"
+    }
+  ]
+}

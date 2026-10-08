@@ -16,11 +16,12 @@ import {
   storeCatalogPodcast,
 } from '../src/server/ingest/catalog';
 import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
+import { migrateStoredId } from '../src/shared/canonical-id';
 
 interface LogEntry {
   timestamp: string;
   action: 'inserted' | 'updated' | 'skipped';
-  itunes_id: number | null;
+  itunes_id: string | null;
   name: string;
   podcast_index_id: number;
   feed_url: string;
@@ -38,10 +39,9 @@ const BATCH_SIZE = 1000;
 
 const normalizeItunesId = (
   id: number | string | null | undefined,
-): number | null => {
-  if (id === null || id === undefined || id === '' || id === 0) return null;
-  const num = typeof id === 'string' ? parseInt(id, 10) : id;
-  return Number.isNaN(num) || num === 0 ? null : num;
+): string | null => {
+  const identity = migrateStoredId(id);
+  return 'canonicalId' in identity ? identity.canonicalId : null;
 };
 
 const localPath = process.argv[2];
@@ -160,7 +160,7 @@ async function syncBatch(
     WHERE owner_user_id IS NOT NULL AND feed_url = ANY(${batch.map((row) => row.url)}::text[])
   `;
   const privateIds = new Map(
-    privateRows.map((row) => [row.feed_url, Number(row.id)]),
+    privateRows.map((row) => [row.feed_url, String(row.id)]),
   );
 
   for (const row of batch) {

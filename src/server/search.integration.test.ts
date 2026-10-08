@@ -51,9 +51,10 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
 
   test('database text search separates internal and Apple IDs', async () => {
     const results = await searchPodcasts(sql, 'Search');
-    expect(results.map((result) => result.id)).toEqual([152, 153]);
+    expect(results.map((result) => result.id)).toEqual(['152', '153']);
     expect(results.map((result) => result.itunes_id)).toEqual([
-      1614253637, 6806963519,
+      '1614253637',
+      '6806963519',
     ]);
     expect(results.map((result) => result.feed)).toEqual([feed, largeIdFeed]);
   });
@@ -61,15 +62,15 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
   test('feed URL search uses the same internal identity as text search', async () => {
     const [textResult] = await searchPodcasts(sql, 'Search Engine');
     const result = await searchPodcastsByFeedUrl(sql, feed);
-    expect(result?.id).toBe(152);
-    expect(result?.itunes_id).toBe(1614253637);
+    expect(result?.id).toBe('152');
+    expect(result?.itunes_id).toBe('1614253637');
     expect(result).toEqual(textResult);
   });
 
   test('feed URL search preserves iTunes IDs beyond the 32-bit limit', async () => {
     const result = await searchPodcastsByFeedUrl(sql, largeIdFeed);
-    expect(result?.id).toBe(153);
-    expect(result?.itunes_id).toBe(6806963519);
+    expect(result?.id).toBe('153');
+    expect(result?.itunes_id).toBe('6806963519');
   });
 
   test('unlisted public feeds retain their database identity without an Apple ID', async () => {
@@ -78,7 +79,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
       feed: privateFeed,
       title: 'Search Private',
     });
-    expect(result?.id).toBe(154);
+    expect(result?.id).toBe('154');
     expect(result?.itunes_id).toBeUndefined();
     expect(JSON.parse(JSON.stringify(result))).not.toHaveProperty('itunes_id');
   });
@@ -86,7 +87,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
   test('Apple search preserves fresh locators and does not attach a mismatched stored identity', async () => {
     const result = await matchSearchResults(sql, [
       {
-        itunes_id: 6806963519,
+        itunes_id: '6806963519',
         feed: largeIdFeed,
         title: 'Second',
         author: '',
@@ -94,7 +95,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
         thumbnail: '',
       },
       {
-        itunes_id: 1614253637,
+        itunes_id: '1614253637',
         feed: 'https://example.com/migrated',
         title: 'First',
         author: '',
@@ -102,7 +103,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
         thumbnail: '',
       },
       {
-        itunes_id: 999,
+        itunes_id: '999',
         feed: 'https://example.com/new',
         title: 'New',
         author: '',
@@ -113,13 +114,13 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     expect(
       result.map(({ id, itunes_id, feed }) => ({ id, itunes_id, feed })),
     ).toEqual([
-      { id: 153, itunes_id: 6806963519, feed: largeIdFeed },
+      { id: '153', itunes_id: '6806963519', feed: largeIdFeed },
       {
         id: undefined,
-        itunes_id: 1614253637,
+        itunes_id: '1614253637',
         feed: 'https://example.com/migrated',
       },
-      { id: undefined, itunes_id: 999, feed: 'https://example.com/new' },
+      { id: undefined, itunes_id: '999', feed: 'https://example.com/new' },
     ]);
     const [count] = await sql`SELECT count(*)::int AS count FROM podcasts`;
     expect(count.count).toBe(3);
@@ -130,7 +131,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     await sql`INSERT INTO podcast_feed_aliases(feed_url,podcast_id,evidence_type,evidence_reference) VALUES (${alias},152,'reviewed','search fixture')`;
     const [result] = await matchSearchResults(sql, [
       {
-        itunes_id: 1614253637,
+        itunes_id: '1614253637',
         feed: alias,
         title: 'Apple title',
         author: '',
@@ -138,13 +139,13 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
         thumbnail: '',
       },
     ]);
-    expect(result).toMatchObject({ id: 152, feed, title: 'Apple title' });
+    expect(result).toMatchObject({ id: '152', feed, title: 'Apple title' });
   });
 
   test('unassociated feed matches require verification before binding Apple identity', async () => {
     const [result] = await matchSearchResults(sql, [
       {
-        itunes_id: 999,
+        itunes_id: '999',
         feed: privateFeed,
         title: 'Search Private',
         author: '',
@@ -159,7 +160,7 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
 
   test('Apple listings sharing a feed collapse to the first', async () => {
     const listing = (itunes_id: number, title: string) => ({
-      itunes_id,
+      itunes_id: String(itunes_id),
       feed: 'https://example.com/shared',
       title,
       author: '',
@@ -202,14 +203,14 @@ describe.skipIf(!databaseUrl)('search identities with PostgreSQL', () => {
     `;
     const ids = async (term: string) =>
       (await searchEpisodes(sql, term)).map(({ id }) => id);
-    expect((await ids('field')).sort()).toEqual([9001, 9002, 9005]);
-    expect(await ids('field office')).toEqual([9005]);
-    expect(await ids('fie')).toContain(9001);
+    expect((await ids('field')).sort()).toEqual(['9001', '9002', '9005']);
+    expect(await ids('field office')).toEqual(['9005']);
+    expect(await ids('fie')).toContain('9001');
     expect(await ids('&&& !!')).toEqual([]);
     const [episode] = await searchEpisodes(sql, 'garlic');
     expect(episode).toMatchObject({
-      id: 9002,
-      podcastId: 153,
+      id: '9002',
+      podcastId: '153',
       podcastTitle: 'Search Results',
       isPrivate: false,
       file: { url: 'https://example.com/2.mp3' },

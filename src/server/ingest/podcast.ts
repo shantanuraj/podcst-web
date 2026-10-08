@@ -25,7 +25,7 @@ export async function ingestPodcast(
 }
 
 export async function refreshPodcast(
-  podcastId: number,
+  podcastId: string,
   userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
   if (!(await canAccessPodcast(sql, podcastId, userId))) return null;
@@ -39,11 +39,11 @@ export async function getPodcastByFeedUrl(
   userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
   const podcast = await findPodcastIdentity(sql, feedUrl);
-  return podcast ? getPodcastById(Number(podcast.id), userId) : null;
+  return podcast ? getPodcastById(String(podcast.id), userId) : null;
 }
 
 export async function getPodcastById(
-  id: number,
+  id: string,
   userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
   if (!(await canAccessPodcast(sql, id, userId))) return null;
@@ -109,7 +109,7 @@ export async function getPodcastById(
 
 export const getEpisodeById = cache(
   async (
-    episodeId: number,
+    episodeId: string,
     userId: string | null = null,
   ): Promise<IEpisodeInfo | null> => {
     const query = () => sql`
@@ -129,7 +129,7 @@ export const getEpisodeById = cache(
     if (!row) return null;
 
     if (row.file_url == null) {
-      await prepareEpisodeRead(sql, row.podcast_id as number);
+      await prepareEpisodeRead(sql, String(row.podcast_id));
       [row] = await query();
       if (row?.file_url == null) return null;
     }
@@ -161,7 +161,7 @@ export const getEpisodeById = cache(
 );
 
 async function readPodcastInfoById(
-  id: number,
+  id: string,
   userId: string | null = null,
 ): Promise<IPodcastInfo | null> {
   const [podcast] = await sql`
@@ -245,7 +245,7 @@ export async function getEpisodesPaginated(
 }
 
 export async function getEpisodeWithPodcast(
-  episodeId: number,
+  episodeId: string,
   userId: string | null = null,
 ): Promise<{ episode: IEpisodeInfo; podcast: IPodcastInfo } | null> {
   const episode = await getEpisodeById(episodeId, userId);

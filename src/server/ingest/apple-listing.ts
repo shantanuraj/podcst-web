@@ -1,3 +1,4 @@
+import { isCanonicalId, migrateStoredId } from '@/shared/canonical-id';
 import { ITUNES_API } from '../../data/constants';
 import { feedUrl } from '../../shared/feed-url';
 import {
@@ -6,7 +7,7 @@ import {
 } from './podcast-identity';
 
 export interface AppleListing extends AppleListingVerification {
-  itunesId: number;
+  itunesId: string;
   feedUrl: string;
 }
 
@@ -14,7 +15,7 @@ type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
 export function appleFeedForId(
   results: unknown[],
-  itunesId: number,
+  itunesId: string,
 ): string | null {
   const feeds = new Set<string | null>();
   for (const result of results) {
@@ -24,7 +25,13 @@ export function appleFeedForId(
       collectionId?: unknown;
       feedUrl?: unknown;
     };
-    if (row.kind !== 'podcast' || row.collectionId !== itunesId) continue;
+    const identity = migrateStoredId(row.collectionId);
+    if (
+      row.kind !== 'podcast' ||
+      !('canonicalId' in identity) ||
+      identity.canonicalId !== itunesId
+    )
+      continue;
     if (row.feedUrl === undefined || row.feedUrl === null || row.feedUrl === '')
       feeds.add(null);
     else if (typeof row.feedUrl === 'string') {
@@ -50,8 +57,7 @@ export function appleFeedForId(
 export function assertFreshAppleListing(listing: AppleListing) {
   const age = Date.now() - Date.parse(listing.verifiedAt);
   if (
-    !Number.isSafeInteger(listing.itunesId) ||
-    listing.itunesId <= 0 ||
+    !isCanonicalId(listing.itunesId) ||
     !/^[a-z]{2}$/.test(listing.country) ||
     !Number.isFinite(age) ||
     age < 0 ||
@@ -69,11 +75,11 @@ export function assertFreshAppleListing(listing: AppleListing) {
 }
 
 export async function lookupAppleListing(
-  itunesId: number,
+  itunesId: string,
   country: string,
   request: Fetch = fetch,
 ): Promise<AppleListing | null> {
-  if (!Number.isSafeInteger(itunesId) || itunesId <= 0)
+  if (!isCanonicalId(itunesId))
     throw new TypeError('itunes_id must be a positive integer');
   if (!/^[a-z]{2}$/.test(country))
     throw new TypeError('Invalid Apple storefront');

@@ -1,6 +1,6 @@
 [
   {
-    "id": 301,
+    "id": "301",
     "isPrivate": false,
     "feed": "https://lexfridman.com/feed/podcast/",
     "title": "Lex Fridman Podcast",
@@ -13,8 +13,8 @@
     "published": 1789605649000,
     "episodes": [
       {
-        "id": 262004164,
-        "podcastId": 301,
+        "id": "262004164",
+        "podcastId": "301",
         "isPrivate": false,
         "guid": "https://lexfridman.com/?p=6554",
         "title": "#502 – Psychiatry, Insane Asylums, Mental Illness, ECT, Lobotomies, Freud & Jung",
@@ -36,8 +36,8 @@
         }
       },
       {
-        "id": 241423217,
-        "podcastId": 301,
+        "id": "241423217",
+        "podcastId": "301",
         "isPrivate": false,
         "guid": "https://lexfridman.com/?p=6506",
         "title": "#501 – DHH: Future of Programming, AI, Agentic Engineering, Vibe Coding & Linux",
@@ -61,7 +61,7 @@
     ]
   },
   {
-    "id": 9002,
+    "id": "9002",
     "isPrivate": true,
     "feed": "https://private.example/feed.xml?token=redacted",
     "title": "Members Feed",
@@ -74,8 +74,8 @@
     "published": 1789000000000,
     "episodes": [
       {
-        "id": 90020,
-        "podcastId": 9002,
+        "id": "90020",
+        "podcastId": "9002",
         "isPrivate": true,
         "guid": "members-1",
         "title": "Members episode",
@@ -99,7 +99,7 @@
     ]
   },
   {
-    "id": 9003,
+    "id": "9003",
     "isPrivate": false,
     "feed": "https://example.com/empty.xml",
     "title": "Quiet Show",

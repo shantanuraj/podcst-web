@@ -48,8 +48,9 @@ export async function fetchFeed(
   feedUrl: string,
   previous?: FeedMeta,
   privateFeed = false,
+  signal?: AbortSignal,
 ): Promise<FeedFetchResult> {
-  const res = await fetchFeedResponse(feedUrl, previous);
+  const res = await fetchFeedResponse(feedUrl, previous, { signal });
 
   const movement =
     res.redirected && !privateFeed ? { publicRedirect: true as const } : {};
@@ -81,7 +82,7 @@ export async function fetchFeed(
 
 export async function savePollState(
   sql: postgres.ISql,
-  podcastId: number,
+  podcastId: string,
   meta: FeedMeta,
   intervalSeconds: number,
 ): Promise<void> {
@@ -105,7 +106,7 @@ export async function savePollState(
 
 export async function refreshFeed(
   sql: postgres.Sql,
-  podcastId: number,
+  podcastId: string,
   mode: RefreshMode = 'stale',
   resolveMove = resolvePublicFeedMove,
 ): Promise<RefreshResult> {

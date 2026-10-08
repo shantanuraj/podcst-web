@@ -18,11 +18,11 @@ This contract describes the API used by the native clients. Route handlers live 
 
 **Private-feed headers.** Responses that can contain private data carry `Cache-Control: private, no-store` and `Vary: Cookie` (`privateFeedHeaders` in `src/server/podcast-access.ts`). The table below notes which responses carry them. Clients must not place those bodies in shared caches. Podcast visibility is decided only by `podcasts.owner_user_id` (`podcastAccess` in the same file); `isPrivate` in responses is a derived projection, never an authorization input.
 
-**Error bodies.** Every deliberate error response is `ErrorMessage`, `{ "message": string }`. `/api/top` has no deliberate error response.
+**Error bodies.** Deliberate errors contain `message`. Durable progress/follow/list routes additionally return the stable `code` described in the [state contract](../state/README.md); clients must not branch on English messages. `/api/top` has no deliberate error response.
 
 The messages are human-readable English, not stable codes; clients branch on the HTTP status and show `message`. Routes that read a JSON body treat a malformed or `null` body as an empty object, so it fails their validation with 400 `ErrorMessage` (`src/app/api/errors.test.ts`). Unhandled database or upstream failures on any route produce a 500 without a defined body.
 
-**Numbers and nulls.** Database `bigint` values are parsed to JavaScript numbers (`src/server/db.ts`), so podcast and episode IDs are JSON integers. Timestamps (`published`) are milliseconds since the Unix epoch. `duration` is whole seconds. A key documented as "omitted" is absent from the JSON, which is different from `null`.
+**IDs, numbers and nulls.** PostgreSQL bigint decoding stays exact. Catalogue and Apple IDs are canonical decimal strings from `1` through `9223372036854775807`; numeric wire IDs are rejected. Genre/category IDs, counts and times remain numbers. Timestamps (`published`) are epoch milliseconds; `duration` is whole source seconds. Omitted fields differ from explicit `null`. Durable scope is `{protocol:1, accountId, generation}`; a resource stream adds `clientId` and decimal-string `sequence`. An expected account is an assertion, never authentication authority.
 
 **Artwork.** `cover`, `thumbnail` and `episodeArt` are opaque URLs. A URL on `assets.podcst.app` may receive a `w` parameter to request a square WebP variant; the permitted widths live in [`contracts/playback/rules.json`](../playback/rules.json) under `artwork`, and the server behaviour is documented in [Artwork sizing and transport](../../docs/ios-artwork-cache.md#server-contract). Private artwork is served directly, never through that host.
 
@@ -36,7 +36,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `id` | integer | |
+| `id` | decimal string | Canonical podcast identity. |
 | `isPrivate` | boolean | |
 | `feed` | string | The stored feed URL. For a private podcast it can contain credentials; never log, display in full or share it. |
 | `title`, `author`, `cover` | string | |
@@ -53,7 +53,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `id`, `podcastId` | integer | |
+| `id`, `podcastId` | decimal string | Exact canonical identities. |
 | `isPrivate` | boolean | Copied from the podcast. |
 | `feed`, `podcastTitle`, `cover`, `author` | string | Copied from the podcast. |
 | `guid` | string | Unique within the podcast. |
@@ -71,7 +71,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 ### Chart and search shapes
 
-`TopPodcast` (`IPodcast`, produced by `getTopPodcasts` in `src/server/ingest/top.ts`) has `id`, `itunes_id` (integer or null), `author`, `feed`, `title`, `cover`, `thumbnail` (falls back to `cover`, so never null), `categories` (always `[]`), `explicit` and `count` (the stored episode count). Here `explicit` is the **string** `"explicit"` or `"notExplicit"`; every other route sends a boolean. The type `ExplicitState` also names `"cleaned"`, but no current serializer emits it. Decoders treat `"explicit"` as true and any other string as false, as `BoolOrString` does in `APIClient.swift`.
+`TopPodcast` (`IPodcast`, produced by `getTopPodcasts` in `src/server/ingest/top.ts`) has `id`, `itunes_id` (decimal string or null), `author`, `feed`, `title`, `cover`, `thumbnail` (falls back to `cover`, so never null), `categories` (always `[]`), `explicit` and `count` (the stored episode count). Here `explicit` is the **string** `"explicit"` or `"notExplicit"`; every other route sends a boolean. The type `ExplicitState` also names `"cleaned"`, but no current serializer emits it. Decoders treat `"explicit"` as true and any other string as false, as `BoolOrString` does in `APIClient.swift`.
 
 `SearchResult` (`IPodcastSearchResult`) has `author`, `feed`, `cover`, `title`, plus:
 
@@ -153,12 +153,12 @@ Query (`src/app/api/feed/episodes/route.ts`, `readEpisodePage` in `src/server/in
 
 | Parameter | Meaning |
 | --- | --- |
-| `podcastId` | Required integer. |
-| `limit` | Page size, default 20. Not validated: a non-numeric or negative value causes a 500, and there is no upper bound. Send a positive integer; iOS uses 200 to load a catalogue and 2 for guest release previews. |
-| `cursor` | Offset from the previous page's `nextCursor`. Omit for the first page. |
+| `podcastId` | Required canonical decimal string. |
+| `limit` | Integer page size 1–200, default 20. |
+| `cursor` | Nonnegative integer offset through 2147483647 from `nextCursor`; omit for the first page. |
 | `sortBy` | `published` (default), `title` or `duration`; other values fall back to `published`. |
 | `sortDir` | `desc` (default) or `asc`; other values fall back to `desc`. |
-| `search` | Case-insensitive substring match against title or show notes. |
+| `search` | At most 200 characters; case-insensitive substring match against title or show notes. |
 | `unplayed` | `true` excludes episodes the signed-in account completed; ignored without a session. |
 
 Ordering is the sort column, then episode ID in the same direction. Only `duration` sorts nulls last.
@@ -171,7 +171,7 @@ Fixtures: `feed-episodes.first.json` and `feed-episodes.second.json` (captured; 
 
 ### `GET /api/episodes/:episodeId/chapters` — optional (web)
 
-Accepts a positive, safe-integer **episode database ID**, never an enclosure URL.
+Accepts an exact decimal-string **episode database ID**, never an enclosure URL.
 Visibility is checked before each cache lookup or metadata fetch. An invisible or
 missing episode returns 404; an invalid ID returns 400. Responses, including
 errors and public episodes, carry private-feed headers.
@@ -191,7 +191,7 @@ fixtures.
 
 ### `POST /api/feed/resolve` — public
 
-Body: `{ "itunes_id": positive integer, "locale"?: two-letter code }` (locale defaults to `us`; matched case-insensitively). Resolves or indexes the public podcast for an iTunes listing (`resolvePodcast` in `src/server/ingest/resolve-podcast.ts`) and returns `ResolvedPodcast` `{ "id": integer }`.
+Body: `{ "itunes_id": canonical decimal string, "locale"?: two-letter code }` (locale defaults to `us`; matched case-insensitively). Resolves or indexes the public podcast for an iTunes listing (`resolvePodcast` in `src/server/ingest/resolve-podcast.ts`) and returns `ResolvedPodcast` `{ "id": decimal string }`. Exact string provider responses are preserved; unsafe numeric provider responses are not guessed.
 
 | Status | Body |
 | --- | --- |
@@ -204,7 +204,7 @@ No private-feed headers. Fixtures: `feed-resolve.resolved.json`, `feed-resolve.n
 
 ### `POST /api/feed/refresh` — optional
 
-Body: `{ "podcastId": positive integer, "onlyIfStale"?: boolean }`. Both modes call `refreshFeed(sql, podcastId)` with its default `stale` mode (`src/server/ingest/feed-refresh.ts`): the feed is fetched only if it was last polled at least 15 minutes ago (`STALE_FEED_INTERVAL`, `isRefreshDue` in `src/server/ingest/feed-schedule.ts`) and is not in a failure back-off. Neither mode forces a fetch.
+Body: `{ "podcastId": canonical decimal string, "onlyIfStale"?: boolean }`. Both modes call `refreshFeed(sql, podcastId)` with its default `stale` mode (`src/server/ingest/feed-refresh.ts`): the feed is fetched only if it was last polled at least 15 minutes ago (`STALE_FEED_INTERVAL`, `isRefreshDue` in `src/server/ingest/feed-schedule.ts`) and is not in a failure back-off. Neither mode forces a fetch.
 
 With `"onlyIfStale": true`, the response is `RefreshStatus` `{ "status": string }`:
 
@@ -267,32 +267,64 @@ Deletes the session if present and clears the cookie. Does not depend on Redis. 
 
 ### `GET /api/subscriptions` — required
 
-Returns `Podcast[]` ordered by subscription time, newest first, each with at most two episodes (`getSubscriptions`). Private podcasts appear only for their owner. Private-feed headers. 401 `{message: "Unauthorized"}`. Fixtures: `subscriptions.list.json` (derived; includes a private podcast and a podcast with no episodes), `subscriptions.unauthorized.json` (captured).
+Without a view, returns hydrated `Podcast[]` previews, newest subscription first,
+with at most two episodes per show. These previews are not membership truth.
+`view=membership` returns the complete scoped `FollowSnapshot` from the
+[state schema](../state/schema.json), including unavailable owned references without
+private metadata. Duplicate/unknown query parameters are rejected. Failed reads
+never represent an empty library. Fixtures: `subscriptions.list.json`,
+`subscriptions.unauthorized.json`, `follow-state.membership.json`.
 
 ### `POST /api/subscriptions` — required
 
-Two bodies:
+Accepts `FollowBatch` and returns `FollowAcknowledgement`: scoped, sequenced desired
+`{podcastId, followed}` actions, never toggles or cache replacement. Effects,
+revisions and acknowledgements commit together; identical replay does not reapply.
+See [durable state](../state/README.md) for ordering, errors and limits. Fixtures:
+`follow-changes.accepted.json`, `follow-changes.partial.json`.
 
-- `{ "podcastId": integer }`: subscribes. Idempotent. Returns `Success`, 400 `{message: "podcastId required"}` for a missing, zero or non-number ID, or 404 `{message: "Podcast not found"}` when not visible. Fixtures: `subscriptions-add.success.json`, `subscriptions-add.not-found.json`.
-- `{ "feedUrls": string[] }`: OPML import. For each URL in order, indexes it as with `POST /api/feed` (creating a private podcast if unknown) and subscribes (`importSubscriptions`). Returns `ImportResult` `{ "succeeded": integer, "failed": integer }` with private-feed headers. The response does not identify which URLs failed. The work is sequential and includes feed fetches, so a large import is a long request. Fixture: `subscriptions-import.result.json`.
+Unversioned one-item writers and `DELETE /api/subscriptions` return 426
+`update_required`. Unfollow is an ordinary `followed:false` action.
 
-### `DELETE /api/subscriptions?podcastId=` — required
+### `POST /api/subscriptions/resolve` — required
 
-Removes the subscription. Always returns `Success` when a session and `podcastId` are present, even if nothing was removed; 400 `{message: "podcastId required"}` otherwise. Fixture: `subscriptions-remove.success.json`.
+Body: durable scope plus `feedUrls`, 1–20 strings of at most 4096 characters.
+Returns the same scope and ordered `{index, podcastId:string|null,
+status:"resolved"|"unavailable"}` outcomes. It resolves identities but does **not**
+follow them. Clients persist ordinary follow intents for successful items and keep
+failures for explicit retry. Resolution uses the existing safe indexer, at most two
+concurrent fetches and one ten-second upstream deadline; work not resolved in that
+budget remains unavailable. Admission is six requests/account/minute. Scope is
+rechecked after resolution. Fixture: `follow-resolution.result.json`.
 
 ### `GET /api/progress` — required
 
-Returns `Progress?`: `null` when nothing qualifies, otherwise `{ "position": integer, "episode": Episode }` for the most recently updated progress row that is not completed and whose podcast is visible (`getCurrentProgress` in `src/server/progress.ts`). Private-feed headers on 200. 401 `{message: "Unauthorized"}`. Fixtures: `progress.empty.json`, `progress.current.json` (derived), `progress.unauthorized.json` (captured).
+Presentation reads remain: no query returns `{position, episode}` or `null` for the
+latest playable incomplete row, ordered by accepted revision; `recent=1..10` returns
+such rows; `episodeIds` (1–200 distinct decimal strings) or `podcastId` returns
+`{episodeId:string, position, completed}` rows. These presentation responses do not
+acknowledge pending work.
 
-Query `recent` (1–10) instead returns `Progress[]`: the account's most recently updated incomplete episodes, newest first, with the same visibility rule (`getRecentProgress`). Query `episodeIds`, 1–200 comma-separated positive integers, returns `EpisodeProgress[]` for those episodes (`getEpisodeProgress`). Either returns 400 `{message: ...}` for an out-of-range value.
-
-Query `podcastId` instead returns `EpisodeProgress[]`, `{ "episodeId": integer, "position": integer, "completed": boolean }` ordered by episode ID, for every progress row the account has in that visible podcast. 400 `{message: "podcastId must be a positive integer"}`.
+`view=state` with exactly one of `episodeIds` or `recent` returns a scoped
+`ProgressSnapshot`. Explicit-ID reads include every requested ID with nullable
+`progress`; `recent=1` also bootstraps account/generation when no episode qualifies.
+Only same-scope, sufficiently new state snapshots can retire acknowledged overlays.
+Unknown/duplicate query parameters and incompatible selections are rejected.
+Fixtures: `progress.empty.json`, `progress.current.json`,
+`progress-state.episodes.json`, `progress-state.empty.json`.
 
 ### `PUT /api/progress` — required
 
-Body: `{ "episodeId": number, "position": number, "completed"?: boolean }`. The position is floored to whole seconds; `completed` is true only for the JSON value `true`. Upserts one row per user and episode; the last write wins regardless of position (`saveProgress`). Returns `Success`, 400 `{message: "episodeId and position required"}`, or 404 `{message: "Episode not found"}` when the episode is not visible. Fixtures: `progress-save.success.json`, `progress-save.invalid.json`.
-
-There is no `POST` handler; a `POST` returns 405. The web client saves on page exit with a keepalive `PUT` (`usePlaybackSync.ts`).
+Accepts `ProgressBatch` and returns `ProgressAcknowledgement`. Each desired action
+requires `{episodeId, positionSeconds, completed}`. `completed:null` is a position-only
+checkpoint that preserves server completion; explicit true/false sets or clears it.
+Snapshot completion is always boolean. Seconds are whole original-source seconds
+in `0..2147483647`, not percentages or playback-rate-adjusted time. Ended or manual
+played completes; unplayed resets to zero; deliberate replay clears completion.
+An identical retry never becomes a new action or latest-playback promotion.
+Unversioned writers return 426, malformed actions 400, and inaccessible identities
+an ordered `not_found` result. Fixtures: `progress-changes.accepted.json`,
+`progress-changes.invalid.json`, `progress-changes.recovery.json`.
 
 ### `GET /api/search/episodes?term=` — public
 
@@ -306,9 +338,11 @@ Query: `locale` (default `us`) and optional `category`, a top-level genre ID. Re
 
 Returns up to four public `TopPodcast` items: podcasts at least three subscribers of `id` also follow, by shared listeners, then shows of the same top-level category from the `locale` chart in rank order (`related` in `src/server/discover.ts`). Private podcasts return 404 `{message: "Podcast not found"}`; 400 `{message: "parameter \`id\` must be a positive integer"}`.
 
-Both native clients consume per-episode progress reads to reconcile completed releases, and restore current playback on launch/foreground. The progress query variants are not yet represented in `index.json`; that is a fixture-coverage gap, not an indication that they are web-only. The chart extensions, `unplayed`, episode search, noteworthy and related are web consumers.
-
-The [next durable state contract](../state/README.md) defines exact identities and retry-safe progress/follow batches. Its schemas and handler factories are tested separately; these routes have not switched to that protocol.
+All clients consume per-episode progress and preserve current/recent reconciliation.
+Shared state-read and mutation fixtures are indexed for both native transports. The
+[durable state contract](../state/README.md) defines persistence, generation fencing,
+exact identities and retry behavior. Catalogue extensions remain separate from
+membership/progress truth.
 
 ### `GET /api/account` — required
 
@@ -326,7 +360,8 @@ Fixtures (derived from the routes): `account.details.json`, `account.unsaved.jso
 
 ### `GET /api/lists` — required
 
-Bootstraps the account's built-in Starred list and returns `{ "lists": EpisodeList[] }`.
+Bootstraps the account's built-in Starred list and returns durable scope plus
+`{ "lists": EpisodeList[] }`.
 `EpisodeList` contains UUID `id`, `kind` (`starred` or `playlist`), nullable `name`,
 decimal-string `revision` and integer `itemCount`. Starred has no stored name;
 clients localize it by kind. Count includes unavailable memberships. There is no
@@ -334,19 +369,19 @@ playlist creation endpoint yet.
 
 All list responses, including errors, carry private-feed headers. Missing
 sessions return 401; nonexistent and other accounts' lists both return 404.
-Uncaught session/database failures return 503 `{message: "Lists unavailable"}`.
+Uncaught session/database failures return private 503 `unavailable`.
 
 ### `GET /api/lists/:id/items` — required
 
-`view=membership` returns `ListSnapshot`: `{ "listId": UUID, "revision": string,
-"items": ListMembership[] }`. This is the **complete** account-owned membership
+`view=membership` returns `ListSnapshot`: durable scope plus `{ "listId": UUID,
+"revision": string, "items": ListMembership[] }`. This is the **complete** account-owned membership
 snapshot, never a page. `limit` and `cursor` are rejected in this view.
 
 `ListMembership` contains:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `episodeId` | integer | Canonical episode database ID. |
+| `episodeId` | decimal string | Canonical episode database ID. |
 | `addedAt` | integer | Server addition time in epoch milliseconds. |
 | `availability` | string | `available`, `content_missing` or `unavailable`. |
 
@@ -370,8 +405,8 @@ retained content is excluded from eviction without subscribing to its podcast.
 
 ### `POST /api/lists/:id/changes` — required
 
-Body `ListBatch`: `{ "clientId": UUID, "sequence": decimal string, "changes":
-[{ "op": "add" | "remove", "episodeId": positive safe integer }] }`.
+Body `ListBatch`: durable scope plus `{ "clientId": UUID, "sequence": decimal
+string, "changes": [{ "op": "add" | "remove", "episodeId": decimal string }] }`.
 There must be 1–100 actions and at most 64 KiB of request body. Extra body/action
 fields are rejected. Sequence ranges from 1 through the signed PostgreSQL bigint
 maximum, encoded as a string so it survives JavaScript decoding exactly.
@@ -382,8 +417,9 @@ deletes the membership and succeeds as a no-op when absent, including for an
 unknown ID. It can remove an owned membership whose episode is now inaccessible.
 No toggle, whole-list replacement, import or source/GUID resolver exists.
 
-Returns `ListAcknowledgement`: `{ "clientId", "sequence", "listId", "revision",
-"results": [{ "episodeId", "status": "applied" | "unchanged" | "not_found" }] }`.
+Returns `ListAcknowledgement`: durable scope plus `{ "clientId", "sequence",
+"listId", "revision", "results": [{ "episodeId", "status": "applied" |
+"unchanged" | "not_found" }] }`.
 Results correspond to actions in order. `not_found` covers missing and
 inaccessible adds. Terminal per-action failures can coexist with successful
 ones; the batch effects and its acknowledgement commit together. Revision advances
@@ -396,9 +432,10 @@ Older, skipped or changed-payload sequences return 409. A saved acknowledgement
 is not a current snapshot: refetch membership after acknowledging a batch.
 Explicit actions on different devices use last server-accepted action wins.
 
-400 covers malformed input, 413 oversized bodies and 409 stream protocol errors.
-Mutation requests are limited to 120 per account per minute; new stream
-registrations to 20 per account per hour. Limits return 429 with `Retry-After: 60`;
+400 covers malformed input, 413 oversized bodies, 426 unsupported protocol, and
+409 account/generation/stream conflicts. Scope checks precede replay. Mutation
+requests share a 120/account/minute budget across lists, progress and follows;
+new stream registrations share a 20/account/hour budget. Limits return 429 with `Retry-After: 60`;
 Redis failures fail closed with 503. Retry transient failures with the identical
 batch. Do not retry a protocol 409 under a new sequence or client ID.
 
@@ -409,6 +446,17 @@ Fixtures derived from `src/server/lists/service.ts` and `response.ts`:
 Web, iOS and Android implement durable outboxes and run the shared
 [offline transition vectors](../fixtures/sync/star-outbox.json). See the
 [episode-list design](../../docs/episode-lists.md) for guest transfer and rollout.
+
+### `POST /api/lists/:id/migration` — required
+
+The one-time bridge accepts durable scope plus `batch`, containing the unchanged
+old `{clientId, sequence, changes:[{op, episodeId:number}]}` request. Only positive
+safe numeric IDs from the old protocol are accepted here. The server keeps the old
+numeric request hash and acknowledgement in its ledger, and returns a normalized
+scoped/string-ID acknowledgement. Both accepted and unaccepted old flights keep
+their original sequence; this is not a new intent or an ongoing legacy writer API.
+The bridge refuses work after a recovery-generation rotation. Fixture:
+`list-migration.accepted.json`; preservation cases live in the state/list tests.
 
 ## Fixtures
 

@@ -2,7 +2,7 @@ import type postgres from 'postgres';
 import { podcastAccess } from '@/server/podcast-access';
 
 export interface ChapterEpisode {
-  id: number;
+  id: string;
   owner_user_id: string | null;
   file_url: string | null;
   file_length: number | string | null;
@@ -12,7 +12,7 @@ export interface ChapterEpisode {
 
 export async function readChapterEpisode(
   sql: postgres.ISql,
-  id: number,
+  id: string,
   userId: string | null,
 ) {
   const [episode] = await sql<ChapterEpisode[]>`

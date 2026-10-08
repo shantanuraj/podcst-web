@@ -19,9 +19,10 @@ import { legacyListHash } from '../lists/legacy';
 import { createEpisodeListService } from '../lists/service';
 import { createFollowStateService } from './follows';
 import { createProgressStateService } from './progress';
+import { createFollowResolver, parseFollowResolution } from './resolve';
 
 const migration = readFileSync(
-  new URL('../../../migrations/staged/0010-durable-state.sql', import.meta.url),
+  new URL('../../../migrations/active/0010-durable-state.sql', import.meta.url),
   'utf8',
 );
 const accountId = fixtures.progressBatch.accountId;
@@ -93,7 +94,6 @@ describe.skipIf(!process.env.PG_BIN)(
       cluster = startPostgres();
       sql = postgres({ ...cluster.options, max: 8 });
       await createSchemaFixture(sql);
-      await sql.begin((tx) => tx.unsafe(migration));
       progress = createProgressStateService(sql);
       follows = createFollowStateService(sql);
     }, 30_000);
@@ -238,6 +238,38 @@ describe.skipIf(!process.env.PG_BIN)(
       const time = (await follows.read(accountId)).items[0].followedAtMs;
       await follows.change(accountId, { ...membership, sequence: '2' });
       expect((await follows.read(accountId)).items[0].followedAtMs).toBe(time);
+    });
+
+    test('position checkpoints preserve another device completion and replay only their acknowledgement', async () => {
+      const a = randomUUID();
+      const b = randomUUID();
+      await progress.change(accountId, batch(90, false, a));
+      await progress.change(accountId, batch(0, true, b));
+      const checkpoint: ProgressBatch = {
+        ...stream(a, '2'),
+        changes: [{ episodeId: first, positionSeconds: 95, completed: null }],
+      };
+      const ack = await progress.change(accountId, checkpoint);
+      expect(
+        (await progress.read(accountId, [first])).items[0].progress,
+      ).toMatchObject({ positionSeconds: 95, completed: true });
+      expect((await progress.recent(accountId, 1)).items).toEqual([]);
+      await progress.change(accountId, batch(0, false, b, '2'));
+      const afterUnplayed = await progress.read(accountId, [first]);
+      expect(await progress.change(accountId, checkpoint)).toEqual(ack);
+      expect(await progress.read(accountId, [first])).toEqual(afterUnplayed);
+      await progress.change(accountId, batch(0, true, b, '3'));
+      await progress.change(accountId, batch(12, false, a, '3'));
+      expect(
+        (await progress.read(accountId, [first])).items[0].progress,
+      ).toMatchObject({ positionSeconds: 12, completed: false });
+      await progress.change(accountId, {
+        ...stream(),
+        changes: [{ episodeId: second, positionSeconds: 95, completed: null }],
+      });
+      expect(
+        (await progress.read(accountId, [second])).items[0].progress?.completed,
+      ).toBe(false);
     });
 
     test('keeps explicit completion independent of position and orders actions within a batch', async () => {
@@ -440,25 +472,39 @@ describe.skipIf(!process.env.PG_BIN)(
       const source = JSON.stringify(frozen);
       const originalHash = legacyListHash(listId, frozen);
       const scope = { protocol: 1 as const, accountId, generation };
-      const originalAck = await lists.change(
-        accountId,
+      const originalAck = {
+        clientId: frozen.clientId,
+        sequence: '1',
         listId,
-        frozen,
-        accepted ? undefined : scope,
-      );
+        revision: '1',
+        results: [{ episodeId: 101, status: 'applied' }],
+      };
+      if (accepted) {
+        await sql`INSERT INTO episode_list_items (list_id, episode_id) VALUES (${listId}, 101)`;
+        await sql`UPDATE episode_lists SET revision = 1 WHERE id = ${listId}`;
+        await sql`INSERT INTO episode_list_clients (user_id, client_id, last_sequence, last_request_hash, last_result)
+          VALUES (${accountId}, ${frozen.clientId}, 1, ${originalHash}, ${sql.json(originalAck)})`;
+      } else {
+        await lists.migrate(accountId, listId, scope, frozen);
+      }
       await lists.change(accountId, listId, {
+        ...scope,
         clientId: randomUUID(),
         sequence: '1',
-        changes: [{ op: 'remove', episodeId: 101 }],
+        changes: [{ op: 'remove', episodeId: '101' }],
       });
-      const replay = await lists.change(
+      const replay = await lists.migrate(
         accountId,
         listId,
-        JSON.parse(source),
         scope,
+        JSON.parse(source),
       );
-      expect(replay).toEqual(originalAck);
-      expect(replay.results[0].episodeId).toBe(101);
+      expect(replay).toEqual({
+        ...scope,
+        ...originalAck,
+        results: [{ episodeId: '101', status: 'applied' }],
+      });
+      expect(replay.results[0].episodeId).toBe('101');
       expect((await lists.membership(accountId, listId)).items).toEqual([]);
       const [stored] =
         await sql`SELECT last_sequence::text, last_request_hash, last_result FROM episode_list_clients WHERE user_id = ${accountId} AND client_id = ${frozen.clientId}`;
@@ -470,16 +516,146 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(legacyListHash(listId, converted)).not.toBe(originalHash);
       expect(JSON.stringify(frozen)).toBe(source);
       await expect(
-        lists.change('other', listId, frozen, scope),
+        lists.migrate('other', listId, scope, frozen),
       ).rejects.toMatchObject({ code: 'account_mismatch' });
       const restoredGeneration = randomUUID();
       await sql`UPDATE state_generation SET generation = ${restoredGeneration}`;
       await expect(
-        lists.change(accountId, listId, frozen, {
-          ...scope,
-          generation: restoredGeneration,
-        }),
+        lists.migrate(
+          accountId,
+          listId,
+          {
+            ...scope,
+            generation: restoredGeneration,
+          },
+          frozen,
+        ),
       ).rejects.toMatchObject({ code: 'recovery_required' });
+    });
+
+    test('resolves ordered import outcomes without bypassing follow intent', async () => {
+      const scope = { protocol: 1 as const, accountId, generation };
+      const calls: string[] = [];
+      const resolve = createFollowResolver(sql, async (_sql, url, user) => {
+        expect(user).toBe(accountId);
+        calls.push(url);
+        if (url.includes('missing'))
+          throw new Error('Synthetic upstream failure');
+        return url.includes('second') ? second : first;
+      });
+      const result = await resolve(accountId, scope, [
+        'https://fixture.invalid/first',
+        'not a URL',
+        'https://fixture.invalid/missing',
+        'https://fixture.invalid/second',
+      ]);
+      expect(result).toEqual({
+        ...scope,
+        items: [
+          { index: 0, podcastId: first, status: 'resolved' },
+          { index: 1, podcastId: null, status: 'unavailable' },
+          { index: 2, podcastId: null, status: 'unavailable' },
+          { index: 3, podcastId: second, status: 'resolved' },
+        ],
+      });
+      expect(stateValidator('followResolution')(result)).toBe(true);
+      expect(calls).toHaveLength(3);
+      expect(await sql`SELECT * FROM subscriptions`).toHaveLength(0);
+      expect(await sql`SELECT * FROM follow_clients`).toHaveLength(0);
+      await expect(
+        resolve('other', scope, ['https://fixture.invalid/first']),
+      ).rejects.toMatchObject({ code: 'account_mismatch' });
+      expect(calls).toHaveLength(3);
+      expect(
+        parseFollowResolution({
+          ...scope,
+          feedUrls: Array(21).fill('https://fixture.invalid/'),
+        }),
+      ).toBeNull();
+      expect(
+        parseFollowResolution({ ...scope, feedUrls: ['x'.repeat(4097)] }),
+      ).toBeNull();
+    });
+
+    test('bounds import concurrency and aborts slow resolution within one deadline', async () => {
+      let active = 0;
+      let maximum = 0;
+      let calls = 0;
+      const resolve = createFollowResolver(
+        sql,
+        async (_sql, _url, _user, signal) => {
+          calls++;
+          active++;
+          maximum = Math.max(maximum, active);
+          try {
+            signal?.throwIfAborted();
+            await new Promise((_, reject) =>
+              signal?.addEventListener(
+                'abort',
+                () => reject(new Error('Cancelled')),
+                { once: true },
+              ),
+            );
+            return first;
+          } finally {
+            active--;
+          }
+        },
+        10,
+      );
+      const scope = { protocol: 1 as const, accountId, generation };
+      const result = await resolve(
+        accountId,
+        scope,
+        Array.from({ length: 20 }, (_, i) => `https://fixture.invalid/${i}`),
+      );
+      expect(calls).toBeLessThanOrEqual(2);
+      expect(maximum).toBeLessThanOrEqual(2);
+      expect(active).toBe(0);
+      expect(result.items).toHaveLength(20);
+      expect(result.items.every(({ status }) => status === 'unavailable')).toBe(
+        true,
+      );
+      expect(await sql`SELECT * FROM subscriptions`).toHaveLength(0);
+    });
+
+    test('refuses import results from a generation that changed during resolution', async () => {
+      const resolve = createFollowResolver(sql, async () => {
+        await sql`UPDATE state_generation SET generation = ${randomUUID()}`;
+        return first;
+      });
+      await expect(
+        resolve(accountId, { protocol: 1, accountId, generation }, [
+          'https://fixture.invalid/first',
+        ]),
+      ).rejects.toMatchObject({ code: 'recovery_required' });
+      expect(await sql`SELECT * FROM subscriptions`).toHaveLength(0);
+    });
+
+    test('refuses an invalid historical position without rewriting or discarding its source', async () => {
+      await sql`CREATE DATABASE state_invalid_upgrade`;
+      const upgrade = postgres({
+        ...cluster.options,
+        database: 'state_invalid_upgrade',
+      });
+      try {
+        await createSchemaFixture(upgrade, '0009-email-code-security.sql');
+        await seed(upgrade);
+        await upgrade`INSERT INTO playback_progress (user_id, episode_id, position) VALUES (${accountId}, ${first}, -1)`;
+        await expect(
+          upgrade.begin((tx) => tx.unsafe(migration)),
+        ).rejects.toMatchObject({ code: '23514' });
+        expect(
+          (await upgrade`SELECT position FROM playback_progress`)[0].position,
+        ).toBe(-1);
+        expect(
+          (await upgrade`SELECT to_regclass('state_generation') AS state`)[0]
+            .state,
+        ).toBeNull();
+      } finally {
+        await upgrade.end();
+        await sql`DROP DATABASE state_invalid_upgrade`;
+      }
     });
 
     test('upgrades populated state without dropping positions, completion or ordering', async () => {
@@ -489,7 +665,7 @@ describe.skipIf(!process.env.PG_BIN)(
         database: 'state_upgrade',
       });
       try {
-        await createSchemaFixture(upgrade);
+        await createSchemaFixture(upgrade, '0009-email-code-security.sql');
         await seed(upgrade);
         await upgrade`
         INSERT INTO playback_progress (user_id, episode_id, position, completed, updated_at) VALUES

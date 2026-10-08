@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { type LegacyListBatch, legacyListHash } from './legacy';
+import type { LegacyListBatch } from '@/shared/lists';
+import { legacyListHash } from './legacy';
 
 test('pins the original numeric Starred hash independently of the new state protocol', () => {
   const listId = '0c339753-cb50-477c-843e-e641b414a060';

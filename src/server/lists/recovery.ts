@@ -6,7 +6,7 @@ export async function recoverListContent(
   sql: postgres.Sql,
   userId: string,
   listId: string,
-  claim: (podcastId: number) => Promise<boolean>,
+  claim: (podcastId: string) => Promise<boolean>,
   refresh = refreshFeed,
 ) {
   const candidates = await sql`
@@ -21,9 +21,9 @@ export async function recoverListContent(
       AND (coalesce(s.failures, 0) = 0 OR s.next_poll_at IS NULL OR s.next_poll_at <= now())
     ORDER BY s.last_polled_at ASC NULLS FIRST, p.id LIMIT 20
   `;
-  const selected: number[] = [];
+  const selected: string[] = [];
   for (const row of candidates) {
-    const id = Number(row.id);
+    const id = String(row.id);
     if (await claim(id)) selected.push(id);
     if (selected.length === 3) break;
   }

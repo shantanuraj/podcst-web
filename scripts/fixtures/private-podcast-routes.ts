@@ -1,9 +1,11 @@
 import { mock } from 'bun:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { lstatSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { NextRequest } from 'next/server';
+import { seedFollow, seedProgress } from '../lib/state-fixture';
 import { mockFeedTransport } from './feed-transport';
 
 mockFeedTransport();
@@ -56,12 +58,44 @@ assert.equal(
   realpathSync((await sql`SHOW data_directory`)[0].data_directory),
   realpathSync(join(directory, 'data')),
 );
+const { createProgressStateService } = await import(
+  '../../src/server/state/progress'
+);
+const { createFollowStateService } = await import(
+  '../../src/server/state/follows'
+);
+const { createStateChangeHandlers } = await import(
+  '../../src/server/state/response'
+);
+const progressState = createProgressStateService(sql);
+const followState = createFollowStateService(sql);
+mock.module('@/server/state', () => ({
+  progressState,
+  followState,
+  limitState: async () => {},
+  stateChanges: createStateChangeHandlers(
+    { progress: progressState.change, follows: followState.change },
+    async () => actor,
+    async () => {},
+  ),
+}));
+const [{ generation }] = await sql`SELECT generation FROM state_generation`;
+const scope = () => ({ protocol: 1, accountId: actor, generation });
+const batch = (changes: unknown[]) => ({
+  ...scope(),
+  clientId: randomUUID(),
+  sequence: '1',
+  changes,
+});
 const search = await import('../../src/app/api/search/route');
 const feedRoute = await import('../../src/app/api/feed/route');
 const info = await import('../../src/app/api/feed/info/route');
 const episodes = await import('../../src/app/api/feed/episodes/route');
 const refresh = await import('../../src/app/api/feed/refresh/route');
 const subscriptions = await import('../../src/app/api/subscriptions/route');
+const resolution = await import(
+  '../../src/app/api/subscriptions/resolve/route'
+);
 const progress = await import('../../src/app/api/progress/route');
 const top = await import('../../src/app/api/top/route');
 const { default: shortPage } = await import('../../src/app/s/[slug]/page');
@@ -74,8 +108,11 @@ function request(path: string, body?: unknown) {
     body === undefined
       ? {}
       : {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: path === '/api/progress' ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Podcst-Client': 'native',
+          },
           body: JSON.stringify(body),
         },
   );
@@ -122,7 +159,7 @@ try {
   const id = result.id;
   const [episode] =
     await sql`SELECT id, guid FROM episodes WHERE podcast_id = ${id} ORDER BY id LIMIT 1`;
-  const episodeId = Number(episode.id);
+  const episodeId = String(episode.id);
   assert.equal(
     (await feedRoute.GET(request(`/api/feed?id=${id}`))).status,
     200,
@@ -136,14 +173,23 @@ try {
     200,
   );
   assert.equal(
-    (await subscriptions.POST(request('/api/subscriptions', { podcastId: id })))
-      .status,
+    (
+      await subscriptions.POST(
+        request(
+          '/api/subscriptions',
+          batch([{ podcastId: id, followed: true }]),
+        ),
+      )
+    ).status,
     200,
   );
   assert.equal(
     (
       await progress.PUT(
-        request('/api/progress', { episodeId, position: 37, completed: false }),
+        request(
+          '/api/progress',
+          batch([{ episodeId, positionSeconds: 37, completed: false }]),
+        ),
       )
     ).status,
     200,
@@ -154,7 +200,11 @@ try {
       .isPrivate,
     true,
   );
-  assert.equal((await (await subscriptions.GET()).json())[0].isPrivate, true);
+  assert.equal(
+    (await (await subscriptions.GET(request('/api/subscriptions'))).json())[0]
+      .isPrivate,
+    true,
+  );
   assert.equal(
     (await readers.getEpisodeById(episodeId, 'owner'))?.isPrivate,
     true,
@@ -229,31 +279,40 @@ try {
   }
 
   actor = 'other';
-  assert.equal(
-    (await subscriptions.POST(request('/api/subscriptions', { podcastId: id })))
-      .status,
-    404,
+  const deniedFollow = await subscriptions.POST(
+    request('/api/subscriptions', batch([{ podcastId: id, followed: true }])),
   );
-  assert.equal(
-    (await progress.PUT(request('/api/progress', { episodeId, position: 99 })))
-      .status,
-    404,
+  assert.equal(deniedFollow.status, 200);
+  assert.equal((await deniedFollow.json()).results[0].status, 'not_found');
+  const deniedProgress = await progress.PUT(
+    request(
+      '/api/progress',
+      batch([{ episodeId, positionSeconds: 99, completed: false }]),
+    ),
   );
+  assert.equal(deniedProgress.status, 200);
+  assert.equal((await deniedProgress.json()).results[0].status, 'not_found');
   assert.equal(
     await (await progress.GET(request('/api/progress'))).json(),
     null,
   );
   assert.deepEqual(
     await (
-      await subscriptions.POST(
-        request('/api/subscriptions', { feedUrls: [feed] }),
+      await resolution.POST(
+        request('/api/subscriptions/resolve', { ...scope(), feedUrls: [feed] }),
       )
     ).json(),
-    { succeeded: 0, failed: 1 },
+    {
+      ...scope(),
+      items: [{ index: 0, podcastId: null, status: 'unavailable' }],
+    },
   );
-  await sql`INSERT INTO subscriptions (user_id, podcast_id) VALUES ('other', ${id})`;
-  await sql`INSERT INTO playback_progress (user_id, episode_id, position) VALUES ('other', ${episodeId}, 88)`;
-  assert.deepEqual(await (await subscriptions.GET()).json(), []);
+  await seedFollow(sql, 'other', id);
+  await seedProgress(sql, 'other', episodeId, 88);
+  assert.deepEqual(
+    await (await subscriptions.GET(request('/api/subscriptions'))).json(),
+    [],
+  );
   assert.equal(
     await (await progress.GET(request('/api/progress'))).json(),
     null,
@@ -274,7 +333,7 @@ try {
   const { registerPublicAliases } = await import(
     '../../src/server/ingest/feed-aliases'
   );
-  await indexPodcast(sql, feed, 999);
+  await indexPodcast(sql, feed, '999');
   const alias = 'https://public.example.invalid/historical';
   await registerPublicAliases(sql, {
     podcastId: id,
@@ -304,11 +363,14 @@ try {
   );
   assert.deepEqual(
     await (
-      await subscriptions.POST(
-        request('/api/subscriptions', { feedUrls: [alias] }),
+      await resolution.POST(
+        request('/api/subscriptions/resolve', {
+          ...scope(),
+          feedUrls: [alias],
+        }),
       )
     ).json(),
-    { succeeded: 1, failed: 0 },
+    { ...scope(), items: [{ index: 0, podcastId: id, status: 'resolved' }] },
   );
   actor = null;
   shortLink = { feed: alias, guid: episode.guid };

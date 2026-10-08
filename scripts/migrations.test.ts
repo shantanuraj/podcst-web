@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import postgres from 'postgres';
 import { startPostgres } from './lib/postgres-sandbox';
+import { seedFollow, seedProgress } from './lib/state-fixture';
 import {
   migrate as applyMigrations,
   migrationStatus as inspectMigrations,
@@ -239,7 +240,14 @@ describe.skipIf(!process.env.PG_BIN)(
         'podcast_id',
         'published',
       ]);
-      await sql.unsafe(seed);
+      await sql.unsafe(
+        seed.replace(
+          /^INSERT INTO (?:subscriptions|playback_progress).*;$/gm,
+          '',
+        ),
+      );
+      await seedFollow(sql, 'listener', '1');
+      await seedProgress(sql, 'listener', '10', 123);
       expect(
         (await sql`SELECT file_url FROM episode_content`)[0].file_url,
       ).toBe('https://example.invalid/audio.mp3');

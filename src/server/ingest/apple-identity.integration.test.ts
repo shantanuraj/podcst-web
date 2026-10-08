@@ -7,22 +7,39 @@ import {
   test,
 } from 'bun:test';
 import postgres from 'postgres';
+import {
+  fixtureLabel,
+  withFixtureId,
+  withFixtureListingId,
+} from '../../../scripts/lib/identity-fixture';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+import { seedFollow, seedProgress } from '../../../scripts/lib/state-fixture';
 import {
   type AppleIdentityPlan,
   claimAppleIdentity,
   findAppleSource,
   prepareAppleIdentity,
 } from './apple-identity';
-import { indexPodcast } from './index-podcast';
+import { indexPodcast as indexCanonicalPodcast } from './index-podcast';
 import { lockPodcastIdentities } from './podcast-identity';
-import { resolvePodcast } from './resolve-podcast';
+import { resolvePodcast as resolveCanonicalPodcast } from './resolve-podcast';
+
+const resolveFixturePodcast = withFixtureId(resolveCanonicalPodcast);
+const resolvePodcast = async (
+  ...args: Parameters<typeof resolveFixturePodcast>
+) => {
+  const id = await resolveFixturePodcast(...args);
+  return id === null ? null : fixtureLabel(id);
+};
+const indexFixturePodcast = withFixtureListingId(indexCanonicalPodcast);
+const indexPodcast = async (...args: Parameters<typeof indexFixturePodcast>) =>
+  fixtureLabel(await indexFixturePodcast(...args));
 
 const oldFeed = 'https://example.invalid/old';
 const newFeed = 'https://example.invalid/current';
 const evidence = (itunesId = 101, feedUrl = newFeed) => ({
-  itunesId,
+  itunesId: String(itunesId),
   feedUrl,
   country: 'my',
   verifiedAt: new Date().toISOString(),
@@ -39,7 +56,7 @@ async function apply(sql: postgres.Sql, plan: AppleIdentityPlan) {
     await lockPodcastIdentities(tx, plan.identities);
     const target = await findAppleSource(tx, plan.listing);
     if (!target) throw new Error('Missing fixture');
-    return claimAppleIdentity(tx, target, plan);
+    return fixtureLabel(await claimAppleIdentity(tx, target, plan));
   });
 }
 
@@ -64,8 +81,10 @@ describe.skipIf(!process.env.PG_BIN)('Apple-authoritative associations', () => {
     await sql`INSERT INTO podcasts(id,owner_user_id,feed_url,title,author_id,cover) VALUES (3,'owner','https://example.invalid/private','Private',1,'')`;
     await sql`INSERT INTO episodes(id,podcast_id,guid,published) VALUES (11,1,'old-guid',now()),(22,2,'different-guid',now())`;
     await sql`INSERT INTO episode_content(episode_id,title,file_url) VALUES (11,'Historical','https://example.invalid/old.mp3'),(22,'Current','https://example.invalid/new.mp3')`;
-    await sql`INSERT INTO subscriptions(user_id,podcast_id) VALUES ('owner',1),('owner',2)`;
-    await sql`INSERT INTO playback_progress(user_id,episode_id,position) VALUES ('owner',11,17),('owner',22,29)`;
+    await seedFollow(sql, 'owner', '1');
+    await seedFollow(sql, 'owner', '2');
+    await seedProgress(sql, 'owner', '11', 17);
+    await seedProgress(sql, 'owner', '22', 29);
     await sql`INSERT INTO transcripts(episode_id,content,source) VALUES (11,'Retained transcript','fixture')`;
     await sql`INSERT INTO feed_poll_state(podcast_id,failures) VALUES (1,3),(2,1)`;
   });

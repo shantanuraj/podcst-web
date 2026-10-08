@@ -371,6 +371,12 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       await tx`SET LOCAL idle_in_transaction_session_timeout = '60s'`;
       await tx`SET LOCAL timezone = 'UTC'`;
       await tx`SET LOCAL search_path = pg_catalog, public, pg_temp`;
+      const [protocol] =
+        await tx`SELECT to_regclass('public.state_generation') IS NOT NULL AS revisioned`;
+      invariant(
+        !protocol.revisioned,
+        'Revisioned state requires a reviewed identity and stream reconciliation',
+      );
       const [settings] =
         await tx`SELECT current_setting('transaction_isolation') AS isolation, to_jsonb(now()) AS now`;
       invariant(

@@ -1,22 +1,23 @@
 # Durable state protocol
 
-This is the executable contract for the next progress/follow protocol. Validators,
-HTTP change-handler factories, transactional PostgreSQL services and native wire
-models are implemented; the existing API routes and client stores have **not**
-switched to this protocol. See
-[the current API](../api/README.md) for current request shapes.
+This is the executable contract implemented by the server and web/iOS/Android
+adapters. See [the API reference](../api/README.md) for route selection and payload
+fixtures. Activation is a coordinated server, storage and client cutover, not
+permission to apply a migration or deploy an incomplete candidate.
 
 [`schema.json`](schema.json) is ordinary JSON Schema draft-07. Definitions are
 validated with Ajv without coercion, defaults or removal of unknown properties.
 [`fixtures.json`](fixtures.json) is synthetic and shared by web/server, Swift and
 Kotlin tests. [`transitions.json`](transitions.json) supplies lost-ack/opposite-action
-vectors executed against disposable PostgreSQL. Neither these tests nor schema
-validation establish client-storage, physical-device or operational recovery proof.
+vectors executed against disposable PostgreSQL. Client tests exercise IndexedDB,
+protected atomic files and Room migrations with source retention and failure
+injection. These checks are not physical-device or operational recovery proof.
 
-`migrations/staged/0010-durable-state.sql` is exercised by the service tests but is
-intentionally outside the active migration chain until the routes and client
-adapters switch together. Its required revisions reject obsolete inserts. Do not
-activate that schema while old progress/follow writers remain.
+`migrations/active/0010-durable-state.sql` adds the generation, revision heads and
+resource streams and backfills existing state deterministically. Invalid historical
+positions refuse the migration instead of being silently clamped. Coordinate
+writers and backups before activation; required row revisions reject obsolete
+inserts, while public obsolete deployments still need their own retirement plan.
 
 ## Values and bounds
 
@@ -28,6 +29,9 @@ activate that schema while old progress/follow writers remain.
   exactly one account **and** one resource; progress and follows are independent.
 - `positionSeconds` is an integer in `0...2147483647`, measured on the original
   source timeline, never speed-adjusted or silence-trimmed elapsed time.
+- Every progress action includes `completed`: true sets completion, false explicitly
+  clears it, and null preserves the server's current completion under the resource
+  lock (false for a new row). Snapshots always return a concrete boolean.
 - `updatedAtMs` and `followedAtMs` are server epoch-millisecond integers, or explicit
   `null` for an unknown legacy timestamp. They are presentation data, not conflict
   clocks. Revisions determine accepted order.
@@ -73,7 +77,8 @@ Canonical SHA-256 input is UTF-8 `JSON.stringify` of keys in this order:
 `resource` is `progress` or `follows`. Progress action keys are
 `episodeId, positionSeconds, completed`; follow keys are `podcastId, followed`.
 Object input order does not matter; action order and exact decimal strings do.
-This is **not** a change to the existing Starred hash contract.
+This hash is specific to progress/follows. The legacy numeric Starred hash remains
+pinned behind its one-time bridge; new list batches include their scope and list ID.
 
 A saved acknowledgement is not current state. Keep the local overlay until an
 authoritative post-ack read from the same account/generation has a revision at
@@ -86,8 +91,9 @@ same rule prevents a lost-ack follow retry from undoing B's later unfollow.
 
 Only an ended event or explicit Mark played completes an episode. A checkpoint
 at 94%, 95% or 100% does not. Mark unplayed resets to zero/incomplete. Deliberate
-replay clears completion at the chosen source position. A passive checkpoint
-preserves completion. Transport failures, reads, queue hydration, shared-link
+replay clears completion at the chosen source position. A passive checkpoint sends
+`completed:null` and preserves server completion, even if another device changed it
+after the local cache was read. It still supplies a new position action. Transport failures, reads, queue hydration, shared-link
 arrival and timer expiry do not create a completion event.
 
 Guest follows are automatically unioned into the verified account's outbox in
@@ -113,6 +119,7 @@ stable `code` and bounded human-readable `message` fields:
 | `invalid_request` | 400 | Preserve work; surface invalid input |
 | `unauthenticated` | 401 | Pause until the original account authenticates |
 | `request_forbidden` | 403 | Preserve work; fix request context |
+| `not_found` | 404 | Preserve work; resource unavailable |
 | `account_mismatch` | 409 | Suspend the old account's work |
 | `sequence_conflict` | 409 | Block the stream; never reset or renumber |
 | `recovery_required` | 409 | Preserve work; explicit reconciliation required |
@@ -135,11 +142,17 @@ changed since migration. Fetching a new generation cannot make an old ambiguous
 flight safe. The original numeric Starred hash and stored acknowledgement remain
 unchanged; converting that frozen request to strings is not a retry.
 
-The migration service hook is tested against accepted and unaccepted legacy
-batches with an intervening opposite action. The migration HTTP path and local
-conversion journals are not yet wired. Stored numeric IDs outside the safe integer
-range remain unresolved rather than being guessed. Ambiguous old progress writes
-remain local until explicit reapply creates new intent.
+The `/api/lists/:id/migration` bridge and client conversion journals preserve both
+accepted and unaccepted legacy batches across an intervening opposite action. They
+return a normalized scoped/string-ID acknowledgement without changing the stored
+legacy result. Unsafe stored numeric IDs remain visibly unresolved, not guessed.
+Ambiguous unsequenced progress stays local until explicit reapply creates new intent.
+
+Guest-position selection is explicit and commits the new account intent with its
+consumed-source marker. Queue and migration sources remain scoped and survive failed
+activation. Terminal erasure uses durable fences; an unreadable source whose owner
+cannot be established is retained and prevents a false successful-erasure report.
+Ordinary logout never writes that terminal fence.
 
 Generation rotation, post-restore reconciliation, obsolete-writer fencing and
 client storage conversion must be proven before activation. This contract does

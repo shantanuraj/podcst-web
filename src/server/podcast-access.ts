@@ -14,7 +14,7 @@ export function podcastAccess(
 
 export async function canAccessPodcast(
   sql: postgres.ISql,
-  podcastId: number,
+  podcastId: string,
   userId: string | null = null,
 ): Promise<boolean> {
   const [podcast] = await sql`

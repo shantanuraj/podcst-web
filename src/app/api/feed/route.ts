@@ -6,14 +6,15 @@ import {
   ingestPodcast,
 } from '@/server/ingest/podcast';
 import { privateFeedHeaders as headers } from '@/server/podcast-access';
+import { isCanonicalId } from '@/shared/canonical-id';
 import { feedUrl } from '@/shared/feed-url';
 
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get('id');
   const url = request.nextUrl.searchParams.get('url');
   if (id) {
-    const podcastId = Number(id);
-    if (!Number.isSafeInteger(podcastId) || podcastId <= 0) {
+    const podcastId = id;
+    if (!isCanonicalId(podcastId)) {
       return NextResponse.json(
         { message: 'A valid podcast ID is required' },
         { status: 400, headers },

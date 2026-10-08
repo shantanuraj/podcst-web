@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
 import { getPodcastInfoById } from '@/server/ingest/podcast';
 import { privateFeedHeaders as headers } from '@/server/podcast-access';
+import { isCanonicalId } from '@/shared/canonical-id';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -14,8 +15,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const podcastId = parseInt(id, 10);
-  if (Number.isNaN(podcastId)) {
+  const podcastId = id;
+  if (!isCanonicalId(podcastId)) {
     return NextResponse.json(
       { message: 'parameter `id` must be a number' },
       { status: 400 },

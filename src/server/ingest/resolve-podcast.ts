@@ -7,10 +7,10 @@ type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
 export async function resolvePodcast(
   sql: postgres.Sql,
-  itunesId: number,
+  itunesId: string,
   locale = DEFAULT_PODCASTS_LOCALE,
   request: Fetch = fetch,
-): Promise<number | null> {
+): Promise<string | null> {
   const listing = await lookupAppleListing(itunesId, locale, request);
   if (!listing) return null;
   return indexPodcast(sql, listing.feedUrl, itunesId, undefined, listing);

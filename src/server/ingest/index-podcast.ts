@@ -32,17 +32,19 @@ function authorizePrivate(podcast: PodcastIdentity, userId: string) {
   if (podcast.owner_user_id !== null && podcast.owner_user_id !== userId) {
     throw new PodcastAccessDenied('Feed unavailable');
   }
-  return Number(podcast.id);
+  return String(podcast.id);
 }
 
 async function index(
   sql: postgres.Sql,
   feedUrl: string,
   ownerUserId: string | null,
-  itunesId?: number,
+  itunesId?: string,
   verifyMove = verifyPublicFeedMove,
   verification?: AppleListingVerification,
-): Promise<number> {
+  signal?: AbortSignal,
+): Promise<string> {
+  signal?.throwIfAborted();
   const applePlan =
     verification && itunesId !== undefined
       ? await prepareAppleIdentity(sql, { ...verification, itunesId, feedUrl })
@@ -55,7 +57,7 @@ async function index(
     throw new PodcastAccessDenied('Feed unavailable');
   const fetched = existing
     ? null
-    : await fetchFeed(feedUrl, undefined, ownerUserId !== null);
+    : await fetchFeed(feedUrl, undefined, ownerUserId !== null, signal);
   if (fetched && fetched.status !== 'updated')
     throw new Error('Feed was not returned');
   const moveVerification =
@@ -97,7 +99,13 @@ async function index(
       : claimPublicIdentity(tx, source, feedUrl, itunesId, verification);
 
   return sql.begin(async (tx) => {
+    if (signal) {
+      await tx`SET LOCAL lock_timeout = '3s'`;
+      await tx`SET LOCAL statement_timeout = '10s'`;
+    }
+    signal?.throwIfAborted();
     await lockPodcastIdentities(tx, identities);
+    signal?.throwIfAborted();
     let found: PodcastIdentity | undefined;
     for (const locator of locators) {
       const match = await findPodcastIdentity(
@@ -107,7 +115,7 @@ async function index(
         undefined,
         true,
       );
-      if (found && match && Number(found.id) !== Number(match.id))
+      if (found && match && String(found.id) !== String(match.id))
         throw new PodcastIdentityConflict(
           'Move identifies different existing sources',
         );
@@ -121,7 +129,7 @@ async function index(
       if (ownerUserId) return authorizePrivate(found, ownerUserId);
       if (move) {
         await claimPublicAliases(tx, {
-          podcastId: Number(found.id),
+          podcastId: String(found.id),
           expectedFeedUrl: found.feed_url,
           aliases: locators,
           evidence: {
@@ -168,7 +176,7 @@ async function index(
         ? authorizePrivate(winner, ownerUserId)
         : claim(tx, winner);
     }
-    const id = Number(podcast.id);
+    const id = String(podcast.id);
     if (move)
       await claimPublicAliases(tx, {
         podcastId: id,
@@ -190,7 +198,7 @@ async function index(
 export function indexPodcast(
   sql: postgres.Sql,
   feedUrl: string,
-  itunesId?: number,
+  itunesId?: string,
   verifyMove = verifyPublicFeedMove,
   verification?: AppleListingVerification,
 ) {
@@ -201,7 +209,8 @@ export function indexPrivatePodcast(
   sql: postgres.Sql,
   feedUrl: string,
   userId: string,
+  signal?: AbortSignal,
 ) {
   if (!userId) throw new PodcastAccessDenied('Sign in to import a feed');
-  return index(sql, feedUrl, userId);
+  return index(sql, feedUrl, userId, undefined, undefined, undefined, signal);
 }

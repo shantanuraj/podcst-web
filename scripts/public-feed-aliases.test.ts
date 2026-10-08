@@ -16,20 +16,36 @@ import {
 } from '../src/server/ingest/catalog';
 import { storeTopPodcasts } from '../src/server/ingest/charts';
 import { registerPublicAliases } from '../src/server/ingest/feed-aliases';
-import { refreshFeed } from '../src/server/ingest/feed-refresh';
+import { refreshFeed as refreshCanonicalFeed } from '../src/server/ingest/feed-refresh';
 import {
-  findPodcastIdentity,
-  indexPodcast,
-  indexPrivatePodcast,
+  findPodcastIdentity as findCanonicalPodcastIdentity,
+  indexPodcast as indexCanonicalPodcast,
+  indexPrivatePodcast as indexCanonicalPrivatePodcast,
   PodcastAccessDenied,
   PodcastIdentityConflict,
 } from '../src/server/ingest/index-podcast';
-import { resolvePublicFeedMove } from '../src/server/ingest/public-feed-moves';
+import { resolvePublicFeedMove as resolveCanonicalFeedMove } from '../src/server/ingest/public-feed-moves';
 import { searchPodcastsByFeedUrl } from '../src/server/search';
 import { parseAliasPlan, runAliasPlan } from './feed-aliases';
 import { readProtected } from './lib/artifacts';
+import {
+  fixtureLabel,
+  withFixtureId,
+  withFixtureListingId,
+} from './lib/identity-fixture';
 import { startPostgres } from './lib/postgres-sandbox';
 import { createSchemaFixture } from './lib/schema-fixture';
+import { seedProgress } from './lib/state-fixture';
+
+const refreshFeed = withFixtureId(refreshCanonicalFeed);
+const resolvePublicFeedMove = withFixtureId(resolveCanonicalFeedMove);
+const findPodcastIdentity = withFixtureListingId(findCanonicalPodcastIdentity);
+const indexFixturePodcast = withFixtureListingId(indexCanonicalPodcast);
+const indexPodcast = async (...args: Parameters<typeof indexFixturePodcast>) =>
+  fixtureLabel(await indexFixturePodcast(...args));
+const indexPrivatePodcast = async (
+  ...args: Parameters<typeof indexCanonicalPrivatePodcast>
+) => fixtureLabel(await indexCanonicalPrivatePodcast(...args));
 
 const canonical = 'https://feeds.example.invalid/current';
 const old = 'http://feeds.example.invalid/old';
@@ -43,7 +59,7 @@ const xml = readFileSync(
   'utf8',
 );
 const claim = {
-  podcastId: 1,
+  podcastId: '1',
   expectedFeedUrl: canonical,
   aliases: [old],
   evidence: { type: 'reviewed' as const, reference: 'synthetic-review' },
@@ -135,7 +151,7 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(await indexPrivatePodcast(sql, old, 'other')).toBe(1);
       expect(await indexPodcast(sql, old, 101)).toBe(1);
       expect(await searchPodcastsByFeedUrl(sql, old)).toMatchObject({
-        id: 1,
+        id: '1',
         feed: canonical,
         isPrivate: false,
       });
@@ -154,7 +170,7 @@ describe.skipIf(!process.env.PG_BIN)(
 
     test('a canonical move preserves identity, history and validator safety', async () => {
       await sql`INSERT INTO episodes(id,podcast_id,guid,published) VALUES (1,1,'episode',now())`;
-      await sql`INSERT INTO playback_progress(user_id,episode_id,position) VALUES ('owner',1,123)`;
+      await seedProgress(sql, 'owner', '1', 123);
       await sql`INSERT INTO feed_poll_state(podcast_id,etag,hash) VALUES (1,'old-validator','old-hash')`;
       const next = 'https://publisher.example.invalid/new';
       await registerPublicAliases(sql, { ...claim, canonicalFeedUrl: next });
@@ -180,7 +196,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await expect(
         registerPublicAliases(sql, {
           ...claim,
-          podcastId: 2,
+          podcastId: '2',
           expectedFeedUrl: privateUrl,
         }),
       ).rejects.toBeInstanceOf(PodcastAccessDenied);
@@ -237,7 +253,7 @@ describe.skipIf(!process.env.PG_BIN)(
           registerPublicAliases(sql, claim),
           registerPublicAliases(other, {
             ...claim,
-            podcastId: 2,
+            podcastId: '2',
             expectedFeedUrl: 'https://example.invalid/second',
           }),
         ]);
@@ -371,7 +387,7 @@ describe.skipIf(!process.env.PG_BIN)(
         });
         expect(await resolvePublicFeedMove(sql, 1, verify)).toEqual({
           status: 'resolved',
-          podcastId: 1,
+          podcastId: '1',
         });
       } finally {
         await other.end();
@@ -423,7 +439,7 @@ describe.skipIf(!process.env.PG_BIN)(
 
     const catalog = (feed = old): CatalogPodcast => ({
       podcastIndexId: 400,
-      itunesId: 101,
+      itunesId: '101',
       feed,
       authorId: 1,
       title: 'Public metadata',
@@ -512,7 +528,7 @@ describe.skipIf(!process.env.PG_BIN)(
         sql,
         [
           {
-            itunesId: 101,
+            itunesId: '101',
             author: 'Publisher',
             feed: old,
             title: 'Public',
@@ -572,7 +588,7 @@ describe.skipIf(!process.env.PG_BIN)(
             claim,
             {
               ...claim,
-              podcastId: 2,
+              podcastId: '2',
               expectedFeedUrl: 'https://example.invalid/second',
             },
           ],

@@ -1,67 +1,31 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getSession } from '@/server/auth/session';
-import { privateFeedHeaders as headers } from '@/server/podcast-access';
-import {
-  addSubscription,
-  getSubscriptions,
-  importSubscriptions,
-  removeSubscription,
-} from '@/server/subscriptions';
+import { followState, stateChanges } from '@/server/state';
+import { stateResponse } from '@/server/state/http';
+import { StateError } from '@/server/state/protocol';
+import { getSubscriptions } from '@/server/subscriptions';
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  const subscriptions = await getSubscriptions(session.userId);
-  return NextResponse.json(subscriptions, { headers });
+export async function GET(request: NextRequest) {
+  return stateResponse(async () => {
+    const session = await getSession();
+    if (!session) throw new StateError('unauthenticated', 'Unauthorized');
+    const params = request.nextUrl.searchParams;
+    if (
+      [...params.keys()].some((key) => key !== 'view') ||
+      params.getAll('view').length > 1
+    )
+      throw new StateError('invalid_request', 'Invalid follow query');
+    const view = params.get('view');
+    if (view === 'membership') return followState.read(session.userId);
+    if (view !== null)
+      throw new StateError('invalid_request', 'Invalid follow view');
+    return getSubscriptions(session.userId);
+  });
 }
 
-export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = (request: Request) => stateChanges.follows(request);
 
-  const body = (await request.json().catch(() => null)) ?? {};
-
-  if (Array.isArray(body.feedUrls)) {
-    const result = await importSubscriptions(session.userId, body.feedUrls);
-    return NextResponse.json(result, { headers });
-  }
-
-  const podcastId = body.podcastId;
-  if (!podcastId || typeof podcastId !== 'number') {
-    return NextResponse.json(
-      { message: 'podcastId required' },
-      { status: 400 },
-    );
-  }
-
-  const success = await addSubscription(session.userId, podcastId);
-  if (!success) {
-    return NextResponse.json({ message: 'Podcast not found' }, { status: 404 });
-  }
-
-  return NextResponse.json({ success: true });
-}
-
-export async function DELETE(request: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const podcastId = searchParams.get('podcastId');
-  if (!podcastId) {
-    return NextResponse.json(
-      { message: 'podcastId required' },
-      { status: 400 },
-    );
-  }
-
-  await removeSubscription(session.userId, Number(podcastId));
-  return NextResponse.json({ success: true });
-}
+export const DELETE = () =>
+  stateResponse(async () => {
+    throw new StateError('update_required', 'Use desired-state follow batches');
+  });

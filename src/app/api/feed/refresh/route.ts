@@ -7,12 +7,13 @@ import {
   canAccessPodcast,
   privateFeedHeaders as headers,
 } from '@/server/podcast-access';
+import { isCanonicalId } from '@/shared/canonical-id';
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const podcastId = body?.podcastId;
 
-  if (!Number.isSafeInteger(podcastId) || podcastId <= 0) {
+  if (!isCanonicalId(podcastId)) {
     return NextResponse.json(
       { message: 'podcastId must be a positive integer' },
       { status: 400 },

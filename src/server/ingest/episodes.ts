@@ -49,7 +49,7 @@ export const buildRows = (
 
 export async function upsertEpisodes(
   sql: postgres.ISql,
-  podcastId: number,
+  podcastId: string,
   podcastCover: string | null,
   episodes: IEpisode[],
 ): Promise<void> {

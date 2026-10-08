@@ -38,7 +38,7 @@ export async function getRecentProgress(
     JOIN episode_content c ON c.episode_id = e.id
     WHERE pp.user_id = ${userId} AND ${podcastAccess(sql, userId)}
       AND pp.completed = false
-    ORDER BY pp.updated_at DESC
+    ORDER BY pp.revision DESC
     LIMIT ${limit}
   `;
 
@@ -78,7 +78,7 @@ export async function getCurrentProgress(
 
 export async function getEpisodeProgress(
   userId: string,
-  episodeIds: number[],
+  episodeIds: string[],
 ): Promise<EpisodeProgress[]> {
   const rows = await sql`
     SELECT pp.episode_id, pp.position, pp.completed
@@ -90,7 +90,7 @@ export async function getEpisodeProgress(
     ORDER BY pp.episode_id
   `;
   return rows.map((row) => ({
-    episodeId: Number(row.episode_id),
+    episodeId: String(row.episode_id),
     position: row.position,
     completed: row.completed,
   }));
@@ -98,7 +98,7 @@ export async function getEpisodeProgress(
 
 export async function getPodcastProgress(
   userId: string,
-  podcastId: number,
+  podcastId: string,
 ): Promise<EpisodeProgress[]> {
   const rows = await sql`
     SELECT pp.episode_id, pp.position, pp.completed
@@ -110,28 +110,8 @@ export async function getPodcastProgress(
     ORDER BY pp.episode_id
   `;
   return rows.map((row) => ({
-    episodeId: Number(row.episode_id),
+    episodeId: String(row.episode_id),
     position: row.position,
     completed: row.completed,
   }));
-}
-
-export async function saveProgress(
-  userId: string,
-  episodeId: number,
-  position: number,
-  completed: boolean,
-): Promise<boolean> {
-  const [saved] = await sql`
-    INSERT INTO playback_progress (user_id, episode_id, position, completed, updated_at)
-    SELECT ${userId}, e.id, ${position}, ${completed}, now()
-    FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
-    WHERE e.id = ${episodeId} AND ${podcastAccess(sql, userId)}
-    ON CONFLICT (user_id, episode_id) DO UPDATE SET
-      position = EXCLUDED.position,
-      completed = EXCLUDED.completed,
-      updated_at = EXCLUDED.updated_at
-    RETURNING episode_id
-  `;
-  return !!saved;
 }

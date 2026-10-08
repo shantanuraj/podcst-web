@@ -23,7 +23,7 @@ const podcast = (collectionId: number): iTunes.Podcast => ({
 test('Apple search results separate collection IDs from database IDs', () => {
   const ids = [1614253637, 6806963519];
   const results = adaptResponse({ results: ids.map(podcast) });
-  expect(results.map((result) => result.itunes_id)).toEqual(ids);
+  expect(results.map((result) => result.itunes_id)).toEqual(ids.map(String));
   expect(results.every((result) => result.id === undefined)).toBe(true);
 });
 
@@ -33,6 +33,6 @@ test('feed URL exceptions preserve the Apple search identity', () => {
   });
   expect(result).toHaveLength(1);
   expect(result[0].id).toBeUndefined();
-  expect(result[0].itunes_id).toBe(1473872585);
+  expect(result[0].itunes_id).toBe('1473872585');
   expect(result[0].feed).toBe('https://apple.news/podcast/apple_news_today');
 });

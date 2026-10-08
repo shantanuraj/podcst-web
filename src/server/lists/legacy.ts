@@ -1,10 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export interface LegacyListBatch {
-  clientId: string;
-  sequence: string;
-  changes: { op: 'add' | 'remove'; episodeId: number }[];
-}
+import type { LegacyListBatch } from '@/shared/lists';
 
 export function legacyListHash(listId: string, batch: LegacyListBatch) {
   return createHash('sha256')

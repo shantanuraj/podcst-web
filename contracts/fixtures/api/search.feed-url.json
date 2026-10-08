@@ -1,6 +1,6 @@
 [
   {
-    "id": 9002,
+    "id": "9002",
     "isPrivate": true,
     "title": "Members Feed",
     "feed": "https://private.example/feed.xml?token=redacted",

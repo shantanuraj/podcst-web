@@ -22,7 +22,7 @@ export const MAX_LOCAL_ENTRIES = 128;
 export const MAX_IN_FLIGHT = 16;
 
 type ResolveEpisode = (
-  id: number,
+  id: string,
   userId: string | null,
 ) => Promise<ChapterEpisode | null>;
 interface Options {
@@ -49,7 +49,7 @@ export function createChapterService(
   >();
   const pending = new Map<string, Promise<ChapterCacheEntry | null>>();
 
-  async function authorized(id: number, userId: string | null) {
+  async function authorized(id: string, userId: string | null) {
     const episode = await resolveEpisode(id, userId);
     return episode &&
       (episode.owner_user_id === null || episode.owner_user_id === userId)
@@ -220,7 +220,7 @@ export function createChapterService(
   }
 
   return async (
-    id: number,
+    id: string,
     userId: string | null,
   ): Promise<EpisodeChapters | null> => {
     const episode = await authorized(id, userId);

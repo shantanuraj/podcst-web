@@ -22,7 +22,7 @@ const databaseAvailable = Boolean(databaseUrl || process.env.PG_BIN);
 const staleVerification = '2000-01-01T00:00:00.000Z';
 const schema = `chart_test_${randomUUID().replaceAll('-', '')}`;
 const podcast = (itunesId: number, rank = 1): ChartPodcast => ({
-  itunesId,
+  itunesId: String(itunesId),
   rank,
   verifiedAt: new Date().toISOString(),
   title: `Podcast ${itunesId}`,

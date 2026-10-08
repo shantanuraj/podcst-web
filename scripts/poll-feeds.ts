@@ -35,7 +35,7 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
   let failed = 0;
   let processed = 0;
 
-  async function processPodcast(podcast: { id: number }): Promise<void> {
+  async function processPodcast(podcast: { id: string }): Promise<void> {
     const result = await refreshFeed(sql, podcast.id, 'scheduled');
     if (result === 'updated') updated++;
     else if (result === 'not_modified') unchanged++;

@@ -43,6 +43,23 @@ describe('ordinary feed transport', () => {
     ).rejects.toThrow('Nonpublic');
   });
 
+  test('honors caller cancellation before lookup and during a streamed response', async () => {
+    let requests = 0;
+    const before = new AbortController();
+    before.abort();
+    await expect(get(base, { signal: before.signal })).rejects.toThrow();
+    const active = new AbortController();
+    handler = (_, response) => {
+      requests++;
+      response.write('<rss>');
+      active.abort();
+    };
+    await expect(
+      get(`${base}/slow?token=synthetic`, { signal: active.signal }),
+    ).rejects.toThrow();
+    expect(requests).toBe(1);
+  });
+
   test('pins each hop, preserves query tokens and sends no application credentials', async () => {
     const hosts: string[] = [];
     handler = (request, response) => {

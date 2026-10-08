@@ -34,14 +34,29 @@ describe('Apple chart fetching', () => {
     });
     const result = await fetchTopFromItunes('nl', request);
     expect(result.map(({ itunesId, rank }) => ({ itunesId, rank }))).toEqual([
-      { itunesId: ids[0], rank: 1 },
-      { itunesId: ids[1], rank: 2 },
+      { itunesId: String(ids[0]), rank: 1 },
+      { itunesId: String(ids[1]), rank: 2 },
     ]);
     const lookupUrl = new URL(request.mock.calls[1][0]);
     expect(lookupUrl.searchParams.get('country')).toBe('nl');
     expect(lookupUrl.searchParams.get('entity')).toBe('podcast');
     expect(lookupUrl.searchParams.get('id')).toBe(ids.join(','));
     expect(lookupUrl.searchParams.get('limit')).toBe('100');
+  });
+
+  test('preserves exact string provider IDs and refuses rounded numeric replies', async () => {
+    const id = '9007199254740993';
+    const request = responses(chart([id]), {
+      results: [podcast(1, { collectionId: id })],
+    });
+    expect((await fetchTopFromItunes('us', request))[0].itunesId).toBe(id);
+    expect(new URL(request.mock.calls[1][0]).searchParams.get('id')).toBe(id);
+    const unsafe = responses(chart([id]), {
+      results: [podcast(1, { collectionId: Number(id) })],
+    });
+    await expect(fetchTopFromItunes('us', unsafe)).rejects.toThrow(
+      'no usable podcasts',
+    );
   });
 
   test('filters unavailable feeds and unrelated lookup entries without inventing ranks', async () => {
@@ -92,7 +107,7 @@ describe('Apple chart fetching', () => {
       ['0'],
       ['1.5'],
       ['bad'],
-      ['9007199254740993'],
+      ['9223372036854775808'],
       ['123', '123'],
     ]) {
       const request = responses(chart(values));

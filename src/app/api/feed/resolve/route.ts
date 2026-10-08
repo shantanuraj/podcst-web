@@ -3,12 +3,13 @@ import { DEFAULT_PODCASTS_LOCALE } from '@/data/constants';
 import { sql } from '@/server/db';
 import { PodcastIdentityConflict } from '@/server/ingest/index-podcast';
 import { resolvePodcast } from '@/server/ingest/resolve-podcast';
+import { isCanonicalId } from '@/shared/canonical-id';
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const itunesId = body?.itunes_id;
   const locale = body?.locale ?? DEFAULT_PODCASTS_LOCALE;
-  if (!Number.isSafeInteger(itunesId) || itunesId <= 0) {
+  if (!isCanonicalId(itunesId)) {
     return NextResponse.json(
       { message: 'itunes_id must be a positive integer' },
       { status: 400 },

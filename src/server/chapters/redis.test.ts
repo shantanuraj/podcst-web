@@ -54,8 +54,8 @@ for (const stalled of [false, true]) {
           },
         },
       );
-      expect((await service(42, null))?.source).toBe('shownotes');
-      expect((await service(42, null))?.source).toBe('shownotes');
+      expect((await service('42', null))?.source).toBe('shownotes');
+      expect((await service('42', null))?.source).toBe('shownotes');
       expect(fetched).toBe(1);
       expect(redis.options.enableOfflineQueue).toBe(false);
       expect(redis.options.autoResendUnfulfilledCommands).toBe(false);

@@ -16,7 +16,7 @@ import {
 import type { ChapterEpisode } from './episode';
 
 const episode: ChapterEpisode = {
-  id: 42,
+  id: '42',
   owner_user_id: 'owner',
   file_url: 'https://example.invalid/private?secret=token',
   file_length: 42,
@@ -43,7 +43,7 @@ test('cache identity includes owner, episode, enclosure and decoder/schema versi
   expect(key).not.toContain('secret');
   expect(key).not.toContain('owner');
   for (const change of [
-    { id: 43 },
+    { id: '43' },
     { owner_user_id: null },
     { owner_user_id: 'other' },
     { file_url: `${episode.file_url}&revision=2` },

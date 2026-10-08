@@ -25,6 +25,7 @@ describe.skipIf(!process.env.PG_BIN)(
     let sql: postgres.Sql;
     let lists: EpisodeListService;
     let listId: string;
+    let generation: string;
 
     beforeAll(async () => {
       cluster = startPostgres();
@@ -60,14 +61,19 @@ describe.skipIf(!process.env.PG_BIN)(
         (201, 'Private', 'https://example.invalid/private.mp3'),
         (301, 'Hidden', 'https://example.invalid/hidden.mp3')
     `;
-      listId = (await lists.lists('owner')).lists[0].id;
+      const collection = await lists.lists('owner');
+      listId = collection.lists[0].id;
+      generation = collection.generation;
     });
 
     const change = (op: 'add' | 'remove', ...ids: number[]) =>
       lists.change('owner', listId, {
+        protocol: 1,
+        accountId: 'owner',
+        generation,
         clientId: randomUUID(),
         sequence: '1',
-        changes: ids.map((episodeId) => ({ op, episodeId })),
+        changes: ids.map((episodeId) => ({ op, episodeId: String(episodeId) })),
       });
 
     async function waitingForPodcastLock() {
@@ -101,7 +107,7 @@ describe.skipIf(!process.env.PG_BIN)(
         (await lists.membership('owner', listId)).items.map(
           ({ episodeId }) => episodeId,
         ),
-      ).toEqual([201]);
+      ).toEqual(['201']);
     });
 
     test('preserves essential content independently of saved membership', async () => {
@@ -158,7 +164,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await evicting;
       await adding;
       expect((await lists.membership('owner', listId)).items[0]).toMatchObject({
-        episodeId: 101,
+        episodeId: '101',
         availability: 'content_missing',
       });
     });
@@ -234,19 +240,19 @@ describe.skipIf(!process.env.PG_BIN)(
       SELECT 1000 + id, id, 'missing', now() FROM podcasts WHERE id >= 4
     `;
       await change('add', 1004, 1005, 1006, 1007, 1008);
-      const refreshed: number[] = [];
+      const refreshed: string[] = [];
       await recoverListContent(
         sql,
         'owner',
         listId,
-        async (id) => id !== 4,
+        async (id) => id !== '4',
         async (_sql, id, mode) => {
           expect(mode).toBe('rebuild');
           refreshed.push(id);
           return 'updated';
         },
       );
-      expect(refreshed).toEqual([5, 6, 7]);
+      expect(refreshed).toEqual(['5', '6', '7']);
     });
   },
 );

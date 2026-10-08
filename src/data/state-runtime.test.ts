@@ -29,6 +29,19 @@ const id = '9007199254740993';
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
 });
+test('opaque account IDs cannot alias inherited object properties', async () => {
+  const storage = browserStateStorage();
+  for (const account of ['__proto__', 'constructor', 'toString']) {
+    await storage.update((root) => {
+      accountState(root, account);
+    });
+    const root = await storage.load();
+    expect(Object.hasOwn(root.accounts, account)).toBe(true);
+    expect(root.accounts[account].progress.queued).toEqual([]);
+    expect(root.accounts[account].follows.queued).toEqual([]);
+  }
+});
+
 function fixture() {
   const storage = browserStateStorage();
   let online = false;

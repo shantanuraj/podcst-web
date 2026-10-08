@@ -13,20 +13,25 @@ import { refreshFeed } from '../src/server/ingest/feed-refresh';
 import {
   claimPublicIdentity,
   findPodcastIdentity,
-  indexPodcast,
+  indexPodcast as indexCanonicalPodcast,
   indexPrivatePodcast,
   PodcastAccessDenied,
   PodcastIdentityConflict,
 } from '../src/server/ingest/index-podcast';
-import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
+import { resolvePodcast as resolveCanonicalPodcast } from '../src/server/ingest/resolve-podcast';
 import { canAccessPodcast } from '../src/server/podcast-access';
 import {
   matchSearchResults,
   searchPodcastsByFeedUrl,
 } from '../src/server/search';
 import { installFeedTransportFixture } from './fixtures/feed-transport';
+import { withFixtureId, withFixtureListingId } from './lib/identity-fixture';
 import { startPostgres } from './lib/postgres-sandbox';
 import { createSchemaFixture } from './lib/schema-fixture';
+import { seedFollow, seedProgress } from './lib/state-fixture';
+
+const indexPodcast = withFixtureListingId(indexCanonicalPodcast);
+const resolvePodcast = withFixtureId(resolveCanonicalPodcast);
 
 installFeedTransportFixture();
 
@@ -150,7 +155,7 @@ describe.skipIf(!process.env.PG_BIN)(
         expect(
           await canAccessPodcast(
             sql,
-            Number(podcast.id),
+            String(podcast.id),
             podcast.owner_user_id,
           ),
         ).toBe(true);
@@ -174,8 +179,8 @@ describe.skipIf(!process.env.PG_BIN)(
       const id = await indexPrivatePodcast(sql, server.url.href, 'owner');
       const [episode] =
         await sql`SELECT id FROM episodes WHERE podcast_id = ${id} ORDER BY id LIMIT 1`;
-      await sql`INSERT INTO subscriptions (user_id, podcast_id) VALUES ('owner', ${id})`;
-      await sql`INSERT INTO playback_progress (user_id, episode_id, position) VALUES ('owner', ${episode.id}, 123)`;
+      await seedFollow(sql, 'owner', id);
+      await seedProgress(sql, 'owner', episode.id, 123);
       expect(
         await resolvePodcast(sql, 101, 'us', lookup(101, server.url.href)),
       ).toBe(id);
@@ -232,7 +237,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await sql`UPDATE podcasts SET feed_url = ${new URL('/rotated?token=new', server.url).href} WHERE id = ${id}`;
       await expect(
         sql.begin((tx) =>
-          claimPublicIdentity(tx, identity, server.url.href, 101),
+          claimPublicIdentity(tx, identity, server.url.href, '101'),
         ),
       ).rejects.toBeInstanceOf(PodcastIdentityConflict);
       expect(await canAccessPodcast(sql, id)).toBe(false);
@@ -251,7 +256,7 @@ describe.skipIf(!process.env.PG_BIN)(
         sql,
         [
           {
-            itunesId: 101,
+            itunesId: '101',
             author: 'Author',
             feed: server.url.href,
             title: 'Public show',
@@ -318,14 +323,14 @@ describe.skipIf(!process.env.PG_BIN)(
             tx,
             identity,
             new URL('/different', server.url).href,
-            101,
+            '101',
           ),
         ),
       ).rejects.toBeInstanceOf(PodcastAccessDenied);
       expect(
         await matchSearchResults(sql, [
           {
-            itunes_id: 101,
+            itunes_id: '101',
             title: 'Public',
             feed: 'https://example.invalid/public',
             author: '',
@@ -335,7 +340,7 @@ describe.skipIf(!process.env.PG_BIN)(
         ]),
       ).toEqual([
         {
-          itunes_id: 101,
+          itunes_id: '101',
           title: 'Public',
           feed: 'https://example.invalid/public',
           author: '',

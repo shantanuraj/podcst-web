@@ -1,8 +1,8 @@
 {
   "position": 1834,
   "episode": {
-    "id": 241423217,
-    "podcastId": 301,
+    "id": "241423217",
+    "podcastId": "301",
     "isPrivate": false,
     "guid": "https://lexfridman.com/?p=6506",
     "title": "#501 – DHH: Future of Programming, AI, Agentic Engineering, Vibe Coding & Linux",

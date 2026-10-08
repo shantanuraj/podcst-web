@@ -15,7 +15,10 @@ trap 'rm -rf "$TMP"' EXIT
 DUMP="$TMP/dump"
 
 pg_dump "$BACKUP_DATABASE_URL" -Fc --strict-names --no-owner --no-privileges \
-  -t public.users -t public.subscriptions -t public.playback_progress \
+  -t public.state_generation -t public.users \
+  -t public.progress_revision_heads -t public.follow_revision_heads \
+  -t public.progress_clients -t public.follow_clients \
+  -t public.subscriptions -t public.playback_progress \
   -t public.passkeys -t public.sessions -t public.email_verifications \
   -t public.transcripts -t public.podcast_feed_aliases \
   -t public.podcast_apple_aliases -t public.account_preferences \

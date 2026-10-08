@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
+import { compareCanonicalIds } from '@/shared/canonical-id';
 import { createSchemaFixture } from '../../scripts/lib/schema-fixture';
+import { seedFollow } from '../../scripts/lib/state-fixture';
 import type { ChartPodcast } from './ingest/charts';
+import { createProgressStateService } from './state/progress';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schema = `discover_test_${randomUUID().replaceAll('-', '')}`;
@@ -13,7 +16,7 @@ const chartPodcast = (
   rank: number,
   genres: number[],
 ): ChartPodcast => ({
-  itunesId,
+  itunesId: String(itunesId),
   rank,
   genres,
   verifiedAt: new Date().toISOString(),
@@ -34,7 +37,7 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
     typeof import('./ingest/charts') &
     typeof import('./ingest/podcast') &
     typeof import('./progress');
-  const ids = new Map<number, number>();
+  const ids = new Map<number, string>();
 
   beforeAll(async () => {
     if (!databaseUrl) throw new Error('TEST_DATABASE_URL required');
@@ -43,14 +46,6 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
     sql = postgres(databaseUrl, {
       connection: { search_path: schema },
       onnotice: () => {},
-      types: {
-        bigint: {
-          to: 20,
-          from: [20],
-          serialize: (value: number) => String(value),
-          parse: Number,
-        },
-      },
     });
     await createSchemaFixture(sql);
     mock.module('./db', () => ({ sql }));
@@ -73,7 +68,7 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
       'us',
     );
     for (const row of await sql`SELECT id, itunes_id FROM podcasts`)
-      ids.set(Number(row.itunes_id), Number(row.id));
+      ids.set(Number(row.itunes_id), String(row.id));
     const day = (offset: number) =>
       new Date(Date.now() - offset * DAY).toISOString().slice(0, 10);
     await sql`
@@ -96,11 +91,11 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
     await published(103, [5, 90]);
     await published(104, [20, 2000]);
     await sql`INSERT INTO users (id, email) VALUES ('a', 'a@example.com'), ('b', 'b@example.com'), ('c', 'c@example.com'), ('d', 'd@example.com')`;
-    await sql`
-      INSERT INTO subscriptions (user_id, podcast_id)
-      SELECT u, p FROM unnest(ARRAY['a','b','c']) u, unnest(${[ids.get(104)!, ids.get(105)!]}::bigint[]) p
-    `;
-    await sql`INSERT INTO subscriptions (user_id, podcast_id) VALUES ('d', ${ids.get(104)!}), ('d', ${ids.get(102)!})`;
+    for (const user of ['a', 'b', 'c'])
+      for (const podcast of [104, 105])
+        await seedFollow(sql, user, ids.get(podcast)!);
+    await seedFollow(sql, 'd', ids.get(104)!);
+    await seedFollow(sql, 'd', ids.get(102)!);
   });
 
   afterAll(async () => {
@@ -184,13 +179,31 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
     const episodes = await sql`
       SELECT id FROM episodes WHERE podcast_id = ${ids.get(102)!} ORDER BY published DESC
     `;
-    await server.saveProgress('a', Number(episodes[0].id), 120, false);
-    await server.saveProgress('a', Number(episodes[1].id), 0, true);
+    const [{ generation }] = await sql`SELECT generation FROM state_generation`;
+    await createProgressStateService(sql).change('a', {
+      protocol: 1,
+      accountId: 'a',
+      generation,
+      clientId: randomUUID(),
+      sequence: '1',
+      changes: [
+        {
+          episodeId: String(episodes[0].id),
+          positionSeconds: 120,
+          completed: false,
+        },
+        {
+          episodeId: String(episodes[1].id),
+          positionSeconds: 0,
+          completed: true,
+        },
+      ],
+    });
     expect(await server.getPodcastProgress('a', ids.get(102)!)).toEqual(
       [
-        { episodeId: Number(episodes[0].id), position: 120, completed: false },
-        { episodeId: Number(episodes[1].id), position: 0, completed: true },
-      ].sort((a, b) => a.episodeId - b.episodeId),
+        { episodeId: String(episodes[0].id), position: 120, completed: false },
+        { episodeId: String(episodes[1].id), position: 0, completed: true },
+      ].sort((a, b) => compareCanonicalIds(a.episodeId, b.episodeId)),
     );
     expect(await server.getPodcastProgress('b', ids.get(102)!)).toEqual([]);
     await sql`
@@ -209,16 +222,16 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
       (
         await server.getEpisodeProgress(
           'a',
-          episodes.map(({ id }) => Number(id)),
+          episodes.map(({ id }) => String(id)),
         )
       ).map(({ completed }) => completed),
     ).toHaveLength(2);
     expect(
-      await server.getEpisodeProgress('b', [Number(episodes[0].id)]),
+      await server.getEpisodeProgress('b', [String(episodes[0].id)]),
     ).toEqual([]);
     const recent = await server.getRecentProgress('a', 3);
     expect(
       recent.map(({ episode, position }) => [episode.id, position]),
-    ).toEqual([[Number(episodes[0].id), 120]]);
+    ).toEqual([[String(episodes[0].id), 120]]);
   });
 });

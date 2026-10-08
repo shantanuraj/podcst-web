@@ -10,6 +10,7 @@ import {
   canAccessPodcast,
   privateFeedHeaders as headers,
 } from '@/server/podcast-access';
+import { isCanonicalId } from '@/shared/canonical-id';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -27,13 +28,31 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const parsedPodcastId = parseInt(podcastId, 10);
-  if (Number.isNaN(parsedPodcastId)) {
+  const parsedPodcastId = podcastId;
+  if (!isCanonicalId(parsedPodcastId)) {
     return NextResponse.json(
       { message: 'parameter `podcastId` must be a number' },
       { status: 400 },
     );
   }
+
+  const pageSize = limit === null ? 20 : Number(limit);
+  const offset = cursor === null ? undefined : Number(cursor);
+  if (
+    (limit !== null && !/^[1-9]\d*$/.test(limit)) ||
+    !Number.isSafeInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > 200 ||
+    (cursor !== null &&
+      (!/^(0|[1-9]\d*)$/.test(cursor) ||
+        !Number.isSafeInteger(offset) ||
+        (offset ?? 0) > 2147483647)) ||
+    (search !== null && search.length > 200)
+  )
+    return NextResponse.json(
+      { message: 'Invalid episode page bounds' },
+      { status: 400, headers },
+    );
 
   const session = await getSession();
   const userId = session?.userId ?? null;
@@ -50,8 +69,8 @@ export async function GET(request: NextRequest) {
   const result = await getEpisodesPaginated(
     {
       podcastId: parsedPodcastId,
-      limit: limit ? parseInt(limit, 10) : 20,
-      cursor: cursor ? parseInt(cursor, 10) : undefined,
+      limit: pageSize,
+      cursor: offset,
       search: search || undefined,
       sortBy: validSortFields.includes(sortBy as SortField)
         ? (sortBy as SortField)

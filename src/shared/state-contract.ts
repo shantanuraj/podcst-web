@@ -15,7 +15,7 @@ export interface StateStream extends StateScope {
 export interface ProgressChange {
   episodeId: string;
   positionSeconds: number;
-  completed: boolean;
+  completed: boolean | null;
 }
 
 export interface FollowChange {
@@ -29,6 +29,18 @@ export interface ProgressBatch extends StateStream {
 
 export interface FollowBatch extends StateStream {
   changes: FollowChange[];
+}
+
+export interface FollowResolutionRequest extends StateScope {
+  feedUrls: string[];
+}
+
+export interface FollowResolution extends StateScope {
+  items: {
+    index: number;
+    podcastId: string | null;
+    status: 'resolved' | 'unavailable';
+  }[];
 }
 
 export type StateResult = 'applied' | 'unchanged' | 'not_found';
@@ -70,6 +82,7 @@ export const stateErrorStatus = {
   invalid_request: 400,
   unauthenticated: 401,
   request_forbidden: 403,
+  not_found: 404,
   account_mismatch: 409,
   sequence_conflict: 409,
   recovery_required: 409,
@@ -87,6 +100,7 @@ export interface StateErrorBody {
 }
 
 interface StateShapes {
+  scope: StateScope;
   id: string;
   revision: string;
   uuid: string;
@@ -96,6 +110,8 @@ interface StateShapes {
   followAcknowledgement: FollowAcknowledgement;
   progressSnapshot: ProgressSnapshot;
   followSnapshot: FollowSnapshot;
+  followResolutionRequest: FollowResolutionRequest;
+  followResolution: FollowResolution;
   error: StateErrorBody;
 }
 
@@ -110,8 +126,21 @@ export function stateValidator<K extends keyof StateShapes>(shape: K) {
   return validate as ValidateFunction<StateShapes[K]>;
 }
 
+export function parseStateScope(value: unknown): StateScope | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const scope = {
+    protocol: record.protocol,
+    accountId: record.accountId,
+    generation: record.generation,
+  };
+  return stateValidator('scope')(scope) ? scope : null;
+}
+
 export const STATE_BATCH_LIMIT =
   schema.definitions.progressBatch.properties.changes.maxItems;
 export const STATE_READ_LIMIT =
   schema.definitions.progressSnapshot.properties.items.maxItems;
+export const STATE_IMPORT_LIMIT =
+  schema.definitions.followResolutionRequest.properties.feedUrls.maxItems;
 export const STATE_BODY_LIMIT = 64 * 1024;

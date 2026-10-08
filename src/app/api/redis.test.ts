@@ -25,7 +25,7 @@ beforeAll(async () => {
 
 const now = 1_800_000_000_000;
 const podcast: IPodcast = {
-  id: 1,
+  id: '1',
   title: 'The Daily',
   author: 'The New York Times',
   feed: 'https://example.com/daily.xml',

@@ -14,15 +14,21 @@ export async function fetchFeedResponse(
     resolve,
     maxBytes,
     timeoutMs = 30_000,
+    signal: externalSignal,
     transport = requestFeed,
   }: {
     resolve?: PublicResolver;
     maxBytes?: number;
     timeoutMs?: number;
+    signal?: AbortSignal;
     transport?: typeof requestFeed;
   } = {},
 ): Promise<FeedResponse & { redirected: boolean }> {
-  const signal = AbortSignal.timeout(timeoutMs);
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const signal = externalSignal
+    ? AbortSignal.any([externalSignal, deadline])
+    : deadline;
+  signal.throwIfAborted();
   let url = feedDestination(input);
   let conditions = validators;
   for (let redirects = 0; ; redirects++) {

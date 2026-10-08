@@ -10,13 +10,16 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
+import { withFixtureId } from '../../../scripts/lib/identity-fixture';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+import { seedFollow, seedProgress } from '../../../scripts/lib/state-fixture';
 
 installFeedTransportFixture();
 
-import { refreshFeed } from './feed-refresh';
+import { refreshFeed as refreshCanonicalFeed } from './feed-refresh';
 import { getDuePodcasts } from './feed-schedule';
 
+const refreshFeed = withFixtureId(refreshCanonicalFeed);
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schema = `feed_refresh_test_${randomUUID().replaceAll('-', '')}`;
 const xml = readFileSync(
@@ -72,9 +75,7 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
       INSERT INTO podcasts (id, feed_url, title, author_id, cover, is_essential, last_published)
       VALUES (139, ${server.url.href}, 'Cached podcast', 1, 'cover', true, now())
     `;
-    await sql`
-      INSERT INTO subscriptions (user_id, podcast_id) VALUES ('test-user', 139)
-    `;
+    await seedFollow(sql, 'test-user', '139');
     await sql`
       INSERT INTO feed_poll_state (podcast_id, last_polled_at, next_poll_at)
       VALUES (139, now() - interval '2 hours', now() + interval '22 hours')
@@ -91,7 +92,7 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
   });
 
   test('subscribed feeds are due hourly without waiting for the old daily schedule', async () => {
-    expect(await getDuePodcasts(sql, 500)).toEqual([{ id: 139 }]);
+    expect(await getDuePodcasts(sql, 500)).toEqual([{ id: '139' }]);
     expect(await refreshFeed(sql, 139, 'scheduled')).toBe('updated');
     const [state] = await sql`
       SELECT failures, extract(epoch FROM next_poll_at - last_polled_at)::int AS seconds
@@ -114,11 +115,9 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     await sql`
       UPDATE podcasts SET is_essential = false, last_published = now() - interval '365 days'
     `;
-    await sql`
-      INSERT INTO playback_progress (user_id, episode_id, position)
-      SELECT 'test-user', id, 10 FROM episodes
-    `;
-    expect(await getDuePodcasts(sql, 500)).toEqual([{ id: 139 }]);
+    for (const row of await sql`SELECT id::text FROM episodes`)
+      await seedProgress(sql, 'test-user', row.id, 10);
+    expect(await getDuePodcasts(sql, 500)).toEqual([{ id: '139' }]);
     expect(await refreshFeed(sql, 139, 'scheduled')).toBe('updated');
     const [state] = await sql`
       SELECT extract(epoch FROM next_poll_at - last_polled_at)::int AS seconds
@@ -145,7 +144,7 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
 
   test('missing poll-state rows do not prevent polling', async () => {
     await sql`DELETE FROM feed_poll_state`;
-    expect(await getDuePodcasts(sql, 500)).toEqual([{ id: 139 }]);
+    expect(await getDuePodcasts(sql, 500)).toEqual([{ id: '139' }]);
     expect(await refreshFeed(sql, 139, 'scheduled')).toBe('updated');
     const [state] = await sql`SELECT failures FROM feed_poll_state`;
     expect(state.failures).toBe(0);

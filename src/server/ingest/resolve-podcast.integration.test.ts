@@ -11,12 +11,27 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
+import {
+  fixtureLabel,
+  withFixtureId,
+} from '../../../scripts/lib/identity-fixture';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 
 installFeedTransportFixture();
 
-import { indexPodcast } from './index-podcast';
-import { resolvePodcast } from './resolve-podcast';
+import { indexPodcast as indexCanonicalPodcast } from './index-podcast';
+import { resolvePodcast as resolveCanonicalPodcast } from './resolve-podcast';
+
+const resolveFixturePodcast = withFixtureId(resolveCanonicalPodcast);
+const resolvePodcast = async (
+  ...args: Parameters<typeof resolveFixturePodcast>
+) => {
+  const id = await resolveFixturePodcast(...args);
+  return id === null ? null : fixtureLabel(id);
+};
+const indexPodcast = async (
+  ...args: Parameters<typeof indexCanonicalPodcast>
+) => fixtureLabel(await indexCanonicalPodcast(...args));
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schema = `resolve_test_${randomUUID().replaceAll('-', '')}`;

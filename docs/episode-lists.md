@@ -12,9 +12,11 @@ playlist management remains out of scope. The
   private, named and manually ordered, with unique episodes in each list.
 - Require canonical episode IDs for starrable episodes in all three clients.
   Feed URLs and GUIDs are catalogue metadata, not fallback membership identities.
-- Reset obsolete development star storage rather than support its formats. There
-  is no legacy migration, episode-resolution endpoint or special import action.
-  This does not call for resetting unrelated downloads, playback or account data.
+- Preserve meaningful storage through one-time validated conversion. Frozen numeric
+  batches keep their exact original payload/hash and sequence through the migration
+  bridge; new work uses scoped decimal-string IDs. Unknown or unsafe identities
+  remain visibly unresolved. No generic resolver or permanent legacy writer API is
+  implied, and unrelated downloads/playback/account state is not reset.
 - Guest stars merge automatically as ordinary add actions, consumed from the
   guest collection once. A guest star can restore a previously unstarred account
   episode: it is a new action, not recovery of an old backup.
@@ -33,18 +35,20 @@ cache is not a set of new user actions.
 
 ## Client implementation
 
-All star buttons and memberships use canonical numeric episode IDs. Missing IDs
-are rejected rather than resolved through feed URLs/GUIDs. Unrelated media-cache
-and playback identities are unchanged. Normal feed discovery/indexing happens
-before an episode can be starred, including by a guest.
+All star buttons and memberships use exact canonical episode identities with
+decimal-string wire IDs. Missing IDs remain local/unresolved, never interchangeable
+with a feed/GUID server key. Queue/media conversion preserves existing references
+and source data. Normal feed discovery/indexing precedes starring, including for
+guests.
 
 - [Web state machine](../src/shared/stars/state.ts) and
   [sender](../src/shared/stars/sync.ts): one atomic IndexedDB root in
-  `podcst-lists`, shared across tabs. Web Locks serialize senders;
+  `podcst-lists-v2`, with the original `podcst-lists` source retained, shared across tabs. Web Locks serialize senders;
   BroadcastChannel publishes projection changes. Browsers without Web Locks keep
   local work but cannot send. AccountSession tokens fence requests and UI actions.
 - [iOS](../ios/Podcst/Core/StarStore.swift): one atomically replaced
-  `Podcst/EpisodeLists/lists.json`, protected until first device authentication
+  `Podcst/EpisodeLists/lists-v1.json`, retaining the original `lists.json` source,
+  protected until first device authentication
   and excluded from backups. Main-actor serialization covers edits, guest
   transfer and account changes.
 - [Android state](../android/core/data/src/main/kotlin/app/podcst/data/StarState.kt)
@@ -67,10 +71,11 @@ is never uploaded as new intent. Reconnect and foreground refresh resume retries
 foreground polling runs every 60 seconds, with more frequent bounded retries for
 pending work. Protocol errors stop the affected stream without renumbering it.
 
-There is no legacy import: web deletes the obsolete `stars` key, iOS removes the
-old `Podcst/Stars` directory, and Android no longer reads the old Room star table.
-Only the new stores participate in guest merging. Downloads, progress and other
-catalogue storage are not reset.
+Conversion retains the old account root and numeric frozen requests until validated
+activation and retirement. Source archives never become whole-library upload intent.
+Confirmed terminal erasure targets only that account, including attributable legacy
+sources, and fences late writers. Unreadable sources prevent a false successful
+erasure acknowledgement; logout never performs terminal erasure.
 
 ## Storage
 
@@ -144,19 +149,21 @@ Require the existing session cookie on all list routes. Ownership comes from
 same 404 as missing lists. Check `podcastAccess` on additions and reads; owning a
 list does not grant access to another account's private episode.
 
-Episode IDs are positive safe JSON integers as today. Addition times are epoch
-milliseconds; list/client IDs are UUID strings. Revisions and sequences are
-validated decimal strings on the wire, with arithmetic/comparisons in PostgreSQL
-or bigint-aware code rather than the existing numeric bigint decoder.
+Episode IDs, revisions and sequences are validated decimal strings on the wire,
+with exact PostgreSQL/bigint-aware comparisons. Addition times are epoch
+milliseconds; list/client IDs are UUID strings. Every new envelope also contains
+`protocol:1`, the expected `accountId` and recovery `generation`. Cookie/session
+identity remains authority, and scope is checked before accepting or replaying.
 
 | Method and path | Purpose |
 | --- | --- |
 | `GET /api/lists` | Bootstrap Starred and return account list summaries. |
 | `GET /api/lists/:id/items?view=membership` | Complete compact membership snapshot. |
 | `GET /api/lists/:id/items?view=episodes` | Paginated episode display data; the default view. |
-| `POST /api/lists/:id/changes` | Apply a deduplicated batch of add/remove actions. |
+| `POST /api/lists/:id/changes` | Apply a scoped deduplicated batch of string-ID actions. |
+| `POST /api/lists/:id/migration` | Retire an unchanged frozen numeric request under its original stream/hash. |
 
-No `/api/stars`, episode-resolution route or import operation.
+No `/api/stars`, episode-resolution route or whole-library import operation.
 
 ### List summaries
 
@@ -164,6 +171,9 @@ No `/api/stars`, episode-resolution route or import operation.
 
 ```json
 {
+  "protocol": 1,
+  "accountId": "fixture-account",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
   "lists": [
     {
       "id": "0c339753-cb50-477c-843e-e641b414a060",
@@ -185,16 +195,19 @@ The membership view returns every episode ID and addition time in one response:
 
 ```json
 {
+  "protocol": 1,
+  "accountId": "fixture-account",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
   "listId": "0c339753-cb50-477c-843e-e641b414a060",
   "revision": "7",
   "items": [
     {
-      "episodeId": 123,
+      "episodeId": "123",
       "addedAt": 1770000000000,
       "availability": "content_missing"
     },
     {
-      "episodeId": 789,
+      "episodeId": "789",
       "addedAt": 1769000000000,
       "availability": "available"
     }
@@ -245,11 +258,14 @@ Accept 1–100 actions and at most 64 KiB per request:
 
 ```json
 {
+  "protocol": 1,
+  "accountId": "fixture-account",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
   "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
   "sequence": "12",
   "changes": [
-    { "op": "add", "episodeId": 123 },
-    { "op": "remove", "episodeId": 456 }
+    { "op": "add", "episodeId": "123" },
+    { "op": "remove", "episodeId": "456" }
   ]
 }
 ```
@@ -265,13 +281,16 @@ one ordered result per action:
 
 ```json
 {
+  "protocol": 1,
+  "accountId": "fixture-account",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
   "clientId": "a7a2e014-b64f-4487-9c92-71cd59fc0cf7",
   "sequence": "12",
   "listId": "0c339753-cb50-477c-843e-e641b414a060",
   "revision": "8",
   "results": [
-    { "episodeId": 123, "status": "applied" },
-    { "episodeId": 456, "status": "unchanged" }
+    { "episodeId": "123", "status": "applied" },
+    { "episodeId": "456", "status": "unchanged" }
   ]
 }
 ```
@@ -282,9 +301,9 @@ refresh, rather than guessing a replacement identity or retrying as a new add.
 Successful effects and all action results commit together with the stream
 acknowledgement. A database failure rolls the whole transaction back.
 
-Errors retain `{ "message": string }`: 400 for invalid input, 413 for oversized
-requests, 401 for no session, 404 for a missing/foreign list and 409 for a broken
-stream sequence/hash contract. Clients do not branch on English messages.
+Errors contain stable `code` and `message`: 400 for invalid input, 413 for oversized
+requests, 401 for no session, 404 for a missing/foreign list, 426 for unsupported
+protocol, and 409 for account/generation/sequence conflicts. Clients do not branch on English messages.
 Transient failures and 429s retry the identical batch with backoff. A current
 batch's protocol 409 stops that stream and preserves its outbox for diagnosis;
 never silently renumber/reidentify it. Ignore late responses for retired batches.
@@ -443,11 +462,12 @@ to subsequent list edits. Sharing, collaboration and repeated entries stay out.
    database/route tests. Document the live contract only once implemented.
 2. Add shared API fixtures and sync transition vectors; update all three client
    decoders and test suites together.
-3. Replace development star storage and implement canonical-ID cache/outbox
-   adapters plus atomic guest transfer. No compatibility migration. Reuse account
+3. Convert canonical-ID caches/outboxes with source-preserving activation and the
+   one-time frozen-request bridge; implement atomic guest transfer and reuse account
    boundaries and existing star-button presentation.
-4. Deploy server and coordinated pre-release client updates. Verify fresh/offline
-   installs and guest/account transitions rather than supporting old star formats.
+4. Coordinate server/client activation and obsolete-writer retirement. Verify
+   fresh/offline installs, retained sources and account transitions. Migration-only
+   readers are not an ongoing legacy wire protocol.
 5. Ship playlist ordering/lifecycle separately on these tables.
 
 Required tests:

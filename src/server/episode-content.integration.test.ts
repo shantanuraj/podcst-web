@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { createSchemaFixture } from '../../scripts/lib/schema-fixture';
+import { seedFollow, seedProgress } from '../../scripts/lib/state-fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const schema = `episode_content_test_${randomUUID().replaceAll('-', '')}`;
@@ -22,14 +23,6 @@ describe.skipIf(!databaseUrl)(
       sql = postgres(databaseUrl, {
         connection: { search_path: schema },
         onnotice: () => {},
-        types: {
-          bigint: {
-            to: 20,
-            from: [20],
-            serialize: (value: number) => String(value),
-            parse: Number,
-          },
-        },
       });
       await createSchemaFixture(sql);
       mock.module('./db', () => ({ sql }));
@@ -55,12 +48,16 @@ describe.skipIf(!databaseUrl)(
              (103, 'Also kept', 'https://example.com/also-kept.mp3')
     `;
       await sql`INSERT INTO users (id, email) VALUES ('user', 'user@example.com')`;
-      await sql`INSERT INTO subscriptions (user_id, podcast_id) VALUES ('user', 1)`;
-      await sql`
-      INSERT INTO playback_progress (user_id, episode_id, position, updated_at)
-      VALUES ('user', 101, 30, now() - interval '1 day'),
-             ('user', 102, 60, now())
-    `;
+      await seedFollow(sql, 'user', '1');
+      await seedProgress(
+        sql,
+        'user',
+        '101',
+        30,
+        false,
+        new Date(Date.now() - 86_400_000),
+      );
+      await seedProgress(sql, 'user', '102', 60);
     });
 
     afterAll(async () => {
@@ -73,27 +70,31 @@ describe.skipIf(!databaseUrl)(
     });
 
     test('podcast responses omit episodes without content', async () => {
-      const podcast = await server.getPodcastById(1);
+      const podcast = await server.getPodcastById('1');
       expect(podcast?.episodes.map((episode) => episode.id)).toEqual([
-        103, 101,
+        '103',
+        '101',
       ]);
     });
 
     test('an episode without content is not found', async () => {
-      expect(await server.getEpisodeById(102)).toBeNull();
-      expect((await server.getEpisodeById(101))?.file.url).toBe(
+      expect(await server.getEpisodeById('102')).toBeNull();
+      expect((await server.getEpisodeById('101'))?.file.url).toBe(
         'https://example.com/kept.mp3',
       );
     });
 
     test('subscription releases come from episodes with content', async () => {
       const [podcast] = await server.getSubscriptions('user');
-      expect(podcast.episodes.map((episode) => episode.id)).toEqual([103, 101]);
+      expect(podcast.episodes.map((episode) => episode.id)).toEqual([
+        '103',
+        '101',
+      ]);
     });
 
     test('current progress skips episodes without content', async () => {
       const progress = await server.getCurrentProgress('user');
-      expect(progress?.episode.id).toBe(101);
+      expect(progress?.episode.id).toBe('101');
       expect(progress?.position).toBe(30);
     });
   },

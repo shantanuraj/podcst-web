@@ -107,7 +107,7 @@ export async function verifyPublicFeedMove(
 
 export async function resolvePublicFeedMove(
   sql: postgres.Sql,
-  podcastId: number,
+  podcastId: string,
   verify = verifyPublicFeedMove,
 ) {
   const [source] =

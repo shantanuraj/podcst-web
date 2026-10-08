@@ -9,12 +9,12 @@ import {
   PodcastIdentityConflict,
 } from './podcast-identity';
 
-type Claim = { feedUrl: string; itunesId?: number };
+type Claim = { feedUrl: string; itunesId?: string };
 
 export interface AppleIdentityPlan {
   listing: AppleListing;
   identities: Claim[];
-  previousSourceId: number | null;
+  previousSourceId: string | null;
 }
 
 export async function prepareAppleIdentity(
@@ -28,16 +28,16 @@ export async function prepareAppleIdentity(
   );
   const aliases = await sql<{ itunes_id: string; podcast_id: string }[]>`
     SELECT itunes_id, podcast_id FROM podcast_apple_aliases
-    WHERE podcast_id = ANY(${sources.map(({ id }) => Number(id))}::bigint[])
+    WHERE podcast_id = ANY(${sources.map(({ id }) => id)}::bigint[])
     ORDER BY itunes_id
   `;
   const owners = new Set([
     ...sources
-      .filter((p) => Number(p.itunes_id) === listing.itunesId)
-      .map((p) => Number(p.id)),
+      .filter((p) => String(p.itunes_id) === listing.itunesId)
+      .map((p) => p.id),
     ...aliases
-      .filter((a) => Number(a.itunes_id) === listing.itunesId)
-      .map((a) => Number(a.podcast_id)),
+      .filter((a) => a.itunes_id === listing.itunesId)
+      .map((a) => a.podcast_id),
   ]);
   if (owners.size > 1)
     throw new PodcastIdentityConflict(
@@ -50,14 +50,12 @@ export async function prepareAppleIdentity(
     identities.push({
       feedUrl: source.feed_url,
       itunesId:
-        source.itunes_id === null ? undefined : Number(source.itunes_id),
+        source.itunes_id === null ? undefined : String(source.itunes_id),
     });
-    for (const alias of aliases.filter(
-      (a) => Number(a.podcast_id) === Number(source.id),
-    ))
+    for (const alias of aliases.filter((a) => a.podcast_id === source.id))
       identities.push({
         feedUrl: source.feed_url,
-        itunesId: Number(alias.itunes_id),
+        itunesId: alias.itunes_id,
       });
   }
   return {
@@ -96,7 +94,7 @@ export async function claimAppleIdentity(
   source: PodcastIdentity,
   plan: AppleIdentityPlan,
   lockedIdentities = plan.identities,
-): Promise<number> {
+): Promise<string> {
   const { listing } = plan;
   assertFreshAppleListing(listing);
   const matches = await findPodcastIdentities(
@@ -107,14 +105,14 @@ export async function claimAppleIdentity(
     true,
   );
   const target = await findAppleSource(tx, listing, true);
-  if (!target || Number(target.id) !== Number(source.id))
+  if (!target || target.id !== source.id)
     throw new PodcastIdentityConflict(
       'Verified listing does not identify this source',
     );
   const current = await prepareAppleIdentity(tx, listing);
   if (
     current.previousSourceId !== plan.previousSourceId &&
-    current.previousSourceId !== Number(target.id)
+    current.previousSourceId !== target.id
   )
     throw new PodcastIdentityConflict(
       'Apple association changed during verification; retry',
@@ -122,15 +120,13 @@ export async function claimAppleIdentity(
   const locked = keys(lockedIdentities);
   if ([...keys(current.identities)].some((key) => !locked.has(key)))
     throw new PodcastIdentityConflict('Apple identity lock set changed; retry');
-  const previous = matches.find(
-    (p) => Number(p.id) === current.previousSourceId,
-  );
-  if (previous && Number(previous.id) !== Number(target.id)) {
+  const previous = matches.find((p) => p.id === current.previousSourceId);
+  if (previous && previous.id !== target.id) {
     if (previous.owner_user_id !== null || target.owner_user_id !== null)
       throw new PodcastIdentityConflict(
         'Apple reassignment requires public sources',
       );
-    if (Number(previous.itunes_id) === listing.itunesId) {
+    if (String(previous.itunes_id) === listing.itunesId) {
       const [replacement] = await tx`
         SELECT itunes_id FROM podcast_apple_aliases
         WHERE podcast_id = ${previous.id} ORDER BY itunes_id LIMIT 1
@@ -152,12 +148,12 @@ export async function claimAppleIdentity(
     listing.itunesId,
     listing,
   );
-  if (previous && Number(previous.id) !== id)
+  if (previous && previous.id !== id)
     console.info(
       JSON.stringify({
         event: 'apple_association_staged',
         itunesId: listing.itunesId,
-        from: Number(previous.id),
+        from: previous.id,
         to: id,
         country: listing.country,
         verifiedAt: listing.verifiedAt,

@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { validateCatalogue } from '../../src/data/catalogue';
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
@@ -20,7 +21,7 @@ interface Capture extends IndexEntry {
 const origin = process.env.PODCST_API_ORIGIN ?? 'https://www.podcst.app';
 const directory = join(import.meta.dir, '..', 'fixtures', 'api');
 const indexFile = 'index.json';
-const podcastId = 301;
+const podcastId = '301';
 const searchTerm = 'lex fridman';
 const locales = ['us', 'nl'];
 const listLimit = 3;
@@ -78,7 +79,10 @@ async function request(capture: Capture): Promise<Json> {
     method: capture.endpoint.split(' ')[0],
     headers: {
       Accept: 'application/json',
-      ...(capture.body && { 'Content-Type': 'application/json' }),
+      ...(capture.body && {
+        'Content-Type': 'application/json',
+        'X-Podcst-Client': 'native',
+      }),
     },
     body: capture.body && JSON.stringify(capture.body),
   });
@@ -88,6 +92,16 @@ async function request(capture: Capture): Promise<Json> {
     );
   }
   const body = (await response.json()) as Json;
+  if (
+    [
+      'TopPodcast[]',
+      'SearchResult[]',
+      'Podcast',
+      'PodcastInfo',
+      'EpisodePage',
+    ].includes(capture.decodesAs)
+  )
+    validateCatalogue(body);
   return capture.trim ? capture.trim(body) : body;
 }
 

@@ -1,3 +1,4 @@
+import { isCanonicalId } from '@/shared/canonical-id';
 import type { IPodcast } from '@/types';
 import { sql } from '../db';
 import { genreColumns, genreJoin, genresOf } from '../genres';
@@ -5,13 +6,11 @@ import { genreColumns, genreJoin, genresOf } from '../genres';
 export async function publicTopPodcasts(
   podcasts: IPodcast[],
 ): Promise<IPodcast[]> {
-  const ids = podcasts
-    .map((podcast) => podcast.id)
-    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  const ids = podcasts.map((podcast) => podcast.id).filter(isCanonicalId);
   if (!ids.length) return [];
   const rows =
     await sql`SELECT id, feed_url FROM podcasts WHERE id = ANY(${ids}::bigint[]) AND owner_user_id IS NULL`;
-  const allowed = new Map(rows.map((row) => [Number(row.id), row.feed_url]));
+  const allowed = new Map(rows.map((row) => [String(row.id), row.feed_url]));
   return podcasts.filter((podcast) => allowed.get(podcast.id) === podcast.feed);
 }
 

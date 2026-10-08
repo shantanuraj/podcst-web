@@ -66,6 +66,27 @@ test('validates every request and response fixture against ordinary JSON Schema'
   );
 });
 
+test('requires an explicit checkpoint completion mask and keeps snapshot truth boolean', () => {
+  expect(
+    stateValidator('progressBatch')(fixtures.progressCheckpointBatch),
+  ).toBe(true);
+  const checkpoint = structuredClone(fixtures.progressCheckpointBatch) as {
+    changes: Record<string, unknown>[];
+  };
+  delete checkpoint.changes[0].completed;
+  expect(stateValidator('progressBatch')(checkpoint)).toBe(false);
+  const snapshot = structuredClone(fixtures.progressSnapshot);
+  const present = snapshot.items[0].progress!;
+  expect(
+    stateValidator('progressSnapshot')({
+      ...snapshot,
+      items: [
+        { ...snapshot.items[0], progress: { ...present, completed: null } },
+      ],
+    }),
+  ).toBe(false);
+});
+
 test('requires explicit nullable progress rather than omitted state', () => {
   const snapshot = fixtures.progressSnapshot;
   expect(
@@ -95,7 +116,6 @@ test('bounds every progress input and refuses ambiguous or partial intent', asyn
     ).rejects.toMatchObject({ code: 'invalid_request' });
   for (const body of [
     null,
-    {},
     [],
     { ...progress, changes: [] },
     {
@@ -126,9 +146,14 @@ test('bounds every progress input and refuses ambiguous or partial intent', asyn
       'follows',
     ),
   ).rejects.toMatchObject({ code: 'invalid_request' });
-  await expect(
-    readStateBatch(request({ ...progress, protocol: 0 }), 'progress'),
-  ).rejects.toMatchObject({ code: 'update_required' });
+  for (const body of [
+    {},
+    { episodeId: 1, position: 0 },
+    { ...progress, protocol: 0 },
+  ])
+    await expect(
+      readStateBatch(request(body), 'progress'),
+    ).rejects.toMatchObject({ code: 'update_required' });
 });
 
 test('bounds request bytes and rejects malformed UTF-8, JSON and stalled streams', async () => {
@@ -233,14 +258,11 @@ test('fences A to B to A and recovery generations before replay checks', () => {
 test('uses explicit completion and source-time positions', () => {
   for (const vector of fixtures.completion)
     expect(
-      progressIntent(
-        vector.event as ProgressEvent,
-        vector.positionSeconds,
-        vector.previousCompleted,
-      ),
+      progressIntent(vector.event as ProgressEvent, vector.positionSeconds),
     ).toEqual({
       positionSeconds: vector.expectedPositionSeconds,
-      completed: vector.expectedCompleted,
+      completed:
+        vector.event === 'checkpoint' ? null : vector.expectedCompleted,
     });
   for (const position of [
     -1,
@@ -249,7 +271,7 @@ test('uses explicit completion and source-time positions', () => {
     Number.POSITIVE_INFINITY,
     2147483648,
   ])
-    expect(() => progressIntent('checkpoint', position, false)).toThrow(
+    expect(() => progressIntent('checkpoint', position)).toThrow(
       'Invalid source position',
     );
 });

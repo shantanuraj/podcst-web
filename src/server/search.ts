@@ -22,20 +22,20 @@ export async function matchSearchResults(
         JOIN podcasts p ON p.id = apple.id
       `
     : [];
-  const byItunesId = new Map(rows.map((row) => [Number(row.itunes_id), row]));
+  const byItunesId = new Map(rows.map((row) => [String(row.itunes_id), row]));
   if (byItunesId.size !== rows.length)
     throw new PodcastIdentityConflict(
       'Apple identity identifies multiple sources',
     );
   const seen = new Set<string>();
   return results.flatMap((result) => {
-    const existing = byItunesId.get(result.itunes_id ?? 0);
+    const existing = byItunesId.get(result.itunes_id ?? '');
     const matchesFeed =
       existing &&
       (existing.feed_url === result.feed ||
         existing.feed_aliases.includes(result.feed));
     const match = matchesFeed
-      ? { ...result, id: Number(existing.id), feed: existing.feed_url }
+      ? { ...result, id: String(existing.id), feed: existing.feed_url }
       : result;
     if (seen.has(match.feed)) return [];
     seen.add(match.feed);
@@ -83,8 +83,8 @@ export async function searchEpisodes(
     LIMIT ${limit}
   `;
   return rows.map((row) => ({
-    id: Number(row.episode_id),
-    podcastId: Number(row.podcast_id),
+    id: String(row.episode_id),
+    podcastId: String(row.podcast_id),
     isPrivate: false,
     feed: row.feed_url,
     podcastTitle: row.podcast_title,
@@ -135,9 +135,9 @@ export async function searchPodcasts(
   `;
 
   return rows.map((row) => ({
-    id: Number(row.id),
+    id: String(row.id),
     isPrivate: false,
-    itunes_id: Number(row.itunes_id),
+    itunes_id: String(row.itunes_id),
     title: row.title,
     feed: row.feed_url,
     cover: row.cover,
@@ -169,9 +169,9 @@ export async function searchPodcastsByFeedUrl(
   if (!row) return null;
 
   return {
-    id: Number(row.id),
+    id: String(row.id),
     isPrivate: row.owner_user_id !== null,
-    itunes_id: row.itunes_id === null ? undefined : Number(row.itunes_id),
+    itunes_id: row.itunes_id === null ? undefined : String(row.itunes_id),
     title: row.title,
     feed: row.feed_url,
     cover: row.cover,

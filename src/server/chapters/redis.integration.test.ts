@@ -87,7 +87,7 @@ describe.skipIf(!url)('shared chapter cache with Redis', () => {
 
   test('deduplicates services through real Redis and performs weekly background renewal', async () => {
     const episode = {
-      id: 42,
+      id: '42',
       owner_user_id: null,
       file_url: `https://example.invalid/${randomUUID()}`,
       file_type: 'audio/mpeg',
@@ -134,15 +134,15 @@ describe.skipIf(!url)('shared chapter cache with Redis', () => {
       ...options,
       cache: b,
     });
-    const initial = one(42, null);
+    const initial = one(episode.id, null);
     await running;
-    expect((await two(42, null))?.source).toBe('shownotes');
+    expect((await two(episode.id, null))?.source).toBe('shownotes');
     expect(fetched).toBe(1);
     finish();
     await initial;
-    expect((await two(42, null))?.source).toBe('embedded');
+    expect((await two(episode.id, null))?.source).toBe('embedded');
     now += FRESH_MS;
-    await Promise.all([one(42, null), two(42, null)]);
+    await Promise.all([one(episode.id, null), two(episode.id, null)]);
     expect(fetched).toBe(1);
     await Promise.all(jobs.splice(0).map((work) => work()));
     expect(fetched).toBe(2);

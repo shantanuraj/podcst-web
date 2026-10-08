@@ -1,19 +1,22 @@
 {
+  "protocol": 1,
+  "accountId": "3f9a6c2e8b1d4f7a0c5e9b2d6a8f1c3e7b4d0a92",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
   "listId": "0c339753-cb50-477c-843e-e641b414a060",
   "revision": "9007199254740993",
   "items": [
     {
-      "episodeId": 910001,
+      "episodeId": "910001",
       "addedAt": 1770000000000,
       "availability": "available"
     },
     {
-      "episodeId": 910002,
+      "episodeId": "910002",
       "addedAt": 1769000000000,
       "availability": "content_missing"
     },
     {
-      "episodeId": 910003,
+      "episodeId": "910003",
       "addedAt": 1768000000000,
       "availability": "unavailable"
     }

@@ -8,6 +8,7 @@ import {
 } from '../src/server/ingest/feed-aliases';
 import { lockPodcastIdentities } from '../src/server/ingest/podcast-identity';
 import { verifyPublicFeedMove } from '../src/server/ingest/public-feed-moves';
+import { compareCanonicalIds, isCanonicalId } from '../src/shared/canonical-id';
 import { readProtected, writeProtected } from './lib/artifacts';
 import { openDatabase } from './lib/database';
 
@@ -24,8 +25,7 @@ export function parseAliasPlan(input: unknown): PublicAliasClaim[] {
   const claims = input.claims as PublicAliasClaim[];
   for (const claim of claims) {
     if (
-      !Number.isSafeInteger(claim?.podcastId) ||
-      claim.podcastId <= 0 ||
+      !isCanonicalId(claim?.podcastId) ||
       typeof claim.expectedFeedUrl !== 'string' ||
       !Array.isArray(claim.aliases) ||
       claim.aliases.length > 32 ||
@@ -54,7 +54,7 @@ export async function runAliasPlan(
   parseAliasPlan({ claims });
   const rolledBack = new Error('Alias review rollback');
   const ids = [...new Set(claims.map((claim) => claim.podcastId))].sort(
-    (a, b) => a - b,
+    compareCanonicalIds,
   );
   let changed = 0;
   try {
@@ -73,16 +73,16 @@ export async function runAliasPlan(
         ),
       );
       const sources =
-        await tx`SELECT p.id, p.owner_user_id, to_jsonb(p) AS data FROM podcasts p WHERE id = ANY(${ids}::bigint[]) ORDER BY id FOR UPDATE`;
+        await tx`SELECT p.id, p.owner_user_id, to_jsonb(p) || jsonb_build_object('id',p.id::text,'itunes_id',p.itunes_id::text) AS data FROM podcasts p WHERE id = ANY(${ids}::bigint[]) ORDER BY id FOR UPDATE`;
       if (
         sources.length !== ids.length ||
         sources.some((source) => source.owner_user_id !== null)
       )
         throw new Error('All alias targets must be public existing sources');
       const aliases =
-        await tx`SELECT to_jsonb(a) AS data FROM podcast_feed_aliases a WHERE podcast_id = ANY(${ids}::bigint[]) ORDER BY feed_url FOR UPDATE`;
+        await tx`SELECT to_jsonb(a) || jsonb_build_object('podcast_id',a.podcast_id::text) AS data FROM podcast_feed_aliases a WHERE podcast_id = ANY(${ids}::bigint[]) ORDER BY feed_url FOR UPDATE`;
       const polling =
-        await tx`SELECT to_jsonb(p) AS data FROM feed_poll_state p WHERE podcast_id = ANY(${ids}::bigint[]) ORDER BY podcast_id FOR UPDATE`;
+        await tx`SELECT to_jsonb(p) || jsonb_build_object('podcast_id',p.podcast_id::text) AS data FROM feed_poll_state p WHERE podcast_id = ANY(${ids}::bigint[]) ORDER BY podcast_id FOR UPDATE`;
       writeProtected(
         receiptPath,
         {

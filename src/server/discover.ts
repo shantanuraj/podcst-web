@@ -9,8 +9,8 @@ const SHARED_LISTENERS = 3;
 export type Noteworthy = IPodcast & { firstPublished: number | null };
 
 const podcast = (r: Record<string, unknown>): IPodcast => ({
-  id: Number(r.id),
-  itunes_id: (r.itunes_id as number | null) ?? undefined,
+  id: String(r.id),
+  itunes_id: r.itunes_id == null ? undefined : String(r.itunes_id),
   author: r.author_name as string,
   feed: r.feed_url as string,
   title: r.title as string,
@@ -53,7 +53,7 @@ export async function noteworthy(
 }
 
 export async function related(
-  podcastId: number,
+  podcastId: string,
   locale: string,
   limit: number,
 ): Promise<IPodcast[]> {
@@ -75,7 +75,7 @@ export async function related(
     ORDER BY co.listeners DESC, p.id
     LIMIT ${limit}
   `;
-  const chosen = [podcastId, ...shared.map((row) => Number(row.id))];
+  const chosen = [podcastId, ...shared.map((row) => String(row.id))];
   const neighbours =
     shared.length >= limit
       ? []

@@ -1,44 +1,15 @@
 import type { ListSnapshot } from '@/shared/lists';
-import { privateFeedHeaders as headers } from '../podcast-access';
+import { permitsMutation } from '../auth/request';
+import { stateResponse } from '../state/http';
+import { readStateBody, StateError } from '../state/protocol';
 import {
   isListId,
-  LIST_BODY_LIMIT,
   LIST_PAGE_LIMIT,
   parseListBatch,
   parseListCursor,
+  parseListMigration,
 } from './input';
-import { type EpisodeListService, ListError } from './service';
-
-async function readBatch(request: Request) {
-  if (Number(request.headers.get('content-length')) > LIST_BODY_LIMIT)
-    throw new ListError(413, 'List request too large');
-  const reader = request.body?.getReader();
-  if (!reader) throw new ListError(400, 'List changes required');
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  let bytes = 0;
-  let text = '';
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > LIST_BODY_LIMIT) {
-        await reader.cancel();
-        throw new ListError(413, 'List request too large');
-      }
-      text += decoder.decode(value, { stream: true });
-    }
-    text += decoder.decode();
-    const batch = parseListBatch(JSON.parse(text));
-    if (!batch) throw new ListError(400, 'Invalid list changes');
-    return batch;
-  } catch (error) {
-    if (error instanceof ListError) throw error;
-    throw new ListError(400, 'Invalid list changes');
-  } finally {
-    reader.releaseLock();
-  }
-}
+import type { EpisodeListService } from './service';
 
 export function createListHandlers(
   service: EpisodeListService,
@@ -55,32 +26,24 @@ export function createListHandlers(
       scheduleRecovery?.(userId, result.listId);
     return result;
   };
-  const respond = async (operation: (userId: string) => Promise<unknown>) => {
-    try {
+  const respond = (operation: (userId: string) => Promise<unknown>) =>
+    stateResponse(async () => {
       const userId = await authenticate();
-      if (!userId) throw new ListError(401, 'Unauthorized');
-      return Response.json(await operation(userId), { headers });
-    } catch (error) {
-      return Response.json(
-        {
-          message:
-            error instanceof ListError ? error.message : 'Lists unavailable',
-        },
-        {
-          status: error instanceof ListError ? error.status : 503,
-          headers: {
-            ...headers,
-            ...(error instanceof ListError && error.status === 429
-              ? { 'Retry-After': '60' }
-              : {}),
-          },
-        },
-      );
-    }
-  };
+      if (!userId) throw new StateError('unauthenticated', 'Unauthorized');
+      return operation(userId);
+    });
   const identify = (id: string) => {
-    if (!isListId(id)) throw new ListError(400, 'Invalid list ID');
+    if (!isListId(id))
+      throw new StateError('invalid_request', 'Invalid list ID');
     return id.toLowerCase();
+  };
+  const mutation = (request: Request) => {
+    if (!permitsMutation(request))
+      throw new StateError('request_forbidden', 'Request not permitted');
+  };
+  const account = (userId: string, expected: string) => {
+    if (userId !== expected)
+      throw new StateError('account_mismatch', 'Account changed');
   };
 
   return {
@@ -94,25 +57,27 @@ export function createListHandlers(
             !['view', 'limit', 'cursor'].includes(key) ||
             params.getAll(key).length !== 1
           )
-            throw new ListError(400, 'Invalid list query');
+            throw new StateError('invalid_request', 'Invalid list query');
         }
         const view = params.get('view') ?? 'episodes';
         if (view === 'membership') {
           if (params.has('limit') || params.has('cursor'))
-            throw new ListError(
-              400,
+            throw new StateError(
+              'invalid_request',
               'Membership snapshots cannot be paginated',
             );
           return recover(userId, await service.membership(userId, listId));
         }
-        if (view !== 'episodes') throw new ListError(400, 'Invalid list view');
+        if (view !== 'episodes')
+          throw new StateError('invalid_request', 'Invalid list view');
         const limit = params.get('limit') ?? '100';
         if (!/^[1-9]\d{0,2}$/.test(limit) || Number(limit) > LIST_PAGE_LIMIT)
-          throw new ListError(400, 'Invalid list page size');
+          throw new StateError('invalid_request', 'Invalid list page size');
         const cursor = params.has('cursor')
           ? parseListCursor(params.get('cursor') ?? '', listId)
           : undefined;
-        if (cursor === null) throw new ListError(400, 'Invalid list cursor');
+        if (cursor === null)
+          throw new StateError('invalid_request', 'Invalid list cursor');
         return recover(
           userId,
           await service.episodes(userId, listId, {
@@ -123,12 +88,44 @@ export function createListHandlers(
       }),
     changes: (request: Request, id: string) =>
       respond(async (userId) => {
+        mutation(request);
         const listId = identify(id);
-        const batch = await readBatch(request);
+        const batch = parseListBatch(await readStateBody(request));
+        if (!batch)
+          throw new StateError('invalid_request', 'Invalid list changes');
+        account(userId, batch.accountId);
         await beforeChange?.(userId);
         const result = await service.change(userId, listId, batch);
         if (
           batch.changes.some(
+            (change, index) =>
+              change.op === 'add' &&
+              result.results[index].status !== 'not_found',
+          )
+        )
+          scheduleRecovery?.(userId, listId);
+        return result;
+      }),
+    migration: (request: Request, id: string) =>
+      respond(async (userId) => {
+        mutation(request);
+        const listId = identify(id);
+        const input = parseListMigration(await readStateBody(request));
+        if (!input)
+          throw new StateError(
+            'invalid_request',
+            'Invalid legacy list changes',
+          );
+        account(userId, input.scope.accountId);
+        await beforeChange?.(userId);
+        const result = await service.migrate(
+          userId,
+          listId,
+          input.scope,
+          input.batch,
+        );
+        if (
+          input.batch.changes.some(
             (change, index) =>
               change.op === 'add' &&
               result.results[index].status !== 'not_found',

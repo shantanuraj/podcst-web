@@ -24,7 +24,6 @@ val generateRules by tasks.registering {
         val media = section("media")
         val artwork = section("artwork")
         val discovery = section("discovery")
-        val completion = (section("completion")["parity"] as Map<*, *>)["savedPositionFractionOfKnownDuration"]
         @Suppress("UNCHECKED_CAST")
         val regions = discovery["regions"] as List<Map<String, String>>
         val file = output.get().file("app/podcst/model/Rules.kt").asFile
@@ -42,7 +41,6 @@ val generateRules by tasks.registering {
                 appendLine("    val skipBack = ${long(skip["backwardSeconds"])}.seconds")
                 appendLine("    val skipForward = ${long(skip["forwardSeconds"])}.seconds")
                 appendLine("    val progressInterval = ${long(section("progress")["periodicPlayingSeconds"])}.seconds")
-                appendLine("    const val COMPLETION_THRESHOLD = ${double(completion)}")
                 appendLine("    const val MINIMUM_CHAPTERS = ${long(chapters["minimumCount"])}")
                 appendLine("    val chapterRestartThreshold = ${double(chapters["previousRestartThresholdSeconds"])}.seconds")
                 appendLine("    val chapterLookahead = ${double(chapters["nextStartEpsilonSeconds"])}.seconds")

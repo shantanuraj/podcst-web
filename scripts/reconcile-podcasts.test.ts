@@ -87,10 +87,29 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
 
   beforeEach(async () => {
     await sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
-    await createSchemaFixture(sql);
+    await createSchemaFixture(sql, '0009-email-code-security.sql');
     await sql.unsafe(seed);
     plan.reviewedIdentities = (await inspect()).result?.identitiesDigest;
     delete plan.reviewedMissingMedia;
+  });
+
+  test('refuses revisioned state before inspecting or rewriting identities', async () => {
+    await sql.unsafe(
+      readFileSync(
+        new URL('../migrations/active/0010-durable-state.sql', import.meta.url),
+        'utf8',
+      ),
+    );
+    const before =
+      await sql`SELECT to_jsonb(p)::text AS value FROM playback_progress p ORDER BY episode_id`;
+    await expect(inspect()).rejects.toThrow(
+      'Revisioned state requires a reviewed identity and stream reconciliation',
+    );
+    expect(
+      Array.from(
+        await sql`SELECT to_jsonb(p)::text AS value FROM playback_progress p ORDER BY episode_id`,
+      ),
+    ).toEqual(Array.from(before));
   });
 
   test.each([

@@ -1,7 +1,7 @@
 [
   {
-    "id": 1,
-    "itunes_id": 1200361736,
+    "id": "1",
+    "itunes_id": "1200361736",
     "author": "The New York Times",
     "feed": "https://feeds.simplecast.com/Sl5CSM3S",
     "title": "The Daily",
@@ -12,8 +12,8 @@
     "count": 64
   },
   {
-    "id": 3,
-    "itunes_id": 1322200189,
+    "id": "3",
+    "itunes_id": "1322200189",
     "author": "Audiochuck",
     "feed": "https://feeds.simplecast.com/qm_9xx0g",
     "title": "Crime Junkie",
@@ -24,8 +24,8 @@
     "count": 531
   },
   {
-    "id": 4,
-    "itunes_id": 1464919521,
+    "id": "4",
+    "itunes_id": "1464919521",
     "author": "NBC News",
     "feed": "https://podcastfeeds.nbcnews.com/HL4TzgYC",
     "title": "Dateline NBC",

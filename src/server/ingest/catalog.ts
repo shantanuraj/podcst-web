@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { isCanonicalId } from '@/shared/canonical-id';
 import { feedUrl } from '../../shared/feed-url';
 import {
   claimPublicIdentity,
@@ -10,7 +11,7 @@ import {
 
 export interface CatalogPodcast {
   podcastIndexId: number;
-  itunesId: number | null;
+  itunesId: string | null;
   feed: string;
   authorId: number;
   title: string;
@@ -49,7 +50,7 @@ export interface CatalogRow {
 export function catalogInput(
   row: CatalogRow,
   authorId: number,
-  itunesId: number | null = null,
+  itunesId: string | null = null,
 ): CatalogPodcast {
   return {
     podcastIndexId: row.id,
@@ -135,10 +136,7 @@ export async function storeCatalogPodcast(
   )
     throw new TypeError('Invalid catalog identity');
   const itunesId = input.itunesId ?? undefined;
-  if (
-    itunesId !== undefined &&
-    (!Number.isSafeInteger(itunesId) || itunesId <= 0)
-  )
+  if (itunesId !== undefined && !isCanonicalId(itunesId))
     throw new TypeError('Invalid Apple identity');
   const observed = await findPodcastIdentity(
     sql,

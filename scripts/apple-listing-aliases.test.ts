@@ -13,15 +13,32 @@ import {
   type ChartPodcast,
   storeTopPodcasts,
 } from '../src/server/ingest/charts';
-import { indexPodcast } from '../src/server/ingest/index-podcast';
+import { indexPodcast as indexCanonicalPodcast } from '../src/server/ingest/index-podcast';
 import {
   claimPublicIdentity,
-  findPodcastIdentity,
+  findPodcastIdentity as findCanonicalPodcastIdentity,
 } from '../src/server/ingest/podcast-identity';
-import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
+import { resolvePodcast as resolveCanonicalPodcast } from '../src/server/ingest/resolve-podcast';
 import { matchSearchResults } from '../src/server/search';
+import {
+  fixtureLabel,
+  withFixtureId,
+  withFixtureListingId,
+} from './lib/identity-fixture';
 import { startPostgres } from './lib/postgres-sandbox';
 import { createSchemaFixture } from './lib/schema-fixture';
+
+const resolveFixturePodcast = withFixtureId(resolveCanonicalPodcast);
+const resolvePodcast = async (
+  ...args: Parameters<typeof resolveFixturePodcast>
+) => {
+  const id = await resolveFixturePodcast(...args);
+  return id === null ? null : fixtureLabel(id);
+};
+const findPodcastIdentity = withFixtureListingId(findCanonicalPodcastIdentity);
+const indexFixturePodcast = withFixtureListingId(indexCanonicalPodcast);
+const indexPodcast = async (...args: Parameters<typeof indexFixturePodcast>) =>
+  fixtureLabel(await indexFixturePodcast(...args));
 
 const feed = 'https://example.invalid/a';
 const otherFeed = 'https://example.invalid/b';
@@ -36,7 +53,7 @@ const listing = (itunesId: number, url = feed) =>
     }),
   );
 const chart = (itunesId: number, rank: number, url = feed): ChartPodcast => ({
-  itunesId,
+  itunesId: String(itunesId),
   rank,
   feed: url,
   title: 'Synthetic',
@@ -89,7 +106,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
     expect((await findPodcastIdentity(sql, feed, 303))?.id).toBe('1');
     const results = await matchSearchResults(sql, [
       {
-        itunes_id: 303,
+        itunes_id: '303',
         title: 'Listing',
         author: 'Publisher',
         feed,
@@ -97,7 +114,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
         thumbnail: '',
       },
     ]);
-    expect(results[0]).toMatchObject({ id: 1, itunes_id: 303, feed });
+    expect(results[0]).toMatchObject({ id: '1', itunes_id: '303', feed });
   });
 
   test('search presents one result per established source without claiming unknown listings', async () => {
@@ -106,7 +123,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
     const results = await matchSearchResults(
       sql,
       [303, 101, 999].map((itunes_id) => ({
-        itunes_id,
+        itunes_id: String(itunes_id),
         title: 'Synthetic',
         author: 'Publisher',
         feed,
@@ -115,7 +132,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
       })),
     );
     expect(results.map((p) => ({ id: p.id, itunesId: p.itunes_id }))).toEqual([
-      { id: 1, itunesId: 303 },
+      { id: '1', itunesId: '303' },
     ]);
     expect(
       (await sql`SELECT count(*)::int AS n FROM podcast_apple_aliases`)[0].n,
@@ -135,7 +152,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
     const sql = cluster.sql;
     const input = {
       podcastIndexId: 501,
-      itunesId: 303,
+      itunesId: '303',
       feed,
       authorId: 1,
       title: 'Public',
@@ -191,7 +208,7 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
           tx,
           source,
           'https://example.invalid/unrelated',
-          303,
+          '303',
           verification(),
         ),
       ),

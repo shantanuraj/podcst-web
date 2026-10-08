@@ -1,0 +1,20 @@
+{
+  "protocol": 1,
+  "accountId": "3f9a6c2e8b1d4f7a0c5e9b2d6a8f1c3e7b4d0a92",
+  "generation": "17adbd84-d0e4-4e2d-ad9f-b084efee3211",
+  "revision": "9007199254740994",
+  "items": [
+    {
+      "podcastId": "9007199254740993",
+      "revision": "9007199254740994",
+      "followedAtMs": 1791360000000,
+      "availability": "available"
+    },
+    {
+      "podcastId": "9223372036854775807",
+      "revision": "9007199254740992",
+      "followedAtMs": null,
+      "availability": "unavailable"
+    }
+  ]
+}

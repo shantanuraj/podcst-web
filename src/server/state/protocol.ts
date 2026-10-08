@@ -77,11 +77,7 @@ export function stateReplay(
   return false;
 }
 
-export async function readStateBatch(
-  request: Request,
-  resource: 'progress' | 'follows',
-  timeoutMs = 5000,
-) {
+export async function readStateBody(request: Request, timeoutMs = 5000) {
   if (Number(request.headers.get('content-length')) > STATE_BODY_LIMIT)
     throw new StateError('request_too_large', 'State request too large');
   const reader = request.body?.getReader();
@@ -109,18 +105,10 @@ export async function readStateBatch(
       text += decoder.decode(value, { stream: true });
     }
     const body: unknown = JSON.parse(text + decoder.decode());
-    if (
-      body &&
-      typeof body === 'object' &&
-      'protocol' in body &&
-      body.protocol !== 1
-    )
-      throw new StateError('update_required', 'State protocol update required');
-    const validate = stateValidator(
-      resource === 'progress' ? 'progressBatch' : 'followBatch',
-    );
-    if (!validate(body))
+    if (!body || typeof body !== 'object' || Array.isArray(body))
       throw new StateError('invalid_request', 'Invalid state changes');
+    if (!('protocol' in body) || body.protocol !== 1)
+      throw new StateError('update_required', 'State protocol update required');
     return body;
   } catch (error) {
     if (error instanceof StateError) throw error;
@@ -129,4 +117,18 @@ export async function readStateBatch(
     clearTimeout(timer);
     reader.releaseLock();
   }
+}
+
+export async function readStateBatch(
+  request: Request,
+  resource: 'progress' | 'follows',
+  timeoutMs = 5000,
+) {
+  const body = await readStateBody(request, timeoutMs);
+  const validate = stateValidator(
+    resource === 'progress' ? 'progressBatch' : 'followBatch',
+  );
+  if (!validate(body))
+    throw new StateError('invalid_request', 'Invalid state changes');
+  return body;
 }

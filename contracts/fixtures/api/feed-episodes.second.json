@@ -1,8 +1,8 @@
 {
   "episodes": [
     {
-      "id": 229899766,
-      "podcastId": 301,
+      "id": "229899766",
+      "podcastId": "301",
       "isPrivate": false,
       "feed": "https://lexfridman.com/feed/podcast/",
       "podcastTitle": "Lex Fridman Podcast",
@@ -24,8 +24,8 @@
       }
     },
     {
-      "id": 214706447,
-      "podcastId": 301,
+      "id": "214706447",
+      "podcastId": "301",
       "isPrivate": false,
       "feed": "https://lexfridman.com/feed/podcast/",
       "podcastTitle": "Lex Fridman Podcast",

@@ -65,7 +65,13 @@ Actively replaying an episode restores its emphasis. Use the account's saved
 `completed` flag, including manual completion at position zero, rather than
 inferring completion from the feed duration. Pending local progress takes
 precedence over a remote read, and account changes discard the prior account's
-presentation state.
+presentation state while retaining protected pending work for its original scope.
+
+Completion comes only from ended/manual played events. Mark unplayed resets to
+zero/incomplete; deliberate replay clears completion. Position-only checkpoints
+at 94%, 95% or 100% do not complete an episode and use the durable protocol's
+explicit `completed:null` mask, so another device's played flag is not cleared.
+See [state vectors](../state/fixtures.json) for the transition and wire boundary.
 
 ## `releases.json`
 
