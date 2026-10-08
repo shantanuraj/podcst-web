@@ -114,6 +114,16 @@
     "status": 200,
     "decodesAs": "Verified"
   },
+  "episode-public.json": {
+    "endpoint": "GET /api/episodes/:episodeId",
+    "status": 200,
+    "decodesAs": "PublicEpisode"
+  },
+  "episode-public.not-found.json": {
+    "endpoint": "GET /api/episodes/:episodeId",
+    "status": 404,
+    "decodesAs": "ErrorMessage"
+  },
   "feed-episodes.first.json": {
     "endpoint": "GET /api/feed/episodes",
     "status": 200,

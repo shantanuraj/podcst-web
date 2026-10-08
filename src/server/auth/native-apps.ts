@@ -10,6 +10,18 @@ const androidApps = [
 ];
 
 export const appleAppSiteAssociation = {
+  applinks: {
+    details: [
+      {
+        appIDs: appleApps,
+        components: [
+          { '/': '/episodes/*%*', exclude: true },
+          { '/': '/episodes/*/*/*', exclude: true },
+          { '/': '/episodes/*' },
+        ],
+      },
+    ],
+  },
   webcredentials: { apps: appleApps },
 };
 

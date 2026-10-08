@@ -169,6 +169,18 @@ Errors: 400 `{message: "parameter \`podcastId\` required"}` or `{message: "param
 
 Fixtures: `feed-episodes.first.json` and `feed-episodes.second.json` (captured; the second page follows the first page's `nextCursor`), `feed-episodes.missing-podcast-id.json` (captured), `feed-episodes.not-found.json` (derived from the route).
 
+### `GET /api/episodes/:episodeId?podcastId=` — public
+
+Resolves one shared episode without loading the whole catalogue (`src/server/sharing/public-episode.ts`). Both IDs are required canonical decimal strings, and the session is ignored, so only public content resolves. Response `{ "podcast": PodcastInfo, "episode": Episode }`. Errors:
+
+- 400 `{message: "Invalid episode ID"}`.
+- 404 `{message: "Episode not found"}`, whether the episode is missing, belongs to another podcast or is private.
+- 503 `{message: "Episode unavailable"}`.
+
+Success is publicly cacheable. The link format that leads here is in [the sharing contract](../sharing/README.md).
+
+Fixtures: `episode-public.json` (derived from `feed-info.json` and the first episode of `feed-episodes.first.json`), `episode-public.not-found.json`.
+
 ### `GET /api/episodes/:episodeId/chapters` — optional (web)
 
 Accepts an exact decimal-string **episode database ID**, never an enclosure URL.

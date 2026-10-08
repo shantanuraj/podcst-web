@@ -1,0 +1,447 @@
+{
+  "origin": "https://www.podcst.app",
+  "maxSeconds": 604800,
+  "format": [
+    { "seconds": 0, "expected": "0s" },
+    { "seconds": 7, "expected": "7s" },
+    { "seconds": 59.9, "expected": "59s" },
+    { "seconds": 60, "expected": "1m00s" },
+    { "seconds": 1092, "expected": "18m12s" },
+    { "seconds": 2165, "expected": "36m05s" },
+    { "seconds": 3600, "expected": "1h00m00s" },
+    { "seconds": 3725.6, "expected": "1h02m05s" },
+    { "seconds": 604800, "expected": "168h00m00s" }
+  ],
+  "generate": [
+    {
+      "name": "show",
+      "target": { "podcastId": "301" },
+      "expected": "https://www.podcst.app/episodes/301"
+    },
+    {
+      "name": "episode",
+      "target": { "podcastId": "301", "episodeId": "88412" },
+      "expected": "https://www.podcst.app/episodes/301/88412"
+    },
+    {
+      "name": "time floors the playhead",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 1092.97 }
+      },
+      "expected": "https://www.podcst.app/episodes/301/88412?t=18m12s"
+    },
+    {
+      "name": "time at zero",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 0 }
+      },
+      "expected": "https://www.podcst.app/episodes/301/88412?t=0s"
+    },
+    {
+      "name": "clip",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "clip", "start": 1092.4, "end": 1300.8 }
+      },
+      "expected": "https://www.podcst.app/episodes/301/88412?t=18m12s-21m40s"
+    },
+    {
+      "name": "chapter",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": {
+          "kind": "chapter",
+          "chapter": 3,
+          "start": 1060,
+          "end": 2165
+        }
+      },
+      "expected": "https://www.podcst.app/episodes/301/88412?ch=3&t=17m40s-36m05s"
+    },
+    {
+      "name": "IDs above 2^53 stay exact",
+      "target": {
+        "podcastId": "9223372036854775807",
+        "episodeId": "9007199254740993"
+      },
+      "expected": "https://www.podcst.app/episodes/9223372036854775807/9007199254740993"
+    },
+    {
+      "name": "clip collapsing after flooring",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "clip", "start": 10.2, "end": 10.9 }
+      },
+      "expected": null
+    },
+    {
+      "name": "negative time",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": -1 }
+      },
+      "expected": null
+    },
+    {
+      "name": "time past the bound",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 604801 }
+      },
+      "expected": null
+    },
+    {
+      "name": "non-finite time",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": "NaN" }
+      },
+      "expected": null
+    },
+    {
+      "name": "chapter zero",
+      "target": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "chapter", "chapter": 0, "start": 0, "end": 60 }
+      },
+      "expected": null
+    },
+    {
+      "name": "moment without an episode",
+      "target": {
+        "podcastId": "301",
+        "moment": { "kind": "time", "start": 60 }
+      },
+      "expected": null
+    },
+    {
+      "name": "non-canonical podcast ID",
+      "target": { "podcastId": "0301", "episodeId": "88412" },
+      "expected": null
+    }
+  ],
+  "parse": [
+    {
+      "url": "https://www.podcst.app/episodes/301",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": null,
+        "moment": null,
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://podcst.app/episodes/301/88412",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=18m12s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 1092 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=18m12s-21m40s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "clip", "start": 1092, "end": 1300 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?ch=3&t=17m40s-36m05s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": {
+          "kind": "chapter",
+          "chapter": 3,
+          "start": 1060,
+          "end": 2165
+        },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=17m40s-36m05s&ch=3&utm_source=x#notes",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": {
+          "kind": "chapter",
+          "chapter": 3,
+          "start": 1060,
+          "end": 2165
+        },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=0s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 0 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=90s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 90 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=1h02m05s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 3725 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=2m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 120 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=168h00m00s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": { "kind": "time", "start": 604800 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/9223372036854775807/9007199254740993?t=5s",
+      "expected": {
+        "podcastId": "9223372036854775807",
+        "episodeId": "9007199254740993",
+        "moment": { "kind": "time", "start": 5 },
+        "invalidMoment": false
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=168h00m01s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=1092",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=18m60s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=1h60m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=1m2.5s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=-5s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=1m&t=2m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=21m40s-18m12s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=18m12s-18m12s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=1m-2m-3m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?ch=3&t=17m40s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?ch=3",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?ch=0&t=1m-2m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?ch=03&t=1m-2m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?ch=3&ch=3&t=1m-2m",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412?t=99999999999999999999s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": "88412",
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301?t=5s",
+      "expected": {
+        "podcastId": "301",
+        "episodeId": null,
+        "moment": null,
+        "invalidMoment": true
+      }
+    },
+    { "url": "http://www.podcst.app/episodes/301/88412", "expected": null },
+    { "url": "https://evil.example/episodes/301/88412", "expected": null },
+    {
+      "url": "https://podcst.app.evil.example/episodes/301/88412",
+      "expected": null
+    },
+    {
+      "url": "https://www.podcst.app:8443/episodes/301/88412",
+      "expected": null
+    },
+    {
+      "url": "https://user@www.podcst.app/episodes/301/88412",
+      "expected": null
+    },
+    {
+      "url": "https://www.podcst.app/episodes/301/88412/extra",
+      "expected": null
+    },
+    { "url": "https://www.podcst.app/episodes/301/88412/", "expected": null },
+    { "url": "https://www.podcst.app/episodes/0301/88412", "expected": null },
+    {
+      "url": "https://www.podcst.app/episodes/301/9223372036854775808",
+      "expected": null
+    },
+    {
+      "url": "https://www.podcst.app/episodes/https%3A%2F%2Fexample.com%2Ffeed/abc",
+      "expected": null
+    },
+    { "url": "https://www.podcst.app/episodes", "expected": null },
+    { "url": "https://www.podcst.app/s/abc123", "expected": null },
+    { "url": "podcst://episodes/301/88412", "expected": null }
+  ]
+}

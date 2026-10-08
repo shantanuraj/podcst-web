@@ -46,8 +46,20 @@ describe('native app identity', () => {
     ]);
   });
 
-  it('keeps the iOS web credentials association', () => {
+  it('opens canonical episode links in iOS and keeps web credentials', () => {
     expect(appleAppSiteAssociation).toEqual({
+      applinks: {
+        details: [
+          {
+            appIDs: ['DBD4H768ZS.app.podcst.ios'],
+            components: [
+              { '/': '/episodes/*%*', exclude: true },
+              { '/': '/episodes/*/*/*', exclude: true },
+              { '/': '/episodes/*' },
+            ],
+          },
+        ],
+      },
       webcredentials: { apps: ['DBD4H768ZS.app.podcst.ios'] },
     });
   });
