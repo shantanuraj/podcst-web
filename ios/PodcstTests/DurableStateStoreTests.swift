@@ -135,6 +135,11 @@ import XCTest
         await state.flush()
         XCTAssertFalse(state.verified)
         XCTAssertNil(state.position(1))
+        api.sessionStatus = 401
+        do { try await state.activate(accountID: "a", verifiedAccountID: "a"); XCTFail("A previously verified session cannot bypass an auth pause") } catch {}
+        XCTAssertFalse(state.verified)
+        XCTAssertEqual(api.progressBatches.count, 1)
+        api.sessionStatus = nil
         api.status = nil
         api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
         state = store(api)
@@ -148,6 +153,18 @@ import XCTest
         XCTAssertEqual(api.progressBatches.count, count)
         XCTAssertTrue(state.pending)
         XCTAssertEqual(api.progressBatches.first?.clientId, api.progressBatches.last?.clientId)
+    }
+
+    func testExpiredSnapshotPausesBeforeAnyMutation() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        try state.setProgress(id: 1, position: 12, event: .checkpoint)
+        api.readStatus = 401
+        do { try await state.refreshProgress(ids: [1]); XCTFail("Expired read must fail") } catch {}
+        XCTAssertFalse(state.verified)
+        await state.flush()
+        XCTAssertTrue(api.progressBatches.isEmpty)
     }
 
     func testStaleReadAndOrderedResultMismatchCannotConsumeFlight() async throws {
@@ -332,9 +349,15 @@ import XCTest
     var stale = false
     var malformedAck = false
     var status: Int?
+    var sessionStatus: Int?
+    var readStatus: Int?
     var beforeProgress: (() -> Void)?
-    func sessionUser() async throws -> User? { User(id: user, email: "synthetic@example.invalid") }
+    func sessionUser() async throws -> User? {
+        if let sessionStatus { throw APIError(statusCode: sessionStatus, message: "Synthetic session failure") }
+        return User(id: user, email: "synthetic@example.invalid")
+    }
     func progressState(ids: [Int]?) async throws -> StateSnapshot<StateProgressItem> {
+        if let readStatus { throw APIError(statusCode: readStatus, message: "Synthetic snapshot failure") }
         let items = try (ids ?? []).map { id in
             let progress: StateProgress? = progressRevision == 0 ? nil : StateProgress(positionSeconds: position, completed: completed, revision: try StateID(String(progressRevision)), updatedAtMs: try JSONDecoder().decode(StateTimestamp.self, from: Data("null".utf8)))
             return try JSONDecoder().decode(StateProgressItem.self, from: JSONEncoder().encode(Item(episodeId: StateID(String(id)), progress: progress)))

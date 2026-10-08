@@ -289,7 +289,7 @@ private struct DurableRoot: Codable {
         guard let accountID else { verified = false; return }
         if verified && !authenticationPaused { return }
         let token = epoch
-        if verifiedAccountID != accountID {
+        if authenticationPaused || verifiedAccountID != accountID {
             guard try await api.sessionUser()?.id == accountID else { throw DurableStateFailure.suspended }
         }
         try check(token)
@@ -328,9 +328,15 @@ private struct DurableRoot: Codable {
         let ids = Array(Set(ids)).sorted()
         for offset in stride(from: 0, to: ids.count, by: 200) {
             let requested = Array(ids[offset..<min(offset + 200, ids.count)])
-            let snapshot = try await api.progressState(ids: requested)
-            try check(token)
-            try installProgress(snapshot, requested: requested, retire: false)
+            do {
+                let snapshot = try await api.progressState(ids: requested)
+                try check(token)
+                try installProgress(snapshot, requested: requested, retire: false)
+            } catch {
+                try check(token)
+                pauseIfUnauthenticated(error)
+                throw error
+            }
         }
     }
     private func installProgress(_ snapshot: StateSnapshot<StateProgressItem>, requested: [Int], retire: Bool) throws {
@@ -387,6 +393,7 @@ private struct DurableRoot: Codable {
                 if !account.progress.pending && (!includeFollows || !account.follows.pending) && !blocked { error = nil }
             } catch {
                 guard epoch == token, !Task.isCancelled else { return }
+                pauseIfUnauthenticated(error)
                 self.error = error.localizedDescription
             }
         }
@@ -427,10 +434,13 @@ private struct DurableRoot: Codable {
             try installFollows(snapshot)
         } while account.follows.pending
     }
+    private func pauseIfUnauthenticated(_ failure: Error) {
+        if (failure as? APIError)?.statusCode == 401 { authenticationPaused = true; verified = false }
+    }
     private func record(_ failure: Error, progress: Bool) throws {
         error = failure.localizedDescription
         if let apiError = failure as? APIError {
-            if apiError.statusCode == 401 { authenticationPaused = true; verified = false; return }
+            if apiError.statusCode == 401 { pauseIfUnauthenticated(failure); return }
             retryAfter = Date().addingTimeInterval(max(2, apiError.retryAfter ?? 2))
             if [400, 403, 404, 409, 413, 426].contains(apiError.statusCode) {
                 try update { if progress { $0.progress.blocked = apiError.code ?? "protocol_error" } else { $0.follows.blocked = apiError.code ?? "protocol_error" } }
