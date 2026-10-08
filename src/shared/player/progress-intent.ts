@@ -7,11 +7,7 @@ export type ProgressEvent =
   | 'unplayed'
   | 'replay';
 
-export function progressIntent(
-  event: ProgressEvent,
-  positionSeconds: number,
-  previousCompleted: boolean,
-) {
+export function progressIntent(event: ProgressEvent, positionSeconds: number) {
   if (
     !Number.isSafeInteger(positionSeconds) ||
     positionSeconds < schema.definitions.seconds.minimum ||
@@ -21,8 +17,6 @@ export function progressIntent(
   return {
     positionSeconds: event === 'unplayed' ? 0 : positionSeconds,
     completed:
-      event === 'ended' ||
-      event === 'played' ||
-      (event === 'checkpoint' && previousCompleted),
+      event === 'checkpoint' ? null : event === 'ended' || event === 'played',
   };
 }

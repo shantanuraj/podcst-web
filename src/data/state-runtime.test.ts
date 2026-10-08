@@ -1,16 +1,11 @@
 import { beforeEach, expect, test } from 'bun:test';
 import { IDBFactory } from 'fake-indexeddb';
-import {
-  type ProgressEvent,
-  progressIntent,
-} from '@/shared/player/progress-intent';
 import type {
   FollowBatch,
   ProgressBatch,
   StateScope,
 } from '@/shared/state-contract';
 import { followProjection } from '@/shared/subscriptions/follow-outbox';
-import vectors from '../../contracts/state/fixtures.json';
 import { ApiError } from './api';
 import {
   freezeProgress,
@@ -42,9 +37,11 @@ function fixture() {
   let completed = false;
   let followed = false;
   const sent: unknown[] = [];
+  const requests: string[] = [];
   const ledger = new Map<string, unknown>();
   const api: StateTransport = {
     request: async (path, _method, body) => {
+      requests.push(`${_method ?? 'GET'} ${path}`);
       if (body) {
         const batch = body as ProgressBatch | FollowBatch;
         sent.push(structuredClone(body));
@@ -54,7 +51,7 @@ function fixture() {
         const results = batch.changes.map((item) => {
           if ('episodeId' in item) {
             position = item.positionSeconds;
-            completed = item.completed;
+            completed = item.completed ?? completed;
             return { episodeId: item.episodeId, status: 'applied' };
           }
           followed = item.followed;
@@ -113,10 +110,15 @@ function fixture() {
     storage,
     api,
     sent,
+    requests,
     make,
     online: async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       online = true;
+    },
+    remotePlayed: () => {
+      completed = true;
+      revision++;
     },
     remote: (next: number, follow = false) => {
       position = next;
@@ -125,19 +127,6 @@ function fixture() {
     },
   };
 }
-for (const vector of vectors.completion)
-  test(vector.name, () => {
-    expect(
-      progressIntent(
-        vector.event as ProgressEvent,
-        vector.positionSeconds,
-        vector.previousCompleted,
-      ),
-    ).toEqual({
-      positionSeconds: vector.expectedPositionSeconds,
-      completed: vector.expectedCompleted,
-    });
-  });
 test('offline restart retains progress/follows and canonical IDs; A-B-A hides work', async () => {
   const f = fixture();
   const first = f.make();
@@ -335,18 +324,24 @@ test('401 retains frozen work and never erases; confirmed erase fences same acco
   const erased = await f.storage.load();
   expect(() => accountState(erased, 'a')).toThrow();
 });
-test('offline unknown completion checkpoint is durable and resolved before freezing', async () => {
+test('offline unknown-completion checkpoint sends null before reading completion truth', async () => {
   const f = fixture();
   const sync = f.make();
   await sync.activate('a');
   await sync.progress(id, 'checkpoint', 95);
   let state = (await f.storage.load()).accounts.a.progress;
-  expect(state.needsCompletion).toEqual([id]);
+  expect(state.queued[0].completed).toBeNull();
+  expect(progressProjection(state).get(id)?.completed).toBe(false);
   expect(state.queued[0].positionSeconds).toBe(95);
   await f.online();
   await sync.refresh();
   state = (await f.storage.load()).accounts.a.progress;
-  expect(state.needsCompletion).toEqual([]);
+  expect((f.sent[0] as ProgressBatch).changes[0].completed).toBeNull();
+  expect(f.requests.filter((path) => path.includes('/progress'))).toEqual([
+    'GET /progress?view=state&recent=1',
+    'PUT /progress',
+    `GET /progress?view=state&episodeIds=${id}`,
+  ]);
   expect(state.saved[id].completed).toBe(false);
 });
 test('late response after account change cannot populate the new projection', async () => {
@@ -685,4 +680,160 @@ test('selected guest intent stays behind an existing frozen account batch withou
   expect(progress.flight).toEqual(frozen);
   expect(progress.sequence).toBe('1');
   expect(progress.queued).toEqual([f.selection]);
+});
+
+test('remote played survives a local known-false checkpoint and only explicit replay clears it', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await f.online();
+  await sync.refresh();
+  await sync.readProgress([id]);
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id)
+      ?.completed,
+  ).toBe(false);
+  f.remotePlayed();
+  await sync.progress(id, 'checkpoint', 95);
+  await sync.refresh();
+  expect((f.sent[0] as ProgressBatch).changes).toEqual([
+    { episodeId: id, positionSeconds: 95, completed: null },
+  ]);
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id),
+  ).toEqual({ episodeId: id, positionSeconds: 95, completed: true });
+  await sync.progress(id, 'replay', 12);
+  await sync.refresh();
+  expect((f.sent[1] as ProgressBatch).changes).toEqual([
+    { episodeId: id, positionSeconds: 12, completed: false },
+  ]);
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id),
+  ).toEqual({ episodeId: id, positionSeconds: 12, completed: false });
+});
+test('null checkpoint survives lost acknowledgement and restart byte-for-byte', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'checkpoint', 95);
+  const request = f.api.request;
+  let lost = true;
+  f.api.request = async (...args) => {
+    const result = await request(...args);
+    if (args[2] && lost) {
+      lost = false;
+      throw new Error('Lost acknowledgement');
+    }
+    return result;
+  };
+  await f.online();
+  await sync.refresh();
+  const frozen = JSON.stringify(
+    (await f.storage.load()).accounts.a.progress.flight?.batch,
+  );
+  f.remotePlayed();
+  const restart = f.make();
+  await restart.activate('a');
+  expect(JSON.stringify(f.sent[0])).toBe(frozen);
+  expect(JSON.stringify(f.sent[1])).toBe(frozen);
+  expect((f.sent[1] as ProgressBatch).changes[0].completed).toBeNull();
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id)
+      ?.completed,
+  ).toBe(true);
+});
+test.each([
+  true,
+  false,
+])('guest checkpoint selection stays concrete %s and transfers as an explicit boolean', async (completed) => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate(null);
+  await sync.progress(id, completed ? 'played' : 'replay', 0);
+  await sync.progress(id, 'checkpoint', 95);
+  const selection = progressProjection(
+    (await f.storage.load()).guest.progress,
+  ).get(id)!;
+  expect(selection).toEqual({ episodeId: id, positionSeconds: 95, completed });
+  await f.storage.update((root) => {
+    accountState(root, 'a').progress.scope = scope;
+  });
+  await sync.activate('a');
+  await expect(
+    sync.transferGuestProgress('a', { ...selection, completed: null } as never),
+  ).rejects.toThrow('Guest selection changed');
+  await sync.transferGuestProgress('a', selection);
+  expect((await f.storage.load()).accounts.a.progress.queued).toEqual([
+    selection,
+  ]);
+  expect(
+    progressProjection((await f.storage.load()).guest.progress).has(id),
+  ).toBe(false);
+});
+
+test('new explicit played intent survives an in-flight null checkpoint and its post-ack read', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'checkpoint', 95);
+  const request = f.api.request;
+  const gate = Promise.withResolvers<void>();
+  const started = Promise.withResolvers<void>();
+  let first = true;
+  f.api.request = async (...args) => {
+    const result = await request(...args);
+    if (args[2] && first) {
+      first = false;
+      started.resolve();
+      await gate.promise;
+    }
+    return result;
+  };
+  await f.online();
+  const sending = sync.refresh();
+  await started.promise;
+  const frozen = JSON.stringify(
+    (await f.storage.load()).accounts.a.progress.flight?.batch,
+  );
+  await sync.progress(id, 'played', 0);
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id)
+      ?.completed,
+  ).toBe(true);
+  gate.resolve();
+  await sending;
+  expect(JSON.stringify(f.sent[0])).toBe(frozen);
+  expect((f.sent[0] as ProgressBatch).changes[0].completed).toBeNull();
+  expect((f.sent[1] as ProgressBatch).changes).toEqual([
+    { episodeId: id, positionSeconds: 0, completed: true },
+  ]);
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id)
+      ?.completed,
+  ).toBe(true);
+});
+
+test('known local completion survives an offline null checkpoint and IndexedDB restart', async () => {
+  const f = fixture();
+  await f.storage.update((root) => {
+    const progress = accountState(root, 'a').progress;
+    progress.scope = scope;
+    progress.revision = '1';
+    progress.saved[id] = { episodeId: id, positionSeconds: 0, completed: true };
+  });
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'checkpoint', 95);
+  const restart = f.make(browserStateStorage());
+  await restart.activate('a');
+  const outbox = restart.getSnapshot().state?.accounts.a.progress;
+  expect(outbox?.queued).toEqual([
+    { episodeId: id, positionSeconds: 95, completed: null },
+  ]);
+  expect(outbox && progressProjection(outbox).get(id)).toEqual({
+    episodeId: id,
+    positionSeconds: 95,
+    completed: true,
+  });
+  expect(f.sent).toEqual([]);
 });

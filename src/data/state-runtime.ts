@@ -3,6 +3,7 @@ import {
   acknowledgeProgress,
   freezeProgress,
   installProgress,
+  type ProgressPosition,
   progressProjection,
   queueProgress,
   sameScope,
@@ -13,7 +14,7 @@ import {
   unionGuestFollows,
 } from '@/data/state-storage';
 import type { ProgressEvent } from '@/shared/player/progress-intent';
-import type { ProgressChange, StateScope } from '@/shared/state-contract';
+import type { StateScope } from '@/shared/state-contract';
 import { stateValidator } from '@/shared/state-contract';
 import type { DurableStorage } from '@/shared/storage/durable';
 import {
@@ -157,7 +158,6 @@ export class StateRuntime {
           episodeId,
           event,
           position,
-          account === null,
         ),
       );
       this.emit({ error: undefined });
@@ -168,7 +168,7 @@ export class StateRuntime {
       throw error;
     }
   }
-  async transferGuestProgress(account: string, selection: ProgressChange) {
+  async transferGuestProgress(account: string, selection: ProgressPosition) {
     const epoch = this.epoch;
     const scope =
       this.view.account === account
@@ -188,7 +188,6 @@ export class StateRuntime {
           !current ||
           current.positionSeconds !== chosen.positionSeconds ||
           current.completed !== chosen.completed ||
-          guest.needsCompletion.includes(chosen.episodeId) ||
           guest.flight?.batch.changes.some(
             (item) => item.episodeId === chosen.episodeId,
           )
@@ -329,25 +328,6 @@ export class StateRuntime {
             progress = root.accounts[account].progress;
           }
           do {
-            if (progress.needsCompletion.length) {
-              const ids = progress.needsCompletion.slice(0, 200);
-              const snapshot = await this.api.request(
-                `/progress?view=state&episodeIds=${ids.join(',')}`,
-              );
-              active();
-              root = await this.update(epoch, (root) =>
-                this.protocol(() =>
-                  installProgress(
-                    accountState(root, account).progress,
-                    snapshot,
-                    account,
-                    ids,
-                    false,
-                  ),
-                ),
-              );
-              progress = root.accounts[account].progress;
-            }
             root = await this.update(epoch, (root) =>
               this.protocol(() =>
                 freezeProgress(accountState(root, account).progress),

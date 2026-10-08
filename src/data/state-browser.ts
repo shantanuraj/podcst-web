@@ -5,9 +5,8 @@ import { StateRuntime } from '@/data/state-runtime';
 import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import type { AccountSession } from '@/shared/auth/account-session';
-import type { ProgressChange } from '@/shared/state-contract';
 import { followProjection } from '@/shared/subscriptions/follow-outbox';
-import { progressProjection } from './progress-outbox';
+import { type ProgressPosition, progressProjection } from './progress-outbox';
 
 const runtimes = new WeakMap<
   AccountSession,
@@ -143,7 +142,7 @@ export function useDurableState() {
       : [],
     canTransferGuestProgress:
       !!account?.progress.scope && !account.progress.blocked,
-    transferGuestProgress: (selection: ProgressChange) => {
+    transferGuestProgress: (selection: ProgressPosition) => {
       if (!token.scope || !session.current(token))
         return Promise.reject(new Error('Verified account changed'));
       return sync.transferGuestProgress(token.scope, selection);

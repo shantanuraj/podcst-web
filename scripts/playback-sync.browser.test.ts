@@ -72,7 +72,7 @@ test.skipIf(!chrome)(
           if (!ledger.has(key)) {
             revision++;
             const change = update.changes.at(-1);
-            completed = change.completed;
+            completed = change.completed ?? completed;
             if (current)
               (current as { position: number }).position =
                 change.positionSeconds;
@@ -102,10 +102,10 @@ test.skipIf(!chrome)(
     });
     expect(outcome.requests.filter((path) => path === '/')).toHaveLength(2);
     expect(writes.map((batch) => batch.changes)).toEqual([
-      [{ episodeId: '2', positionSeconds: 1439, completed: false }],
-      [{ episodeId: '2', positionSeconds: 2101, completed: false }],
-      [{ episodeId: '2', positionSeconds: 2140, completed: false }],
-      [{ episodeId: '2', positionSeconds: 2140, completed: false }],
+      [{ episodeId: '2', positionSeconds: 1439, completed: null }],
+      [{ episodeId: '2', positionSeconds: 2101, completed: null }],
+      [{ episodeId: '2', positionSeconds: 2140, completed: null }],
+      [{ episodeId: '2', positionSeconds: 2140, completed: null }],
       [{ episodeId: '2', positionSeconds: 3600, completed: true }],
     ]);
     expect(writes[3]).toEqual(writes[2]);

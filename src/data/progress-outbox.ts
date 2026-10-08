@@ -11,14 +11,17 @@ import {
   stateValidator,
 } from '@/shared/state-contract';
 
+export interface ProgressPosition extends Omit<ProgressChange, 'completed'> {
+  completed: boolean;
+}
+
 export interface ProgressOutbox {
   scope?: StateScope;
   clientId: string;
   sequence: string;
   revision: string;
-  saved: Record<string, ProgressChange>;
+  saved: Record<string, ProgressPosition>;
   queued: ProgressChange[];
-  needsCompletion: string[];
   flight?: { batch: ProgressBatch; ack?: ProgressAcknowledgement };
   blocked?: string;
   failures: string[];
@@ -29,7 +32,6 @@ export const emptyProgress = (): ProgressOutbox => ({
   revision: '0',
   saved: {},
   queued: [],
-  needsCompletion: [],
   failures: [],
 });
 export function progressProjection(state: ProgressOutbox) {
@@ -38,11 +40,13 @@ export function progressProjection(state: ProgressOutbox) {
     ...(state.flight?.batch.changes.filter(
       (_, i) => state.flight?.ack?.results[i].status !== 'not_found',
     ) ?? []),
-    ...state.queued.filter(
-      (item) => !state.needsCompletion.includes(item.episodeId),
-    ),
+    ...state.queued,
   ])
-    rows.set(change.episodeId, change);
+    rows.set(change.episodeId, {
+      ...change,
+      completed:
+        change.completed ?? rows.get(change.episodeId)?.completed ?? false,
+    });
   return rows;
 }
 export function queueProgress(
@@ -50,27 +54,18 @@ export function queueProgress(
   episodeId: string,
   event: ProgressEvent,
   position: number,
-  completionKnown = true,
 ) {
   if (!isCanonicalId(episodeId))
     throw new Error('Canonical episode ID required');
-  const unresolved =
-    event === 'checkpoint' &&
-    ((!completionKnown && !progressProjection(state).has(episodeId)) ||
-      state.needsCompletion.includes(episodeId));
-  state.needsCompletion = state.needsCompletion.filter(
-    (id) => id !== episodeId,
-  );
-  if (unresolved) state.needsCompletion.push(episodeId);
-  const change = {
+  const change: ProgressChange = {
     episodeId,
-    ...progressIntent(
-      event,
-      position,
-      progressProjection(state).get(episodeId)?.completed ?? false,
-    ),
+    ...progressIntent(event, position),
   };
-  state.queued = state.queued.filter((item) => item.episodeId !== episodeId);
+  state.queued = state.queued.filter(
+    (item) =>
+      item.episodeId !== episodeId ||
+      (change.completed === null && item.completed !== null),
+  );
   state.queued.push(change);
   state.failures = state.failures.filter((id) => id !== episodeId);
 }
@@ -80,18 +75,8 @@ export function freezeProgress(state: ProgressOutbox) {
       ...state.scope,
       clientId: state.clientId,
       sequence: String(BigInt(state.sequence) + 1n),
-      changes: state.queued
-        .slice(
-          0,
-          state.needsCompletion.length
-            ? state.queued.findIndex((item) =>
-                state.needsCompletion.includes(item.episodeId),
-              )
-            : 100,
-        )
-        .slice(0, 100),
+      changes: state.queued.slice(0, 100),
     };
-    if (!batch.changes.length) return;
     if (!stateValidator('progressBatch')(batch))
       throw new Error('Progress stream exhausted or invalid');
     state.sequence = batch.sequence;
@@ -157,15 +142,6 @@ export function installProgress(
   };
   state.revision = value.revision;
   for (const item of value.items) {
-    if (state.needsCompletion.includes(item.episodeId)) {
-      const queued = state.queued.find(
-        (change) => change.episodeId === item.episodeId,
-      );
-      if (queued) queued.completed = item.progress?.completed ?? false;
-      state.needsCompletion = state.needsCompletion.filter(
-        (id) => id !== item.episodeId,
-      );
-    }
     if (item.progress)
       state.saved[item.episodeId] = {
         episodeId: item.episodeId,
@@ -206,7 +182,6 @@ export function validProgress(value: unknown): value is ProgressOutbox {
     !stateValidator('uuid')(state.clientId) ||
     !stateValidator('revision')(state.sequence) ||
     !stateValidator('revision')(state.revision) ||
-    !Array.isArray(state.needsCompletion) ||
     !Array.isArray(state.queued) ||
     !Array.isArray(state.failures) ||
     !state.saved ||
@@ -214,18 +189,18 @@ export function validProgress(value: unknown): value is ProgressOutbox {
   )
     return false;
   const changeValid = (change: ProgressChange) =>
+    !!change &&
     isCanonicalId(change.episodeId) &&
     Number.isInteger(change.positionSeconds) &&
     change.positionSeconds >= 0 &&
     change.positionSeconds <= 2147483647 &&
-    typeof change.completed === 'boolean';
+    (change.completed === null || typeof change.completed === 'boolean');
   return (
     (!state.scope || validStateScope(state.scope)) &&
-    state.needsCompletion.every(
-      (id) =>
-        isCanonicalId(id) && state.queued.some((item) => item.episodeId === id),
+    state.queued.every(changeValid) &&
+    Object.values(state.saved).every(
+      (item) => changeValid(item) && typeof item.completed === 'boolean',
     ) &&
-    [...state.queued, ...Object.values(state.saved)].every(changeValid) &&
     Object.entries(state.saved).every(([id, item]) => id === item.episodeId) &&
     (!state.flight ||
       (stateValidator('progressBatch')(state.flight.batch) &&
