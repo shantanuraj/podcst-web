@@ -7,6 +7,8 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -47,8 +49,19 @@ object StateRevisionSerializer : KSerializer<StateRevision> {
     override fun deserialize(decoder: Decoder) = StateRevision(decimalString(decoder))
 }
 
+object StateCompletionSerializer : KSerializer<Boolean> {
+    override val descriptor = PrimitiveSerialDescriptor("StateCompletion", PrimitiveKind.BOOLEAN)
+    override fun serialize(encoder: Encoder, value: Boolean) = encoder.encodeBoolean(value)
+    override fun deserialize(decoder: Decoder): Boolean {
+        if (decoder !is JsonDecoder) return decoder.decodeBoolean()
+        val value = decoder.decodeJsonElement() as? JsonPrimitive
+        if (value == null || value.isString) throw SerializationException("Completion must be a boolean")
+        return value.booleanOrNull ?: throw SerializationException("Completion must be a boolean")
+    }
+}
+
 @Serializable
-data class StateProgressChange(val episodeId: StateID, val positionSeconds: Int, val completed: Boolean)
+data class StateProgressChange(val episodeId: StateID, val positionSeconds: Int, @Serializable(StateCompletionSerializer::class) val completed: Boolean?)
 
 @Serializable
 data class StateFollowChange(val podcastId: StateID, val followed: Boolean)
@@ -84,7 +97,7 @@ data class StateAcknowledgement<Result>(
 )
 
 @Serializable
-data class StateProgress(val positionSeconds: Int, val completed: Boolean, val revision: StateID, val updatedAtMs: Long?)
+data class StateProgress(val positionSeconds: Int, @Serializable(StateCompletionSerializer::class) val completed: Boolean, val revision: StateID, val updatedAtMs: Long?)
 
 @Serializable
 data class StateProgressItem(val episodeId: StateID, val progress: StateProgress?)
@@ -109,6 +122,12 @@ data class StateErrorBody(val code: String, val message: String)
 
 enum class StateProgressEvent {
     checkpoint, ended, played, unplayed, replay;
+
+    val requestCompletion: Boolean? get() = when (this) {
+        checkpoint -> null
+        ended, played -> true
+        unplayed, replay -> false
+    }
 
     fun intent(positionSeconds: Int, previousCompleted: Boolean): Pair<Int, Boolean> {
         require(positionSeconds >= 0) { "Invalid source position" }

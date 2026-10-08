@@ -153,7 +153,7 @@ class ProgressRepository(
             val completed = episode.id?.let { state?.progressOverlay()?.get(it)?.completed ?: state?.progress?.get(it)?.completed } ?: previous?.completed ?: false
             require(position >= Duration.ZERO && position.inWholeSeconds <= Int.MAX_VALUE) { "Source position is outside the supported range" }
             val (seconds, done) = event.intent(position.inWholeSeconds.toInt(), completed)
-            if (account != null && episode.id != null) durable.queueProgress(account, StateProgressChange(StateID(episode.id.toString()), seconds, done), legacyToken)
+            if (account != null && episode.id != null) durable.queueProgress(account, StateProgressChange(StateID(episode.id.toString()), seconds, event.requestCompletion), legacyToken, knownCompleted = completed)
             try {
                 owner.database.withTransaction {
                     owner.database.episodes().upsert(listOf(episode.entity()))

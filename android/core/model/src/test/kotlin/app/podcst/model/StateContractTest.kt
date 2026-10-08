@@ -46,6 +46,30 @@ class StateContractTest {
     }
 
     @Test
+    fun checkpointCompletionIsRequiredNullableWhileSnapshotsStayConcrete() {
+        for (value in listOf<Boolean?>(null, false, true)) {
+            val change = StateProgressChange(StateID("9007199254740993"), 94, value)
+            val encoded = json.encodeToString(StateProgressChange.serializer(), change)
+            assertTrue(encoded.contains("\"completed\":${value ?: "null"}"))
+            assertEquals(change, json.decodeFromString<StateProgressChange>(encoded))
+        }
+        val missing = """{"episodeId":"1","positionSeconds":94}"""
+        assertTrue(runCatching { json.decodeFromString<StateProgressChange>(missing) }.isFailure)
+        for (value in listOf("0", "\"false\"", "{}", "[]")) {
+            assertTrue(value, runCatching { json.decodeFromString<StateProgressChange>("""{"episodeId":"1","positionSeconds":94,"completed":$value}""") }.isFailure)
+        }
+        for (suffix in listOf("", ",\"completed\":null", ",\"completed\":\"false\"")) {
+            assertTrue(runCatching { json.decodeFromString<StateProgress>("""{"positionSeconds":94,"revision":"1","updatedAtMs":null$suffix}""") }.isFailure)
+        }
+        assertNull(StateProgressEvent.checkpoint.requestCompletion)
+        assertEquals(true, StateProgressEvent.played.requestCompletion)
+        assertEquals(true, StateProgressEvent.ended.requestCompletion)
+        assertEquals(false, StateProgressEvent.replay.requestCompletion)
+        assertEquals(false, StateProgressEvent.unplayed.requestCompletion)
+        assertEquals(true, StateProgressEvent.checkpoint.intent(94, true).second)
+    }
+
+    @Test
     fun explicitCompletionMatchesSharedVectors() {
         for (entry in fixtures.getValue("completion").jsonArray) {
             val vector = entry.jsonObject

@@ -17,6 +17,8 @@ internal data class ProgressFlight(val batch: StateBatch<StateProgressChange>, v
 @Serializable
 internal data class FollowFlight(val batch: StateBatch<StateFollowChange>, val ack: StateAcknowledgement<StateFollowResult>? = null)
 
+internal data class ProgressProjection(val positionSeconds: Int, val completed: Boolean)
+
 @Serializable
 internal data class DurableAccount(
     val generation: String? = null,
@@ -28,6 +30,7 @@ internal data class DurableAccount(
     val followRevision: Long = 0,
     val progress: Map<Long, StateProgress?> = emptyMap(),
     val follows: List<StateFollowItem> = emptyList(),
+    val progressCompletion: Map<Long, Boolean> = emptyMap(),
     val progressQueued: List<StateProgressChange> = emptyList(),
     val followQueued: List<StateFollowChange> = emptyList(),
     val progressFlight: ProgressFlight? = null,
@@ -39,8 +42,15 @@ internal data class DurableAccount(
     val importFeeds: List<String> = emptyList(),
     val failures: Set<String> = emptySet(),
 ) {
-    fun progressOverlay(): Map<Long, StateProgressChange> =
-        (progressFlight?.batch?.changes.orEmpty() + progressQueued).associateBy { it.episodeId.value.toLong() }
+    fun progressOverlay(): Map<Long, ProgressProjection> {
+        val result = mutableMapOf<Long, ProgressProjection>()
+        for (change in progressFlight?.batch?.changes.orEmpty() + progressQueued) {
+            val id = change.episodeId.value.toLong()
+            val previous = result[id]?.completed ?: progress[id]?.completed ?: progressCompletion[id] ?: false
+            result[id] = ProgressProjection(change.positionSeconds, change.completed ?: previous)
+        }
+        return result
+    }
     fun followed(): Set<Long> {
         val result = follows.mapTo(mutableSetOf()) { it.podcastId.value.toLong() }
         for (change in followFlight?.batch?.changes.orEmpty() + followQueued) {
@@ -58,7 +68,7 @@ data class DurableStatus(val pending: Boolean = false, val error: String? = null
 
 class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null) {
     private val file = AtomicFile(file)
-    private val json = Json { encodeDefaults = true }
+    private val json = Json { encodeDefaults = true; explicitNulls = true }
     private var readable = true
     private var root = try {
         if (this.file.baseFile.exists() || File(file.path + ".bak").exists()) decode(this.file.readFully())
@@ -130,9 +140,11 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
     @Synchronized fun erase(account: String) { commit(root.copy(accounts = root.accounts - account)); errors.remove(account) }
     @Synchronized fun checkpoint() { check(readable); }
 
-    internal fun queueProgress(account: String, change: StateProgressChange, legacyToken: String? = null) = change(account) {
+    internal fun queueProgress(account: String, change: StateProgressChange, legacyToken: String? = null, knownCompleted: Boolean? = null) = change(account) {
         require(change.positionSeconds >= 0)
-        it.copy(progressQueued = it.progressQueued.filterNot { old -> old.episodeId == change.episodeId } + change, reappliedLegacy = if (legacyToken == null) it.reappliedLegacy else it.reappliedLegacy + (legacyToken to change.episodeId.value.toLong()), failures = it.failures - "Episode ${change.episodeId.value} unavailable")
+        val id = change.episodeId.value.toLong()
+        val queued = it.progressQueued.filterNot { old -> old.episodeId == change.episodeId && (change.completed != null || old.completed == null) } + change
+        it.copy(progressQueued = queued, progressCompletion = if (knownCompleted == null || id in it.progressCompletion) it.progressCompletion else it.progressCompletion + (id to knownCompleted), reappliedLegacy = if (legacyToken == null) it.reappliedLegacy else it.reappliedLegacy + (legacyToken to change.episodeId.value.toLong()), failures = it.failures - "Episode ${change.episodeId.value} unavailable")
     }
     internal fun queueFollow(account: String, change: StateFollowChange) = change(account) {
         it.copy(followQueued = it.followQueued.filterNot { old -> old.podcastId == change.podcastId } + change, failures = it.failures - "Podcast ${change.podcastId.value} unavailable")
@@ -176,7 +188,8 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
         if (requested != null) check(ids.toSet() == requested.toSet())
         snapshot.items.forEach { row -> row.progress?.let { p -> check(p.positionSeconds >= 0 && p.revision.value.toLong() <= head && (p.updatedAtMs == null || p.updatedAtMs in 0..8640000000000000L)) } }
         val retire = it.progressFlight?.let { flight -> flight.ack != null && requested != null && requested.containsAll(flight.batch.changes.map { it.episodeId.value.toLong() }) } == true
-        it.copy(generation = snapshot.generation, progressRevision = head, progress = it.progress + snapshot.items.associate { it.episodeId.value.toLong() to it.progress }, progressFlight = if (retire) null else it.progressFlight)
+        val next = it.copy(generation = snapshot.generation, progressRevision = head, progress = it.progress + snapshot.items.associate { it.episodeId.value.toLong() to it.progress }, progressFlight = if (retire) null else it.progressFlight)
+        next.copy(progressCompletion = next.progressCompletion.filterKeys { id -> id in next.progressOverlay() })
     }
     internal fun installFollows(account: String, snapshot: StateSnapshot<StateFollowItem>) = change(account) {
         validateStateScope(snapshot.protocol, snapshot.accountId, snapshot.generation, account, it.generation)
@@ -205,7 +218,7 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
                 validateStateScope(1, account, saved.followClient, account)
                 saved.generation?.let { validateStateScope(1, account, it, account) }
                 check(saved.progressSequence >= 0 && saved.followSequence >= 0 && saved.progressRevision >= 0 && saved.followRevision >= 0)
-                check(saved.progress.keys.all { it > 0 })
+                check(saved.progress.keys.all { it > 0 } && saved.progressCompletion.keys.all { it > 0 })
                 check(saved.progressQueued.all { it.positionSeconds >= 0 })
                 saved.progressFlight?.let { flight ->
                     validateStateScope(flight.batch.protocol, flight.batch.accountId, flight.batch.generation, account, checkNotNull(saved.generation))

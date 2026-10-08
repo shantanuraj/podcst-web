@@ -17,6 +17,9 @@ import app.podcst.network.testing.PlaybackFixtures.progress
 import app.podcst.network.testing.Reply
 import app.podcst.playback.audio.AudioStages
 import app.podcst.playback.audio.SourceTimeline
+import kotlinx.serialization.json.Json
+import app.podcst.model.StateBatch
+import app.podcst.model.StateProgressChange
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -124,6 +127,21 @@ class PlaybackSyncTest {
         fixture.settle()
         assertTrue(scopes.database.outbox().pending().isEmpty())
         assertEquals(1, fixture.server.calls.count { it.body.isNotEmpty() })
+    }
+
+    @Test
+    fun unsavedReplayIsNotLostOrPromotedToPlayedByItsFollowingCheckpoint() = runTest {
+        val fixture = fixture()
+        fixture.hydrated()
+        fixture.coordinator.play(phone, 0.seconds)
+        fixture.player.setPosition(9000)
+        fixture.coordinator.pause()
+        fixture.settle()
+        fixture.progress.sync()
+        val changes = fixture.server.calls.filter { it.body.isNotEmpty() }.flatMap { Json.decodeFromString<StateBatch<StateProgressChange>>(it.body).changes }
+        assertEquals(listOf(false, null), changes.map { it.completed })
+        assertEquals(9, changes.last().positionSeconds)
+        assertFalse(scopes.database.progress().get(phone.identity.value)!!.completed)
     }
 
     @Test

@@ -43,6 +43,17 @@ class DurableWireTest {
         assertFalse(bridge.getValue("batch").jsonObject.getValue("changes").jsonArray.single().jsonObject.getValue("episodeId").jsonPrimitive.isString)
     }
 
+    @Test fun checkpointRequestEncodesLiteralNullAndRejectsAnOmittedCompletion() = runTest {
+        val response = """{"protocol":1,"accountId":"$account","generation":"$generation","clientId":"$client","sequence":"1","revision":"1","results":[{"episodeId":"9007199254740993","status":"applied"}]}"""
+        val server = FakeServer { Reply(response) }
+        val batch = StateBatch(1, account, generation, client, StateID("1"), listOf(StateProgressChange(StateID("9007199254740993"), 94, null)))
+        server.api.changeProgress(batch)
+        val completed = Json.parseToJsonElement(server.calls.single().body).jsonObject.getValue("changes").jsonArray.single().jsonObject.getValue("completed")
+        assertEquals(JsonNull, completed)
+        val missing = server.calls.single().body.replace(",\"completed\":null", "")
+        assertTrue(runCatching { PodcstApi.json.decodeFromString<StateBatch<StateProgressChange>>(missing) }.isFailure)
+    }
+
     @Test fun resolveAndStateReadsUseStringIdsAndStrictRequiredNulls() = runTest {
         val server = FakeServer { call ->
             if (call.path.endsWith("resolve")) Reply("""{"id":"9223372036854775807"}""")

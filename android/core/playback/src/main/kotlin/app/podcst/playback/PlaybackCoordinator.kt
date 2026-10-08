@@ -119,7 +119,7 @@ class PlaybackCoordinator internal constructor(
     private val writes = mutableListOf<Job>()
     private data class PendingProgress(val episode: Episode, val position: Duration, val event: app.podcst.model.StateProgressEvent, val owner: app.podcst.data.Scope)
     private val savingProgress = mutableSetOf<String>()
-    private val unsavedProgress = mutableMapOf<String, PendingProgress>()
+    private val unsavedProgress = mutableMapOf<String, List<PendingProgress>>()
     private val writeFailures = mutableMapOf<String, Throwable>()
     private var progressCheckpoint: ProgressCheckpoint? = null
 
@@ -331,7 +331,7 @@ class PlaybackCoordinator internal constructor(
             persist()
             emitProgress(completed = false)
         }
-        unsavedProgress.values.toList().forEach(::savePending)
+        unsavedProgress.values.mapNotNull { it.firstOrNull() }.forEach(::savePending)
     }
 
     suspend fun checkpointAndSuspend() {
@@ -462,11 +462,12 @@ class PlaybackCoordinator internal constructor(
     }
 
     private fun queueProgress(value: PendingProgress) {
-        val previous = unsavedProgress[value.episode.identity.value]
-        val next = if (value.event == app.podcst.model.StateProgressEvent.checkpoint && previous?.event in listOf(app.podcst.model.StateProgressEvent.ended, app.podcst.model.StateProgressEvent.played))
-            value.copy(event = app.podcst.model.StateProgressEvent.played) else value
-        unsavedProgress[next.episode.identity.value] = next
-        savePending(next)
+        val key = value.episode.identity.value
+        val previous = unsavedProgress[key].orEmpty()
+        val next = if (value.event == app.podcst.model.StateProgressEvent.checkpoint)
+            previous.filter { it.event != app.podcst.model.StateProgressEvent.checkpoint } + value else listOf(value)
+        unsavedProgress[key] = next
+        savePending(next.first())
     }
 
     private fun savePending(pending: PendingProgress) {
@@ -474,10 +475,15 @@ class PlaybackCoordinator internal constructor(
         if (!savingProgress.add(key)) return
         writes.removeAll { it.isCompleted }
         writes += scope.launch {
-            if (unsavedProgress[key] != pending || scopes.current.value !== pending.owner) { savingProgress.remove(key); return@launch }
+            if (pending !in unsavedProgress[key].orEmpty() || scopes.current.value !== pending.owner) {
+                savingProgress.remove(key)
+                unsavedProgress[key]?.firstOrNull()?.takeIf { it != pending && scopes.current.value === it.owner }?.let(::savePending)
+                return@launch
+            }
             try {
                 progress.event(pending.episode, pending.position, pending.event, pending.owner)
-                if (unsavedProgress[key] == pending) unsavedProgress.remove(key)
+                val remaining = unsavedProgress[key].orEmpty().filterNot { it == pending }
+                if (remaining.isEmpty()) unsavedProgress.remove(key) else unsavedProgress[key] = remaining
                 writeFailures.remove(key)
                 val current = state.value
                 if (current.episode?.identity == pending.episode.identity && current.position.inWholeSeconds == pending.position.inWholeSeconds)
@@ -487,7 +493,7 @@ class PlaybackCoordinator internal constructor(
                 writeFailures[key] = failure
             } finally {
                 savingProgress.remove(key)
-                unsavedProgress[key]?.takeIf { it != pending }?.let(::savePending)
+                unsavedProgress[key]?.firstOrNull()?.takeIf { it != pending }?.let(::savePending)
             }
         }
     }

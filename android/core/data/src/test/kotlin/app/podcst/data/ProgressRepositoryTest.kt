@@ -6,6 +6,10 @@ import app.podcst.network.testing.*
 import app.podcst.network.testing.PlaybackFixtures.episode
 import app.podcst.network.testing.PlaybackFixtures.progress
 import java.io.IOException
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.*
+import app.podcst.model.StateBatch
+import app.podcst.model.StateProgressChange
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -46,6 +50,44 @@ class ProgressRepositoryTest {
         assertFalse(scopes.database.progress().get(short.identity.value)!!.completed)
         repository.event(short, 100.seconds, StateProgressEvent.unplayed)
         assertEquals(0L, scopes.database.progress().get(short.identity.value)!!.positionMs)
+    }
+
+    @Test fun anotherDevicePlayedFlagSurvivesCheckpointAndExplicitReplayClearsIt() = runTest {
+        val remote = StateFixtures { Reply("null") }
+        remote.saveFromAnotherDevice(1, 80, false)
+        val server = FakeServer(remote::route)
+        val repository = repository(server)
+        scopes.database.episodes().upsert(listOf(phone.entity()))
+        repository.refresh(listOf(phone))
+        assertFalse(repository.progress.first().getValue(phone.identity.value).completed)
+        remote.saveFromAnotherDevice(1, 80, true)
+        repository.record(phone, 94.seconds, false)
+        assertEquals(SyncOutcome.Done, repository.sync())
+        val checkpoint = Json.decodeFromString<StateBatch<StateProgressChange>>(server.calls.single { it.body.isNotEmpty() }.body)
+        assertNull(checkpoint.changes.single().completed)
+        assertTrue(server.calls.single { it.body.isNotEmpty() }.body.contains("\"completed\":null"))
+        assertTrue(repository.progress.first().getValue(phone.identity.value).completed)
+        assertTrue(scopes.database.progress().get(phone.identity.value)!!.completed)
+        repository.event(phone, 12.seconds, StateProgressEvent.replay)
+        assertEquals(SyncOutcome.Done, repository.sync())
+        val replay = Json.decodeFromString<StateBatch<StateProgressChange>>(server.calls.last { it.body.isNotEmpty() }.body)
+        assertEquals(false, replay.changes.single().completed)
+        assertFalse(repository.progress.first().getValue(phone.identity.value).completed)
+        assertEquals(12000L, scopes.database.progress().get(phone.identity.value)?.positionMs)
+    }
+
+    @Test fun offlineCheckpointRetainsRoomCompletionAndDurableProjectionAcrossAccountRoundTrip() = runTest {
+        val repository = repository(server())
+        scopes.database.episodes().upsert(listOf(phone.entity()))
+        scopes.database.progress().upsert(ProgressEntity(phone.identity.value, 0, 100000, true, 1))
+        repository.record(phone, 95.seconds, false)
+        assertNull(scopes.durable.account("owner").progressQueued.single().completed)
+        assertTrue(scopes.database.progress().get(phone.identity.value)!!.completed)
+        assertTrue(repository.progress.first().getValue(phone.identity.value).completed)
+        scopes.switch("other"); scopes.resumeSync("other")
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        assertTrue(repository.progress.first().getValue(phone.identity.value).completed)
+        assertNull(scopes.durable.account("owner").progressQueued.single().completed)
     }
 
     @Test fun currentPlaybackReconcilesBackwardWithoutCreatingIntent() = runTest {

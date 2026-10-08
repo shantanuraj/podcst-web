@@ -10,6 +10,11 @@ class StateFixtures(private val account: String = "owner", private val presentat
     private var revision = 0L
     private val rows = mutableMapOf<Long, StateProgress>()
     private val acknowledgements = mutableMapOf<Pair<String, String>, Reply>()
+    fun saveFromAnotherDevice(episodeId: Long, positionSeconds: Int, completed: Boolean) {
+        revision++
+        rows[episodeId] = StateProgress(positionSeconds, completed, StateID(revision.toString()), null)
+    }
+
     fun route(call: Call): Reply {
         if (call.path != "/api/progress") return presentation(call)
         if (call.body.isNotEmpty()) {
@@ -18,7 +23,7 @@ class StateFixtures(private val account: String = "owner", private val presentat
             acknowledgements[key]?.let { return it }
             val result = batch.changes.map { change ->
                 revision++
-                rows[change.episodeId.value.toLong()] = StateProgress(change.positionSeconds, change.completed, StateID(revision.toString()), null)
+                rows[change.episodeId.value.toLong()] = StateProgress(change.positionSeconds, change.completed ?: rows[change.episodeId.value.toLong()]?.completed ?: false, StateID(revision.toString()), null)
                 StateProgressResult(change.episodeId, StateResult.applied)
             }
             return Reply(json.encodeToString(StateAcknowledgement(1, account, generation, batch.clientId, batch.sequence, StateRevision(revision.toString()), result))).also { acknowledgements[key] = it }

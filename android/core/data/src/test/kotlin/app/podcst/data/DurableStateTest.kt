@@ -4,6 +4,8 @@ import app.podcst.model.*
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
@@ -124,6 +126,74 @@ class DurableStateTest {
         assertTrue(store.account("a").followed().contains(id.value.toLong()))
         store.installFollows("a", StateSnapshot(1, "a", generation, StateRevision("2"), emptyList()))
         assertTrue(open().account("a").followed().isEmpty())
+    }
+
+    @Test fun nullCheckpointPreservesOfflineCompletionAndNewerExplicitIntentBehindFlight() {
+        val store = open(); bootstrap(store)
+        store.queueProgress("a", StateProgressChange(id, 94, null), knownCompleted = true)
+        assertTrue(open().account("a").progressOverlay().getValue(id.value.toLong()).completed)
+        val flight = store.freezeProgress("a").progressFlight!!
+        val bytes = Json.encodeToString(flight.batch)
+        assertTrue(bytes.contains("\"completed\":null"))
+        store.installProgress("a", StateSnapshot(1, "a", generation, StateRevision("0"), listOf(StateProgressItem(id, null))), listOf(id.value.toLong()))
+        assertTrue(store.account("a").progressOverlay().getValue(id.value.toLong()).completed)
+        store.queueProgress("a", StateProgressChange(id, 12, false))
+        val restarted = open()
+        assertEquals(bytes, Json.encodeToString(restarted.freezeProgress("a").progressFlight!!.batch))
+        assertEquals(false, restarted.account("a").progressOverlay().getValue(id.value.toLong()).completed)
+        restarted.acknowledgeProgress("a", ack(flight))
+        val played = snapshot(94, "1").let { it.copy(items = it.items.map { row -> row.copy(progress = row.progress!!.copy(completed = true)) }) }
+        restarted.installProgress("a", played, listOf(id.value.toLong()))
+        assertFalse(restarted.account("a").progressOverlay().getValue(id.value.toLong()).completed)
+        val next = restarted.freezeProgress("a").progressFlight!!.batch
+        assertEquals("2", next.sequence.value)
+        assertEquals(false, next.changes.single().completed)
+    }
+
+    @Test fun checkpointCoalescingRetainsPriorUnsentExplicitCompletion() {
+        val store = open(); bootstrap(store)
+        store.queueProgress("a", StateProgressChange(id, 0, true))
+        store.queueProgress("a", StateProgressChange(id, 94, null))
+        store.queueProgress("a", StateProgressChange(id, 100, null))
+        assertEquals(listOf(StateProgressChange(id, 0, true), StateProgressChange(id, 100, null)), open().account("a").progressQueued)
+        assertTrue(open().account("a").progressOverlay().getValue(id.value.toLong()).completed)
+        store.queueProgress("a", StateProgressChange(id, 12, false))
+        store.queueProgress("a", StateProgressChange(id, 95, null))
+        assertEquals(listOf(false, null), store.account("a").progressQueued.map { it.completed })
+        assertFalse(store.account("a").progressOverlay().getValue(id.value.toLong()).completed)
+    }
+
+    @Test fun existingBooleanFrozenRequestsStayVerbatimWhenNewNullWorkIsQueued() {
+        for (completion in listOf(false, true)) {
+            val path = File(dir, "legacy-$completion.json")
+            val store = DurableState(path); bootstrap(store)
+            store.queueProgress("a", StateProgressChange(id, 9, completion))
+            val frozen = store.freezeProgress("a").progressFlight!!.batch
+            val original = """{"protocol":1,"accountId":"a","generation":"$generation","clientId":"${frozen.clientId}","sequence":"1","changes":[{"episodeId":"${id.value}","positionSeconds":9,"completed":$completion}]}"""
+            assertEquals(original, Json.encodeToString(frozen))
+            val restarted = DurableState(path)
+            restarted.queueProgress("a", StateProgressChange(id, 94, null))
+            assertEquals(original, Json.encodeToString(restarted.freezeProgress("a").progressFlight!!.batch))
+            assertEquals(completion, restarted.account("a").progressOverlay().getValue(id.value.toLong()).completed)
+            assertNull(restarted.account("a").progressQueued.single().completed)
+            restarted.acknowledgeProgress("a", ack(restarted.account("a").progressFlight!!))
+            val latest = snapshot(12, "2").let { it.copy(items = it.items.map { row -> row.copy(progress = row.progress!!.copy(completed = !completion)) }) }
+            restarted.installProgress("a", latest, listOf(id.value.toLong()))
+            assertEquals(!completion, restarted.account("a").progressOverlay().getValue(id.value.toLong()).completed)
+            assertNull(restarted.freezeProgress("a").progressFlight!!.batch.changes.single().completed)
+        }
+    }
+
+    @Test fun unknownCompletionCanFreezeButOmittingRequiredNullBlocksTheJournal() {
+        val store = open(); bootstrap(store)
+        store.queueProgress("a", StateProgressChange(id, 95, null))
+        assertNull(store.freezeProgress("a").progressFlight!!.batch.changes.single().completed)
+        val malformed = file.readText().replace(",\"completed\":null", "")
+        file.writeText(malformed)
+        val blocked = open()
+        assertTrue(blocked.status.value.blocked)
+        assertTrue(runCatching { blocked.freezeProgress("a") }.isFailure)
+        assertEquals(malformed, file.readText())
     }
 
     @Test fun corruptSourceStaysBlockedAndByteIdentical() {
