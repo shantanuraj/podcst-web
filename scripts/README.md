@@ -45,8 +45,17 @@ production migration or prove physical-device behavior.
 ## Backup coverage and recovery
 
 [`podcst-backup.sh`](podcst-backup.sh) is the authoritative selected-table list.
-Its daily encrypted archive includes account/authentication state, subscriptions,
-playback, transcripts, feed/Apple aliases, preferences, and:
+Its encrypted archive includes account/authentication state, subscriptions,
+playback, transcripts, feed/Apple aliases, preferences, and complete dependency
+parents in the same snapshot:
+
+- `authors`, `podcasts` (including ownership), `episodes` and `episode_content`:
+  saved metadata remains recoverable even when a publisher disappears
+- `countries`, `genres`, `podcasts_genres`: reference parents and assignments
+- `oauth_accounts`: conservatively retained; absence of current callers does not
+  establish that existing credentials can be discarded
+- `podcst_migrations.history`: matching migration names/checksums and adoption history
+
 
 - `episode_lists`: starred lists and playlists, including revisions and timestamps
 - `episode_list_items`: membership and ordering timestamps, even for evicted content
@@ -57,22 +66,60 @@ playback, transcripts, feed/Apple aliases, preferences, and:
 - `progress_clients`, `follow_clients`: stream sequences, hashes and saved acknowledgements
 
 All selected tables share one `pg_dump` snapshot. `--strict-names` refuses missing
-tables; a dump failure prevents encryption/upload. Activate this selection only
-with migrations through `0010` applied and the backup role able to read every
-selected table. Encryption, object naming and retention are unchanged.
+tables; a dump failure prevents encryption/upload. Owned serial sequences are
+included by `pg_dump`; their `SEQUENCE SET` entries are required, not just the
+maximum surviving IDs. Encryption, object naming and retention are unchanged.
+The script's retention periods are not recovery objectives or deletion promises.
 
-This is **not a complete database backup**. The separate identity snapshots cover
-only selected podcast/episode identity columns and run independently; they are not
-a transactionally coherent companion to the daily dump. Catalogue/reference
-parents and episode content are not included in the selected-table archive.
+This is a dependency-closed application snapshot, **not a full database backup**.
+Only these current application tables are excluded:
 
-Rehearse recovery in an isolated database with the matching schema and coherent
-parent identities, including ownership. Restore users before their dependents,
-podcasts/episodes before memberships, countries/podcasts before chart history,
-and lists before list items. When loading data into an existing schema, review a
-parent-first `pg_restore --use-list` order: a full archive's default data-only
-order need not satisfy existing foreign keys. Do not disable constraints or
-invent missing production identities to make a restore pass.
+| Table | Recovery consequence |
+| --- | --- |
+| `feed_poll_state` | Rebuild validators/backoff/scheduling; cold polling adds I/O and must be rate-controlled |
+| `poll_metrics` | Historical operational telemetry is lost; do not use it as durable recovery evidence |
+| `top_podcasts` | Current charts need a refresh; `chart_history` remains included |
+
+The separately timed identity snapshots are not needed as parents for this
+archive and must not be spliced into it. Audio files are not archived. PostgreSQL
+roles/grants, encryption keys, service configuration and Redis are outside the
+archive. New tables require an explicit coverage decision, especially deletion
+receipts and erasure/revocation records.
+
+### Activation and fresh restore
+
+1. Before activation, compare the exact installed helper revision, migration
+   ledger and schema with the reviewed candidate. Require migrations through
+   `0010`, SELECT on every selected table (including the migration ledger), schema
+   USAGE and sequence read privileges. Stop on drift or permission errors; do not
+   broaden grants, skip tables or migrate to make a backup pass. Use the
+   [schema comparison](../docs/schema-inventory.md) separately: a ledger alone
+   does not prove absence of schema drift.
+2. Measure database size, dump duration, temporary disk, encrypted upload size and
+   retention cost before changing a schedule. Synthetic comparisons are not
+   production capacity measurements. Get explicit operational approval for the
+   target, revision, impact, writer plan, checkpoint, recovery and verification.
+3. Under separately approved artifact access, verify ciphertext identity/hash,
+   retention and key availability in a protected environment. Retain the source
+   revision, PostgreSQL/tool versions and schema/migration checksums with the
+   private receipt. Do not download production data to developer machines.
+4. Create a **fresh isolated database** from the exact trusted migration chain.
+   Do not restore selected archive DDL as a schema: table selection omits function
+   dependencies such as ownership guards. Keep foreign keys and triggers enabled,
+   fence all writers and admit no traffic. Remove only the disposable bootstrap
+   `genres`, `state_generation` and migration-ledger rows before loading captured
+   data; do not preseed catalogue or account parents.
+5. Review `pg_restore --list` and construct a `--use-list` containing each selected
+   `TABLE DATA` entry in the script's parent-first selection order, followed by all
+   owned `SEQUENCE SET` entries. Use `--data-only --exit-on-error
+   --single-transaction`. Verify coverage rather than guessing sequence names.
+   On any error discard the isolated target: sequence changes are not guaranteed
+   to roll back. Never disable guards or invent parents to make recovery pass.
+6. Compare restored migration names/checksums with the pinned source chain; refuse
+   mismatches or pending migrations. Verify exact rows, private access refusal,
+   saved metadata, ranks, sequences and new inserts, plus replay/subsequent
+   mutations. The synthetic fixture exercises this procedure, not a production
+   restore command or release authorization.
 
 Restore resource rows, revision heads, generation and client deduplication records
 from the same snapshot. Omitting retry state can reapply acknowledged progress,
@@ -82,8 +129,13 @@ one, under a reviewed restore procedure with no writers admitted.
 
 Before restored traffic opens, rotate only the current generation, keeping
 `legacy_generation` unchanged, and enforce the separately required post-checkpoint
-erasure/revocation obligations. Old clients must remain blocked for explicit
-reconciliation; never renumber streams or upload cached libraries. A client can be
+erasure/revocation obligations. An old snapshot cannot contain later deletions or
+credential revocations; generation rotation does **not** revoke restored sessions
+or passkeys. Independently recoverable, privacy-minimized suppression records and
+an approved retention/replay policy are prerequisites for reopening restored
+traffic, not supplied by this script. If that evidence is unavailable, remain
+closed. Old clients must remain blocked for explicit reconciliation; never
+renumber streams or upload cached libraries. A client can be
 ahead of the checkpoint even if its next sequence appears acceptable. Account for
 newer activity before recovery; do not blindly restore over it. Keep credentials,
 dumps and recovery records outside the repository.
@@ -102,9 +154,16 @@ PG_BIN=/path/to/postgresql-16/bin bun --no-env-file test scripts/backup-config.t
 ```
 
 With `PG_BIN`, tests create disposable local clusters using all active migrations.
-They require every public table to be selected or explicitly excluded with a
-reason, verify archive table coverage and exact row restoration, exercise restored
-retry deduplication for lists/progress/follows, fence clients ahead of a restored
-checkpoint, and reject each missing selected table. New migrations must
-update this coverage decision. These synthetic tests do not prove production
-backup recovery, encryption-key availability or recovery time objectives.
+They require every application/ledger table to be selected or explicitly excluded
+with a reason, check foreign-key closure and parent order, then restore into a
+fresh matching-schema database without publisher access or invented parents.
+Checks cover exact rows, ledger checksums, owned sequence positions (including
+unused high values), new inserts, saved private/public metadata, guards,
+pre-checkpoint cascades, lost-ack/opposite-action retries and subsequent mutations.
+Generation rotation fences all three resources, including legacy Starred work.
+Every missing selected table refuses a dump. A synthetic size/runtime comparison
+prints selected/full archive bytes and elapsed times; it is not a storage budget.
+
+New migrations must update this coverage decision. These tests do not implement
+account deletion or later erasure replay, and do not prove production ciphertext
+recovery, off-host key availability, alert delivery or recovery objectives.
