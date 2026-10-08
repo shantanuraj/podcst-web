@@ -438,3 +438,37 @@ test('denied storage remains visible and is never treated as empty saved state',
   expect(sync.getSnapshot().error).toContain('Unable to open');
   await expect(sync.follow(id, true)).rejects.toThrow();
 });
+
+test('OPML preserves per-URL failures across restart without retrying successful resolutions', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await f.online();
+  await sync.refresh();
+  const request = f.api.request;
+  f.api.request = async (...args) =>
+    args[0] === '/subscriptions/resolve'
+      ? {
+          ...scope,
+          items: [
+            { index: 0, podcastId: id, status: 'resolved' },
+            { index: 1, podcastId: null, status: 'unavailable' },
+          ],
+        }
+      : request(...args);
+  const good = 'https://good.invalid/feed';
+  const bad = 'https://bad.invalid/feed';
+  expect(await sync.resolveFeeds([good, bad])).toEqual({
+    succeeded: 1,
+    failed: [bad],
+  });
+  expect((await f.storage.load()).accounts.a.follows.importFailures).toEqual([
+    bad,
+  ]);
+  await sync.refresh();
+  const restart = f.make();
+  await restart.activate('a');
+  expect(
+    restart.getSnapshot().state?.accounts.a.follows.importFailures,
+  ).toEqual([bad]);
+});

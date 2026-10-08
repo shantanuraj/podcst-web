@@ -424,53 +424,83 @@ export class StateRuntime {
     const scope = account
       ? this.view.state?.accounts[account]?.follows.scope
       : undefined;
-    if (!scope) throw new Error('Verified follow scope unavailable');
+    if (!account || !scope)
+      throw new Error('Verified follow scope unavailable');
+    await this.update(epoch, (root) => {
+      const follows = accountState(root, account).follows;
+      follows.importFailures = [
+        ...new Set([...follows.importFailures, ...feedUrls]),
+      ];
+    });
     const failed: string[] = [];
     let succeeded = 0;
     for (let start = 0; start < feedUrls.length; start += 20) {
       const urls = feedUrls.slice(start, start + 20);
-      const response = (await this.api.request(
-        '/subscriptions/resolve',
-        'POST',
-        { ...scope, feedUrls: urls },
-      )) as StateScope & {
-        items: { index: number; podcastId: string | null; status: string }[];
-      };
-      if (epoch !== this.epoch) throw new Error('Session retired');
-      if (
-        response.protocol !== 1 ||
-        response.accountId !== scope.accountId ||
-        response.generation !== scope.generation ||
-        !Array.isArray(response.items) ||
-        response.items.length !== urls.length ||
-        response.items.some(
-          (item, index) =>
-            item.index !== index ||
-            (item.status === 'resolved'
-              ? !stateValidator('id')(item.podcastId)
-              : item.status !== 'unavailable' || item.podcastId !== null),
+      try {
+        const response = (await this.api.request(
+          '/subscriptions/resolve',
+          'POST',
+          { ...scope, feedUrls: urls },
+        )) as StateScope & {
+          items: { index: number; podcastId: string | null; status: string }[];
+        };
+        if (epoch !== this.epoch) throw new Error('Session retired');
+        if (
+          response.protocol !== 1 ||
+          response.accountId !== scope.accountId ||
+          response.generation !== scope.generation ||
+          !Array.isArray(response.items) ||
+          response.items.length !== urls.length ||
+          response.items.some(
+            (item, index) =>
+              item.index !== index ||
+              (item.status === 'resolved'
+                ? !stateValidator('id')(item.podcastId)
+                : item.status !== 'unavailable' || item.podcastId !== null),
+          )
         )
-      )
-        throw new StateProtocolError('Invalid resolver response');
-      await this.update(epoch, (root) => {
-        for (const item of response.items) {
-          if (item.status === 'resolved') {
-            queueFollow(
-              accountState(root, account!).follows,
-              item.podcastId!,
-              true,
-            );
-            if (legacy && root.legacyFollows)
-              root.legacyFollows.unresolved =
-                root.legacyFollows.unresolved.filter(
-                  (feed) => feed !== urls[item.index],
-                );
+          throw new StateProtocolError('Invalid resolver response');
+        await this.update(epoch, (root) => {
+          for (const item of response.items) {
+            if (item.status === 'resolved') {
+              queueFollow(
+                accountState(root, account).follows,
+                item.podcastId!,
+                true,
+              );
+              const follows = accountState(root, account).follows;
+              follows.importFailures = follows.importFailures.filter(
+                (url) => url !== urls[item.index],
+              );
+              if (legacy && root.legacyFollows)
+                root.legacyFollows.unresolved =
+                  root.legacyFollows.unresolved.filter(
+                    (feed) => feed !== urls[item.index],
+                  );
+            }
           }
+        });
+        for (const item of response.items) {
+          if (item.status === 'resolved') succeeded++;
+          else failed.push(urls[item.index]);
         }
-      });
-      for (const item of response.items) {
-        if (item.status === 'resolved') succeeded++;
-        else failed.push(urls[item.index]);
+      } catch (error) {
+        if (epoch !== this.epoch) throw error;
+        failed.push(...urls);
+        if (
+          error instanceof StateProtocolError ||
+          (error instanceof ApiError &&
+            [400, 403, 404, 409, 413, 426].includes(error.status))
+        ) {
+          await this.update(epoch, (root) => {
+            accountState(root, account).follows.blocked = error.message;
+          });
+          failed.push(...feedUrls.slice(start + 20));
+          break;
+        }
+        this.emit({
+          error: 'Some feed URLs could not be resolved. Retained for retry.',
+        });
       }
     }
     void this.refresh();

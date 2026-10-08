@@ -143,6 +143,7 @@ export function useDurableState() {
       : new Map((state?.guest.follows ?? []).map((id) => [id, 'available'])),
     initialized: !!state,
     unresolvedFollows: state?.legacyFollows?.unresolved ?? [],
+    unresolvedImports: follows?.importFailures ?? [],
     pending:
       session.scope !== null &&
       !!(

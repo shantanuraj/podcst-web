@@ -19,6 +19,7 @@ export interface FollowOutbox {
   flight?: { batch: FollowBatch; ack?: FollowAcknowledgement };
   blocked?: string;
   failures: string[];
+  importFailures: string[];
 }
 export const emptyFollows = (): FollowOutbox => ({
   clientId: crypto.randomUUID(),
@@ -26,6 +27,7 @@ export const emptyFollows = (): FollowOutbox => ({
   revision: '0',
   queued: [],
   failures: [],
+  importFailures: [],
 });
 export function followProjection(state: FollowOutbox) {
   const items = new Map(
@@ -129,6 +131,8 @@ export function validFollows(value: unknown): value is FollowOutbox {
         isCanonicalId(item.podcastId) && typeof item.followed === 'boolean',
     ) &&
     Array.isArray(state.failures) &&
+    Array.isArray(state.importFailures) &&
+    state.importFailures.every((url) => typeof url === 'string') &&
     (!state.scope || validStateScope(state.scope)) &&
     (!state.snapshot ||
       (stateValidator('followSnapshot')(state.snapshot) &&

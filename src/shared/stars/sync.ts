@@ -286,7 +286,9 @@ export class StarSync {
           }).catch(() => {});
         this.nextAttempt =
           Date.now() +
-          Math.min(60_000, 1000 * 2 ** Math.min(this.failures++, 6));
+          (error instanceof ApiError && error.retryAfter
+            ? error.retryAfter * 1000
+            : Math.min(60_000, 1000 * 2 ** Math.min(this.failures++, 6)));
         this.emit({
           error: 'Star sync paused. Changes remain saved on this device.',
         });

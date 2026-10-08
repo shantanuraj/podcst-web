@@ -108,6 +108,23 @@ export default function LibraryPage() {
           ))}
         </ul>
       )}
+      {user && durable.unresolvedImports.length > 0 && (
+        <ul>
+          {durable.unresolvedImports.map((feed) => (
+            <li key={feed}>
+              {feed}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  void durable.sync.resolveFeeds([feed]).catch(() => {});
+                }}
+              >
+                Retry import
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {(subscriptions.isError || localError) && (
         <p role="alert">
           {localError ??

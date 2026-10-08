@@ -25,25 +25,17 @@ export function usePodcastProgress(podcastId: string | undefined) {
     enabled: options.enabled && token.scope !== null && !!podcastId,
     staleTime: 30_000,
   });
-  const durable = useDurableState();
   const rows = session.current(token, resource) ? query.data : undefined;
+  const authoritative = useEpisodeProgress(
+    (rows ?? []).map((row) => row.episodeId),
+  );
   return useMemo(
     () =>
       new Map([
         ...(rows ?? []).map((row) => [row.episodeId, row] as const),
-        ...[...durable.progress.values()].map(
-          (row) =>
-            [
-              row.episodeId,
-              {
-                episodeId: row.episodeId,
-                position: row.positionSeconds,
-                completed: row.completed,
-              },
-            ] as const,
-        ),
+        ...authoritative,
       ]),
-    [rows, durable.progress],
+    [rows, authoritative],
   );
 }
 
