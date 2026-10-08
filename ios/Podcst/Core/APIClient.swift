@@ -116,7 +116,7 @@ public final class APIClient {
             }
         }
         if let itunesId = podcast.itunesId {
-            let identity: RawPodcastIdentity = try await post(path: "/api/feed/resolve", body: ResolvePodcastBody(itunes_id: itunesId, locale: podcast.itunesLocale ?? "us"))
+            let identity: RawPodcastIdentity = try await post(path: "/api/feed/resolve", body: ResolvePodcastBody(itunes_id: String(itunesId), locale: podcast.itunesLocale ?? "us"))
             var resolved = podcast
             resolved.id = identity.id
             return try await detail(of: resolved, forceRefresh: forceRefresh)
@@ -155,7 +155,7 @@ public final class APIClient {
 
     public func refresh(podcastID: Int) async throws -> Podcast {
         try await feedCache.load(.id(podcastID), refreshing: true) {
-            let raw: RawPodcast = try await self.post(path: "/api/feed/refresh", body: ["podcastId": podcastID])
+            let raw: RawPodcast = try await self.post(path: "/api/feed/refresh", body: ["podcastId": String(podcastID)])
             return self.mapPodcast(raw)
         }
     }
@@ -341,24 +341,6 @@ public final class APIClient {
         return try await request.value
     }
 
-    public func subscribe(podcastID: Int) async throws {
-        let _: RawSuccess = try await post(path: "/api/subscriptions", body: ["podcastId": podcastID])
-        feedCache.markSubscribed(id: podcastID)
-        if let currentUserID { subscriptionCache.remove(currentUserID) }
-    }
-
-    public func unsubscribe(podcastID: Int) async throws {
-        let _: RawSuccess = try await delete(path: "/api/subscriptions", query: [URLQueryItem(name: "podcastId", value: String(podcastID))])
-        feedCache.removeSubscription(id: podcastID)
-        if let currentUserID { subscriptionCache.remove(currentUserID) }
-    }
-
-    public func importSubscriptions(feeds: [String]) async throws -> SubscriptionImportResult {
-        let result: SubscriptionImportResult = try await post(path: "/api/subscriptions", body: ["feedUrls": feeds])
-        if let currentUserID { subscriptionCache.remove(currentUserID) }
-        return result
-    }
-
     public func currentProgress() async throws -> PlaybackProgress? {
         let raw: RawProgress? = try await get(path: "/api/progress")
         guard let raw else { return nil }
@@ -373,36 +355,70 @@ public final class APIClient {
             try Task.checkCancellation()
             guard revision == sessionRevision else { throw CancellationError() }
             let batch = ids[offset..<min(offset + 200, ids.count)]
-            let page: [EpisodeProgress] = try await get(path: "/api/progress", query: [URLQueryItem(name: "episodeIds", value: batch.map(String.init).joined(separator: ","))])
-            rows.append(contentsOf: page)
+            let page: [RawEpisodeProgress] = try await get(path: "/api/progress", query: [URLQueryItem(name: "episodeIds", value: batch.map(String.init).joined(separator: ","))])
+            rows.append(contentsOf: page.map { EpisodeProgress(episodeId: $0.episodeId, position: $0.position, completed: $0.completed) })
         }
         return rows
     }
 
-    public func saveProgress(episodeID: Int, position: Double, completed: Bool) async throws {
-        let _: RawSuccess = try await put(path: "/api/progress", body: ProgressBody(episodeId: episodeID, position: Int(position.rounded(.towardZero)), completed: completed))
+    func progressState(ids: [Int]? = nil) async throws -> StateSnapshot<StateProgressItem> {
+        var query = [URLQueryItem(name: "view", value: "state")]
+        query.append(ids.map { URLQueryItem(name: "episodeIds", value: $0.map(String.init).joined(separator: ",")) } ?? URLQueryItem(name: "recent", value: "1"))
+        return try await get(path: "/api/progress", query: query)
     }
 
-    func lists() async throws -> [AccountEpisodeList] {
+    func followState() async throws -> StateSnapshot<StateFollowItem> {
+        try await get(path: "/api/subscriptions", query: [URLQueryItem(name: "view", value: "membership")])
+    }
+
+    func changeProgress(_ batch: StateBatch<StateProgressChange>) async throws -> StateAcknowledgement<StateProgressResult> {
+        try await put(path: "/api/progress", body: batch)
+    }
+
+    func changeFollows(_ batch: StateBatch<StateFollowChange>) async throws -> StateAcknowledgement<StateFollowResult> {
+        try await post(path: "/api/subscriptions", body: batch)
+    }
+
+    func resolveFollows(_ feeds: [String], scope: StateScope) async throws -> FollowResolution {
+        struct Body: Encodable { var `protocol` = 1; var accountId: String; var generation: String; var feedUrls: [String] }
+        return try await post(path: "/api/subscriptions/resolve", body: Body(accountId: scope.accountId, generation: scope.generation, feedUrls: feeds))
+    }
+
+    func lists() async throws -> StarLists {
         let raw: RawEpisodeLists = try await get(path: "/api/lists")
-        return raw.lists
+        return StarLists(scope: StateScope(protocol: raw.protocol, accountId: raw.accountId, generation: raw.generation), lists: raw.lists)
     }
 
     func listMembership(id: String) async throws -> ListSnapshot {
-        try await get(path: "/api/lists/\(id)/items", query: [URLQueryItem(name: "view", value: "membership")])
+        let raw: RawListSnapshot = try await get(path: "/api/lists/\(id)/items", query: [URLQueryItem(name: "view", value: "membership")])
+        return ListSnapshot(scope: raw.scope, listId: raw.listId, revision: raw.revision, items: raw.items.map(\.membership))
     }
 
     func listEpisodes(id: String, cursor: String? = nil) async throws -> ListEpisodePage {
         var query = [URLQueryItem(name: "view", value: "episodes")]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         let raw: RawListEpisodePage = try await get(path: "/api/lists/\(id)/items", query: query)
-        return ListEpisodePage(listId: raw.listId, revision: raw.revision, items: raw.items.map {
+        return ListEpisodePage(scope: StateScope(protocol: raw.protocol, accountId: raw.accountId, generation: raw.generation), listId: raw.listId, revision: raw.revision, items: raw.items.map {
             ListEpisodeItem(membership: $0.membership, episode: $0.episode.map { mapEpisode($0) })
         }, nextCursor: raw.nextCursor)
     }
 
     func changeList(id: String, batch: ListBatch) async throws -> ListAcknowledgement {
-        try await post(path: "/api/lists/\(id)/changes", body: batch)
+        let raw: RawListAcknowledgement
+        if let scope = batch.scope {
+            struct Change: Encodable { var op: ListChange.Operation; var episodeId: String }
+            struct Body: Encodable { var `protocol` = 1; var accountId: String; var generation: String; var clientId: String; var sequence: String; var changes: [Change] }
+            raw = try await post(path: "/api/lists/\(id)/changes", body: Body(accountId: scope.accountId, generation: scope.generation, clientId: batch.clientId, sequence: batch.sequence, changes: batch.changes.map { Change(op: $0.op, episodeId: String($0.episodeId)) }))
+        } else { throw DurableStateFailure.protocolViolation }
+        return raw.acknowledgement
+    }
+
+    func migrateList(id: String, batch: ListBatch, scope: StateScope) async throws -> ListAcknowledgement {
+        // ListBatch retains its original numeric Codable representation, without a scope key.
+        struct Body: Encodable { var `protocol` = 1; var accountId: String; var generation: String; var batch: ListBatch }
+        guard batch.scope == nil else { throw DurableStateFailure.protocolViolation }
+        let raw: RawListAcknowledgement = try await post(path: "/api/lists/\(id)/migration", body: Body(accountId: scope.accountId, generation: scope.generation, batch: batch))
+        return raw.acknowledgement
     }
 
     func account() async throws -> Account {
@@ -470,11 +486,11 @@ public final class APIClient {
         if usesSession { persistCookie(from: http) }
         guard (200..<300).contains(http.statusCode) else {
             let message = (try? JSONDecoder().decode(RawError.self, from: data).message) ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
-            throw APIError(statusCode: http.statusCode, message: message)
+            throw APIError(statusCode: http.statusCode, message: message, code: (try? JSONDecoder().decode(StateErrorBody.self, from: data))?.code, retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init))
         }
         if data.isEmpty { return try JSONDecoder().decode(T.self, from: Data("{}".utf8)) }
         do { return try JSONDecoder().decode(T.self, from: data) }
-        catch { throw APIError(statusCode: http.statusCode, message: "Invalid API response") }
+        catch { throw DurableStateFailure.protocolViolation }
     }
 
     private func persistCookie(from response: HTTPURLResponse) {
@@ -810,8 +826,11 @@ public struct KeychainStore: SessionCredentialStore, Sendable {
 }
 
 private struct EmptyBody: Encodable {}
-private struct RawEpisodeLists: Decodable { var lists: [AccountEpisodeList] }
+private struct RawEpisodeLists: Decodable { var `protocol`: Int; var accountId: String; var generation: String; var lists: [AccountEpisodeList] }
 private struct RawListEpisodePage: Decodable {
+    var `protocol`: Int
+    var accountId: String
+    var generation: String
     var listId: String
     var revision: String
     var items: [RawListEpisodeItem]
@@ -824,11 +843,10 @@ private struct RawListEpisodeItem: Decodable {
     private enum CodingKeys: String, CodingKey { case episode }
 
     init(from decoder: Decoder) throws {
-        membership = try ListMembership(from: decoder)
+        membership = try RawListMembership(from: decoder).membership
         episode = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(RawEpisode.self, forKey: .episode)
     }
 }
-private struct ProgressBody: Encodable { var episodeId: Int; var position: Int; var completed: Bool }
 private struct PasskeyVerification: Encodable {
     var response: PasskeyCredential
     var flowId: String
@@ -862,12 +880,12 @@ private struct RawPasskeyOptions: Decodable {
 private struct RawPasskeyDescriptor: Decodable { var id: String }
 private struct RawSession: Decodable { var user: RawUser? }
 private struct RawUser: Decodable { var id: String; var email: String; var name: String?; var image: String?; var hasPasskey: Bool }
-private struct ResolvePodcastBody: Encodable { var itunes_id: Int; var locale: String }
-private struct RawPodcastIdentity: Decodable { var id: Int }
+private struct ResolvePodcastBody: Encodable { var itunes_id: String; var locale: String }
+private struct RawPodcastIdentity: Decodable { @CatalogueID var id: Int }
 private struct RawSearchResult: Decodable {
     var isPrivate: Bool?
-    var id: Int?
-    var itunesId: Int?
+    @OptionalCatalogueID var id: Int?
+    @OptionalCatalogueID var itunesId: Int?
     var author: String
     var feed: String
     var cover: String
@@ -893,12 +911,12 @@ private struct RawPreferences: Codable {
 }
 private struct RawPasskey: Decodable { var id: String; var provider: String?; var createdAt: String; var lastUsedAt: String? }
 private struct RawAccount: Decodable { var createdAt: String?; var passkeys: [RawPasskey]; var preferences: RawPreferences? }
-private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
+private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; @CatalogueID var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
 
 private struct RawPodcast: Decodable {
     var isPrivate: Bool?
-    var id: Int?
-    var itunesId: Int?
+    @OptionalCatalogueID var id: Int?
+    @OptionalCatalogueID var itunesId: Int?
     var feed: String?
     var feedUrl: String?
     var title: String
@@ -919,8 +937,8 @@ private struct RawPodcast: Decodable {
 
 private struct RawEpisode: Decodable {
     var isPrivate: Bool?
-    var id: Int?
-    var podcastId: Int?
+    @OptionalCatalogueID var id: Int?
+    @OptionalCatalogueID var podcastId: Int?
     var guid: String
     var feed: String?
     var podcastTitle: String?
@@ -1030,3 +1048,25 @@ private extension Data {
         base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
 }
+
+private struct RawListMembership: Decodable {
+    @CatalogueID var episodeId: Int
+    var addedAt: Double
+    var availability: ListAvailability
+    var membership: ListMembership { ListMembership(episodeId: episodeId, addedAt: addedAt, availability: availability) }
+}
+private struct RawListSnapshot: Decodable {
+    var `protocol`: Int; var accountId: String; var generation: String
+    var listId: String; var revision: String; var items: [RawListMembership]
+    var scope: StateScope { StateScope(protocol: `protocol`, accountId: accountId, generation: generation) }
+}
+private struct RawListAcknowledgement: Decodable {
+    struct Result: Decodable { @CatalogueID var episodeId: Int; var status: ListChangeResult.Status }
+    var `protocol`: Int; var accountId: String; var generation: String
+    var clientId: String; var sequence: String; var listId: String; var revision: String; var results: [Result]
+    var acknowledgement: ListAcknowledgement {
+        ListAcknowledgement(scope: StateScope(protocol: `protocol`, accountId: accountId, generation: generation), clientId: clientId, sequence: sequence, listId: listId, revision: revision, results: results.map { ListChangeResult(episodeId: $0.episodeId, status: $0.status) })
+    }
+}
+
+private struct RawEpisodeProgress: Decodable { @CatalogueID var episodeId: Int; var position: Double; var completed: Bool }

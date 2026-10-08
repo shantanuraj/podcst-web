@@ -35,12 +35,23 @@ struct PodcstApp: App {
         _playback = State(initialValue: playback)
         _account = State(initialValue: AccountStore(api: api, preferences: playback.audioPreferences))
         appDelegate.media = media
-        session.suspendAccountWork = { [weak stars] in stars?.suspend() }
+        session.suspendAccountWork = { [weak stars, weak library] in
+            stars?.suspend()
+            library?.durable.suspend()
+        }
         session.resumeAccountWork = { [weak stars] accountID in stars?.resume(accountID: accountID) }
         session.prepareAccountChange = { [weak library, weak playback] accountID in
             stars.suspend()
             playback?.beginAccountChange()
-            await library?.resetProgressSync()
+            do {
+                try library?.checkpointAndSuspend()
+                try stars.checkpointAndSuspend()
+            } catch {
+                playback?.cancelAccountChange()
+                playback?.onProgress = { [weak library] update in library?.saveProgress(update) }
+                throw error
+            }
+            await library?.resetProgressSync(accountID: accountID)
             await routing.releaseMedia()
             await playback?.releaseChapterMetadata()
             do { try await media.switchAccount(to: accountID) }

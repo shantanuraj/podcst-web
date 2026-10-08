@@ -5,6 +5,7 @@ import Observation
 @Observable
 public final class SessionStore {
     public private(set) var user: User?
+    private(set) var verifiedAccountID: String?
     public private(set) var isLoading = true
     public private(set) var error: String?
 
@@ -31,6 +32,7 @@ public final class SessionStore {
             try await prepareAccountChange?(value?.id)
         }
         user = value
+        verifiedAccountID = value?.id
         api.restoreAccount(value?.id)
         if let value, let data = try? JSONEncoder().encode(value) {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)

@@ -156,7 +156,7 @@ struct StateErrorBody: Codable, Equatable, Sendable {
     var message: String
 }
 
-enum StateProgressEvent: String, Decodable {
+public enum StateProgressEvent: String, Codable, Sendable {
     case checkpoint, ended, played, unplayed, replay
 
     func intent(positionSeconds: Int, previousCompleted: Bool) throws -> (positionSeconds: Int, completed: Bool) {
@@ -164,4 +164,65 @@ enum StateProgressEvent: String, Decodable {
         return (self == .unplayed ? 0 : positionSeconds,
                 self == .ended || self == .played || (self == .checkpoint && previousCompleted))
     }
+}
+
+// Wire-only codecs. Local archives deliberately use separate numeric models.
+@propertyWrapper struct CatalogueID: Decodable {
+    var wrappedValue: Int
+    init(from decoder: Decoder) throws { wrappedValue = Int(try StateID(from: decoder).value)! }
+}
+@propertyWrapper struct OptionalCatalogueID: Decodable {
+    var wrappedValue: Int?
+    init(wrappedValue: Int? = nil) { self.wrappedValue = wrappedValue }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        wrappedValue = c.decodeNil() ? nil : Int(try c.decode(StateID.self).value)
+    }
+}
+extension KeyedDecodingContainer {
+    func decode(_ type: OptionalCatalogueID.Type, forKey key: Key) throws -> OptionalCatalogueID {
+        try decodeIfPresent(type, forKey: key) ?? OptionalCatalogueID()
+    }
+}
+
+struct StateScope: Codable, Equatable, Sendable {
+    var `protocol` = 1
+    var accountId: String
+    var generation: String
+    func validate(account: String) throws {
+        guard `protocol` == 1, accountId == account, !account.isEmpty, account.utf8.count <= 128,
+              UUID(uuidString: generation)?.uuidString.lowercased() == generation else { throw DurableStateFailure.protocolViolation }
+    }
+}
+
+enum DurableStateFailure: Error, LocalizedError {
+    case protocolViolation, storageUnavailable, suspended, unresolved
+    var errorDescription: String? {
+        switch self {
+        case .protocolViolation: "Sync blocked: server state needs reconciliation. Saved work has been preserved."
+        case .storageUnavailable: "Device storage is unavailable. This change was not saved."
+        case .suspended: "Sync paused until this account signs in again."
+        case .unresolved: "Legacy identity is unresolved. Original data has been preserved."
+        }
+    }
+}
+
+extension StateRevision {
+    var number: Int64 { Int64(value)! }
+}
+extension StateID {
+    var number: Int { Int(value)! }
+}
+
+struct FollowResolution: Decodable {
+    struct Item: Decodable { var index: Int; var podcastId: StateID?; var status: String }
+    var `protocol`: Int
+    var accountId: String
+    var generation: String
+    var items: [Item]
+}
+
+func readPreservedState(_ url: URL) throws -> Data? {
+    do { return try Data(contentsOf: url) }
+    catch let error as NSError where error.domain == NSCocoaErrorDomain && [NSFileReadNoSuchFileError, NSFileNoSuchFileError].contains(error.code) { return nil }
 }

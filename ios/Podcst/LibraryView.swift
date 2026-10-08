@@ -18,6 +18,31 @@ struct LibraryView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 LibraryLists()
+                if let error = library.syncError { Text(error).font(.footnote).foregroundStyle(.red).padding(.vertical, 8) }
+                if library.syncBlocked { Text("Sync blocked — saved changes are preserved").font(.footnote) }
+                else if library.syncPending { Text("Changes pending sync").font(.footnote) }
+                if library.unresolvedCount > 0 { Text("\(library.unresolvedCount) legacy identities remain unresolved; original data is preserved.").font(.footnote) }
+                ForEach(library.durable.guestPositions, id: \.episodeId) { change in
+                    Button("Use guest position for episode \(change.episodeId.value)") {
+                        library.reapplyGuest(change)
+                    }.font(.footnote)
+                }
+                ForEach(Array(library.legacyProgress.enumerated()), id: \.offset) { _, update in
+                    Button("Reapply legacy position for episode \(update.episodeID) (\(update.position.formatted()))") { library.reapplyLegacy(update) }
+                        .font(.footnote)
+                }
+                if !library.durable.pendingImportFeeds.isEmpty {
+                    Button("Retry unresolved feed imports") { Task { await library.importFeeds(library.durable.pendingImportFeeds) } }.font(.footnote)
+                }
+                ForEach(library.durable.unresolvedGuest, id: \.identity) { podcast in
+                    Button("Resolve legacy follow: \(podcast.title)") { Task { await library.importFeeds([podcast.feed]) } }.font(.footnote)
+                }
+                ForEach(library.durable.failures, id: \.self) { Text($0).font(.footnote).foregroundStyle(.red) }
+                ForEach(Array(library.durable.unavailableIDs).sorted(), id: \.self) { id in
+                    Button("Unfollow unavailable podcast \(id)") {
+                        Task { await library.toggleSubscription(Podcast(id: id, feed: "", title: "Unavailable podcast")) }
+                    }.font(.footnote)
+                }
                 if library.podcasts.isEmpty {
                     Group {
                         if library.isLoading {

@@ -27,7 +27,7 @@ final class MediaStore {
         downloads = BackgroundMediaDownloads(accountID: accountID, rootURL: rootURL.appendingPathComponent("downloads", isDirectory: true), configuration: downloadConfiguration)
     }
 
-    func key(for episode: Episode) -> MediaKey { MediaKey(accountID: accountID, episode: episode) }
+    func key(for episode: Episode) -> MediaKey { downloads.key(for: episode) }
     func status(for episode: Episode) -> MediaDownloadState { states[key(for: episode)] ?? .notDownloaded }
 
     func download(_ episode: Episode) async throws {

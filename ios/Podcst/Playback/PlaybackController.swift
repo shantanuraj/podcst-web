@@ -25,8 +25,10 @@ public struct PlaybackUpdate: Codable, Hashable, Sendable {
     public let episode: Episode
     public let position: TimeInterval
     public let completed: Bool
+    public var event: StateProgressEvent?
 
-    public init(episode: Episode, position: TimeInterval, completed: Bool) {
+    public init(episode: Episode, position: TimeInterval, completed: Bool, event: StateProgressEvent? = nil) {
+        self.event = event
         self.episode = episode
         self.position = position
         self.completed = completed
@@ -212,6 +214,7 @@ public final class PlaybackController {
         currentTime = position.isFinite ? max(0, position) : 0
         duration = episode.duration ?? 0
         persist()
+        emitReplay()
         replaceCurrentItem(startingAt: currentTime, autoPlay: true)
     }
 
@@ -295,6 +298,7 @@ public final class PlaybackController {
         progressRevision = UUID()
         let clamped = max(0, position)
         currentTime = clamped
+        emitReplay()
         generation = UUID()
         transition(to: shouldPlay ? .loading : .paused)
         if transport.hasSource {
@@ -378,6 +382,7 @@ public final class PlaybackController {
         currentTime = 0
         duration = queue[nextIndex].duration ?? 0
         persist()
+        emitReplay()
         replaceCurrentItem(startingAt: 0, autoPlay: true)
     }
 
@@ -389,6 +394,7 @@ public final class PlaybackController {
         currentTime = 0
         duration = queue[previousIndex].duration ?? 0
         persist()
+        emitReplay()
         replaceCurrentItem(startingAt: 0, autoPlay: true)
     }
 
@@ -484,12 +490,20 @@ public final class PlaybackController {
         updateNowPlayingInfo()
     }
 
+    func cancelAccountChange() { changingAccount = false }
+
     func switchAccount(to id: String?) {
         defer { changingAccount = false }
         guard accountID != id else { return }
         onProgress = nil
-        clear()
+        persist()
+        stopPlayback()
+        queue = []
+        currentIndex = 0
+        currentTime = 0
+        duration = 0
         accountID = id
+        loadPersistedState()
         persist()
     }
 
@@ -614,6 +628,7 @@ public final class PlaybackController {
             currentIndex = following(currentIndex)
             currentTime = 0
             duration = queue[currentIndex].duration ?? 0
+            emitReplay()
             replaceCurrentItem(startingAt: 0, autoPlay: true)
         } else {
             queue.removeAll(keepingCapacity: false)
@@ -638,6 +653,11 @@ public final class PlaybackController {
         parsedChapters = nil
         transport.stop()
         transition(to: .idle)
+    }
+
+    private func emitReplay() {
+        guard let episode = currentEpisode else { return }
+        onProgress?(PlaybackUpdate(episode: episode, position: currentTime, completed: false, event: .replay))
     }
 
     private func emitProgress(completed: Bool) {
@@ -866,7 +886,12 @@ public final class PlaybackController {
         }
     }
 
+    private var scopedStorageURL: URL {
+        storageURL.appendingPathExtension("scopes").appendingPathComponent(MediaKey.scope(accountID) + ".json")
+    }
+
     private func persist() {
+        let storageURL = scopedStorageURL
         let snapshot = PersistedState(accountID: accountID, queue: queue, currentIndex: currentIndex, currentTime: currentTime, stopped: state == .idle)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         do {
@@ -882,7 +907,8 @@ public final class PlaybackController {
     }
 
     private func loadPersistedState() {
-        guard let data = try? Data(contentsOf: storageURL), let persisted = try? JSONDecoder().decode(PersistedState.self, from: data) else { return }
+        let source = FileManager.default.fileExists(atPath: scopedStorageURL.path) ? scopedStorageURL : storageURL
+        guard let data = try? Data(contentsOf: source), let persisted = try? JSONDecoder().decode(PersistedState.self, from: data) else { return }
         guard persisted.accountID == accountID else { return }
         queue = persisted.queue
         currentIndex = queue.isEmpty ? 0 : min(max(0, persisted.currentIndex), queue.count - 1)

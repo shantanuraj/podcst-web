@@ -18,3 +18,5 @@ xcuserdata/
 *.p8
 *.mobileprovision
 *.provisionprofile
+
+.derivedData/

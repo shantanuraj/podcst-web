@@ -11,6 +11,7 @@ struct MediaDownloadRecord: Codable {
     }
 
     var episode: Episode
+    var retainedKey: String?
     var id = UUID()
     var intent: Intent = .requested
     var resumeData: Data?
@@ -365,7 +366,18 @@ final class BackgroundMediaDownloads {
     }
 
     private var accountDirectory: URL { rootURL.appendingPathComponent(MediaKey.scope(accountID), isDirectory: true) }
-    private func key(for episode: Episode) -> MediaKey { MediaKey(accountID: accountID, episode: episode) }
+    func key(for episode: Episode) -> MediaKey {
+        let canonical = MediaKey(accountID: accountID, episode: episode)
+        if records[canonical] != nil { return canonical }
+        // Only reuse a unique source-scoped legacy reference, never a global GUID match.
+        let matches = records.filter { _, record in
+            (episode.id != nil && record.episode.id == episode.id) ||
+            (record.episode.id == nil && record.episode.guid == episode.guid &&
+             ((!record.episode.feed.isEmpty && record.episode.feed == episode.feed) ||
+              (record.episode.podcastId != nil && record.episode.podcastId == episode.podcastId)))
+        }
+        return matches.count == 1 ? matches.first!.key : canonical
+    }
     private func directory(_ key: MediaKey) -> URL { accountDirectory.appendingPathComponent(key.rawValue, isDirectory: true) }
     private func completeDirectory(_ key: MediaKey) -> URL { directory(key).appendingPathComponent("complete", isDirectory: true) }
     private func descriptor(_ key: MediaKey, id: UUID) -> String { "\(MediaKey.scope(accountID))/\(key.rawValue)/\(id.uuidString)" }
@@ -381,9 +393,16 @@ final class BackgroundMediaDownloads {
     }
 
     private func persist(_ key: MediaKey) throws {
-        guard let record = records[key] else { return }
+        guard var record = records[key] else { return }
+        record.retainedKey = key.rawValue
         try HTTPMediaByteSource.prepareDirectory(directory(key))
-        try JSONEncoder().encode(record).write(to: directory(key).appendingPathComponent("transfer.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        let legacy = directory(key).appendingPathComponent("transfer.json")
+        let source = directory(key).appendingPathComponent("transfer-source.json")
+        if FileManager.default.fileExists(atPath: legacy.path), !FileManager.default.fileExists(atPath: source.path) {
+            try Data(contentsOf: legacy).write(to: source, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+        try JSONEncoder().encode(record).write(to: legacy, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        records[key] = record
     }
 
     private func restore() {
@@ -397,8 +416,8 @@ final class BackgroundMediaDownloads {
             }
             guard let data = try? Data(contentsOf: directory.appendingPathComponent("transfer.json")),
                   let record = try? JSONDecoder().decode(MediaDownloadRecord.self, from: data),
-                  key(for: record.episode).rawValue == directory.lastPathComponent else { continue }
-            let key = key(for: record.episode)
+                  (record.retainedKey ?? MediaKey(accountID: accountID, episode: record.episode).rawValue) == directory.lastPathComponent else { continue }
+            let key = MediaKey(rawValue: directory.lastPathComponent)
             records[key] = record
             if let manifest = DownloadedMediaFile.manifest(in: completeDirectory(key)) {
                 states[key] = .available(bytes: manifest.storedBytes)

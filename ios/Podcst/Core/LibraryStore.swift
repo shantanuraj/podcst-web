@@ -16,11 +16,13 @@ public final class LibraryStore {
     private let progressDirectory: URL
     private let guestKey = "guest.library.podcasts"
     private static let releasesPerPodcast = 2
-    @ObservationIgnored private var progressWriter: PlaybackProgressWriter?
-    private var progressAccountID: String?
-    private var savedProgress: [Int: EpisodeProgress] = [:]
-    @ObservationIgnored private var progressEdits: [Int: UUID] = [:]
-    @ObservationIgnored private var progressRead = UUID()
+    @ObservationIgnored private var unsavedProgress: [Int: PlaybackUpdate] = [:]
+    let durable: DurableStateStore
+    var syncPending: Bool { durable.pending }
+    var syncBlocked: Bool { durable.blocked }
+    var syncError: String? { durable.error ?? error }
+    var legacyProgress: [PlaybackProgressWriter.Update] { durable.legacyProgress }
+    var unresolvedCount: Int { durable.unresolvedCount }
 
     public init(api: APIClient, session: SessionStore, defaults: UserDefaults = .standard, progressDirectory: URL? = nil) {
         self.api = api
@@ -28,6 +30,9 @@ public final class LibraryStore {
         self.defaults = defaults
         self.progressDirectory = progressDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Podcst/Progress", isDirectory: true)
+        durable = DurableStateStore(directory: self.progressDirectory, api: api, accountID: session.user?.id)
+        do { try durable.importGuestSource(defaults.data(forKey: guestKey)) }
+        catch { self.error = "Guest follows could not be migrated. Original data has been preserved." }
         let cached = session.user == nil ? nil : api.cachedSubscriptions()
         podcasts = session.user == nil ? loadGuest() : cached ?? []
         hasLoaded = cached != nil || !api.hasSession
@@ -42,37 +47,32 @@ public final class LibraryStore {
     }
 
     func progress(for episode: Episode) -> EpisodeProgress? {
-        guard !session.isLoading, let accountID = session.user?.id,
-              progressAccountID == accountID, let id = episode.id else { return nil }
-        return savedProgress[id]
+        guard !session.isLoading, let id = episode.id, let value = durable.position(id) else { return nil }
+        return EpisodeProgress(episodeId: id, position: Double(value.positionSeconds), completed: value.completed)
+    }
+
+    private func activateState() async throws {
+        guard !session.isLoading else { throw DurableStateFailure.suspended }
+        try await durable.activate(accountID: session.user?.id, verifiedAccountID: session.verifiedAccountID)
+        if let accountID = session.user?.id {
+            let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()
+            try durable.importLegacyProgress(progressDirectory.appendingPathComponent(key + ".json"))
+        }
     }
 
     func loadProgress(for episodes: [Episode]) async {
-        guard !Task.isCancelled, !session.isLoading, let accountID = session.user?.id,
-              api.accountID == accountID else { return }
-        let ids = Set(episodes.compactMap(\.id))
-        guard !ids.isEmpty else { return }
-        let writer = writer(for: accountID)
-        let edits = progressEdits
-        let pending = Set(writer.pendingUpdates.map(\.episodeID))
-        let read = UUID()
-        progressRead = read
+        let accountID = session.user?.id
         do {
-            let rows = try await api.episodeProgress(episodeIDs: Array(ids))
-            guard !Task.isCancelled, !session.isLoading, session.user?.id == accountID,
-                  api.accountID == accountID, progressWriter === writer, progressRead == read else { return }
-            let protected = pending.union(writer.pendingUpdates.map(\.episodeID))
-            let remote = Dictionary(uniqueKeysWithValues: rows.map { ($0.episodeId, $0) })
-            for id in ids where edits[id] == progressEdits[id] && !protected.contains(id) {
-                savedProgress[id] = remote[id]
-            }
+            try await activateState()
+            try await durable.refreshProgress(ids: episodes.compactMap(\.id))
         } catch {
-            return
+            guard !Task.isCancelled, session.user?.id == accountID, !session.isLoading else { return }
+            self.error = error.localizedDescription
         }
     }
 
     public func isSubscribed(_ podcast: Podcast) -> Bool {
-        podcasts.contains { $0.identity == podcast.identity }
+        podcast.id.map { durable.followedIDs.contains($0) } ?? (session.user == nil && durable.unresolvedGuest.contains { $0.identity == podcast.identity })
     }
 
     public func load(forceRefresh: Bool = false) async {
@@ -87,11 +87,16 @@ public final class LibraryStore {
         }
         do {
             if accountID != nil {
-                if let cached = api.cachedSubscriptions() { podcasts = cached }
-                let subscriptions = try await (forceRefresh ? api.refreshSubscriptions() : api.subscriptions())
+                try await activateState()
+                await durable.flush()
+                let subscriptions = try await api.refreshSubscriptions()
                 guard session.user?.id == accountID, !Task.isCancelled else { return }
-                podcasts = subscriptions
+                guard durable.verified else { podcasts = []; return }
+                podcasts = subscriptions.filter { podcast in
+                    podcast.id.map { durable.followedIDs.contains($0) && !durable.unavailableIDs.contains($0) } ?? false
+                }
             } else {
+                try await durable.activate(accountID: nil)
                 podcasts = loadGuest()
                 var refreshError: Error?
                 for podcast in podcasts {
@@ -114,134 +119,132 @@ public final class LibraryStore {
 
     public func toggleSubscription(_ podcast: Podcast) async {
         guard !session.isLoading else { return }
-        guard podcast.isPrivate != true || session.user != nil else {
-            error = "Sign in to follow a private podcast"
-            return
-        }
+        guard podcast.isPrivate != true || session.user != nil else { error = "Sign in to follow a private podcast"; return }
         let accountID = session.user?.id
         do {
-            if session.user != nil {
-                guard let id = podcast.id else { throw APIError(statusCode: 400, message: "Podcast ID required") }
-                if isSubscribed(podcast) {
-                    try await api.unsubscribe(podcastID: id)
-                } else {
-                    try await api.subscribe(podcastID: id)
-                }
-                podcasts = try await api.subscriptions()
-            } else {
-                if let index = podcasts.firstIndex(where: { $0.identity == podcast.identity }) {
-                    podcasts.remove(at: index)
-                    persistGuest()
-                } else {
-                    podcasts.append(podcast)
-                    persistGuest()
-                    try await loadGuestPodcast(podcast)
-                }
-                guard session.user == nil, !session.isLoading, !Task.isCancelled else { return }
+            if durable.accountID != accountID { try await activateState() }
+            else if accountID != nil && !durable.verified {
+                do { try await activateState() } catch { self.error = "Changes saved locally; waiting for account verification." }
             }
+            let followed = !isSubscribed(podcast)
+            try durable.setFollow(podcast, followed: followed)
+            if followed { podcasts.append(podcast) } else { podcasts.removeAll { $0.identity == podcast.identity } }
             error = nil
-        } catch let failure {
+            if accountID == nil, followed { try await loadGuestPodcast(podcast) }
+            guard session.user?.id == accountID, !session.isLoading else { return }
+            await durable.flush()
+        } catch {
             guard session.user?.id == accountID, !session.isLoading, !Task.isCancelled else { return }
-            error = failure.localizedDescription
+            self.error = error.localizedDescription
         }
     }
 
     func restoreProgress() async -> PlaybackProgress? {
-        guard !Task.isCancelled, !session.isLoading,
-              let accountID = session.user?.id, api.accountID == accountID else { return nil }
-        let writer = writer(for: accountID)
-        await writer.flush()
-        guard !Task.isCancelled, !session.isLoading,
-              session.user?.id == accountID, !writer.hasPendingUpdates else { return nil }
+        guard !Task.isCancelled, !session.isLoading, let accountID = session.user?.id, api.accountID == accountID else { return nil }
         do {
+            try await activateState()
+            await durable.flush(includeFollows: false)
+            guard !durable.progressPending, !durable.progressBlocked, durable.verified else { return nil }
             let latest = try await api.currentProgress()
-            guard !Task.isCancelled, !session.isLoading,
-                  session.user?.id == accountID, !writer.hasPendingUpdates else { return nil }
-            error = nil
+            guard !Task.isCancelled, !session.isLoading, session.user?.id == accountID, !durable.progressPending else { return nil }
             return latest
-        } catch let failure {
-            guard !Task.isCancelled, !session.isLoading,
-                  session.user?.id == accountID else { return nil }
-            error = failure.localizedDescription
+        } catch {
+            guard !Task.isCancelled, session.user?.id == accountID, !session.isLoading else { return nil }
+            self.error = error.localizedDescription
             return nil
         }
     }
 
     public func saveProgress(_ update: PlaybackUpdate) {
-        guard let accountID = session.user?.id, let episodeID = update.episode.id else { return }
-        let writer = writer(for: accountID)
-        savedProgress[episodeID] = EpisodeProgress(episodeId: episodeID, position: update.position, completed: update.completed)
-        progressEdits[episodeID] = UUID()
-        writer.submit(.init(episodeID: episodeID, position: update.position, completed: update.completed))
+        guard durable.accountID == session.user?.id else { error = "Playback remains local until this account is verified."; return }
+        guard let id = update.episode.id else { error = "This episode has no canonical identity. Playback remains local."; return }
+        do {
+            try durable.setProgress(id: id, position: update.position, event: update.event ?? (update.completed ? .ended : .checkpoint))
+            unsavedProgress[id] = nil
+            error = nil
+            Task { await durable.flush(includeFollows: false) }
+        } catch { unsavedProgress[id] = update; self.error = error.localizedDescription }
+    }
+
+    func mark(_ episode: Episode, played: Bool) {
+        guard durable.accountID == session.user?.id else { error = "Verify this account before saving progress."; return }
+        guard let id = episode.id else { error = "Episode identity is unresolved."; return }
+        do {
+            try durable.setProgress(id: id, position: 0, event: played ? .played : .unplayed)
+            Task { await durable.flush(includeFollows: false) }
+        } catch { self.error = error.localizedDescription }
+    }
+
+    func reapplyLegacy(_ update: PlaybackProgressWriter.Update) {
+        do { try durable.reapplyLegacy(update); Task { await durable.flush(includeFollows: false) } }
+        catch { self.error = error.localizedDescription }
     }
 
     func flushProgress() async {
-        guard !Task.isCancelled, !session.isLoading,
-              let accountID = session.user?.id, api.accountID == accountID else { return }
-        await writer(for: accountID).flush()
+        guard !session.isLoading else { return }
+        do { try await activateState(); await durable.flush(includeFollows: false) }
+        catch { self.error = error.localizedDescription }
     }
 
-    private func writer(for accountID: String) -> PlaybackProgressWriter {
-        if progressAccountID == accountID, let progressWriter { return progressWriter }
-        let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()
-        let writer = PlaybackProgressWriter(storageURL: progressDirectory.appendingPathComponent(key + ".json")) { [weak self] value in
-            guard let self, self.session.user?.id == accountID, self.api.accountID == accountID else { throw CancellationError() }
-            do {
-                try await self.api.saveProgress(episodeID: value.episodeID, position: value.position, completed: value.completed)
-                guard self.session.user?.id == accountID, !Task.isCancelled else { return }
-                self.error = nil
-            } catch {
-                guard self.session.user?.id == accountID, !Task.isCancelled else { return }
-                self.error = error.localizedDescription
-                throw error
-            }
+    func checkpointAndSuspend() throws {
+        for (id, update) in unsavedProgress {
+            try durable.setProgress(id: id, position: update.position, event: update.event ?? (update.completed ? .ended : .checkpoint))
         }
-        savedProgress = Dictionary(uniqueKeysWithValues: writer.pendingUpdates.map {
-            ($0.episodeID, EpisodeProgress(episodeId: $0.episodeID, position: $0.position, completed: $0.completed))
-        })
-        progressEdits = [:]
-        progressAccountID = accountID
-        progressWriter = writer
-        return writer
+        try durable.checkpointAndSuspend()
+        unsavedProgress = [:]
+    }
+    func terminalErase(accountID: String) throws {
+        let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()
+        let source = progressDirectory.appendingPathComponent(key + ".json")
+        if FileManager.default.fileExists(atPath: source.path) { try FileManager.default.removeItem(at: source) }
+        try durable.terminalErase(accountID: accountID)
     }
 
-    public func resetProgressSync() async {
-        let writer = progressWriter
-        progressWriter = nil
-        progressAccountID = nil
-        progressRead = UUID()
-        savedProgress = [:]
-        progressEdits = [:]
+    func reapplyGuest(_ change: StateProgressChange) {
+        do { try durable.reapplyGuest(change); Task { await durable.flush(includeFollows: false) } }
+        catch { self.error = error.localizedDescription }
+    }
+
+    public func resetProgressSync(accountID: String? = nil) async {
+        guard unsavedProgress.isEmpty else { error = "Unable to suspend: playback changes still need device storage."; return }
+        durable.selectAccount(accountID)
+        error = nil
         podcasts = []
-        await writer?.reset()
     }
 
     public func importFeeds(_ feeds: [String]) async {
         guard !feeds.isEmpty else { return }
         do {
-            if session.user != nil {
-                _ = try await api.importSubscriptions(feeds: feeds)
-                podcasts = try await api.subscriptions()
-            } else {
-                var imported: [Podcast] = []
-                for feed in feeds {
-                    if let podcast = try? await api.podcast(feed: feed), podcast.isPrivate != true { imported.append(podcast) }
+            try await activateState()
+            if let accountID = session.user?.id {
+                await durable.flush()
+                guard let scope = durable.scope else { throw DurableStateFailure.suspended }
+                try durable.stageImport(feeds)
+                let pending = durable.pendingImportFeeds
+                for offset in stride(from: 0, to: pending.count, by: 20) {
+                    let batch = Array(pending[offset..<min(offset + 20, pending.count)])
+                    let result = try await api.resolveFollows(batch, scope: scope)
+                    guard session.user?.id == accountID, durable.scope == scope,
+                          result.protocol == 1, result.accountId == scope.accountId, result.generation == scope.generation,
+                          result.items.map(\.index) == Array(batch.indices),
+                          result.items.allSatisfy({ ($0.status == "resolved" && $0.podcastId != nil) || ($0.status == "unavailable" && $0.podcastId == nil) }) else { throw DurableStateFailure.protocolViolation }
+                    for item in result.items {
+                        if let id = item.podcastId { try durable.resolvedImport(feed: batch[item.index], id: id) }
+                    }
+                    if result.items.contains(where: { $0.status == "unavailable" }) { error = "Some feeds could not be resolved. Retry the import to resolve them." }
                 }
-                var byIdentity = Dictionary(uniqueKeysWithValues: podcasts.map { ($0.identity, $0) })
-                imported.forEach { byIdentity[$0.identity] = $0 }
-                podcasts = Array(byIdentity.values).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-                persistGuest()
+                await durable.flush()
+            } else {
+                for feed in feeds {
+                    let podcast = try await api.podcast(feed: feed)
+                    if podcast.isPrivate != true { try durable.setFollow(podcast, followed: true) }
+                }
+                podcasts = durable.guestFollows
             }
-            error = nil
-        } catch let failure {
-            error = failure.localizedDescription
-        }
+        } catch { self.error = error.localizedDescription }
     }
 
-    private func loadGuest() -> [Podcast] {
-        guard let data = defaults.data(forKey: guestKey), let value = try? JSONDecoder().decode([Podcast].self, from: data) else { return [] }
-        return value.filter { $0.isPrivate != true }
-    }
+    private func loadGuest() -> [Podcast] { durable.guestFollows + durable.unresolvedGuest }
 
     private func loadGuestPodcast(_ podcast: Podcast, forceRefresh: Bool = false) async throws {
         var updated: Podcast
@@ -257,11 +260,8 @@ public final class LibraryStore {
         }
         guard session.user == nil, !session.isLoading, !Task.isCancelled,
               let index = podcasts.firstIndex(of: podcast) else { return }
+        try durable.cacheGuest(updated, replacing: podcast)
         podcasts[index] = updated
-        persistGuest()
     }
 
-    private func persistGuest() {
-        if let data = try? JSONEncoder().encode(podcasts) { defaults.set(data, forKey: guestKey) }
-    }
 }

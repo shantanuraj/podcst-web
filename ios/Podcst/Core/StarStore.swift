@@ -4,9 +4,10 @@ import Observation
 @MainActor
 protocol StarAPI {
     func sessionUser() async throws -> User?
-    func lists() async throws -> [AccountEpisodeList]
+    func lists() async throws -> StarLists
     func listMembership(id: String) async throws -> ListSnapshot
     func listEpisodes(id: String, cursor: String?) async throws -> ListEpisodePage
+    func migrateList(id: String, batch: ListBatch, scope: StateScope) async throws -> ListAcknowledgement
     func changeList(id: String, batch: ListBatch) async throws -> ListAcknowledgement
 }
 
@@ -28,9 +29,12 @@ private struct StarFlight: Codable {
     var batch: ListBatch
     var intents: [StarIntent]
     var acknowledgement: ListAcknowledgement?
+    var legacyAcknowledgement: ListAcknowledgement?
 }
 
 private struct StarScope: Codable {
+    var scope: StateScope?
+    var unresolved: [StarIntent]?
     var clientId = UUID().uuidString.lowercased()
     var sequence: Int64 = 0
     var listId: String?
@@ -59,21 +63,23 @@ private struct StarScope: Codable {
     mutating func enqueue(_ id: Int, _ op: ListChange.Operation, at: Double, episode: Episode? = nil) {
         if let episode { episodes[id] = episode }
         failures.remove(id)
-        queued.append(StarIntent(change: ListChange(op: op, episodeId: id), at: at))
+        let addedAt = op == .add ? stars.first(where: { $0.id == id })?.membership.addedAt ?? at : at
+        queued.removeAll { $0.change.episodeId == id }
+        queued.append(StarIntent(change: ListChange(op: op, episodeId: id), at: addedAt))
     }
 
     mutating func freeze() throws {
-        guard flight == nil, !queued.isEmpty, listId != nil, blocked == nil else { return }
+        guard flight == nil, !queued.isEmpty, listId != nil, blocked == nil, let scope else { return }
         guard sequence < Int64.max else { throw StarFailure.protocolViolation }
         let intents = Array(queued.prefix(100))
         queued.removeFirst(intents.count)
         sequence += 1
-        flight = StarFlight(batch: ListBatch(clientId: clientId, sequence: String(sequence), changes: intents.map(\.change)), intents: intents)
+        flight = StarFlight(batch: ListBatch(scope: scope, clientId: clientId, sequence: String(sequence), changes: intents.map(\.change)), intents: intents)
     }
 
     mutating func acknowledge(_ value: ListAcknowledgement) throws {
-        guard let sent = flight, value.clientId == sent.batch.clientId, value.sequence == sent.batch.sequence,
-              value.listId == listId, let revision = Int64(value.revision), revision >= 0,
+        guard let sent = flight, value.scope == scope, value.scope != nil, value.clientId == sent.batch.clientId, value.sequence == sent.batch.sequence,
+              value.listId == listId, (try? StateRevision(value.revision)) != nil,
               value.results.count == sent.intents.count,
               zip(value.results, sent.intents).allSatisfy({ $0.episodeId == $1.change.episodeId }) else { throw StarFailure.protocolViolation }
         flight?.acknowledgement = value
@@ -88,11 +94,10 @@ private struct StarScope: Codable {
     }
 
     mutating func install(_ value: ListSnapshot) throws {
-        guard value.listId == listId, let revision = Int64(value.revision), revision >= 0,
-              revision >= (Int64(snapshot?.revision ?? "0") ?? 0),
-              revision >= (Int64(flight?.acknowledgement?.revision ?? "0") ?? 0),
+        guard value.scope == scope, value.scope != nil, value.listId == listId, let revision = try? StateRevision(value.revision).number,
               Set(value.items.map(\.episodeId)).count == value.items.count,
               value.items.allSatisfy({ StarStore.validID($0.episodeId) && $0.addedAt.isFinite && $0.addedAt.rounded() == $0.addedAt }) else { throw StarFailure.protocolViolation }
+        guard revision >= (Int64(snapshot?.revision ?? "0") ?? 0), revision >= (Int64(flight?.acknowledgement?.revision ?? "0") ?? 0) else { throw StarFailure.staleSnapshot }
         snapshot = value
         if flight?.acknowledgement != nil { flight = nil }
         let visible = Set(stars.map(\.id))
@@ -101,7 +106,7 @@ private struct StarScope: Codable {
     }
 
     mutating func hydrate(_ page: ListEpisodePage) {
-        guard page.listId == listId, page.revision == snapshot?.revision else { return }
+        guard page.scope == scope, page.scope != nil, page.listId == listId, page.revision == snapshot?.revision else { return }
         for item in page.items {
             let id = item.membership.episodeId
             guard let index = snapshot?.items.firstIndex(where: { $0.episodeId == id }) else { continue }
@@ -113,7 +118,7 @@ private struct StarScope: Codable {
     }
 }
 
-private enum StarFailure: Error { case protocolViolation, sessionChanged, storageUnavailable }
+private enum StarFailure: Error { case protocolViolation, sessionChanged, storageUnavailable, staleSnapshot }
 
 @MainActor
 @Observable
@@ -139,8 +144,7 @@ final class StarStore {
     init(accountID: String? = nil, directory: URL? = nil, api: (any StarAPI)? = nil, save: ((Data, URL) throws -> Void)? = nil, now: @escaping () -> Date = Date.init) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Podcst", isDirectory: true)
         let directory = directory ?? base.appendingPathComponent("EpisodeLists", isDirectory: true)
-        if directory == base.appendingPathComponent("EpisodeLists", isDirectory: true) { try? FileManager.default.removeItem(at: base.appendingPathComponent("Stars")) }
-        url = directory.appendingPathComponent("lists.json")
+        url = directory.appendingPathComponent("lists-v1.json")
         self.accountID = accountID
         self.now = now
         self.api = api
@@ -152,14 +156,36 @@ final class StarStore {
             try file.setResourceValues(values)
             try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
-        if FileManager.default.fileExists(atPath: url.path) {
-            do { root = try JSONDecoder().decode([String: StarScope].self, from: Data(contentsOf: url)) }
-            catch { readable = false; ready = false; self.error = "Saved episodes could not be opened. Pending work has not been reset." }
-        }
+        do {
+            let active = try readPreservedState(url)
+            let source = directory.appendingPathComponent("lists.json")
+            if let data = try active ?? readPreservedState(source) {
+                var converted = try JSONDecoder().decode([String: StarScope].self, from: data)
+                if active == nil {
+                    for key in Array(converted.keys) {
+                        var state = converted[key]!
+                        state.unresolved = state.queued.filter { $0.change.episodeId <= 0 || $0.change.episodeId > 9_007_199_254_740_991 }
+                        state.queued.removeAll { $0.change.episodeId <= 0 || $0.change.episodeId > 9_007_199_254_740_991 }
+                        state.unresolved! += (state.snapshot?.items ?? []).filter { $0.episodeId <= 0 || $0.episodeId > 9_007_199_254_740_991 }.map { StarIntent(change: ListChange(op: .add, episodeId: $0.episodeId), at: $0.addedAt) }
+                        if state.flight != nil {
+                            let originalAcknowledgement = state.flight?.acknowledgement
+                            state.flight?.legacyAcknowledgement = originalAcknowledgement
+                            state.flight?.acknowledgement = nil
+                        }
+                        converted[key] = state
+                    }
+                    let staged = try JSONEncoder().encode(converted)
+                    _ = try JSONDecoder().decode([String: StarScope].self, from: staged)
+                    try self.save(staged, url)
+                }
+                root = converted
+                // lists.json remains byte-for-byte intact. lists-v1.json atomically activates conversion.
+            }
+        } catch { readable = false; ready = false; self.error = "Saved episodes could not be opened. Pending work has not been reset." }
         publish()
     }
 
-    nonisolated static func validID(_ id: Int?) -> Bool { id.map { $0 > 0 && $0 <= 9_007_199_254_740_991 } ?? false }
+    nonisolated static func validID(_ id: Int?) -> Bool { id.map { $0 > 0 } ?? false }
     var episodes: [Episode] { stars.compactMap(\.episode) }
     private var key: String { MediaKey.scope(accountID) }
     private var state: StarScope { root[key] ?? StarScope() }
@@ -171,7 +197,7 @@ final class StarStore {
     @discardableResult func toggle(_ episode: Episode) -> Bool { contains(episode) ? unstar(episode) : star(episode) }
 
     private func edit(_ id: Int?, _ op: ListChange.Operation, episode: Episode? = nil) -> Bool {
-        guard ready, let id, Self.validID(id) else { error = "A canonical episode ID and an active account scope are required."; return false }
+        guard ready, let id, Self.validID(id), !(state.unresolved ?? []).contains(where: { $0.change.episodeId == id }) else { error = "A canonical episode ID and an active account scope are required."; return false }
         do {
             error = nil
             try update { state in
@@ -206,7 +232,7 @@ final class StarStore {
         suspend()
         var next = root
         if accountID != nil { next[key]?.episodes = [:]; next[key]?.snapshot = nil }
-        if let id { Self.mergeGuest(&next, account: id) }
+        if api == nil, let id { Self.mergeGuest(&next, account: id) }
         try commit(next)
         accountID = id
         ready = readable && activate
@@ -244,6 +270,7 @@ final class StarStore {
         stars = ready ? state.stars : []
         pending = accountID != nil && (state.flight != nil || !state.queued.isEmpty)
         if state.blocked != nil { error = "Star sync needs attention. Pending edits have been kept." }
+        else if !(state.unresolved ?? []).isEmpty { error = "Legacy Starred identities are unresolved. Original data has been preserved." }
         else if !state.failures.isEmpty { error = "\(state.failures.count) episode(s) could not be added." }
     }
 
@@ -272,24 +299,31 @@ final class StarStore {
                 error = nil
                 publish()
                 guard state.blocked == nil else { return }
-                if state.listId == nil {
-                    let lists = try await api.lists()
-                    try check(token)
-                    guard let list = lists.first(where: { $0.kind == "starred" }) else { throw StarFailure.protocolViolation }
-                    try update { $0.listId = list.id }
-                }
+                let catalogue = try await api.lists()
+                try check(token)
+                try catalogue.scope.validate(account: accountID)
+                guard state.scope == nil || state.scope == catalogue.scope,
+                      let list = catalogue.lists.first(where: { $0.kind == "starred" }),
+                      state.listId == nil || state.listId == list.id else { throw StarFailure.protocolViolation }
+                try update { $0.scope = catalogue.scope; $0.listId = list.id }
                 guard let id = state.listId else { throw StarFailure.protocolViolation }
                 repeat {
                     try check(token)
                     try update { try $0.freeze() }
                     if let flight = state.flight, flight.acknowledgement == nil {
                         do {
-                            let ack = try await api.changeList(id: id, batch: flight.batch)
+                            let ack: ListAcknowledgement
+                            if flight.batch.scope == nil {
+                                guard let scope = state.scope else { throw StarFailure.protocolViolation }
+                                ack = try await api.migrateList(id: id, batch: flight.batch, scope: scope)
+                            } else {
+                                ack = try await api.changeList(id: id, batch: flight.batch)
+                            }
                             try check(token)
                             try update { try $0.acknowledge(ack) }
                         } catch {
                             try check(token)
-                            if let failure = error as? APIError, [400, 404, 409, 413].contains(failure.statusCode) { try update { $0.blocked = failure.statusCode } }
+                            if let failure = error as? APIError, [400, 404, 409, 413, 426].contains(failure.statusCode) { try update { $0.blocked = failure.statusCode } }
                             throw error
                         }
                     }
@@ -311,19 +345,40 @@ final class StarStore {
                 lastSync = now()
             } catch {
                 guard token == generation, !Task.isCancelled else { return }
+                if case StarFailure.protocolViolation = error { try? update { $0.blocked = 409 } }
+                if case DurableStateFailure.protocolViolation = error { try? update { $0.blocked = 409 } }
                 if let failure = error as? APIError, [401, 403].contains(failure.statusCode) {
+                    authenticationPaused = true
                     ready = false
                     stars = []
                     try? update { $0.episodes = [:]; $0.snapshot = nil }
                 }
                 attempts += 1
-                nextAttempt = now().addingTimeInterval(min(60, pow(2, Double(min(attempts, 6)))))
+                nextAttempt = now().addingTimeInterval(max((error as? APIError)?.retryAfter ?? 0, min(60, pow(2, Double(min(attempts, 6))))))
                 self.error = "Star sync paused. Changes remain saved on this device."
                 publish()
             }
         }
         syncing = task
         await task.value
+    }
+
+    func checkpointAndSuspend() throws {
+        try commit(root)
+        suspend()
+    }
+
+    func terminalErase(accountID: String) throws {
+        if self.accountID == accountID { suspend() }
+        let source = url.deletingLastPathComponent().appendingPathComponent("lists.json")
+        if FileManager.default.fileExists(atPath: source.path) {
+            var legacy = try JSONDecoder().decode([String: StarScope].self, from: Data(contentsOf: source))
+            legacy[MediaKey.scope(accountID)] = nil
+            try save(JSONEncoder().encode(legacy), source)
+        }
+        var next = root
+        next[MediaKey.scope(accountID)] = nil
+        try commit(next)
     }
 
     private func check(_ token: UUID) throws {

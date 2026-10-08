@@ -61,6 +61,49 @@ final class ContractFixtureTests: XCTestCase {
         }
     }
 
+    func testStrictCatalogueWireAndNumericStarBridgeAreSeparate() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ContractURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://wire.example.invalid")!, session: URLSession(configuration: configuration), keychain: ContractCredentials(value: "synthetic"))
+        defer { ContractURLProtocol.reset() }
+        let podcast = #"{"id":"9223372036854775807","feed":"fixture","title":"Fixture","author":"","cover":"","description":"","explicit":false,"keywords":[],"episodeCount":0}"#
+        ContractURLProtocol.install([ContractResponse(status: 200, data: Data(podcast.utf8))])
+        let decoded = try await api.podcastInfo(id: Int.max)
+        XCTAssertEqual(decoded.id, Int.max)
+        ContractURLProtocol.install([ContractResponse(status: 200, data: Data(podcast.replacingOccurrences(of: #""9223372036854775807""#, with: "9223372036854775807").utf8))])
+        do { _ = try await api.podcastInfo(id: Int.max); XCTFail("Numeric wire identity must be rejected") } catch {}
+
+        let scope = StateScope(accountId: "fixture-account", generation: "17adbd84-d0e4-4e2d-ad9f-b084efee3211")
+        let client = "a7a2e014-b64f-4487-9c92-71cd59fc0cf7"
+        let response = #"{"protocol":1,"accountId":"fixture-account","generation":"17adbd84-d0e4-4e2d-ad9f-b084efee3211","clientId":"a7a2e014-b64f-4487-9c92-71cd59fc0cf7","sequence":"1","listId":"starred","revision":"1","results":[{"episodeId":"9007199254740993","status":"applied"}]}"#
+        ContractURLProtocol.install([ContractResponse(status: 200, data: Data(response.utf8))])
+        let ack = try await api.changeList(id: "starred", batch: ListBatch(scope: scope, clientId: client, sequence: "1", changes: [ListChange(op: .add, episodeId: 9_007_199_254_740_993)]))
+        XCTAssertEqual(ack.results.first?.episodeId, 9_007_199_254_740_993)
+        let request = try XCTUnwrap(ContractURLProtocol.requests().last)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: requestData(request)) as? [String: Any])
+        XCTAssertEqual((body["changes"] as? [[String: Any]])?.first?["episodeId"] as? String, "9007199254740993")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Podcst-Client"), "native")
+
+        ContractURLProtocol.install([ContractResponse(status: 200, data: Data(response.replacingOccurrences(of: "9007199254740993", with: "42").utf8))])
+        let legacy = ListBatch(clientId: client, sequence: "1", changes: [ListChange(op: .add, episodeId: 42)])
+        _ = try await api.migrateList(id: "starred", batch: legacy, scope: scope)
+        let migration = try XCTUnwrap(ContractURLProtocol.requests().last)
+        XCTAssertEqual(migration.url?.path, "/api/lists/starred/migration")
+        let wrapper = try XCTUnwrap(JSONSerialization.jsonObject(with: requestData(migration)) as? [String: Any])
+        let embedded = try XCTUnwrap(wrapper["batch"] as? NSDictionary)
+        XCTAssertEqual(embedded, try JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? NSDictionary)
+        XCTAssertTrue(((wrapper["batch"] as? [String: Any])?["changes"] as? [[String: Any]])?.first?["episodeId"] is NSNumber)
+    }
+
+    private func requestData(_ request: URLRequest) throws -> Data {
+        if let data = request.httpBody { return data }
+        let stream = try XCTUnwrap(request.httpBodyStream)
+        stream.open(); defer { stream.close() }
+        var data = Data(); var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable { let count = stream.read(&buffer, maxLength: buffer.count); if count <= 0 { break }; data.append(buffer, count: count) }
+        return data
+    }
+
     func testStateWireFixturesRoundTripExactly() throws {
         let data = try contractData("state/fixtures.json")
         let fixtures = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -187,7 +230,9 @@ final class ContractFixtureTests: XCTestCase {
                 )
             }
             defaults.set(try JSONEncoder().encode(podcasts), forKey: "guest.library.podcasts")
-            let library = LibraryStore(api: api, session: session, defaults: defaults)
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let library = LibraryStore(api: api, session: session, defaults: defaults, progressDirectory: directory)
             XCTAssertEqual(library.newReleases.map(\.guid), vector.expected, vector.name)
             defaults.removePersistentDomain(forName: suiteName)
         }
@@ -211,6 +256,8 @@ final class ContractFixtureTests: XCTestCase {
     }
 
     private func consume(fixture: APIFixture, name: String, api: APIClient) async throws {
+        let scope = StateScope(accountId: "fixture-account-a", generation: "17adbd84-d0e4-4e2d-ad9f-b084efee3211")
+        let client = "a7a2e014-b64f-4487-9c92-71cd59fc0cf7"
         switch fixture.endpoint {
         case "GET /api/top": _ = try await api.top(locale: "fixture-\(UUID().uuidString)")
         case "POST /api/search": _ = try await api.search(term: "fixture", locale: "us")
@@ -227,14 +274,13 @@ final class ContractFixtureTests: XCTestCase {
         case "POST /api/auth/logout": await api.signOut()
         case "GET /api/subscriptions": _ = try await api.subscriptions()
         case "POST /api/subscriptions":
-            if fixture.type == "ImportResult" { _ = try await api.importSubscriptions(feeds: ["https://fixture.example/feed.xml"]) }
-            else { try await api.subscribe(podcastID: 910001) }
-        case "DELETE /api/subscriptions": try await api.unsubscribe(podcastID: 910001)
+            _ = try await api.changeFollows(StateBatch(protocol: 1, accountId: scope.accountId, generation: scope.generation, clientId: client, sequence: StateID("1"), changes: [StateFollowChange(podcastId: StateID("910001"), followed: true)]))
+        case "POST /api/subscriptions/resolve": _ = try await api.resolveFollows(["https://fixture.example/feed.xml"], scope: scope)
         case "GET /api/progress": _ = try await api.currentProgress()
-        case "PUT /api/progress": try await api.saveProgress(episodeID: 910001, position: 12, completed: false)
+        case "PUT /api/progress": _ = try await api.changeProgress(StateBatch(protocol: 1, accountId: scope.accountId, generation: scope.generation, clientId: client, sequence: StateID("1"), changes: [StateProgressChange(episodeId: StateID("910001"), positionSeconds: 12, completed: false)]))
         case "GET /api/lists":
             let lists = try await api.lists()
-            XCTAssertEqual(lists.first?.revision, "9007199254740993")
+            XCTAssertEqual(lists.lists.first?.revision, "9007199254740993")
         case "GET /api/lists/:id/items":
             if fixture.type == "ListSnapshot" {
                 let snapshot = try await api.listMembership(id: ":id")
@@ -247,7 +293,7 @@ final class ContractFixtureTests: XCTestCase {
                 XCTAssertNil(page.nextCursor)
             }
         case "POST /api/lists/:id/changes":
-            let result = try await api.changeList(id: ":id", batch: ListBatch(clientId: "a7a2e014-b64f-4487-9c92-71cd59fc0cf7", sequence: "9007199254740993", changes: [ListChange(op: .add, episodeId: 910001), ListChange(op: .remove, episodeId: 910002), ListChange(op: .add, episodeId: 910003)]))
+            let result = try await api.changeList(id: ":id", batch: ListBatch(scope: scope, clientId: "a7a2e014-b64f-4487-9c92-71cd59fc0cf7", sequence: "9007199254740993", changes: [ListChange(op: .add, episodeId: 910001), ListChange(op: .remove, episodeId: 910002), ListChange(op: .add, episodeId: 910003)]))
             XCTAssertEqual(result.sequence, "9007199254740993")
             XCTAssertEqual(result.results.map(\.status), [.applied, .unchanged, .notFound])
         case "GET /api/account": _ = try await api.account()
@@ -292,7 +338,7 @@ private struct APIFixture: Decodable {
 
 private struct ErrorFixture: Decodable { let message: String }
 private struct RefreshStatusFixture: Decodable { let status: String }
-private struct ResolvedPodcastFixture: Decodable { let id: Int }
+private struct ResolvedPodcastFixture: Decodable { let id: StateID }
 private struct SuccessFixture: Decodable { let success: Bool }
 private struct VerifiedFixture: Decodable { let verified: Bool }
 private struct PasskeyLoginResultFixture: Decodable { let verified: Bool; let userId: String? }

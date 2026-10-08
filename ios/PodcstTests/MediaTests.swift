@@ -224,6 +224,35 @@ final class MediaTests: XCTestCase {
         }
     }
 
+    func testLegacyDownloadAliasSurvivesCanonicalPromotionAndRestartWithoutRedownload() async throws {
+        let body = payload(count: 50_000)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let root = temporaryDirectory()
+        var legacy = episode(url: url)
+        legacy.id = nil
+        let directory = downloadDirectory(root: root, accountID: "one", episode: legacy)
+        try HTTPMediaByteSource.prepareDirectory(directory)
+        let source = try JSONEncoder().encode(MediaDownloadRecord(episode: legacy, intent: .paused))
+        try source.write(to: directory.appendingPathComponent("transfer.json"))
+        var canonical = legacy
+        canonical.id = 9_007_199_254_740_993
+        let store = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        XCTAssertEqual(store.key(for: canonical), MediaKey(accountID: "one", episode: legacy))
+        try await store.download(canonical)
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("transfer-source.json")), source)
+        let requests = server.requests.count
+        let restored = MediaStore(accountID: "one", rootURL: root, downloadConfiguration: .ephemeral)
+        canonical.feed = "https://moved.example.invalid/feed"
+        canonical.file.url = url.appendingPathComponent("moved").absoluteString
+        XCTAssertEqual(restored.status(for: canonical), .available(bytes: Int64(body.count)))
+        try await restored.download(canonical)
+        XCTAssertEqual(server.requests.count, requests)
+        var unrelated = canonical; unrelated.id = 9_007_199_254_740_994
+        XCTAssertEqual(restored.status(for: unrelated), .notDownloaded)
+    }
+
     func testRequestedDownloadRecoversMissingTaskAfterRelaunchWithoutDuplication() async throws {
         let body = payload(count: 350_000)
         let server = try MediaHTTPServer(data: body, delay: 0.2)

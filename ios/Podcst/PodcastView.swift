@@ -323,6 +323,7 @@ struct EpisodeRow: View {
 }
 
 struct EpisodeMenuActions: View {
+    @Environment(LibraryStore.self) private var library
     @Environment(PlaybackController.self) private var playback
     @Environment(StarStore.self) private var stars
     @Environment(Router.self) private var router
@@ -332,6 +333,8 @@ struct EpisodeMenuActions: View {
         let starred = stars.contains(episode)
         Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") { playback.enqueue(episode, next: true) }
         Button("Add to queue", systemImage: "text.append") { playback.enqueue(episode) }
+        Button("Mark played", systemImage: "checkmark.circle") { library.mark(episode, played: true) }
+        Button("Mark unplayed", systemImage: "circle") { library.mark(episode, played: false) }
         Divider()
         Button(starred ? "Unstar" : "Star", systemImage: starred ? "star.slash" : "star") { router.star(episode, !starred, in: stars) }
         Button("Add to list…", systemImage: "text.badge.plus") { router.listing = episode }

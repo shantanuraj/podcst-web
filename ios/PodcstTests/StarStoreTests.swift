@@ -89,7 +89,7 @@ final class StarStoreTests: XCTestCase {
         XCTAssertTrue(stars.pending)
         let persisted = StarStore(accountID: "owner", directory: directory)
         XCTAssertEqual(persisted.stars.map(\.id), [2])
-        XCTAssertFalse(try String(contentsOf: directory.appendingPathComponent("lists.json"), encoding: .utf8).contains("Episode 2"))
+        XCTAssertFalse(try String(contentsOf: directory.appendingPathComponent("lists-v1.json"), encoding: .utf8).contains("Episode 2"))
     }
 
     func testFailedPersistenceDoesNotReportSavedOrConsumeGuestWork() throws {
@@ -298,9 +298,80 @@ final class StarStoreTests: XCTestCase {
         XCTAssertFalse(restored.pending)
     }
 
+    func testNumericFrozenBridgeRetainsSourceAndAcceptedAckAcrossConversionFailure() async throws {
+        let api = StarServer()
+        let offline = StarStore(accountID: "owner", directory: directory)
+        offline.star(starEpisode(1))
+        api.failSnapshot = true
+        await StarStore(accountID: "owner", directory: directory, api: api).refresh()
+        let activated = directory.appendingPathComponent("lists-v1.json")
+        var root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: activated)) as? [String: Any])
+        let key = MediaKey.scope("owner")
+        var account = try XCTUnwrap(root[key] as? [String: Any])
+        account.removeValue(forKey: "scope")
+        var flight = try XCTUnwrap(account["flight"] as? [String: Any])
+        var batch = try XCTUnwrap(flight["batch"] as? [String: Any])
+        batch.removeValue(forKey: "scope")
+        var ack = try XCTUnwrap(flight["acknowledgement"] as? [String: Any])
+        ack.removeValue(forKey: "scope")
+        flight["batch"] = batch; flight["acknowledgement"] = ack
+        account["flight"] = flight; root[key] = account
+        let original = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        let source = directory.appendingPathComponent("lists.json")
+        try original.write(to: source)
+        try FileManager.default.removeItem(at: activated)
+        let denied = StarStore(accountID: "owner", directory: directory, api: api, save: { _, _ in throw CocoaError(.fileWriteNoPermission) })
+        XCTAssertFalse(denied.ready)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        api.failSnapshot = false
+        api.members.items = []; api.members.revision = "2"
+        let migrated = StarStore(accountID: "owner", directory: directory, api: api)
+        await migrated.refresh()
+        XCTAssertEqual(api.bridged.count, 1)
+        XCTAssertNil(api.bridged[0].scope)
+        let embedded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(api.bridged[0])) as? NSDictionary)
+        XCTAssertEqual(embedded, batch as NSDictionary)
+        XCTAssertFalse(migrated.pending)
+        XCTAssertTrue(migrated.stars.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        await StarStore(accountID: "owner", directory: directory, api: api).refresh()
+        XCTAssertEqual(api.bridged.count, 1)
+    }
+
+    func testCanonicalIDsAboveDoubleRangeUseNewScopedBatch() async throws {
+        let api = StarServer()
+        let state = StarStore(accountID: "owner", directory: directory, api: api)
+        XCTAssertTrue(state.star(starEpisode(9_007_199_254_740_993)))
+        await state.refresh()
+        XCTAssertEqual(api.sent.first?.changes.first?.episodeId, 9_007_199_254_740_993)
+        XCTAssertNotNil(api.sent.first?.scope)
+        XCTAssertTrue(api.bridged.isEmpty)
+    }
+
+    func testLegacyBridgeRefusesChangedRecoveryGenerationWithoutRelabelling() async throws {
+        let api = StarServer()
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        let client = "a7a2e014-b64f-4487-9c92-71cd59fc0cf7"
+        let batch = ListBatch(clientId: client, sequence: "1", changes: [ListChange(op: .add, episodeId: 42)])
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(batch)) as? [String: Any])
+        let archive: [String: Any] = [MediaKey.scope("owner"): ["clientId": client, "sequence": 1, "listId": api.id, "episodes": [:], "queued": [], "failures": [], "flight": ["batch": encoded, "intents": [["change": ["op": "add", "episodeId": 42], "at": 1]]]]]
+        let source = directory.appendingPathComponent("lists.json")
+        let bytes = try JSONSerialization.data(withJSONObject: archive)
+        try DurableStateStore.protectedWrite(bytes, source)
+        let state = StarStore(accountID: "owner", directory: directory, api: api)
+        await state.refresh()
+        XCTAssertTrue(state.pending)
+        XCTAssertNotNil(state.error)
+        XCTAssertEqual(api.bridged, [batch])
+        XCTAssertTrue(api.sent.isEmpty)
+        await StarStore(accountID: "owner", directory: directory, api: api).refresh()
+        XCTAssertEqual(api.bridged.count, 1)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+
     func testCorruptOutboxIsNotSilentlyReset() throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("lists.json")
+        let url = directory.appendingPathComponent("lists-v1.json")
         try Data("corrupt".utf8).write(to: url)
         let stars = StarStore(accountID: "owner", directory: directory)
         XCTAssertFalse(stars.star(starEpisode(1)))
@@ -317,8 +388,10 @@ private func starEpisode(_ id: Int) -> Episode {
 private final class StarServer: StarAPI {
     let id = "0c339753-cb50-477c-843e-e641b414a060"
     var user = "owner"
+    var generation = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
     var members = ListSnapshot(listId: "0c339753-cb50-477c-843e-e641b414a060", revision: "0", items: [])
     var sent: [ListBatch] = []
+    var bridged: [ListBatch] = []
     var accepted: [String: ListAcknowledgement] = [:]
     var loseReply = false
     var failSnapshot = false
@@ -329,16 +402,23 @@ private final class StarServer: StarAPI {
     var beforeSnapshot: (() async -> Void)?
 
     func sessionUser() async throws -> User? { User(id: user, email: "\(user)@example.invalid") }
-    func lists() async throws -> [AccountEpisodeList] { [AccountEpisodeList(id: id, kind: "starred", revision: members.revision, itemCount: members.items.count)] }
+    var scope: StateScope { StateScope(accountId: user, generation: generation) }
+    func lists() async throws -> StarLists { StarLists(scope: scope, lists: [AccountEpisodeList(id: id, kind: "starred", revision: members.revision, itemCount: members.items.count)]) }
+    func migrateList(id: String, batch: ListBatch, scope: StateScope) async throws -> ListAcknowledgement {
+        bridged.append(batch)
+        guard generation == "17adbd84-d0e4-4e2d-ad9f-b084efee3211" else { throw APIError(statusCode: 409, message: "Recovery required", code: "recovery_required") }
+        return try await changeList(id: id, batch: batch)
+    }
     func listMembership(id: String) async throws -> ListSnapshot {
         await beforeSnapshot?()
         if failSnapshot { throw URLError(.notConnectedToInternet) }
         var snapshot = members
+        snapshot.scope = scope
         snapshot.revision = snapshotRevision ?? members.revision
         return snapshot
     }
     func listEpisodes(id: String, cursor: String?) async throws -> ListEpisodePage {
-        ListEpisodePage(listId: id, revision: members.revision, items: members.items.map { ListEpisodeItem(membership: $0, episode: $0.availability == .available ? starEpisode($0.episodeId) : nil) }, nextCursor: nil)
+        ListEpisodePage(scope: scope, listId: id, revision: members.revision, items: members.items.map { ListEpisodeItem(membership: $0, episode: $0.availability == .available ? starEpisode($0.episodeId) : nil) }, nextCursor: nil)
     }
     func changeList(id: String, batch: ListBatch) async throws -> ListAcknowledgement {
         sent.append(batch)
@@ -351,7 +431,7 @@ private final class StarServer: StarAPI {
             else if !notFound, !members.items.contains(where: { $0.episodeId == change.episodeId }) { members.items.append(ListMembership(episodeId: change.episodeId, addedAt: Double(change.episodeId), availability: .available)) }
         }
         members.revision = String((Int(members.revision) ?? 0) + 1)
-        let result = ListAcknowledgement(clientId: batch.clientId, sequence: batch.sequence, listId: id, revision: members.revision, results: batch.changes.map { ListChangeResult(episodeId: $0.episodeId, status: notFound ? .notFound : .applied) })
+        let result = ListAcknowledgement(scope: scope, clientId: batch.clientId, sequence: batch.sequence, listId: id, revision: members.revision, results: batch.changes.map { ListChangeResult(episodeId: $0.episodeId, status: notFound ? .notFound : .applied) })
         accepted[key] = result
         if loseReply { loseReply = false; throw URLError(.networkConnectionLost) }
         return result

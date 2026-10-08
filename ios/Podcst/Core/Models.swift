@@ -14,8 +14,8 @@ public struct EpisodeFile: Codable, Hashable, Sendable {
 
 public struct Episode: Codable, Hashable, Sendable, Identifiable {
     public var isPrivate: Bool?
-    public var id: Int?
-    public var podcastId: Int?
+    @StoredCatalogueID public var id: Int?
+    @StoredCatalogueID public var podcastId: Int?
     public var guid: String
     public var feed: String
     public var podcastTitle: String?
@@ -51,7 +51,12 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
         self.file = file
     }
 
-    public var identity: String { "\(feed)\u{001F}\(guid)" }
+    public var identity: String { id.map { "episode:\($0)" } ?? podcastId.map { "local:podcast:\($0)\u{001F}\(guid)" } ?? "local:\(feed)\u{001F}\(guid)" }
+    var retainedMediaIdentity: String {
+        if let value = id ?? _id.unresolved.map(Int.init) { return "episode:\(value)" }
+        if let value = podcastId ?? _podcastId.unresolved.map(Int.init) { return "podcast:\(value):\(guid)" }
+        return "\(feed)\u{001F}\(guid)"
+    }
     public var audioURL: URL? { URL(string: file.url) }
     public var artworkURL: URL? { URL(string: episodeArt ?? cover) }
     public var shareURL: URL? {
@@ -61,8 +66,8 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
 
 public struct Podcast: Codable, Hashable, Sendable, Identifiable {
     public var isPrivate: Bool?
-    public var id: Int?
-    public var itunesId: Int?
+    @StoredCatalogueID public var id: Int?
+    @StoredCatalogueID public var itunesId: Int?
     public var itunesLocale: String?
     public var feed: String
     public var title: String
@@ -96,7 +101,7 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
         self.episodes = episodes
     }
 
-    public var identity: String { feed }
+    public var identity: String { id.map { "podcast:\($0)" } ?? "local:\(feed)" }
     public var artworkURL: URL? { URL(string: cover) }
     public var shareURL: URL? { isPrivate == true ? nil : webpageForSharing(link, excluding: [feed]) }
 }
@@ -198,6 +203,7 @@ struct ListMembership: Codable, Hashable, Sendable {
 }
 
 struct ListSnapshot: Codable, Equatable, Sendable {
+    var scope: StateScope? = nil
     var listId: String
     var revision: String
     var items: [ListMembership]
@@ -209,6 +215,7 @@ struct ListEpisodeItem: Sendable {
 }
 
 struct ListEpisodePage: Sendable {
+    var scope: StateScope? = nil
     var listId: String
     var revision: String
     var items: [ListEpisodeItem]
@@ -222,6 +229,7 @@ struct ListChange: Codable, Equatable, Sendable {
 }
 
 struct ListBatch: Codable, Equatable, Sendable {
+    var scope: StateScope? = nil
     var clientId: String
     var sequence: String
     var changes: [ListChange]
@@ -237,6 +245,7 @@ struct ListChangeResult: Codable, Equatable, Sendable {
 }
 
 struct ListAcknowledgement: Codable, Equatable, Sendable {
+    var scope: StateScope? = nil
     var clientId: String
     var sequence: String
     var listId: String
@@ -248,10 +257,50 @@ public struct APIError: Error, Codable, LocalizedError, Sendable {
     public var statusCode: Int
     public var message: String
 
-    public init(statusCode: Int, message: String) {
+    public var code: String?
+    public var retryAfter: Double?
+
+    public init(statusCode: Int, message: String, code: String? = nil, retryAfter: Double? = nil) {
+        self.code = code
+        self.retryAfter = retryAfter
         self.statusCode = statusCode
         self.message = message
     }
 
     public var errorDescription: String? { message }
+}
+
+struct StarLists: Sendable {
+    var scope: StateScope
+    var lists: [AccountEpisodeList]
+}
+
+/// Local archives upgrade safe numeric IDs to strings. Unsafe legacy numbers stay
+/// in the archive but are not promoted to synchronized identities.
+@propertyWrapper public struct StoredCatalogueID: Codable, Hashable, Sendable {
+    public var wrappedValue: Int?
+    fileprivate var unresolved: Int64?
+    public init(wrappedValue: Int? = nil) { self.wrappedValue = wrappedValue }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { wrappedValue = nil; return }
+        if let string = try? c.decode(String.self) {
+            wrappedValue = try StateID(string).number
+        } else {
+            let number = try c.decode(Int64.self)
+            if number > 0, number <= 9_007_199_254_740_991 { wrappedValue = Int(number) }
+            else { wrappedValue = nil; unresolved = number }
+        }
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        if let wrappedValue { try c.encode(String(wrappedValue)) }
+        else if let unresolved { try c.encode(unresolved) }
+        else { try c.encodeNil() }
+    }
+}
+extension KeyedDecodingContainer {
+    func decode(_ type: StoredCatalogueID.Type, forKey key: Key) throws -> StoredCatalogueID {
+        try decodeIfPresent(type, forKey: key) ?? StoredCatalogueID()
+    }
 }

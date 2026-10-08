@@ -218,7 +218,7 @@ final class SessionTests: XCTestCase {
         let defaults = UserDefaults(suiteName: defaultsName)!
         defer { defaults.removePersistentDomain(forName: defaultsName) }
         let session = SessionStore(api: fixture.api, storageURL: fixture.url)
-        let library = LibraryStore(api: fixture.api, session: session, defaults: defaults)
+        let library = LibraryStore(api: fixture.api, session: session, defaults: defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
 
         XCTAssertTrue(fixture.api.hasSession)
         XCTAssertNil(session.user)
@@ -270,7 +270,7 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(fixture.library.podcasts.map(\.episodeCount), [100, 101, 102])
         XCTAssertNil(fixture.library.error)
         XCTAssertFalse(fixture.library.isLoading)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, fixture.library.podcasts)
         XCTAssertEqual(restored.newReleases, fixture.library.newReleases)
     }
@@ -310,14 +310,15 @@ final class SessionTests: XCTestCase {
         let subscription = Task { await fixture.library.toggleSubscription(original) }
         await fulfillment(of: [started], timeout: 2)
         let saved = try XCTUnwrap(fixture.defaults.data(forKey: "guest.library.podcasts"))
-        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [original])
+        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), []) // original migration source is immutable
+        XCTAssertEqual(fixture.library.durable.guestFollows + fixture.library.durable.unresolvedGuest, [original])
         try XCTUnwrap(pending).respond(resolved)
         await subscription.value
 
         XCTAssertEqual(fixture.library.podcasts, [resolved])
         XCTAssertEqual(fixture.library.newReleases.map(\.title), ["Episode 3", "Episode 2"])
         XCTAssertNil(fixture.library.error)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, [resolved])
     }
 
@@ -343,9 +344,9 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(fixture.library.podcasts.first, unavailable)
         XCTAssertEqual(fixture.library.podcasts.last?.episodes, updatedEpisodes)
         XCTAssertEqual(fixture.library.newReleases.map(\.title), ["Episode 3", "Episode 2", "Episode 1"])
-        XCTAssertNotNil(fixture.library.error)
+        XCTAssertNotNil(fixture.library.syncError)
         XCTAssertFalse(fixture.library.isLoading)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, fixture.library.podcasts)
     }
 
@@ -364,8 +365,8 @@ final class SessionTests: XCTestCase {
 
         XCTAssertEqual(requests, 1)
         XCTAssertEqual(fixture.library.podcasts, [podcast])
-        XCTAssertNotNil(fixture.library.error)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        XCTAssertNotNil(fixture.library.syncError)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, [podcast])
 
         await fixture.library.toggleSubscription(podcast)
@@ -373,7 +374,7 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(requests, 1)
         XCTAssertTrue(fixture.library.podcasts.isEmpty)
         XCTAssertNil(fixture.library.error)
-        let removed = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let removed = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertTrue(removed.podcasts.isEmpty)
     }
 
@@ -401,9 +402,9 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(requests, 2)
         XCTAssertEqual(fixture.library.podcasts.map(\.title), [unavailable.title, updated.title])
         XCTAssertEqual(fixture.library.newReleases.map(\.title), [episode.title])
-        XCTAssertNotNil(fixture.library.error)
+        XCTAssertNotNil(fixture.library.syncError)
         XCTAssertFalse(fixture.library.isLoading)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, fixture.library.podcasts)
     }
 
@@ -437,7 +438,7 @@ final class SessionTests: XCTestCase {
 
         XCTAssertEqual(fixture.library.podcasts.map(\.title), [updated.title, added.title])
         XCTAssertNil(fixture.library.error)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, fixture.library.podcasts)
     }
 
@@ -462,7 +463,7 @@ final class SessionTests: XCTestCase {
 
         XCTAssertEqual(fixture.library.podcasts, [original])
         XCTAssertNil(fixture.library.error)
-        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults)
+        let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
         XCTAssertEqual(restored.podcasts, [original])
     }
 
@@ -520,7 +521,8 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(fixture.library.podcasts.isEmpty)
         XCTAssertNil(fixture.library.error)
         let saved = try XCTUnwrap(fixture.defaults.data(forKey: "guest.library.podcasts"))
-        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [original])
+        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), []) // original migration source is immutable
+        XCTAssertEqual(fixture.library.durable.guestFollows + fixture.library.durable.unresolvedGuest, [original])
     }
 
     func testSharingUsesOnlyDeclaredPublicWebpages() {
@@ -554,6 +556,7 @@ final class SessionTests: XCTestCase {
             try request.respond(["user": User(id: "listener", email: "listener@example.test")])
         }
         await fixture.session.restore()
+        try await library.durable.activate(accountID: "listener", verifiedAccountID: "listener")
         var offlineRequests = 0
         GuestLibraryURLProtocol.handler = { request in
             XCTAssertEqual(request.request.httpMethod, "PUT")
@@ -565,12 +568,12 @@ final class SessionTests: XCTestCase {
         library.saveProgress(.init(episode: episode, position: 123, completed: false))
         await library.flushProgress()
         XCTAssertGreaterThan(offlineRequests, 0)
-        XCTAssertNotNil(library.error)
+        XCTAssertNotNil(library.syncError)
+        try await Task.sleep(for: .seconds(2.1))
         var retriedRequests = 0
         GuestLibraryURLProtocol.handler = { request in
-            XCTAssertEqual(request.request.httpMethod, "PUT")
             XCTAssertEqual(request.request.url?.path, "/api/progress")
-            retriedRequests += 1
+            if request.request.httpMethod == "PUT" { retriedRequests += 1 }
             try request.respond(["success": true])
         }
         await library.flushProgress()
@@ -608,7 +611,8 @@ final class SessionTests: XCTestCase {
         GuestLibraryURLProtocol.handler = { request in request.fail(URLError(.notConnectedToInternet)) }
         fixture.library.saveProgress(.init(episode: episode, position: 123, completed: false))
         await fixture.library.flushProgress()
-        XCTAssertNotNil(fixture.library.error)
+        XCTAssertNotNil(fixture.library.syncError)
+        try await Task.sleep(for: .seconds(2.1))
         var methods: [String] = []
         GuestLibraryURLProtocol.handler = { request in
             XCTAssertEqual(request.request.url?.path, "/api/progress")
@@ -618,7 +622,7 @@ final class SessionTests: XCTestCase {
             else { try request.respond(PlaybackProgress(episode: episode, position: 123)) }
         }
         let latest = await fixture.library.restoreProgress()
-        XCTAssertEqual(methods, ["PUT", "GET"])
+        XCTAssertEqual(methods, ["PUT", "GET", "GET"])
         XCTAssertEqual(latest?.position, 123)
         XCTAssertNil(fixture.library.error)
     }
@@ -638,7 +642,7 @@ final class SessionTests: XCTestCase {
         let latest = await fixture.library.restoreProgress()
         XCTAssertNil(latest)
         XCTAssertGreaterThan(writes, 0)
-        XCTAssertNotNil(fixture.library.error)
+        XCTAssertNotNil(fixture.library.syncError)
     }
 
     func testProgressRestorationCannotCrossAccountChanges() async throws {
@@ -678,6 +682,7 @@ final class SessionTests: XCTestCase {
             try request.respond(["user": User(id: "first", email: "listener@example.test")])
         }
         await fixture.session.restore()
+        try await library.durable.activate(accountID: "first", verifiedAccountID: "first")
         GuestLibraryURLProtocol.handler = { request in
             request.fail(URLError(.notConnectedToInternet))
         }
@@ -721,7 +726,7 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(fixture.library.podcasts.isEmpty)
         await fixture.library.toggleSubscription(podcast)
         XCTAssertTrue(fixture.library.podcasts.isEmpty)
-        XCTAssertNotNil(fixture.library.error)
+        XCTAssertNotNil(fixture.library.syncError)
     }
 
     func testAuthenticatedRSSSearchAndImportUseBodiesAndPreservePrivacy() async throws {
@@ -823,8 +828,8 @@ final class SessionTests: XCTestCase {
         var pending: GuestLibraryRequest?
         GuestLibraryURLProtocol.handler = { request in
             if request.request.httpMethod == "GET" {
-                pending = request
-                started.fulfill()
+                if pending == nil { pending = request; started.fulfill() }
+                else { try request.respond([EpisodeProgress(episodeId: 42, position: 0, completed: true)]) }
             } else {
                 try request.respond(["success": true])
             }
@@ -833,7 +838,7 @@ final class SessionTests: XCTestCase {
         await fulfillment(of: [started], timeout: 2)
         fixture.library.saveProgress(.init(episode: episode, position: 0, completed: true))
         await fixture.library.flushProgress()
-        try XCTUnwrap(pending).respond([EpisodeProgress(episodeId: 42, position: 12, completed: false)])
+        try XCTUnwrap(pending).respondState(items: [["episodeId": "42", "progress": NSNull()]], revision: 0)
         await refresh.value
         XCTAssertEqual(fixture.library.progress(for: episode)?.completed, true)
     }
@@ -914,10 +919,13 @@ final class SessionTests: XCTestCase {
         }
         await fixture.session.restore()
         let library = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
+        try await library.durable.activate(accountID: "listener", verifiedAccountID: "listener")
         return GuestLibraryFixture(api: fixture.api, session: fixture.session, library: library, defaults: fixture.defaults, defaultsName: fixture.defaultsName, url: fixture.url)
     }
 
     private func guestFixture(podcasts: [Podcast], restoreSession: Bool = true) async throws -> GuestLibraryFixture {
+        GuestLibraryURLProtocol.stateAccountID = "listener"
+        GuestLibraryURLProtocol.stateRevision = 0
         let defaultsName = "GuestLibrary-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsName)!
         defaults.set(try JSONEncoder().encode(podcasts), forKey: "guest.library.podcasts")
@@ -930,7 +938,7 @@ final class SessionTests: XCTestCase {
         }
         let session = SessionStore(api: api, storageURL: url)
         if restoreSession { await session.restore() }
-        let library = LibraryStore(api: api, session: session, defaults: defaults)
+        let library = LibraryStore(api: api, session: session, defaults: defaults, progressDirectory: url.appendingPathExtension("progress"))
         return GuestLibraryFixture(api: api, session: session, library: library, defaults: defaults, defaultsName: defaultsName, url: url)
     }
 }
@@ -954,6 +962,9 @@ private struct GuestLibraryFixture {
 
 private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
     @MainActor static var handler: (@MainActor (GuestLibraryRequest) throws -> Void)?
+    @MainActor static var stateAccountID = "listener"
+    @MainActor static var stateRevision = 0
+    static let stateGeneration = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -971,8 +982,14 @@ private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
             }
         }
         Task { @MainActor in
-            do { try GuestLibraryURLProtocol.handler?(request) }
-            catch { request.fail(error) }
+            do {
+                let query = URLComponents(url: request.request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                if query.contains(URLQueryItem(name: "view", value: "state")) && query.contains(URLQueryItem(name: "recent", value: "1")) {
+                    try request.respondState(items: [], revision: 0)
+                } else if query.contains(URLQueryItem(name: "view", value: "membership")) {
+                    try request.respondState(items: [], revision: 0)
+                } else { try GuestLibraryURLProtocol.handler?(request) }
+            } catch { request.fail(error) }
         }
     }
 
@@ -983,10 +1000,46 @@ private struct GuestLibraryRequest: Sendable {
     let request: URLRequest
     let complete: @Sendable (Result<(Data, [String: String]), Error>) -> Void
 
-    func respond<T: Encodable>(_ value: T, headers: [String: String] = [:]) throws {
+    @MainActor func respondState(items: [[String: Any]], revision: Int) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["protocol": 1, "accountId": GuestLibraryURLProtocol.stateAccountID, "generation": GuestLibraryURLProtocol.stateGeneration, "revision": String(revision), "items": items])
+        complete(.success((data, ["Content-Type": "application/json"])))
+    }
+
+    @MainActor func respond<T: Encodable>(_ value: T, headers: [String: String] = [:]) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
-        complete(.success((try encoder.encode(value), headers.merging(["Content-Type": "application/json"]) { first, _ in first })))
+        let data = try encoder.encode(value)
+        if let object = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as? [String: Any], let user = object["user"] as? [String: Any], let id = user["id"] as? String { GuestLibraryURLProtocol.stateAccountID = id }
+        let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if request.url?.path == "/api/progress", request.httpMethod == "PUT" {
+            let body: Data
+            if let data = request.httpBody { body = data }
+            else if let stream = request.httpBodyStream {
+                stream.open(); defer { stream.close() }
+                var bytes = Data(); var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable { let count = stream.read(&buffer, maxLength: buffer.count); if count <= 0 { break }; bytes.append(buffer, count: count) }
+                body = bytes
+            } else { throw URLError(.badServerResponse) }
+            let batch = try JSONDecoder().decode(StateBatch<StateProgressChange>.self, from: body)
+            GuestLibraryURLProtocol.stateRevision += batch.changes.count
+            let ack = StateAcknowledgement(protocol: 1, accountId: batch.accountId, generation: batch.generation, clientId: batch.clientId, sequence: batch.sequence, revision: try StateRevision(String(GuestLibraryURLProtocol.stateRevision)), results: batch.changes.map { StateProgressResult(episodeId: $0.episodeId, status: .applied) })
+            complete(.success((try encoder.encode(ack), ["Content-Type": "application/json"])))
+            return
+        }
+        if query.contains(URLQueryItem(name: "view", value: "state")) {
+            let ids = query.first { $0.name == "episodeIds" }?.value?.split(separator: ",").compactMap { Int($0) } ?? []
+            var rows = value as? [EpisodeProgress] ?? []
+            if let latest = value as? PlaybackProgress, let id = latest.episode.id { rows = [EpisodeProgress(episodeId: id, position: latest.position, completed: false)] }
+            let revision = max(1, GuestLibraryURLProtocol.stateRevision)
+            let items: [[String: Any]] = ids.map { id in
+                let row = rows.first { $0.episodeId == id }
+                let progress: Any = row.map { ["positionSeconds": Int($0.position), "completed": $0.completed, "revision": String(revision), "updatedAtMs": NSNull()] as [String: Any] } ?? NSNull()
+                return ["episodeId": String(id), "progress": progress]
+            }
+            try respondState(items: items, revision: revision)
+            return
+        }
+        complete(.success((data, headers.merging(["Content-Type": "application/json"]) { first, _ in first })))
     }
 
     func fail(_ error: Error) {
@@ -1016,10 +1069,13 @@ private final class SessionURLProtocol: URLProtocol, @unchecked Sendable {
             switch url.path {
             case "/api/auth/session":
                 payload = #"{"user":{"id":"listener","email":"listener@example.test","hasPasskey":false}}"#
+            case "/api/subscriptions" where url.query?.contains("view=membership") == true:
+                payload = #"{"protocol":1,"accountId":"listener","generation":"17adbd84-d0e4-4e2d-ad9f-b084efee3211","revision":"1","items":[{"podcastId":"9021","revision":"1","followedAtMs":null,"availability":"available"}]}"#
             case "/api/subscriptions":
-                payload = #"[{"id":9021,"feed":"https://example.test/feed","title":"Restored show","author":"Author","cover":"","explicit":false,"episodes":[{"id":9022,"guid":"restored","title":"Restored episode","explicit":false,"file":{"url":"https://example.test/audio.mp3"}}]}]"#
+                payload = #"[{"id":"9021","feed":"https://example.test/feed","title":"Restored show","author":"Author","cover":"","explicit":false,"episodes":[{"id":"9022","guid":"restored","title":"Restored episode","explicit":false,"file":{"url":"https://example.test/audio.mp3"}}]}]"#
             case "/api/progress":
-                payload = "null"
+                if url.query?.contains("view=state") == true { payload = #"{"protocol":1,"accountId":"listener","generation":"17adbd84-d0e4-4e2d-ad9f-b084efee3211","revision":"0","items":[]}"# }
+                else { payload = "null" }
             default:
                 client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable))
                 return

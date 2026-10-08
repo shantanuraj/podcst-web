@@ -353,7 +353,19 @@ final class PlaybackTests: XCTestCase {
         XCTAssertTrue(transport.playedRates.isEmpty)
     }
 
-    func testPlaybackStateBelongsToItsAccountAndSwitchingClearsIt() {
+    func testDeliberatePlaybackAndSeekingEmitReplayRatherThanPassiveCompletion() {
+        let controller = PlaybackController(transport: FakePlaybackTransport(), persistenceURL: temporaryURL())
+        var replayPositions: [Double] = []
+        controller.onProgress = { if $0.event == .replay { replayPositions.append($0.position); XCTAssertFalse($0.completed) } }
+        controller.play(episode(guid: "first"), at: 90)
+        controller.seek(to: 12)
+        controller.enqueue(episode(guid: "second"))
+        controller.next()
+        controller.previous()
+        XCTAssertEqual(replayPositions, [90, 12, 0, 0])
+    }
+
+    func testPlaybackStateBelongsToItsAccountAndSwitchingRetainsIt() {
         let url = temporaryURL()
         let transport = FakePlaybackTransport()
         let first = PlaybackController(transport: transport, persistenceURL: url, accountID: "first")
@@ -366,7 +378,7 @@ final class PlaybackTests: XCTestCase {
         XCTAssertFalse(transport.hasSource)
         XCTAssertTrue(first.queue.isEmpty)
         XCTAssertEqual(first.state, .idle)
-        XCTAssertNil(PlaybackController(transport: FakePlaybackTransport(), persistenceURL: url, accountID: "first").currentEpisode)
+        XCTAssertEqual(PlaybackController(transport: FakePlaybackTransport(), persistenceURL: url, accountID: "first").currentEpisode?.guid, "private")
     }
 
     func testToggleCancelsPlayIntentWhileLoadingAndBuffering() {
@@ -548,7 +560,7 @@ final class PlaybackTests: XCTestCase {
         let clock = FakePlaybackClock()
         let controller = makeController(transport: transport, clock: clock)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"), at: 120)
         transport.becomeReady(duration: 600)
         controller.setRate(2)
@@ -572,7 +584,7 @@ final class PlaybackTests: XCTestCase {
         let clock = FakePlaybackClock()
         let controller = makeController(transport: transport, clock: clock)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"))
         clock.advance(by: 100)
         transport.becomeReady(duration: 600)
@@ -603,7 +615,7 @@ final class PlaybackTests: XCTestCase {
         let clock = FakePlaybackClock()
         let controller = makeController(transport: transport, clock: clock)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"))
         transport.becomeReady(duration: 100)
         clock.advance(by: 20)
@@ -668,7 +680,7 @@ final class PlaybackTests: XCTestCase {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"))
         transport.becomeReady(duration: 100)
         transport.advance(to: 27)
@@ -687,7 +699,7 @@ final class PlaybackTests: XCTestCase {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"))
         controller.enqueue(episode(guid: "second"))
         transport.becomeReady(duration: 100)
@@ -707,7 +719,7 @@ final class PlaybackTests: XCTestCase {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport, persistenceURL: url)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"))
         controller.enqueue(episode(guid: "second"))
         transport.becomeReady(duration: 100)
@@ -756,7 +768,7 @@ final class PlaybackTests: XCTestCase {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "first"))
         controller.enqueue(episode(guid: "second"))
         transport.becomeReady(duration: 100)
@@ -902,7 +914,7 @@ final class PlaybackTests: XCTestCase {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport, persistenceURL: url)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         XCTAssertEqual(controller.currentEpisode?.guid, "tal-899")
 
         await controller.restoreProgress {
@@ -930,7 +942,7 @@ final class PlaybackTests: XCTestCase {
         let transport = FakePlaybackTransport()
         let controller = makeController(transport: transport)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         controller.play(episode(guid: "phone"), at: 42)
         transport.becomeReady(duration: 300)
         controller.pause()
@@ -958,7 +970,7 @@ final class PlaybackTests: XCTestCase {
         let item = episode(guid: "same")
         controller.restore(item, at: 3672)
         var updates: [PlaybackUpdate] = []
-        controller.onProgress = { updates.append($0) }
+        controller.onProgress = { if $0.event != .replay { updates.append($0) } }
         for position in [1200.0, 1800.0] {
             await controller.restoreProgress { PlaybackProgress(episode: item, position: position) }
             transport.becomeReady(duration: 3725)
@@ -978,7 +990,7 @@ final class PlaybackTests: XCTestCase {
             controller.pause()
             if stopped { controller.stop() }
             var updates: [PlaybackUpdate] = []
-            controller.onProgress = { updates.append($0) }
+            controller.onProgress = { if $0.event != .replay { updates.append($0) } }
             await controller.restoreProgress { PlaybackProgress(episode: item, position: 42) }
             XCTAssertEqual(controller.state, stopped ? .idle : .paused)
             XCTAssertEqual(controller.currentTime, 42.5)

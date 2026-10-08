@@ -37,14 +37,14 @@ final class FeedCacheTests: XCTestCase {
         for databaseID in [9001, nil] as [Int?] {
             let externalID = 6806963519
             var searchResult: [String: Any] = [
-                "itunes_id": externalID,
+                "itunes_id": String(externalID),
                 "feed": "https://example.com/migrated-feed.xml",
                 "title": "Example",
                 "author": "Author",
                 "cover": "https://example.com/cover.jpg",
                 "thumbnail": "https://example.com/thumbnail.jpg",
             ]
-            searchResult["id"] = databaseID
+            searchResult["id"] = databaseID.map(String.init)
             let catalogue: [String: Any] = [
                 "episodes": [Self.episodePayload(id: 1), Self.episodePayload(id: 2), Self.episodePayload(id: 3)],
                 "total": 3,
@@ -52,7 +52,7 @@ final class FeedCacheTests: XCTestCase {
             ]
             DetailURLProtocol.responses = [
                 "/api/search": try JSONSerialization.data(withJSONObject: [searchResult]),
-                "/api/feed/resolve": Data(#"{"id":9001}"#.utf8),
+                "/api/feed/resolve": Data(#"{"id":"9001"}"#.utf8),
                 "/api/feed/info": try JSONSerialization.data(withJSONObject: Self.podcastPayload(episodeCount: 3)),
                 "/api/feed/episodes": try JSONSerialization.data(withJSONObject: catalogue),
             ]
@@ -83,7 +83,7 @@ final class FeedCacheTests: XCTestCase {
                 XCTAssertEqual(request.httpMethod, "POST")
                 let body = try XCTUnwrap(request.httpBody)
                 let values = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-                XCTAssertEqual(values["itunes_id"] as? Int, externalID)
+                XCTAssertEqual(values["itunes_id"] as? String, String(externalID))
                 XCTAssertEqual(values["locale"] as? String, "nl")
                 XCTAssertNil(values["id"])
             } else {
@@ -111,7 +111,7 @@ final class FeedCacheTests: XCTestCase {
 
     func testForcedAppleDetailResolvesBeforeRefreshingTheInternalID() async throws {
         DetailURLProtocol.responses = [
-            "/api/feed/resolve": Data(#"{"id":9001}"#.utf8),
+            "/api/feed/resolve": Data(#"{"id":"9001"}"#.utf8),
             "/api/feed/refresh": try JSONSerialization.data(withJSONObject: Self.feedPayload(episodeIDs: [1, 2, 3])),
         ]
         defer { DetailURLProtocol.reset() }
@@ -122,7 +122,7 @@ final class FeedCacheTests: XCTestCase {
         XCTAssertEqual(DetailURLProtocol.requests.map { $0.url?.path }, ["/api/feed/resolve", "/api/feed/refresh"])
         let body = try XCTUnwrap(DetailURLProtocol.requests.last?.httpBody)
         let values = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        XCTAssertEqual(values["podcastId"] as? Int, 9001)
+        XCTAssertEqual(values["podcastId"] as? String, "9001")
     }
 
     func testForcedPodcastDetailRefreshesCompleteCachedCatalogue() async throws {
@@ -380,7 +380,7 @@ final class FeedCacheTests: XCTestCase {
 
     private static func podcastPayload(episodeCount: Int) -> [String: Any] {
         [
-            "id": 9001,
+            "id": "9001",
             "feed": "https://example.com/feed.xml",
             "title": "Example",
             "author": "Author",
@@ -396,7 +396,7 @@ final class FeedCacheTests: XCTestCase {
 
     private static func feedPayload(episodeIDs: [Int], id: Int? = 9001, title: String = "Example") -> [String: Any] {
         var payload = podcastPayload(episodeCount: episodeIDs.count)
-        payload["id"] = id
+        payload["id"] = id.map(String.init)
         payload["title"] = title
         payload["episodes"] = episodeIDs.map(episodePayload)
         return payload
@@ -404,8 +404,8 @@ final class FeedCacheTests: XCTestCase {
 
     private static func episodePayload(id: Int) -> [String: Any] {
         [
-            "id": id,
-            "podcastId": 9001,
+            "id": String(id),
+            "podcastId": "9001",
             "feed": "https://example.com/feed.xml",
             "podcastTitle": "Example",
             "guid": "episode-\(id)",

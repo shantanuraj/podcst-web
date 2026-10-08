@@ -5,7 +5,7 @@ struct MediaKey: Hashable, Codable, Sendable {
     let rawValue: String
 
     init(accountID: String?, episode: Episode) {
-        let identity = episode.id.map { "episode:\($0)" } ?? episode.podcastId.map { "podcast:\($0):\(episode.guid)" } ?? episode.identity
+        let identity = episode.retainedMediaIdentity
         rawValue = Self.digest(Self.scope(accountID) + "\u{001F}" + identity)
     }
 
