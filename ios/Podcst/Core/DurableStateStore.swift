@@ -66,8 +66,6 @@ private struct DurableRoot: Codable {
     var unresolvedGuest: [Podcast] = []
 }
 
-/// The root file is the activation marker and the transaction boundary for intent,
-/// projection, frozen payload, acknowledgement, and consuming guest intent.
 @MainActor @Observable final class DurableStateStore {
     private var root = DurableRoot()
     private(set) var accountID: String?
@@ -197,7 +195,6 @@ private struct DurableRoot: Codable {
             state.legacyProgress = updates
             state.legacyProgressImported = true
         }
-        // The old file is intentionally retained, including after explicit reapply.
     }
 
     func reapplyLegacy(_ update: PlaybackProgressWriter.Update) throws {

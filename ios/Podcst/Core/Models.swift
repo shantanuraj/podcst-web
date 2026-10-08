@@ -275,8 +275,6 @@ struct StarLists: Sendable {
     var lists: [AccountEpisodeList]
 }
 
-/// Local archives upgrade safe numeric IDs to strings. Unsafe legacy numbers stay
-/// in the archive but are not promoted to synchronized identities.
 @propertyWrapper public struct StoredCatalogueID: Codable, Hashable, Sendable {
     public var wrappedValue: Int?
     fileprivate var unresolved: Int64?

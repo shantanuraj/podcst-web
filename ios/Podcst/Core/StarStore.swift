@@ -179,7 +179,6 @@ final class StarStore {
                     try self.save(staged, url)
                 }
                 root = converted
-                // lists.json remains byte-for-byte intact. lists-v1.json atomically activates conversion.
             }
         } catch { readable = false; ready = false; self.error = "Saved episodes could not be opened. Pending work has not been reset." }
         publish()

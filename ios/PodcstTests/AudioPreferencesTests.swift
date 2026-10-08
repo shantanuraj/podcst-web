@@ -23,6 +23,4 @@ final class AudioPreferencesTests: XCTestCase {
         XCTAssertFalse(restored.hasOverride(for: feed))
     }
 
-    // Progress outbox coverage moved to DurableStateStoreTests. Old unsequenced
-    // replay and logout-drop expectations are intentionally no longer valid.
 }

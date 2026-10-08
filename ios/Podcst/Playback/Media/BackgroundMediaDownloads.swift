@@ -369,7 +369,6 @@ final class BackgroundMediaDownloads {
     func key(for episode: Episode) -> MediaKey {
         let canonical = MediaKey(accountID: accountID, episode: episode)
         if records[canonical] != nil { return canonical }
-        // Only reuse a unique source-scoped legacy reference, never a global GUID match.
         let matches = records.filter { _, record in
             (episode.id != nil && record.episode.id == episode.id) ||
             (record.episode.id == nil && record.episode.guid == episode.guid &&

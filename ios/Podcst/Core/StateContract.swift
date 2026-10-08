@@ -166,7 +166,6 @@ public enum StateProgressEvent: String, Codable, Sendable {
     }
 }
 
-// Wire-only codecs. Local archives deliberately use separate numeric models.
 @propertyWrapper struct CatalogueID: Decodable {
     var wrappedValue: Int
     init(from decoder: Decoder) throws { wrappedValue = Int(try StateID(from: decoder).value)! }

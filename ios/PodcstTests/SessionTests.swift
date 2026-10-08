@@ -310,7 +310,7 @@ final class SessionTests: XCTestCase {
         let subscription = Task { await fixture.library.toggleSubscription(original) }
         await fulfillment(of: [started], timeout: 2)
         let saved = try XCTUnwrap(fixture.defaults.data(forKey: "guest.library.podcasts"))
-        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), []) // original migration source is immutable
+        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [])
         XCTAssertEqual(fixture.library.durable.guestFollows + fixture.library.durable.unresolvedGuest, [original])
         try XCTUnwrap(pending).respond(resolved)
         await subscription.value
@@ -521,7 +521,7 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(fixture.library.podcasts.isEmpty)
         XCTAssertNil(fixture.library.error)
         let saved = try XCTUnwrap(fixture.defaults.data(forKey: "guest.library.podcasts"))
-        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), []) // original migration source is immutable
+        XCTAssertEqual(try JSONDecoder().decode([Podcast].self, from: saved), [])
         XCTAssertEqual(fixture.library.durable.guestFollows + fixture.library.durable.unresolvedGuest, [original])
     }
 

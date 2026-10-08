@@ -298,7 +298,6 @@ import XCTest
         XCTAssertEqual(try JSONDecoder().decode(Episode.self, from: JSONEncoder().encode(episode)).id, episode.id)
     }
 
-    // Run these individually in separate xcodebuild invocations to prove a process boundary.
     private var processDirectory: URL { FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("DurableStateSyntheticRestart") }
     func testProcessRestartWrite() async throws {
         try? FileManager.default.removeItem(at: processDirectory)
@@ -311,7 +310,6 @@ import XCTest
         XCTAssertTrue(state.pending)
         let attrs = try FileManager.default.attributesOfItem(atPath: processDirectory.appendingPathComponent("durable-state-v1.json").path)
         #if targetEnvironment(simulator)
-        // Simulator does not implement the device data-protection filesystem attribute.
         XCTAssertGreaterThan((attrs[.size] as? NSNumber)?.intValue ?? 0, 0)
         #else
         XCTAssertEqual(attrs[.protectionKey] as? FileProtectionType, .completeUntilFirstUserAuthentication)

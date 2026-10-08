@@ -414,7 +414,6 @@ public final class APIClient {
     }
 
     func migrateList(id: String, batch: ListBatch, scope: StateScope) async throws -> ListAcknowledgement {
-        // ListBatch retains its original numeric Codable representation, without a scope key.
         struct Body: Encodable { var `protocol` = 1; var accountId: String; var generation: String; var batch: ListBatch }
         guard batch.scope == nil else { throw DurableStateFailure.protocolViolation }
         let raw: RawListAcknowledgement = try await post(path: "/api/lists/\(id)/migration", body: Body(accountId: scope.accountId, generation: scope.generation, batch: batch))
