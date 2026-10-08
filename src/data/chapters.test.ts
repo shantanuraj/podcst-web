@@ -7,8 +7,8 @@ import type { IEpisodeInfo } from '@/types';
 import { chapterQueryOptions } from './chapters';
 
 const episode = {
-  id: 42,
-  podcastId: 7,
+  id: '42',
+  podcastId: '7',
   isPrivate: true,
   file: { url: 'https://example.invalid/secret' },
 } as IEpisodeInfo;
@@ -64,7 +64,7 @@ test('requests by database ID, scopes keys by account and revision, and disables
   );
   spies.push(spy);
   const options = chapterQueryOptions(session, episode);
-  expect(options.queryKey).toEqual(['account', 'owner', 'chapters', 42, 0]);
+  expect(options.queryKey).toEqual(['account', 'owner', 'chapters', '42', 0]);
   expect(JSON.stringify(options.queryKey)).not.toContain('secret');
   expect(await client.fetchQuery<EpisodeChapters>(options)).toEqual(result);
   expect(spy.mock.calls[0][0]).toBe('/api/episodes/42/chapters');
@@ -141,7 +141,7 @@ test('changing episodes cancels and discards the old observer response', async (
   );
   const unsubscribe = observer.subscribe(() => {});
   await new Promise((resolve) => setTimeout(resolve, 0));
-  observer.setOptions(chapterQueryOptions(session, { ...episode, id: 43 }));
+  observer.setOptions(chapterQueryOptions(session, { ...episode, id: '43' }));
   await observer.refetch();
   expect(oldSignal?.aborted).toBe(true);
   finish(Response.json(result));
@@ -164,6 +164,6 @@ test('authorization denial invalidates the podcast, not an unrelated episode-num
     client.fetchQuery(chapterQueryOptions(session, episode)),
   ).rejects.toThrow();
   await session.refresh();
-  expect(session.getSnapshot().denied.has(7)).toBe(true);
+  expect(session.getSnapshot().denied.has('7')).toBe(true);
   expect(chapterQueryOptions(session, episode).enabled).toBe(false);
 });

@@ -15,8 +15,8 @@ import type { IEpisodeInfo } from '@/types';
 import { ReleaseRow } from './ReleaseRow';
 
 const episode = {
-  id: 201,
-  podcastId: 7,
+  id: '201',
+  podcastId: '7',
   title: 'Finished fixture',
   podcastTitle: 'Fixture show',
   feed: 'https://example.invalid/feed',
@@ -46,25 +46,25 @@ function account(scope: string | null = 'fixture') {
   );
 }
 
-function Rows({ ids }: { ids: number[] }) {
+function Rows({ ids }: { ids: string[] }) {
   const progress = useEpisodeProgress(ids);
   return (
     <ReleaseRow
       episode={episode}
       when="Yesterday"
-      progress={progress.get(201)}
+      progress={progress.get('201')}
     />
   );
 }
 
 function render(completed?: boolean, scope: string | null = 'fixture') {
   const session = account(scope);
-  const ids = Array.from({ length: 201 }, (_, index) => index + 1);
+  const ids = Array.from({ length: 201 }, (_, index) => String(index + 1));
   for (const query of episodeProgressQueries(session, ids)) {
     session.client.setQueryData(
       query.queryKey,
       query.queryKey.at(-1) === '201' && completed !== undefined
-        ? [{ episodeId: 201, position: 0, completed }]
+        ? [{ episodeId: '201', position: 0, completed }]
         : [],
     );
   }
@@ -91,9 +91,9 @@ test('completed releases remain visible, marked played, with enabled replay and 
   expect(markup).not.toContain('aria-disabled="true"');
   expect(
     newReleases([
-      { episodes: [episode, { ...episode, id: 202, published: 2000 }] },
+      { episodes: [episode, { ...episode, id: '202', published: 2000 }] },
     ]).map(({ id }) => id),
-  ).toEqual([202, 201]);
+  ).toEqual(['202', '201']);
 });
 
 test('unfinished and unknown progress do not appear played', () => {
@@ -106,16 +106,16 @@ test('unfinished and unknown progress do not appear played', () => {
 test('progress queries cover every release in bounded, deduplicated account-scoped batches', () => {
   const session = account();
   const queries = episodeProgressQueries(session, [
-    201,
-    ...Array.from({ length: 201 }, (_, i) => i + 1),
+    '201',
+    ...Array.from({ length: 201 }, (_, i) => String(i + 1)),
   ]);
   expect(queries).toHaveLength(2);
   expect(String(queries[0].queryKey.at(-1)).split(',')).toHaveLength(200);
   expect(queries[1].queryKey.at(-1)).toBe('201');
   expect(queries[1].queryKey).not.toEqual(
-    episodeProgressQueries(account('another'), [201])[0].queryKey,
+    episodeProgressQueries(account('another'), ['201'])[0].queryKey,
   );
-  expect(episodeProgressQueries(account(null), [201])[0].enabled).toBe(false);
+  expect(episodeProgressQueries(account(null), ['201'])[0].enabled).toBe(false);
   expect(episodeProgressQueries(session, [])).toEqual([]);
   session.client.clear();
 });

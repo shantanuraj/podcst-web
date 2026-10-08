@@ -17,7 +17,7 @@ const episodesQueryKey = (
   search?: string,
   sort?: string,
   direction?: string,
-) => scopedEpisodesQueryKey(null, id, search, sort, direction);
+) => scopedEpisodesQueryKey(null, String(id), search, sort, direction);
 const feedRefreshOptions = (
   client: QueryClient,
   id: number,
@@ -26,7 +26,7 @@ const feedRefreshOptions = (
 ) => {
   const session = sessions.get(client);
   if (!session) throw new Error('Missing fixture account');
-  return scopedFeedRefreshOptions(session, id, refresh, empty);
+  return scopedFeedRefreshOptions(session, String(id), refresh, empty);
 };
 
 const clients: QueryClient[] = [];
@@ -152,7 +152,7 @@ describe('feed refresh', () => {
     const nextPage = { ...oldPage, total: 41 };
     const boundary = EpisodesHydration({
       scope: null,
-      podcastId: 1,
+      podcastId: '1',
       initialData: nextPage,
       children: null,
     });

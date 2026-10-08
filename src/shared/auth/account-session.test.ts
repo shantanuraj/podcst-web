@@ -27,8 +27,8 @@ const other: AccountUser = {
   email: 'b@example.invalid',
 };
 const episode = {
-  id: 4242,
-  podcastId: 42,
+  id: '4242',
+  podcastId: '42',
   guid: 'private-fixture',
   isPrivate: true,
   title: 'Owner-only fixture',
@@ -91,7 +91,7 @@ describe('web account boundary', () => {
         accountQueryKey('guest', kind, 42),
       );
     }
-    expect(episodesQueryKey('a', 42)[1]).toBe('a');
+    expect(episodesQueryKey('a', '42')[1]).toBe('a');
   });
 
   test.each([
@@ -102,7 +102,7 @@ describe('web account boundary', () => {
       ...f.session.query('episodes', 42, async () => {
         throw new ApiError(status, 'Unavailable');
       }),
-      queryKey: episodesQueryKey(owner.id, 42),
+      queryKey: episodesQueryKey(owner.id, '42'),
       initialPageParam: undefined,
       getNextPageParam: () => undefined,
       staleTime: Infinity,

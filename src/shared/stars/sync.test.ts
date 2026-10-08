@@ -28,7 +28,12 @@ function required<T>(value: T | undefined): T {
 }
 
 const id = '0c339753-cb50-477c-843e-e641b414a060';
-const episode = (id: number) =>
+const wire = {
+  protocol: 1 as const,
+  accountId: 'owner',
+  generation: '17adbd84-d0e4-4e2d-ad9f-b084efee3211',
+};
+const episode = (id: string) =>
   ({
     id,
     guid: 'shared',
@@ -36,12 +41,13 @@ const episode = (id: number) =>
     title: `Episode ${id}`,
     file: { url: 'https://example.invalid/audio.mp3' },
   }) as IEpisodeInfo;
-const snapshot = (ids: number[], revision = '1'): ListSnapshot => ({
+const snapshot = (ids: string[], revision = '1'): ListSnapshot => ({
+  ...wire,
   listId: id,
   revision,
   items: ids.map((episodeId) => ({
     episodeId,
-    addedAt: episodeId,
+    addedAt: Number(episodeId),
     availability: 'available',
   })),
 });
@@ -64,9 +70,13 @@ function fixture(storage: StarStorage = browserStorage()) {
   let remote = snapshot([]);
   const sent: ListBatch[] = [];
   const api: StarAPI = {
-    lists: async () => [
-      { id, kind: 'starred', name: null, revision: '1', itemCount: 0 },
-    ],
+    lists: async () => ({
+      ...wire,
+      lists: [{ id, kind: 'starred', name: null, revision: '1', itemCount: 0 }],
+    }),
+    migration: async () => {
+      throw new Error('Not a legacy fixture');
+    },
     membership: async () => structuredClone(remote),
     episodes: async () => ({
       ...remote,
@@ -117,14 +127,14 @@ describe('durable web stars', () => {
         await sync.activate(step.accountId ?? null);
       else if (step.episodeId !== undefined)
         await sync.edit(
-          step.episodeId,
+          String(step.episodeId),
           step.op === 'add' ? 'add' : 'remove',
-          episode(step.episodeId),
+          episode(String(step.episodeId)),
         );
       const { state, scope } = sync.getSnapshot();
       if (!state) throw new Error('Missing local state');
       expect(project(state).map(({ episodeId }) => episodeId)).toEqual(
-        step.ids,
+        step.ids.map(String),
       );
       expect(!!scope && (!!state.flight || state.queued.length > 0)).toBe(
         step.pending,
@@ -133,27 +143,32 @@ describe('durable web stars', () => {
   });
   test('canonical IDs distinguish identical GUIDs and survive URL changes', () => {
     const state = emptyScope();
-    enqueue(state, 1, 'add', 1, episode(1));
-    enqueue(state, 2, 'add', 2, episode(2));
-    enqueue(state, 1, 'add', 3, {
-      ...episode(1),
+    enqueue(state, '1', 'add', 1, episode('1'));
+    enqueue(state, '2', 'add', 2, episode('2'));
+    enqueue(state, '1', 'add', 3, {
+      ...episode('1'),
       feed: 'https://changed.invalid',
     });
-    expect(project(state).map(({ episodeId }) => episodeId)).toEqual([2, 1]);
+    expect(project(state).map(({ episodeId }) => episodeId)).toEqual([
+      '2',
+      '1',
+    ]);
     expect(project(state)[1].addedAt).toBe(1);
-    expect(() => enqueue(state, NaN, 'add', 1)).toThrow();
-    expect(() => enqueue(state, 0, 'add', 1)).toThrow();
+    expect(() => enqueue(state, NaN as never, 'add', 1)).toThrow();
+    expect(() => enqueue(state, '0', 'add', 1)).toThrow();
   });
 
   test('guest transfer and new taps serialize across independent IndexedDB connections', async () => {
     const first = browserStorage();
     const second = browserStorage();
     await first.update((root) =>
-      enqueue(scopeIn(root, null), 1, 'add', 1, episode(1)),
+      enqueue(scopeIn(root, null), '1', 'add', 1, episode('1')),
     );
     await Promise.all([
       first.update((root) => mergeGuest(root, 'owner')),
-      second.update((root) => enqueue(scopeIn(root, 'owner'), 1, 'remove', 2)),
+      second.update((root) =>
+        enqueue(scopeIn(root, 'owner'), '1', 'remove', 2),
+      ),
     ]);
     const root = await second.load();
     expect(root.guest).toBeUndefined();
@@ -168,7 +183,7 @@ describe('durable web stars', () => {
 
   test('failed guest transactions retain the original guest work', async () => {
     const storage = browserStorage();
-    await storage.update((root) => enqueue(scopeIn(root, null), 1, 'add', 1));
+    await storage.update((root) => enqueue(scopeIn(root, null), '1', 'add', 1));
     await expect(
       storage.update((root) => {
         mergeGuest(root, 'owner');
@@ -193,25 +208,30 @@ describe('durable web stars', () => {
     const sync = new StarSync(storage, f.api, async () => {});
     await sync.activate(null);
     fail = true;
-    await sync.edit(1, 'add', episode(1));
+    await expect(sync.edit('1', 'add', episode('1'))).rejects.toThrow();
     expect(project(required(sync.getSnapshot().state))).toEqual([]);
     expect(sync.getSnapshot().error).toContain('Unable to save');
   });
 
   test('freezes exact batches and leaves rapid toggles behind them', () => {
-    const state = { ...emptyScope(), listId: id };
-    enqueue(state, 1, 'add', 1);
+    const state = { ...emptyScope(), wire, listId: id };
+    enqueue(state, '1', 'add', 1);
     const frozen = structuredClone(freeze(state));
-    enqueue(state, 1, 'remove', 2);
-    enqueue(state, 1, 'add', 3);
+    enqueue(state, '1', 'remove', 2);
+    enqueue(state, '1', 'add', 3);
     expect(freeze(state)).toEqual(frozen);
     expect(state.queued).toHaveLength(2);
     expect(state.sequence).toBe('1');
   });
 
   test('bounds batches at 100 and never rounds bigint sequences', () => {
-    const state = { ...emptyScope(), listId: id, sequence: '9007199254740992' };
-    for (let n = 1; n <= 101; n++) enqueue(state, n, 'add', n);
+    const state = {
+      ...emptyScope(),
+      wire,
+      listId: id,
+      sequence: '9007199254740992',
+    };
+    for (let n = 1; n <= 101; n++) enqueue(state, String(n), 'add', n);
     expect(freeze(state)?.batch.sequence).toBe('9007199254740993');
     expect(state.flight?.batch.changes).toHaveLength(100);
     expect(state.queued).toHaveLength(1);
@@ -221,7 +241,7 @@ describe('durable web stars', () => {
     const f = fixture();
     const sync = f.make();
     await sync.activate('owner');
-    await sync.edit(1, 'add', episode(1));
+    await sync.edit('1', 'add', episode('1'));
     let original: ListBatch;
     let first = true;
     f.api.changes = async (_, batch) => {
@@ -248,7 +268,7 @@ describe('durable web stars', () => {
     const f = fixture();
     const sync = f.make();
     await sync.activate('owner');
-    await sync.edit(1, 'add', episode(1));
+    await sync.edit('1', 'add', episode('1'));
     f.api.membership = async () => {
       throw new Error('Offline');
     };
@@ -256,7 +276,7 @@ describe('durable web stars', () => {
     await sync.refresh();
     expect(sync.getSnapshot().state?.flight?.ack).toBeDefined();
     expect(project(required(sync.getSnapshot().state))).toHaveLength(1);
-    f.api.membership = async () => snapshot([1]);
+    f.api.membership = async () => snapshot(['1']);
     const restarted = f.make();
     await restarted.activate('owner');
     await restarted.refresh();
@@ -268,7 +288,7 @@ describe('durable web stars', () => {
     const f = fixture();
     const sync = f.make();
     await sync.activate(null);
-    await sync.edit(1, 'add', episode(1));
+    await sync.edit('1', 'add', episode('1'));
     await sync.activate('owner');
     expect(project(required(sync.getSnapshot().state))).toHaveLength(1);
     await sync.activate('other');
@@ -295,7 +315,7 @@ describe('durable web stars', () => {
     const reading = sync.refresh();
     await started.promise;
     await sync.activate(null);
-    delayed.resolve(snapshot([1]));
+    delayed.resolve(snapshot(['1']));
     await reading;
     expect(sync.getSnapshot().scope).toBeNull();
     expect(project(required(sync.getSnapshot().state))).toEqual([]);
@@ -306,7 +326,7 @@ describe('durable web stars', () => {
     const f = fixture();
     const sync = f.make();
     await sync.activate('owner');
-    await sync.edit(1, 'add', episode(1));
+    await sync.edit('1', 'add', episode('1'));
     f.api.changes = async () => {
       throw new ApiError(409, 'Conflict');
     };
@@ -322,42 +342,42 @@ describe('durable web stars', () => {
   });
 
   test('terminal failures retire optimistic success while newer intents survive', () => {
-    const state = { ...emptyScope(), listId: id };
-    enqueue(state, 1, 'add', 1, episode(1));
+    const state = { ...emptyScope(), wire, listId: id };
+    enqueue(state, '1', 'add', 1, episode('1'));
     const flight = required(freeze(state));
     acknowledge(state, {
       ...ack(flight.batch),
-      results: [{ episodeId: 1, status: 'not_found' }],
+      results: [{ episodeId: '1', status: 'not_found' }],
     });
     expect(project(state)).toEqual([]);
-    expect(state.failures).toEqual([1]);
-    enqueue(state, 2, 'add', 2, episode(2));
+    expect(state.failures).toEqual(['1']);
+    enqueue(state, '2', 'add', 2, episode('2'));
     installSnapshot(state, snapshot([]));
-    expect(project(state).map(({ episodeId }) => episodeId)).toEqual([2]);
+    expect(project(state).map(({ episodeId }) => episodeId)).toEqual(['2']);
   });
 
   test('rejects stale, malformed and incomplete snapshots without retiring the overlay', () => {
-    const state = { ...emptyScope(), listId: id };
-    enqueue(state, 1, 'add', 1);
+    const state = { ...emptyScope(), wire, listId: id };
+    enqueue(state, '1', 'add', 1);
     acknowledge(state, ack(required(freeze(state)).batch, '3'));
     expect(() => installSnapshot(state, snapshot([], '2'))).toThrow();
     expect(() =>
       installSnapshot(state, { ...snapshot([], '3'), items: null as never }),
     ).toThrow();
-    expect(() => installSnapshot(state, snapshot([1, 1], '3'))).toThrow();
+    expect(() => installSnapshot(state, snapshot(['1', '1'], '3'))).toThrow();
     expect(project(state)).toHaveLength(1);
     expect(state.flight?.ack).toBeDefined();
   });
 
   test('display pages cannot create or delete memberships; revocation invalidates metadata', () => {
-    const state = { ...emptyScope(), listId: id };
-    state.episodes[1] = episode(1);
-    installSnapshot(state, snapshot([1, 2]));
+    const state = { ...emptyScope(), wire, listId: id };
+    state.episodes[1] = episode('1');
+    installSnapshot(state, snapshot(['1', '2']));
     hydratePage(state, {
       ...snapshot([]),
       items: [
         {
-          episodeId: 1,
+          episodeId: '1',
           addedAt: 1,
           availability: 'unavailable',
           episode: null,
@@ -371,10 +391,10 @@ describe('durable web stars', () => {
       ...snapshot([], '0'),
       items: [
         {
-          episodeId: 1,
+          episodeId: '1',
           addedAt: 1,
           availability: 'available',
-          episode: episode(1),
+          episode: episode('1'),
         },
       ],
       nextCursor: null,

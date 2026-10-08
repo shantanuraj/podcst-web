@@ -1,0 +1,440 @@
+import { beforeEach, expect, test } from 'bun:test';
+import { IDBFactory } from 'fake-indexeddb';
+import {
+  type ProgressEvent,
+  progressIntent,
+} from '@/shared/player/progress-intent';
+import type {
+  FollowBatch,
+  ProgressBatch,
+  StateScope,
+} from '@/shared/state-contract';
+import { followProjection } from '@/shared/subscriptions/follow-outbox';
+import vectors from '../../contracts/state/fixtures.json';
+import { ApiError } from './api';
+import { progressProjection } from './progress-outbox';
+import { StateRuntime, type StateTransport } from './state-runtime';
+import {
+  accountState,
+  browserStateStorage,
+  convertGuestFollows,
+  unionGuestFollows,
+} from './state-storage';
+
+const scope: StateScope = {
+  protocol: 1,
+  accountId: 'a',
+  generation: '17adbd84-d0e4-4e2d-ad9f-b084efee3211',
+};
+const id = '9007199254740993';
+beforeEach(() => {
+  globalThis.indexedDB = new IDBFactory();
+});
+function fixture() {
+  const storage = browserStateStorage();
+  let online = false;
+  let revision = 0;
+  let position = 0;
+  let completed = false;
+  let followed = false;
+  const sent: unknown[] = [];
+  const ledger = new Map<string, unknown>();
+  const api: StateTransport = {
+    request: async (path, _method, body) => {
+      if (body) {
+        const batch = body as ProgressBatch | FollowBatch;
+        sent.push(structuredClone(body));
+        const key = `${path}:${batch.clientId}:${batch.sequence}`;
+        if (ledger.has(key)) return structuredClone(ledger.get(key));
+        revision++;
+        const results = batch.changes.map((item) => {
+          if ('episodeId' in item) {
+            position = item.positionSeconds;
+            completed = item.completed;
+            return { episodeId: item.episodeId, status: 'applied' };
+          }
+          followed = item.followed;
+          return { podcastId: item.podcastId, status: 'applied' };
+        });
+        const { changes: _, ...stream } = batch;
+        const ack = { ...stream, revision: String(revision), results };
+        ledger.set(key, ack);
+        return ack;
+      }
+      if (path.startsWith('/progress'))
+        return {
+          ...scope,
+          revision: String(revision),
+          items: path.includes('episodeIds')
+            ? [
+                {
+                  episodeId: id,
+                  progress: revision
+                    ? {
+                        positionSeconds: position,
+                        completed,
+                        revision: String(revision),
+                        updatedAtMs: null,
+                      }
+                    : null,
+                },
+              ]
+            : [],
+        };
+      return {
+        ...scope,
+        revision: String(revision),
+        items: followed
+          ? [
+              {
+                podcastId: id,
+                revision: String(revision),
+                followedAtMs: null,
+                availability: 'available',
+              },
+            ]
+          : [],
+      };
+    },
+  };
+  let tail = Promise.resolve();
+  const lock = async (work: () => Promise<void>) => {
+    if (!online) return;
+    const task = tail.then(work);
+    tail = task.catch(() => {});
+    await task;
+  };
+  const make = (store = storage) => new StateRuntime(store, api, lock);
+  return {
+    storage,
+    api,
+    sent,
+    make,
+    online: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      online = true;
+    },
+    remote: (next: number, follow = false) => {
+      position = next;
+      followed = follow;
+      revision++;
+    },
+  };
+}
+for (const vector of vectors.completion)
+  test(vector.name, () => {
+    expect(
+      progressIntent(
+        vector.event as ProgressEvent,
+        vector.positionSeconds,
+        vector.previousCompleted,
+      ),
+    ).toEqual({
+      positionSeconds: vector.expectedPositionSeconds,
+      completed: vector.expectedCompleted,
+    });
+  });
+test('offline restart retains progress/follows and canonical IDs; A-B-A hides work', async () => {
+  const f = fixture();
+  const first = f.make();
+  await first.activate('a');
+  await first.progress(id, 'replay', 90);
+  await first.follow(id, true);
+  await first.activate('b');
+  expect(first.getSnapshot().state?.accounts.b).toBeUndefined();
+  const restarted = f.make();
+  await restarted.activate('a');
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id)
+      ?.positionSeconds,
+  ).toBe(90);
+  await f.online();
+  await restarted.refresh();
+  expect(f.sent).toHaveLength(2);
+  expect((await f.storage.load()).accounts.a.progress.flight).toBeUndefined();
+});
+test('lost ack retries exact bytes without resurrecting another-device follow or rewind', async () => {
+  const f = fixture();
+  const first = f.make();
+  await first.activate('a');
+  await first.progress(id, 'replay', 90);
+  const request = f.api.request;
+  let lost = true;
+  f.api.request = async (...args) => {
+    const reply = await request(...args);
+    if (args[2] && lost) {
+      lost = false;
+      throw new Error('Lost ack');
+    }
+    return reply;
+  };
+  await f.online();
+  await first.refresh();
+  f.remote(12);
+  const restarted = f.make();
+  await restarted.activate('a');
+  expect(f.sent[1]).toEqual(f.sent[0]);
+  expect(
+    progressProjection((await f.storage.load()).accounts.a.progress).get(id)
+      ?.positionSeconds,
+  ).toBe(12);
+  await restarted.follow(id, true);
+  await restarted.refresh();
+  expect(
+    followProjection((await f.storage.load()).accounts.a.follows).has(id),
+  ).toBe(true);
+});
+test('newer intent during flight survives ack and post-ack read', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'replay', 90);
+  const request = f.api.request;
+  const delayed = Promise.withResolvers<void>();
+  const started = Promise.withResolvers<void>();
+  let once = true;
+  f.api.request = async (...args) => {
+    const reply = await request(...args);
+    if (args[2] && once) {
+      once = false;
+      started.resolve();
+      await delayed.promise;
+    }
+    return reply;
+  };
+  await f.online();
+  const run = sync.refresh();
+  await started.promise;
+  await sync.progress(id, 'replay', 12);
+  delayed.resolve();
+  await run;
+  const state = (await f.storage.load()).accounts.a.progress;
+  expect(state.sequence).toBe('2');
+  expect(progressProjection(state).get(id)?.positionSeconds).toBe(12);
+});
+test('failed intent write is not projected or saved', async () => {
+  const f = fixture();
+  let fail = false;
+  const sync = f.make({
+    load: f.storage.load,
+    update: (change) =>
+      fail ? Promise.reject(new Error('Disk full')) : f.storage.update(change),
+  });
+  await sync.activate('a');
+  fail = true;
+  await expect(sync.progress(id, 'played', 0)).rejects.toThrow();
+  expect(sync.getSnapshot().error).toContain('could not be saved');
+  expect((await f.storage.load()).accounts.a).toBeUndefined();
+});
+for (const boundary of ['freeze', 'ack', 'read'] as const)
+  test(`write failure at ${boundary} retains restartable flight`, async () => {
+    const f = fixture();
+    let failed = false;
+    const storage = {
+      load: f.storage.load,
+      update: (change: Parameters<typeof f.storage.update>[0]) =>
+        f.storage.update((root) => {
+          const before = structuredClone(root.accounts.a?.progress);
+          change(root);
+          const after = root.accounts.a?.progress;
+          if (
+            !failed &&
+            ((boundary === 'freeze' && !before?.flight && after?.flight) ||
+              (boundary === 'ack' &&
+                !before?.flight?.ack &&
+                after?.flight?.ack) ||
+              (boundary === 'read' && before?.flight?.ack && !after?.flight))
+          ) {
+            failed = true;
+            throw new Error('Disk full');
+          }
+        }),
+    };
+    const sync = f.make(storage);
+    await sync.activate('a');
+    await sync.progress(id, 'played', 0);
+    await f.online();
+    await sync.refresh();
+    expect(failed).toBe(true);
+    const retained = (await f.storage.load()).accounts.a.progress;
+    expect(retained.queued.length || retained.flight).toBeTruthy();
+    const restart = f.make();
+    await restart.activate('a');
+    expect((await f.storage.load()).accounts.a.progress.flight).toBeUndefined();
+    if (boundary === 'ack') expect(f.sent[0]).toEqual(f.sent[1]);
+  });
+test('cross-connection guest union consumes only explicit guest intent atomically', async () => {
+  const a = browserStateStorage();
+  const b = browserStateStorage();
+  const source = {
+    safe: { id: 3, episodes: [] },
+    unsafe: { id: 9007199254740992, episodes: [] },
+  };
+  await a.update((root) => convertGuestFollows(root, source));
+  await expect(
+    a.update((root) => {
+      unionGuestFollows(root, 'a');
+      throw new Error('Crash');
+    }),
+  ).rejects.toThrow();
+  expect((await b.load()).guest.follows).toEqual(['3']);
+  await Promise.all([
+    a.update((root) => unionGuestFollows(root, 'a')),
+    b.update((root) => unionGuestFollows(root, 'b')),
+  ]);
+  const root = await a.load();
+  expect(root.accounts.a.follows.queued).toHaveLength(1);
+  expect(root.accounts.b.follows.queued).toEqual([]);
+  expect(root.legacyFollows?.source).toEqual(source);
+  expect(root.legacyFollows?.unresolved).toEqual(['unsafe']);
+});
+test('protocol generation failure blocks without replacing stream or frozen payload', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'played', 0);
+  const request = f.api.request;
+  f.api.request = async (...args) => {
+    const reply = await request(...args);
+    return args[2]
+      ? { ...(reply as object), generation: crypto.randomUUID() }
+      : reply;
+  };
+  await f.online();
+  await sync.refresh();
+  const before = (await f.storage.load()).accounts.a.progress;
+  expect(before.blocked).toBeDefined();
+  const restart = f.make();
+  await restart.activate('a');
+  expect((await f.storage.load()).accounts.a.progress.flight).toEqual(
+    before.flight,
+  );
+  expect(f.sent).toHaveLength(1);
+});
+test('401 retains frozen work and never erases; confirmed erase fences same account', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.follow(id, true);
+  await f.online();
+  const request = f.api.request;
+  f.api.request = (...args) =>
+    args[2]
+      ? Promise.reject(new ApiError(401, 'Expired', 'unauthenticated'))
+      : request(...args);
+  await sync.refresh();
+  expect((await f.storage.load()).accounts.a.follows.flight).toBeDefined();
+  await sync.suspend();
+  expect(sync.getSnapshot().state).toBeUndefined();
+  await sync.erase('a');
+  expect((await f.storage.load()).accounts.a).toBeUndefined();
+  const erased = await f.storage.load();
+  expect(() => accountState(erased, 'a')).toThrow();
+});
+test('offline unknown completion checkpoint is durable and resolved before freezing', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'checkpoint', 95);
+  let state = (await f.storage.load()).accounts.a.progress;
+  expect(state.needsCompletion).toEqual([id]);
+  expect(state.queued[0].positionSeconds).toBe(95);
+  await f.online();
+  await sync.refresh();
+  state = (await f.storage.load()).accounts.a.progress;
+  expect(state.needsCompletion).toEqual([]);
+  expect(state.saved[id].completed).toBe(false);
+});
+test('late response after account change cannot populate the new projection', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'played', 0);
+  const delayed = Promise.withResolvers<unknown>();
+  const started = Promise.withResolvers<void>();
+  f.api.request = () => {
+    started.resolve();
+    return delayed.promise;
+  };
+  await f.online();
+  const run = sync.refresh();
+  await started.promise;
+  await sync.activate(null);
+  delayed.resolve({ ...scope, revision: '0', items: [] });
+  await run;
+  expect(sync.getSnapshot().account).toBeNull();
+  expect((await f.storage.load()).accounts.a.progress.scope).toBeUndefined();
+});
+
+test('independent tabs serialize senders and preserve one stream sequence', async () => {
+  const f = fixture();
+  const a = f.make();
+  const b = f.make(browserStateStorage());
+  await a.activate('a');
+  await b.activate('a');
+  await Promise.all([a.progress(id, 'replay', 10), b.follow(id, true)]);
+  await f.online();
+  await Promise.all([a.refresh(), b.refresh()]);
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.sequence).toBe('1');
+  expect(root.accounts.a.follows.sequence).toBe('1');
+  expect(f.sent).toHaveLength(2);
+});
+test('lost follow ack cannot resurrect a later remote unfollow', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.follow(id, true);
+  const request = f.api.request;
+  let lost = true;
+  f.api.request = async (...args) => {
+    const result = await request(...args);
+    if (args[2] && lost) {
+      lost = false;
+      throw new Error('Lost ack');
+    }
+    return result;
+  };
+  await f.online();
+  await sync.refresh();
+  f.remote(0, false);
+  const restart = f.make();
+  await restart.activate('a');
+  expect(f.sent[1]).toEqual(f.sent[0]);
+  expect(
+    followProjection((await f.storage.load()).accounts.a.follows).has(id),
+  ).toBe(false);
+});
+test('unavailable progress transport does not stall follow sending', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await sync.progress(id, 'played', 0);
+  await sync.follow(id, true);
+  const request = f.api.request;
+  f.api.request = (...args) =>
+    args[0].startsWith('/progress')
+      ? Promise.reject(new Error('Unavailable'))
+      : request(...args);
+  await f.online();
+  await sync.refresh();
+  const root = await f.storage.load();
+  expect(root.accounts.a.progress.queued).toHaveLength(1);
+  expect(root.accounts.a.follows.flight).toBeUndefined();
+  expect(root.accounts.a.follows.sequence).toBe('1');
+});
+test('denied storage remains visible and is never treated as empty saved state', async () => {
+  const f = fixture();
+  const sync = f.make({
+    load: async () => {
+      throw new Error('Denied');
+    },
+    update: async () => {
+      throw new Error('Denied');
+    },
+  });
+  await sync.activate('a');
+  expect(sync.getSnapshot().state).toBeUndefined();
+  expect(sync.getSnapshot().error).toContain('Unable to open');
+  await expect(sync.follow(id, true)).rejects.toThrow();
+});

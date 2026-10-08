@@ -11,8 +11,8 @@ import type { IEpisodeInfo } from '@/types';
 import { Chapters } from './Chapters';
 
 const episode = {
-  id: 42,
-  podcastId: 7,
+  id: '42',
+  podcastId: '7',
   feed: 'fixture',
   guid: 'fixture',
   showNotes: '00:00 Notes start<br>01:00 Notes end',

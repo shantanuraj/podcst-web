@@ -15,8 +15,8 @@ import { EpisodeActions } from '@/ui/EpisodeInfo/EpisodeActions';
 import { EpisodeRow } from '@/ui/EpisodesList/EpisodeRow';
 
 const episode: IEpisodeInfo = {
-  id: 301841099,
-  podcastId: 1,
+  id: '301841099',
+  podcastId: '1',
   feed: 'https://example.invalid/rss',
   guid: 'star-surface-fixture',
   title: 'A starrable episode',
@@ -131,11 +131,11 @@ describe('star controls on current web surfaces', () => {
         let control = starControl(f.render(surface.render(episode)));
         expect(control).toContain('aria-pressed="false"');
         expect(control).not.toContain('disabled=""');
-        await f.sync.edit(episode.id as number, 'add', episode);
+        await f.sync.edit(episode.id as string, 'add', episode);
         control = starControl(f.render(surface.render(episode)));
         expect(control).toContain('aria-label="Unstar A starrable episode"');
         expect(control).toContain('aria-pressed="true"');
-        await f.sync.edit(episode.id as number, 'remove');
+        await f.sync.edit(episode.id as string, 'remove');
         expect(starControl(f.render(surface.render(episode)))).toContain(
           'aria-pressed="false"',
         );
@@ -165,7 +165,7 @@ describe('star controls on current web surfaces', () => {
     const item = { ...episode, isPrivate: true };
     try {
       await f.sync.activate('owner');
-      await f.sync.edit(item.id as number, 'add', item);
+      await f.sync.edit(item.id as string, 'add', item);
       const markup = f.render(
         <EpisodeActions episode={item} shareTitle={item.title} />,
       );
@@ -188,7 +188,7 @@ describe('star controls on current web surfaces', () => {
     const f = fixture();
     try {
       await f.sync.activate(null);
-      await f.sync.edit(episode.id as number, 'add', episode);
+      await f.sync.edit(episode.id as string, 'add', episode);
       const control = starControl(f.render(<LibraryPage />));
       expect(control).toContain('aria-label="Unstar A starrable episode"');
       expect(control).toContain('aria-pressed="true"');

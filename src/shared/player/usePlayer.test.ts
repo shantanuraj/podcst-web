@@ -7,7 +7,7 @@ import { getCurrentEpisode, usePlayer } from './usePlayer';
 
 const episode = (id: number) =>
   ({
-    id,
+    id: String(id),
     feed: 'synthetic',
     guid: `episode-${id}`,
     title: `Episode ${id}`,

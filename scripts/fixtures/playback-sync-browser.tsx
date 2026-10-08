@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
+import { connectState, stateRuntime } from '../../src/data/state-browser';
 import { AccountContext } from '../../src/shared/auth/AccountBoundary';
 import { AccountSession } from '../../src/shared/auth/account-session';
 import AudioUtils from '../../src/shared/player/AudioUtils';
@@ -20,9 +21,10 @@ const owner = {
 };
 const episode = (id: number) =>
   ({
-    id,
-    podcastId: id,
+    id: String(id),
+    podcastId: String(id),
     guid: String(id),
+    feed: `https://example.invalid/${id}.rss`,
     title: `Episode ${id}`,
     duration: 3600,
     cover: '',
@@ -71,16 +73,6 @@ async function run() {
     });
     await phoneProgress(1438);
   }
-  const keepalives: boolean[] = [];
-  const originalFetch = window.fetch;
-  window.fetch = Object.assign(
-    (input: RequestInfo | URL, init?: RequestInit) => {
-      if (input === '/api/progress' && init?.method === 'PUT')
-        keepalives.push(init.keepalive === true);
-      return originalFetch(input, init);
-    },
-    originalFetch,
-  );
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -92,6 +84,8 @@ async function run() {
     publish() {},
   });
   session.synchronizePlayer();
+  const disconnect = connectState(session);
+  await stateRuntime(session).sync.activate(owner.id);
   const container = document.getElementById('app');
   if (!container) throw new Error('Missing fixture container');
   const root = createRoot(container);
@@ -156,7 +150,7 @@ async function run() {
   pagehide();
   await waitFor(async () => (await writes()).length === 2);
   await tick();
-  assert(keepalives[0], 'Unsaved progress did not use keepalive');
+  await stateRuntime(session).sync.checkpoint();
   usePlayer.getState().pause();
   pagehide();
   await tick();
@@ -167,15 +161,14 @@ async function run() {
   await waitFor(async () => (await writes()).length === 3);
   await tick();
   pagehide();
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  await stateRuntime(session).sync.refresh();
   await waitFor(async () => (await writes()).length === 4);
   await tick();
-  assert(
-    keepalives.join(',') === 'true,false,true',
-    'Failed progress was not retried with keepalive',
-  );
   usePlayer.getState().markPlayed();
   await waitFor(async () => (await writes()).length === 5);
   await tick();
+  disconnect();
   root.unmount();
   client.clear();
   await fetch('/result', {

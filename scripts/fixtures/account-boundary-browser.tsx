@@ -29,8 +29,8 @@ const owner: AccountUser = {
   hasPasskey: false,
 };
 const episode = {
-  id: 4242,
-  podcastId: 42,
+  id: '4242',
+  podcastId: '42',
   guid: 'private-fixture',
   isPrivate: true,
   title: 'Private owner sentinel',
@@ -61,7 +61,7 @@ function PlaybackSync() {
 }
 
 function Episodes() {
-  const result = useEpisodesInfinite({ podcastId: 42 });
+  const result = useEpisodesInfinite({ podcastId: '42' });
   return (
     <div id="episode-list">
       {result.data?.pages
@@ -104,9 +104,9 @@ async function run() {
     <QueryClientProvider client={client}>
       <AccountContext.Provider value={session}>
         <PlaybackSync />
-        <AccountContent scope={owner.id} resource={42} privateContent>
+        <AccountContent scope={owner.id} resource="42" privateContent>
           <div id="private-heading">Private metadata sentinel</div>
-          <EpisodesHydration scope={owner.id} podcastId={42} initialData={page}>
+          <EpisodesHydration scope={owner.id} podcastId="42" initialData={page}>
             <Episodes />
           </EpisodesHydration>
         </AccountContent>
@@ -156,7 +156,7 @@ async function run() {
   let denied = false;
   await client
     .fetchQuery(
-      session.query('episodes', 42, async (signal) => {
+      session.query('episodes', '42', async (signal) => {
         const response = await fetch('/api/feed/episodes?podcastId=42', {
           signal,
         });

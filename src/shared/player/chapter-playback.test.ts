@@ -6,7 +6,7 @@ import { sameEpisode } from './episode-identity';
 import { getSeekOrStartAt, type IPlayerState, usePlayer } from './usePlayer';
 
 const episode = {
-  id: 42,
+  id: '42',
   feed: 'synthetic',
   guid: 'chapter-fixture',
 } as IEpisodeInfo;
@@ -41,12 +41,12 @@ test('chapter navigation seeks through existing actions in original time, with e
   expect(player.skipToNextEpisode).toHaveBeenCalledTimes(1);
   navigateChapter(player, episode, [], 'previous');
   expect(player.skipToPreviousEpisode).toHaveBeenCalledTimes(1);
-  navigateChapter(player, { ...episode, id: 43 }, chapters, 'next');
+  navigateChapter(player, { ...episode, id: '43' }, chapters, 'next');
   expect(player.skipToNextEpisode).toHaveBeenCalledTimes(1);
 });
 
 test('chapter identity includes feed or database ID, not GUID alone', () => {
-  expect(sameEpisode(episode, { ...episode, id: 43 })).toBe(false);
+  expect(sameEpisode(episode, { ...episode, id: '43' })).toBe(false);
   expect(
     sameEpisode(
       { ...episode, id: undefined },
@@ -68,7 +68,7 @@ test('selection uses existing seek/start action for local audio and unloaded epi
   });
   getSeekOrStartAt(usePlayer.getState())(episode, 30.5);
   expect(seek).toHaveBeenCalledWith(30.5);
-  const other = { ...episode, id: 43, guid: 'other' };
+  const other = { ...episode, id: '43', guid: 'other' };
   getSeekOrStartAt(usePlayer.getState())(other, 12.25);
   expect(start).toHaveBeenCalledWith(other, 12.25);
   usePlayer.setState(state, true);
@@ -97,7 +97,7 @@ test('chapter selection cannot seek a different episode with a reused GUID', () 
   const saved = usePlayer.getState();
   const seek = spyOn(AudioUtils, 'seekTo').mockImplementation(() => {});
   const play = spyOn(AudioUtils, 'play').mockImplementation(() => {});
-  const other = { ...episode, id: 43, feed: 'different-feed' };
+  const other = { ...episode, id: '43', feed: 'different-feed' };
   try {
     usePlayer.setState({
       queue: [episode],

@@ -10,8 +10,8 @@ import { getCurrentEpisode, usePlayer } from './usePlayer';
 
 const episode = (id: number) =>
   ({
-    id,
-    podcastId: id,
+    id: String(id),
+    podcastId: String(id),
     guid: String(id),
     title: `Episode ${id}`,
     duration: 3600,
