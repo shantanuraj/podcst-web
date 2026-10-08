@@ -120,7 +120,6 @@ export async function generateMetadata(props: {
           `Listen to ${episode.title} from ${podcast?.title || 'podcast'}`,
         openGraph: {
           url,
-          title,
           images: podcast?.cover || episode.cover,
         },
         alternates: {

@@ -166,7 +166,10 @@ async function readPage(pathname: string, userAgent: string) {
   expect(page.openGraphTitle).toBe(page.title);
   expect(page.twitterTitle).toBe(page.title);
   expect(page.description.length).toBeGreaterThan(0);
-  expect(new URL(page.canonical).pathname).toBe(pathname);
+  expect(new URL(page.canonical).pathname).toBe(
+    new URL(pathname, baseUrl).pathname,
+  );
+  expect(new URL(page.canonical).search).toBe('');
   return page;
 }
 
@@ -189,6 +192,14 @@ describe.skipIf(!baseUrl)('public HTML without JavaScript', () => {
       expect(Bun.escapeHTML(episode?.partOfSeries?.name || '')).toBe(
         podcastLink?.label || '',
       );
+    }, 35_000);
+
+    test(`${name}: shared moments keep branded metadata and a clean canonical URL`, async () => {
+      for (const query of ['?t=1s', '?t=1s-2s']) {
+        const page = await readPage(`${episodePath}${query}`, userAgent);
+        expect(page.title).toContain('0:01');
+        expect(page.title).toEndWith(' — Podcst');
+      }
     }, 35_000);
 
     test(`${name}: podcast heading and first episode page are visible without hydration`, async () => {
