@@ -116,8 +116,10 @@ This installs a Release build. Add `--audio-lab` to install the separate
 
 ## Android
 
-Requires JDK 17, the Android SDK, and Rust through rustup. SDK/NDK/CMake versions
-are pinned in [`android/core/audio-engine/build.gradle.kts`](android/core/audio-engine/build.gradle.kts)
+Requires JDK 17, the Android SDK, and Rust through rustup. The shared NDK version is
+in [`android/gradle/libs.versions.toml`](android/gradle/libs.versions.toml); app and
+engine ABIs share `podcst.androidAbis` in `android/gradle.properties`. SDK/CMake
+settings are in [`android/core/audio-engine/build.gradle.kts`](android/core/audio-engine/build.gradle.kts)
 and the [CI workflow](.github/workflows/android.yml). Set `ANDROID_HOME` to your
 SDK installation. The app targets Android 13 or later.
 
@@ -137,6 +139,10 @@ Gradle properties. Keep keystores and passwords outside the repository.
 
 From the repository root, `yarn android:install <device-serial>` builds and
 installs a signed Release build on a connected device.
+
+For archive/AAB version overrides, privacy review, symbols and store-installed
+validation, see [native distribution](docs/native-distribution.md). Local device
+installation does not establish TestFlight or Play internal-testing acceptance.
 
 Both native clients default to the hosted API. For backend work, configure their
 `APIClient` (iOS) or `PodcstApi` (Android) with your development server. Passkeys on

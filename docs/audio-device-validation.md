@@ -4,7 +4,9 @@ Simulator and DSP tests do not establish physical-device sound quality, battery
 use or route behaviour. Test an optimized build on real devices, including an
 older supported model. Record the commit, device/OS, route, speed, effects and
 steps with each result; keep personal device identifiers and private media out
-of shared reports.
+of shared reports. Use the [native acceptance worksheet](native-release-validation.md)
+for hardware inventory, exact artifact/API identity, testers, results and evidence.
+Agree performance thresholds before treating measurements as acceptance.
 
 ## Listening and controls
 
