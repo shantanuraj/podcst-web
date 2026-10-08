@@ -79,7 +79,14 @@ Database tests create isolated schemas; the test role needs permission to create
 schemas. Use a dedicated Redis instance or database with no valuable data.
 Migration and repair tests start their own PostgreSQL clusters when `PG_BIN`
 points to the directory containing `initdb` and `pg_ctl`. Missing integration
-prerequisites cause skips, not passing coverage.
+prerequisites cause skips, not passing coverage. The list limiter suite starts its
+own loopback-only Redis with persistence disabled; it needs `redis-server` on
+`PATH`, not just `TEST_REDIS_URL`. CI installs the binary and sets
+`REQUIRE_LIST_LIMIT_TESTS=1` so its absence fails instead of silently skipping:
+
+```sh
+REQUIRE_LIST_LIMIT_TESTS=1 bun --no-env-file test src/server/lists/limits.integration.test.ts
+```
 
 ## iOS
 

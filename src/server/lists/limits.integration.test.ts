@@ -3,6 +3,9 @@ import { Redis } from 'ioredis';
 import { createListLimiter } from './limits';
 
 const executable = Bun.which('redis-server');
+if (process.env.REQUIRE_LIST_LIMIT_TESTS === '1' && !executable) {
+  throw new Error('redis-server required for list limiter integration tests');
+}
 
 describe.skipIf(!executable)('list limits on disposable Redis', () => {
   let server: ReturnType<typeof Bun.spawn>;
