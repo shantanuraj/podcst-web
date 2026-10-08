@@ -272,11 +272,15 @@ final class ContractFixtureTests: XCTestCase {
         case "POST /api/auth/verify": try await api.sendCode(email: "fixture@example.test")
         case "POST /api/auth/email-login": _ = try await api.signIn(email: "fixture@example.test", code: "123456")
         case "POST /api/auth/logout": await api.signOut()
-        case "GET /api/subscriptions": _ = try await api.subscriptions()
+        case "GET /api/subscriptions":
+            if fixture.type == "FollowSnapshot" { _ = try await api.followState() }
+            else { _ = try await api.subscriptions() }
         case "POST /api/subscriptions":
             _ = try await api.changeFollows(StateBatch(protocol: 1, accountId: scope.accountId, generation: scope.generation, clientId: client, sequence: StateID("1"), changes: [StateFollowChange(podcastId: StateID("910001"), followed: true)]))
         case "POST /api/subscriptions/resolve": _ = try await api.resolveFollows(["https://fixture.example/feed.xml"], scope: scope)
-        case "GET /api/progress": _ = try await api.currentProgress()
+        case "GET /api/progress":
+            if fixture.type == "ProgressSnapshot" { _ = try await api.progressState() }
+            else { _ = try await api.currentProgress() }
         case "PUT /api/progress": _ = try await api.changeProgress(StateBatch(protocol: 1, accountId: scope.accountId, generation: scope.generation, clientId: client, sequence: StateID("1"), changes: [StateProgressChange(episodeId: StateID("910001"), positionSeconds: 12, completed: false)]))
         case "GET /api/lists":
             let lists = try await api.lists()
@@ -296,6 +300,8 @@ final class ContractFixtureTests: XCTestCase {
             let result = try await api.changeList(id: ":id", batch: ListBatch(scope: scope, clientId: "a7a2e014-b64f-4487-9c92-71cd59fc0cf7", sequence: "9007199254740993", changes: [ListChange(op: .add, episodeId: 910001), ListChange(op: .remove, episodeId: 910002), ListChange(op: .add, episodeId: 910003)]))
             XCTAssertEqual(result.sequence, "9007199254740993")
             XCTAssertEqual(result.results.map(\.status), [.applied, .unchanged, .notFound])
+        case "POST /api/lists/:id/migration":
+            _ = try await api.migrateList(id: ":id", batch: ListBatch(clientId: client, sequence: "9007199254740993", changes: [ListChange(op: .add, episodeId: 910001), ListChange(op: .remove, episodeId: 910002), ListChange(op: .add, episodeId: 910003)]), scope: scope)
         case "GET /api/account": _ = try await api.account()
         case "PUT /api/account/preferences": _ = try await api.savePreferences(AudioOptions(speed: 1.5, effects: AudioEffects(volumeBoost: true)))
         case "DELETE /api/account/passkeys/:id": try await api.removePasskey(id: ":id")
