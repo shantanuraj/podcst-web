@@ -224,12 +224,12 @@ With `"onlyIfStale": true`, the response is `RefreshStatus` `{ "status": string 
 | --- | --- | --- |
 | `updated` | 200 | The feed changed and episodes were stored. |
 | `not_modified` | 200 | Fetched; unchanged. |
-| `skipped` | 200 | Not due. |
-| `busy` | 202 | Another refresh holds the podcast lock; retry later. |
+| `skipped` | 200 | Not due, or the fetched result lost its lease/source binding before publication. |
+| `busy` | 202 | An active refresh lease or contended podcast write lock; retry later. |
 | `not_found` | 404 | The podcast row disappeared. |
 | `error` | 502 | The fetch failed; back-off was recorded. |
 
-The web client retries `busy` with exponential back-off and refetches episode data after `updated` (`src/data/feed-refresh.ts`).
+The web client retries `busy` with exponential back-off and refetches episode data after `updated` (`src/data/feed-refresh.ts`). Fetching runs outside database transactions, between a short lease claim and a source/owner/token-checked write phase ([details](../../docs/feed-fetching.md#refresh-transactions)). This endpoint still awaits fetching; it is not a new queued-job or freshness API.
 
 Without `onlyIfStale`, the response is the full `Podcast` for every outcome except `not_found` and `error`, which return 500 `{message: "Failed to refresh feed"}`. `busy` and `skipped` therefore return the current stored podcast. iOS uses this mode for pull-to-refresh (`APIClient.refresh(podcastID:)`).
 

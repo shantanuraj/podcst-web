@@ -30,6 +30,35 @@ Chapter metadata retains its separate range/redirect/validator policy. Public
 move verification retains its own locator/evidence policy. These callers share
 only the applicable DNS, pinned-request, validator and RSS-body primitives.
 
+## Refresh transactions
+
+Migration `0011-feed-refresh-leases.sql` adds a token and expiry to the disposable
+`feed_poll_state` row. Refresh uses three phases:
+
+1. Briefly acquire the existing per-podcast advisory lock, lock/recheck the source,
+   apply scheduling/backoff rules, and claim a 60-second lease.
+2. Release the transaction and connection before DNS, HTTP and parsing.
+3. Reacquire locks in the same order and recheck the token, expiry, owner and exact
+   locator before publishing metadata/content and the next schedule atomically.
+
+Active leases return `busy` and are excluded from scheduled polling. A dead worker's
+lease expires; a late worker cannot publish, charge failure backoff or release a
+replacement's token. If the commit lock is busy, the unused claim also expires.
+Source URL/owner changes invalidate the lease and HTTP validators and make the new
+source due, even if a URL changes away and back. Ordinary metadata/access updates
+do not invalidate it. Deleted sources are never recreated by refresh completion.
+
+Saved-content writers and eviction retain their existing advisory-lock ordering.
+They can run during network I/O; the refresh write phase still serializes with
+those mutations. Conditional responses, rebuilds and failure backoff keep their
+existing behavior. Public move verification runs only after a successful commit.
+
+Apply the migration only under a separately approved writer/activation plan. Old
+refresh workers do not honor leases and must be retired at cutover. The new
+trigger also requires source writers to retain their existing poll-state UPDATE
+permission. Leases are reconstructible scheduler state, not durable user intent;
+restores may omit them and resume cold polling.
+
 ## Verification and remaining work
 
 Synthetic suites cover private/mixed/IPv6 destinations, pinning and rebinding,
@@ -39,6 +68,12 @@ Local integration tests inject a fixture resolver; production has no loopback
 switch or environment bypass. Existing publisher fixtures still parse, but this
 is not a broad publisher-compatibility survey.
 
-Fetches still run inside refresh/import transactions. Moving that work to durable
-claim/fetch/commit leases and agreeing pending/freshness API semantics is a
-separate change; bounded transport alone does not solve transaction occupancy.
+Disposable PostgreSQL tests additionally prove connection/lock release during
+fetch, single-worker admission, expired-worker recovery, stale success/failure
+refusal, source/owner/deletion races, exact large IDs, Starred retention, populated
+migration rollback and trigger search-path isolation.
+
+Import fetching already precedes its write transaction, but global interactive
+admission and import identity/ownership races still require review. Reads still
+await content rebuilds. No pending/freshness DTO or background-job API is introduced
+here; nonblocking reads and changed response contracts remain separate work.

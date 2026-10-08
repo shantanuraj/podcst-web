@@ -84,8 +84,7 @@ export async function claimPublicAliases(
     await tx`UPDATE podcasts SET feed_url = ${canonical}, updated_at = now() WHERE id = ${claim.podcastId}`;
     await tx`
       INSERT INTO feed_poll_state (podcast_id, next_poll_at, failures) VALUES (${claim.podcastId}, now(), 0)
-      ON CONFLICT (podcast_id) DO UPDATE SET etag = NULL, last_modified = NULL, hash = NULL,
-        last_polled_at = NULL, next_poll_at = now(), failures = 0
+      ON CONFLICT (podcast_id) DO NOTHING
     `;
   }
   await tx`DELETE FROM podcast_feed_aliases WHERE podcast_id = ${claim.podcastId} AND feed_url = ${canonical}`;

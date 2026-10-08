@@ -69,6 +69,7 @@ export async function getDuePodcasts(sql: postgres.Sql, limit: number) {
     JOIN podcasts p ON p.id = c.id
     LEFT JOIN feed_poll_state s ON s.podcast_id = p.id
     WHERE p.is_active = true
+      AND (s.refresh_expires_at IS NULL OR s.refresh_expires_at <= now())
       AND (
         s.next_poll_at IS NULL OR s.next_poll_at <= now()
         OR (
