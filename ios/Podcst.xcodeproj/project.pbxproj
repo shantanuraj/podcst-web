@@ -160,6 +160,7 @@
 		F86D521B642B788319196312 = {isa = PBXBuildFile; fileRef = D5A7AB1D8FBB932075787C3E; };
 		6B3FCD8A93C1FF724498BA7B = {isa = PBXBuildFile; fileRef = D5A7AB1D8FBB932075787C3E; };
 		4E7E521EC7785029944A6534 = {isa = PBXBuildFile; fileRef = 11A8DCAAA6B9BD4AA43F0DEC; };
+		D05000000000000000000002 = {isa = PBXBuildFile; fileRef = D05000000000000000000001; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -293,6 +294,7 @@
 		77903BF3FCDDB37D6FDD5406 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/Media/BackgroundMediaDownloads.swift"; sourceTree = "<group>"; };
 		D5A7AB1D8FBB932075787C3E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/Media/DownloadedMediaFile.swift"; sourceTree = "<group>"; };
 		11A8DCAAA6B9BD4AA43F0DEC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadedMediaFileTests.swift"; sourceTree = "<group>"; };
+		D05000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -378,6 +380,7 @@
 				115A9B040A2E64A464D8C75F /* RootView.swift */,
 				F754A39CE6B3C70CF8228342 /* SettingsView.swift */,
 				F9D6E69B6BD7D99E5E6B4C1A /* Podcst.entitlements */,
+				D05000000000000000000001,
 				E95984C2429031F651BE7C6F /* Theme.swift */,
 				2FF58CC5CDAD096FA7DE89F1 /* Fonts/Inter.ttf */,
 				7560420A003084CB2158B661 /* Fonts/InstrumentSerif-Italic.ttf */,
@@ -590,6 +593,7 @@
 				868D1B2DA0B00B16D87042DD /* Fonts/InstrumentSerif-Italic.ttf in Resources */,
 				C5D57C3090625EEBBCFC79BF /* Fonts/Inter.ttf in Resources */,
 				4A7C2E91D03B58F6A1E4C7B2 /* Assets.xcassets in Resources */,
+				D05000000000000000000002,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -846,7 +850,6 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = DBD4H768ZS;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -877,8 +880,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = DBD4H768ZS;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;

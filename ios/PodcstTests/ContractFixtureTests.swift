@@ -4,6 +4,24 @@ import XCTest
 
 @MainActor
 final class ContractFixtureTests: XCTestCase {
+    func testAppBundlesRequiredReasonManifest() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy"))
+        let manifest = try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let accesses = try XCTUnwrap(manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
+        var reasons: [String: [String]] = [:]
+        for access in accesses {
+            let category = try XCTUnwrap(access["NSPrivacyAccessedAPIType"] as? String)
+            XCTAssertNil(reasons[category])
+            reasons[category] = try XCTUnwrap(access["NSPrivacyAccessedAPITypeReasons"] as? [String])
+        }
+        XCTAssertEqual(reasons, [
+            "NSPrivacyAccessedAPICategoryUserDefaults": ["CA92.1"],
+            "NSPrivacyAccessedAPICategoryFileTimestamp": ["C617.1"],
+            "NSPrivacyAccessedAPICategorySystemBootTime": ["35F9.1"],
+            "NSPrivacyAccessedAPICategoryDiskSpace": ["85F4.1"],
+        ])
+    }
+
     func testAPIContractFixturesAreConsumed() async throws {
         let root = contractRoot().appendingPathComponent("fixtures/api")
         let index = try JSONDecoder().decode([String: APIFixture].self, from: Data(contentsOf: root.appendingPathComponent("index.json")))

@@ -1,4 +1,6 @@
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+CURRENT_PROJECT_VERSION = 1
+MARKETING_VERSION = 1.0
 DEFINES_MODULE = YES
 LIBRARY_SEARCH_PATHS = $(inherited) $(BUILT_PRODUCTS_DIR)
 OTHER_LDFLAGS = $(inherited) -lpodcst_audio_engine -liconv -lc++ -framework Security -framework CoreFoundation
