@@ -46,6 +46,8 @@ data class EpisodeEntity(
     val fileLength: Long,
     val fileType: String,
     val isPrivate: Boolean,
+    val mediaIdentity: String? = null,
+    val mediaReferenceIdentity: String? = null,
 )
 
 @Entity(tableName = "subscriptions")

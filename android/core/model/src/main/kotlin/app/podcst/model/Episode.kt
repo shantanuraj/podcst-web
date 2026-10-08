@@ -30,8 +30,11 @@ data class Episode(
     val author: String? = null,
     val file: EpisodeFile,
     val isPrivate: Boolean = false,
+    val mediaIdentity: String? = null,
+    val mediaReferenceIdentity: String? = null,
+    val localIdentity: String? = null,
 ) {
-    val identity: EpisodeIdentity get() = EpisodeIdentity(feed, guid)
+    val identity: EpisodeIdentity get() = id?.let { EpisodeIdentity("episode:$it") } ?: EpisodeIdentity(localIdentity ?: "local:$feed\u001F$guid")
     val artwork: String get() = episodeArt?.takeIf { it.isNotBlank() } ?: cover
     val notes: String get() = showNotes.ifEmpty { summary.orEmpty() }
     val shareUrl: String? get() = if (isPrivate) null else shareableWebpage(link, excluding = listOf(feed, file.url))
@@ -41,5 +44,5 @@ data class Episode(
 @Serializable
 @JvmInline
 value class EpisodeIdentity(val value: String) {
-    constructor(feed: String, guid: String) : this("$feed\u001F$guid")
+    constructor(feed: String, guid: String) : this("local:$feed\u001F$guid")
 }

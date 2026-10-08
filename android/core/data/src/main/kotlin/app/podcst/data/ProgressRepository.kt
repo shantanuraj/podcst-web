@@ -1,20 +1,19 @@
 package app.podcst.data
 
 import androidx.room.withTransaction
-import app.podcst.database.OutboxEntity
 import app.podcst.database.ProgressEntity
 import app.podcst.database.domain
 import app.podcst.database.entity
-import app.podcst.model.Episode
-import app.podcst.model.EpisodeProgress
-import app.podcst.model.PlaybackProgress
+import app.podcst.model.*
 import app.podcst.network.ApiException
 import app.podcst.network.PodcstApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -27,139 +26,204 @@ class ProgressRepository(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val syncMutex = Mutex()
+    private val edits = Mutex()
+    private val durable = scopes.durable
+    private var retryAt = 0L
+    val status = durable.status
 
     val progress: Flow<Map<String, EpisodeProgress>> = scopes.current.flatMapLatest { scope ->
-        scope.database.progress().observeAll().map { rows -> rows.associate { it.identity to it.domain() } }
+        combine(scope.database.progress().observeAll(), durable.revision) { rows, _ ->
+            val result = rows.associate { it.identity to it.domain() }.toMutableMap()
+            scope.accountId?.let { account ->
+                val saved = runCatching { durable.account(account) }.getOrNull()
+                saved?.progress?.forEach { (id, progress) ->
+                    val key = "episode:$id"
+                    if (progress == null) result.remove(key) else result[key] = EpisodeProgress(progress.positionSeconds.seconds, result[key]?.duration, progress.completed, Instant.fromEpochMilliseconds(progress.updatedAtMs ?: 0))
+                }
+                saved?.progressOverlay()?.forEach { (id, change) ->
+                    val key = "episode:$id"
+                    result[key] = EpisodeProgress(change.positionSeconds.seconds, result[key]?.duration, change.completed, result[key]?.updated ?: Instant.fromEpochMilliseconds(clock()))
+                }
+            }
+            result
+        }
+    }
+    val legacyProgress: Flow<List<Episode>> = scopes.current.flatMapLatest { owner ->
+        combine(owner.database.episodes().observeLegacyProgress(), owner.database.outbox().observePending(), durable.revision) { episodes, pending, _ ->
+            val reapplied = owner.accountId?.let { runCatching { durable.account(it).reappliedLegacy }.getOrNull() }.orEmpty()
+            val ids = pending.filter { "${it.episodeId}:${it.queuedAt}" !in reapplied }.map { it.episodeId }.toSet()
+            episodes.filter { it.id in ids || it.mediaIdentity?.removePrefix("episode:")?.toLongOrNull() in ids }.map { it.domain() }
+        }
     }
 
     val unfinished: Flow<List<Episode>> = scopes.current.flatMapLatest { scope ->
-        scope.database.episodes().observeUnfinished(UNFINISHED_LIMIT).map { rows -> rows.map { it.domain() } }
+        scope.database.episodes().observeUnfinished(50).map { rows -> rows.map { it.domain() } }
     }
 
-    suspend fun record(episode: Episode, position: Duration, completed: Boolean, owner: Scope = scopes.current.value) {
-        if (scopes.current.value !== owner) return
-        val database = owner.database
-        val duration = episode.duration
-        val done = completed || EpisodeProgress.completes(position, duration)
-        val now = clock()
-        val queued = database.withTransaction {
-            if (scopes.current.value !== owner) return@withTransaction false
-            database.episodes().upsert(listOf(episode.entity()))
-            database.progress().upsert(
-                ProgressEntity(episode.identity.value, position.inWholeMilliseconds, duration?.inWholeMilliseconds, done, now),
-            )
-            val id = episode.id ?: return@withTransaction false
-            if (owner.accountId == null) return@withTransaction false
-            val previous = database.outbox().get(id)
-            val queuedAt = maxOf(now, previous?.queuedAt?.plus(1) ?: now)
-            database.outbox().enqueue(OutboxEntity(id, position.inWholeMilliseconds / 1000.0, done, queuedAt))
-            true
+    suspend fun record(episode: Episode, position: Duration, completed: Boolean, owner: Scope = scopes.current.value) =
+        event(episode, position, if (completed) StateProgressEvent.ended else StateProgressEvent.checkpoint, owner)
+
+    suspend fun event(episode: Episode, position: Duration, event: StateProgressEvent, owner: Scope = scopes.current.value, legacyToken: String? = null) = edits.withLock {
+        if (scopes.current.value !== owner) return@withLock
+        try {
+            val previous = owner.database.progress().get(episode.identity.value)
+            val account = owner.accountId
+            val state = account?.let(durable::account)
+            val completed = episode.id?.let { state?.progressOverlay()?.get(it)?.completed ?: state?.progress?.get(it)?.completed } ?: previous?.completed ?: false
+            require(position >= Duration.ZERO && position.inWholeSeconds <= Int.MAX_VALUE) { "Source position is outside the supported range" }
+            val (seconds, done) = event.intent(position.inWholeSeconds.toInt(), completed)
+            // This journal commit is the saved projection; Room is only a reconstructible presentation copy.
+            if (account != null && episode.id != null) durable.queueProgress(account, StateProgressChange(StateID(episode.id.toString()), seconds, done), legacyToken)
+            try {
+                owner.database.withTransaction {
+                    owner.database.episodes().upsert(listOf(episode.entity()))
+                    owner.database.progress().upsert(ProgressEntity(episode.identity.value, seconds * 1000L, episode.duration?.inWholeMilliseconds, done, clock()))
+                }
+            } catch (failure: Exception) {
+                if (failure is CancellationException || account == null || episode.id == null) throw failure
+                durable.error(account, "Progress is saved in the durable journal; its presentation cache could not be updated.")
+            }
+            if (account != null && episode.id != null) scheduler.syncProgress()
+        } catch (failure: Exception) { durable.error(owner.accountId, "Progress could not be saved: ${failure.message}"); throw failure }
+    }
+
+    /** Old unkeyed writes are never sent implicitly, even if the server has no progress. */
+    suspend fun reapplyLegacy(episode: Episode) {
+        val owner = scopes.current.value
+        val id = episode.id ?: error("Resolve this episode before reapplying")
+        val stored = owner.database.episodes().get(episode.identity.value) ?: error("Resolve this episode before reapplying")
+        // The retained media seed records the original numeric reference; a newly resolved ID
+        // must not accidentally select another legacy row that happens to have that number.
+        val retainedId = stored.mediaIdentity?.takeIf { it.startsWith("episode:") }?.removePrefix("episode:")?.toLongOrNull()
+        val originalId = retainedId ?: run {
+            val db = owner.database.openHelper.readableDatabase
+            val hasSource = db.query("SELECT name FROM sqlite_master WHERE name='legacy_episode_source'").use { it.moveToFirst() }
+            if (hasSource) db.query("SELECT id FROM legacy_episode_source WHERE feed = ? AND guid = ?", arrayOf(episode.feed, episode.guid)).use { row ->
+                if (row.count == 1 && row.moveToFirst()) row.getLong(0) else null
+            } else id
         }
-        if (queued) scheduler.syncProgress()
+        val old = originalId?.let { owner.database.outbox().get(it) } ?: error("No ambiguous saved progress remains for this episode")
+        event(episode, old.position.seconds, if (old.completed) StateProgressEvent.played else StateProgressEvent.replay, owner, "${old.episodeId}:${old.queuedAt}")
+        // Keep the original source row as evidence; repeated reapply is an explicit NEW action.
     }
 
     suspend fun restoreLatest(): PlaybackProgress? {
         val owner = scopes.current.value
+        val epoch = scopes.epoch
         return syncMutex.withLock {
-            if (owner.accountId == null || scopes.current.value !== owner) return@withLock null
-            if (syncPending(owner) != SyncOutcome.Done || scopes.current.value !== owner) return@withLock null
-            val database = owner.database
-            if (database.outbox().pending().isNotEmpty()) return@withLock null
+            if (!active(owner, epoch) || syncPending(owner, epoch) != SyncOutcome.Done) return@withLock null
+            val account = owner.accountId ?: return@withLock null
+            val saved = durable.account(account)
+            if (saved.progressFlight != null || saved.progressQueued.isNotEmpty() || saved.progressBlocked != null) return@withLock null
             val latest = api.currentProgress() ?: return@withLock null
-            if (scopes.current.value !== owner) return@withLock null
-            database.withTransaction {
-                if (scopes.current.value !== owner || database.outbox().pending().isNotEmpty()) return@withTransaction null
-                database.episodes().upsert(listOf(latest.episode.entity()))
-                database.progress().upsert(
-                    ProgressEntity(
-                        latest.episode.identity.value,
-                        latest.position.seconds.inWholeMilliseconds,
-                        latest.episode.duration?.inWholeMilliseconds,
-                        false,
-                        clock(),
-                    ),
-                )
-                latest
-            }
+            if (!active(owner, epoch)) return@withLock null
+            val snapshot = api.progressState(listOfNotNull(latest.episode.id))
+            if (!active(owner, epoch)) return@withLock null
+            durable.installProgress(account, snapshot, listOfNotNull(latest.episode.id))
+            if (durable.account(account).progressOverlay().isNotEmpty()) return@withLock null
+            val truth = snapshot.items.singleOrNull()?.progress ?: return@withLock null
+            if (truth.completed) return@withLock null
+            owner.database.episodes().upsert(listOf(latest.episode.entity()))
+            installProjection(owner)
+            latest.copy(episode = owner.database.episodes().get(latest.episode.identity.value)?.domain() ?: latest.episode, position = truth.positionSeconds.toDouble())
         }
     }
 
     suspend fun refresh(episodes: List<Episode>) {
         val owner = scopes.current.value
-        if (owner.accountId == null) return
-        val selected = episodes.filter { it.id != null }.distinctBy { it.identity }
-        if (selected.isEmpty()) return
+        val epoch = scopes.epoch
+        val account = owner.accountId ?: return
+        if (!active(owner, epoch)) return
         syncMutex.withLock {
-            if (scopes.current.value !== owner) return@withLock
-            val database = owner.database
-            val before = database.withTransaction {
-                selected.associate { it.identity.value to database.progress().get(it.identity.value) }
+            for (ids in episodes.mapNotNull { it.id }.distinct().chunked(200)) {
+                val snapshot = api.progressState(ids)
+                if (!active(owner, epoch)) return@withLock
+                durable.installProgress(account, snapshot, ids)
             }
-            val pending = database.outbox().pending().mapTo(mutableSetOf()) { it.episodeId }
-            val remote = api.episodeProgress(selected.mapNotNull { it.id }).associateBy { it.episodeId }
-            if (scopes.current.value !== owner) return@withLock
-            database.withTransaction {
-                if (scopes.current.value !== owner) return@withTransaction
-                pending += database.outbox().pending().map { it.episodeId }
-                for (episode in selected) {
-                    val identity = episode.identity.value
-                    if (episode.id in pending || database.progress().get(identity) != before[identity]) continue
-                    val saved = remote[episode.id]
-                    if (saved == null) {
-                        database.progress().delete(identity)
-                    } else {
-                        database.progress().upsert(ProgressEntity(
-                            identity,
-                            saved.position.seconds.inWholeMilliseconds,
-                            episode.duration?.inWholeMilliseconds,
-                            saved.completed,
-                            before[identity]?.updatedAt ?: clock(),
-                        ))
-                    }
-                }
-            }
+            installProjection(owner)
         }
     }
-
     suspend fun sync(): SyncOutcome {
         val owner = scopes.current.value
-        return syncMutex.withLock { syncPending(owner) }
+        val epoch = scopes.epoch
+        return syncMutex.withLock { syncPending(owner, epoch) }
     }
+    private fun active(owner: Scope, epoch: Long) = scopes.current.value === owner && scopes.epoch == epoch && scopes.verified && owner.accountId != null
 
-    private suspend fun syncPending(scope: Scope): SyncOutcome {
-        if (scopes.current.value !== scope) return SyncOutcome.Done
-        if (scope.accountId == null) return SyncOutcome.Done
-        val outbox = scope.database.outbox()
-        for (update in outbox.pending()) {
-            if (scopes.current.value !== scope) return SyncOutcome.Done
-            try {
-                api.saveProgress(update.episodeId, update.position, update.completed)
-            } catch (failure: ApiException) {
-                when {
-                    failure.status == 401 || failure.status == 403 -> return SyncOutcome.Done
-                    failure.status in 400..499 && failure.status !in RETRYABLE -> Unit
-                    else -> return SyncOutcome.Retry
-                }
-            } catch (failure: java.io.IOException) {
-                return SyncOutcome.Retry
+    private suspend fun syncPending(owner: Scope, epoch: Long): SyncOutcome {
+        val account = owner.accountId ?: return SyncOutcome.Done
+        if (!active(owner, epoch)) return SyncOutcome.Done
+        if (clock() < retryAt) return SyncOutcome.Retry
+        try {
+            if (durable.account(account).progressBlocked != null) return SyncOutcome.Done
+            if (durable.account(account).generation == null) {
+                val snapshot = api.progressState()
+                if (!active(owner, epoch)) return SyncOutcome.Done
+                durable.installProgress(account, snapshot)
             }
-            if (scopes.current.value !== scope) return SyncOutcome.Done
-            outbox.sent(update.episodeId, update.queuedAt)
+            do {
+                if (!active(owner, epoch)) return SyncOutcome.Done
+                val current = durable.freezeProgress(account)
+                val flight = current.progressFlight ?: break
+                if (flight.ack == null) {
+                    val ack = api.changeProgress(flight.batch)
+                    if (!active(owner, epoch)) return SyncOutcome.Done
+                    durable.acknowledgeProgress(account, ack)
+                }
+                val ids = flight.batch.changes.map { it.episodeId.value.toLong() }.distinct()
+                val snapshot = api.progressState(ids)
+                if (!active(owner, epoch)) return SyncOutcome.Done
+                durable.installProgress(account, snapshot, ids)
+                installProjection(owner)
+            } while (durable.account(account).progressQueued.isNotEmpty())
+            installProjection(owner)
+            retireReappliedSource(owner)
+            if (owner.database.outbox().pending().any { "${it.episodeId}:${it.queuedAt}" !in durable.account(account).reappliedLegacy }) durable.error(account, "Old progress is kept locally. Use Reapply saved progress to send a new action.") else durable.clearError(account)
+            return SyncOutcome.Done
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            if (!active(owner, epoch)) return SyncOutcome.Done
+            durable.error(account, "Progress sync paused: ${failure.message}. Pending work retained.")
+            if (failure is ApiException && failure.status == 401) { scopes.suspendSync(); return SyncOutcome.Done }
+            if (failure is IllegalArgumentException || failure is IllegalStateException || failure is ApiException && (failure.code == "invalid_response" || failure.status in listOf(400, 403, 404, 409, 413, 426))) {
+                durable.change(account) { it.copy(progressBlocked = "Progress sync blocked: ${failure.message}") }
+                return SyncOutcome.Done
+            }
+            retryAt = clock() + ((failure as? ApiException)?.retryAfterSeconds?.coerceIn(1, 86400) ?: 30) * 1000
+            return SyncOutcome.Retry
         }
-        return SyncOutcome.Done
+    }
+    private suspend fun retireReappliedSource(owner: Scope) {
+        val account = owner.accountId ?: return
+        val saved = durable.account(account)
+        for ((token, canonicalId) in saved.reappliedLegacy) {
+            if (canonicalId in saved.progressOverlay() || canonicalId !in saved.progress || "Episode $canonicalId unavailable" in saved.failures) continue
+            val (oldId, queuedAt) = token.split(':').map(String::toLong)
+            owner.database.withTransaction {
+                owner.database.outbox().sent(oldId, queuedAt)
+                val db = owner.database.openHelper.writableDatabase
+                val archived = db.query("SELECT name FROM sqlite_master WHERE name='legacy_episode_source'").use { it.moveToFirst() }
+                if (archived) db.execSQL("DELETE FROM legacy_episode_source WHERE id = ? AND id NOT IN (SELECT episodeId FROM progress_outbox)", arrayOf<Any>(oldId))
+            }
+            durable.change(account) { it.copy(reappliedLegacy = it.reappliedLegacy - token) }
+        }
     }
 
-    private companion object {
-        const val UNFINISHED_LIMIT = 50
-        val RETRYABLE = setOf(408, 425, 429)
+    private suspend fun installProjection(owner: Scope) {
+        val account = owner.accountId ?: return
+        val saved = durable.account(account)
+        owner.database.withTransaction {
+            for ((id, progress) in saved.progress) {
+                val key = "episode:$id"
+                if (id in saved.progressOverlay()) continue
+                if (progress == null) owner.database.progress().delete(key) else {
+                    val old = owner.database.progress().get(key)
+                    owner.database.progress().upsert(ProgressEntity(key, progress.positionSeconds * 1000L, old?.durationMs, progress.completed, progress.updatedAtMs ?: clock()))
+                }
+            }
+        }
     }
 }
 
 enum class SyncOutcome { Done, Retry }
-
-internal fun ProgressEntity.domain() = EpisodeProgress(
-    position = positionMs.milliseconds,
-    duration = durationMs?.milliseconds,
-    completed = completed,
-    updated = Instant.fromEpochMilliseconds(updatedAt),
-)
+internal fun ProgressEntity.domain() = EpisodeProgress(positionMs.milliseconds, durationMs?.milliseconds, completed, Instant.fromEpochMilliseconds(updatedAt))

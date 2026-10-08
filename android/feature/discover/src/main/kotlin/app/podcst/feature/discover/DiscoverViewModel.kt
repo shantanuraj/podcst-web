@@ -42,7 +42,7 @@ data class DiscoverState(
     val refreshing: Boolean = load == ChartLoad.Loading && chart.isNotEmpty()
     val initial: String? = user?.let { (it.name?.takeIf(String::isNotBlank) ?: it.email).firstOrNull()?.lowercase() }
 
-    fun subscribed(podcast: Podcast): Boolean = podcast.feed in subscribed
+    fun subscribed(podcast: Podcast): Boolean = podcast.identity in subscribed
 }
 
 class DiscoverViewModel(

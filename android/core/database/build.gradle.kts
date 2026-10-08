@@ -6,6 +6,7 @@ plugins {
 
 android {
     namespace = "app.podcst.database"
+    testOptions.unitTests.all { it.systemProperty("podcst.schemas", file("schemas").absolutePath) }
 }
 
 room {

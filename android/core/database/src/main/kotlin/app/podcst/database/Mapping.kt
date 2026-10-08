@@ -26,6 +26,8 @@ fun Episode.entity() = EpisodeEntity(
     fileUrl = file.url,
     fileLength = file.length,
     fileType = file.type,
+    mediaIdentity = mediaIdentity ?: id?.let { "episode:$it" } ?: podcastId?.let { "podcast:$it:$guid" } ?: "$feed\u001F$guid",
+    mediaReferenceIdentity = mediaReferenceIdentity ?: identity.value,
     isPrivate = isPrivate,
 )
 
@@ -46,6 +48,9 @@ fun EpisodeEntity.domain() = Episode(
     showNotes = showNotes,
     author = author,
     file = EpisodeFile(fileUrl, fileLength, fileType),
+    mediaIdentity = mediaIdentity,
+    mediaReferenceIdentity = mediaReferenceIdentity,
+    localIdentity = identity.takeIf { id == null },
     isPrivate = isPrivate,
 )
 

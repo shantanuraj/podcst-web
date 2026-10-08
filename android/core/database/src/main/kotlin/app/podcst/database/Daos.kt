@@ -11,6 +11,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PodcastDao {
+    @Query("SELECT * FROM podcasts WHERE id IS NULL")
+    fun observeUnresolved(): Flow<List<PodcastEntity>>
+    @Query("SELECT * FROM podcasts WHERE id IS NULL")
+    suspend fun unresolved(): List<PodcastEntity>
+
+    @Query("SELECT * FROM podcasts")
+    fun observeAll(): Flow<List<PodcastEntity>>
+
     @Query("SELECT * FROM podcasts WHERE feed = :feed")
     fun observe(feed: String): Flow<PodcastEntity?>
 
@@ -35,6 +43,14 @@ interface PodcastDao {
 
 @Dao
 interface EpisodeDao {
+    @Query("SELECT e.* FROM episodes e JOIN progress_outbox o ON e.id = o.episodeId OR e.mediaIdentity = 'episode:' || o.episodeId")
+    fun observeLegacyProgress(): Flow<List<EpisodeEntity>>
+
+    @Query("SELECT * FROM episodes WHERE id IS NULL")
+    fun observeUnresolved(): Flow<List<EpisodeEntity>>
+    @Query("SELECT * FROM episodes WHERE id IS NULL")
+    suspend fun unresolved(): List<EpisodeEntity>
+
     @Query("SELECT * FROM episodes WHERE feed = :feed")
     fun observeCatalog(feed: String): Flow<List<EpisodeEntity>>
 
@@ -47,14 +63,47 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE identity = :identity")
     suspend fun get(identity: String): EpisodeEntity?
 
-    @Query("SELECT * FROM episodes WHERE identity IN (:identities)")
+    @Query("SELECT * FROM episodes WHERE identity IN (:identities) OR mediaReferenceIdentity IN (:identities)")
     suspend fun get(identities: List<String>): List<EpisodeEntity>
 
-    @Query("SELECT * FROM episodes WHERE identity IN (:identities)")
+    @Query("SELECT * FROM episodes WHERE identity IN (:identities) OR mediaReferenceIdentity IN (:identities)")
     fun observe(identities: List<String>): Flow<List<EpisodeEntity>>
 
     @Upsert
-    suspend fun upsert(episodes: List<EpisodeEntity>)
+    suspend fun writeEpisodes(episodes: List<EpisodeEntity>)
+
+    @Query("SELECT * FROM episodes WHERE feed = :feed AND guid = :guid")
+    suspend fun source(feed: String, guid: String): List<EpisodeEntity>
+
+    @Query("UPDATE queue SET identity = :new WHERE identity = :old")
+    suspend fun moveQueue(old: String, new: String)
+    @Query("UPDATE player SET current = :new WHERE current = :old")
+    suspend fun movePlayer(old: String, new: String)
+    @Query("UPDATE OR IGNORE progress SET identity = :new WHERE identity = :old")
+    suspend fun moveProgress(old: String, new: String)
+    @Query("UPDATE OR IGNORE stars SET identity = :new WHERE identity = :old")
+    suspend fun moveStars(old: String, new: String)
+    @Query("DELETE FROM episodes WHERE identity = :identity")
+    suspend fun remove(identity: String)
+
+    @Transaction
+    suspend fun upsert(episodes: List<EpisodeEntity>) {
+        for (episode in episodes) {
+            val existing = get(episode.identity)
+            // Only an exact source-scoped observation may resolve an old local reference.
+            val source = source(episode.feed, episode.guid).singleOrNull()?.takeIf { it.id == null && episode.id != null }
+            val media = existing?.mediaIdentity ?: source?.mediaIdentity ?: episode.mediaIdentity
+            if (source != null && source.identity != episode.identity) {
+                moveQueue(source.identity, episode.identity)
+                movePlayer(source.identity, episode.identity)
+                moveProgress(source.identity, episode.identity)
+                moveStars(source.identity, episode.identity)
+                // Keep conflicting old progress/source rows; they are not new upload intent.
+                remove(source.identity)
+            }
+            writeEpisodes(listOf(episode.copy(mediaIdentity = media, mediaReferenceIdentity = existing?.mediaReferenceIdentity ?: source?.mediaReferenceIdentity ?: episode.mediaReferenceIdentity)))
+        }
+    }
 
     @RewriteQueriesToDropUnusedColumns
     @Query(
@@ -177,6 +226,9 @@ interface ProgressDao {
 
 @Dao
 interface OutboxDao {
+    @Query("SELECT * FROM progress_outbox ORDER BY queuedAt")
+    fun observePending(): Flow<List<OutboxEntity>>
+
     @Query("SELECT * FROM progress_outbox ORDER BY queuedAt")
     suspend fun pending(): List<OutboxEntity>
 

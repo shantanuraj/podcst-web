@@ -1,5 +1,7 @@
 package app.podcst.data
 
+import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
 import app.podcst.database.PodcastEntity
 import app.podcst.database.domain
 import app.podcst.database.entity
@@ -25,15 +27,23 @@ class CatalogRepository(
     }
 
     suspend fun refreshChart(region: Region, force: Boolean = false) {
-        val charts = scopes.database.charts()
+        val owner = scopes.current.value
+        val charts = owner.database.charts()
         val refreshedAt = charts.refreshedAt(region.code)
         if (!force && refreshedAt != null && clock() - refreshedAt < CHART_LIFETIME) return
         val podcasts = api.top(region.code, PlaybackRules.CHART_LIMIT)
-        store(podcasts)
+        if (scopes.current.value !== owner) throw CancellationException("Account changed")
+        store(podcasts, owner = owner)
         charts.replace(region.code, podcasts.map { it.feed }, clock())
     }
 
-    suspend fun search(term: String, region: Region): List<Podcast> = api.search(term, region.code)
+    suspend fun search(term: String, region: Region): List<Podcast> {
+        val owner = scopes.current.value
+        val epoch = scopes.epoch
+        val result = api.search(term, region.code)
+        if (scopes.current.value !== owner || scopes.epoch != epoch || owner.accountId != null && !scopes.verified) throw CancellationException("Account changed")
+        return if (owner.accountId == null) result.filterNot { it.isPrivate } else result
+    }
 
     fun podcast(feed: String): Flow<Podcast?> = scopes.current.flatMapLatest { scope ->
         combine(scope.database.podcasts().observe(feed), scope.database.episodes().observeCatalog(feed)) { podcast, episodes ->
@@ -54,27 +64,56 @@ class CatalogRepository(
         podcast.itunesId?.let { itunesId ->
             return load(api.resolve(itunesId, podcast.itunesLocale ?: Region.DEFAULT.code), force)
         }
+        val owner = scopes.current.value
         val resolved = api.podcast(podcast.feed)
+        if (scopes.current.value !== owner) throw CancellationException("Account changed")
         resolved.id?.let { id -> return load(id, force) }
-        store(listOf(resolved), complete = resolved.episodes.isNotEmpty())
+        store(listOf(resolved), complete = resolved.episodes.isNotEmpty(), owner = owner)
         return resolved
     }
 
     suspend fun load(id: Long, force: Boolean = false): Podcast {
-        val existing = scopes.database.podcasts().byId(id)
+        val owner = scopes.current.value
+        val existing = owner.database.podcasts().byId(id)
         if (!force && existing != null && existing.complete && fresh(existing)) {
             return existing.domain(scopes.database.episodes().catalog(existing.feed).map { it.domain() })
         }
         val podcast = if (force) api.refresh(id) else complete(id)
-        store(listOf(podcast), complete = true)
-        return podcast
+        if (scopes.current.value !== owner) throw CancellationException("Account changed")
+        store(listOf(podcast), complete = true, owner = owner)
+        return podcast.copy(episodes = owner.database.episodes().catalog(podcast.feed).map { it.domain() })
     }
 
-    internal suspend fun store(podcasts: List<Podcast>, complete: Boolean? = null) {
-        val database = scopes.database
-        val existing = podcasts.associate { it.feed to database.podcasts().get(it.feed) }
-        database.podcasts().upsert(podcasts.map { merged(existing[it.feed], it, complete) })
-        database.episodes().upsert(podcasts.flatMap { podcast -> podcast.episodes.map { it.entity() } })
+    internal suspend fun store(podcasts: List<Podcast>, complete: Boolean? = null, owner: Scope = scopes.current.value) {
+        if (scopes.current.value !== owner) throw CancellationException("Account changed")
+        if (owner.accountId != null && !scopes.verified) throw CancellationException("Account is not verified")
+        if (owner.accountId == null && podcasts.any { it.isPrivate || it.episodes.any { episode -> episode.isPrivate } }) throw CancellationException("Private catalogue requires a verified account")
+        val database = owner.database
+        database.withTransaction {
+            if (scopes.current.value !== owner) throw CancellationException("Account changed")
+            for (podcast in podcasts) {
+                val previous = podcast.id?.let { database.podcasts().byId(it) }
+                if (previous != null && previous.feed != podcast.feed) {
+                    // Feed URLs are lookup aliases, not synchronized identity. Move local references
+                    // alongside metadata in the same Room transaction. Persisted routes retain the canonical ID.
+                    val db = database.openHelper.writableDatabase
+                    db.execSQL("UPDATE OR IGNORE subscriptions SET feed = ? WHERE feed = ?", arrayOf(podcast.feed, previous.feed))
+                    db.execSQL("UPDATE charts SET feed = ? WHERE feed = ?", arrayOf(podcast.feed, previous.feed))
+                    db.execSQL("UPDATE episodes SET feed = ? WHERE podcastId = ?", arrayOf<Any?>(podcast.feed, podcast.id))
+                    db.execSQL("DELETE FROM podcasts WHERE feed = ?", arrayOf(previous.feed))
+                }
+                database.podcasts().upsert(listOf(merged(previous ?: database.podcasts().get(podcast.feed), podcast, complete)))
+                database.episodes().upsert(podcast.episodes.map { it.entity() })
+                val db = database.openHelper.writableDatabase
+                val archived = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='legacy_episode_source'").use { it.moveToFirst() }
+                if (archived) {
+                    for (episode in podcast.episodes.filter { it.id != null }) db.execSQL(
+                        "DELETE FROM legacy_episode_source WHERE feed = ? AND guid = ? AND id NOT IN (SELECT episodeId FROM progress_outbox)", arrayOf(episode.feed, episode.guid),
+                    )
+                    if (podcast.id != null) db.execSQL("DELETE FROM legacy_podcast_source WHERE feed = ?", arrayOf(podcast.feed))
+                }
+            }
+        }
     }
 
     private suspend fun complete(id: Long): Podcast {

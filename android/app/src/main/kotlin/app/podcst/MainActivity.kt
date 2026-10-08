@@ -60,6 +60,8 @@ class MainActivity : ComponentActivity() {
                 while (isActive) {
                     delay(5_000)
                     graph.stars.poll()
+                    graph.progress.sync()
+                    runCatching { graph.library.refresh() }
                 }
             }
         }

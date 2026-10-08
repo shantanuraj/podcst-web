@@ -1,5 +1,6 @@
 package app.podcst.network
 
+import app.podcst.model.*
 import app.podcst.model.AudioEffects
 import app.podcst.model.AudioOptions
 import app.podcst.model.ListAvailability
@@ -23,6 +24,8 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class ApiContractTest {
+    private val GENERATION = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
+    private val CLIENT = "a7a2e014-b64f-4487-9c92-71cd59fc0cf7"
     private val fixtures = File(checkNotNull(System.getProperty("podcst.contracts")), "fixtures/api")
     private val client = OkHttpClient()
     private lateinit var api: PodcstApi
@@ -68,6 +71,12 @@ class ApiContractTest {
             assertTrue(name, PodcstApi.json.decodeFromString<WireRefreshStatus>(body).status.isNotEmpty())
             return
         }
+        if (endpoint == "DELETE /api/subscriptions") {
+            // The adapter deliberately has no obsolete mutation writer to drive this fixture.
+            assertEquals("Replace obsolete success fixture with update-required", 426, status)
+            assertEquals("update_required", PodcstApi.json.decodeFromString<StateErrorBody>(body).code)
+            return
+        }
         val server = MockWebServer().apply { start() }
         api = PodcstApi(client, MemoryCookies().apply { write("token") }, server.url("/"))
         server.enqueue(MockResponse.Builder().code(status).body(body).addHeader("Content-Type", "application/json").build())
@@ -105,12 +114,12 @@ class ApiContractTest {
             "POST /api/auth/login" -> if (type == "PasskeyLoginResult") api.signInWithPasskey("{}", PasskeyChallenge("{}", "fixture-flow", 0)) else api.passkeyChallenge()
             "POST /api/auth/register" -> if (type == "PasskeyRegistrationResult") api.registerPasskey("{}", PasskeyChallenge("{}", "fixture-flow", 0)) else api.passkeyRegistration()
             "POST /api/auth/logout" -> api.signOut()
-            "GET /api/subscriptions" -> api.subscriptions().forEach { assertTrue(it.id != null) }
-            "POST /api/subscriptions" -> if (type == "ImportResult") api.importSubscriptions(listOf("https://example.com/feed.xml")) else api.subscribe(1)
-            "DELETE /api/subscriptions" -> api.unsubscribe(1)
-            "GET /api/progress" -> api.currentProgress()
-            "PUT /api/progress" -> api.saveProgress(1, 12.5, false)
-            "GET /api/lists" -> assertEquals("9007199254740993", api.lists().first().revision)
+            "GET /api/subscriptions" -> if (body.trimStart().startsWith("{" ) && body.contains("\"protocol\"")) api.followState() else api.subscriptions().forEach { assertTrue(it.id != null) }
+            "POST /api/subscriptions" -> api.changeFollows(StateBatch(1, "fixture-account-a", GENERATION, CLIENT, StateID("1"), listOf(StateFollowChange(StateID("1"), true))))
+            "POST /api/subscriptions/resolve" -> api.resolveSubscriptions("fixture-account-a", GENERATION, listOf("https://example.test/feed.xml"))
+            "GET /api/progress" -> if (body.contains("\"protocol\"")) api.progressState() else api.currentProgress()
+            "PUT /api/progress" -> api.changeProgress(StateBatch(1, "fixture-account-a", GENERATION, CLIENT, StateID("1"), listOf(StateProgressChange(StateID("1"), 12, false))))
+            "GET /api/lists" -> assertEquals("9007199254740993", api.lists().lists.first().revision)
             "GET /api/lists/:id/items" -> if (type == "ListSnapshot") {
                 val snapshot = api.listMembership(":id")
                 assertEquals("9007199254740993", snapshot.revision)
@@ -121,8 +130,8 @@ class ApiContractTest {
                 assertEquals(null, page.items.last().episode)
                 assertEquals(null, page.nextCursor)
             }
-            "POST /api/lists/:id/changes" -> {
-                val result = api.changeList(":id", ListBatch("a7a2e014-b64f-4487-9c92-71cd59fc0cf7", "9007199254740993", listOf(ListChange(ListChange.Operation.Add, 910001), ListChange(ListChange.Operation.Remove, 910002), ListChange(ListChange.Operation.Add, 910003))))
+            "POST /api/lists/:id/changes", "POST /api/lists/:id/migration" -> {
+                val result = api.changeList(":id", ListBatch("a7a2e014-b64f-4487-9c92-71cd59fc0cf7", "9007199254740993", listOf(ListChange(ListChange.Operation.Add, 910001), ListChange(ListChange.Operation.Remove, 910002), ListChange(ListChange.Operation.Add, 910003))), "fixture-account-a", GENERATION, endpoint.endsWith("/migration"))
                 assertEquals("9007199254740993", result.sequence)
                 assertEquals(listOf(ListChangeResult.Status.Applied, ListChangeResult.Status.Unchanged, ListChangeResult.Status.NotFound), result.results.map { it.status })
             }

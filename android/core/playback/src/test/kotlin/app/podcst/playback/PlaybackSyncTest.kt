@@ -9,6 +9,7 @@ import app.podcst.data.WorkScheduler
 import app.podcst.database.PlayerEntity
 import app.podcst.database.PodcstDatabase
 import app.podcst.database.entity
+import app.podcst.network.testing.StateFixtures
 import app.podcst.network.testing.Call
 import app.podcst.network.testing.FakeServer
 import app.podcst.network.testing.PlaybackFixtures.episode
@@ -41,7 +42,7 @@ import kotlin.time.Duration.Companion.seconds
 @Config(sdk = [35])
 class PlaybackSyncTest {
     private val application = RuntimeEnvironment.getApplication()
-    private val scopes = Scopes(application, "owner")
+    private val scopes = Scopes(application, "owner").also { it.resumeSync("owner") }
     private val phone = episode(1)
     private val web = episode(2)
     private val queued = episode(3)
@@ -63,7 +64,7 @@ class PlaybackSyncTest {
         val current = fixture.coordinator.state.value
         assertEquals(web.identity, current.episode?.identity)
         assertEquals(1271.seconds, current.position)
-        assertEquals(listOf(phone, queued, web), current.queue.episodes)
+        assertEquals(listOf(phone, queued, web).map { it.identity }, current.queue.episodes.map { it.identity })
         assertEquals(PlaybackStatus.Paused, current.status)
         assertFalse(current.requested)
         assertEquals(0, fixture.player.mediaItemCount)
@@ -114,14 +115,15 @@ class PlaybackSyncTest {
         fixture.player.setPosition(3673000)
         fixture.coordinator.pause()
         fixture.settle()
-        assertEquals(3673.0, scopes.database.outbox().pending().single().position, 0.0)
+        assertTrue(scopes.durable.status.value.pending)
+        assertEquals(3673000L, scopes.database.progress().get(phone.identity.value)?.positionMs)
         fixture.progress.sync()
         fixture.coordinator.checkpoint()
         fixture.coordinator.pause()
         fixture.coordinator.checkpoint()
         fixture.settle()
         assertTrue(scopes.database.outbox().pending().isEmpty())
-        assertEquals(1, fixture.server.calls.size)
+        assertEquals(1, fixture.server.calls.count { it.body.isNotEmpty() })
     }
 
     @Test
@@ -130,7 +132,7 @@ class PlaybackSyncTest {
         fixture.coordinator.restoreProgress()
         fixture.settle()
         assertEquals(1200.seconds, fixture.coordinator.state.value.position)
-        assertEquals(listOf(phone, queued), fixture.coordinator.state.value.queue.episodes)
+        assertEquals(listOf(phone, queued).map { it.identity }, fixture.coordinator.state.value.queue.episodes.map { it.identity })
         assertTrue(scopes.database.outbox().pending().isEmpty())
     }
 
@@ -256,7 +258,7 @@ class PlaybackSyncTest {
         val database = scopes.database
         database.episodes().upsert(listOf(phone.entity(), queued.entity()))
         database.player().save(listOf(phone.identity.value, queued.identity.value), PlayerEntity(current = phone.identity.value, positionMs = 3672000, active = true))
-        val server = FakeServer(route)
+        val server = FakeServer(StateFixtures(presentation = route)::route)
         val repository = ProgressRepository(server.api, scopes, object : WorkScheduler {
             override fun syncProgress() = Unit
             override fun refreshFeeds() = Unit

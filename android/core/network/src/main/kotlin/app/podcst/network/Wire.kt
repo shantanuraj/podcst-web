@@ -1,5 +1,6 @@
 package app.podcst.network
 
+import app.podcst.model.CatalogueId
 import app.podcst.model.Account
 import app.podcst.model.AccountEpisodeList
 import app.podcst.model.ListAvailability
@@ -45,8 +46,8 @@ internal data class WireFile(val url: String, val length: Long? = null, val type
 @Serializable
 internal data class WireEpisode(
     val isPrivate: Boolean? = null,
-    val id: Long? = null,
-    val podcastId: Long? = null,
+    @Serializable(CatalogueId::class) val id: Long? = null,
+    @Serializable(CatalogueId::class) val podcastId: Long? = null,
     val guid: String,
     val feed: String? = null,
     val podcastTitle: String? = null,
@@ -66,8 +67,8 @@ internal data class WireEpisode(
 @Serializable
 internal data class WirePodcast(
     val isPrivate: Boolean? = null,
-    val id: Long? = null,
-    @SerialName("itunes_id") val itunesId: Long? = null,
+    @Serializable(CatalogueId::class) val id: Long? = null,
+    @SerialName("itunes_id") @Serializable(CatalogueId::class) val itunesId: Long? = null,
     val feed: String? = null,
     @SerialName("feed_url") val feedUrl: String? = null,
     val title: String = "",
@@ -101,22 +102,22 @@ internal data class WireUser(
     val hasPasskey: Boolean = false,
 )
 
-@Serializable internal data class WireEpisodeLists(val lists: List<AccountEpisodeList>)
-@Serializable internal data class WireListEpisodeItem(val episodeId: Long, val addedAt: Long, val availability: ListAvailability, val episode: WireEpisode? = null)
-@Serializable internal data class WireListEpisodePage(val listId: String, val revision: String, val items: List<WireListEpisodeItem>, val nextCursor: String? = null)
+@Serializable internal data class WireEpisodeLists(val protocol: Int, val accountId: String, val generation: String, val lists: List<AccountEpisodeList>)
+@Serializable internal data class WireListEpisodeItem(@Serializable(CatalogueId::class) val episodeId: Long, val addedAt: Long, val availability: ListAvailability, val episode: WireEpisode? = null)
+@Serializable internal data class WireListEpisodePage(val protocol: Int, val accountId: String, val generation: String, val listId: String, val revision: String, val items: List<WireListEpisodeItem>, val nextCursor: String? = null)
 
 internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, items.map {
     ListEpisodeItem(ListMembership(it.episodeId, it.addedAt, it.availability), it.episode?.domain())
-}, nextCursor)
+}, nextCursor, protocol, accountId, generation)
 
 @Serializable internal data class WireSession(val user: WireUser? = null)
 @Serializable internal data class WireProgress(val episode: WireEpisode, val position: Double)
-@Serializable internal data class WireIdentity(val id: Long)
+@Serializable internal data class WireIdentity(@Serializable(CatalogueId::class) val id: Long)
 @Serializable internal data class WireSuccess(val success: Boolean = false)
 @Serializable internal data class WireSent(val sent: Boolean = false)
 @Serializable internal data class WireVerified(val verified: Boolean = false, val userId: String? = null)
 @Serializable internal data class WireRefreshStatus(val status: String)
-@Serializable internal data class WireError(val message: String? = null)
+@Serializable internal data class WireError(val message: String? = null, val code: String? = null)
 @Serializable internal data class WirePreferences(val speed: Double, val volumeBoost: Boolean, val trimSilence: Boolean)
 @Serializable internal data class WirePasskey(val id: String, val provider: String? = null, val createdAt: String, val lastUsedAt: String? = null)
 @Serializable internal data class WireAccount(val createdAt: String? = null, val passkeys: List<WirePasskey>, val preferences: WirePreferences? = null)
@@ -190,3 +191,8 @@ internal fun WireAccount.domain() = Account(
     passkeys = passkeys.map { Passkey(it.id, it.provider, Instant.parse(it.createdAt), it.lastUsedAt?.let(Instant::parse)) },
     preferences = preferences?.domain(),
 )
+
+@Serializable internal data class WireSavedProgress(@Serializable(CatalogueId::class) val episodeId: Long, val position: Double, val completed: Boolean)
+
+@Serializable internal data class WireListMembership(@Serializable(CatalogueId::class) val episodeId: Long, val addedAt: Long, val availability: ListAvailability)
+@Serializable internal data class WireListSnapshot(val protocol: Int, val accountId: String, val generation: String, val listId: String, val revision: app.podcst.model.StateRevision, val items: List<WireListMembership>)

@@ -268,7 +268,7 @@ private fun DiscoverPreview() {
     PodcstTheme {
         Box(Modifier.background(Podcst.colors.paper)) {
             DiscoverScreen(
-                DiscoverState(chart = chart, load = ChartLoad.Loaded, subscribed = setOf("feed2"), user = User("1", "shantanu@example.com")),
+                DiscoverState(chart = chart, load = ChartLoad.Loaded, subscribed = setOf("local:feed2"), user = User("1", "shantanu@example.com")),
                 onSearch = {},
                 onAccount = {},
                 onPodcast = {},

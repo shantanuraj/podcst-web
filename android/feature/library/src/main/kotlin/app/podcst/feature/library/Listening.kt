@@ -78,7 +78,7 @@ internal fun continueAndNew(unfinished: List<Episode>, releases: List<Episode>, 
         .take(CONTINUE_LIMIT)
 
 internal fun downloaded(entries: Collection<DownloadEntry>, episodes: List<Episode>): List<Episode> {
-    val byIdentity = episodes.associateBy { it.identity.value }
+    val byIdentity = episodes.mapNotNull { episode -> episode.mediaReferenceIdentity?.let { it to episode } }.toMap() + episodes.associateBy { it.identity.value }
     return entries
         .sortedWith(compareBy<DownloadEntry> { it.state.stored }.thenByDescending { it.updated })
         .mapNotNull { byIdentity[it.identity] }

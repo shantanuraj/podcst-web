@@ -1,6 +1,6 @@
 package app.podcst.network
 
-import app.podcst.model.Account
+import app.podcst.model.*
 import app.podcst.model.AccountEpisodeList
 import app.podcst.model.ListAcknowledgement
 import app.podcst.model.ListBatch
@@ -45,7 +45,7 @@ interface SessionCookieStore {
     fun clear()
 }
 
-class ApiException(val status: Int, message: String) : IOException(message)
+class ApiException(val status: Int, message: String, val code: String? = null, val retryAfterSeconds: Long? = null) : IOException(message)
 
 data class PasskeyChallenge(val requestJson: String, val flowId: String, internal val revision: Long)
 
@@ -91,10 +91,10 @@ class PodcstApi(
     ).domain(podcastId)
 
     suspend fun resolve(itunesId: Long, locale: String): Long =
-        post<WireIdentity>("api/feed/resolve", body { put("itunes_id", itunesId); put("locale", locale) }).id
+        post<WireIdentity>("api/feed/resolve", body { put("itunes_id", itunesId.toString()); put("locale", locale) }).id
 
     suspend fun refresh(podcastId: Long): Podcast =
-        post<WirePodcast>("api/feed/refresh", body { put("podcastId", podcastId) }).domain()
+        post<WirePodcast>("api/feed/refresh", body { put("podcastId", podcastId.toString()) }).domain()
 
     suspend fun sessionUser(): User? = get<WireSession>("api/auth/session").user?.domain()
 
@@ -166,16 +166,24 @@ class PodcstApi(
 
     suspend fun subscriptions(): List<Podcast> = get<List<WirePodcast>>("api/subscriptions").map { it.domain() }
 
-    suspend fun subscribe(podcastId: Long) {
-        post<WireSuccess>("api/subscriptions", body { put("podcastId", podcastId) })
-    }
+    suspend fun followState(): StateSnapshot<StateFollowItem> = get("api/subscriptions", "view" to "membership")
 
-    suspend fun unsubscribe(podcastId: Long) {
-        send<WireSuccess>("DELETE", url("api/subscriptions", "podcastId" to "$podcastId"), null)
-    }
+    suspend fun changeFollows(batch: StateBatch<StateFollowChange>): StateAcknowledgement<StateFollowResult> =
+        post("api/subscriptions", json.encodeToJsonElement(StateBatch.serializer(StateFollowChange.serializer()), batch))
 
-    suspend fun importSubscriptions(feeds: List<String>): ImportResult =
-        post<ImportResult>("api/subscriptions", body { putJsonArray("feedUrls") { feeds.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } } })
+    suspend fun resolveSubscriptions(accountId: String, generation: String, feeds: List<String>): FollowResolution =
+        post("api/subscriptions/resolve", body {
+            put("protocol", 1); put("accountId", accountId); put("generation", generation)
+            putJsonArray("feedUrls") { feeds.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
+        })
+
+    suspend fun progressState(ids: List<Long>? = null): StateSnapshot<StateProgressItem> =
+        if (ids == null) get("api/progress", "view" to "state", "recent" to "1")
+        else { require(ids.size in 1..200 && ids.distinct().size == ids.size)
+            get("api/progress", "view" to "state", "episodeIds" to ids.joinToString(",")) }
+
+    suspend fun changeProgress(batch: StateBatch<StateProgressChange>): StateAcknowledgement<StateProgressResult> =
+        send("PUT", url("api/progress"), json.encodeToJsonElement(StateBatch.serializer(StateProgressChange.serializer()), batch))
 
     suspend fun currentProgress(): PlaybackProgress? =
         get<WireProgress?>("api/progress")?.let { PlaybackProgress(it.episode.domain(), it.position) }
@@ -184,27 +192,26 @@ class PodcstApi(
         val token = revision.get()
         return episodeIds.distinct().sorted().chunked(200).flatMap { batch ->
             if (revision.get() != token) throw CancellationException("Session changed")
-            get<List<SavedEpisodeProgress>>("api/progress", "episodeIds" to batch.joinToString(","))
+            get<List<WireSavedProgress>>("api/progress", "episodeIds" to batch.joinToString(",")).map { SavedEpisodeProgress(it.episodeId, it.position, it.completed) }
         }
     }
 
-    suspend fun saveProgress(episodeId: Long, position: Double, completed: Boolean) {
-        send<WireSuccess>("PUT", url("api/progress"), body {
-            put("episodeId", episodeId)
-            put("position", position.toLong())
-            put("completed", completed)
-        })
+    suspend fun lists(): AccountLists = get("api/lists")
+
+    suspend fun listMembership(id: String): ListSnapshot = get<WireListSnapshot>("api/lists/$id/items", "view" to "membership").let {
+        ListSnapshot(it.listId, it.revision.value, it.items.map { row -> ListMembership(row.episodeId, row.addedAt, row.availability) }, it.protocol, it.accountId, it.generation)
     }
-
-    suspend fun lists(): List<AccountEpisodeList> = get<WireEpisodeLists>("api/lists").lists
-
-    suspend fun listMembership(id: String): ListSnapshot = get("api/lists/$id/items", "view" to "membership")
 
     suspend fun listEpisodes(id: String, cursor: String? = null): ListEpisodePage =
         get<WireListEpisodePage>("api/lists/$id/items", "view" to "episodes", "cursor" to cursor).domain()
 
-    suspend fun changeList(id: String, batch: ListBatch): ListAcknowledgement =
-        post("api/lists/$id/changes", json.encodeToJsonElement(ListBatch.serializer(), batch))
+    suspend fun changeList(id: String, batch: ListBatch, accountId: String, generation: String, legacy: Boolean): ListAcknowledgement {
+        val payload = if (legacy) body {
+            put("protocol", 1); put("accountId", accountId); put("generation", generation)
+            put("batch", json.encodeToJsonElement(ListBatch.serializer(), batch))
+        } else json.encodeToJsonElement(StateBatch.serializer(StringListChange.serializer()), StateBatch(1, accountId, generation, batch.clientId, StateID(batch.sequence), batch.changes.map { StringListChange(it.op, it.episodeId) }))
+        return post<StringListAcknowledgement>("api/lists/$id/" + if (legacy) "migration" else "changes", payload).domain()
+    }
 
     suspend fun account(): Account = get<WireAccount>("api/account").domain()
 
@@ -241,11 +248,11 @@ class PodcstApi(
             if (session && revision.get() != token) throw CancellationException("Session changed")
             if (session) persistCookie(response)
             val text = response.body.string()
-            if (!response.isSuccessful) throw ApiException(response.code, errorMessage(text) ?: response.message.ifEmpty { "HTTP ${response.code}" })
+            if (!response.isSuccessful) throw ApiException(response.code, errorMessage(text) ?: response.message.ifEmpty { "HTTP ${response.code}" }, runCatching { json.decodeFromString<WireError>(text).code }.getOrNull(), response.header("Retry-After")?.toLongOrNull())
             try {
                 json.decodeFromString(strategy, text.ifEmpty { "{}" })
             } catch (failure: IllegalArgumentException) {
-                throw ApiException(response.code, "Invalid API response")
+                throw ApiException(response.code, "Invalid API response", "invalid_response")
             }
         }
     }
@@ -270,8 +277,8 @@ class PodcstApi(
         private val JSON = "application/json".toMediaType()
         internal val json = Json {
             ignoreUnknownKeys = true
-            explicitNulls = false
-            coerceInputValues = true
+            explicitNulls = true
+            coerceInputValues = false
         }
     }
 }

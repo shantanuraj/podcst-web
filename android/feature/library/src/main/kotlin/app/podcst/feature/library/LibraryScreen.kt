@@ -61,6 +61,7 @@ fun LibraryScreen(
     onSettings: () -> Unit,
     onList: (EpisodeList) -> Unit,
     onPodcast: (Podcast) -> Unit,
+    onRemoveUnavailable: (Long) -> Unit,
 ) {
     PullToRefreshBox(
         isRefreshing = state.refresh == Refresh.Running,
@@ -70,6 +71,16 @@ fun LibraryScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(onSettings) }
             item { Lists(state, onList) }
+            items(state.legacyProgress, key = { "legacy:${it.identity.value}" }) { episode ->
+                androidx.compose.material3.TextButton(onClick = { actions.reapplyProgress(episode) }) {
+                    Text("Reapply old saved progress: ${episode.title}")
+                }
+            }
+            items(state.unavailable, key = { "unavailable:$it" }) { id ->
+                androidx.compose.material3.TextButton(onClick = { onRemoveUnavailable(id) }) {
+                    Text("Unavailable podcast $id — Unfollow")
+                }
+            }
             if (state.episodes.isNotEmpty()) {
                 item {
                     SectionHeader(stringResource(R.string.continue_and_new), Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp)) {

@@ -27,6 +27,8 @@ data class LibraryState(
     val downloads: Int = 0,
     val refresh: Refresh = Refresh.Idle,
     val loaded: Boolean = false,
+    val unavailable: List<Long> = emptyList(),
+    val legacyProgress: List<Episode> = emptyList(),
 )
 
 class LibraryViewModel(
@@ -46,7 +48,7 @@ class LibraryViewModel(
         listening(progress, stars, downloads, playback, clock),
         refresh,
         ::library,
-    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
+    ).combine(library.unavailable) { state, unavailable -> state.copy(unavailable = unavailable) }.combine(progress.legacyProgress) { state, legacy -> state.copy(legacyProgress = legacy) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
 
     init {
         refresh(force = false)
@@ -56,6 +58,8 @@ class LibraryViewModel(
         library.refresh(force)
         progress.refresh(library.newReleases.first())
     }
+
+    fun removeUnavailable(id: Long) = viewModelScope.refresh(refresh) { library.removeUnavailable(id) }
 
     fun refreshProgress() = viewModelScope.refresh(refresh) {
         progress.refresh(library.newReleases.first())

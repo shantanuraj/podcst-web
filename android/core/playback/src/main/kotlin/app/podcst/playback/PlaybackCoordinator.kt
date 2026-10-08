@@ -116,6 +116,11 @@ class PlaybackCoordinator internal constructor(
 
     private val restoration: Job
     private var playbackRevision = 0L
+    private val writes = mutableListOf<Job>()
+    private data class PendingProgress(val episode: Episode, val position: Duration, val event: app.podcst.model.StateProgressEvent, val owner: app.podcst.data.Scope)
+    private val savingProgress = mutableSetOf<String>()
+    private val unsavedProgress = mutableMapOf<String, PendingProgress>()
+    private val writeFailures = mutableMapOf<String, Throwable>()
     private var progressCheckpoint: ProgressCheckpoint? = null
 
     private var loaded: String? = null
@@ -141,6 +146,8 @@ class PlaybackCoordinator internal constructor(
         val start = at ?: Duration.ZERO
         update { it.copy(queue = queue, position = start, duration = episode.duration ?: Duration.ZERO) }
         load(episode, start, autoplay = true)
+        val owner = scopes.current.value
+        queueProgress(PendingProgress(episode, start, app.podcst.model.StateProgressEvent.replay, owner))
         persist()
     }
 
@@ -319,11 +326,26 @@ class PlaybackCoordinator internal constructor(
     }
 
     fun checkpoint() {
-        if (!state.value.active) return
-        capturePosition()
-        persist()
-        emitProgress(completed = false)
+        if (state.value.active) {
+            capturePosition()
+            persist()
+            emitProgress(completed = false)
+        }
+        unsavedProgress.values.toList().forEach(::savePending)
     }
+
+    suspend fun checkpointAndSuspend() {
+        pause()
+        changingAccount = true
+        unload()
+        checkpoint()
+        // Await both Room queue writes and the durable progress commit before changing scopes.
+        while (writes.any { !it.isCompleted }) writes.toList().forEach { it.join() }
+        writeFailures.values.firstOrNull()?.let { throw it }
+        writes.removeAll { it.isCompleted }
+    }
+
+    fun resumeAccountWork() { changingAccount = false }
 
     fun beginAccountChange() {
         pause()
@@ -434,10 +456,41 @@ class PlaybackCoordinator internal constructor(
         playingSince = if (current.status == PlaybackStatus.Playing) SystemClock.elapsedRealtime() else null
         val checkpoint = progressAt(current, completed)
         if (progressCheckpoint == checkpoint) return
-        progressCheckpoint = checkpoint
         val owner = scopes.current.value
         val position = current.position
-        scope.launch { progress.record(episode.copy(duration = current.duration.takeIf(Duration::isPositive) ?: episode.duration), position, completed, owner) }
+        queueProgress(PendingProgress(episode.copy(duration = current.duration.takeIf(Duration::isPositive) ?: episode.duration), position,
+            if (completed) app.podcst.model.StateProgressEvent.ended else app.podcst.model.StateProgressEvent.checkpoint, owner))
+    }
+
+    private fun queueProgress(value: PendingProgress) {
+        val previous = unsavedProgress[value.episode.identity.value]
+        val next = if (value.event == app.podcst.model.StateProgressEvent.checkpoint && previous?.event in listOf(app.podcst.model.StateProgressEvent.ended, app.podcst.model.StateProgressEvent.played))
+            value.copy(event = app.podcst.model.StateProgressEvent.played) else value
+        unsavedProgress[next.episode.identity.value] = next
+        savePending(next)
+    }
+
+    private fun savePending(pending: PendingProgress) {
+        val key = pending.episode.identity.value
+        if (!savingProgress.add(key)) return
+        writes.removeAll { it.isCompleted }
+        writes += scope.launch {
+            if (unsavedProgress[key] != pending || scopes.current.value !== pending.owner) { savingProgress.remove(key); return@launch }
+            try {
+                progress.event(pending.episode, pending.position, pending.event, pending.owner)
+                if (unsavedProgress[key] == pending) unsavedProgress.remove(key)
+                writeFailures.remove(key)
+                val current = state.value
+                if (current.episode?.identity == pending.episode.identity && current.position.inWholeSeconds == pending.position.inWholeSeconds)
+                    progressCheckpoint = progressAt(current, pending.event == app.podcst.model.StateProgressEvent.ended || pending.event == app.podcst.model.StateProgressEvent.played)
+            } catch (failure: Exception) {
+                if (failure is CancellationException) throw failure
+                writeFailures[key] = failure
+            } finally {
+                savingProgress.remove(key)
+                unsavedProgress[key]?.takeIf { it != pending }?.let(::savePending)
+            }
+        }
     }
 
     private data class ProgressCheckpoint(val identity: String, val seconds: Long, val completed: Boolean)
@@ -450,15 +503,23 @@ class PlaybackCoordinator internal constructor(
         val queue = current.queue
         val owner = scopes.current.value
         val database = owner.database
-        scope.launch {
+        writes.removeAll { it.isCompleted }
+        writes += scope.launch {
             if (scopes.current.value !== owner) return@launch
-            database.withTransaction {
-                if (scopes.current.value !== owner) return@withTransaction
-                database.episodes().upsert(queue.episodes.map { it.entity() })
-                database.player().save(
-                    queue.episodes.map { it.identity.value },
-                    PlayerEntity(current = queue.episode?.identity?.value, positionMs = current.position.inWholeMilliseconds, active = queue.active),
-                )
+            try {
+                database.withTransaction {
+                    if (scopes.current.value !== owner) return@withTransaction
+                    database.episodes().upsert(queue.episodes.map { it.entity() })
+                    database.player().save(
+                        queue.episodes.map { it.identity.value },
+                        PlayerEntity(current = queue.episode?.identity?.value, positionMs = current.position.inWholeMilliseconds, active = queue.active),
+                    )
+                }
+                writeFailures.remove("queue")
+            } catch (failure: Exception) {
+                if (failure is CancellationException) throw failure
+                writeFailures["queue"] = failure
+                scopes.durable.error(owner.accountId, "Playback queue could not be saved. Retry checkpoint before leaving.")
             }
         }
     }

@@ -17,8 +17,4 @@ data class EpisodeProgress(
     val remaining: Duration? get() = duration?.let { (it - position).coerceAtLeast(Duration.ZERO) }
     val started: Boolean get() = position.isPositive() && !completed
 
-    companion object {
-        fun completes(position: Duration, duration: Duration?): Boolean =
-            duration?.takeIf { it.isPositive() }?.let { position >= it * PlaybackRules.COMPLETION_THRESHOLD } ?: false
-    }
 }

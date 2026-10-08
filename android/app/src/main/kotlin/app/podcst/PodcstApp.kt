@@ -61,6 +61,7 @@ import app.podcst.destinations.settingsEntries
 import app.podcst.feature.player.MiniPlayer
 import app.podcst.feature.player.NowPlayingScreen
 import app.podcst.feature.player.PlayerViewModel
+import kotlinx.coroutines.launch
 import app.podcst.model.Episode
 
 @Composable
@@ -85,6 +86,8 @@ private fun Shell(graph: AppGraph) {
     val actions = rememberEpisodeActions(graph, navigator, toaster) { listTarget = it }
     val player: PlayerViewModel = viewModel { PlayerViewModel(graph.playback, graph.stars, graph.downloads) }
     val playerState by player.state.collectAsStateWithLifecycle()
+    val durableStatus by graph.scopes.durable.status.collectAsStateWithLifecycle()
+    val unresolved by graph.retained.count.collectAsStateWithLifecycle(0)
     val openPodcast: (Episode) -> Unit = { navigator.podcast(it.podcast) }
     val stop = {
         val state = graph.playback.state.value
@@ -115,6 +118,19 @@ private fun Shell(graph: AppGraph) {
         Box(Modifier.fillMaxSize().background(Podcst.colors.paper)) {
             val typing = WindowInsets.isImeVisible
             Column(Modifier.fillMaxSize()) {
+                if (unresolved > 0) {
+                    androidx.compose.material3.TextButton(onClick = { graph.scope.launch { runCatching { graph.retained.resolve() } } }) {
+                        Text("$unresolved local items need identity verification — Resolve")
+                    }
+                }
+                if (durableStatus.pending || durableStatus.error != null) {
+                    androidx.compose.material3.TextButton(onClick = {
+                        graph.scope.launch {
+                            graph.progress.sync()
+                            runCatching { graph.library.retryImports(); graph.library.refresh() }
+                        }
+                    }) { Text(durableStatus.error ?: "Changes saved on this device — sync pending") }
+                }
                 Box(Modifier.weight(1f).fillMaxWidth().imePadding()) {
                     NavDisplay(
                         backStack = navigator.stack,

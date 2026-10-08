@@ -51,9 +51,9 @@ class MediaStore(context: Context, client: OkHttpClient) {
         private const val DOWNLOAD_THREADS = 2
 
         fun key(episode: Episode): String {
-            val identity = episode.id?.let { "episode:$it" }
+            val identity = episode.mediaIdentity ?: episode.id?.let { "episode:$it" }
                 ?: episode.podcastId?.let { "podcast:$it:${episode.guid}" }
-                ?: episode.identity.value
+                ?: "${episode.feed}\u001F${episode.guid}"
             return MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
         }
     }

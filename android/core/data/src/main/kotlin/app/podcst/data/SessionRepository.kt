@@ -30,14 +30,20 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     private val state = MutableStateFlow(SessionState(user = cachedUser()))
     val session: StateFlow<SessionState> = state.asStateFlow()
     val user: User? get() = state.value.user
+    private var verified = false
+    private var prepared = false
+    var checkpointAccountWork: (suspend () -> Unit)? = null
     var accountChange: AccountChange? = null
     var suspendAccountWork: (() -> Unit)? = null
     var resumeAccountWork: ((String?) -> Unit)? = null
 
     suspend fun restore() = mutex.withLock {
+        verified = false
+        suspendAccountWork?.invoke()
         state.update { it.copy(loading = true) }
         try {
             update(api.sessionUser())
+            verified = true
             if (state.value.user == null) api.clearSession()
             state.update { it.copy(error = null) }
         } catch (cancelled: CancellationException) {
@@ -50,7 +56,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             state.update { it.copy(error = failure.message) }
         } finally {
             state.update { it.copy(loading = false) }
-            resumeAccountWork?.invoke(state.value.user?.id)
+            if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
         }
     }
 
@@ -70,25 +76,30 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     }
 
     suspend fun signOut() = mutex.withLock {
+        checkpointAccountWork?.invoke()
         suspendAccountWork?.invoke()
         state.update { it.copy(loading = true) }
         try {
             update(null)
+            verified = true
             api.signOut()
             state.update { it.copy(error = null) }
         } finally {
             state.update { it.copy(loading = false) }
-            resumeAccountWork?.invoke(state.value.user?.id)
+            if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
         }
     }
 
     fun dismissError() = state.update { it.copy(error = null) }
 
     private suspend fun changing(block: suspend () -> User?): Boolean = mutex.withLock {
+        checkpointAccountWork?.invoke()
         suspendAccountWork?.invoke()
+        verified = false
         state.update { it.copy(loading = true) }
         try {
             update(block())
+            verified = true
             state.update { it.copy(error = null) }
             state.value.user != null
         } catch (cancelled: CancellationException) {
@@ -98,7 +109,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             false
         } finally {
             state.update { it.copy(loading = false) }
-            resumeAccountWork?.invoke(state.value.user?.id)
+            if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
         }
     }
 
@@ -114,9 +125,10 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     }
 
     private suspend fun update(value: User?) {
-        if (state.value.user?.id != value?.id) {
+        if (!prepared || state.value.user?.id != value?.id) {
             file.delete()
             accountChange?.prepare(value?.id)
+            prepared = true
         }
         state.update { it.copy(user = value) }
         if (value != null) file.writeText(json.encodeToString(User.serializer(), value)) else file.delete()

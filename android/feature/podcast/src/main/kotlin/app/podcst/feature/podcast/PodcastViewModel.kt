@@ -113,7 +113,7 @@ class PodcastViewModel(
     ) { progress, starred, entries, current -> EpisodeMarks(progress, starred, entries.mapValues { it.value.state }, current) }
 
     val state: StateFlow<PodcastScreenState> = combine(podcast, episodes, order, subscription, marks) { podcast, episodes, order, (subscribed, subscribing, load), marks ->
-        PodcastScreenState(podcast, episodes, order, podcast.feed in subscribed, subscribing, load, marks)
+        PodcastScreenState(podcast, episodes, order, podcast.identity in subscribed, subscribing, load, marks)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PodcastScreenState(route))
 
     init {

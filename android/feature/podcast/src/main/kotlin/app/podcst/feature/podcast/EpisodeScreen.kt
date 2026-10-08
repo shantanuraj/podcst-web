@@ -132,6 +132,8 @@ private fun Overflow(state: EpisodeScreenState, actions: EpisodeActions, onOpenP
             } else {
                 MenuEntry(stringResource(DesignR.string.remove_download), PodcstIcons.Download) { open = false; actions.removeDownload(episode) }
             }
+            MenuEntry("Reapply saved progress", PodcstIcons.CheckCircle) { open = false; actions.reapplyProgress(episode) }
+            if (state.progress?.completed == true) MenuEntry("Mark unplayed", PodcstIcons.CheckCircle) { open = false; actions.markUnplayed(episode) }
             if (state.progress?.completed != true) MenuEntry(stringResource(DesignR.string.mark_played), PodcstIcons.CheckCircle) { open = false; actions.markPlayed(episode) }
             MenuDivider()
             MenuEntry(stringResource(R.string.go_to_podcast), PodcstIcons.ChevronRight) { open = false; onOpenPodcast() }

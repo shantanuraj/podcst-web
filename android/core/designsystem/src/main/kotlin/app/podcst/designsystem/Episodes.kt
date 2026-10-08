@@ -76,6 +76,8 @@ interface EpisodeActions {
     fun download(episode: Episode)
     fun removeDownload(episode: Episode)
     fun markPlayed(episode: Episode)
+    fun markUnplayed(episode: Episode)
+    fun reapplyProgress(episode: Episode)
     fun share(episode: Episode)
 }
 
@@ -262,6 +264,8 @@ fun EpisodeMenu(state: EpisodeRowState, actions: EpisodeActions, expanded: Boole
         } else {
             MenuEntry(stringResource(R.string.remove_download), PodcstIcons.Download) { onDismiss(); actions.removeDownload(episode) }
         }
+        MenuEntry("Reapply saved progress", PodcstIcons.CheckCircle) { onDismiss(); actions.reapplyProgress(episode) }
+        if (state.progress?.completed == true) MenuEntry("Mark unplayed", PodcstIcons.CheckCircle) { onDismiss(); actions.markUnplayed(episode) }
         if (state.progress?.completed != true) MenuEntry(stringResource(R.string.mark_played), PodcstIcons.CheckCircle) { onDismiss(); actions.markPlayed(episode) }
         if (episode.shareUrl != null) MenuEntry(stringResource(R.string.share), PodcstIcons.Share) { onDismiss(); actions.share(episode) }
     }

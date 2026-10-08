@@ -42,10 +42,18 @@ class DiscoverStateTest {
     }
 
     @Test
-    fun marksSubscribedPodcastsByFeed() {
-        val state = DiscoverState(chart = chart, subscribed = setOf("feed2"))
+    fun marksUnresolvedPodcastsByExplicitLocalIdentity() {
+        val state = DiscoverState(chart = chart, subscribed = setOf("local:feed2"))
         assertTrue(state.subscribed(chart[2]))
         assertFalse(state.subscribed(chart[1]))
+    }
+
+    @Test
+    fun canonicalMembershipSurvivesFeedChanges() {
+        val original = Podcast(id = 9007199254740993, feed = "old", title = "Show")
+        val state = DiscoverState(subscribed = setOf(original.identity))
+        assertTrue(state.subscribed(original.copy(feed = "moved")))
+        assertFalse(state.subscribed(original.copy(id = 2)))
     }
 
     @Test

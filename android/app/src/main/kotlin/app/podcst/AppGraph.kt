@@ -48,9 +48,10 @@ class AppGraph(application: Application) {
     val preferences = Preferences(application)
     val session = SessionRepository(application, api)
     val account = AccountRepository(api, session, preferences)
-    val scopes = Scopes(application, session.user?.id)
+    val scopes = Scopes(application, null)
     val scheduler = WorkManagerScheduler(application)
     val catalog = CatalogRepository(api, scopes)
+    val retained = app.podcst.data.RetainedState(scopes, api, catalog)
     val library = LibraryRepository(api, scopes, catalog)
     val progress = ProgressRepository(api, scopes, scheduler)
     val stars = StarRepository(File(application.noBackupFilesDir, "episode-lists.json"), api.starRemote(), scope, session.user?.id)
@@ -68,16 +69,26 @@ class AppGraph(application: Application) {
     )
 
     init {
+        scopes.retainedMediaIdentities = { downloads.states.value.values.mapTo(mutableSetOf()) { it.identity } }
         account.start(scope)
-        session.suspendAccountWork = stars::suspendSync
-        session.resumeAccountWork = stars::resumeSync
+        session.checkpointAccountWork = {
+            playback.checkpointAndSuspend()
+            scopes.checkpoint()
+            stars.checkpoint()
+        }
+        session.suspendAccountWork = { stars.suspendSync(); scopes.suspendSync() }
+        session.resumeAccountWork = { account ->
+            scopes.resumeSync(account)
+            stars.resumeSync(account)
+            playback.resumeAccountWork()
+            scope.launch { progress.sync(); runCatching { library.refresh() } }
+        }
         application.getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { scope.launch { stars.refresh() } }
+            override fun onAvailable(network: Network) { scope.launch { stars.refresh(); progress.sync(); runCatching { library.refresh() } } }
         })
         session.accountChange = AccountChange { accountId ->
             stars.suspendSync()
-            playback.beginAccountChange()
-            downloads.purge()
+            playback.checkpointAndSuspend()
             stars.switchAccount(accountId, activate = false)
             scopes.switch(accountId)
             artwork.switch(Scope.key(accountId))
@@ -88,6 +99,13 @@ class AppGraph(application: Application) {
                 podcasts.map { it.cover }.toSet() + (queue + releases.take(RETAINED_RELEASES)).flatMap { listOf(it.artwork, it.cover) }
             }.distinctUntilChanged().collect(artwork::retain)
         }
+    }
+
+    /** Invoke only after authoritative account-deletion acknowledgement, never logout/401. */
+    suspend fun eraseAcknowledgedAccount(accountId: String) {
+        check(scopes.current.value.accountId != accountId)
+        scopes.erase(accountId)
+        stars.erase(accountId)
     }
 
     private companion object {

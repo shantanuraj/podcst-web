@@ -116,3 +116,14 @@ enum class StateProgressEvent {
             (this == ended || this == played || (this == checkpoint && previousCompleted))
     }
 }
+
+@Serializable
+data class FollowResolution(val protocol: Int, val accountId: String, val generation: String, val items: List<FollowResolutionItem>)
+@Serializable
+data class FollowResolutionItem(val index: Int, val podcastId: StateID?, val status: String)
+
+fun validateStateScope(protocol: Int, accountId: String, generation: String, expectedAccount: String, expectedGeneration: String? = null) {
+    check(protocol == 1 && accountId == expectedAccount && accountId.length in 1..128)
+    check(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").matches(generation))
+    check(expectedGeneration == null || generation == expectedGeneration) { "Recovery generation changed; pending work retained" }
+}

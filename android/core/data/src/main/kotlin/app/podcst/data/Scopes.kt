@@ -2,7 +2,10 @@ package app.podcst.data
 
 import android.content.Context
 import app.podcst.database.PodcstDatabase
+import app.podcst.database.domain
 import java.security.MessageDigest
+import java.io.File
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,16 +21,46 @@ class Scope internal constructor(val accountId: String?, val database: PodcstDat
 }
 
 class Scopes(private val context: Context, accountId: String?) {
+    val durable = DurableState(File(context.noBackupFilesDir, "durable-state.json"))
+    var retainedMediaIdentities: () -> Set<String> = { emptySet() }
+    @Volatile var verified: Boolean = false
+        private set
+    private val authenticationEpoch = java.util.concurrent.atomic.AtomicLong()
+    val epoch: Long get() = authenticationEpoch.get()
     private val state = MutableStateFlow(open(accountId))
     val current: StateFlow<Scope> = state.asStateFlow()
     val database: PodcstDatabase get() = state.value.database
 
-    fun switch(accountId: String?) {
+    fun suspendSync() { verified = false; authenticationEpoch.incrementAndGet(); durable.activate(null) }
+    fun resumeSync(accountId: String?) { if (accountId == current.value.accountId) { verified = true; durable.activate(accountId) } }
+    suspend fun checkpoint() { durable.checkpoint() }
+    suspend fun erase(accountId: String) {
+        check(current.value.accountId != accountId) { "Suspend and leave the erased account first" }
+        durable.erase(accountId)
+        PodcstDatabase.delete(context, Scope.key(accountId))
+    }
+
+    suspend fun switch(accountId: String?) {
         val previous = state.value
         if (previous.accountId == accountId) return
-        state.value = open(accountId)
+        suspendSync()
+        if (previous.accountId == null) durable.importGuestSource(previous.database.podcasts().subscribed().map { it.domain() })
+        val next = open(accountId)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { next.database.openHelper.writableDatabase }
+        if (previous.accountId != null) durable.retainPending(previous.accountId)
+        if (previous.accountId != null) previous.database.withTransaction {
+            val db = previous.database.openHelper.writableDatabase
+            db.execSQL("DELETE FROM charts")
+            db.execSQL("DELETE FROM chart_refreshes")
+            db.execSQL("DELETE FROM subscriptions")
+            val media = retainedMediaIdentities().toList()
+            val placeholders = media.joinToString(",") { "?" }
+            val retained = if (media.isEmpty()) "" else " AND identity NOT IN ($placeholders) AND COALESCE(mediaReferenceIdentity, identity) NOT IN ($placeholders)"
+            db.execSQL("DELETE FROM episodes WHERE identity NOT IN (SELECT identity FROM queue UNION SELECT identity FROM progress UNION SELECT identity FROM stars) AND id IS NOT NULL" + retained, (media + media).toTypedArray())
+            db.execSQL("DELETE FROM podcasts WHERE feed NOT IN (SELECT feed FROM episodes) AND id IS NOT NULL")
+        }
+        state.value = next
         previous.database.close()
-        if (previous.accountId != null) PodcstDatabase.delete(context, previous.key)
     }
 
     private fun open(accountId: String?) = Scope(accountId, PodcstDatabase.open(context, Scope.key(accountId)))

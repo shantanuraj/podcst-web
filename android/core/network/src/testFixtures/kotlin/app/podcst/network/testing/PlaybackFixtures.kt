@@ -21,6 +21,8 @@ object PlaybackFixtures {
 
     fun progress(episode: Episode, position: Double): Reply {
         val fields = Json.encodeToJsonElement(episode.copy(duration = null)).jsonObject.toMutableMap()
+        episode.id?.let { fields["id"] = JsonPrimitive(it.toString()) }
+        episode.podcastId?.let { fields["podcastId"] = JsonPrimitive(it.toString()) }
         episode.duration?.let { fields["duration"] = JsonPrimitive(it.inWholeMilliseconds / 1000.0) }
         return Reply(JsonObject(mapOf("episode" to JsonObject(fields), "position" to JsonPrimitive(position))).toString())
     }

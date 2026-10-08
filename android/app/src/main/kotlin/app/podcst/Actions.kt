@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import app.podcst.database.entity
+import app.podcst.database.domain
 import app.podcst.designsystem.EpisodeActions
 import app.podcst.designsystem.PodcstIcons
 import app.podcst.designsystem.ToastAction
@@ -33,7 +34,8 @@ class AppEpisodeActions(
         }
         graph.scope.launch {
             val saved = graph.progress.progress.first()[episode.identity.value]
-            playback.play(episode, saved?.takeIf { it.started }?.position)
+            val stored = graph.scopes.database.episodes().get(episode.identity.value)?.domain() ?: episode
+            playback.play(stored, saved?.takeIf { it.started }?.position)
         }
     }
 
@@ -77,9 +79,13 @@ class AppEpisodeActions(
     override fun addToList(episode: Episode) = chooseList(episode)
 
     override fun download(episode: Episode) {
-        graph.scope.launch { graph.scopes.database.episodes().upsert(listOf(episode.entity())) }
-        graph.downloads.download(episode)
-        toaster.show(context.getString(R.string.downloading_episode), episode.title)
+        graph.scope.launch {
+            val owner = graph.scopes.current.value
+            owner.database.episodes().upsert(listOf(episode.entity()))
+            if (graph.scopes.current.value !== owner) return@launch
+            graph.downloads.download(owner.database.episodes().get(episode.identity.value)?.domain() ?: episode)
+            toaster.show(context.getString(R.string.downloading_episode), episode.title)
+        }
     }
 
     override fun removeDownload(episode: Episode) {
@@ -92,7 +98,22 @@ class AppEpisodeActions(
         if (playback.state.value.episode?.identity == episode.identity && playback.state.value.active) {
             playback.markPlayed()
         } else {
-            graph.scope.launch { graph.progress.record(episode, episode.duration ?: kotlin.time.Duration.ZERO, completed = true) }
+            graph.scope.launch { runCatching { graph.progress.event(episode, kotlin.time.Duration.ZERO, app.podcst.model.StateProgressEvent.played) }.onFailure { toaster.show("Unable to save progress", it.message) } }
+        }
+    }
+
+    override fun markUnplayed(episode: Episode) {
+        if (graph.playback.state.value.episode?.identity == episode.identity) { graph.playback.pause(); graph.playback.seek(kotlin.time.Duration.ZERO) }
+        graph.scope.launch {
+            runCatching { graph.progress.event(episode, kotlin.time.Duration.ZERO, app.podcst.model.StateProgressEvent.unplayed) }
+                .onFailure { toaster.show("Unable to save progress", it.message) }
+        }
+    }
+
+    override fun reapplyProgress(episode: Episode) {
+        graph.scope.launch {
+            runCatching { graph.progress.reapplyLegacy(episode) }
+                .onFailure { toaster.show("Unable to reapply progress", it.message) }
         }
     }
 

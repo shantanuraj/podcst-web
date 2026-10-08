@@ -39,6 +39,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
             onSettings = { navigator.push(SettingsRoute) },
             onList = { list -> navigator.push(EpisodeListRoute(list)) },
             onPodcast = navigator::podcast,
+            onRemoveUnavailable = model::removeUnavailable,
         )
     }
     entry<EpisodeListRoute> { route ->

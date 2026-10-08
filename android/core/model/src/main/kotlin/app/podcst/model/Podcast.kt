@@ -22,7 +22,7 @@ data class Podcast(
     val episodes: List<Episode> = emptyList(),
     val isPrivate: Boolean = false,
 ) {
-    val identity: String get() = feed
+    val identity: String get() = id?.let { "podcast:$it" } ?: "local:$feed"
     val shareUrl: String? get() = if (isPrivate) null else shareableWebpage(link, excluding = listOf(feed))
 }
 
