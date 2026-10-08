@@ -50,6 +50,34 @@ enum StateContractError: Error {
 struct StateProgressChange: Codable, Equatable, Sendable {
     var episodeId: StateID
     var positionSeconds: Int
+    var completed: Bool?
+
+    enum CodingKeys: String, CodingKey { case episodeId, positionSeconds, completed }
+
+    init(episodeId: StateID, positionSeconds: Int, completed: Bool?) {
+        self.episodeId = episodeId
+        self.positionSeconds = positionSeconds
+        self.completed = completed
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        episodeId = try container.decode(StateID.self, forKey: .episodeId)
+        positionSeconds = try container.decode(Int.self, forKey: .positionSeconds)
+        completed = try container.decode(Bool?.self, forKey: .completed)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(episodeId, forKey: .episodeId)
+        try container.encode(positionSeconds, forKey: .positionSeconds)
+        try container.encode(completed, forKey: .completed)
+    }
+}
+
+struct LocalProgress: Codable, Equatable, Sendable {
+    var episodeId: StateID
+    var positionSeconds: Int
     var completed: Bool
 }
 

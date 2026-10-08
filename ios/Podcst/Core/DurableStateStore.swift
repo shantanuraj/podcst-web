@@ -48,7 +48,7 @@ private struct DurableAccount: Codable {
     var scope: StateScope?
     var progress = StateStream<StateProgressChange, StateProgressResult>()
     var follows = StateStream<StateFollowChange, StateFollowResult>()
-    var positions: [Int: StateProgressChange] = [:]
+    var positions: [Int: LocalProgress] = [:]
     var memberships: [StateFollowItem] = []
     var legacyProgressSource: Data?
     var legacyProgress: [PlaybackProgressWriter.Update] = []
@@ -60,7 +60,7 @@ private struct DurableRoot: Codable {
     var version = 1
     var accounts: [String: DurableAccount] = [:]
     var guestFollows: [Podcast] = []
-    var guestProgress: [Int: StateProgressChange] = [:]
+    var guestProgress: [Int: LocalProgress] = [:]
     var legacyGuestSource: Data?
     var guestImported = false
     var unresolvedGuest: [Podcast] = []
@@ -113,12 +113,12 @@ private struct DurableRoot: Codable {
     var pending: Bool { accountID != nil && (account.progress.pending || account.follows.pending) && !isSuspended }
     var blocked: Bool { !readable || (verified && (account.progress.blocked != nil || account.follows.blocked != nil)) }
     var guestFollows: [Podcast] { root.guestFollows }
-    var guestPositions: [StateProgressChange] { verified ? root.guestProgress.values.sorted { $0.episodeId.number < $1.episodeId.number } : [] }
-    func reapplyGuest(_ change: StateProgressChange) throws {
+    var guestPositions: [LocalProgress] { verified ? root.guestProgress.values.sorted { $0.episodeId.number < $1.episodeId.number } : [] }
+    func reapplyGuest(_ change: LocalProgress) throws {
         guard verified else { throw DurableStateFailure.suspended }
         try update { state in
             state.progress.queued.removeAll { $0.episodeId == change.episodeId }
-            state.progress.queued.append(change)
+            state.progress.queued.append(StateProgressChange(episodeId: change.episodeId, positionSeconds: change.positionSeconds, completed: change.completed))
         }
     }
     var legacyProgress: [PlaybackProgressWriter.Update] { verified ? account.legacyProgress : [] }
@@ -139,12 +139,16 @@ private struct DurableRoot: Codable {
         }
     }
 
-    func position(_ id: Int) -> StateProgressChange? {
+    func position(_ id: Int) -> LocalProgress? {
         if accountID == nil { return root.guestProgress[id] }
         guard verified else { return nil }
         let state = account
-        return (state.progress.queued.last { $0.episodeId.number == id })
-            ?? (state.progress.flight?.changes.last { $0.episodeId.number == id }) ?? state.positions[id]
+        var value = state.positions[id]
+        for change in (state.progress.flight?.changes ?? []) + state.progress.queued where change.episodeId.number == id {
+            value = LocalProgress(episodeId: change.episodeId, positionSeconds: change.positionSeconds,
+                                  completed: change.completed ?? value?.completed ?? false)
+        }
+        return value
     }
     var followedIDs: Set<Int> {
         guard verified else { return Set(root.guestFollows.compactMap(\.id)) }
@@ -212,12 +216,14 @@ private struct DurableRoot: Codable {
     func setProgress(id: Int, position: Double, event: StateProgressEvent) throws {
         guard position.isFinite, position >= 0, position <= Double(Int32.max) else { throw StateContractError.invalidPosition }
         let value = try event.intent(positionSeconds: Int(position), previousCompleted: self.position(id)?.completed ?? false)
-        let change = StateProgressChange(episodeId: try StateID(String(id)), positionSeconds: value.positionSeconds, completed: value.completed)
+        let local = LocalProgress(episodeId: try StateID(String(id)), positionSeconds: value.positionSeconds, completed: value.completed)
         if accountID == nil {
-            try commit { $0.guestProgress[id] = change }
+            try commit { $0.guestProgress[id] = local }
         } else {
+            let change = StateProgressChange(episodeId: local.episodeId, positionSeconds: local.positionSeconds,
+                                             completed: event == .checkpoint ? nil : local.completed)
             try update { state in
-                state.progress.queued.removeAll { $0.episodeId == change.episodeId }
+                state.progress.queued.removeAll { $0.episodeId == change.episodeId && (change.completed != nil || $0.completed == nil) }
                 state.progress.queued.append(change)
             }
         }
@@ -268,7 +274,11 @@ private struct DurableRoot: Codable {
     }
     func checkpointAndSuspend() throws {
         if accountID != nil {
-            try update { $0.positions = [:]; $0.memberships = [] }
+            try update { state in
+                let pending = Set(((state.progress.flight?.changes ?? []) + state.progress.queued).map { $0.episodeId.number })
+                state.positions = state.positions.filter { pending.contains($0.key) }
+                state.memberships = []
+            }
         } else { try commit { _ in } }
         suspend()
     }
@@ -346,7 +356,7 @@ private struct DurableRoot: Codable {
             state.scope = StateScope(protocol: snapshot.protocol, accountId: snapshot.accountId, generation: snapshot.generation)
             try state.progress.install(revision: snapshot.revision.number, retire: retire)
             for item in snapshot.items {
-                state.positions[item.episodeId.number] = item.progress.map { StateProgressChange(episodeId: item.episodeId, positionSeconds: $0.positionSeconds, completed: $0.completed) }
+                state.positions[item.episodeId.number] = item.progress.map { LocalProgress(episodeId: item.episodeId, positionSeconds: $0.positionSeconds, completed: $0.completed) }
             }
         }
     }

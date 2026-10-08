@@ -29,6 +29,157 @@ import XCTest
         XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("9007199254740993"))
     }
 
+    func testRemotePlayedSurvivesCheckpointUntilExplicitReplay() async throws {
+        let api = StateServer()
+        api.progressRevision = 1
+        api.position = 10
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        try await state.refreshProgress(ids: [1])
+        XCTAssertEqual(state.position(1)?.completed, false)
+        api.completed = true
+        api.progressRevision = 2
+        try state.setProgress(id: 1, position: 95, event: .checkpoint)
+        XCTAssertEqual(state.position(1)?.completed, false)
+        await state.flush()
+        XCTAssertNil(api.progressBatches[0].changes[0].completed)
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(api.progressBatches[0])) as? [String: Any])
+        XCTAssertTrue((sent["changes"] as? [[String: Any]])?.first?["completed"] is NSNull)
+        XCTAssertEqual(state.position(1)?.completed, true)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 95)
+        try state.setProgress(id: 1, position: 12, event: .replay)
+        await state.flush()
+        XCTAssertEqual(api.progressBatches[1].changes[0].completed, false)
+        XCTAssertEqual(state.position(1)?.completed, false)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 12)
+    }
+
+    func testOfflineNullCheckpointRetainsKnownCompletionAcrossSuspendAndRestart() async throws {
+        let api = StateServer()
+        api.progressRevision = 1
+        api.completed = true
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        try await state.refreshProgress(ids: [1])
+        try state.setProgress(id: 1, position: 94, event: .checkpoint)
+        api.status = 503
+        await state.flush()
+        XCTAssertNil(api.progressBatches[0].changes[0].completed)
+        XCTAssertEqual(state.position(1)?.completed, true)
+        try state.checkpointAndSuspend()
+        state = store(api)
+        try await state.activate(accountID: "a")
+        XCTAssertEqual(state.position(1)?.completed, true)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 94)
+        api.status = nil
+        await state.flush()
+        XCTAssertEqual(api.progressBatches[0], api.progressBatches[1])
+        XCTAssertEqual(state.position(1)?.completed, true)
+    }
+
+    func testQueuedCheckpointsCoalesceWithoutDiscardingExplicitCompletion() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        try state.setProgress(id: 1, position: 0, event: .played)
+        for position in [94.0, 95.0, 100.0] { try state.setProgress(id: 1, position: position, event: .checkpoint) }
+        XCTAssertEqual(state.position(1)?.completed, true)
+        state = store(api)
+        try await state.activate(accountID: "a")
+        XCTAssertEqual(state.position(1)?.completed, true)
+        await state.flush()
+        XCTAssertEqual(api.progressBatches[0].changes.count, 2)
+        XCTAssertEqual(api.progressBatches[0].changes.map(\.positionSeconds), [0, 100])
+        XCTAssertEqual(api.progressBatches[0].changes[0].completed, true)
+        XCTAssertNil(api.progressBatches[0].changes[1].completed)
+        XCTAssertEqual(state.position(1)?.completed, true)
+        try state.setProgress(id: 1, position: 70, event: .checkpoint)
+        try state.setProgress(id: 1, position: 70, event: .unplayed)
+        await state.flush()
+        XCTAssertEqual(api.progressBatches[1].changes.count, 1)
+        XCTAssertEqual(api.progressBatches[1].changes[0].completed, false)
+        XCTAssertEqual(api.progressBatches[1].changes[0].positionSeconds, 0)
+    }
+
+    func testFrozenBooleanPayloadIsNeverRewrittenByCheckpointRefinement() async throws {
+        for completed in [false, true] {
+            directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            let api = StateServer()
+            var state = store(api)
+            try await state.activate(accountID: "a")
+            try state.setProgress(id: 1, position: 12, event: completed ? .played : .replay)
+            api.loseAck = true
+            await state.flush()
+            let original = api.progressBatches[0]
+            let originalPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? NSDictionary)
+            XCTAssertEqual(original.changes[0].completed, completed)
+            api.completed = !completed
+            api.progressRevision += 1
+            try state.setProgress(id: 1, position: 20, event: .checkpoint)
+            state = store(api)
+            try await state.activate(accountID: "a")
+            await state.flush()
+            XCTAssertEqual(api.progressBatches[1], original)
+            XCTAssertEqual(try JSONSerialization.jsonObject(with: JSONEncoder().encode(api.progressBatches[1])) as? NSDictionary, originalPayload)
+            XCTAssertEqual(api.progressBatches[1].changes[0].completed, completed)
+            XCTAssertNil(api.progressBatches[2].changes[0].completed)
+            XCTAssertEqual(state.position(1)?.completed, !completed)
+            try FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    func testGuestSelectionAndLegacyReapplyKeepConcreteCompletion() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try state.setProgress(id: 1, position: 0, event: .played)
+        try state.setProgress(id: 1, position: 95, event: .checkpoint)
+        XCTAssertEqual(state.position(1)?.completed, true)
+        state = store(api)
+        XCTAssertEqual(state.position(1)?.completed, true)
+        try state.setProgress(id: 1, position: 12, event: .replay)
+        try state.setProgress(id: 1, position: 20, event: .checkpoint)
+        try await state.activate(accountID: "a")
+        let selected = try XCTUnwrap(state.guestPositions.first)
+        XCTAssertFalse(selected.completed)
+        api.completed = true
+        api.progressRevision = 1
+        try state.reapplyGuest(selected)
+        await state.flush()
+        XCTAssertEqual(api.progressBatches[0].changes[0].completed, false)
+        XCTAssertEqual(state.position(1)?.completed, false)
+        let source = directory.appendingPathComponent("legacy.json")
+        let bytes = Data(#"[{"episodeID":1,"position":0,"completed":true}]"#.utf8)
+        try DurableStateStore.protectedWrite(bytes, source)
+        try state.importLegacyProgress(source)
+        try state.reapplyLegacy(try XCTUnwrap(state.legacyProgress.first))
+        await state.flush()
+        XCTAssertEqual(api.progressBatches[1].changes[0].completed, true)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+
+    func testCompletionCodecRequiresNullableRequestKeyAndConcreteSnapshotValue() throws {
+        let decoder = JSONDecoder()
+        let change = try decoder.decode(StateProgressChange.self, from: Data(#"{"episodeId":"1","positionSeconds":3,"completed":null}"#.utf8))
+        XCTAssertNil(change.completed)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(change)) as? [String: Any])
+        XCTAssertTrue(encoded.keys.contains("completed"))
+        XCTAssertTrue(encoded["completed"] is NSNull)
+        for field in ["", #", "completed":"false""#, #", "completed":0"#, #", "completed":{}"#] {
+            let bytes = Data((#"{"episodeId":"1","positionSeconds":3"# + field + "}").utf8)
+            XCTAssertThrowsError(try decoder.decode(StateProgressChange.self, from: bytes))
+        }
+        for field in ["", #", "completed":null"#, #", "completed":"false""#] {
+            let bytes = Data((#"{"positionSeconds":3,"revision":"1","updatedAtMs":null"# + field + "}").utf8)
+            XCTAssertThrowsError(try decoder.decode(StateProgress.self, from: bytes))
+        }
+        let localNull = Data(#"{"episodeId":"1","positionSeconds":3,"completed":null}"#.utf8)
+        XCTAssertThrowsError(try decoder.decode(LocalProgress.self, from: localNull))
+        for completed in [false, true] {
+            let boolean = StateProgressChange(episodeId: try StateID("1"), positionSeconds: 3, completed: completed)
+            XCTAssertEqual(try decoder.decode(StateProgressChange.self, from: JSONEncoder().encode(boolean)), boolean)
+        }
+    }
+
     func testFollowLostAckCannotResurrectRemoteUnfollow() async throws {
         let api = StateServer()
         var state = store(api)
@@ -89,6 +240,8 @@ import XCTest
         await state.flush()
         XCTAssertEqual(api.progressBatches.map { $0.sequence.value }, ["1", "2"])
         XCTAssertEqual(api.progressBatches.map { $0.changes[0].positionSeconds }, [90, 12])
+        XCTAssertNil(api.progressBatches[0].changes[0].completed)
+        XCTAssertEqual(api.progressBatches[1].changes[0].completed, false)
         XCTAssertEqual(state.position(1)?.positionSeconds, 12)
     }
 
@@ -373,7 +526,7 @@ import XCTest
         if batch.generation != generation { throw APIError(statusCode: 409, message: "Recovery required", code: "recovery_required") }
         let key = batch.clientId + ":" + batch.sequence.value
         if let ack = progressAcks[key] { return ack }
-        for change in batch.changes { position = change.positionSeconds; completed = change.completed; progressRevision += 1 }
+        for change in batch.changes { position = change.positionSeconds; completed = change.completed ?? completed; progressRevision += 1 }
         let ack = StateAcknowledgement(protocol: 1, accountId: user, generation: generation, clientId: batch.clientId, sequence: batch.sequence, revision: try StateRevision(String(progressRevision)), results: try batch.changes.map { StateProgressResult(episodeId: malformedAck ? try StateID("999") : $0.episodeId, status: .applied) })
         progressAcks[key] = ack
         if loseAck { loseAck = false; throw URLError(.networkConnectionLost) }

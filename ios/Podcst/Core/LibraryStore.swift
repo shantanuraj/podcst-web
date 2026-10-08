@@ -200,7 +200,7 @@ public final class LibraryStore {
         try durable.terminalErase(accountID: accountID)
     }
 
-    func reapplyGuest(_ change: StateProgressChange) {
+    func reapplyGuest(_ change: LocalProgress) {
         do { try durable.reapplyGuest(change); Task { await durable.flush(includeFollows: false) } }
         catch { self.error = error.localizedDescription }
     }
