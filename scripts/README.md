@@ -19,6 +19,29 @@ environment-file permissions. Backup scripts require Linux/GNU coreutils,
 PostgreSQL client tools, age, AWS CLI and (for identity snapshots) zstd on `PATH`.
 Missing required configuration stops the script before a dump or upload.
 
+## Built application checks
+
+Build the reviewed candidate in an isolated checkout with frozen dependencies and
+no application environment files, then run:
+
+```sh
+BUILT_APP_DIRECTORY=/path/to/built-checkout PG_BIN=/path/to/postgresql/bin \
+  bun --no-env-file scripts/test-built-app.ts
+```
+
+The runner needs Node, Bun and `redis-server`. It starts disposable PostgreSQL and
+Redis, seeds synthetic data, and serves the standalone build on loopback. It runs
+SSR checks and authenticated progress/follow/list HTTP tests, including lost-ack
+replay, the numeric Starred bridge, checkpoint completion and rejected writers.
+The app and test processes receive an explicit environment, not inherited
+application credentials. Redis uses an owner-protected local socket.
+
+The runner does not rebuild the candidate: keep its build artifacts, source and the
+current checkout's schema/tests aligned. Standalone environment files are refused.
+Sandbox processes are stopped on success, failure or interruption; failed runs
+retain their private log directory for diagnosis. These checks do not authorize a
+production migration or prove physical-device behavior.
+
 ## Backup coverage and recovery
 
 [`podcst-backup.sh`](podcst-backup.sh) is the authoritative selected-table list.
