@@ -75,8 +75,6 @@ class LibraryRepository(
                 if (durable.account(account).followBlocked != null) return@withLock
                 val snapshot = api.followState()
                 if (!active(owner, epoch)) return@withLock
-                // An ordinary preflight read cannot retire an acknowledged overlay. It is nevertheless
-                // authoritative and initiated after any persisted ack from the previous process.
                 durable.installFollows(account, snapshot)
                 for (guest in durable.guestFollows()) {
                     val resolved = if (guest.id != null) guest else api.podcast(guest.feed)
@@ -133,7 +131,6 @@ class LibraryRepository(
             if (subscribed) owner.database.subscriptions().delete(podcast.feed)
             else owner.database.subscriptions().insert(SubscriptionEntity(podcast.feed, clock()))
         } catch (failure: Exception) { durable.error(owner.accountId, "Follow could not be saved: ${failure.message}"); throw failure }
-        // Network failure must not turn a successfully persisted intent into a failed save.
         runCatching { refresh() }.onFailure { if (it is CancellationException) throw it }
     }
 

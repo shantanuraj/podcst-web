@@ -4,7 +4,6 @@ import app.podcst.model.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
-/** Synthetic protocol adapter; no external server or account data. */
 class StateFixtures(private val account: String = "owner", private val presentation: (Call) -> Reply) {
     val generation = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

@@ -55,7 +55,6 @@ private data class DurableRoot(val version: Int = 1, val accounts: Map<String, D
 
 data class DurableStatus(val pending: Boolean = false, val error: String? = null, val blocked: Boolean = false)
 
-/** The single atomic commit is both the intent journal and its optimistic projection. Never a cache. */
 class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null) {
     private val file = AtomicFile(file)
     private val json = Json { encodeDefaults = true }
@@ -90,7 +89,6 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
     }
     @Synchronized fun guestFollows(): List<Podcast> { check(readable); return root.guestFollows.values.toList() }
 
-    /** Called only after a scoped server snapshot verified this account. Consumption and union share one commit. */
     @Synchronized fun unionGuest(account: String, resolved: List<Podcast>) {
         var target = account(account)
         val consumed = mutableSetOf<String>()
@@ -108,7 +106,7 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
     }
 
     @Synchronized fun erase(account: String) { commit(root.copy(accounts = root.accounts - account)); errors.remove(account) }
-    @Synchronized fun checkpoint() { check(readable); /* All mutations are synchronously committed before returning. */ }
+    @Synchronized fun checkpoint() { check(readable); }
 
     internal fun queueProgress(account: String, change: StateProgressChange, legacyToken: String? = null) = change(account) {
         require(change.positionSeconds >= 0)

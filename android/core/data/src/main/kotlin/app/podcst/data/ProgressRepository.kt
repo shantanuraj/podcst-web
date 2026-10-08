@@ -72,7 +72,6 @@ class ProgressRepository(
             val completed = episode.id?.let { state?.progressOverlay()?.get(it)?.completed ?: state?.progress?.get(it)?.completed } ?: previous?.completed ?: false
             require(position >= Duration.ZERO && position.inWholeSeconds <= Int.MAX_VALUE) { "Source position is outside the supported range" }
             val (seconds, done) = event.intent(position.inWholeSeconds.toInt(), completed)
-            // This journal commit is the saved projection; Room is only a reconstructible presentation copy.
             if (account != null && episode.id != null) durable.queueProgress(account, StateProgressChange(StateID(episode.id.toString()), seconds, done), legacyToken)
             try {
                 owner.database.withTransaction {
@@ -87,13 +86,10 @@ class ProgressRepository(
         } catch (failure: Exception) { durable.error(owner.accountId, "Progress could not be saved: ${failure.message}"); throw failure }
     }
 
-    /** Old unkeyed writes are never sent implicitly, even if the server has no progress. */
     suspend fun reapplyLegacy(episode: Episode) {
         val owner = scopes.current.value
         val id = episode.id ?: error("Resolve this episode before reapplying")
         val stored = owner.database.episodes().get(episode.identity.value) ?: error("Resolve this episode before reapplying")
-        // The retained media seed records the original numeric reference; a newly resolved ID
-        // must not accidentally select another legacy row that happens to have that number.
         val retainedId = stored.mediaIdentity?.takeIf { it.startsWith("episode:") }?.removePrefix("episode:")?.toLongOrNull()
         val originalId = retainedId ?: run {
             val db = owner.database.openHelper.readableDatabase
@@ -104,7 +100,6 @@ class ProgressRepository(
         }
         val old = originalId?.let { owner.database.outbox().get(it) } ?: error("No ambiguous saved progress remains for this episode")
         event(episode, old.position.seconds, if (old.completed) StateProgressEvent.played else StateProgressEvent.replay, owner, "${old.episodeId}:${old.queuedAt}")
-        // Keep the original source row as evidence; repeated reapply is an explicit NEW action.
     }
 
     suspend fun restoreLatest(): PlaybackProgress? {

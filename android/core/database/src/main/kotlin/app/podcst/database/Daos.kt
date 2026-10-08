@@ -90,7 +90,6 @@ interface EpisodeDao {
     suspend fun upsert(episodes: List<EpisodeEntity>) {
         for (episode in episodes) {
             val existing = get(episode.identity)
-            // Only an exact source-scoped observation may resolve an old local reference.
             val source = source(episode.feed, episode.guid).singleOrNull()?.takeIf { it.id == null && episode.id != null }
             val media = existing?.mediaIdentity ?: source?.mediaIdentity ?: episode.mediaIdentity
             if (source != null && source.identity != episode.identity) {
@@ -98,7 +97,6 @@ interface EpisodeDao {
                 movePlayer(source.identity, episode.identity)
                 moveProgress(source.identity, episode.identity)
                 moveStars(source.identity, episode.identity)
-                // Keep conflicting old progress/source rows; they are not new upload intent.
                 remove(source.identity)
             }
             writeEpisodes(listOf(episode.copy(mediaIdentity = media, mediaReferenceIdentity = existing?.mediaReferenceIdentity ?: source?.mediaReferenceIdentity ?: episode.mediaReferenceIdentity)))

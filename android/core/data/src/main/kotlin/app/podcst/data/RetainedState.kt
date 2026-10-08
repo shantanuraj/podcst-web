@@ -5,7 +5,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 
-/** Read-only legacy material stays device-local until this explicit, source-scoped resolution. */
 class RetainedState(private val scopes: Scopes, private val api: PodcstApi, private val catalog: CatalogRepository) {
     val episodes = scopes.current.flatMapLatest { owner -> owner.database.episodes().observeUnresolved() }
     val podcasts = scopes.current.flatMapLatest { owner -> owner.database.podcasts().observeUnresolved() }
@@ -17,8 +16,6 @@ class RetainedState(private val scopes: Scopes, private val api: PodcstApi, priv
         try {
             val feeds = owner.database.episodes().unresolved().map { it.feed } + owner.database.podcasts().unresolved().map { it.feed }
             for (feed in feeds.distinct()) {
-                // Only feed/GUID within the original source may establish a mapping. Catalog's
-                // transactional upsert moves references only when exactly one old record matches.
                 val podcast = api.podcast(feed)
                 if (scopes.current.value !== owner) throw CancellationException("Account changed")
                 if (podcast.feed != feed || podcast.id == null) continue

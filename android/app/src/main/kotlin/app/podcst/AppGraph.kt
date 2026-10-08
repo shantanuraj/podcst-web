@@ -101,7 +101,6 @@ class AppGraph(application: Application) {
         }
     }
 
-    /** Invoke only after authoritative account-deletion acknowledgement, never logout/401. */
     suspend fun eraseAcknowledgedAccount(accountId: String) {
         check(scopes.current.value.accountId != accountId)
         scopes.erase(accountId)

@@ -94,8 +94,6 @@ class CatalogRepository(
             for (podcast in podcasts) {
                 val previous = podcast.id?.let { database.podcasts().byId(it) }
                 if (previous != null && previous.feed != podcast.feed) {
-                    // Feed URLs are lookup aliases, not synchronized identity. Move local references
-                    // alongside metadata in the same Room transaction. Persisted routes retain the canonical ID.
                     val db = database.openHelper.writableDatabase
                     db.execSQL("UPDATE OR IGNORE subscriptions SET feed = ? WHERE feed = ?", arrayOf(podcast.feed, previous.feed))
                     db.execSQL("UPDATE charts SET feed = ? WHERE feed = ?", arrayOf(podcast.feed, previous.feed))

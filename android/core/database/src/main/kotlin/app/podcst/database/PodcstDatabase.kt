@@ -35,8 +35,6 @@ abstract class PodcstDatabase : RoomDatabase() {
     companion object {
         val IDENTITY_MIGRATION = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                // Room runs this and its activation/version marker in one transaction. Source is
-                // retained only for ambiguous IDs and old replay-less writes, never used for upload.
                 db.execSQL("CREATE TABLE legacy_episode_source AS SELECT * FROM episodes WHERE id <= 0 OR id > 9007199254740991 OR podcastId <= 0 OR podcastId > 9007199254740991 OR id IN (SELECT id FROM episodes GROUP BY id HAVING COUNT(*) > 1) OR id IN (SELECT episodeId FROM progress_outbox)")
                 db.execSQL("CREATE TABLE legacy_podcast_source AS SELECT * FROM podcasts WHERE id <= 0 OR id > 9007199254740991 OR itunesId <= 0 OR itunesId > 9007199254740991 OR id IN (SELECT id FROM podcasts GROUP BY id HAVING COUNT(*) > 1)")
                 db.execSQL("ALTER TABLE episodes ADD COLUMN mediaIdentity TEXT")

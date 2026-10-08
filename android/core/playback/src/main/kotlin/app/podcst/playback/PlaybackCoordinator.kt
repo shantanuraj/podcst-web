@@ -339,7 +339,6 @@ class PlaybackCoordinator internal constructor(
         changingAccount = true
         unload()
         checkpoint()
-        // Await both Room queue writes and the durable progress commit before changing scopes.
         while (writes.any { !it.isCompleted }) writes.toList().forEach { it.join() }
         writeFailures.values.firstOrNull()?.let { throw it }
         writes.removeAll { it.isCompleted }

@@ -139,7 +139,6 @@ class StarRepository(
             mutex.withLock {
                 val next = root.toMutableMap()
                 if (old != null) next[Scope.key(old)]?.let { next[Scope.key(old)] = it.copy(episodes = emptyMap(), snapshot = null) }
-                // Guest union waits for remote account verification in refresh().
                 commit(next)
                 checkCurrent(token)
                 view(token) { StarsState(accountId, ready = readable && activate, revision = token) }
@@ -154,7 +153,6 @@ class StarRepository(
     suspend fun erase(accountId: String) = withContext(io) {
         mutex.withLock {
             check(state.value.accountId != accountId) { "Suspend and leave the erased account first" }
-            // Erasure also removes any retained migration source for this account, not other accounts.
             if (migrationSource.baseFile.exists()) {
                 val source = json.parseToJsonElement(migrationSource.readFully().decodeToString()).jsonObject
                 atomicWrite(migrationSource, JsonObject(source - Scope.key(accountId)).toString().encodeToByteArray())
@@ -294,7 +292,6 @@ class StarRepository(
         file.baseFile.parentFile?.mkdirs()
         if (!migrationSource.baseFile.exists() && file.baseFile.exists() && root.values.any { it.identityVersion == 1 }) {
             val source = file.readFully()
-            // Validate before staging. The original numeric request/ack bytes survive activation.
             decode(source)
             atomicWrite(migrationSource, source)
         }

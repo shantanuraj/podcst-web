@@ -72,7 +72,6 @@ class ApiContractTest {
             return
         }
         if (endpoint == "DELETE /api/subscriptions") {
-            // The adapter deliberately has no obsolete mutation writer to drive this fixture.
             assertEquals("Replace obsolete success fixture with update-required", 426, status)
             assertEquals("update_required", PodcstApi.json.decodeFromString<StateErrorBody>(body).code)
             return
