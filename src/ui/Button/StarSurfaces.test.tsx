@@ -65,6 +65,7 @@ function fixture(account: string | null = null) {
     renderToStaticMarkup(
       <AppRouterContext.Provider
         value={{
+          bfcacheId: 'fixture',
           back() {},
           forward() {},
           refresh() {},

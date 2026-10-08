@@ -42,7 +42,7 @@
     "ioredis": "5.11.1",
     "match-sorter": "8.3.0",
     "music-metadata": "12.0.0",
-    "next": "16.2.9",
+    "next": "16.3.8",
     "postgres": "^3.4.9",
     "react": "19.2.7",
     "react-dom": "19.2.7",
@@ -72,7 +72,7 @@
     "husky": "9.1.7",
     "lint-staged": "17.0.8",
     "opentype.js": "^2.0.0",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.29",
     "tailwindcss": "^4.3.1"
   },
   "resolutions": {
@@ -88,10 +88,15 @@
     "@peculiar/asn1-schema": "^2.8.0",
     "@peculiar/asn1-x509": "^2.8.0",
     "@peculiar/asn1-x509-attr": "^2.8.0",
-    "minimatch": "^10.2.5",
+    "baseline-browser-mapping": "^2.11.0",
+    "brace-expansion": "^5.0.12",
+    "browserslist": "^4.28.7",
+    "minimatch": "^10.2.6",
     "picomatch": "^4.0.4",
-    "postcss": "^8.5.15",
-    "shell-quote": "^1.8.4"
+    "postcss": "^8.5.29",
+    "sharp": "^0.35.5",
+    "shell-quote": "^1.11.0",
+    "source-map-js": "^1.2.2"
   },
   "packageManager": "yarn@1.22.22"
 }
