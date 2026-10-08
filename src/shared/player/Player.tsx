@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDurableState } from '@/data/state-browser';
 import { useTranslation } from '@/shared/i18n';
 import { shortcuts } from '@/shared/keyboard/shortcuts';
 import {
@@ -69,6 +70,7 @@ function PlayerBar({
   const { chapter, position, duration } = useTimeline(episode);
   const playing = usePlayer((state) => state.state === 'playing');
   const hold = useHold(onExpand);
+  const durable = useDurableState();
 
   return (
     <div className={styles.bar}>
@@ -103,6 +105,11 @@ function PlayerBar({
           <span className={styles.podcast}>
             {episode.podcastTitle || episode.author}
           </span>
+          {(durable.error || durable.pending) && (
+            <span className={styles.podcast} role="status">
+              {durable.error ?? 'Saved on this device. Waiting to sync…'}
+            </span>
+          )}
         </button>
         <StarButton episode={episode} />
         <span className={styles.compact}>

@@ -19,6 +19,8 @@ test('wire catalogue IDs are exact strings while categories, counts and position
       ],
     }),
   ).not.toThrow();
+  expect(() => validateCatalogue({ id: 301 })).toThrow();
+  expect(() => validateCatalogue({ id: '301' })).not.toThrow();
   for (const value of [12, 9007199254740992, '01', '9223372036854775808'])
     expect(() =>
       validateCatalogue({ episodeId: value, position: 95 }),
