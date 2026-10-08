@@ -1,26 +1,84 @@
-import { createStore, del, get, update } from 'idb-keyval';
+import { createStore, get, update } from 'idb-keyval';
 import { responseData } from '@/data/api';
 import type { AccountSession } from '@/shared/auth/account-session';
-import type { EpisodeList } from '@/shared/lists';
-import type { StarRoot } from './state';
+import type { ListsSnapshot } from '@/shared/lists';
+import { durableStorage } from '@/shared/storage/durable';
+import { convertStars } from './conversion';
+import { type StarRoot, validStarScope } from './state';
 import { type StarStorage, StarSync } from './sync';
 
 export function browserStorage(): StarStorage {
-  const store = createStore('podcst-lists', 'state');
-  return {
-    load: async () => (await get<StarRoot>('root', store)) ?? {},
-    update: async (change) => {
-      let result: StarRoot = {};
-      await update<StarRoot>(
-        'root',
-        (stored) => {
-          result = stored ?? {};
-          change(result);
-          return result;
-        },
-        store,
+  let legacy: ReturnType<typeof createStore>;
+  const storage = durableStorage<{
+    version: 2;
+    source?: unknown;
+    erased?: string[];
+    root: StarRoot;
+  }>(
+    'podcst-lists-v2',
+    () => ({ version: 2, root: {} }),
+    (
+      value,
+    ): value is {
+      version: 2;
+      source?: unknown;
+      erased?: string[];
+      root: StarRoot;
+    } => {
+      const stored = value as { version: number; root: StarRoot };
+      return (
+        !!stored &&
+        stored.version === 2 &&
+        !!stored.root &&
+        Object.entries(stored.root).every(
+          ([key, state]) =>
+            validStarScope(state) &&
+            (!state.wire || key === `account:${state.wire.accountId}`),
+        )
       );
-      return result;
+    },
+  );
+  const initialize = async () => {
+    const installed = await storage.load();
+    if (installed.source !== undefined) return installed;
+    legacy ??= createStore('podcst-lists', 'state');
+    const source = await get('root', legacy);
+    return storage.update((stored) => {
+      if (stored.source !== undefined) return;
+      if (source !== undefined) stored.root = convertStars(source);
+      stored.source = source ?? null;
+    });
+  };
+  return {
+    load: async () => (await initialize()).root,
+    erase: async (account) => {
+      const key = `account:${account}`;
+      await storage.update((stored) => {
+        delete stored.root[key];
+        stored.erased ??= [];
+        if (!stored.erased.includes(key)) stored.erased.push(key);
+        if (stored.source && typeof stored.source === 'object')
+          delete (stored.source as Record<string, unknown>)[key];
+      });
+      legacy ??= createStore('podcst-lists', 'state');
+      await update<Record<string, unknown>>(
+        'root',
+        (source) => {
+          if (source) delete source[key];
+          return source ?? {};
+        },
+        legacy,
+      );
+    },
+    update: async (change) => {
+      await initialize();
+      return (
+        await storage.update((stored) => {
+          change(stored.root);
+          if (stored.erased?.some((key) => key in stored.root))
+            throw new Error('Account terminally erased');
+        })
+      ).root;
     },
   };
 }
@@ -72,11 +130,13 @@ export function starRuntime(session: AccountSession) {
             }
           };
           await confirm();
-          const result = await request<{ lists: EpisodeList[] }>('');
+          const result = await request<ListsSnapshot>('');
           await confirm();
-          return result.lists;
+          return result;
         },
         membership: (id) => request(`/${id}/items?view=membership`),
+        migration: (id, scope, batch) =>
+          request(`/${id}/migration`, { ...scope, batch }),
         changes: (id, batch) => request(`/${id}/changes`, batch),
         episodes: (id, cursor) =>
           request(
@@ -86,13 +146,9 @@ export function starRuntime(session: AccountSession) {
       async (work) => {
         if (!navigator.locks)
           throw new Error('Cross-tab synchronization is unavailable');
-        await navigator.locks.request(
-          'podcst-list-sender',
-          { ifAvailable: true },
-          async (lock) => {
-            if (lock) await work();
-          },
-        );
+        await navigator.locks.request('podcst-list-sender', async (lock) => {
+          if (lock) await work();
+        });
       },
       () => created.notify(),
     ),
@@ -119,7 +175,10 @@ export function connectStars(session: AccountSession) {
   };
   const unsubscribe = session.subscribe(activate);
   activate();
-  void del('stars').catch(() => {});
+  const unregister = session.registerLifecycle({
+    suspend: () => runtime.sync.suspend(),
+    erase: (account) => runtime.sync.erase(account),
+  });
   const refresh = () => {
     if (document.visibilityState === 'visible') void runtime.sync.refresh();
   };
@@ -138,6 +197,7 @@ export function connectStars(session: AccountSession) {
   }, 5000);
   return () => {
     unsubscribe();
+    unregister();
     clearInterval(timer);
     window.removeEventListener('online', refresh);
     window.removeEventListener('focus', refresh);

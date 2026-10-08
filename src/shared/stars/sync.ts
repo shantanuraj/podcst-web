@@ -1,11 +1,15 @@
 import { ApiError } from '@/data/api';
+import { sameScope } from '@/data/progress-outbox';
+import { StateProtocolError } from '@/data/state-runtime';
 import type {
-  EpisodeList,
+  LegacyListBatch,
   ListAcknowledgement,
   ListBatch,
   ListEpisodePage,
   ListSnapshot,
+  ListsSnapshot,
 } from '@/shared/lists';
+import { type StateScope, stateValidator } from '@/shared/state-contract';
 import type { IEpisodeInfo } from '@/types';
 import {
   acknowledge,
@@ -24,12 +28,18 @@ import {
 
 export interface StarStorage {
   load(): Promise<StarRoot>;
+  erase?(account: string): Promise<void>;
   update(change: (root: StarRoot) => void): Promise<StarRoot>;
 }
 export interface StarAPI {
-  lists(): Promise<EpisodeList[]>;
+  lists(): Promise<ListsSnapshot>;
   membership(id: string): Promise<ListSnapshot>;
   changes(id: string, batch: ListBatch): Promise<ListAcknowledgement>;
+  migration(
+    id: string,
+    scope: StateScope,
+    batch: LegacyListBatch,
+  ): Promise<ListAcknowledgement>;
   episodes(id: string, cursor?: string): Promise<ListEpisodePage>;
 }
 export interface StarView {
@@ -107,7 +117,7 @@ export class StarSync {
     }
   };
 
-  async edit(episodeId: number, op?: 'add' | 'remove', episode?: IEpisodeInfo) {
+  async edit(episodeId: string, op?: 'add' | 'remove', episode?: IEpisodeInfo) {
     const generation = this.generation;
     const scope = this.view.scope;
     if (scope === undefined || !this.view.state) return;
@@ -142,6 +152,7 @@ export class StarSync {
     } catch {
       if (generation === this.generation)
         this.emit({ error: 'Unable to save this change on your device.' });
+      throw new Error('Unable to save this change on your device.');
     }
   }
 
@@ -161,6 +172,21 @@ export class StarSync {
     return state;
   }
 
+  async suspend() {
+    await this.activate(undefined);
+    if (this.view.error) throw new Error(this.view.error);
+  }
+
+  async erase(account: string) {
+    if (this.view.scope === account) await this.suspend();
+    if (this.storage.erase) await this.storage.erase(account);
+    else
+      await this.storage.update((root) => {
+        delete root[scopeKey(account)];
+      });
+    this.publish();
+  }
+
   refresh = (): Promise<void> => {
     if (this.running) return this.running;
     const scope = this.view.scope;
@@ -177,13 +203,36 @@ export class StarSync {
       this.emit({ syncing: true, error: undefined });
       let state = await update(() => {});
       if (state.blocked) return;
-      if (!state.listId) {
-        const list = (await this.api.lists()).find(
-          ({ kind }) => kind === 'starred',
-        );
+      if (!state.wire || !state.listId) {
+        const envelope = await this.api.lists();
+        if (
+          envelope.protocol !== 1 ||
+          envelope.accountId !== scope ||
+          !stateValidator('uuid')(envelope.generation) ||
+          !Array.isArray(envelope.lists) ||
+          envelope.lists.some(
+            (list) =>
+              !stateValidator('uuid')(list.id) ||
+              !stateValidator('revision')(list.revision) ||
+              !['starred', 'playlist'].includes(list.kind) ||
+              !Number.isSafeInteger(list.itemCount) ||
+              list.itemCount < 0,
+          )
+        )
+          throw new StateProtocolError('Invalid lists scope');
+        const list = envelope.lists.find(({ kind }) => kind === 'starred');
         active();
         if (!list) throw new Error('Starred list missing');
         state = await update((state) => {
+          if (state.wire && !sameScope(state.wire, envelope)) {
+            state.blocked = 409;
+            return;
+          }
+          state.wire = {
+            protocol: 1,
+            accountId: scope,
+            generation: envelope.generation,
+          };
           state.listId = list.id;
         });
       }
@@ -192,14 +241,16 @@ export class StarSync {
         state = await update(freeze);
         if (state.flight && !state.flight.ack) {
           try {
-            const ack = await this.api.changes(id, state.flight.batch);
+            const ack = state.legacy
+              ? await this.api.migration(id, state.wire!, state.legacy.batch)
+              : await this.api.changes(id, state.flight.batch);
             active();
             await update((state) => acknowledge(state, ack));
           } catch (error) {
             active();
             if (
               error instanceof ApiError &&
-              [400, 404, 409, 413].includes(error.status)
+              [400, 403, 404, 409, 413, 426].includes(error.status)
             )
               await update((state) => {
                 state.blocked = error.status;
@@ -227,8 +278,12 @@ export class StarSync {
       this.failures = 0;
       this.nextAttempt = 0;
     })
-      .catch(() => {
+      .catch(async (error) => {
         if (generation !== this.generation) return;
+        if (error instanceof StateProtocolError)
+          await update((state) => {
+            state.blocked = 409;
+          }).catch(() => {});
         this.nextAttempt =
           Date.now() +
           Math.min(60_000, 1000 * 2 ** Math.min(this.failures++, 6));

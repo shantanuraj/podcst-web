@@ -28,20 +28,22 @@ export function useStars() {
       !!state &&
       view.scope !== null &&
       (!!state.flight || state.queued.length > 0),
-    error: state?.blocked
-      ? 'Star sync needs attention. Pending edits have been kept.'
-      : state?.failures.length
-        ? `${state.failures.length} episode(s) could not be added.`
-        : view.error,
+    error:
+      state?.blocked || state?.unresolved?.length
+        ? 'Star sync needs attention. Pending edits have been kept.'
+        : state?.failures.length
+          ? `${state.failures.length} episode(s) could not be added.`
+          : view.error,
     contains: (episode: IEpisodeInfo) =>
       validEpisodeId(episode.id) &&
       stars.some(({ episodeId }) => episodeId === episode.id),
     toggle: (episode: IEpisodeInfo) => {
       if (state && session.current(token) && validEpisodeId(episode.id))
-        void sync.edit(episode.id, undefined, episode);
+        void sync.edit(episode.id, undefined, episode).catch(() => {});
     },
-    unstar: (episodeId: number) => {
-      if (state && session.current(token)) void sync.edit(episodeId, 'remove');
+    unstar: (episodeId: string) => {
+      if (state && session.current(token))
+        void sync.edit(episodeId, 'remove').catch(() => {});
     },
     refresh: sync.refresh,
   };
