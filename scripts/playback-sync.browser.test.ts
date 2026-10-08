@@ -94,6 +94,7 @@ test.skipIf(!chrome)(
       restoredDifferentEpisode: true,
       restoredSameEpisode: true,
       preservedQueue: true,
+      scopedQueuePreserved: true,
       unchangedRefreshIsReadOnly: true,
       unsavedProgressFlushed: true,
       failedSaveRetried: true,

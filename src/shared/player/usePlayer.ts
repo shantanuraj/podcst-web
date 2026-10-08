@@ -499,18 +499,21 @@ usePlayer.subscribe((currentState, previousState) => {
       Math.floor(currentState.seekPosition / PERSISTED_SECONDS) !==
         Math.floor(previousState.seekPosition / PERSISTED_SECONDS))
   ) {
-    try {
-      writeSession({
-        scope: currentState.accountScope,
-        queue: currentState.queue,
-        current: currentState.currentTrackIndex,
-        position: currentState.seekPosition,
-      });
-    } catch {
-      usePlayer.setState({
-        storageError: 'Queue changes could not be saved. Source retained.',
-      });
-    }
+    void writeSession({
+      scope: currentState.accountScope,
+      queue: currentState.queue,
+      current: currentState.currentTrackIndex,
+      position: currentState.seekPosition,
+    }).catch(() => {
+      const active = usePlayer.getState();
+      if (
+        active.accountScope === currentState.accountScope &&
+        active.accountRevision === currentState.accountRevision
+      )
+        usePlayer.setState({
+          storageError: 'Queue changes could not be saved. Source retained.',
+        });
+    });
   }
 
   if (

@@ -30,7 +30,12 @@ const initial = usePlayer.getState();
 let client: QueryClient;
 let session: AccountSession;
 
-beforeEach(() => {
+const originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+beforeEach(async () => {
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: { request: async (_name: string, work: () => void) => work() },
+  });
   spyOn(AudioUtils, 'play').mockImplementation(() => {});
   spyOn(AudioUtils, 'pause').mockImplementation(() => {});
   spyOn(AudioUtils, 'stop').mockImplementation(() => {});
@@ -44,7 +49,7 @@ beforeEach(() => {
       },
     },
   });
-  writeSession({
+  await writeSession({
     scope: owner.id,
     queue: [browser, queued],
     current: 0,
@@ -62,6 +67,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalLocks) Object.defineProperty(navigator, 'locks', originalLocks);
+  else Reflect.deleteProperty(navigator, 'locks');
   client.clear();
   Reflect.deleteProperty(globalThis, 'window');
   usePlayer.setState(initial, true);

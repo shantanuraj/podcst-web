@@ -10,6 +10,7 @@ import {
   connectAccountEvents,
 } from '@/shared/auth/account-events';
 import { AccountSession } from '@/shared/auth/account-session';
+import { connectQueueSession } from '@/shared/player/queue-lifecycle';
 import { usePlayer } from '@/shared/player/usePlayer';
 import { connectStars } from '@/shared/stars/browser';
 
@@ -56,6 +57,7 @@ export function QueryProvider({
       connection.close();
     };
   }, [session]);
+  useEffect(() => connectQueueSession(session), [session]);
   useEffect(() => connectStars(session), [session]);
   useEffect(() => connectState(session), [session]);
   return (

@@ -4,7 +4,10 @@ import { connectState, stateRuntime } from '../../src/data/state-browser';
 import { AccountContext } from '../../src/shared/auth/AccountBoundary';
 import { AccountSession } from '../../src/shared/auth/account-session';
 import AudioUtils from '../../src/shared/player/AudioUtils';
-import { writeSession } from '../../src/shared/player/persisted-session';
+import {
+  readSession,
+  writeSession,
+} from '../../src/shared/player/persisted-session';
 import { usePlaybackSync } from '../../src/shared/player/usePlaybackSync';
 import {
   getCurrentEpisode,
@@ -65,14 +68,24 @@ async function run() {
   AudioUtils.stop = () => {};
   const reloaded = sessionStorage.getItem('reloaded') === 'true';
   if (!reloaded) {
-    writeSession({
+    await writeSession({
       scope: owner.id,
       queue: [browser, queued],
       current: 0,
       position: 1728,
     });
+    await writeSession({
+      scope: 'other',
+      queue: [queued],
+      current: 0,
+      position: 9,
+    });
     await phoneProgress(1438);
   }
+  assert(
+    readSession('other')?.position === 9,
+    'Another account queue was overwritten',
+  );
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -179,6 +192,7 @@ async function run() {
         restoredDifferentEpisode: true,
         restoredSameEpisode: true,
         preservedQueue: true,
+        scopedQueuePreserved: true,
         unchangedRefreshIsReadOnly: true,
         unsavedProgressFlushed: true,
         failedSaveRetried: true,

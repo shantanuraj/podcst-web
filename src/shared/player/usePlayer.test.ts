@@ -18,7 +18,12 @@ const episode = (id: number) =>
 const [a, b, c] = [episode(1), episode(2), episode(3)];
 const initial = usePlayer.getState();
 
-beforeEach(() => {
+const originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+beforeEach(async () => {
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: { request: async (_name: string, work: () => void) => work() },
+  });
   spyOn(AudioUtils, 'play').mockImplementation(() => {});
   spyOn(AudioUtils, 'pause').mockImplementation(() => {});
   spyOn(AudioUtils, 'resume').mockImplementation(() => {});
@@ -27,6 +32,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalLocks) Object.defineProperty(navigator, 'locks', originalLocks);
+  else Reflect.deleteProperty(navigator, 'locks');
   mock.restore();
   usePlayer.setState(initial, true);
 });
@@ -120,7 +127,7 @@ test('only contract speeds are accepted and holding restores the chosen speed', 
   });
 });
 
-test('a persisted session is restored only for the account that saved it', () => {
+test('a persisted session is restored only for its account and survives A to B to A', async () => {
   const store = new Map<string, string>();
   const window = {
     localStorage: {
@@ -133,7 +140,12 @@ test('a persisted session is restored only for the account that saved it', () =>
     value: window,
   });
   try {
-    writeSession({ scope: 'owner', queue: [a, b], current: 1, position: 30 });
+    await writeSession({
+      scope: 'owner',
+      queue: [a, b],
+      current: 1,
+      position: 30,
+    });
     expect(readSession('other')).toBeNull();
     expect(readSession(null)).toBeNull();
     usePlayer.getState().setAccount('owner', 1);
@@ -146,7 +158,9 @@ test('a persisted session is restored only for the account that saved it', () =>
     usePlayer.getState().setAccount(undefined, 2);
     usePlayer.getState().setAccount('other', 2);
     expect(usePlayer.getState().queue).toEqual([]);
-    expect(readSession('owner')).toBeNull();
+    expect(readSession('owner')?.queue).toEqual([a, b]);
+    usePlayer.getState().setAccount('owner', 3);
+    expect(usePlayer.getState().queue).toEqual([a, b]);
   } finally {
     Reflect.deleteProperty(globalThis, 'window');
   }
