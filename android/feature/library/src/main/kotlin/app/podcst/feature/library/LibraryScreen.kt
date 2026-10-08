@@ -62,6 +62,7 @@ fun LibraryScreen(
     onList: (EpisodeList) -> Unit,
     onPodcast: (Podcast) -> Unit,
     onRemoveUnavailable: (Long) -> Unit,
+    onTransferGuestProgress: (app.podcst.data.GuestProgressSelection) -> Unit,
 ) {
     PullToRefreshBox(
         isRefreshing = state.refresh == Refresh.Running,
@@ -71,6 +72,18 @@ fun LibraryScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(onSettings) }
             item { Lists(state, onList) }
+            if (state.guestProgress.isNotEmpty()) {
+                item { SectionHeader("Choose a guest position to use in this account", Modifier.padding(20.dp)) }
+                items(state.guestProgress, key = { "guest:${it.accountId}:${it.sourceToken}" }) { selection ->
+                    androidx.compose.material3.TextButton(
+                        enabled = selection.canTransfer && state.refresh != Refresh.Running,
+                        onClick = { onTransferGuestProgress(selection) },
+                    ) {
+                        Text(if (selection.canTransfer) "Use ${selection.positionSeconds}s${if (selection.completed) " (played)" else ""}: ${selection.episode.title}"
+                            else "Resolve this guest episode before transferring: ${selection.episode.title}")
+                    }
+                }
+            }
             items(state.legacyProgress, key = { "legacy:${it.identity.value}" }) { episode ->
                 androidx.compose.material3.TextButton(onClick = { actions.reapplyProgress(episode) }) {
                     Text("Reapply old saved progress: ${episode.title}")

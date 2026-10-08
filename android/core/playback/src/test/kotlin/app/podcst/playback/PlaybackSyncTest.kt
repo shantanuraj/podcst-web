@@ -52,7 +52,7 @@ class PlaybackSyncTest {
     fun close() {
         player?.release()
         val current = scopes.current.value
-        current.database.close()
+        scopes.close()
         PodcstDatabase.delete(application, current.key)
     }
 

@@ -2,6 +2,7 @@ package app.podcst.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.podcst.data.GuestProgressSelection
 import app.podcst.data.LibraryRepository
 import app.podcst.data.ProgressRepository
 import app.podcst.data.StarRepository
@@ -29,6 +30,7 @@ data class LibraryState(
     val loaded: Boolean = false,
     val unavailable: List<Long> = emptyList(),
     val legacyProgress: List<Episode> = emptyList(),
+    val guestProgress: List<GuestProgressSelection> = emptyList(),
 )
 
 class LibraryViewModel(
@@ -48,7 +50,7 @@ class LibraryViewModel(
         listening(progress, stars, downloads, playback, clock),
         refresh,
         ::library,
-    ).combine(library.unavailable) { state, unavailable -> state.copy(unavailable = unavailable) }.combine(progress.legacyProgress) { state, legacy -> state.copy(legacyProgress = legacy) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
+    ).combine(library.unavailable) { state, unavailable -> state.copy(unavailable = unavailable) }.combine(progress.legacyProgress) { state, legacy -> state.copy(legacyProgress = legacy) }.combine(progress.guestProgress) { state, guest -> state.copy(guestProgress = guest) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
 
     init {
         refresh(force = false)
@@ -58,6 +60,8 @@ class LibraryViewModel(
         library.refresh(force)
         progress.refresh(library.newReleases.first())
     }
+
+    fun transferGuestProgress(selection: GuestProgressSelection) = viewModelScope.refresh(refresh) { progress.transferGuestProgress(selection) }
 
     fun removeUnavailable(id: Long) = viewModelScope.refresh(refresh) { library.removeUnavailable(id) }
 

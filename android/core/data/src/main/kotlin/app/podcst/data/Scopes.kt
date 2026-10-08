@@ -20,22 +20,39 @@ class Scope internal constructor(val accountId: String?, val database: PodcstDat
     }
 }
 
-class Scopes(private val context: Context, accountId: String?) {
-    val durable = DurableState(File(context.noBackupFilesDir, "durable-state.json"))
+class Scopes(
+    private val context: Context,
+    accountId: String?,
+    val durable: DurableState = DurableState(File(context.noBackupFilesDir, "durable-state.json")),
+) {
+    private val guest = lazy { PodcstDatabase.open(context, Scope.key(null)) }
+    internal val guestDatabase: PodcstDatabase get() = guest.value
     var retainedMediaIdentities: () -> Set<String> = { emptySet() }
-    @Volatile var verified: Boolean = false
-        private set
+    private val verifiedState = MutableStateFlow(false)
+    val verification: StateFlow<Boolean> = verifiedState.asStateFlow()
+    val verified: Boolean get() = verifiedState.value
     private val authenticationEpoch = java.util.concurrent.atomic.AtomicLong()
     val epoch: Long get() = authenticationEpoch.get()
     private val state = MutableStateFlow(open(accountId))
     val current: StateFlow<Scope> = state.asStateFlow()
     val database: PodcstDatabase get() = state.value.database
 
-    fun suspendSync() { verified = false; authenticationEpoch.incrementAndGet(); durable.activate(null) }
-    fun resumeSync(accountId: String?) { if (accountId == current.value.accountId) { verified = true; durable.activate(accountId) } }
+    @Synchronized fun suspendSync() { verifiedState.value = false; authenticationEpoch.incrementAndGet(); durable.activate(null) }
+    @Synchronized fun resumeSync(accountId: String?) { if (accountId == current.value.accountId) { verifiedState.value = true; durable.activate(accountId) } }
+    @Synchronized internal fun <T> withVerifiedAccount(owner: Scope, epoch: Long, block: () -> T): T {
+        check(current.value === owner && owner.accountId != null && verified && this.epoch == epoch) { "Account verification changed; select the guest position again" }
+        return block()
+    }
+
     suspend fun checkpoint() { durable.checkpoint() }
     suspend fun erase(accountId: String) {
         check(current.value.accountId != accountId) { "Suspend and leave the erased account first" }
+        val transfers = durable.account(accountId).guestProgressTransfers.values
+        if (transfers.isNotEmpty()) guestDatabase.withTransaction {
+            for (source in transfers) {
+                guestDatabase.openHelper.writableDatabase.execSQL("DELETE FROM progress WHERE identity = ? AND sourceToken = ?", arrayOf(source.identity, source.sourceToken))
+            }
+        }
         durable.erase(accountId)
         PodcstDatabase.delete(context, Scope.key(accountId))
     }
@@ -60,8 +77,13 @@ class Scopes(private val context: Context, accountId: String?) {
             db.execSQL("DELETE FROM podcasts WHERE feed NOT IN (SELECT feed FROM episodes) AND id IS NOT NULL")
         }
         state.value = next
-        previous.database.close()
+        if (previous.accountId != null) previous.database.close()
     }
 
-    private fun open(accountId: String?) = Scope(accountId, PodcstDatabase.open(context, Scope.key(accountId)))
+    fun close() {
+        if (current.value.accountId != null) current.value.database.close()
+        if (guest.isInitialized()) guest.value.close()
+    }
+
+    private fun open(accountId: String?) = Scope(accountId, if (accountId == null) guestDatabase else PodcstDatabase.open(context, Scope.key(accountId)))
 }

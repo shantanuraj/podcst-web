@@ -23,17 +23,17 @@ class IdentityMigrationTest {
     private var opened: PodcstDatabase? = null
     @After fun close() { opened?.close(); PodcstDatabase.delete(context, key) }
 
-    private fun oldDatabase(): SQLiteDatabase {
+    private fun oldDatabase(version: Int = 1): SQLiteDatabase {
         val path = context.getDatabasePath(PodcstDatabase.name(key)).also { it.parentFile!!.mkdirs() }
         val db = SQLiteDatabase.openOrCreateDatabase(path, null)
-        val schema = Json.parseToJsonElement(File(checkNotNull(System.getProperty("podcst.schemas")), "app.podcst.database.PodcstDatabase/1.json").readText()).jsonObject.getValue("database").jsonObject
+        val schema = Json.parseToJsonElement(File(checkNotNull(System.getProperty("podcst.schemas")), "app.podcst.database.PodcstDatabase/$version.json").readText()).jsonObject.getValue("database").jsonObject
         schema.getValue("entities").jsonArray.forEach { value ->
             val entity = value.jsonObject
             db.execSQL(entity.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", entity.getValue("tableName").jsonPrimitive.content))
             entity["indices"]?.jsonArray?.forEach { index -> db.execSQL(index.jsonObject.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", entity.getValue("tableName").jsonPrimitive.content)) }
         }
         schema.getValue("setupQueries").jsonArray.forEach { db.execSQL(it.jsonPrimitive.content) }
-        db.version = 1
+        db.version = version
         return db
     }
     private fun insert(db: SQLiteDatabase, feed: String, guid: String, id: Long) {
@@ -61,7 +61,7 @@ class IdentityMigrationTest {
         db.close()
         db = PodcstDatabase.open(context, key).also { opened = it }
         assertEquals(2, db.episodes().queue().size)
-        assertEquals(2, db.openHelper.readableDatabase.version)
+        assertEquals(3, db.openHelper.readableDatabase.version)
     }
 
     @Test fun exactSourceResolutionMovesQueueProgressAndPreservesFallbackMediaWithoutCrossGuidGuess() = runTest {
@@ -105,7 +105,7 @@ class IdentityMigrationTest {
                     PodcstDatabase.IDENTITY_MIGRATION.migrate(db)
                     throw java.io.IOException("synthetic activation failure")
                 }
-            }).build()
+            }, PodcstDatabase.PROGRESS_SOURCE_MIGRATION).build()
         assertTrue(runCatching { failed.episodes().catalog("https://a.test") }.isFailure)
         failed.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(PodcstDatabase.name(key)).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
@@ -114,6 +114,40 @@ class IdentityMigrationTest {
         }
         val restarted = PodcstDatabase.open(context, key).also { opened = it }
         assertEquals("episode:42", restarted.episodes().catalog("https://a.test").single().identity)
+    }
+
+    @Test fun guestSourceTokenMigrationRollsBackAndRestartsWithoutChangingProgress() = runTest {
+        oldDatabase(2).use { db ->
+            db.execSQL("INSERT INTO progress VALUES('episode:42', 95000, 100000, 0, 1000)")
+        }
+        val failed = androidx.room.Room.databaseBuilder(context, PodcstDatabase::class.java, PodcstDatabase.name(key))
+            .addMigrations(object : androidx.room.migration.Migration(2, 3) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    PodcstDatabase.PROGRESS_SOURCE_MIGRATION.migrate(db)
+                    throw java.io.IOException("source token activation denied")
+                }
+            }).build()
+        assertTrue(runCatching { failed.progress().get("episode:42") }.isFailure)
+        failed.close()
+        SQLiteDatabase.openDatabase(context.getDatabasePath(PodcstDatabase.name(key)).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            assertEquals(2, db.version)
+            db.rawQuery("SELECT * FROM progress", null).use { row ->
+                assertTrue(row.moveToFirst())
+                assertEquals(-1, row.getColumnIndex("sourceToken"))
+                assertEquals(95000L, row.getLong(row.getColumnIndexOrThrow("positionMs")))
+            }
+        }
+        val migrated = PodcstDatabase.open(context, key).also { opened = it }
+        val source = migrated.progress().get("episode:42")!!
+        assertEquals(95000L, source.positionMs)
+        assertFalse(source.completed)
+        assertTrue(source.sourceToken.isNotBlank())
+        migrated.close()
+        val restarted = PodcstDatabase.open(context, key).also { opened = it }
+        assertEquals(source, restarted.progress().get("episode:42"))
+        val newer = ProgressEntity(source.identity, source.positionMs, source.durationMs, source.completed, source.updatedAt)
+        restarted.progress().upsert(newer)
+        assertNotEquals(source.sourceToken, restarted.progress().get("episode:42")!!.sourceToken)
     }
 
     @Test fun conflictingLegacyIdsRemainExplicitlyLocalInsteadOfCollapsingQueue() = runTest {

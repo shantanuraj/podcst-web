@@ -27,7 +27,7 @@ class ProgressRepositoryTest {
     private val scheduler = object : WorkScheduler { override fun syncProgress() = Unit; override fun refreshFeeds() = Unit }
     private val phone = episode(1)
     private val web = episode(2)
-    @After fun close() { val current = scopes.current.value; current.database.close(); PodcstDatabase.delete(application, current.key) }
+    @After fun close() { val current = scopes.current.value; scopes.close(); PodcstDatabase.delete(application, current.key) }
     private fun repository(server: FakeServer) = ProgressRepository(server.api, scopes, scheduler) { 1000 }
     private fun server() = FakeServer(StateFixtures { progress(web, 12.0) }::route)
 

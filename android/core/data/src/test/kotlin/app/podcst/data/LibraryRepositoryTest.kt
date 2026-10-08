@@ -27,7 +27,7 @@ class LibraryRepositoryTest {
     private val generation = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
     private val guest = Podcast(id = 9007199254740993, feed = "https://guest.test/rss", title = "Guest")
     private val json = Json { encodeDefaults = true }
-    @After fun close() { val owner = scopes.current.value; owner.database.close(); PodcstDatabase.delete(context, owner.key) }
+    @After fun close() { val owner = scopes.current.value; scopes.close(); PodcstDatabase.delete(context, owner.key) }
     private fun library(server: FakeServer) = LibraryRepository(server.api, scopes, CatalogRepository(server.api, scopes))
 
     @Test fun automaticGuestUnionAndOfflineUnfollowSurviveAccountRoundTripWithoutUploadingCachedShows() = runTest {

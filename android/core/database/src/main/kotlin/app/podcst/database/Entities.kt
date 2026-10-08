@@ -90,6 +90,7 @@ data class ProgressEntity(
     val durationMs: Long?,
     val completed: Boolean,
     val updatedAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "''") val sourceToken: String = java.util.UUID.randomUUID().toString(),
 )
 
 @Entity(tableName = "progress_outbox")

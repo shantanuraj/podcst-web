@@ -19,7 +19,7 @@ import androidx.room.TypeConverters
         OutboxEntity::class,
         StarEntity::class,
     ],
-    version = 2,
+    version = 3,
 )
 @TypeConverters(Converters::class)
 abstract class PodcstDatabase : RoomDatabase() {
@@ -54,10 +54,17 @@ abstract class PodcstDatabase : RoomDatabase() {
             }
         }
 
+        val PROGRESS_SOURCE_MIGRATION = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE progress ADD COLUMN sourceToken TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE progress SET sourceToken = lower(hex(randomblob(16)))")
+            }
+        }
+
         fun name(scope: String) = "podcst-$scope.db"
 
         fun open(context: Context, scope: String): PodcstDatabase =
-            Room.databaseBuilder(context, PodcstDatabase::class.java, name(scope)).addMigrations(IDENTITY_MIGRATION).build()
+            Room.databaseBuilder(context, PodcstDatabase::class.java, name(scope)).addMigrations(IDENTITY_MIGRATION, PROGRESS_SOURCE_MIGRATION).build()
 
         fun delete(context: Context, scope: String) {
             val removed = context.deleteDatabase(name(scope))

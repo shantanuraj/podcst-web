@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -30,6 +32,85 @@ class ProgressRepository(
     private val durable = scopes.durable
     private var retryAt = 0L
     val status = durable.status
+
+    val guestProgress: Flow<List<GuestProgressSelection>> = combine(scopes.current, scopes.verification) { owner, verified -> owner to verified }
+        .flatMapLatest { (owner, verified) ->
+            val account = owner.accountId
+            val epoch = scopes.epoch
+            if (account == null || !verified) flowOf(emptyList()) else {
+                combine(scopes.guestDatabase.progress().observeAll(), durable.revision) { rows, _ ->
+                    val selections = rows.mapNotNull { row ->
+                        if (durable.guestProgressRecipient(row.sourceToken) != null) return@mapNotNull null
+                        val episode = scopes.guestDatabase.episodes().get(row.identity)?.domain() ?: return@mapNotNull null
+                        GuestProgressSelection(account, epoch, episode, row.guestSource(episode))
+                    }
+                    if (active(owner, epoch)) selections else emptyList()
+                }.catch { failure ->
+                    if (failure is CancellationException) throw failure
+                    durable.error(account, "Guest progress could not be read. Original source is retained.")
+                }
+            }
+        }
+
+    suspend fun transferGuestProgress(selection: GuestProgressSelection) = edits.withLock {
+        val owner = scopes.current.value
+        val account = selection.accountId
+        try {
+            check(owner.accountId == account) { "Account changed; select the guest position again" }
+            check(active(owner, selection.epoch)) { "Account verification changed; select the guest position again" }
+            scopes.guestDatabase.withTransaction {
+                val recipient = durable.guestProgressRecipient(selection.sourceToken)
+                if (recipient == null) {
+                    val row = scopes.guestDatabase.progress().get(selection.source.identity)
+                    val episode = scopes.guestDatabase.episodes().get(selection.source.identity)?.domain()
+                    check(row != null && episode != null && row.guestSource(episode) == selection.source) { "Guest progress changed; select its current position again" }
+                }
+                scopes.withVerifiedAccount(owner, selection.epoch) { durable.transferGuestProgress(account, selection.source) }
+            }
+            if (active(owner, selection.epoch)) {
+                try {
+                    owner.database.withTransaction {
+                        if (!active(owner, selection.epoch)) return@withTransaction
+                        owner.database.episodes().upsert(listOf(selection.episode.entity()))
+                        val id = checkNotNull(selection.source.episodeId)
+                        val saved = durable.account(account)
+                        val overlay = saved.progressOverlay()[id]
+                        val accepted = saved.progress[id]
+                        if (overlay != null || accepted != null) owner.database.progress().upsert(ProgressEntity(
+                            selection.episode.identity.value,
+                            (overlay?.positionSeconds ?: checkNotNull(accepted).positionSeconds) * 1000L,
+                            selection.source.durationMs,
+                            overlay?.completed ?: checkNotNull(accepted).completed,
+                            accepted?.updatedAtMs ?: clock(),
+                        ))
+                    }
+                    cleanupGuestProgress(owner, selection.epoch)
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    durable.error(account, "Guest position is saved for this account. Local cleanup needs retry; source evidence is retained.")
+                }
+                scheduler.syncProgress()
+            }
+        } catch (failure: Exception) {
+            if (failure is CancellationException) throw failure
+            durable.error(account, "Guest position transfer could not finish: ${failure.message}")
+            throw failure
+        }
+    }
+
+    internal suspend fun cleanupGuestProgress(owner: Scope = scopes.current.value, epoch: Long = scopes.epoch) {
+        val account = owner.accountId ?: return
+        if (!active(owner, epoch) || durable.account(account).guestProgressTransfers.isEmpty()) return
+        scopes.guestDatabase.withTransaction {
+            scopes.withVerifiedAccount(owner, epoch) {
+                for (source in durable.account(account).guestProgressTransfers.values) {
+                    scopes.guestDatabase.openHelper.writableDatabase.execSQL(
+                        "DELETE FROM progress WHERE identity = ? AND sourceToken = ?", arrayOf(source.identity, source.sourceToken),
+                    )
+                }
+            }
+        }
+    }
 
     val progress: Flow<Map<String, EpisodeProgress>> = scopes.current.flatMapLatest { scope ->
         combine(scope.database.progress().observeAll(), durable.revision) { rows, _ ->
@@ -148,6 +229,12 @@ class ProgressRepository(
     private suspend fun syncPending(owner: Scope, epoch: Long): SyncOutcome {
         val account = owner.accountId ?: return SyncOutcome.Done
         if (!active(owner, epoch)) return SyncOutcome.Done
+        try { cleanupGuestProgress(owner, epoch) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            durable.error(account, "Guest position cleanup needs retry. Source evidence and pending account work are retained.")
+            return SyncOutcome.Retry
+        }
         if (clock() < retryAt) return SyncOutcome.Retry
         try {
             if (durable.account(account).progressBlocked != null) return SyncOutcome.Done

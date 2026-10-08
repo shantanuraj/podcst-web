@@ -34,6 +34,7 @@ internal data class DurableAccount(
     val followFlight: FollowFlight? = null,
     val progressBlocked: String? = null,
     val followBlocked: String? = null,
+    val guestProgressTransfers: Map<String, GuestProgressSource> = emptyMap(),
     val reappliedLegacy: Map<String, Long> = emptyMap(),
     val importFeeds: List<String> = emptyList(),
     val failures: Set<String> = emptySet(),
@@ -99,6 +100,27 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
             consumed += podcast.feed
         }
         commit(root.copy(accounts = root.accounts + (account to target), guestFollows = root.guestFollows - consumed))
+    }
+
+    @Synchronized internal fun guestProgressRecipient(sourceToken: String): String? {
+        check(readable) { "Saved state is unreadable" }
+        return root.accounts.entries.firstOrNull { sourceToken in it.value.guestProgressTransfers }?.key
+    }
+
+    @Synchronized internal fun transferGuestProgress(account: String, source: GuestProgressSource): Boolean {
+        val recipient = guestProgressRecipient(source.sourceToken)
+        if (recipient != null) {
+            check(recipient == account && root.accounts.getValue(account).guestProgressTransfers[source.sourceToken] == source) { "This guest position was already transferred to another account" }
+            return false
+        }
+        val change = source.change()
+        val saved = account(account)
+        commit(root.copy(accounts = root.accounts + (account to saved.copy(
+            progressQueued = saved.progressQueued.filterNot { it.episodeId == change.episodeId } + change,
+            guestProgressTransfers = saved.guestProgressTransfers + (source.sourceToken to source),
+            failures = saved.failures - "Episode ${change.episodeId.value} unavailable",
+        ))))
+        return true
     }
 
     internal fun retainPending(account: String) = change(account) {
@@ -174,7 +196,10 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
         }
         return json.decodeFromString<DurableRoot>(text).also { root ->
             check(root.version == 1)
+            val transferred = root.accounts.values.flatMap { it.guestProgressTransfers.keys }
+            check(transferred.distinct().size == transferred.size)
             for ((account, saved) in root.accounts) {
+                saved.guestProgressTransfers.forEach { (token, source) -> check(token == source.sourceToken); source.change() }
                 check(account.length in 1..128)
                 validateStateScope(1, account, saved.progressClient, account)
                 validateStateScope(1, account, saved.followClient, account)
