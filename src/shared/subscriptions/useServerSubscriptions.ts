@@ -33,16 +33,29 @@ export function useServerSubscriptions() {
 function useFollowChange(followed: boolean) {
   const session = useAccountSession();
   const token = session.token();
-  return useMutation({
+  const durable = useDurableState();
+  const mutation = useMutation({
     mutationKey: accountQueryKey(
       token.scope,
       followed ? 'subscribe' : 'unsubscribe',
     ),
-    mutationFn: (podcastId: string) => {
+    mutationFn: async (podcastId: string) => {
       if (!session.current(token)) throw new Error('Session changed');
-      return stateRuntime(session).sync.follow(podcastId, followed);
+      await stateRuntime(session).sync.follow(podcastId, followed);
+      return token;
     },
   });
+  return {
+    ...mutation,
+    unavailablePodcastId:
+      followed &&
+      mutation.isSuccess &&
+      session.current(mutation.data) &&
+      durable.failedFollows.includes(mutation.variables) &&
+      !durable.follows.has(mutation.variables)
+        ? mutation.variables
+        : undefined,
+  };
 }
 export const useSubscribe = () => useFollowChange(true);
 export const useUnsubscribe = () => useFollowChange(false);

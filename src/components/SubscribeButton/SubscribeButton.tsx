@@ -20,7 +20,11 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
   const { data: user } = useSession();
   const { membership, syncError, pending } = useServerSubscriptions();
   const localError = useSubscriptions((state) => state.error);
-  const { mutate: serverSubscribe, isPending: isSubscribing } = useSubscribe();
+  const {
+    mutate: serverSubscribe,
+    isPending: isSubscribing,
+    unavailablePodcastId,
+  } = useSubscribe();
   const { mutate: serverUnsubscribe, isPending: isUnsubscribing } =
     useUnsubscribe();
 
@@ -41,6 +45,14 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
     ? isServerSubscribed
     : isLocalSubscribed;
   const isPending = isSubscribing || isUnsubscribing;
+  const status =
+    syncError ??
+    localError ??
+    (podcastId && unavailablePodcastId === podcastId
+      ? 'This podcast is no longer available.'
+      : pending
+        ? 'Saved on this device. Waiting to sync…'
+        : undefined);
 
   const onSubscribeClick = useCallback(() => {
     if (canUseServer) {
@@ -81,11 +93,7 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
       >
         {isSubscribedToFeed ? t('podcast.unsubscribe') : t('podcast.subscribe')}
       </Button>
-      {(syncError || localError || pending) && (
-        <span role="status">
-          {syncError ?? localError ?? 'Saved on this device. Waiting to sync…'}
-        </span>
-      )}
+      {status && <span role="status">{status}</span>}
     </>
   );
 }

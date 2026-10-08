@@ -65,6 +65,12 @@ position wins. Each affected row stores its accepted revision. `not_found` is a
 terminal per-action outcome without a row update or revision increment. The
 acknowledgement's revision is the resource head after the batch.
 
+The web client retains terminal follow outcomes for diagnostics without showing
+historical failures as Library warnings. An unavailable result appears beside
+Follow only for that control's current attempt in the active account session.
+This keeps stale actions for removed or merged podcasts quiet while storage,
+transport and protocol failures remain visible.
+
 Stream state, effects, revisions and acknowledgement commit atomically. Each
 stream starts at `"1"`, with one frozen batch in flight. Repeating the immediately
 preceding sequence and canonical payload returns the saved acknowledgement,

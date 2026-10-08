@@ -291,7 +291,7 @@ test('an empty catalogue and confirmed empty membership show the empty library',
   }
 });
 
-test('rejected changes show specific dismissible notices without interrupting loading', async () => {
+test('rejected progress remains dismissible during loading without announcing saved follow failures', async () => {
   const failures = { progress: ['701', '701'], follows: ['8', '9', '8'] };
   const f = await fixture({ failures });
   try {
@@ -301,17 +301,18 @@ test('rejected changes show specific dismissible notices without interrupting lo
     expect(markup).toContain(
       'Listening progress could not be saved for 1 unavailable episode.',
     );
-    expect(markup).toContain(
-      '2 podcasts could not be followed because they are unavailable.',
-    );
+    expect(markup).not.toContain('could not be followed');
     expect(markup).toContain('>Dismiss</button>');
-    await f.sync.dismissFailures(failures);
+    await f.sync.dismissFailures({ progress: failures.progress });
     await f.sync.reload();
     const dismissed = f.render();
     expectLoading(dismissed);
     expect(dismissed).not.toContain('could not be saved');
     expect(dismissed).not.toContain('could not be followed');
     expect(dismissed).not.toContain('>Dismiss</button>');
+    expect(
+      (await f.sync.storage.load()).accounts[scope.accountId].follows.failures,
+    ).toEqual(failures.follows);
   } finally {
     await f.dispose();
   }
@@ -320,15 +321,46 @@ test('rejected changes show specific dismissible notices without interrupting lo
 test('retiring an account hides its failure notices', async () => {
   const f = await fixture({
     catalogue: [podcast],
-    failures: { progress: [], follows: ['8'] },
+    failures: { progress: ['701'], follows: ['8'] },
   });
   try {
     expect(f.render()).toContain(
-      '1 podcast could not be followed because it is unavailable.',
+      'Listening progress could not be saved for 1 unavailable episode.',
     );
+    expect(f.render()).not.toContain('could not be followed');
     f.session.beginAuthChange();
+    expect(f.render()).not.toContain('could not be saved');
     expect(f.render()).not.toContain('could not be followed');
     expect(f.render()).not.toContain('>Dismiss</button>');
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('a saved failure for an old podcast leaves its current subscription clean and retains diagnostics', async () => {
+  const f = await fixture({
+    items: [membership('7')],
+    catalogue: [podcast],
+    failures: { progress: [], follows: ['8'] },
+  });
+  try {
+    const oldFeed = 'https://example.invalid/old-feed';
+    await f.sync.storage.update((root) => {
+      root.guest.catalog = {
+        [oldFeed]: { ...podcast, id: '8', feed: oldFeed },
+      };
+    });
+    await f.sync.reload();
+    const before = await f.sync.storage.load();
+    const markup = f.render();
+    expect(section(markup, 'Subscriptions')).toContain(podcast.title);
+    expect(section(markup, 'Subscriptions')).toContain('1 ·');
+    expect(markup).not.toContain('could not be followed');
+    expect(markup).not.toContain('Some changes could not be applied');
+    expect(markup).not.toContain('Podcast details unavailable');
+    expect(markup).not.toContain('>Dismiss</button>');
+    expect(before.accounts[scope.accountId].follows.failures).toEqual(['8']);
+    expect(await f.sync.storage.load()).toEqual(before);
   } finally {
     await f.dispose();
   }

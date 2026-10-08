@@ -101,34 +101,19 @@ export default function LibraryPage() {
         <DurableStateStatus />
         {queueError}
       </p>
-      {(durable.failedProgress.length > 0 ||
-        durable.failedFollows.length > 0) && (
+      {durable.failedProgress.length > 0 && (
         <div role="status" className={styles.notice}>
-          <div>
-            {durable.failedProgress.length > 0 && (
-              <p>
-                Listening progress could not be saved for{' '}
-                {durable.failedProgress.length} unavailable{' '}
-                {durable.failedProgress.length === 1 ? 'episode' : 'episodes'}.
-              </p>
-            )}
-            {durable.failedFollows.length > 0 && (
-              <p>
-                {durable.failedFollows.length}{' '}
-                {durable.failedFollows.length === 1 ? 'podcast' : 'podcasts'}{' '}
-                could not be followed because{' '}
-                {durable.failedFollows.length === 1 ? 'it is' : 'they are'}{' '}
-                unavailable.
-              </p>
-            )}
-          </div>
+          <p>
+            Listening progress could not be saved for{' '}
+            {durable.failedProgress.length} unavailable{' '}
+            {durable.failedProgress.length === 1 ? 'episode' : 'episodes'}.
+          </p>
           <Button
             type="button"
             onClick={() => {
               void durable
                 .dismissFailures({
                   progress: durable.failedProgress,
-                  follows: durable.failedFollows,
                 })
                 .catch(() => {});
             }}
