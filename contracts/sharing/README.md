@@ -65,6 +65,12 @@ In clip mode:
 - Play full episode leaves clip mode where the playhead is.
 - Stopping, or playing another episode, also leaves clip mode.
 
+The linked episode only borrows the queue while in clip mode:
+
+- Keep listening and Play full episode keep it as the current episode.
+- Add episode to queue moves it to the end of the queue and makes the previously current episode current again, paused.
+- Close, or leaving clip mode any other way, removes it from the queue unless it was already queued before the link opened. The previously current episode becomes current again, paused.
+
 Arrival rules:
 
 - iOS and Android start playback on arrival. The linked episode becomes current and the previously current episode moves to the top of Up Next. Nothing else in the queue changes.
