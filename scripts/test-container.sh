@@ -37,7 +37,9 @@ done
 
 docker run -d --network "$network" --name "$web" -p 127.0.0.1::3000 \
   -e "DATABASE_URL=postgres://postgres@$database:5432/postgres" \
-  -e "REDIS_URL=redis://$redis:6379" "$image" >/dev/null
+  -e "REDIS_URL=redis://$redis:6379" \
+  -e "AUTH_CODE_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+  "$image" >/dev/null
 binding=$(docker port "$web" 3000/tcp)
 base="http://127.0.0.1:${binding##*:}"
 for attempt in {1..30}; do
