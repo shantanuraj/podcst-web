@@ -488,6 +488,29 @@ describe.skipIf(!process.env.PG_BIN)(
       }
     });
 
+    test('authenticated revocation remains available when the auth admission dependency is down', async () => {
+      const handlers = createErasureHandlers({
+        service: () => service,
+        session: async () => other,
+        limit: async () => {
+          throw new Error('Synthetic auth admission outage');
+        },
+        clearSession: async () => {},
+      });
+      const response = await handlers.revoke(
+        new Request('http://localhost:3000/api/account/passkeys/key-b', {
+          method: 'DELETE',
+          headers: { 'X-Podcst-Client': 'native' },
+        }),
+        'key-b',
+      );
+      expect(response.status).toBe(200);
+      expect((await response.json()).status).toBe('completed');
+      expect(await sql`SELECT 1 FROM passkeys WHERE id = 'key-b'`).toHaveLength(
+        0,
+      );
+    });
+
     test.each([
       'acceptance',
       'application',

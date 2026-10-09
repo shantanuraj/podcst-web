@@ -115,7 +115,6 @@ export function createErasureHandlers({
     revoke: (request: Request, credentialId: string) =>
       respond(request, async () => {
         const user = await signedIn();
-        await limit(request, 'challenge', user.userId);
         return service().revoke(user, credentialId);
       }),
   };
