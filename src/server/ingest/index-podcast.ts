@@ -1,4 +1,7 @@
 import type postgres from 'postgres';
+import { FEED_LIMITS } from '@/shared/feed-contract';
+import { readGeneration } from '../state/generation';
+import { StateError } from '../state/protocol';
 import {
   claimAppleIdentity,
   findAppleSource,
@@ -28,6 +31,11 @@ export {
   PodcastIdentityConflict,
 } from './podcast-identity';
 
+export interface PrivateImportScope {
+  generation: string;
+  sessionId?: string;
+}
+
 function authorizePrivate(podcast: PodcastIdentity, userId: string) {
   if (podcast.owner_user_id !== null && podcast.owner_user_id !== userId) {
     throw new PodcastAccessDenied('Feed unavailable');
@@ -43,6 +51,7 @@ async function index(
   verifyMove = verifyPublicFeedMove,
   verification?: AppleListingVerification,
   signal?: AbortSignal,
+  scope?: PrivateImportScope,
 ): Promise<string> {
   signal?.throwIfAborted();
   const applePlan =
@@ -52,8 +61,8 @@ async function index(
   const existing = applePlan
     ? await findAppleSource(sql, applePlan.listing)
     : await findPodcastIdentity(sql, feedUrl, itunesId);
-  if (existing && ownerUserId) return authorizePrivate(existing, ownerUserId);
-  if (existing?.owner_user_id && itunesId === undefined)
+  if (existing && ownerUserId) authorizePrivate(existing, ownerUserId);
+  if (!ownerUserId && existing?.owner_user_id && itunesId === undefined)
     throw new PodcastAccessDenied('Feed unavailable');
   const fetched = existing
     ? null
@@ -104,6 +113,19 @@ async function index(
       await tx`SET LOCAL statement_timeout = '10s'`;
     }
     signal?.throwIfAborted();
+    if (ownerUserId) {
+      const current = await readGeneration(tx, ownerUserId, true);
+      if (current.scope.generation !== scope?.generation)
+        throw new StateError('recovery_required', 'Account recovery required');
+      if (scope.sessionId !== undefined) {
+        const [session] = await tx`
+          SELECT id FROM sessions WHERE id = ${scope.sessionId} AND user_id = ${ownerUserId}
+            AND expires_at > clock_timestamp() FOR SHARE
+        `;
+        if (!session)
+          throw new StateError('unauthenticated', 'Authentication required');
+      }
+    }
     await lockPodcastIdentities(tx, identities);
     signal?.throwIfAborted();
     let found: PodcastIdentity | undefined;
@@ -126,6 +148,7 @@ async function index(
         throw new PodcastIdentityConflict(
           'Canonical source changed during import; retry',
         );
+      signal?.throwIfAborted();
       if (ownerUserId) return authorizePrivate(found, ownerUserId);
       if (move) {
         await claimPublicAliases(tx, {
@@ -172,6 +195,7 @@ async function index(
       );
       if (!winner)
         throw new PodcastIdentityConflict('Unable to resolve podcast identity');
+      signal?.throwIfAborted();
       return ownerUserId
         ? authorizePrivate(winner, ownerUserId)
         : claim(tx, winner);
@@ -191,6 +215,7 @@ async function index(
     if (applePlan) await claim(tx, podcast);
     await upsertEpisodes(tx, id, data.cover, data.episodes);
     await savePollState(tx, id, fetched, getPollInterval(null));
+    signal?.throwIfAborted();
     return id;
   });
 }
@@ -205,12 +230,28 @@ export function indexPodcast(
   return index(sql, feedUrl, null, itunesId, verifyMove, verification);
 }
 
-export function indexPrivatePodcast(
+export async function indexPrivatePodcast(
   sql: postgres.Sql,
   feedUrl: string,
   userId: string,
-  signal?: AbortSignal,
+  callerSignal?: AbortSignal,
+  scope?: PrivateImportScope,
 ) {
   if (!userId) throw new PodcastAccessDenied('Sign in to import a feed');
-  return index(sql, feedUrl, userId, undefined, undefined, undefined, signal);
+  const deadline = AbortSignal.timeout(FEED_LIMITS.imports.deadlineMs);
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, deadline])
+    : deadline;
+  signal.throwIfAborted();
+  const expected = scope ?? (await readGeneration(sql, userId)).scope;
+  return index(
+    sql,
+    feedUrl,
+    userId,
+    undefined,
+    undefined,
+    undefined,
+    signal,
+    expected,
+  );
 }

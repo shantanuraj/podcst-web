@@ -98,7 +98,16 @@ fetch, single-worker admission, expired-worker recovery, stale success/failure
 refusal, source/owner/deletion races, exact large IDs, Starred retention, populated
 migration rollback and trigger search-path isolation.
 
-Import fetching already precedes its write transaction, but global interactive
-admission and import identity/ownership races still require integration. Serving
-reads still await content rebuilds until the coordinated route/client cutover.
-The demand/schema foundation does not activate those response changes by itself.
+Private indexing now rechecks the account and recovery generation under lock after
+fetching, including previously cached identities. Callers can bind the transaction
+to the initiating session; revocation then refuses publication. Cancellation is
+rechecked before commit. Concurrent private winners retain their owner and content.
+
+The shared Redis admission implementation atomically enforces principal/global
+refresh budgets, import-start budgets and expiring import concurrency permits.
+Principal keys are keyed hashes; no locators are stored. A stale permit cannot pass
+its publication check or release a replacement. Limiter failure refuses new work.
+Route integration must supply the session binding and retain the permit through
+bounded indexing; these helpers alone do not close every interactive entry point.
+Serving reads still await content rebuilds until the coordinated route/client
+cutover. The foundation does not activate those response changes by itself.
