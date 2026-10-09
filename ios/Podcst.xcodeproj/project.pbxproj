@@ -29,6 +29,7 @@
 		7D4E88272EBF9DE023F2D8B0 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB3C7E807DE826D4DA0ED18C /* Components.swift */; };
 		868D1B2DA0B00B16D87042DD /* Fonts/InstrumentSerif-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7560420A003084CB2158B661 /* Fonts/InstrumentSerif-Italic.ttf */; };
 		87A60D1E5A97DF14FF9FB808 = {isa = PBXBuildFile; fileRef = 751258073276A4561FB50C12; };
+		F01200000000000000000002 /* Core/FeedContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01200000000000000000001 /* Core/FeedContract.swift */; };
 		D01000000000000000000002 /* Core/StateContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01000000000000000000001 /* Core/StateContract.swift */; };
 		D02000000000000000000002 = {isa = PBXBuildFile; fileRef = D02000000000000000000001; };
 		8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A357A35D6089D818A2411D /* Core/Models.swift */; };
@@ -230,6 +231,7 @@
 		B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		CB3C7E807DE826D4DA0ED18C /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		D93CD43E71868DB1B23962D7 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueView.swift; sourceTree = "<group>"; };
+		F01200000000000000000001 /* Core/FeedContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/FeedContract.swift; sourceTree = "<group>"; };
 		D01000000000000000000001 /* Core/StateContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/StateContract.swift; sourceTree = "<group>"; };
 		D02000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/DurableStateStore.swift; sourceTree = "<group>"; };
 		E2A357A35D6089D818A2411D /* Core/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Models.swift; sourceTree = "<group>"; };
@@ -366,6 +368,7 @@
 				9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */,
 				3C2869B1B1D5A358576E332C /* Core/APIClient.swift */,
 				60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */,
+				F01200000000000000000001 /* Core/FeedContract.swift */,
 				D01000000000000000000001 /* Core/StateContract.swift */,
 				D02000000000000000000001,
 				E2A357A35D6089D818A2411D /* Core/Models.swift */,
@@ -730,6 +733,7 @@
 				A01500000000000000000012 /* Playback/Native/PodcstLimiterAudioUnit.mm in Sources */,
 				7B593FE8762E76C85CC81150 /* Core/APIClient.swift in Sources */,
 				A9F95465554040AFD6737C4A /* Core/LibraryStore.swift in Sources */,
+				F01200000000000000000002 /* Core/FeedContract.swift in Sources */,
 				D01000000000000000000002 /* Core/StateContract.swift in Sources */,
 				D02000000000000000000002,
 				8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */,

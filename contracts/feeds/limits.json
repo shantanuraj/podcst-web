@@ -1,0 +1,35 @@
+{
+  "bodyBytes": 65536,
+  "bodyTimeoutMs": 5000,
+  "imports": {
+    "items": 20,
+    "workers": 2,
+    "deadlineMs": 10000,
+    "requestsPerMinute": 6,
+    "startsPerMinute": 120,
+    "concurrencyPerAccount": 2,
+    "concurrencyGlobal": 16,
+    "retrySeconds": 30
+  },
+  "refresh": {
+    "freshSeconds": 900,
+    "requestsPerMinute": 12,
+    "startsPerMinute": 60,
+    "queueCapacity": 256,
+    "demandSeconds": 900,
+    "rebuildCooldownSeconds": 900,
+    "concurrencyGlobal": 10,
+    "leaseSeconds": 60
+  },
+  "opml": {
+    "bytes": 5242880,
+    "feeds": 1000,
+    "outlines": 10000,
+    "depth": 32,
+    "pendingPerScope": 1000
+  },
+  "client": {
+    "recheckSeconds": 5,
+    "pollWindowSeconds": 120
+  }
+}

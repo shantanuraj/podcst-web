@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://www.podcst.app/contracts/feeds/v1",
+  "definitions": {
+    "timestamp": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "nullableTimestamp": { "anyOf": [{ "$ref": "#/definitions/timestamp" }, { "type": "null" }] },
+    "freshness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["content", "state", "checkedAtMs", "retryAtMs"],
+      "properties": {
+        "content": { "enum": ["cached", "missing"] },
+        "state": { "enum": ["fresh", "stale", "pending", "backoff", "unavailable"] },
+        "checkedAtMs": { "$ref": "#/definitions/nullableTimestamp" },
+        "retryAtMs": { "$ref": "#/definitions/nullableTimestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "fresh" } } },
+          "then": { "properties": { "content": { "const": "cached" }, "checkedAtMs": { "$ref": "#/definitions/timestamp" } } }
+        },
+        {
+          "if": { "properties": { "state": { "enum": ["pending", "backoff"] } } },
+          "then": { "properties": { "retryAtMs": { "$ref": "#/definitions/timestamp" } } },
+          "else": { "properties": { "retryAtMs": { "type": "null" } } }
+        }
+      ]
+    },
+    "refreshRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["podcastId"],
+      "properties": { "podcastId": { "$ref": "https://www.podcst.app/contracts/state/v1#/definitions/id" } }
+    },
+    "refreshResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["podcastId", "freshness"],
+      "properties": {
+        "podcastId": { "$ref": "https://www.podcst.app/contracts/state/v1#/definitions/id" },
+        "freshness": { "$ref": "#/definitions/freshness" }
+      }
+    },
+    "resolutionItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["index", "podcastId", "status", "retryAfterSeconds"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0, "maximum": 19 },
+        "podcastId": { "anyOf": [{ "$ref": "https://www.podcst.app/contracts/state/v1#/definitions/id" }, { "type": "null" }] },
+        "status": { "enum": ["resolved", "retry", "unavailable"] },
+        "retryAfterSeconds": { "anyOf": [{ "type": "integer", "minimum": 1, "maximum": 86400 }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "resolved" } } },
+          "then": { "properties": { "podcastId": { "$ref": "https://www.podcst.app/contracts/state/v1#/definitions/id" } } },
+          "else": { "properties": { "podcastId": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "retry" } } },
+          "then": { "properties": { "retryAfterSeconds": { "type": "integer", "minimum": 1, "maximum": 86400 } } },
+          "else": { "properties": { "retryAfterSeconds": { "type": "null" } } }
+        }
+      ]
+    }
+  }
+}

@@ -124,6 +124,27 @@ final class ContractFixtureTests: XCTestCase {
         return data
     }
 
+    func testFeedFreshnessAndImportContractFixtures() throws {
+        let data = try contractData("feeds/fixtures.json")
+        let fixtures = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        for fixture in fixtures {
+            let name = try XCTUnwrap(fixture["name"] as? String)
+            let shape = try XCTUnwrap(fixture["shape"] as? String)
+            let valid = try XCTUnwrap(fixture["valid"] as? Bool)
+            let value = try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["value"]))
+            let decode = {
+                switch shape {
+                case "freshness": _ = try JSONDecoder().decode(FeedFreshness.self, from: value)
+                case "refreshResponse": _ = try JSONDecoder().decode(FeedRefreshResponse.self, from: value)
+                case "resolutionItem": _ = try JSONDecoder().decode(FeedResolutionItem.self, from: value)
+                default: XCTFail("Unknown feed fixture \(shape)")
+                }
+            }
+            if valid { XCTAssertNoThrow(try decode(), name) }
+            else { XCTAssertThrowsError(try decode(), name) }
+        }
+    }
+
     func testStateWireFixturesRoundTripExactly() throws {
         let data = try contractData("state/fixtures.json")
         let fixtures = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
