@@ -156,18 +156,6 @@ export default function LibraryPage() {
           ))}
         </ul>
       )}
-      {subscriptions.data?.some(
-        (podcast) =>
-          podcast.freshness?.state === 'pending' ||
-          podcast.freshness?.content === 'missing',
-      ) && (
-        <p role="status">
-          Preparing some episodes. Cached content and follows are retained.{' '}
-          <button type="button" onClick={() => void subscriptions.refetch()}>
-            Recheck
-          </button>
-        </p>
-      )}
       {(subscriptions.isError || localError) && (
         <p role="alert">
           {localError ??
@@ -234,13 +222,6 @@ export default function LibraryPage() {
           {(starred.error || starred.pending) && (
             <p role="status">
               {starred.error ?? 'Saved on this device. Waiting to sync…'}
-            </p>
-          )}
-          {starred.stars.some(
-            (item) => item.freshness?.state === 'pending',
-          ) && (
-            <p role="status">
-              Preparing saved episode content. Memberships are unchanged.
             </p>
           )}
           <ul>

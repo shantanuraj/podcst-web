@@ -7,6 +7,7 @@ import { ApiError } from '@/data/api';
 import { feedRefreshOptions } from '@/data/feed-refresh';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { type FeedFreshness, feedRecheckDelay } from '@/shared/feed-contract';
+import { Button } from '@/ui/Button';
 
 export function FeedRefresh({
   podcastId,
@@ -44,9 +45,11 @@ export function FeedRefresh({
     );
     return () => clearTimeout(timer);
   }, [retryAt, now]);
-  if (freshness?.state === 'fresh' && freshness.content === 'cached')
+  if (
+    !empty ||
+    (freshness?.state === 'fresh' && freshness.content === 'cached')
+  )
     return null;
-  if (!empty && query.isPending) return null;
   const automatic =
     query.data &&
     feedRecheckDelay(freshness, query.data.startedAt, now) !== false;
@@ -54,23 +57,21 @@ export function FeedRefresh({
     <div role="status" aria-live="polite">
       <p>
         {freshness?.state === 'pending'
-          ? freshness.content === 'missing'
-            ? 'Preparing episodes…'
-            : 'Refreshing episodes. Cached episodes remain available.'
+          ? 'Preparing episodes…'
           : freshness?.state === 'backoff'
-            ? 'Updates delayed. Cached episodes remain available.'
+            ? 'Episodes are temporarily unavailable. Try again shortly.'
             : query.isPending
-              ? 'Checking episodes…'
-              : 'Updates unavailable. Existing content and follows are retained.'}
+              ? 'Loading episodes…'
+              : 'Episodes could not be loaded.'}
       </p>
       {!automatic && !query.isFetching && (
-        <button
+        <Button
           type="button"
           disabled={retryAt > now}
           onClick={() => retry(Date.now())}
         >
           Retry
-        </button>
+        </Button>
       )}
     </div>
   );

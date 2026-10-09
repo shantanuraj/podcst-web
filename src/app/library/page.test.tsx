@@ -8,11 +8,14 @@ import { accountState } from '@/data/state-storage';
 import { AccountContext } from '@/shared/auth/AccountBoundary';
 import { accountQueryKey } from '@/shared/auth/account';
 import { AccountSession } from '@/shared/auth/account-session';
+import type { FeedFreshness } from '@/shared/feed-contract';
 import { TranslationProvider } from '@/shared/i18n';
+import type { ListEpisodeItem } from '@/shared/lists';
+import { starRuntime } from '@/shared/stars/browser';
 import type { FollowSnapshot, StateScope } from '@/shared/state-contract';
 import { installFollows } from '@/shared/subscriptions/follow-outbox';
 import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
-import type { IPodcastEpisodesInfo } from '@/types';
+import type { IEpisodeInfo, IPodcastEpisodesInfo } from '@/types';
 import LibraryPage from './page';
 
 const scope: StateScope = {
@@ -33,6 +36,28 @@ const podcast: IPodcastEpisodesInfo = {
   published: null,
   episodes: [],
 };
+const episode: IEpisodeInfo = {
+  id: '701',
+  podcastId: '7',
+  feed: podcast.feed,
+  podcastTitle: podcast.title,
+  title: 'A cached library episode',
+  guid: 'cached-episode',
+  summary: null,
+  showNotes: '',
+  published: Date.now(),
+  cover: podcast.cover,
+  explicit: false,
+  duration: 120,
+  link: null,
+  author: podcast.author,
+  episodeArt: null,
+  file: {
+    url: 'https://example.invalid/audio.mp3',
+    length: 1,
+    type: 'audio/mpeg',
+  },
+};
 const membership = (
   podcastId: string,
   availability: 'available' | 'unavailable' = 'available',
@@ -51,6 +76,7 @@ async function fixture({
   error = false,
   failures,
   guest = false,
+  starred,
 }: {
   items?: FollowSnapshot['items'];
   catalogue?: IPodcastEpisodesInfo[];
@@ -59,6 +85,7 @@ async function fixture({
   error?: boolean;
   failures?: { progress: string[]; follows: string[] };
   guest?: boolean;
+  starred?: ListEpisodeItem[];
 } = {}) {
   const indexedDB = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
   globalThis.indexedDB = new IDBFactory();
@@ -66,15 +93,40 @@ async function fixture({
   Object.defineProperty(navigator, 'locks', {
     configurable: true,
     value: {
-      request: async (_name: string, work: () => Promise<void>) => work(),
+      request: async (_name: string, work: (lock: object) => Promise<void>) =>
+        work({}),
     },
   });
   const snapshot: FollowSnapshot = { ...scope, revision: '1', items };
+  const starSnapshot = {
+    ...scope,
+    listId: '0c339753-cb50-477c-843e-e641b414a060',
+    revision: '1',
+    items: starred ?? [],
+  };
   const started = Promise.withResolvers<void>();
   const pending = Promise.withResolvers<void>();
   const fetcher = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
-      async () => {
+      async (input: RequestInfo | URL) => {
+        const path = String(input);
+        if (starred && path === '/api/auth/session')
+          return Response.json({ user: { id: scope.accountId } });
+        if (starred && path === '/api/lists')
+          return Response.json({
+            ...scope,
+            lists: [
+              {
+                id: starSnapshot.listId,
+                kind: 'starred',
+                name: null,
+                revision: '1',
+                itemCount: starred.length,
+              },
+            ],
+          });
+        if (starred && path.startsWith('/api/lists/'))
+          return Response.json({ ...starSnapshot, nextCursor: null });
         started.resolve();
         if (membershipPending) await pending.promise;
         return Response.json(snapshot);
@@ -127,6 +179,8 @@ async function fixture({
   const activation = sync.activate(session.scope);
   if (membershipPending) await started.promise;
   else await activation;
+  const stars = starred ? starRuntime(session).sync : undefined;
+  if (stars) await stars.activate(session.scope);
   const queryKey = accountQueryKey(scope.accountId, 'subscriptions', 'library');
   if (catalogue !== undefined) client.setQueryData(queryKey, catalogue);
   if (fetching || error)
@@ -166,6 +220,7 @@ async function fixture({
       pending.resolve();
       await activation;
       await sync.suspend();
+      await stars?.suspend();
       client.clear();
       fetcher.mockRestore();
       if (locks) Object.defineProperty(navigator, 'locks', locks);
@@ -228,6 +283,91 @@ test('cached subscription tiles survive a background refetch', async () => {
     expect(section(markup, 'Subscriptions')).toContain(podcast.title);
     expect(markup).not.toContain('Podcast details unavailable');
     expect(markup).not.toContain('Your Library is Empty');
+  } finally {
+    await f.dispose();
+  }
+});
+
+test.each([
+  ['pending', 'cached'],
+  ['backoff', 'cached'],
+  ['unavailable', 'cached'],
+  ['pending', 'missing'],
+] as const)('%s freshness with %s server content keeps the cached library quiet', async (state, content) => {
+  const freshness: FeedFreshness = {
+    state,
+    content,
+    checkedAtMs: null,
+    retryAtMs: null,
+  };
+  const f = await fixture({
+    items: [membership('7')],
+    catalogue: [{ ...podcast, episodes: [episode], freshness }],
+  });
+  try {
+    const markup = f.render();
+    expect(section(markup, 'Subscriptions')).toContain(podcast.title);
+    expect(section(markup, 'New episodes')).toContain(episode.title);
+    expect(markup).not.toContain('Preparing some episodes');
+    expect(markup).not.toContain('Cached content and follows are retained');
+    expect(markup).not.toContain('>Recheck</button>');
+    expect(markup).not.toContain('aria-busy="true"');
+    expect(markup).not.toContain('Podcast details unavailable');
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('saved content preparation stays with missing episodes instead of becoming a library banner', async () => {
+  const freshness: FeedFreshness = {
+    state: 'pending',
+    content: 'missing',
+    checkedAtMs: null,
+    retryAtMs: null,
+  };
+  const f = await fixture({
+    items: [membership('7')],
+    catalogue: [podcast],
+    starred: [
+      {
+        episodeId: '701',
+        addedAt: 0,
+        availability: 'available',
+        episode,
+        freshness,
+      },
+      {
+        episodeId: '702',
+        addedAt: 0,
+        availability: 'content_missing',
+        episode: null,
+        freshness,
+      },
+      {
+        episodeId: '703',
+        addedAt: 0,
+        availability: 'unavailable',
+        episode: null,
+      },
+      {
+        episodeId: '704',
+        addedAt: 0,
+        availability: 'content_missing',
+        episode: null,
+      },
+    ],
+  });
+  try {
+    const markup = f.render();
+    const starred = section(markup, 'Starred');
+    expect(starred).toContain(episode.title);
+    expect(starred).toContain('Preparing episode…');
+    expect(starred).toContain('Episode unavailable');
+    expect(starred).toContain('Episode details unavailable');
+    expect(starred.match(/>Unstar<\/button>/g)).toHaveLength(3);
+    expect(markup).not.toContain('Preparing saved episode content');
+    expect(markup).not.toContain('Memberships are unchanged');
+    expect(markup.replace(starred, '')).not.toContain('Preparing episode…');
   } finally {
     await f.dispose();
   }
