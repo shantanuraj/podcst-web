@@ -14,6 +14,7 @@ import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 
 installFeedTransportFixture();
 
+import { refreshFeed } from '../ingest/feed-refresh';
 import { evictWarm } from '../tiering';
 import { recoverListContent } from './recovery';
 import { createEpisodeListService, type EpisodeListService } from './service';
@@ -190,7 +191,14 @@ describe.skipIf(!process.env.PG_BIN)(
         INSERT INTO feed_poll_state (podcast_id, last_polled_at, next_poll_at, etag)
         VALUES (1, now(), now() + interval '1 day', 'old')
       `;
-        await recoverListContent(sql, 'owner', listId, async () => true);
+        await recoverListContent(sql, 'owner', listId, async () => {});
+        expect(fetches).toBe(0);
+        expect(
+          (
+            await sql`SELECT demand_rebuild FROM feed_poll_state WHERE podcast_id = 1`
+          )[0].demand_rebuild,
+        ).toBe(true);
+        await refreshFeed(sql, '1', 'scheduled');
         expect(fetches).toBe(1);
         expect(
           (
@@ -223,14 +231,13 @@ describe.skipIf(!process.env.PG_BIN)(
       let claims = 0;
       const claim = async () => {
         claims++;
-        return true;
       };
       await recoverListContent(sql, 'owner', listId, claim);
       await recoverListContent(sql, 'other', listId, claim);
       expect(claims).toBe(0);
     });
 
-    test('bounds recovery and skips feeds already claimed by another request', async () => {
+    test('bounds durable recovery attempts and preserves other memberships on admission failure', async () => {
       await sql`
       INSERT INTO podcasts (id, author_id, feed_url, title, cover)
       SELECT n, 1, 'https://example.invalid/' || n, 'Show', 'cover' FROM generate_series(4, 8) n
@@ -240,19 +247,19 @@ describe.skipIf(!process.env.PG_BIN)(
       SELECT 1000 + id, id, 'missing', now() FROM podcasts WHERE id >= 4
     `;
       await change('add', 1004, 1005, 1006, 1007, 1008);
-      const refreshed: string[] = [];
-      await recoverListContent(
-        sql,
-        'owner',
-        listId,
-        async (id) => id !== '4',
-        async (_sql, id, mode) => {
-          expect(mode).toBe('rebuild');
-          refreshed.push(id);
-          return 'updated';
-        },
-      );
-      expect(refreshed).toEqual(['5', '6', '7']);
+      const admitted: string[] = [];
+      await recoverListContent(sql, 'owner', listId, async (id) => {
+        admitted.push(id);
+        if (id === '4') throw new Error('Unavailable');
+      });
+      expect(admitted).toEqual(['4', '5', '6']);
+      expect(
+        Array.from(
+          await sql`SELECT podcast_id FROM feed_poll_state WHERE demand_token IS NOT NULL ORDER BY podcast_id`,
+          (row) => String(row.podcast_id),
+        ),
+      ).toEqual(['5', '6']);
+      expect((await lists.membership('owner', listId)).items).toHaveLength(5);
     });
   },
 );

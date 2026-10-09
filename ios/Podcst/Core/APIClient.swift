@@ -16,8 +16,14 @@ public final class APIClient {
     private var sessionRevision = UUID()
     var hasSession: Bool { sessionCookie?.isEmpty == false }
     var accountID: String? { currentUserID }
+    var activityToken: UUID { sessionRevision }
 
-    func restoreAccount(_ id: String?) { currentUserID = id }
+    func restoreAccount(_ id: String?) {
+        guard id != currentUserID else { return }
+        beginAuthentication()
+        feedCache.clear()
+        currentUserID = id
+    }
     private let keychain: any SessionCredentialStore
     private let feedCache = FeedCache(storageURL: FeedCache.defaultStorageURL())
     private let topCache = PodcastSnapshotCache(namespace: "top", lifetime: 3600)
@@ -78,25 +84,28 @@ public final class APIClient {
             let raw: RawPodcast = self.hasSession
                 ? try await self.post(path: "/api/feed", body: ["url": feed])
                 : try await self.get(path: "/api/feed", query: [URLQueryItem(name: "url", value: feed)])
-            return self.mapPodcast(raw, feedFallback: feed)
+            return try self.mapFullPodcast(raw, feedFallback: feed)
         }
     }
 
     public func podcast(id: Int) async throws -> Podcast {
         try await feedCache.load(.id(id)) {
             let raw: RawPodcast = try await self.get(path: "/api/feed", query: [URLQueryItem(name: "id", value: String(id))])
-            return self.mapPodcast(raw)
+            return try self.mapFullPodcast(raw)
         }
     }
 
-    public func detail(of podcast: Podcast, forceRefresh: Bool = false) async throws -> Podcast {
+    public func detail(of podcast: Podcast, forceRefresh: Bool = false, recheck: Bool = false) async throws -> Podcast {
         if let id = podcast.id {
-            if forceRefresh { return try await refresh(podcastID: id) }
-            let refresh = podcast.episodes.count <= 2 || podcast.episodes.count < podcast.episodeCount
+            let revision = sessionRevision
+            if forceRefresh { _ = try await refresh(podcastID: id) }
+            guard revision == sessionRevision else { throw CancellationError() }
+            let refresh = forceRefresh || recheck || podcast.freshness?.state != .fresh || podcast.episodes.count <= 2 || podcast.episodes.count < podcast.episodeCount
             return try await feedCache.load(.id(id), refreshing: refresh) {
                 async let info = self.podcastInfo(id: id)
                 async let catalogue = self.allEpisodes(podcastID: id)
                 let (infoResult, catalogueResult) = try await (info, catalogue)
+                guard infoResult.id == id else { throw FeedContractError.invalidResponse }
                 return Podcast(
                     id: infoResult.id,
                     feed: infoResult.feed,
@@ -111,7 +120,8 @@ public final class APIClient {
                     keywords: infoResult.keywords,
                     episodeCount: max(infoResult.episodeCount, catalogueResult.total),
                     episodes: catalogueResult.episodes,
-                    isPrivate: infoResult.isPrivate ?? false
+                    isPrivate: infoResult.isPrivate ?? false,
+                    freshness: catalogueResult.freshness
                 )
             }
         }
@@ -132,10 +142,10 @@ public final class APIClient {
     }
 
     func publicEpisode(podcastID: Int, episodeID: Int) async throws -> Episode {
-        let raw: RawPublicEpisode = try await get(path: "/api/episodes/\(episodeID)", query: [URLQueryItem(name: "podcastId", value: String(podcastID))])
+        let raw: RawPublicEpisode = try await get(path: "/api/episodes/\(episodeID)", query: [URLQueryItem(name: "podcastId", value: String(podcastID))], usesSession: false)
         let podcast = mapPodcastInfo(raw.podcast)
         let episode = mapEpisode(raw.episode, podcastId: podcast.id, feedFallback: podcast.feed, coverFallback: podcast.cover, titleFallback: podcast.title)
-        guard podcast.id == podcastID, episode.id == episodeID, episode.podcastId == podcastID else { throw DurableStateFailure.protocolViolation }
+        guard podcast.id == podcastID, episode.id == episodeID, episode.podcastId == podcastID, podcast.isPrivate != true, episode.isPrivate != true else { throw DurableStateFailure.protocolViolation }
         return episode
     }
 
@@ -144,37 +154,38 @@ public final class APIClient {
         if let cursor { query.append(URLQueryItem(name: "cursor", value: String(cursor))) }
         if let search, !search.isEmpty { query.append(URLQueryItem(name: "search", value: search)) }
         let raw: RawEpisodePage = try await get(path: "/api/feed/episodes", query: query)
-        return EpisodePage(episodes: raw.episodes.map { mapEpisode($0, podcastId: podcastID) }, total: raw.total, hasMore: raw.hasMore, nextCursor: raw.nextCursor)
+        return EpisodePage(episodes: raw.episodes.map { mapEpisode($0, podcastId: podcastID) }, total: raw.total, hasMore: raw.hasMore, nextCursor: raw.nextCursor, freshness: raw.freshness)
     }
 
-    private func allEpisodes(podcastID: Int) async throws -> (episodes: [Episode], total: Int) {
+    private func allEpisodes(podcastID: Int) async throws -> (episodes: [Episode], total: Int, freshness: FeedFreshness?) {
         var cursor: Int?
         var collected: [Episode] = []
         var total = 0
+        var freshness: FeedFreshness?
         repeat {
             let page = try await episodes(podcastID: podcastID, cursor: cursor, limit: 200)
             collected.append(contentsOf: page.episodes)
             total = max(total, page.total)
+            freshness = page.freshness
             guard page.hasMore, let nextCursor = page.nextCursor, nextCursor != cursor else { break }
             cursor = nextCursor
         } while true
-        return (collected, total)
+        return (collected, total, freshness)
     }
 
-    public func refresh(podcastID: Int) async throws -> Podcast {
-        try await feedCache.load(.id(podcastID), refreshing: true) {
-            let raw: RawPodcast = try await self.post(path: "/api/feed/refresh", body: ["podcastId": String(podcastID)])
-            return self.mapPodcast(raw)
-        }
+    public func refresh(podcastID: Int) async throws -> FeedRefreshResponse {
+        let raw: FeedRefreshResponse = try await post(path: "/api/feed/refresh", body: ["podcastId": String(podcastID)])
+        guard raw.podcastId.number == podcastID else { throw FeedContractError.invalidResponse }
+        return raw
     }
 
     public func sessionUser() async throws -> User? {
         let raw: RawSession = try await get(path: "/api/auth/session")
         guard let user = raw.user else {
-            currentUserID = nil
+            restoreAccount(nil)
             return nil
         }
-        currentUserID = user.id
+        restoreAccount(user.id)
         return User(id: user.id, email: user.email, name: user.name, image: user.image, hasPasskey: user.hasPasskey)
     }
 
@@ -330,7 +341,7 @@ public final class APIClient {
 
     private func fetchSubscriptions() async throws -> [Podcast] {
         let rows: [RawPodcast] = try await get(path: "/api/subscriptions")
-        let podcasts = rows.map { mapPodcast($0) }
+        let podcasts = try rows.map { try mapFullPodcast($0) }
         feedCache.markSubscribed(podcasts)
         return podcasts
     }
@@ -406,7 +417,7 @@ public final class APIClient {
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         let raw: RawListEpisodePage = try await get(path: "/api/lists/\(id)/items", query: query)
         return ListEpisodePage(scope: StateScope(protocol: raw.protocol, accountId: raw.accountId, generation: raw.generation), listId: raw.listId, revision: raw.revision, items: raw.items.map {
-            ListEpisodeItem(membership: $0.membership, episode: $0.episode.map { mapEpisode($0) })
+            ListEpisodeItem(membership: $0.membership, episode: $0.episode.map { mapEpisode($0) }, freshness: $0.freshness)
         }, nextCursor: raw.nextCursor)
     }
 
@@ -490,9 +501,9 @@ public final class APIClient {
         guard !usesSession || revision == sessionRevision else { throw CancellationError() }
         guard let http = response as? HTTPURLResponse else { throw APIError(statusCode: 0, message: "Invalid API response") }
         if usesSession { persistCookie(from: http) }
-        guard (200..<300).contains(http.statusCode) else {
-            let message = (try? JSONDecoder().decode(RawError.self, from: data).message) ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
-            throw APIError(statusCode: http.statusCode, message: message, code: (try? JSONDecoder().decode(StateErrorBody.self, from: data))?.code, retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init))
+        let failure = (!(200..<300).contains(http.statusCode) || http.statusCode == 202) ? (try? JSONDecoder().decode(RawError.self, from: data)) : nil
+        if !(200..<300).contains(http.statusCode) || http.statusCode == 202 && failure?.code == "content_pending" {
+            throw APIError(statusCode: http.statusCode, message: failure?.message ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode), code: failure?.code, retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init), freshness: failure?.freshness)
         }
         if data.isEmpty { return try JSONDecoder().decode(T.self, from: Data("{}".utf8)) }
         do { return try JSONDecoder().decode(T.self, from: data) }
@@ -518,10 +529,15 @@ public final class APIClient {
         Podcast(id: raw.id, feed: raw.feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.cover, description: raw.description, link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords, episodeCount: raw.episodeCount, isPrivate: raw.isPrivate ?? false)
     }
 
+    private func mapFullPodcast(_ raw: RawPodcast, feedFallback: String? = nil) throws -> Podcast {
+        guard raw.freshness != nil else { throw FeedContractError.invalidResponse }
+        return mapPodcast(raw, feedFallback: feedFallback)
+    }
+
     private func mapPodcast(_ raw: RawPodcast, feedFallback: String? = nil) -> Podcast {
         let feed = raw.feed ?? raw.feedUrl ?? feedFallback ?? ""
         feedCache.identify(id: raw.id, feed: feed)
-        return Podcast(id: raw.id, feed: feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.thumbnail ?? raw.cover, description: raw.description ?? "", link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords ?? [], episodeCount: raw.episodeCount ?? raw.count ?? raw.episodes?.count ?? 0, episodes: raw.episodes?.map { mapEpisode($0, podcastId: raw.id, feedFallback: feed, coverFallback: raw.cover, titleFallback: raw.title) } ?? [], isPrivate: raw.isPrivate ?? false)
+        return Podcast(id: raw.id, feed: feed, title: raw.title, author: raw.author, cover: raw.cover, thumbnail: raw.thumbnail ?? raw.cover, description: raw.description ?? "", link: raw.link, published: date(raw.published), explicit: raw.explicit.value, keywords: raw.keywords ?? [], episodeCount: raw.episodeCount ?? raw.count ?? raw.episodes?.count ?? 0, episodes: raw.episodes?.map { mapEpisode($0, podcastId: raw.id, feedFallback: feed, coverFallback: raw.cover, titleFallback: raw.title) } ?? [], isPrivate: raw.isPrivate ?? false, freshness: raw.freshness)
     }
 
     private func mapEpisode(_ raw: RawEpisode, podcastId: Int? = nil, feedFallback: String? = nil, coverFallback: String? = nil, titleFallback: String? = nil) -> Episode {
@@ -651,7 +667,9 @@ final class FeedCache {
         let task = Task { try await fetch() }
         pending[resolved] = Pending(sequence: requestSequence, refreshing: refreshing, task: task)
         do {
-            let podcast = try await task.value
+            var podcast = try await task.value
+            guard pending[resolved]?.sequence == requestSequence else { throw CancellationError() }
+            podcast = podcast.preservingContent(of: entries[resolved]?.podcast)
             identify(id: podcast.id, feed: podcast.feed)
             let destination = key(requestedKey)
             if pending[resolved]?.sequence == requestSequence {
@@ -662,7 +680,7 @@ final class FeedCache {
                     expires: date.addingTimeInterval(lifetime),
                     lastAccess: date,
                     persistent: persistent,
-                    complete: true
+                    complete: podcast.freshness?.content != .missing
                 )
                 pending[resolved] = nil
                 evictIfNeeded()
@@ -670,12 +688,15 @@ final class FeedCache {
             }
             return podcast
         } catch {
-            if pending[resolved]?.sequence == requestSequence {
-                pending[resolved] = nil
+            guard pending[resolved]?.sequence == requestSequence else { throw CancellationError() }
+            pending[resolved] = nil
+            if error is CancellationError { throw error }
+            if let failure = error as? APIError, [401, 403, 404].contains(failure.statusCode) {
+                entries[resolved] = nil
+                persist()
+                throw error
             }
-            if !refreshing, let stale = entries[resolved]?.podcast {
-                return stale
-            }
+            if !refreshing, let stale = entries[resolved]?.podcast { return stale }
             throw error
         }
     }
@@ -849,19 +870,22 @@ private struct RawListEpisodePage: Decodable {
 private struct RawListEpisodeItem: Decodable {
     var membership: ListMembership
     var episode: RawEpisode?
+    var freshness: FeedFreshness?
 
-    private enum CodingKeys: String, CodingKey { case episode }
+    private enum CodingKeys: String, CodingKey { case episode, freshness }
 
     init(from decoder: Decoder) throws {
         membership = try RawListMembership(from: decoder).membership
-        episode = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(RawEpisode.self, forKey: .episode)
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        episode = try fields.decodeIfPresent(RawEpisode.self, forKey: .episode)
+        freshness = try fields.decode(FeedFreshness?.self, forKey: .freshness)
     }
 }
 private struct PasskeyVerification: Encodable {
     var response: PasskeyCredential
     var flowId: String
 }
-private struct RawError: Decodable { var message: String? }
+private struct RawError: Decodable { var message: String?; var code: String?; var freshness: FeedFreshness? }
 private struct RawSuccess: Decodable { var success: Bool }
 private struct RawSent: Decodable { var sent: Bool }
 private struct RawVerified: Decodable { var verified: Bool }
@@ -904,7 +928,7 @@ private struct RawSearchResult: Decodable {
 
     enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", author, feed, cover, thumbnail, title, isPrivate }
 }
-private struct RawEpisodePage: Decodable { var episodes: [RawEpisode]; var total: Int; var hasMore: Bool; var nextCursor: Int? }
+private struct RawEpisodePage: Decodable { var freshness: FeedFreshness; var episodes: [RawEpisode]; var total: Int; var hasMore: Bool; var nextCursor: Int? }
 private struct RawProgress: Decodable { var episode: RawEpisode; var position: Double }
 private struct RawPreferences: Codable {
     var speed: Double
@@ -925,6 +949,7 @@ private struct RawPublicEpisode: Decodable { var podcast: RawPodcastInfo; var ep
 private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; @CatalogueID var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
 
 private struct RawPodcast: Decodable {
+    var freshness: FeedFreshness?
     var isPrivate: Bool?
     @OptionalCatalogueID var id: Int?
     @OptionalCatalogueID var itunesId: Int?
@@ -943,7 +968,7 @@ private struct RawPodcast: Decodable {
     var count: Int?
     var episodes: [RawEpisode]?
 
-    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", feed, feedUrl = "feed_url", title, author, cover, thumbnail, description, link, published, explicit, keywords, episodeCount, count, episodes, isPrivate }
+    enum CodingKeys: String, CodingKey { case id, itunesId = "itunes_id", feed, feedUrl = "feed_url", title, author, cover, thumbnail, description, link, published, explicit, keywords, episodeCount, count, episodes, isPrivate, freshness }
 }
 
 private struct RawEpisode: Decodable {

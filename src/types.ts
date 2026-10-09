@@ -215,6 +215,7 @@ export interface IEpisodeListing {
  * Episode info listing
  */
 export interface IPodcastEpisodesInfo extends IEpisodeListing {
+  freshness?: import('@/shared/feed-contract').FeedFreshness;
   id?: string;
   episodes: IEpisodeInfo[];
   feed: string;
@@ -247,6 +248,7 @@ export interface IPodcastInfo {
  * Paginated episodes response
  */
 export interface IPaginatedEpisodes {
+  freshness?: import('@/shared/feed-contract').FeedFreshness;
   episodes: IEpisodeInfo[];
   total: number;
   hasMore: boolean;

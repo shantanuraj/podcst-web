@@ -24,13 +24,14 @@ class LibraryRepository(
     private var retryAt = 0L
     val status = durable.status
     val podcasts: Flow<List<Podcast>> = scopes.current.flatMapLatest { scope ->
-        combine(if (scope.accountId == null) scope.database.podcasts().observeSubscribed() else scope.database.podcasts().observeAll(), durable.revision) { rows, _ ->
+        combine(if (scope.accountId == null) scope.database.podcasts().observeSubscribed() else scope.database.podcasts().observeAll(), durable.revision, catalog.freshness) { rows, _, freshness ->
             val account = scope.accountId
-            if (account == null) rows.map { it.domain() } else {
+            val visible = if (account == null) rows else {
                 val state = runCatching { durable.account(account) }.getOrNull()
                 val unavailable = state?.follows.orEmpty().filter { it.availability == StateAvailability.unavailable }.map { it.podcastId.value.toLong() }.toSet()
-                rows.filter { it.id in state?.followed().orEmpty() && it.id !in unavailable }.map { it.domain() }
+                rows.filter { it.id in state?.followed().orEmpty() && it.id !in unavailable }
             }
+            visible.map { it.domain().copy(freshness = freshness[it.id]) }
         }
     }
     val subscribed: Flow<Set<String>> = scopes.current.flatMapLatest { owner ->
@@ -134,24 +135,31 @@ class LibraryRepository(
         runCatching { refresh() }.onFailure { if (it is CancellationException) throw it }
     }
 
-    suspend fun import(feeds: List<String>): ImportResult {
+    fun importScope(): () -> Boolean {
+        val owner = scopes.current.value
+        val epoch = scopes.epoch
+        return { scopes.current.value === owner && scopes.epoch == epoch }
+    }
+
+    suspend fun import(feeds: List<String>, scopeCurrent: () -> Boolean = { true }): ImportResult {
         if (feeds.isEmpty()) return ImportResult(0, 0)
         val owner = scopes.current.value
+        if (!scopeCurrent()) throw CancellationException("Import scope retired")
         val account = owner.accountId
         var succeeded = 0
         if (account != null) {
-            check(scopes.verified) { "Verify your account before importing" }
             val epoch = scopes.epoch
-            val snapshot = api.followState()
-            check(active(owner, epoch))
-            durable.installFollows(account, snapshot)
             val selected = feeds.distinct()
-            FeedImportRequest.batches(account, snapshot.generation, selected)
+            require(selected.all { it.isNotEmpty() && it.length <= 4096 })
             durable.change(account) {
                 val merged = (it.importFeeds + selected).distinct()
                 check(merged.size <= FeedLimits.PENDING_PER_SCOPE || merged.size == it.importFeeds.size) { "Too many unresolved imports. Retry pending feeds first." }
                 it.copy(importFeeds = merged)
             }
+            check(active(owner, epoch)) { "Verify your account before importing. Pending inputs retained." }
+            val snapshot = api.followState()
+            check(active(owner, epoch))
+            durable.installFollows(account, snapshot)
             val ready = selected.filter { (durable.account(account).importRetryAt[it] ?: 0L) <= clock() }
             val batches = FeedImportRequest.batches(account, snapshot.generation, ready)
             for ((offset, batch) in batches.withIndex()) {
@@ -210,14 +218,18 @@ class LibraryRepository(
         }
         return ImportResult(succeeded, selected.size - succeeded)
     }
-    suspend fun retryImports(): ImportResult = scopes.current.value.accountId?.let { import(durable.account(it).importFeeds) } ?: import(durable.guestImportFeeds())
+    suspend fun retryImports(): ImportResult {
+        val current = importScope()
+        val feeds = scopes.current.value.accountId?.let { durable.account(it).importFeeds } ?: durable.guestImportFeeds()
+        return import(feeds, current)
+    }
     suspend fun opml(): String = Opml.document(scopes.database.podcasts().subscribed().map { it.domain() })
 
     private suspend fun refreshGuest(podcast: Podcast, force: Boolean) {
         val owner = scopes.current.value
         val updated = when {
             force -> catalog.load(podcast, force = true)
-            podcast.id != null -> api.episodes(checkNotNull(podcast.id), limit = PlaybackRules.RELEASES_PER_PODCAST).let { podcast.copy(episodes = it.episodes, episodeCount = it.total) }
+            podcast.id != null -> api.episodes(checkNotNull(podcast.id), limit = PlaybackRules.RELEASES_PER_PODCAST).let { podcast.copy(episodes = it.episodes, episodeCount = it.total, freshness = it.freshness) }
             else -> api.podcast(podcast.feed)
         }
         catalog.store(listOf(updated), owner = owner)

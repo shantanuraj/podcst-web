@@ -35,6 +35,7 @@ val generateRules by tasks.registering {
         val feed = JsonSlurper().parse(feedLimits.asFile) as Map<String, Any?>
         val imports = feed["imports"] as Map<String, Any?>
         val opml = feed["opml"] as Map<String, Any?>
+        val client = feed["client"] as Map<String, Any?>
         val file = output.get().file("app/podcst/model/Rules.kt").asFile
         file.parentFile.mkdirs()
         file.writeText(
@@ -71,6 +72,8 @@ val generateRules by tasks.registering {
                 appendLine("    const val OPML_DEPTH = ${long(opml["depth"])}")
                 appendLine("    const val OPML_OUTLINES = ${long(opml["outlines"])}")
                 appendLine("    const val OPML_FEEDS = ${long(opml["feeds"])}")
+                appendLine("    const val RECHECK_SECONDS = ${long(client["recheckSeconds"])}")
+                appendLine("    const val POLL_WINDOW_SECONDS = ${long(client["pollWindowSeconds"])}")
                 appendLine("}")
                 appendLine()
                 appendLine("object ShareRules {")
@@ -104,5 +107,6 @@ dependencies {
 }
 
 tasks.test {
+    inputs.dir(contracts)
     systemProperty("podcst.contracts", contracts.asFile.absolutePath)
 }

@@ -1,55 +1,41 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
 import { sql } from '@/server/db';
-import { refreshFeed } from '@/server/ingest/feed-refresh';
-import { refreshPodcast } from '@/server/ingest/podcast';
+import { requestFeedRefresh } from '@/server/ingest/feed-demand';
 import {
-  canAccessPodcast,
-  privateFeedHeaders as headers,
-} from '@/server/podcast-access';
-import { isCanonicalId } from '@/shared/canonical-id';
+  feedPrincipal,
+  interactiveAdmission,
+} from '@/server/ingest/interactive-admission';
+import { feedError, readFeedBody } from '@/server/ingest/interactive-response';
+import { privateFeedHeaders as headers } from '@/server/podcast-access';
+import { feedValidator } from '@/shared/feed-contract';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const podcastId = body?.podcastId;
-
-  if (!isCanonicalId(podcastId)) {
-    return NextResponse.json(
-      { message: 'podcastId must be a positive integer' },
-      { status: 400 },
+  try {
+    const body = await readFeedBody(request);
+    if (!feedValidator('refreshRequest')(body)) throw new TypeError();
+    const userId = (await getSession())?.userId ?? null;
+    const principal = userId
+      ? { kind: 'account' as const, id: userId }
+      : feedPrincipal(request.headers);
+    const freshness = await requestFeedRefresh(
+      sql,
+      body.podcastId,
+      userId,
+      async () => {
+        await (await interactiveAdmission()).refresh(principal);
+      },
     );
-  }
-
-  const session = await getSession();
-  const userId = session?.userId ?? null;
-  if (!(await canAccessPodcast(sql, podcastId, userId))) {
+    if (!freshness)
+      return NextResponse.json(
+        { message: 'Podcast not found' },
+        { status: 404, headers },
+      );
     return NextResponse.json(
-      { message: 'Podcast not found' },
-      { status: 404, headers },
+      { podcastId: body.podcastId, freshness },
+      { status: freshness.state === 'pending' ? 202 : 200, headers },
     );
+  } catch (error) {
+    return feedError(error);
   }
-
-  if (body.onlyIfStale === true) {
-    const status = await refreshFeed(sql, podcastId);
-    const code =
-      status === 'not_found'
-        ? 404
-        : status === 'error'
-          ? 502
-          : status === 'busy'
-            ? 202
-            : 200;
-    return NextResponse.json({ status }, { status: code, headers });
-  }
-
-  const podcast = await refreshPodcast(podcastId, userId);
-
-  if (!podcast) {
-    return NextResponse.json(
-      { message: 'Failed to refresh feed' },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json(podcast, { headers });
 }

@@ -43,8 +43,7 @@ export async function readFeedState(
              SELECT 1 FROM episodes e JOIN episode_content c ON c.episode_id = e.id
              WHERE e.podcast_id = p.id ${episodeId ? sql`AND e.id = ${episodeId}` : sql``}
            ) AS has_content,
-           ${episodeId === undefined} AND p.episode_count = 0 AND s.last_success_at IS NOT NULL
-             AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.podcast_id = p.id) AS empty_feed,
+           ${episodeId === undefined} AND p.episode_count = 0 AND s.last_success_at IS NOT NULL AS empty_feed,
            clock_timestamp() AS observed_at
     FROM podcasts p LEFT JOIN feed_poll_state s ON s.podcast_id = p.id
     WHERE p.id = ${podcastId} AND ${podcastAccess(sql, userId)}

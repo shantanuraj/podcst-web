@@ -27,9 +27,13 @@ export async function verifyPublicFeedMove(
     url: string,
     signal: AbortSignal,
   ) => ReturnType<typeof requestPublicFeed> = requestPublicFeed,
+  callerSignal?: AbortSignal,
 ): Promise<Verification> {
   const requestedUrl = publicAliasUrl(input);
-  const signal = AbortSignal.timeout(30_000);
+  const deadline = AbortSignal.timeout(30_000);
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, deadline])
+    : deadline;
   const seen = new Set<string>();
   const hops: { from: string; to: string; status: number }[] = [];
   let url = requestedUrl;

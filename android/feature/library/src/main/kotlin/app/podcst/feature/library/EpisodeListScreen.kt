@@ -77,6 +77,7 @@ import app.podcst.designsystem.R as DesignR
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EpisodeListScreen(state: EpisodeListState, model: EpisodeListViewModel, actions: EpisodeActions, onBack: () -> Unit) {
+    FeedRecheck(state.freshness, model::recheckContent)
     val content = @Composable {
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(state, onBack) }
@@ -85,7 +86,7 @@ fun EpisodeListScreen(state: EpisodeListState, model: EpisodeListViewModel, acti
             }
             items(state.missing, key = { "missing:${it.id}" }) { star ->
                 Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Episode details unavailable", Modifier.weight(1f), color = Podcst.colors.ink)
+                    Text(star.freshness?.message ?: "Episode details unavailable", Modifier.weight(1f), color = Podcst.colors.ink)
                     androidx.compose.material3.TextButton(onClick = { model.removeStar(star.id) }) { Text(stringResource(DesignR.string.unstar)) }
                 }
             }

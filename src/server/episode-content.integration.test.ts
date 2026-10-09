@@ -77,8 +77,11 @@ describe.skipIf(!databaseUrl)(
       ]);
     });
 
-    test('an episode without content is not found', async () => {
-      expect(await server.getEpisodeById('102')).toBeNull();
+    test('a visible retained episode is unavailable content rather than a fabricated absence', async () => {
+      await expect(server.getEpisodeById('102')).rejects.toMatchObject({
+        podcastId: '1',
+        freshness: { content: 'missing', state: 'unavailable' },
+      });
       expect((await server.getEpisodeById('101'))?.file.url).toBe(
         'https://example.com/kept.mp3',
       );

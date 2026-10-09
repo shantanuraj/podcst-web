@@ -58,12 +58,14 @@ fun LibraryScreen(
     state: LibraryState,
     actions: EpisodeActions,
     onRefresh: () -> Unit,
+    onRecheck: suspend () -> Unit,
     onSettings: () -> Unit,
     onList: (EpisodeList) -> Unit,
     onPodcast: (Podcast) -> Unit,
     onRemoveUnavailable: (Long) -> Unit,
     onTransferGuestProgress: (app.podcst.data.GuestProgressSelection) -> Unit,
 ) {
+    FeedRecheck(state.podcasts.mapNotNull { it.freshness }, onRecheck)
     PullToRefreshBox(
         isRefreshing = state.refresh == Refresh.Running,
         onRefresh = onRefresh,
@@ -72,6 +74,9 @@ fun LibraryScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(onSettings) }
             item { Lists(state, onList) }
+            if (state.podcasts.any { it.freshness?.state == app.podcst.model.FeedFreshness.State.pending || it.freshness?.content == app.podcst.model.FeedFreshness.Content.missing }) item {
+                Text("Preparing some episodes. Cached content and follows are retained.", Modifier.padding(20.dp))
+            }
             if (state.guestProgress.isNotEmpty()) {
                 item { SectionHeader("Choose a guest position to use in this account", Modifier.padding(20.dp)) }
                 items(state.guestProgress, key = { "guest:${it.accountId}:${it.sourceToken}" }) { selection ->

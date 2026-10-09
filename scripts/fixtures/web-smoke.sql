@@ -20,8 +20,17 @@ SELECT id, 'Synthetic Episode ' || guid, '<p>Synthetic show notes for rendering 
   600, 'https://example.invalid/episode.mp3', 'audio/mpeg'
 FROM episodes;
 
-INSERT INTO feed_poll_state (podcast_id, last_polled_at, next_poll_at)
-SELECT id, now(), now() + interval '1 day' FROM podcasts;
+INSERT INTO feed_poll_state (podcast_id, last_polled_at, next_poll_at, last_success_at, last_rebuilt_at)
+SELECT id, now(), now() + interval '1 day', now(), now() FROM podcasts;
 
 INSERT INTO top_podcasts (country_id, genre_id, rank, podcast_id)
 SELECT 'us', 0, id, id FROM podcasts;
+
+INSERT INTO podcasts (id, author_id, feed_url, title, description, cover, episode_count)
+VALUES (9, 1, 'https://example.invalid/cold.xml', 'Synthetic Cold Podcast', 'Retained identity awaiting content.', '', 1),
+       (10, 1, 'https://example.invalid/empty.xml', 'Synthetic Empty Podcast', 'A validated empty feed.', '', 0),
+       (11, 1, 'https://example.invalid/removed.xml', 'Synthetic Rebuilt Podcast', 'Retained episode not returned by publisher.', '', 1);
+INSERT INTO episodes (id, podcast_id, guid, published)
+VALUES (990001, 9, 'cold-episode', now()), (990002, 11, 'removed-episode', now());
+INSERT INTO feed_poll_state (podcast_id, last_success_at, last_rebuilt_at)
+VALUES (9, NULL, NULL), (10, now(), now()), (11, now(), now());

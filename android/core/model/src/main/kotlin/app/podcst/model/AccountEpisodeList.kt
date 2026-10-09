@@ -19,7 +19,7 @@ data class ListMembership(val episodeId: Long, val addedAt: Long, val availabili
 @Serializable
 data class ListSnapshot(val listId: String, val revision: String, val items: List<ListMembership>, val protocol: Int? = null, val accountId: String? = null, val generation: String? = null)
 
-data class ListEpisodeItem(val membership: ListMembership, val episode: Episode?)
+data class ListEpisodeItem(val membership: ListMembership, val episode: Episode?, val freshness: FeedFreshness? = null)
 
 data class ListEpisodePage(val listId: String, val revision: String, val items: List<ListEpisodeItem>, val nextCursor: String?, val protocol: Int? = null, val accountId: String? = null, val generation: String? = null)
 

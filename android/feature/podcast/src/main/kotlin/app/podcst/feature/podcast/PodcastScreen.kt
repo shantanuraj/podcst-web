@@ -36,6 +36,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.podcst.model.FeedFreshness
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +92,12 @@ fun PodcastScreen(
     onBack: () -> Unit,
     onShare: () -> Unit,
 ) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, viewModel) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) viewModel.suspendReads() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); viewModel.suspendReads() }
+    }
     val colors = Podcst.colors
     val list = rememberLazyListState()
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
@@ -246,6 +257,9 @@ private fun Tabs(selected: PodcastTab, onSelect: (PodcastTab) -> Unit) {
 
 private fun LazyListScope.episodes(state: PodcastScreenState, query: String, viewModel: PodcastViewModel, actions: EpisodeActions) {
     item(key = "episodes-header") { EpisodesHeader(state, viewModel) }
+    state.podcast.freshness?.takeIf { it.state != FeedFreshness.State.fresh }?.let { freshness ->
+        item(key = "freshness") { Message(freshness.message, action = stringResource(DesignR.string.retry), onAction = viewModel::retry) }
+    }
     if (state.podcast.episodes.size > FILTER_THRESHOLD) item(key = "filter") { FilterField(query, viewModel::filter) }
     if (state.load == LoadState.Failed) {
         item(key = "failure") {
@@ -267,7 +281,7 @@ private fun LazyListScope.episodes(state: PodcastScreenState, query: String, vie
                         CircularProgressIndicator(Modifier.size(24.dp), color = Podcst.colors.accent, strokeWidth = 2.dp)
                     }
                 query.isNotBlank() -> Message(stringResource(R.string.no_matches, query.trim()))
-                state.podcast.episodes.isEmpty() && state.load == LoadState.Loaded -> Message(stringResource(R.string.no_episodes))
+                state.podcast.episodes.isEmpty() && state.load == LoadState.Loaded && state.podcast.freshness?.content != FeedFreshness.Content.missing -> Message(stringResource(R.string.no_episodes))
             }
         }
     }

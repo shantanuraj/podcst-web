@@ -2,9 +2,10 @@
 
 `schema.json`, `fixtures.json` and `limits.json` define the coordinated refresh/read
 and import cutover. TypeScript, Swift and Kotlin consume the shared validation
-vectors. Scoped follow resolution now uses the retryable import contract across
-server/web/iOS/Android. Refresh/freshness DTOs are not yet wired into read/refresh
-endpoints; the [API reference](../api/README.md) distinguishes current behavior.
+vectors. Server/web/iOS/Android implement retryable scoped imports, bounded OPML,
+nonblocking reads and refresh admission. The [API reference](../api/README.md)
+describes the serving shapes and fixtures. Native/browser persisted catalogue
+models may omit freshness for older local content; new wire responses may not.
 No frozen progress, follow or Starred request changes as part of this contract.
 
 OPML uses strict streaming parsers across all clients with shared `opml.json`
@@ -68,8 +69,9 @@ The scoped resolution envelope and input order stay unchanged. Each input gets o
 
 Retain unresolved input locally for retry; never guess IDs or treat a timeout as
 proof that nothing committed. Imports remain synchronous and bounded, not another
-job service. The scoped batch route wires shared admission; RSS search, single import
-and public interactive resolution still need the same integration. Private commits recheck account/session,
+job service. Scoped batches, RSS search, single imports and interactive Apple
+resolution (including SSR) share admission. Cached authorized identities do not
+need a network permit. Private commits recheck account/session,
 recovery generation and source identity after network work. Resolution never writes
 membership directly.
 

@@ -163,6 +163,7 @@ describe.skipIf(!process.env.PG_BIN)('durable feed demand', () => {
     await refreshFeed(sql, id, 'scheduled');
     expect(await state()).toMatchObject({ content: 'cached', state: 'fresh' });
     await sql`INSERT INTO episodes (id, podcast_id, guid, published) VALUES (44, ${id}, 'removed', now())`;
+    expect(await state()).toMatchObject({ content: 'cached', state: 'fresh' });
     expect(await state('44')).toMatchObject({
       content: 'missing',
       state: 'unavailable',

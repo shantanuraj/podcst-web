@@ -9,6 +9,7 @@
       "episodeId": "910001",
       "addedAt": 1770000000000,
       "availability": "available",
+      "freshness": { "content": "cached", "state": "fresh", "checkedAtMs": 1791499200000, "retryAtMs": null },
       "episode": {
         "id": "910001",
         "podcastId": "900001",
@@ -37,12 +38,14 @@
       "episodeId": "910002",
       "addedAt": 1769000000000,
       "availability": "content_missing",
+      "freshness": { "content": "missing", "state": "pending", "checkedAtMs": null, "retryAtMs": 1791499205000 },
       "episode": null
     },
     {
       "episodeId": "910003",
       "addedAt": 1768000000000,
       "availability": "unavailable",
+      "freshness": null,
       "episode": null
     }
   ],

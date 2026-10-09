@@ -1,6 +1,7 @@
 package app.podcst.network
 
 import app.podcst.model.CatalogueId
+import app.podcst.model.FeedFreshness
 import app.podcst.model.Account
 import app.podcst.model.AccountEpisodeList
 import app.podcst.model.ListAvailability
@@ -83,10 +84,12 @@ internal data class WirePodcast(
     val episodeCount: Int? = null,
     val count: Int? = null,
     val episodes: List<WireEpisode>? = null,
+    val freshness: FeedFreshness? = null,
 )
 
 @Serializable
 internal data class WireEpisodePage(
+    val freshness: FeedFreshness,
     val episodes: List<WireEpisode>,
     val total: Int,
     val hasMore: Boolean,
@@ -103,11 +106,11 @@ internal data class WireUser(
 )
 
 @Serializable internal data class WireEpisodeLists(val protocol: Int, val accountId: String, val generation: String, val lists: List<AccountEpisodeList>)
-@Serializable internal data class WireListEpisodeItem(@Serializable(CatalogueId::class) val episodeId: Long, val addedAt: Long, val availability: ListAvailability, val episode: WireEpisode? = null)
+@Serializable internal data class WireListEpisodeItem(@Serializable(CatalogueId::class) val episodeId: Long, val addedAt: Long, val availability: ListAvailability, val freshness: FeedFreshness?, val episode: WireEpisode? = null)
 @Serializable internal data class WireListEpisodePage(val protocol: Int, val accountId: String, val generation: String, val listId: String, val revision: String, val items: List<WireListEpisodeItem>, val nextCursor: String? = null)
 
 internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, items.map {
-    ListEpisodeItem(ListMembership(it.episodeId, it.addedAt, it.availability), it.episode?.domain())
+    ListEpisodeItem(ListMembership(it.episodeId, it.addedAt, it.availability), it.episode?.domain(), it.freshness)
 }, nextCursor, protocol, accountId, generation)
 
 @Serializable internal data class WirePublicEpisode(val podcast: WirePodcast, val episode: WireEpisode)
@@ -117,8 +120,7 @@ internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, it
 @Serializable internal data class WireSuccess(val success: Boolean = false)
 @Serializable internal data class WireSent(val sent: Boolean = false)
 @Serializable internal data class WireVerified(val verified: Boolean = false, val userId: String? = null)
-@Serializable internal data class WireRefreshStatus(val status: String)
-@Serializable internal data class WireError(val message: String? = null, val code: String? = null)
+@Serializable internal data class WireError(val message: String? = null, val code: String? = null, val freshness: FeedFreshness? = null)
 @Serializable internal data class WirePreferences(val speed: Double, val volumeBoost: Boolean, val trimSilence: Boolean)
 @Serializable internal data class WirePasskey(val id: String, val provider: String? = null, val createdAt: String, val lastUsedAt: String? = null)
 @Serializable internal data class WireAccount(val createdAt: String? = null, val passkeys: List<WirePasskey>, val preferences: WirePreferences? = null)
@@ -175,11 +177,17 @@ internal fun WirePodcast.domain(feedFallback: String? = null, locale: String? = 
         episodeCount = episodeCount ?: count ?: episodes?.size ?: 0,
         episodes = episodes.orEmpty().map { it.domain(id, feed, cover, title) },
         isPrivate = isPrivate ?: false,
+        freshness = freshness,
     )
 }
 
+internal fun WirePodcast.full(feedFallback: String? = null): Podcast {
+    requireNotNull(freshness) { "Feed freshness required" }
+    return domain(feedFallback)
+}
+
 internal fun WireEpisodePage.domain(podcastId: Long) =
-    EpisodePage(episodes.map { it.domain(podcastId) }, total, hasMore, nextCursor)
+    EpisodePage(episodes.map { it.domain(podcastId) }, total, hasMore, nextCursor, freshness)
 
 internal fun WireUser.domain() = User(id, email, name, image, hasPasskey)
 

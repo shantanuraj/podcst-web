@@ -221,6 +221,54 @@ describe.skipIf(!baseUrl)('public HTML without JavaScript', () => {
       expect(new URL(podcast?.url || '').pathname).toBe(podcastPath);
     }, 35_000);
 
+    test(`${name}: missing shared content preserves canonical intent and renders preparing without publisher I/O`, async () => {
+      const page = await readPage('/episodes/9/990001?t=12s-20s', userAgent);
+      expect(page.heading).toContain('Preparing episode');
+      expect(page.title.toLowerCase()).toContain('preparing');
+      expect(
+        page.schemas.some((schema) => schema['@type'] === 'PodcastEpisode'),
+      ).toBe(false);
+      const response = await fetch(
+        new URL('/api/episodes/990001?podcastId=9', baseUrl),
+      );
+      expect(response.status).toBe(202);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+      expect((await response.json()).freshness).toMatchObject({
+        content: 'missing',
+        state: 'pending',
+      });
+    }, 35_000);
+
+    test(`${name}: rebuilt missing content is unavailable rather than an invented 404 or endless pending`, async () => {
+      const page = await readPage('/episodes/11/990002?t=12s', userAgent);
+      expect(page.heading).toContain('temporarily unavailable');
+      expect(page.title.toLowerCase()).toContain('unavailable');
+      const response = await fetch(
+        new URL('/api/episodes/990002?podcastId=11', baseUrl),
+      );
+      expect(response.status).toBe(503);
+      expect((await response.json()).freshness).toMatchObject({
+        content: 'missing',
+        state: 'unavailable',
+      });
+    }, 35_000);
+
+    test(`${name}: a successfully validated empty feed is cached, not preparing`, async () => {
+      const page = await readPage('/episodes/10', userAgent);
+      expect(page.heading).toBe('Synthetic Empty Podcast');
+      const response = await fetch(
+        new URL('/api/feed/episodes?podcastId=10', baseUrl),
+      );
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.episodes).toEqual([]);
+      expect(body.total).toBe(0);
+      expect(body.freshness).toMatchObject({
+        content: 'cached',
+        state: 'fresh',
+      });
+    }, 35_000);
+
     test(`${name}: chart entries and metadata are available without JavaScript`, async () => {
       const page = await readPage(chartPath, userAgent);
       expect(page.chartHeading.length).toBeGreaterThan(0);

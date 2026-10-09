@@ -47,6 +47,7 @@ data class ToastMessage(
     val icon: ImageVector? = null,
     val actions: List<ToastAction> = emptyList(),
     val id: Long = System.nanoTime(),
+    val persistent: Boolean = false,
 )
 
 class Toaster {
@@ -71,6 +72,7 @@ fun ToastHost(toaster: Toaster, modifier: Modifier = Modifier) {
     val message by toaster.current.collectAsState()
     LaunchedEffect(message?.id) {
         val shown = message ?: return@LaunchedEffect
+        if (shown.persistent) return@LaunchedEffect
         delay(if (shown.actions.isEmpty()) 2_500 else 5_000)
         toaster.dismiss(shown)
     }

@@ -5,6 +5,7 @@ struct PodcastDetailView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackController.self) private var playback
     @Environment(Router.self) private var router
+    @Environment(\.scenePhase) private var scenePhase
     let podcast: Podcast
     @State private var detail: Podcast?
     @State private var isLoading = false
@@ -13,6 +14,8 @@ struct PodcastDetailView: View {
     @State private var newestFirst = true
     @State private var expanded = false
     @State private var titleVisible = false
+    @State private var readAttempt = UUID()
+    @State private var readOwner = UUID()
 
     private var content: Podcast { detail ?? podcast }
 
@@ -118,6 +121,14 @@ struct PodcastDetailView: View {
                     }
                 }
                 .padding(.top, 20)
+                if let freshness = content.freshness, freshness.state != .fresh {
+                    VStack(alignment: .leading) {
+                        Text(freshness.message).font(.footnote)
+                        Button("Retry updates") {
+                            if Double(freshness.retryAtMs ?? 0) <= Date().timeIntervalSince1970 * 1000 { readAttempt = UUID() }
+                        }
+                    }.padding(.vertical, 12)
+                }
                 if detailError {
                     ErrorRow(message: "Couldn't load the full catalogue.") {
                         await loadDetails(forceRefresh: true)
@@ -134,7 +145,7 @@ struct PodcastDetailView: View {
                     }
                 } else if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(30)
-                } else {
+                } else if !detailError && content.freshness?.content != .missing {
                     Text("No episodes available.")
                         .foregroundStyle(PodcstPalette.secondary)
                         .padding(.vertical, 20)
@@ -152,18 +163,39 @@ struct PodcastDetailView: View {
         .podcstPage()
         .navigationTitle(titleVisible ? content.title : "")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await loadDetails() }
+        .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt)") {
+            guard scenePhase == .active else { return }
+            let startedAt = Date()
+            await loadDetails(recheck: true)
+            while !Task.isCancelled, scenePhase == .active, let delay = content.freshness?.recheckDelay(startedAt: startedAt) {
+                do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() }
+                catch { return }
+                await loadDetails(recheck: true)
+                if detailError { return }
+            }
+        }
     }
 
-    private func loadDetails(forceRefresh: Bool = false) async {
+    private func loadDetails(forceRefresh: Bool = false, recheck: Bool = false) async {
+        if forceRefresh, Double(content.freshness?.retryAtMs ?? 0) > Date().timeIntervalSince1970 * 1000 { return }
+        let token = api.activityToken
+        let owner = UUID()
+        readOwner = owner
         detail = detail ?? api.cachedPodcast(id: podcast.id, feed: podcast.feed)
         let source = detail ?? podcast
         isLoading = forceRefresh || source.episodes.count <= 2 || source.episodes.count < source.episodeCount
         detailError = false
-        defer { isLoading = false }
+        defer { if readOwner == owner { isLoading = false } }
         do {
-            detail = try await api.detail(of: source, forceRefresh: forceRefresh)
+            let result = try await api.detail(of: source, forceRefresh: forceRefresh, recheck: recheck)
+            guard !Task.isCancelled, api.activityToken == token, readOwner == owner else { return }
+            detail = result
+            if forceRefresh { readAttempt = UUID() }
         } catch {
+            guard !Task.isCancelled, api.activityToken == token, readOwner == owner else { return }
+            if let failure = error as? APIError, [401, 403, 404].contains(failure.statusCode) {
+                detail = Podcast(id: source.id, feed: "", title: "Podcast unavailable", isPrivate: source.isPrivate ?? false)
+            }
             detailError = true
         }
     }

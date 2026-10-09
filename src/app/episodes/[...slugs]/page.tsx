@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { PodcastEpisodeSchema, PodcastSeriesSchema } from '@/components/Schema';
 import { getSession } from '@/server/auth/session';
+import { EpisodeContentError } from '@/server/ingest/content-error';
 import {
   getEpisodeById,
   getEpisodesPaginated,
@@ -19,9 +20,15 @@ import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
 import { Related } from '@/ui/PodcastInfo/Related';
+import { EpisodePreparing } from './EpisodePreparing';
 import styles from './Episodes.module.css';
 import { EpisodesNotFound } from './EpisodesNotFound';
 import { FeedRefresh } from './FeedRefresh';
+
+function contentFailure(error: unknown): EpisodeContentError {
+  if (error instanceof EpisodeContentError) return error;
+  throw error;
+}
 
 function isNumeric(str: string): boolean {
   return isCanonicalId(str);
@@ -103,10 +110,26 @@ export async function generateMetadata(props: {
 
   if (parsed.type === 'id' && parsed.episodeId) {
     const [episode, podcast] = await Promise.all([
-      getEpisodeById(parsed.episodeId),
+      getEpisodeById(parsed.episodeId, null, parsed.podcastId).catch(
+        contentFailure,
+      ),
       getPodcastInfoById(parsed.podcastId),
     ]);
-    if (episode && podcast && episode.podcastId === parsed.podcastId) {
+    if (episode instanceof EpisodeContentError && podcast) {
+      const url = `/episodes/${parsed.podcastId}/${parsed.episodeId}`;
+      return {
+        title: `${podcast.title} · ${episode.freshness.state === 'pending' ? 'Episode preparing' : 'Episode unavailable'}`,
+        description: 'Episode content is temporarily unavailable.',
+        alternates: { canonical: url },
+        openGraph: { url, images: podcast.cover },
+      };
+    }
+    if (
+      episode &&
+      !(episode instanceof EpisodeContentError) &&
+      podcast &&
+      episode.podcastId === parsed.podcastId
+    ) {
       const url = `/episodes/${parsed.podcastId}/${parsed.episodeId}`;
       const { moment } = await sharedMoment(
         props.searchParams,
@@ -197,13 +220,30 @@ export default async function Page(props: {
   if (parsed.type === 'id') {
     if (parsed.episodeId) {
       const [episode, podcast] = await Promise.all([
-        getEpisodeById(parsed.episodeId, userId),
+        getEpisodeById(parsed.episodeId, userId, parsed.podcastId).catch(
+          contentFailure,
+        ),
         getPodcastInfoById(parsed.podcastId, userId),
       ]);
 
       if (!episode || !podcast || episode.podcastId !== parsed.podcastId) {
         return <EpisodesNotFound type="episode" />;
       }
+
+      if (episode instanceof EpisodeContentError)
+        return (
+          <AccountContent
+            scope={userId}
+            resource={parsed.podcastId}
+            privateContent={!!podcast.isPrivate}
+          >
+            <EpisodePreparing
+              key={parsed.episodeId}
+              podcastId={parsed.podcastId}
+              freshness={episode.freshness}
+            />
+          </AccountContent>
+        );
 
       const url = `${baseUrl}/episodes/${parsed.podcastId}/${parsed.episodeId}`;
       const podcastData = { ...podcast, episodes: [episode] };
@@ -240,7 +280,7 @@ export default async function Page(props: {
       getEpisodesPaginated({ podcastId: parsed.podcastId, limit: 20 }, userId),
     ]);
 
-    if (!podcast) {
+    if (!podcast || !initialEpisodes) {
       return <EpisodesNotFound type="podcast" />;
     }
 
@@ -256,7 +296,11 @@ export default async function Page(props: {
             podcastId={parsed.podcastId}
             initialData={initialEpisodes}
           >
-            <FeedRefresh podcastId={parsed.podcastId} empty />
+            <FeedRefresh
+              podcastId={parsed.podcastId}
+              empty
+              initialFreshness={initialEpisodes.freshness}
+            />
             <PodcastInfo podcast={podcast} episodes={[]} />
           </EpisodesHydration>
         </AccountContent>
@@ -272,7 +316,10 @@ export default async function Page(props: {
         resource={parsed.podcastId}
         privateContent={!!podcast.isPrivate}
       >
-        <FeedRefresh podcastId={parsed.podcastId} />
+        <FeedRefresh
+          podcastId={parsed.podcastId}
+          initialFreshness={initialEpisodes.freshness}
+        />
         {!podcast.isPrivate && (
           <PodcastSeriesSchema podcast={schemaData} url={url} />
         )}

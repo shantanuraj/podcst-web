@@ -7,32 +7,14 @@ import type {
 } from '@/types';
 import { sql } from '../db';
 import { genreColumns, genreJoin, genresOf } from '../genres';
-import { canAccessPodcast, podcastAccess } from '../podcast-access';
+import { podcastAccess } from '../podcast-access';
+import { EpisodeContentError } from './content-error';
 import {
   type EpisodePageOptions,
   prepareEpisodeRead,
   readEpisodePage,
 } from './episode-read';
-import { refreshFeed } from './feed-refresh';
-import { findPodcastIdentity, indexPrivatePodcast } from './index-podcast';
-
-export async function ingestPodcast(
-  feedUrl: string,
-  userId: string,
-): Promise<IPodcastEpisodesInfo | null> {
-  const id = await indexPrivatePodcast(sql, feedUrl, userId);
-  return getPodcastById(id, userId);
-}
-
-export async function refreshPodcast(
-  podcastId: string,
-  userId: string | null = null,
-): Promise<IPodcastEpisodesInfo | null> {
-  if (!(await canAccessPodcast(sql, podcastId, userId))) return null;
-  const result = await refreshFeed(sql, podcastId);
-  if (result === 'not_found' || result === 'error') return null;
-  return getPodcastById(podcastId, userId);
-}
+import { findPodcastIdentity } from './index-podcast';
 
 export async function getPodcastByFeedUrl(
   feedUrl: string,
@@ -46,8 +28,8 @@ export async function getPodcastById(
   id: string,
   userId: string | null = null,
 ): Promise<IPodcastEpisodesInfo | null> {
-  if (!(await canAccessPodcast(sql, id, userId))) return null;
-  await prepareEpisodeRead(sql, id);
+  const freshness = await prepareEpisodeRead(sql, id, userId);
+  if (!freshness) return null;
   const [podcast] = await sql`
     SELECT p.*, a.name as author_name
     FROM podcasts p
@@ -63,7 +45,8 @@ export async function getPodcastById(
            c.file_url, c.file_length, c.file_type
     FROM episodes e
     JOIN episode_content c ON c.episode_id = e.id
-    WHERE e.podcast_id = ${podcast.id}
+    JOIN podcasts p ON p.id = e.podcast_id
+    WHERE e.podcast_id = ${podcast.id} AND ${podcastAccess(sql, userId)}
     ORDER BY e.published DESC
   `;
 
@@ -79,6 +62,7 @@ export async function getPodcastById(
     published: podcast.last_published?.getTime() || null,
     explicit: podcast.explicit,
     keywords: [],
+    freshness,
     episodes: episodes.map(
       (ep): IEpisodeInfo => ({
         id: ep.id,
@@ -111,6 +95,7 @@ export const getEpisodeById = cache(
   async (
     episodeId: string,
     userId: string | null = null,
+    expectedPodcastId?: string,
   ): Promise<IEpisodeInfo | null> => {
     const query = () => sql`
     SELECT e.id, e.guid, e.published, e.podcast_id,
@@ -123,15 +108,35 @@ export const getEpisodeById = cache(
     JOIN authors a ON a.id = p.author_id
     LEFT JOIN episode_content c ON c.episode_id = e.id
     WHERE e.id = ${episodeId} AND ${podcastAccess(sql, userId)}
+      ${expectedPodcastId ? sql`AND p.id = ${expectedPodcastId}` : sql``}
   `;
-
     let [row] = await query();
     if (!row) return null;
 
     if (row.file_url == null) {
-      await prepareEpisodeRead(sql, String(row.podcast_id));
-      [row] = await query();
-      if (row?.file_url == null) return null;
+      const freshness = await prepareEpisodeRead(
+        sql,
+        String(row.podcast_id),
+        userId,
+        episodeId,
+      );
+      if (!freshness) return null;
+      if (freshness.content === 'cached') {
+        [row] = await query();
+        if (!row) return null;
+      }
+      if (row.file_url == null)
+        throw new EpisodeContentError(
+          String(row.podcast_id),
+          freshness.content === 'missing'
+            ? freshness
+            : {
+                ...freshness,
+                content: 'missing',
+                state: 'unavailable',
+                retryAtMs: null,
+              },
+        );
     }
 
     return {
@@ -200,22 +205,18 @@ export type { SortDirection, SortField } from './episode-read';
 export async function getEpisodesPaginated(
   options: EpisodePageOptions,
   userId: string | null = null,
-): Promise<IPaginatedEpisodes> {
+): Promise<IPaginatedEpisodes | null> {
   const { podcastId } = options;
-  let podcast: IPodcastInfo | null = null;
-  if (await canAccessPodcast(sql, podcastId, userId)) {
-    await prepareEpisodeRead(sql, podcastId);
-    podcast = await readPodcastInfoById(podcastId, userId);
-  }
+  const freshness = await prepareEpisodeRead(sql, podcastId, userId);
+  if (!freshness) return null;
+  const podcast = await readPodcastInfoById(podcastId, userId);
+  if (!podcast) return null;
 
-  if (!podcast) {
-    return { episodes: [], total: 0, hasMore: false };
-  }
-
-  const page = await readEpisodePage(sql, options);
+  const page = await readEpisodePage(sql, options, userId);
 
   return {
     ...page,
+    freshness,
     episodes: page.episodes.map(
       (ep): IEpisodeInfo => ({
         id: ep.id,
@@ -247,8 +248,9 @@ export async function getEpisodesPaginated(
 export async function getEpisodeWithPodcast(
   episodeId: string,
   userId: string | null = null,
+  expectedPodcastId?: string,
 ): Promise<{ episode: IEpisodeInfo; podcast: IPodcastInfo } | null> {
-  const episode = await getEpisodeById(episodeId, userId);
+  const episode = await getEpisodeById(episodeId, userId, expectedPodcastId);
   if (!episode || !episode.podcastId) return null;
 
   const podcast = await getPodcastInfoById(episode.podcastId, userId);

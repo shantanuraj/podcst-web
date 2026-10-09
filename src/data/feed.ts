@@ -1,6 +1,12 @@
-import { hashKey, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  hashKey,
+  type InfiniteData,
+  useInfiniteQuery,
+  useQuery,
+} from '@tanstack/react-query';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { type AccountScope, accountQueryKey } from '@/shared/auth/account';
+import { preserveFeedContent } from '@/shared/feed-content';
 import { useSubscriptions } from '@/shared/subscriptions/useSubscriptions';
 import type {
   IEpisodeListing,
@@ -20,19 +26,29 @@ export const podcastQueryKey = (scope: AccountScope, id: string) =>
 export const useFeed = (feedUrl: string | null) => {
   const session = useAccountSession();
   const token = session.token();
-  const options = session.query('feed', feedUrl ?? '', async (signal) => {
-    if (!feedUrl) return null;
-    const response = await get<IEpisodeListing | null>(
-      '/feed',
-      { url: feedUrl },
-      undefined,
-      signal,
-    );
-    const patched = patchEpisodesResponse(feedUrl)(response);
-    if (patched && session.current(token, feedUrl))
-      await useSubscriptions.getState().syncSubscription(feedUrl, patched);
-    return patched;
-  });
+  const options = session.query(
+    'feed',
+    feedUrl ?? '',
+    async (signal): Promise<IPodcastEpisodesInfo | null> => {
+      if (!feedUrl) return null;
+      const response = await get<IEpisodeListing | null>(
+        '/feed',
+        { url: feedUrl },
+        undefined,
+        signal,
+      );
+      const next = patchEpisodesResponse(feedUrl)(response);
+      const patched = next
+        ? preserveFeedContent(
+            session.client.getQueryData<IPodcastEpisodesInfo>(options.queryKey),
+            next,
+          )
+        : next;
+      if (patched && session.current(token, feedUrl))
+        await useSubscriptions.getState().syncSubscription(feedUrl, patched);
+      return patched;
+    },
+  );
   const query = useQuery({
     ...options,
     enabled: !!feedUrl && options.enabled,
@@ -48,19 +64,27 @@ export const useFeed = (feedUrl: string | null) => {
 export const usePodcast = (podcastId: string) => {
   const session = useAccountSession();
   const token = session.token();
-  const options = session.query('podcast', podcastId, async (signal) => {
-    const response = await get<IPodcastEpisodesInfo | null>(
-      '/feed',
-      { id: String(podcastId) },
-      undefined,
-      signal,
-    );
-    if (response && session.current(token, podcastId))
-      await useSubscriptions
-        .getState()
-        .syncSubscription(response.feed, response);
-    return response;
-  });
+  const options = session.query(
+    'podcast',
+    podcastId,
+    async (signal): Promise<IPodcastEpisodesInfo | null> => {
+      const response = await get<IPodcastEpisodesInfo | null>(
+        '/feed',
+        { id: String(podcastId) },
+        undefined,
+        signal,
+      );
+      const next = response
+        ? preserveFeedContent(
+            session.client.getQueryData<IPodcastEpisodesInfo>(options.queryKey),
+            response,
+          )
+        : response;
+      if (next && session.current(token, podcastId))
+        await useSubscriptions.getState().syncSubscription(next.feed, next);
+      return next;
+    },
+  );
   const query = useQuery({
     ...options,
     enabled: !!podcastId && options.enabled,
@@ -128,9 +152,27 @@ export const useEpisodesInfinite = (options: EpisodesQueryOptions) => {
   const session = useAccountSession();
   const token = session.token();
   const query = useInfiniteQuery({
-    ...session.query('episodes', options.podcastId, (signal, cursor) =>
-      fetchEpisodesPaginated({ ...options, cursor }, signal),
-    ),
+    ...session.query('episodes', options.podcastId, async (signal, cursor) => {
+      const next = await fetchEpisodesPaginated({ ...options, cursor }, signal);
+      const previous = session.client.getQueryData<
+        InfiniteData<IPaginatedEpisodes>
+      >(
+        episodesQueryKey(
+          token.scope,
+          options.podcastId,
+          options.search,
+          options.sortBy,
+          options.sortDir,
+          options.unplayed,
+        ),
+      );
+      return preserveFeedContent(
+        cursor === undefined && next.freshness?.content === 'missing'
+          ? { episodes: previous?.pages.flatMap((page) => page.episodes) ?? [] }
+          : previous?.pages[previous.pageParams.indexOf(cursor)],
+        next,
+      );
+    }),
     queryKey: episodesQueryKey(
       token.scope,
       options.podcastId,

@@ -103,7 +103,10 @@ Body: `{ "term": string, "locale"?: string }`. The term is trimmed and must be 1
 - Text: queries the iTunes Search API for `locale` (default `us`) and annotates matches with indexed IDs (`src/app/api/search/search.ts`). An iTunes failure yields `[]`, not an error.
 - Feed URL (`isFeedUrlInput` in `src/shared/feed-url.ts`: starts with `http:`, `https:` or `scheme://`): requires a session. The server indexes the feed as a private podcast owned by the caller unless it is already indexed, then returns a one-item array, or `[]` if the caller cannot see it. Searching does not subscribe.
 
-Responses carry private-feed headers.
+Responses carry private-feed headers. RSS imports share the scoped resolver’s
+account budgets, initiating-session/generation fence and ten-second upstream
+deadline. JSON bodies are bounded to 64 KiB/five seconds. Temporary failure is
+503 `unavailable`; admission refusal is 429 `rate_limited`, with Retry-After.
 
 | Status | Body | Cause |
 | --- | --- | --- |
@@ -111,7 +114,7 @@ Responses carry private-feed headers.
 | 400 | `{message: "A search term is required"}` | Missing, empty or over-long term |
 | 400 | `{message: "Feed unavailable"}` | Invalid feed URL (`TypeError` from `feedUrl`) |
 | 401 | `{message: "Sign in to open an RSS link"}` | Feed URL without a session |
-| 404 | `{message: "Feed unavailable"}` | Feed fetch failed, or another user owns the private feed |
+| 404 | `{code:"unavailable", message:"Feed unavailable"}` | Unsafe, hidden or permanently unavailable source |
 | 409 | `{message: "Feed unavailable"}` | `PodcastIdentityConflict` |
 
 Fixtures: `search.text.json` (captured; contains results with and without `id`), `search.missing-term.json` (captured), `search.feed-url.json`, `search.empty.json`, `search.sign-in-required.json` (derived from `src/server/search.ts` and `src/app/api/search/route.ts`).
@@ -122,7 +125,12 @@ Query: `term`, `locale`. Text search only: a feed URL returns 400 `{message: "Us
 
 ### `GET /api/feed?id=` — optional
 
-Returns the full `Podcast` with every episode, or 404 `{message: "Podcast not found"}` when it does not exist or is not visible. A non-positive or non-integer `id` returns 400 `{message: "A valid podcast ID is required"}`; neither `id` nor `url` returns 400 `{message: "A podcast ID is required"}`. Before reading, `prepareEpisodeRead` rebuilds content synchronously when a podcast has episodes but no content (`src/server/ingest/episode-read.ts`), so this request can be slow. All responses carry private-feed headers.
+Returns the full `Podcast` with available cached episodes and required `freshness`
+([feed contract](../feeds/README.md)), or 404 when absent/invisible. Invalid IDs
+return 400. Reads never await publisher I/O: missing content can admit bounded
+durable demand to the existing refresher. Cached content remains usable when
+admission is unavailable. Cached empty and missing/evicted content are distinct.
+All responses, including errors, carry private-feed headers.
 
 Fixtures: `feed.id.json` (captured, episodes trimmed to three), `feed.not-found.json`, `feed.invalid-id.json` (captured), `feed.private.json` (derived from `getPodcastById`; empty episodes, null `link` and `published`).
 
@@ -139,7 +147,13 @@ Body: `{ "url": string }` (at most 4,096 characters). Indexes the feed with the 
 | 200 | `Podcast` (same shape as `feed.id.json`; `feed.private.json` shows a private result) |
 | 400 | `{message: "A feed URL is required"}` |
 | 401 | `{message: "Sign in to open an RSS link"}` — `feed.sign-in-required.json` |
-| 404 | `{message: "Feed unavailable"}` — any fetch, validation, ownership or identity failure; `feed.unavailable.json` |
+| 404 | `{code:"unavailable", message:"Feed unavailable"}` — unsafe/hidden/unavailable source |
+| 409 | `{code:"unavailable", message:"Feed unavailable"}` — identity conflict |
+| 429/503 | `{code:"rate_limited"|"unavailable", message:"Feed unavailable"}` with Retry-After |
+
+New fetching uses the shared scoped-import budgets and session/generation fence;
+known authorized sources bypass network admission. Body limits are 64 KiB/five
+seconds. The returned podcast includes freshness without rebuilding inline.
 
 ### `GET /api/feed/info?id=` — optional
 
@@ -163,7 +177,7 @@ Query (`src/app/api/feed/episodes/route.ts`, `readEpisodePage` in `src/server/in
 
 Ordering is the sort column, then episode ID in the same direction. Only `duration` sorts nulls last.
 
-Response `EpisodePage`: `{ "episodes": Episode[], "total": integer, "hasMore": boolean, "nextCursor"?: integer }`. `total` counts all matching episodes. `nextCursor` is omitted on the last page. The cursor is a plain offset, so episodes published between page requests shift later pages; clients de-duplicate by episode `id`.
+Response `EpisodePage`: `{ "episodes": Episode[], "total": integer, "hasMore": boolean, "nextCursor"?: integer, "freshness": FeedFreshness }`. `total` counts matching accessible cached rows, not retained identities without content. Missing content is not authoritative empty state. `nextCursor` is omitted on the last page. The cursor is a plain offset, so clients de-duplicate exact episode IDs.
 
 Errors: 400 `{message: "parameter \`podcastId\` required"}` or `{message: "parameter \`podcastId\` must be a number"}`; 404 `{message: "Podcast not found"}`. Successful and 404 responses carry private-feed headers.
 
@@ -175,8 +189,11 @@ Resolves one shared episode without loading the whole catalogue (`src/server/sha
 
 - 400 `{message: "Invalid episode ID"}`.
 - 404 `{message: "Episode not found"}`, whether the episode is missing, belongs to another podcast or is private.
-- 503 `{message: "Episode unavailable"}`.
+- Known visible identity without content: 202 `{code:"content_pending", message:"Preparing episode", freshness}` only when repair is durably accepted; otherwise 503 `{code:"content_unavailable", message:"Episode content unavailable", freshness}`.
+- Other failures: 503 `{message: "Episode unavailable"}`.
 
+No read fetches a publisher inline. Pending/error responses are private/no-store.
+Successful full rebuilds impose a cooldown even when an episode remains absent.
 Success is publicly cacheable. The link format that leads here is in [the sharing contract](../sharing/README.md).
 
 Fixtures: `episode-public.json` (derived from `feed-info.json` and the first episode of `feed-episodes.first.json`), `episode-public.not-found.json`.
@@ -207,35 +224,41 @@ Body: `{ "itunes_id": canonical decimal string, "locale"?: two-letter code }` (l
 
 | Status | Body |
 | --- | --- |
-| 400 | `{message: "itunes_id must be a positive integer"}` or `{message: "locale must be a two-letter country code"}` |
+| 400 | `{code:"invalid_request", message:"Feed unavailable"}` |
 | 404 | `{message: "Podcast not found"}` |
-| 409 | `{message: "Unable to resolve podcast"}` — identity conflict |
-| 502 | `{message: "Unable to resolve podcast"}` — any other failure |
+| 409 | `{code:"unavailable", message:"Feed unavailable"}` — identity conflict |
+| 429/503 | `{code:"rate_limited"|"unavailable", message:"Feed unavailable"}` |
 
-No private-feed headers. Fixtures: `feed-resolve.resolved.json`, `feed-resolve.not-found.json`, `feed-resolve.unavailable.json` (derived from the route).
+The route and `/itunes/:id` SSR entry share public trusted-source admission,
+a ten-second deadline through lookup/redirect/indexing, and permit ownership
+checks before commit. Existing public Apple identities need no network permit.
+Missing attribution uses the conservative shared bucket, not arbitrary forwarded
+headers. Failures use generic 400/409/429/503 codes without raw locator/error text;
+429/503 include Retry-After. Responses carry private-feed headers. Fixtures:
+`feed-resolve.resolved.json`, `feed-resolve.not-found.json`, `feed-resolve.unavailable.json`.
 
 ### `POST /api/feed/refresh` — optional
 
-Body: `{ "podcastId": canonical decimal string, "onlyIfStale"?: boolean }`. Both modes call `refreshFeed(sql, podcastId)` with its default `stale` mode (`src/server/ingest/feed-refresh.ts`): the feed is fetched only if it was last polled at least 15 minutes ago (`STALE_FEED_INTERVAL`, `isRefreshDue` in `src/server/ingest/feed-schedule.ts`) and is not in a failure back-off. Neither mode forces a fetch.
+Body only `{ "podcastId": canonical decimal string }`; extra fields, including
+`onlyIfStale`, are rejected. Returns `{podcastId, freshness}`: 202 only for joined
+or newly accepted durable demand; 200 for fresh content, existing backoff or a
+recent completed rebuild with unavailable content. This endpoint never waits for
+publisher I/O and never returns a full podcast.
 
-With `"onlyIfStale": true`, the response is `RefreshStatus` `{ "status": string }`:
+Errors: 400 invalid request, 404 invisible/absent source, 429 rate/capacity refusal,
+503 dependency failure. 429/503 include Retry-After. All responses carry
+private-feed headers. Bounds and executable response schemas are in
+[the feed contract](../feeds/README.md).
 
-| `status` | HTTP | Meaning |
-| --- | --- | --- |
-| `updated` | 200 | The feed changed and episodes were stored. |
-| `not_modified` | 200 | Fetched; unchanged. |
-| `skipped` | 200 | Not due, or the fetched result lost its lease/source binding before publication. |
-| `busy` | 202 | An active refresh lease or contended podcast write lock; retry later. |
-| `not_found` | 404 | The podcast row disappeared. |
-| `error` | 502 | The fetch failed; back-off was recorded. |
+Clients admit once and re-read content/status with GET, honor retry advice, and
+stop automatic checks after two foreground minutes or on navigation/scope change.
+An expired client window preserves content, membership and a Retry affordance.
+Shared-link readiness is fenced by the original intent before any playback.
 
-The web client retries `busy` with exponential back-off and refetches episode data after `updated` (`src/data/feed-refresh.ts`). Fetching runs outside database transactions, between a short lease claim and a source/owner/token-checked write phase ([details](../../docs/feed-fetching.md#refresh-transactions)). This endpoint still awaits fetching; it is not a new queued-job or freshness API.
-
-Without `onlyIfStale`, the response is the full `Podcast` for every outcome except `not_found` and `error`, which return 500 `{message: "Failed to refresh feed"}`. `busy` and `skipped` therefore return the current stored podcast. iOS uses this mode for pull-to-refresh (`APIClient.refresh(podcastID:)`).
-
-Errors in both modes: 400 `{message: "podcastId must be a positive integer"}`; 404 `{message: "Podcast not found"}` when not visible. Responses carry private-feed headers, except the 400 and the full-mode 500.
-
-Fixtures: `feed-refresh.updated.json`, `feed-refresh.not-modified.json`, `feed-refresh.skipped.json`, `feed-refresh.busy.json`, `feed-refresh.not-found.json`, `feed-refresh.error.json`, `feed-refresh.failed.json`, `feed-refresh.invalid-id.json` (derived from the route).
+Fixtures: `feed-refresh.pending.json`, `feed-refresh.fresh.json`,
+`feed-refresh.backoff.json`, `feed-refresh.unavailable.json`,
+`feed-refresh.rate-limited.json`, `feed-refresh.not-found.json`,
+`feed-refresh.invalid-id.json`.
 
 ### `GET /api/auth/session` — public
 
@@ -412,7 +435,9 @@ snapshot, never a page. `limit` and `cursor` are rejected in this view.
 | `availability` | string | `available`, `content_missing` or `unavailable`. |
 
 `view=episodes` (default) returns `ListEpisodePage`: the same envelope and entry
-fields, with `episode: Episode | null` per item and `nextCursor: string | null`.
+fields, with `episode: Episode | null`, required `freshness: FeedFreshness | null`
+per item and `nextCursor: string | null`. Invisible sources have null freshness;
+visible sources retain their status even when the selected episode has no content.
 Limit defaults to 100 and must be 1–200. The opaque keyset cursor belongs to that
 list; ordering is addition time then episode ID, descending. Concurrent changes
 can move items between display pages, so deduplicate by ID. Never infer removals
@@ -425,8 +450,10 @@ metadata or access changes. Recheck availability even at an unchanged revision.
 
 Invalid UUIDs, views, duplicate/unknown query parameters, limits and cursors return
 400 `{message: ...}`. The endpoint does not wait for upstream feeds. Missing
-content schedules best-effort recovery after the response: at most three feeds,
-with a 15-minute per-feed throttle and existing failure backoff. A saved episode's
+content admits durable demand before composing status: at most three feeds per
+recovery pass, through shared admission, the existing worker, a 15-minute rebuild
+cooldown and existing failure backoff. No post-response fetch or process-only
+repair queue is used. Admission failure leaves membership/cache intact. A saved episode's
 retained content is excluded from eviction without subscribing to its podcast.
 
 ### `POST /api/lists/:id/changes` — required

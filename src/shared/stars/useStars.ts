@@ -1,7 +1,8 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
+import { feedRecheckDelay } from '@/shared/feed-contract';
 import type { IEpisodeInfo } from '@/types';
 import { starRuntime } from './browser';
 import { project, validEpisodeId } from './state';
@@ -20,6 +21,28 @@ export function useStars() {
       ? view.state
       : undefined;
   const stars = state ? project(state) : [];
+  const window = useMemo(() => ({ startedAt: Date.now() }), [token]);
+  const delays = stars.flatMap((item) => {
+    const delay = feedRecheckDelay(
+      item.freshness ?? undefined,
+      window.startedAt,
+    );
+    return delay === false ? [] : [delay];
+  });
+  const delay = delays.length ? Math.min(...delays) : false;
+  useEffect(() => {
+    if (
+      delay === false ||
+      document.visibilityState === 'hidden' ||
+      !session.current(token)
+    )
+      return;
+    const timer = setTimeout(() => {
+      if (session.current(token) && document.visibilityState !== 'hidden')
+        void sync.refresh();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [delay, session, token, sync]);
   return {
     stars,
     episodes: stars.flatMap(({ episode }) => (episode ? [episode] : [])),
@@ -45,6 +68,9 @@ export function useStars() {
       if (state && session.current(token))
         void sync.edit(episodeId, 'remove').catch(() => {});
     },
-    refresh: sync.refresh,
+    refresh: () => {
+      window.startedAt = Date.now();
+      return sync.refresh();
+    },
   };
 }

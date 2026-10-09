@@ -1,20 +1,55 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { get } from '@/data/api';
 import { stateRuntime, useDurableState } from '@/data/state-browser';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { accountQueryKey } from '@/shared/auth/account';
+import { preserveFeedContent } from '@/shared/feed-content';
+import { feedRecheckDelay } from '@/shared/feed-contract';
 import type { IPodcastEpisodesInfo } from '@/types';
 
 export function useServerSubscriptions() {
   const session = useAccountSession();
   const token = session.token();
   const durable = useDurableState();
-  const options = session.query('subscriptions', 'library', (signal) =>
-    get<IPodcastEpisodesInfo[]>('/subscriptions', {}, undefined, signal),
+  const startedAt = useMemo(() => Date.now(), [token]);
+  const options = session.query(
+    'subscriptions',
+    'library',
+    async (signal): Promise<IPodcastEpisodesInfo[]> => {
+      const next = await get<IPodcastEpisodesInfo[]>(
+        '/subscriptions',
+        {},
+        undefined,
+        signal,
+      );
+      const previous = session.client.getQueryData<IPodcastEpisodesInfo[]>(
+        accountQueryKey(token.scope, 'subscriptions', 'library'),
+      );
+      return next.map((podcast) =>
+        preserveFeedContent(
+          previous?.find((item) => item.id === podcast.id),
+          podcast,
+        ),
+      );
+    },
   );
   const query = useQuery({
     ...options,
     enabled: options.enabled && token.scope !== null,
+    refetchInterval: (query) => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'hidden'
+      )
+        return false;
+      const delays =
+        query.state.data?.flatMap((podcast) => {
+          const delay = feedRecheckDelay(podcast.freshness, startedAt);
+          return delay === false ? [] : [delay];
+        }) ?? [];
+      return delays.length ? Math.min(...delays) : false;
+    },
   });
   return {
     ...query,

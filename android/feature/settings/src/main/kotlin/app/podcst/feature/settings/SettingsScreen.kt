@@ -116,13 +116,19 @@ fun SettingsScreen(
         }
     }
 
+    var importScope by remember { mutableStateOf<(() -> Boolean)?>(null) }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
+        val current = importScope
+        if (current == null || !current()) {
+            toaster.show("Account changed. Select the file again.")
+            return@rememberLauncherForActivityResult
+        }
         scope.launch {
             val document = withContext(Dispatchers.IO) {
                 runCatching { resolver.openInputStream(uri)?.use { app.podcst.model.Opml.read(it) } }.getOrNull()
             }
-            if (document == null) toaster.show(resources.getString(R.string.unreadable)) else viewModel.import(document)
+            if (document == null) toaster.show(resources.getString(R.string.unreadable)) else viewModel.import(document, current)
         }
     }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(OPML_TYPE)) { uri ->
@@ -150,7 +156,7 @@ fun SettingsScreen(
         onSpeed = viewModel::setSpeed,
         onVolumeBoost = viewModel::setVolumeBoost,
         onTrimSilence = viewModel::setTrimSilence,
-        onImport = { importer.launch(OPML_IMPORT_TYPES) },
+        onImport = { importScope = viewModel.importScope(); importer.launch(OPML_IMPORT_TYPES) },
         onExport = { exporter.launch(exportName) },
     )
 }

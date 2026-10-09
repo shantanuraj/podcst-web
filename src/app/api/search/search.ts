@@ -1,10 +1,8 @@
 import { adaptResponse } from '@/app/api/adapter';
 import { DEFAULT_PODCASTS_LOCALE, ITUNES_API } from '@/data/constants';
 import { sql } from '@/server/db';
-import {
-  indexPrivatePodcast,
-  PodcastAccessDenied,
-} from '@/server/ingest/index-podcast';
+import { PodcastAccessDenied } from '@/server/ingest/index-podcast';
+import { importPrivateFeed } from '@/server/ingest/interactive-admission';
 import { matchSearchResults, searchPodcastsByFeedUrl } from '@/server/search';
 import { feedUrl, isFeedUrlInput } from '@/shared/feed-url';
 import type { IPodcastSearchResult, iTunes } from '@/types';
@@ -12,13 +10,14 @@ import type { IPodcastSearchResult, iTunes } from '@/types';
 export async function search(
   term: string,
   locale = DEFAULT_PODCASTS_LOCALE,
-  userId: string | null = null,
+  session: { userId: string; id: string } | null = null,
+  signal?: AbortSignal,
 ) {
   if (isFeedUrlInput(term)) {
-    if (!userId) throw new PodcastAccessDenied('Sign in to open an RSS link');
+    if (!session) throw new PodcastAccessDenied('Sign in to open an RSS link');
     const url = feedUrl(term);
-    await indexPrivatePodcast(sql, url, userId);
-    const result = await searchPodcastsByFeedUrl(sql, url, userId);
+    await importPrivateFeed(sql, url, session, signal);
+    const result = await searchPodcastsByFeedUrl(sql, url, session.userId);
     return result ? [result] : [];
   }
   return searchByTerm(term, locale);

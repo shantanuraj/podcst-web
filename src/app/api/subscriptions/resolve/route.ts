@@ -6,5 +6,7 @@ import { createFollowResolutionHandler } from '@/server/state/resolve-response';
 
 export const maxDuration = 60;
 export const POST = createFollowResolutionHandler(
-  createFollowResolver(sql), getSession, privateImportAdmission,
+  createFollowResolver(sql),
+  getSession,
+  privateImportAdmission,
 );

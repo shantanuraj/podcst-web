@@ -482,16 +482,17 @@ export class StateRuntime {
     return run;
   };
   async resolveFeeds(feedUrls: string[], legacy = false) {
-    await this.refresh();
     const account = this.view.account;
     const epoch = this.epoch;
-    const scope = account
-      ? this.view.state?.accounts[account]?.follows.scope
-      : undefined;
-    if (!account || !scope)
-      throw new Error('Verified follow scope unavailable');
+    if (!account) throw new Error('Account scope unavailable');
     const selected = [...new Set(feedUrls)];
-    feedImportBatches(scope, selected);
+    if (
+      selected.some(
+        (feed) =>
+          typeof feed !== 'string' || !feed.length || feed.length > 4096,
+      )
+    )
+      throw new Error('Invalid import source');
     await this.update(epoch, (root) => {
       const follows = accountState(root, account).follows;
       const merged = [...new Set([...follows.importFailures, ...selected])];
@@ -505,6 +506,12 @@ export class StateRuntime {
         );
       follows.importFailures = merged;
     });
+    await this.refresh();
+    if (epoch !== this.epoch || this.view.account !== account)
+      throw new Error('Session retired');
+    const scope = this.view.state?.accounts[account]?.follows.scope;
+    if (!scope)
+      throw new Error('Verified follow scope unavailable; imports retained');
     const retryAt =
       this.view.state?.accounts[account].follows.importRetryAt ?? {};
     const now = Date.now();

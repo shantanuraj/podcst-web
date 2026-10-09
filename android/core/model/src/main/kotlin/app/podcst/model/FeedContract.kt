@@ -13,6 +13,20 @@ data class FeedFreshness(
     @Serializable enum class Content { cached, missing }
     @Serializable enum class State { fresh, stale, pending, backoff, unavailable }
 
+    fun recheckDelay(startedAt: Long, now: Long = System.currentTimeMillis()): Long? {
+        if (state != State.pending && state != State.backoff) return null
+        val delay = maxOf(FeedLimits.RECHECK_SECONDS * 1000L, (retryAtMs ?: now + FeedLimits.RECHECK_SECONDS * 1000L) - now)
+        return delay.takeIf { it < FeedLimits.POLL_WINDOW_SECONDS * 1000L - (now - startedAt) }
+    }
+
+    val message: String get() = when (state) {
+        State.pending -> if (content == Content.missing) "Preparing episodes…" else "Refreshing. Cached episodes remain available."
+        State.backoff -> "Updates delayed. Existing content is retained."
+        State.unavailable -> "Content temporarily unavailable. Existing follows are retained."
+        State.stale -> "Cached episodes. Updates have not been checked recently."
+        State.fresh -> "Up to date"
+    }
+
     init {
         require(listOfNotNull(checkedAtMs, retryAtMs).all { it in 0..9007199254740991L })
         require(state != State.fresh || content == Content.cached && checkedAtMs != null)

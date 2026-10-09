@@ -3,9 +3,11 @@ import SwiftUI
 struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
+    @Environment(APIClient.self) private var api
     @Environment(\.scenePhase) private var scenePhase
     @Environment(PlaybackController.self) private var playback
     @State private var showingLogin = false
+    @State private var feedWindow = Date()
 
     private var continueAndNew: [Episode] {
         let current = playback.currentEpisode.flatMap {
@@ -18,6 +20,10 @@ struct LibraryView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 LibraryLists()
+                if library.podcasts.contains(where: { $0.freshness?.state == .pending || $0.freshness?.content == .missing }) {
+                    Text("Preparing some episodes. Cached content and follows are retained.").font(.footnote)
+                    Button("Recheck episodes") { Task { feedWindow = Date(); await library.load() } }.font(.footnote)
+                }
                 if let error = library.syncError { Text(error).font(.footnote).foregroundStyle(.red).padding(.vertical, 8) }
                 if library.syncBlocked { Text("Sync blocked — saved changes are preserved").font(.footnote) }
                 else if library.syncPending { Text("Changes pending sync").font(.footnote) }
@@ -32,10 +38,10 @@ struct LibraryView: View {
                         .font(.footnote)
                 }
                 if !library.durable.pendingImportFeeds.isEmpty {
-                    Button("Retry unresolved feed imports") { Task { await library.importFeeds(library.durable.pendingImportFeeds) } }.font(.footnote)
+                    Button("Retry unresolved feed imports") { let activity = api.activityToken; let feeds = library.durable.pendingImportFeeds; Task { await library.importFeeds(feeds, expectedActivity: activity) } }.font(.footnote)
                 }
                 ForEach(library.durable.unresolvedGuest, id: \.identity) { podcast in
-                    Button("Resolve legacy follow: \(podcast.title)") { Task { await library.importFeeds([podcast.feed]) } }.font(.footnote)
+                    Button("Resolve legacy follow: \(podcast.title)") { let activity = api.activityToken; Task { await library.importFeeds([podcast.feed], expectedActivity: activity) } }.font(.footnote)
                 }
                 ForEach(library.durable.failures, id: \.self) { Text($0).font(.footnote).foregroundStyle(.red) }
                 ForEach(Array(library.durable.unavailableIDs).sorted(), id: \.self) { id in
@@ -88,11 +94,17 @@ struct LibraryView: View {
             .padding(.bottom, 24)
         }
         .refreshable {
+            feedWindow = Date()
             await library.load(forceRefresh: true)
             await library.loadProgress(for: library.newReleases)
         }
         .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
             if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
+        }
+        .task(id: "\(api.activityToken):\(scenePhase):\(library.podcasts.compactMap { $0.freshness?.retryAtMs }.min() ?? 0)") {
+            guard scenePhase == .active, let delay = library.podcasts.compactMap({ $0.freshness?.recheckDelay(startedAt: feedWindow) }).min() else { return }
+            do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() } catch { return }
+            await library.load()
         }
         .podcstPage()
         .screenHeader("Library") {

@@ -6,12 +6,14 @@ struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
     @Environment(AccountStore.self) private var account
+    @Environment(APIClient.self) private var api
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Appearance.key) private var appearance = Appearance.system
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
     @State private var showingLogin = false
     @State private var importing = false
     @State private var importError: String?
+    @State private var importActivity: UUID?
     @State private var showingAudio = false
     @State private var removing: Passkey?
     @State private var removalError: String?
@@ -73,7 +75,7 @@ struct SettingsView: View {
                     Text("Listening").eyebrow()
                 }
                 Section {
-                    Button("Import OPML") { importing = true }
+                    Button("Import OPML") { importActivity = api.activityToken; importing = true }
                     ShareLink(item: OPML.document(library.podcasts), preview: SharePreview("Podcst Subscriptions")) {
                         Text("Export subscriptions")
                     }
@@ -117,11 +119,12 @@ struct SettingsView: View {
             }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "opml") ?? .xml, .xml, .plainText]) { result in
                 guard case .success(let url) = result else { return }
+                guard let activity = importActivity, api.activityToken == activity else { importError = "Account changed. Select the file again."; return }
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                 do {
                     let feeds = try OPML.read(url)
-                    Task { await library.importFeeds(feeds) }
+                    Task { await library.importFeeds(feeds, expectedActivity: activity) }
                 } catch { importError = OPML.invalidMessage }
             }
             .alert("Couldn’t import OPML", isPresented: Binding { importError != nil } set: { if !$0 { importError = nil } }) {

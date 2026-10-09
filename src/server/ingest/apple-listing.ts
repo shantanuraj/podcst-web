@@ -1,6 +1,8 @@
 import { isCanonicalId, migrateStoredId } from '@/shared/canonical-id';
 import { ITUNES_API } from '../../data/constants';
 import { feedUrl } from '../../shared/feed-url';
+import { readJsonBody } from '../http/json-body';
+import { MAX_FEED_BYTES } from './feed-limits';
 import {
   type AppleListingVerification,
   PodcastIdentityConflict,
@@ -78,6 +80,7 @@ export async function lookupAppleListing(
   itunesId: string,
   country: string,
   request: Fetch = fetch,
+  callerSignal?: AbortSignal,
 ): Promise<AppleListing | null> {
   if (!isCanonicalId(itunesId))
     throw new TypeError('itunes_id must be a positive integer');
@@ -89,13 +92,26 @@ export async function lookupAppleListing(
     entity: 'podcast',
     country,
   }).toString();
-  const response = await request(url.href, {
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`Apple returned HTTP ${response.status}`);
-  const data = await response.json();
-  if (!Array.isArray(data?.results))
+  const deadline = AbortSignal.timeout(30_000);
+  const signal = callerSignal
+    ? AbortSignal.any([callerSignal, deadline])
+    : deadline;
+  signal.throwIfAborted();
+  const response = await request(url.href, { signal, redirect: 'error' });
+  if (!response.ok) throw new Error('Apple lookup unavailable');
+  const data = await readJsonBody(
+    { body: response.body, headers: response.headers, signal },
+    MAX_FEED_BYTES,
+    30_000,
+  );
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !('results' in data) ||
+    !Array.isArray(data.results)
+  )
     throw new Error('Apple returned an invalid lookup response');
+  signal.throwIfAborted();
   const feed = appleFeedForId(data.results, itunesId);
   return feed
     ? { itunesId, feedUrl: feed, country, verifiedAt: new Date().toISOString() }

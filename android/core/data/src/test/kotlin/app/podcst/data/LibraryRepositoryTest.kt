@@ -31,6 +31,7 @@ class LibraryRepositoryTest {
     private val guest = Podcast(id = 9007199254740993, feed = "https://guest.test/rss", title = "Guest")
     private val json = Json { encodeDefaults = true }
     @After fun close() { val owner = scopes.current.value; scopes.close(); PodcstDatabase.delete(context, owner.key) }
+    private val freshness = """{"content":"cached","state":"fresh","checkedAtMs":1791499200000,"retryAtMs":null}"""
     private fun library(server: FakeServer) = LibraryRepository(server.api, scopes, CatalogRepository(server.api, scopes))
 
     @Test fun automaticGuestUnionAndOfflineUnfollowSurviveAccountRoundTripWithoutUploadingCachedShows() = runTest {
@@ -92,8 +93,8 @@ class LibraryRepositoryTest {
         val server = FakeServer { call ->
             when (call.query?.substringAfter("url=")) {
                 bad -> Reply("""{"message":"Feed unavailable"}""", 502)
-                good -> Reply("""{"id":"9007199254740993","feed":"$good","title":"Good","episodes":[]}""")
-                private -> Reply("""{"id":"2","feed":"$private","title":"Private","isPrivate":true}""")
+                good -> Reply("""{"id":"9007199254740993","feed":"$good","title":"Good","episodes":[],"freshness":$freshness}""")
+                private -> Reply("""{"id":"2","feed":"$private","title":"Private","isPrivate":true,"freshness":$freshness}""")
                 else -> error("Unexpected import request")
             }
         }
@@ -107,7 +108,7 @@ class LibraryRepositoryTest {
         try {
             val retry = FakeServer { call ->
                 val feed = call.query!!.substringAfter("url=")
-                Reply("""{"id":"${if (feed == bad) 3 else 2}","feed":"$feed","title":"Recovered","episodes":[]}""")
+                Reply("""{"id":"${if (feed == bad) 3 else 2}","feed":"$feed","title":"Recovered","episodes":[],"freshness":$freshness}""")
             }
             val library = LibraryRepository(retry.api, restarted, CatalogRepository(retry.api, restarted))
             assertEquals(ImportResult(2, 0), library.retryImports())
@@ -123,7 +124,7 @@ class LibraryRepositoryTest {
         val server = FakeServer {
             arrived.complete(Unit)
             runBlocking { release.await() }
-            Reply("""{"id":"1","feed":"${feeds.first()}","title":"Late","episodes":[]}""")
+            Reply("""{"id":"1","feed":"${feeds.first()}","title":"Late","episodes":[],"freshness":$freshness}""")
         }
         val importing = async { library(server).import(feeds) }
         arrived.await()
@@ -134,6 +135,35 @@ class LibraryRepositoryTest {
         assertTrue(scopes.durable.guestFollows().isEmpty())
         assertTrue(scopes.durable.account("owner").followQueued.isEmpty())
         assertEquals(1, server.calls.size)
+    }
+
+    @Test fun retiredDocumentIntakeCannotStageFeedsInANewerAccount() = runTest {
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        val server = FakeServer { error("Retired input must not make requests") }
+        val library = library(server)
+        val current = library.importScope()
+        scopes.switch("other"); scopes.resumeSync("other")
+        assertTrue(runCatching { library.import(listOf("https://example.invalid/retired"), current) }.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertTrue(scopes.durable.account("owner").importFeeds.isEmpty())
+        assertTrue(scopes.durable.account("other").importFeeds.isEmpty())
+        assertTrue(server.calls.isEmpty())
+    }
+
+    @Test fun offlineBootstrapAndUnverifiedAccountRetainSelectedImportsWithoutCreatingFollows() = runTest {
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        val first = "https://example.invalid/offline"
+        val server = FakeServer { throw IOException("offline") }
+        val library = library(server)
+        assertTrue(runCatching { library.import(listOf(first)) }.isFailure)
+        assertEquals(listOf(first), scopes.durable.account("owner").importFeeds)
+        assertTrue(scopes.durable.account("owner").followQueued.isEmpty())
+        val requests = server.calls.size
+        scopes.suspendSync()
+        val second = "https://example.invalid/unverified"
+        assertTrue(runCatching { library.import(listOf(second)) }.isFailure)
+        assertEquals(requests, server.calls.size)
+        assertEquals(listOf(first, second), scopes.durable.account("owner").importFeeds)
+        assertTrue(scopes.durable.account("owner").followQueued.isEmpty())
     }
 
     @Test fun retryableImportWaitsAcrossRestartAndRetainsOtherPendingWork() = runTest {

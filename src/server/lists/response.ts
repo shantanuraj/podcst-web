@@ -15,15 +15,21 @@ export function createListHandlers(
   service: EpisodeListService,
   authenticate: () => Promise<string | null>,
   beforeChange?: (userId: string) => Promise<void>,
-  scheduleRecovery?: (userId: string, listId: string) => void,
+  scheduleRecovery?: (userId: string, listId: string) => void | Promise<void>,
 ) {
-  const recover = <T extends ListSnapshot>(userId: string, result: T) => {
+  const recover = async <T extends ListSnapshot>(
+    userId: string,
+    load: () => Promise<T>,
+  ) => {
+    const result = await load();
     if (
       result.items.some(
         ({ availability }) => availability === 'content_missing',
       )
-    )
-      scheduleRecovery?.(userId, result.listId);
+    ) {
+      await scheduleRecovery?.(userId, result.listId);
+      if (scheduleRecovery) return load();
+    }
     return result;
   };
   const respond = (operation: (userId: string) => Promise<unknown>) =>
@@ -66,7 +72,7 @@ export function createListHandlers(
               'invalid_request',
               'Membership snapshots cannot be paginated',
             );
-          return recover(userId, await service.membership(userId, listId));
+          return recover(userId, () => service.membership(userId, listId));
         }
         if (view !== 'episodes')
           throw new StateError('invalid_request', 'Invalid list view');
@@ -78,9 +84,8 @@ export function createListHandlers(
           : undefined;
         if (cursor === null)
           throw new StateError('invalid_request', 'Invalid list cursor');
-        return recover(
-          userId,
-          await service.episodes(userId, listId, {
+        return recover(userId, () =>
+          service.episodes(userId, listId, {
             limit: Number(limit),
             cursor,
           }),
@@ -103,7 +108,7 @@ export function createListHandlers(
               result.results[index].status !== 'not_found',
           )
         )
-          scheduleRecovery?.(userId, listId);
+          await scheduleRecovery?.(userId, listId);
         return result;
       }),
     migration: (request: Request, id: string) =>
@@ -131,7 +136,7 @@ export function createListHandlers(
               result.results[index].status !== 'not_found',
           )
         )
-          scheduleRecovery?.(userId, listId);
+          await scheduleRecovery?.(userId, listId);
         return result;
       }),
   };

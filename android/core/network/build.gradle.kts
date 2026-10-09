@@ -13,5 +13,7 @@ dependencies {
 }
 
 tasks.test {
-    systemProperty("podcst.contracts", rootProject.layout.projectDirectory.dir("../contracts").asFile.absolutePath)
+    val contracts = rootProject.layout.projectDirectory.dir("../contracts")
+    inputs.dir(contracts)
+    systemProperty("podcst.contracts", contracts.asFile.absolutePath)
 }

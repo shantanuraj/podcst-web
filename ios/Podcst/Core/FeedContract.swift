@@ -8,6 +8,22 @@ public struct FeedFreshness: Codable, Hashable, Sendable {
     public let checkedAtMs: Int64?
     public let retryAtMs: Int64?
 
+    func recheckDelay(startedAt: Date, now: Date = Date()) -> TimeInterval? {
+        guard state == .pending || state == .backoff else { return nil }
+        let delay = max(Double(FeedLimits.current.client.recheckSeconds), retryAtMs.map { Double($0) / 1000 - now.timeIntervalSince1970 } ?? Double(FeedLimits.current.client.recheckSeconds))
+        return delay < Double(FeedLimits.current.client.pollWindowSeconds) - now.timeIntervalSince(startedAt) ? delay : nil
+    }
+
+    var message: String {
+        switch state {
+        case .pending: content == .missing ? "Preparing episodes…" : "Refreshing. Cached episodes remain available."
+        case .backoff: "Updates delayed. Existing content is retained."
+        case .unavailable: "Content temporarily unavailable. Existing follows are retained."
+        case .stale: "Cached episodes. Updates have not been checked recently."
+        case .fresh: "Up to date"
+        }
+    }
+
     enum CodingKeys: String, CodingKey, CaseIterable { case content, state, checkedAtMs, retryAtMs }
 
     public init(from decoder: Decoder) throws {
@@ -31,12 +47,12 @@ public struct FeedFreshness: Codable, Hashable, Sendable {
     }
 }
 
-struct FeedRefreshResponse: Decodable, Sendable {
+public struct FeedRefreshResponse: Decodable, Sendable {
     let podcastId: StateID
-    let freshness: FeedFreshness
+    public let freshness: FeedFreshness
     enum CodingKeys: String, CodingKey, CaseIterable { case podcastId, freshness }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         try feedKeys(decoder, CodingKeys.allCases.map(\.rawValue))
         let fields = try decoder.container(keyedBy: CodingKeys.self)
         podcastId = try fields.decode(StateID.self, forKey: .podcastId)
@@ -72,6 +88,8 @@ struct FeedLimits: Decodable {
     let bodyBytes: Int
     let imports: Imports
     let opml: Opml
+    struct Client: Decodable { let recheckSeconds: Int; let pollWindowSeconds: Int }
+    let client: Client
     static let current: FeedLimits = {
         guard let url = Bundle.main.url(forResource: "limits", withExtension: "json"),
               let data = try? Data(contentsOf: url), let value = try? JSONDecoder().decode(FeedLimits.self, from: data) else {
@@ -105,6 +123,25 @@ struct FeedImportRequest: Encodable {
         }
         if !batch.isEmpty { batches.append(batch) }
         return batches
+    }
+}
+
+@MainActor
+func awaitFeedContent<T>(read: () async throws -> T, active: () -> Bool, pending: (FeedFreshness) -> Void, now: () -> Date = Date.init, wait: (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }) async throws -> T {
+    let startedAt = now()
+    func check() throws { try Task.checkCancellation(); if !active() { throw CancellationError() } }
+    while true {
+        try check()
+        do {
+            let result = try await read()
+            try check()
+            return result
+        } catch let failure as APIError {
+            try check()
+            guard let freshness = failure.freshness, let delay = freshness.recheckDelay(startedAt: startedAt, now: now()) else { throw failure }
+            pending(freshness)
+            try await wait(delay)
+        }
     }
 }
 

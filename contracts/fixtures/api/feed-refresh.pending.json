@@ -1,0 +1,9 @@
+{
+  "podcastId": "1",
+  "freshness": {
+    "content": "missing",
+    "state": "pending",
+    "checkedAtMs": null,
+    "retryAtMs": 1791499205000
+  }
+}

@@ -1,6 +1,6 @@
-import { after } from 'next/server';
 import { getSession } from '../auth/session';
 import { sql } from '../db';
+import { interactiveAdmission } from '../ingest/interactive-admission';
 import { createRedis } from '../redis';
 import { createListLimiter } from './limits';
 import { recoverListContent } from './recovery';
@@ -25,23 +25,14 @@ export const listHandlers = createListHandlers(
   episodeLists,
   async () => (await getSession())?.userId ?? null,
   (userId) => limit(userId, 'changes'),
-  (userId, listId) =>
-    after(async () => {
-      try {
-        await recoverListContent(sql, userId, listId, async (podcastId) => {
-          await connect();
-          return (
-            (await redis.set(
-              `lists:rebuild:${podcastId}`,
-              '1',
-              'EX',
-              900,
-              'NX',
-            )) === 'OK'
-          );
+  async (userId, listId) => {
+    try {
+      await recoverListContent(sql, userId, listId, async () => {
+        await (await interactiveAdmission()).refresh({
+          kind: 'account',
+          id: userId,
         });
-      } catch {
-        console.warn('Saved episode content recovery failed');
-      }
-    }),
+      });
+    } catch {}
+  },
 );

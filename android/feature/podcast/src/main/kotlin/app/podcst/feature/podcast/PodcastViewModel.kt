@@ -11,6 +11,7 @@ import app.podcst.model.DownloadState
 import app.podcst.model.Episode
 import app.podcst.model.EpisodeProgress
 import app.podcst.model.Podcast
+import app.podcst.network.ApiException
 import app.podcst.model.ShowNotes
 import app.podcst.playback.PlaybackCoordinator
 import app.podcst.playback.media.Downloads
@@ -20,6 +21,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -86,6 +88,7 @@ class PodcastViewModel(
     playback: PlaybackCoordinator,
 ) : ViewModel() {
     private val source = MutableStateFlow(route)
+    private val inaccessible = MutableStateFlow(false)
     private val load = MutableStateFlow(LoadState.Loading)
     private val subscribing = MutableStateFlow(false)
     private val order = MutableStateFlow(EpisodeOrder())
@@ -97,7 +100,8 @@ class PodcastViewModel(
     private val podcast: StateFlow<Podcast> = combine(
         source.map { it.feed }.distinctUntilChanged().flatMapLatest { feed -> catalog.podcast(feed) },
         source,
-    ) { stored, fallback -> stored ?: fallback }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), route)
+        inaccessible,
+    ) { stored, fallback, denied -> if (denied) Podcast(id = fallback.id, feed = "", title = "Podcast unavailable", isPrivate = fallback.isPrivate) else stored?.copy(freshness = stored.freshness ?: fallback.freshness) ?: fallback }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), route)
 
     private val episodes: Flow<List<Episode>> = combine(podcast.map { it.episodes }.distinctUntilChanged(), order, filter) { episodes, order, query ->
         episodes.arranged(order, query, Collator.getInstance())
@@ -120,9 +124,11 @@ class PodcastViewModel(
         fetch(force = false)
     }
 
-    fun refresh() = fetch(force = true)
+    fun refresh() { if ((source.value.freshness?.retryAtMs ?: 0) <= System.currentTimeMillis()) fetch(force = true) }
 
-    fun retry() = fetch(force = false)
+    fun retry() { if ((source.value.freshness?.retryAtMs ?: 0) <= System.currentTimeMillis()) fetch(force = false) }
+
+    fun suspendReads() { loading?.cancel(); load.value = LoadState.Loaded }
 
     fun order(order: EpisodeOrder) {
         this.order.value = order
@@ -151,14 +157,26 @@ class PodcastViewModel(
 
     private fun fetch(force: Boolean) {
         loading?.cancel()
+        val active = catalog.readerActive()
         loading = viewModelScope.launch {
+            val startedAt = System.currentTimeMillis()
             load.value = if (force) LoadState.Refreshing else LoadState.Loading
             load.value = try {
-                source.value = catalog.load(source.value, force)
+                if (!active()) throw CancellationException("Account changed")
+                source.value = catalog.load(source.value, force, recheck = true)
+                inaccessible.value = false
+                load.value = LoadState.Loaded
+                while (active()) {
+                    val wait = source.value.freshness?.recheckDelay(startedAt) ?: break
+                    delay(wait)
+                    if (!active()) throw CancellationException("Account changed")
+                    source.value = catalog.load(source.value, recheck = true)
+                }
                 LoadState.Loaded
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                if (error is ApiException && error.status in listOf(401, 403, 404)) inaccessible.value = true
                 LoadState.Failed
             }
         }

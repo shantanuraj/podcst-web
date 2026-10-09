@@ -45,7 +45,7 @@ interface SessionCookieStore {
     fun clear()
 }
 
-class ApiException(val status: Int, message: String, val code: String? = null, val retryAfterSeconds: Long? = null) : IOException(message)
+class ApiException(val status: Int, message: String, val code: String? = null, val retryAfterSeconds: Long? = null, val freshness: FeedFreshness? = null) : IOException(message)
 
 data class PasskeyChallenge(val requestJson: String, val flowId: String, internal val revision: Long)
 
@@ -66,10 +66,10 @@ class PodcstApi(
             .map { it.domain(locale = locale) }
 
     suspend fun podcast(feed: String): Podcast =
-        if (hasSession) post<WirePodcast>("api/feed", body { put("url", feed) }).domain(feed)
-        else get<WirePodcast>("api/feed", "url" to feed).domain(feed)
+        if (hasSession) post<WirePodcast>("api/feed", body { put("url", feed) }).full(feed)
+        else get<WirePodcast>("api/feed", "url" to feed).full(feed)
 
-    suspend fun podcast(id: Long): Podcast = get<WirePodcast>("api/feed", "id" to "$id").domain()
+    suspend fun podcast(id: Long): Podcast = get<WirePodcast>("api/feed", "id" to "$id").full()
 
     suspend fun podcastInfo(id: Long): Podcast = get<WirePodcast>("api/feed/info", "id" to "$id").domain()
 
@@ -92,14 +92,15 @@ class PodcstApi(
 
     suspend fun publicEpisode(episodeId: Long, podcastId: Long): Episode =
         get<WirePublicEpisode>("api/episodes/$episodeId", "podcastId" to "$podcastId", session = false).let { found ->
+            require(found.podcast.id == podcastId && found.episode.id == episodeId && found.episode.podcastId == podcastId && found.podcast.isPrivate != true && found.episode.isPrivate != true)
             found.episode.domain(found.podcast.id, found.podcast.feed, found.podcast.cover, found.podcast.title)
         }
 
     suspend fun resolve(itunesId: Long, locale: String): Long =
         post<WireIdentity>("api/feed/resolve", body { put("itunes_id", itunesId.toString()); put("locale", locale) }).id
 
-    suspend fun refresh(podcastId: Long): Podcast =
-        post<WirePodcast>("api/feed/refresh", body { put("podcastId", podcastId.toString()) }).domain()
+    suspend fun refresh(podcastId: Long): FeedRefreshResponse =
+        post<FeedRefreshResponse>("api/feed/refresh", body { put("podcastId", podcastId.toString()) }).also { require(it.podcastId.value == podcastId.toString()) }
 
     suspend fun sessionUser(): User? = get<WireSession>("api/auth/session").user?.domain()
 
@@ -169,7 +170,7 @@ class PodcstApi(
         cookies.clear()
     }
 
-    suspend fun subscriptions(): List<Podcast> = get<List<WirePodcast>>("api/subscriptions").map { it.domain() }
+    suspend fun subscriptions(): List<Podcast> = get<List<WirePodcast>>("api/subscriptions").map { it.full() }
 
     suspend fun followState(): StateSnapshot<StateFollowItem> = get("api/subscriptions", "view" to "membership")
 
@@ -250,7 +251,8 @@ class PodcstApi(
             if (session && revision.get() != token) throw CancellationException("Session changed")
             if (session) persistCookie(response)
             val text = response.body.string()
-            if (!response.isSuccessful) throw ApiException(response.code, errorMessage(text) ?: response.message.ifEmpty { "HTTP ${response.code}" }, runCatching { json.decodeFromString<WireError>(text).code }.getOrNull(), response.header("Retry-After")?.toLongOrNull())
+            val failure = if (!response.isSuccessful || response.code == 202) runCatching { json.decodeFromString<WireError>(text) }.getOrNull() else null
+            if (!response.isSuccessful || response.code == 202 && failure?.code == "content_pending") throw ApiException(response.code, failure?.message ?: response.message.ifEmpty { "HTTP ${response.code}" }, failure?.code, response.header("Retry-After")?.toLongOrNull(), failure?.freshness)
             try {
                 json.decodeFromString(strategy, text.ifEmpty { "{}" })
             } catch (failure: IllegalArgumentException) {
@@ -265,7 +267,6 @@ class PodcstApi(
         }?.let(cookies::write)
     }
 
-    private fun errorMessage(text: String) = runCatching { json.decodeFromString<WireError>(text) }.getOrNull()?.message
 
     private fun url(path: String, vararg query: Pair<String, String?>): HttpUrl =
         baseUrl.resolve(path)!!.newBuilder().apply {

@@ -100,12 +100,19 @@ class SettingsViewModel(
         }
     }
 
-    fun import(document: String) {
+    fun importScope(): () -> Boolean = library.importScope()
+
+    fun import(document: String, current: () -> Boolean = importScope()) {
         if (importing.value) return
         importing.value = true
         viewModelScope.launch {
             val event = try {
-                SettingsEvent.Imported(library.import(Opml.feeds(document)))
+                check(current()) { "Account changed. Select the file again." }
+                val feeds = Opml.feeds(document)
+                check(current()) { "Account changed. Select the file again." }
+                val result = library.import(feeds, current)
+                if (!current()) throw CancellationException("Account changed")
+                SettingsEvent.Imported(result)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {

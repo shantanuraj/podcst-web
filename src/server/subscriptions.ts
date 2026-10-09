@@ -1,5 +1,7 @@
 import type { IPodcastEpisodesInfo } from '@/types';
 import { sql } from './db';
+import { prepareEpisodeRead } from './ingest/episode-read';
+import { feedFreshness, readFeedState } from './ingest/feed-demand';
 import { podcastAccess } from './podcast-access';
 
 export async function getSubscriptions(
@@ -25,14 +27,23 @@ export async function getSubscriptions(
 
   const podcasts: IPodcastEpisodesInfo[] = [];
 
+  let repairs = 0;
   for (const row of rows) {
+    const state = await readFeedState(sql, String(row.id), userId);
+    if (!state) continue;
+    const freshness =
+      feedFreshness(state).content === 'missing' && repairs++ < 3
+        ? await prepareEpisodeRead(sql, String(row.id), userId)
+        : feedFreshness(state);
+    if (!freshness) continue;
     const episodes = await sql`
       SELECT e.id, e.guid, e.published,
              c.title, c.summary, c.duration, c.episode_art,
              c.file_url, c.file_length, c.file_type
       FROM episodes e
       JOIN episode_content c ON c.episode_id = e.id
-      WHERE e.podcast_id = ${row.id}
+      JOIN podcasts p ON p.id = e.podcast_id
+      WHERE e.podcast_id = ${row.id} AND ${podcastAccess(sql, userId)}
       ORDER BY e.published DESC
       LIMIT 2
     `;
@@ -74,6 +85,7 @@ export async function getSubscriptions(
       keywords: [],
       published: mappedEpisodes[0]?.published ?? null,
       episodes: mappedEpisodes,
+      freshness,
     });
   }
 

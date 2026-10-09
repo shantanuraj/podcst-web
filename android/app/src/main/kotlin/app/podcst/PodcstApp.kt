@@ -37,6 +37,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
@@ -114,10 +117,13 @@ private fun Shell(graph: AppGraph) {
     BackHandler(enabled = navigator.nowPlaying || navigator.signIn) { navigator.back() }
 
     val handler = remember(graph) { IncomingHandler(context, graph) }
-    LaunchedEffect(graph) {
-        graph.incoming.collectLatest { incoming ->
-            graph.incoming.resetReplayCache()
-            handler.handle(incoming, navigator, toaster)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(graph, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            graph.incoming.collectLatest { incoming ->
+                graph.incoming.resetReplayCache()
+                handler.handle(incoming, navigator, toaster)
+            }
         }
     }
 

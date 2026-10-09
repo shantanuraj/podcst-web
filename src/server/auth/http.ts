@@ -1,3 +1,4 @@
+import { BodyError, readJsonBody } from '../http/json-body';
 import { AuthError } from './error';
 
 export const AUTH_BODY_LIMIT = 16 * 1024;
@@ -9,40 +10,16 @@ export const authHeaders = {
 export async function readAuthBody(
   request: Request,
 ): Promise<Record<string, unknown>> {
-  if (Number(request.headers.get('content-length')) > AUTH_BODY_LIMIT)
-    throw new AuthError(413, 'Authentication request too large');
-  const reader = request.body?.getReader();
-  if (!reader) return {};
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  let text = '';
-  let bytes = 0;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new AuthError(408, 'Authentication request timed out'));
-      void reader.cancel().catch(() => {});
-    }, 5000);
-  });
   try {
-    while (true) {
-      const { value, done } = await Promise.race([reader.read(), deadline]);
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > AUTH_BODY_LIMIT) {
-        void reader.cancel().catch(() => {});
-        throw new AuthError(413, 'Authentication request too large');
-      }
-      text += decoder.decode(value, { stream: true });
-    }
-    const body: unknown = JSON.parse(text + decoder.decode());
+    const body = await readJsonBody(request, AUTH_BODY_LIMIT, 5000, {});
     if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
     return body as Record<string, unknown>;
   } catch (error) {
-    if (error instanceof AuthError) throw error;
+    if (error instanceof BodyError && error.status === 413)
+      throw new AuthError(413, 'Authentication request too large');
+    if (error instanceof BodyError && error.status === 408)
+      throw new AuthError(408, 'Authentication request timed out');
     throw new AuthError(400, 'Invalid authentication request');
-  } finally {
-    clearTimeout(timer);
-    reader.releaseLock();
   }
 }
 

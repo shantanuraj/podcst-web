@@ -238,6 +238,38 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(library.newReleases.map(\.title), ["Restored episode"])
     }
 
+    func testRetiredImportPickerCannotStageInputInANewerActivity() async throws {
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        let activity = fixture.api.activityToken
+        fixture.api.beginAuthentication()
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Retired picker must not make requests") }
+        await fixture.library.importFeeds(["https://example.invalid/retired"], expectedActivity: activity)
+        XCTAssertTrue(fixture.library.durable.pendingImportFeeds.isEmpty)
+        XCTAssertNotNil(fixture.library.error)
+    }
+
+    func testImportInputSurvivesOfflineAccountBootstrapBeforeAnyResolution() async throws {
+        let fixture = try fixture()
+        defer { fixture.cleanUp() }
+        let session = SessionStore(api: fixture.api, storageURL: fixture.url)
+        await session.restore()
+        let directory = fixture.url.deletingLastPathComponent().appendingPathComponent("imports")
+        let defaultsName = "ImportBootstrap-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: defaultsName)!
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let library = LibraryStore(api: fixture.api, session: session, defaults: defaults, progressDirectory: directory)
+        let feed = "https://example.invalid/offline-import"
+        await library.importFeeds([feed])
+        XCTAssertNotNil(library.error)
+        let data = try Data(contentsOf: directory.appendingPathComponent("durable-state-v1.json"))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let accounts = try XCTUnwrap(root["accounts"] as? [String: [String: Any]])
+        XCTAssertEqual(accounts["listener"]?["importFeeds"] as? [String], [feed])
+        let follows = try XCTUnwrap(accounts["listener"]?["follows"] as? [String: Any])
+        XCTAssertEqual((follows["queued"] as? [Any])?.count, 0)
+    }
+
     func testGuestLoadFetchesLatestEpisodesForSavedSubscriptions() async throws {
         let podcasts = (9071...9073).map { (id: Int) in
             Podcast(id: id, feed: "https://example.test/\(id)", title: "Show \(id)")
@@ -292,6 +324,7 @@ final class SessionTests: XCTestCase {
         var resolved = original
         resolved.id = 9091
         resolved.title = "Resolved show"
+        resolved.freshness = fixtureFreshness
         resolved.episodeCount = 3
         resolved.episodes = [2, 1, 3].map { release($0, podcast: resolved) }
         let fixture = try await guestFixture(podcasts: [])
@@ -387,14 +420,12 @@ final class SessionTests: XCTestCase {
         defer { fixture.cleanUp() }
         var requests = 0
         GuestLibraryURLProtocol.handler = { request in
-            XCTAssertEqual(request.request.url?.path, "/api/feed/refresh")
-            XCTAssertEqual(request.request.httpMethod, "POST")
-            requests += 1
-            if requests == 1 {
-                request.fail(URLError(.notConnectedToInternet))
-            } else {
-                try request.respond(updated)
-            }
+            if request.request.url?.path == "/api/feed/refresh" {
+                XCTAssertEqual(request.request.httpMethod, "POST")
+                requests += 1
+                if requests == 1 { request.fail(URLError(.notConnectedToInternet)); return }
+            } else { XCTAssertEqual(request.request.httpMethod, "GET") }
+            try request.respond(updated)
         }
 
         await fixture.library.load(forceRefresh: true)
@@ -421,6 +452,9 @@ final class SessionTests: XCTestCase {
         GuestLibraryURLProtocol.handler = { request in
             if request.request.url?.path == "/api/feed/episodes" {
                 try request.respond(EpisodePage(episodes: [], total: 0, hasMore: false))
+            } else if request.request.url?.path == "/api/feed/info" {
+                let id = URLComponents(url: request.request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "id" }?.value
+                try request.respond(id == String(removed.id!) ? removed : updated)
             } else if pending == nil {
                 pending = request
                 started.fulfill()
@@ -965,6 +999,8 @@ private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
+private let fixtureFreshness = try! JSONDecoder().decode(FeedFreshness.self, from: Data(#"{"content":"cached","state":"fresh","checkedAtMs":1791499200000,"retryAtMs":null}"#.utf8))
+
 private struct GuestLibraryRequest: Sendable {
     let request: URLRequest
     let complete: @Sendable (Result<(Data, [String: String]), Error>) -> Void
@@ -977,7 +1013,21 @@ private struct GuestLibraryRequest: Sendable {
     @MainActor func respond<T: Encodable>(_ value: T, headers: [String: String] = [:]) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
-        let data = try encoder.encode(value)
+        var data = try encoder.encode(value)
+        if var podcast = value as? Podcast {
+            podcast.freshness = podcast.freshness ?? fixtureFreshness
+            if request.url?.path == "/api/feed/refresh" {
+                let freshness = try JSONSerialization.jsonObject(with: encoder.encode(podcast.freshness))
+                data = try JSONSerialization.data(withJSONObject: ["podcastId": String(podcast.id ?? 0), "freshness": freshness])
+            } else if request.url?.path == "/api/feed/episodes" {
+                data = try encoder.encode(EpisodePage(episodes: podcast.episodes, total: podcast.episodeCount, hasMore: false, freshness: podcast.freshness))
+            } else { data = try encoder.encode(podcast) }
+        } else if var page = value as? EpisodePage {
+            page.freshness = page.freshness ?? fixtureFreshness
+            data = try encoder.encode(page)
+        } else if let podcasts = value as? [Podcast], request.url?.path == "/api/subscriptions" {
+            data = try encoder.encode(podcasts.map { original in var podcast = original; podcast.freshness = podcast.freshness ?? fixtureFreshness; return podcast })
+        }
         if let object = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as? [String: Any], let user = object["user"] as? [String: Any], let id = user["id"] as? String { GuestLibraryURLProtocol.stateAccountID = id }
         let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
         if request.url?.path == "/api/progress", request.httpMethod == "PUT" {
@@ -1041,7 +1091,7 @@ private final class SessionURLProtocol: URLProtocol, @unchecked Sendable {
             case "/api/subscriptions" where url.query?.contains("view=membership") == true:
                 payload = #"{"protocol":1,"accountId":"listener","generation":"17adbd84-d0e4-4e2d-ad9f-b084efee3211","revision":"1","items":[{"podcastId":"9021","revision":"1","followedAtMs":null,"availability":"available"}]}"#
             case "/api/subscriptions":
-                payload = #"[{"id":"9021","feed":"https://example.test/feed","title":"Restored show","author":"Author","cover":"","explicit":false,"episodes":[{"id":"9022","guid":"restored","title":"Restored episode","explicit":false,"file":{"url":"https://example.test/audio.mp3"}}]}]"#
+                payload = #"[{"freshness":{"content":"cached","state":"fresh","checkedAtMs":1791499200000,"retryAtMs":null},"id":"9021","feed":"https://example.test/feed","title":"Restored show","author":"Author","cover":"","explicit":false,"episodes":[{"id":"9022","guid":"restored","title":"Restored episode","explicit":false,"file":{"url":"https://example.test/audio.mp3"}}]}]"#
             case "/api/progress":
                 if url.query?.contains("view=state") == true { payload = #"{"protocol":1,"accountId":"listener","generation":"17adbd84-d0e4-4e2d-ad9f-b084efee3211","revision":"0","items":[]}"# }
                 else { payload = "null" }

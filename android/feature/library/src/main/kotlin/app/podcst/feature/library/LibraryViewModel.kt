@@ -56,6 +56,8 @@ class LibraryViewModel(
         refresh(force = false)
     }
 
+    suspend fun recheckContent() = library.refresh()
+
     fun refresh(force: Boolean = true) = viewModelScope.refresh(refresh) {
         library.refresh(force)
         progress.refresh(library.newReleases.first())

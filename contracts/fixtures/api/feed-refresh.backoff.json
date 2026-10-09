@@ -1,0 +1,9 @@
+{
+  "podcastId": "1",
+  "freshness": {
+    "content": "cached",
+    "state": "backoff",
+    "checkedAtMs": 1791499200000,
+    "retryAtMs": 1791499500000
+  }
+}

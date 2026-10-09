@@ -3,6 +3,7 @@ package app.podcst.data
 import app.podcst.model.validateStateScope
 import app.podcst.model.StateRevision
 import app.podcst.model.Episode
+import app.podcst.model.FeedFreshness
 import app.podcst.model.ListAcknowledgement
 import app.podcst.model.ListAvailability
 import app.podcst.model.ListBatch
@@ -16,7 +17,7 @@ import kotlinx.serialization.Serializable
 
 fun validStarId(id: Long?): Boolean = id != null && id > 0
 
-data class StarItem(val membership: ListMembership, val episode: Episode?) {
+data class StarItem(val membership: ListMembership, val episode: Episode?, val freshness: FeedFreshness? = null) {
     val id: Long get() = membership.episodeId
 }
 
@@ -36,6 +37,7 @@ internal data class StarScope(
     var listId: String? = null,
     var snapshot: ListSnapshot? = null,
     var episodes: Map<Long, Episode> = emptyMap(),
+    @kotlinx.serialization.Transient var freshness: Map<Long, FeedFreshness> = emptyMap(),
     var queued: List<StarIntent> = emptyList(),
     var flight: StarFlight? = null,
     var blocked: Int? = null,
@@ -50,7 +52,7 @@ internal data class StarScope(
             else members.putIfAbsent(id, ListMembership(id, intent.at, ListAvailability.ContentMissing))
         }
         return members.values.sortedWith(compareByDescending<ListMembership> { it.addedAt }.thenByDescending { it.episodeId })
-            .map { StarItem(it, episodes[it.episodeId].takeUnless { _ -> it.availability == ListAvailability.Unavailable }) }
+            .map { StarItem(it, episodes[it.episodeId].takeUnless { _ -> it.availability == ListAvailability.Unavailable }, freshness[it.episodeId].takeUnless { _ -> it.availability == ListAvailability.Unavailable }) }
     }
 
     fun enqueue(id: Long, op: ListChange.Operation, at: Long, episode: Episode? = null) {
@@ -109,6 +111,7 @@ internal data class StarScope(
         for (item in page.items) {
             val id = item.membership.episodeId
             val member = members[id] ?: continue
+            freshness = if (item.freshness != null && item.membership.availability != ListAvailability.Unavailable) freshness + (id to checkNotNull(item.freshness)) else freshness - id
             if (item.membership.availability == ListAvailability.Unavailable) {
                 members[id] = member.copy(availability = ListAvailability.Unavailable)
                 episodes = episodes - id

@@ -1,3 +1,8 @@
+import {
+  type FeedFreshness,
+  feedValidator,
+  requireFreshness,
+} from '@/shared/feed-contract';
 import { validateCatalogue } from './catalogue';
 
 function getBaseUrl() {
@@ -15,6 +20,7 @@ export class ApiError extends Error {
     message: string,
     public readonly code?: string,
     public readonly retryAfter?: number,
+    public readonly freshness?: FeedFreshness,
   ) {
     super(message);
   }
@@ -27,12 +33,16 @@ export async function responseData<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => {
     throw new ApiError(response.status, 'Invalid API response');
   });
-  if (!response.ok)
+  if (
+    !response.ok ||
+    (response.status === 202 && data.code === 'content_pending')
+  )
     throw new ApiError(
       response.status,
       data.message || 'Request failed',
       data.code,
       Number(response.headers.get('Retry-After')) || undefined,
+      feedValidator('freshness')(data.freshness) ? data.freshness : undefined,
     );
   if (
     /\/api\/(?:feed|progress|subscriptions|search|noteworthy)(?:[/?]|$)/.test(
@@ -41,6 +51,15 @@ export async function responseData<T>(response: Response): Promise<T> {
   )
     validateCatalogue(data);
   return data as T;
+}
+
+function validateFeedResponse<T>(endpoint: string, data: T): T {
+  if (data == null) return data;
+  if (endpoint === '/feed' || endpoint === '/feed/episodes')
+    requireFreshness(data);
+  if (endpoint === '/subscriptions' && Array.isArray(data))
+    data.forEach(requireFreshness);
+  return data;
 }
 
 export async function get<T>(
@@ -52,11 +71,14 @@ export async function get<T>(
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params))
     query.set(key, String(value));
-  return responseData<T>(
-    await fetch(`${getBaseUrl()}/api${endpoint}?${query}`, {
-      next: { revalidate },
-      signal,
-    }),
+  return validateFeedResponse(
+    endpoint,
+    await responseData<T>(
+      await fetch(`${getBaseUrl()}/api${endpoint}?${query}`, {
+        next: { revalidate },
+        signal,
+      }),
+    ),
   );
 }
 
@@ -65,13 +87,16 @@ export async function post<T>(
   body: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  return responseData<T>(
-    await fetch(`${getBaseUrl()}/api${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-      signal,
-    }),
+  return validateFeedResponse(
+    endpoint,
+    await responseData<T>(
+      await fetch(`${getBaseUrl()}/api${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        cache: 'no-store',
+        signal,
+      }),
+    ),
   );
 }

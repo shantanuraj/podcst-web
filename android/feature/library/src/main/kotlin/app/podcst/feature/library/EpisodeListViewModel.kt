@@ -43,6 +43,7 @@ data class EpisodeListState(
     val missing: List<StarItem> = emptyList(),
     val starPending: Boolean = false,
     val starError: String? = null,
+    val freshness: List<app.podcst.model.FeedFreshness> = emptyList(),
 ) {
     val facets: List<FacetCount> by lazy { facets(rows) }
     val selected: FacetCount? by lazy { facets.firstOrNull { it.filter == filter } ?: facets.firstOrNull() }
@@ -95,6 +96,7 @@ class EpisodeListViewModel(
             missing = stars.items.filter { it.episode == null },
             starPending = stars.pending,
             starError = stars.error,
+            freshness = stars.items.mapNotNull { it.freshness },
         ) else content
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EpisodeListState(list))
 
@@ -103,6 +105,8 @@ class EpisodeListViewModel(
     fun select(filter: ListFilter) = selection.update { it.copy(filter = filter) }
 
     fun sort(sort: ListSort) = selection.update { it.copy(sort = sort) }
+
+    suspend fun recheckContent() { if (list == EpisodeList.Starred) stars.refresh() else library.refresh() }
 
     fun refresh() = viewModelScope.refresh(refresh) {
         if (list == EpisodeList.Starred) stars.refresh() else library.refresh(force = true)

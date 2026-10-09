@@ -1,5 +1,6 @@
 [
   {
+    "freshness": { "content": "cached", "state": "fresh", "checkedAtMs": 1791499200000, "retryAtMs": null },
     "id": "301",
     "isPrivate": false,
     "feed": "https://lexfridman.com/feed/podcast/",
@@ -61,6 +62,7 @@
     ]
   },
   {
+    "freshness": { "content": "cached", "state": "fresh", "checkedAtMs": 1791499200000, "retryAtMs": null },
     "id": "9002",
     "isPrivate": true,
     "feed": "https://private.example/feed.xml?token=redacted",
@@ -99,6 +101,7 @@
     ]
   },
   {
+    "freshness": { "content": "missing", "state": "pending", "checkedAtMs": null, "retryAtMs": 1791499205000 },
     "id": "9003",
     "isPrivate": false,
     "feed": "https://example.com/empty.xml",

@@ -36,6 +36,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
             state,
             actions,
             onRefresh = model::refresh,
+            onRecheck = model::recheckContent,
             onSettings = { navigator.push(SettingsRoute) },
             onList = { list -> navigator.push(EpisodeListRoute(list)) },
             onPodcast = navigator::podcast,

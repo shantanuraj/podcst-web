@@ -67,10 +67,6 @@ class ApiContractTest {
         val status = entry.getValue("status").jsonPrimitive.int
         val type = entry.getValue("decodesAs").jsonPrimitive.content
         val body = File(fixtures, name).readText()
-        if (type == "RefreshStatus") {
-            assertTrue(name, PodcstApi.json.decodeFromString<WireRefreshStatus>(body).status.isNotEmpty())
-            return
-        }
         if (endpoint == "DELETE /api/subscriptions") {
             assertEquals("Replace obsolete success fixture with update-required", 426, status)
             assertEquals("update_required", PodcstApi.json.decodeFromString<StateErrorBody>(body).code)
@@ -90,13 +86,17 @@ class ApiContractTest {
             assertEquals(name, "301", request.url.queryParameter("podcastId"))
             assertEquals(name, null, request.headers["Cookie"])
         }
-        if (status in 200..299) {
+        if (status in 200..299 && type != "ContentReadiness") {
             if (failure != null) throw AssertionError(name, failure)
         } else {
             assertTrue("$name should fail", failure is ApiException)
             val message = Json.parseToJsonElement(body).jsonObject["message"]?.jsonPrimitive?.content
             assertEquals(name, status, (failure as ApiException).status)
             assertEquals(name, message, failure.message)
+            if (type == "ContentReadiness") {
+                assertEquals(FeedFreshness.Content.missing, failure.freshness?.content)
+                assertEquals(if (status == 202) "content_pending" else "content_unavailable", failure.code)
+            }
         }
         server.close()
     }

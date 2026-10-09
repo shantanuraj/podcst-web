@@ -159,19 +159,29 @@
     "status": 200,
     "decodesAs": "PodcastInfo"
   },
-  "feed-refresh.busy.json": {
+  "public-episode.pending.json": {
+    "endpoint": "GET /api/episodes/:episodeId",
+    "status": 202,
+    "decodesAs": "ContentReadiness"
+  },
+  "public-episode.content-unavailable.json": {
+    "endpoint": "GET /api/episodes/:episodeId",
+    "status": 503,
+    "decodesAs": "ContentReadiness"
+  },
+  "feed-refresh.pending.json": {
     "endpoint": "POST /api/feed/refresh",
     "status": 202,
-    "decodesAs": "RefreshStatus"
+    "decodesAs": "FeedRefreshResponse"
   },
-  "feed-refresh.error.json": {
+  "feed-refresh.unavailable.json": {
     "endpoint": "POST /api/feed/refresh",
-    "status": 502,
-    "decodesAs": "RefreshStatus"
+    "status": 503,
+    "decodesAs": "ErrorMessage"
   },
-  "feed-refresh.failed.json": {
+  "feed-refresh.rate-limited.json": {
     "endpoint": "POST /api/feed/refresh",
-    "status": 500,
+    "status": 429,
     "decodesAs": "ErrorMessage"
   },
   "feed-refresh.invalid-id.json": {
@@ -182,22 +192,17 @@
   "feed-refresh.not-found.json": {
     "endpoint": "POST /api/feed/refresh",
     "status": 404,
-    "decodesAs": "RefreshStatus"
+    "decodesAs": "ErrorMessage"
   },
-  "feed-refresh.not-modified.json": {
+  "feed-refresh.backoff.json": {
     "endpoint": "POST /api/feed/refresh",
     "status": 200,
-    "decodesAs": "RefreshStatus"
+    "decodesAs": "FeedRefreshResponse"
   },
-  "feed-refresh.skipped.json": {
+  "feed-refresh.fresh.json": {
     "endpoint": "POST /api/feed/refresh",
     "status": 200,
-    "decodesAs": "RefreshStatus"
-  },
-  "feed-refresh.updated.json": {
-    "endpoint": "POST /api/feed/refresh",
-    "status": 200,
-    "decodesAs": "RefreshStatus"
+    "decodesAs": "FeedRefreshResponse"
   },
   "feed-resolve.not-found.json": {
     "endpoint": "POST /api/feed/resolve",
@@ -211,7 +216,7 @@
   },
   "feed-resolve.unavailable.json": {
     "endpoint": "POST /api/feed/resolve",
-    "status": 502,
+    "status": 503,
     "decodesAs": "ErrorMessage"
   },
   "feed.id.json": {

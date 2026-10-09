@@ -22,6 +22,7 @@ export interface ListSnapshot extends StateScope {
   items: ListMembership[];
 }
 export interface ListEpisodeItem extends ListMembership {
+  freshness?: import('@/shared/feed-contract').FeedFreshness | null;
   episode: IEpisodeInfo | null;
 }
 export interface ListEpisodePage extends Omit<ListSnapshot, 'items'> {

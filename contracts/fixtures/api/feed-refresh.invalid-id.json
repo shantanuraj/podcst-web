@@ -1,3 +1,4 @@
 {
-  "message": "podcastId must be a positive integer"
+  "code": "invalid_request",
+  "message": "Feed unavailable"
 }

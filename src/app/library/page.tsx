@@ -156,6 +156,18 @@ export default function LibraryPage() {
           ))}
         </ul>
       )}
+      {subscriptions.data?.some(
+        (podcast) =>
+          podcast.freshness?.state === 'pending' ||
+          podcast.freshness?.content === 'missing',
+      ) && (
+        <p role="status">
+          Preparing some episodes. Cached content and follows are retained.{' '}
+          <button type="button" onClick={() => void subscriptions.refetch()}>
+            Recheck
+          </button>
+        </p>
+      )}
       {(subscriptions.isError || localError) && (
         <p role="alert">
           {localError ??
@@ -224,28 +236,38 @@ export default function LibraryPage() {
               {starred.error ?? 'Saved on this device. Waiting to sync…'}
             </p>
           )}
+          {starred.stars.some(
+            (item) => item.freshness?.state === 'pending',
+          ) && (
+            <p role="status">
+              Preparing saved episode content. Memberships are unchanged.
+            </p>
+          )}
           <ul>
-            {starred.stars.map(({ episodeId, episode, availability }) =>
-              episode ? (
-                <ReleaseRow
-                  key={episodeId}
-                  episode={episode}
-                  when={null}
-                  progress={progress.get(episodeId)}
-                />
-              ) : (
-                <li key={episodeId}>
-                  {availability === 'unavailable'
-                    ? 'Episode unavailable'
-                    : 'Episode details unavailable'}
-                  <button
-                    type="button"
-                    onClick={() => starred.unstar(episodeId)}
-                  >
-                    {t('library.unstar')}
-                  </button>
-                </li>
-              ),
+            {starred.stars.map(
+              ({ episodeId, episode, availability, freshness }) =>
+                episode ? (
+                  <ReleaseRow
+                    key={episodeId}
+                    episode={episode}
+                    when={null}
+                    progress={progress.get(episodeId)}
+                  />
+                ) : (
+                  <li key={episodeId}>
+                    {availability === 'unavailable'
+                      ? 'Episode unavailable'
+                      : freshness?.state === 'pending'
+                        ? 'Preparing episode…'
+                        : 'Episode details unavailable'}
+                    <button
+                      type="button"
+                      onClick={() => starred.unstar(episodeId)}
+                    >
+                      {t('library.unstar')}
+                    </button>
+                  </li>
+                ),
             )}
           </ul>
         </section>

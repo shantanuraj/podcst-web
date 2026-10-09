@@ -23,8 +23,9 @@ final class Router {
         let wasPlaying: Bool
     }
 
-    var tab: AppTab = .discover
-    var showingPlayer = false
+    var navigationRevision = UUID()
+    var tab: AppTab = .discover { didSet { if oldValue != tab { navigationRevision = UUID() } } }
+    var showingPlayer = false { didSet { if oldValue != showingPlayer { navigationRevision = UUID() } } }
     var stoppedPlayback: StoppedPlayback?
     var toast: Toast?
     var listing: Episode?
@@ -32,15 +33,17 @@ final class Router {
     private var paths: [AppTab: [Route]] = [:]
 
     func path(_ tab: AppTab) -> Binding<[Route]> {
-        Binding { self.paths[tab] ?? [] } set: { self.paths[tab] = $0 }
+        Binding { self.paths[tab] ?? [] } set: { if (self.paths[tab] ?? []) != $0 { self.navigationRevision = UUID() }; self.paths[tab] = $0 }
     }
 
     func reset() {
+        navigationRevision = UUID()
         showingPlayer = false
         paths.removeAll()
     }
 
     func open(_ route: Route) {
+        navigationRevision = UUID()
         showingPlayer = false
         paths[tab, default: []].append(route)
     }
@@ -122,6 +125,7 @@ struct RootView: View {
         .task { configureInitialTab() }
         .onChange(of: library.hasLoaded) { _, _ in configureInitialTab() }
         .onChange(of: session.user?.id) { _, userID in
+            incoming = nil
             router.reset()
             if userID != nil { onboarded = true }
         }
@@ -143,12 +147,14 @@ struct RootView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { receive(url) }
         }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { incoming = nil } }
+        .onChange(of: router.navigationRevision) { _, _ in incoming = nil }
         .task(id: incoming?.id) {
-            guard let link = incoming?.link else { return }
+            guard let link = incoming?.link, scenePhase == .active else { return }
             await open(link)
         }
         .task(id: router.toast?.id) {
-            guard let toast = router.toast,
+            guard let toast = router.toast, !toast.persistent,
                   (try? await Task.sleep(for: .seconds(toast.actions.isEmpty ? 2.5 : 5))) != nil,
                   router.toast == toast else { return }
             router.toast = nil
@@ -181,15 +187,33 @@ struct RootView: View {
             if link.invalidMoment { router.toast = unavailable }
             return
         }
+        let token = api.activityToken
+        let navigation = router.navigationRevision
+        let intent = incoming?.id
+        let playing = playback.currentEpisode?.identity
+        var notice = Toast(title: "Preparing episode…", systemImage: "clock", actions: [Toast.Action(title: "Cancel") { incoming = nil }], persistent: true)
+        let active = { !Task.isCancelled && api.activityToken == token && router.navigationRevision == navigation && incoming?.id == intent && scenePhase == .active && playback.currentEpisode?.identity == playing }
+        defer { if router.toast?.id == notice.id { router.toast = nil } }
         let episode: Episode
         do {
-            episode = try await api.publicEpisode(podcastID: link.podcastId, episodeID: episodeID)
+            episode = try await awaitFeedContent(
+                read: { try await api.publicEpisode(podcastID: link.podcastId, episodeID: episodeID) },
+                active: active,
+                pending: { freshness in
+                    if notice.title != freshness.message { notice = Toast(title: freshness.message, systemImage: "clock", actions: [Toast.Action(title: "Cancel") { incoming = nil }], persistent: true) }
+                    router.toast = notice
+                }
+            )
         } catch {
-            guard !Task.isCancelled, !(error is CancellationError) else { return }
-            router.toast = Toast(title: "Couldn't open that link", systemImage: "exclamationmark.triangle")
+            guard active(), !(error is CancellationError) else { return }
+            if let freshness = (error as? APIError)?.freshness {
+                router.toast = Toast(title: freshness.message, actions: [Toast.Action(title: "Retry") {
+                    if Double(freshness.retryAtMs ?? 0) <= Date().timeIntervalSince1970 * 1000 { incoming = IncomingLink(link: link) }
+                }], persistent: true)
+            } else { router.toast = Toast(title: "Couldn't open that link", systemImage: "exclamationmark.triangle") }
             return
         }
-        guard !Task.isCancelled else { return }
+        guard active() else { return }
         let measured = playback.position(of: episode) != nil && playback.duration > 0 ? playback.duration : nil
         let duration = measured ?? episode.duration.flatMap { $0 > 0 ? $0 : nil } ?? .infinity
         guard let moment = link.moment, moment.start < duration else {

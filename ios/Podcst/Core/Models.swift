@@ -62,6 +62,7 @@ public struct Episode: Codable, Hashable, Sendable, Identifiable {
 }
 
 public struct Podcast: Codable, Hashable, Sendable, Identifiable {
+    public var freshness: FeedFreshness?
     public var isPrivate: Bool?
     @StoredCatalogueID public var id: Int?
     @StoredCatalogueID public var itunesId: Int?
@@ -79,7 +80,8 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
     public var episodeCount: Int
     public var episodes: [Episode]
 
-    public init(id: Int? = nil, itunesId: Int? = nil, itunesLocale: String? = nil, feed: String, title: String, author: String = "", cover: String = "", thumbnail: String = "", description: String = "", link: String? = nil, published: Date? = nil, explicit: Bool = false, keywords: [String] = [], episodeCount: Int = 0, episodes: [Episode] = [], isPrivate: Bool = false) {
+    public init(id: Int? = nil, itunesId: Int? = nil, itunesLocale: String? = nil, feed: String, title: String, author: String = "", cover: String = "", thumbnail: String = "", description: String = "", link: String? = nil, published: Date? = nil, explicit: Bool = false, keywords: [String] = [], episodeCount: Int = 0, episodes: [Episode] = [], isPrivate: Bool = false, freshness: FeedFreshness? = nil) {
+        self.freshness = freshness
         self.isPrivate = isPrivate
         self.id = id
         self.itunesId = itunesId
@@ -98,17 +100,29 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
         self.episodes = episodes
     }
 
+    func preservingContent(of previous: Podcast?) -> Podcast {
+        guard let previous, previous.identity == identity, let freshness,
+              freshness.content == .missing || freshness.state == .pending || freshness.state == .backoff else { return self }
+        var result = self
+        let received = Set(episodes.map(\.identity))
+        result.episodes.append(contentsOf: previous.episodes.filter { !received.contains($0.identity) })
+        result.episodeCount = max(episodeCount, previous.episodeCount)
+        return result
+    }
+
     public var identity: String { id.map { "podcast:\($0)" } ?? "local:\(feed)" }
     public var artworkURL: URL? { URL(string: cover) }
 }
 
 public struct EpisodePage: Codable, Hashable, Sendable {
+    public var freshness: FeedFreshness?
     public var episodes: [Episode]
     public var total: Int
     public var hasMore: Bool
     public var nextCursor: Int?
 
-    public init(episodes: [Episode], total: Int, hasMore: Bool, nextCursor: Int? = nil) {
+    public init(episodes: [Episode], total: Int, hasMore: Bool, nextCursor: Int? = nil, freshness: FeedFreshness? = nil) {
+        self.freshness = freshness
         self.episodes = episodes
         self.total = total
         self.hasMore = hasMore
@@ -200,6 +214,7 @@ struct ListSnapshot: Codable, Equatable, Sendable {
 struct ListEpisodeItem: Sendable {
     var membership: ListMembership
     var episode: Episode?
+    var freshness: FeedFreshness? = nil
 }
 
 struct ListEpisodePage: Sendable {
@@ -247,8 +262,10 @@ public struct APIError: Error, Codable, LocalizedError, Sendable {
 
     public var code: String?
     public var retryAfter: Double?
+    public var freshness: FeedFreshness?
 
-    public init(statusCode: Int, message: String, code: String? = nil, retryAfter: Double? = nil) {
+    public init(statusCode: Int, message: String, code: String? = nil, retryAfter: Double? = nil, freshness: FeedFreshness? = nil) {
+        self.freshness = freshness
         self.code = code
         self.retryAfter = retryAfter
         self.statusCode = statusCode

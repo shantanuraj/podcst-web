@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { fetchEpisodesInfo } from '@/data/episodes';
 import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
 import { isCanonicalId } from '@/shared/canonical-id';
+import { preserveFeedContent } from '@/shared/feed-content';
 import { FEED_LIMITS } from '@/shared/feed-contract';
 import type { IPodcastEpisodesInfo, ISubscriptionsMap } from '@/types';
 
@@ -101,7 +102,10 @@ export function createSubscriptions(storage = browserStateStorage()) {
             if (info.isPrivate) continue;
             if (!isCanonicalId(info.id))
               throw new Error('Resolve this podcast before following');
-            root.guest.catalog[info.feed] = info;
+            root.guest.catalog[info.feed] = preserveFeedContent(
+              root.guest.catalog[info.feed],
+              info,
+            );
             if (!root.guest.follows.includes(info.id))
               root.guest.follows.push(info.id);
             if (source)
@@ -123,7 +127,10 @@ export function createSubscriptions(storage = browserStateStorage()) {
       syncSubscription: (feed, info) =>
         persist((root) => {
           if (root.guest.catalog?.[feed] && !info.isPrivate)
-            root.guest.catalog[feed] = info;
+            root.guest.catalog[feed] = preserveFeedContent(
+              root.guest.catalog[feed],
+              info,
+            );
         }),
       syncAllSubscriptions: async () => {
         set({ isSyncing: true });

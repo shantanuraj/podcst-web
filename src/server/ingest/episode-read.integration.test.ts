@@ -10,11 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
-import {
-  fixtureId,
-  fixtureLabel,
-  withFixtureId,
-} from '../../../scripts/lib/identity-fixture';
+import { fixtureId, fixtureLabel } from '../../../scripts/lib/identity-fixture';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 
 installFeedTransportFixture();
@@ -25,8 +21,16 @@ import {
   type SortDirection,
   type SortField,
 } from './episode-read';
+import { refreshFeed } from './feed-refresh';
 
-const prepareEpisodeRead = withFixtureId(prepareCanonicalEpisodeRead);
+const prepareEpisodeRead = (sql: postgres.Sql, id: number) =>
+  prepareCanonicalEpisodeRead(
+    sql,
+    fixtureId(id),
+    null,
+    undefined,
+    async () => {},
+  );
 const readEpisodePage = async (
   sql: postgres.Sql,
   options: Omit<Parameters<typeof readCanonicalEpisodePage>[1], 'podcastId'> & {
@@ -119,7 +123,7 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
 
   test('records access in the content check without downloading a warm feed', async () => {
     await prepareEpisodeRead(sql, 1);
-    expect(statements).toHaveLength(1);
+    expect(statements).toHaveLength(2);
     expect(requests).toBe(0);
     const [first] =
       await sql`SELECT last_accessed_at FROM podcasts WHERE id = 1`;
@@ -137,8 +141,12 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
     );
   });
 
-  test('does not rebuild empty or missing podcasts', async () => {
-    await prepareEpisodeRead(sql, 2);
+  test('does not rebuild successfully validated empty or missing podcasts', async () => {
+    await sql`INSERT INTO feed_poll_state (podcast_id, last_success_at, last_rebuilt_at) VALUES (2, now(), now())`;
+    expect(await prepareEpisodeRead(sql, 2)).toMatchObject({
+      content: 'cached',
+      state: 'fresh',
+    });
     await prepareEpisodeRead(sql, 999);
     expect(requests).toBe(0);
     expect(
@@ -162,7 +170,7 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
     expect(search.episodes.map((episode) => episode.id)).toEqual([101]);
   });
 
-  test('waits for evicted content to rebuild before the page is read', async () => {
+  test('returns missing content immediately and lets the existing worker rebuild it', async () => {
     await sql`DELETE FROM episodes`;
     await sql`
       INSERT INTO episodes (id, podcast_id, guid, published)
@@ -172,7 +180,13 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
       INSERT INTO feed_poll_state (podcast_id, last_polled_at, next_poll_at, hash)
       VALUES (1, now(), now() + interval '1 day', 'unchanged')
     `;
-    await prepareEpisodeRead(sql, 1);
+    expect(await prepareEpisodeRead(sql, 1)).toMatchObject({
+      content: 'missing',
+      state: 'pending',
+    });
+    expect(requests).toBe(0);
+    expect((await readEpisodePage(sql, { podcastId: 1 })).total).toBe(0);
+    await refreshFeed(sql, fixtureId(1), 'scheduled');
     const page = await readEpisodePage(sql, { podcastId: 1 });
     expect(requests).toBe(1);
     expect(page.total).toBe(1);
@@ -186,8 +200,14 @@ describe.skipIf(!databaseUrl)('episode reads with PostgreSQL', () => {
   test('honors rebuild failure backoff across repeated reads', async () => {
     await sql`DELETE FROM episode_content`;
     respond = () => new Response(null, { status: 503 });
-    await prepareEpisodeRead(sql, 1);
-    await prepareEpisodeRead(sql, 1);
+    expect(await prepareEpisodeRead(sql, 1)).toMatchObject({
+      state: 'pending',
+    });
+    expect(requests).toBe(0);
+    await refreshFeed(sql, fixtureId(1), 'scheduled');
+    expect(await prepareEpisodeRead(sql, 1)).toMatchObject({
+      state: 'backoff',
+    });
     expect(requests).toBe(1);
     const [state] =
       await sql`SELECT failures FROM feed_poll_state WHERE podcast_id = 1`;

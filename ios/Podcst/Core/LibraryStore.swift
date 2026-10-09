@@ -78,9 +78,10 @@ public final class LibraryStore {
     public func load(forceRefresh: Bool = false) async {
         guard !session.isLoading else { return }
         let accountID = session.user?.id
+        let activity = api.activityToken
         isLoading = true
         defer {
-            if session.user?.id == accountID {
+            if api.activityToken == activity, session.user?.id == accountID {
                 isLoading = false
                 hasLoaded = true
             }
@@ -90,11 +91,11 @@ public final class LibraryStore {
                 try await activateState()
                 await durable.flush()
                 let subscriptions = try await api.refreshSubscriptions()
-                guard session.user?.id == accountID, !Task.isCancelled else { return }
+                guard api.activityToken == activity, session.user?.id == accountID, !Task.isCancelled else { return }
                 guard durable.verified else { podcasts = []; return }
                 podcasts = subscriptions.filter { podcast in
                     podcast.id.map { durable.followedIDs.contains($0) && !durable.unavailableIDs.contains($0) } ?? false
-                }
+                }.map { incoming in incoming.preservingContent(of: podcasts.first { $0.identity == incoming.identity }) }
             } else {
                 try await durable.activate(accountID: nil)
                 podcasts = loadGuest()
@@ -112,7 +113,7 @@ public final class LibraryStore {
             }
             error = nil
         } catch let failure {
-            guard session.user?.id == accountID, !Task.isCancelled else { return }
+            guard api.activityToken == activity, session.user?.id == accountID, !Task.isCancelled else { return }
             error = failure.localizedDescription
         }
     }
@@ -212,29 +213,35 @@ public final class LibraryStore {
         podcasts = []
     }
 
-    public func importFeeds(_ feeds: [String]) async {
+    public func importFeeds(_ feeds: [String], expectedActivity: UUID? = nil) async {
         guard !feeds.isEmpty else { return }
         do {
+            let selectedAccount = session.user?.id
+            let activity = expectedActivity ?? api.activityToken
+            guard api.activityToken == activity, !session.isLoading, durable.accountID == selectedAccount else { throw DurableStateFailure.suspended }
+            guard feeds.allSatisfy({ !$0.isEmpty && $0.utf16.count <= 4096 }) else { throw FeedContractError.invalidResponse }
+            if selectedAccount != nil { try durable.stageImport(feeds) } else { try durable.stageGuestImport(feeds) }
             try await activateState()
-            if let accountID = session.user?.id {
+            guard api.activityToken == activity, session.user?.id == selectedAccount, durable.accountID == selectedAccount else { throw CancellationError() }
+            let importToken = durable.activityToken
+            if let accountID = selectedAccount {
                 await durable.flush()
-                guard let scope = durable.scope else { throw DurableStateFailure.suspended }
+                guard api.activityToken == activity, durable.activityToken == importToken, let scope = durable.scope else { throw DurableStateFailure.suspended }
                 _ = try FeedImportRequest.batches(feeds, scope: scope)
-                try durable.stageImport(feeds)
                 let batches = try FeedImportRequest.batches(durable.pendingImportFeeds.filter { durable.importReady($0) }, scope: scope)
                 for (offset, batch) in batches.enumerated() {
-                    guard !Task.isCancelled, session.user?.id == accountID, durable.scope == scope else { throw CancellationError() }
+                    guard !Task.isCancelled, api.activityToken == activity, durable.activityToken == importToken, session.user?.id == accountID, durable.scope == scope else { throw CancellationError() }
                     let result: FollowResolution
                     do { result = try await api.resolveFollows(batch, scope: scope) }
                     catch {
-                        guard !Task.isCancelled, session.user?.id == accountID, durable.scope == scope else { throw CancellationError() }
+                        guard !Task.isCancelled, api.activityToken == activity, durable.activityToken == importToken, session.user?.id == accountID, durable.scope == scope else { throw CancellationError() }
                         if let failure = error as? APIError, failure.statusCode == 429 || failure.statusCode >= 500 {
                             let delay = min(86400, max(1, failure.retryAfter ?? Double(FeedLimits.current.imports.retrySeconds)))
                             try durable.deferImport(batches.dropFirst(offset).flatMap { $0 }, seconds: Int(delay))
                         }
                         throw error
                     }
-                    guard session.user?.id == accountID, durable.scope == scope,
+                    guard api.activityToken == activity, durable.activityToken == importToken, session.user?.id == accountID, durable.scope == scope,
                           result.protocol == 1, result.accountId == scope.accountId, result.generation == scope.generation,
                           result.items.map(\.index) == Array(batch.indices) else { throw DurableStateFailure.protocolViolation }
                     for item in result.items {
@@ -245,8 +252,7 @@ public final class LibraryStore {
                 }
                 await durable.flush()
             } else {
-                let token = durable.activityToken
-                try durable.stageGuestImport(feeds)
+                let token = importToken
                 for feed in durable.pendingImportFeeds {
                     guard !Task.isCancelled, durable.activityToken == token, session.user == nil, durable.accountID == nil, !session.isLoading else { throw CancellationError() }
                     do {
@@ -266,6 +272,7 @@ public final class LibraryStore {
     private func loadGuest() -> [Podcast] { durable.guestFollows + durable.unresolvedGuest }
 
     private func loadGuestPodcast(_ podcast: Podcast, forceRefresh: Bool = false) async throws {
+        let token = api.activityToken
         var updated: Podcast
         if forceRefresh {
             updated = try await api.detail(of: podcast, forceRefresh: true)
@@ -274,10 +281,12 @@ public final class LibraryStore {
             updated = podcast
             updated.episodes = page.episodes
             updated.episodeCount = page.total
+            updated.freshness = page.freshness
+            updated = updated.preservingContent(of: podcast)
         } else {
             updated = try await api.podcast(feed: podcast.feed)
         }
-        guard session.user == nil, !session.isLoading, !Task.isCancelled,
+        guard api.activityToken == token, session.user == nil, !session.isLoading, !Task.isCancelled,
               let index = podcasts.firstIndex(of: podcast) else { return }
         try durable.cacheGuest(updated, replacing: podcast)
         podcasts[index] = updated

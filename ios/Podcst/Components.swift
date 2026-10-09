@@ -329,6 +329,7 @@ struct Toast: Identifiable, Equatable {
     var detail: String? = nil
     var systemImage: String? = nil
     var actions: [Action] = []
+    var persistent = false
 
     static func == (lhs: Toast, rhs: Toast) -> Bool { lhs.id == rhs.id }
 }

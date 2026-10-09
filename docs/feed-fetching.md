@@ -113,6 +113,20 @@ commit and releases the permit afterward, including failures. A fatal scope chan
 cancels/drains sibling work. Ordered retry outcomes and persisted retry timing are
 wired through all three clients. Batch bodies are bounded by encoded bytes and count.
 
-RSS search, single import and public interactive resolution still need this shared
-admission integration. Serving reads still await content rebuilds until the coordinated
-refresh/read/client cutover. The import slice does not activate freshness responses.
+RSS search, single import and public interactive resolution (including the Apple
+SSR entry) now share admission. Apple lookup and public redirect verification
+inherit the same deadline and commit ownership check. Interactive bodies share a
+byte-bounded, cancellation-aware JSON reader with authentication/state protocols.
+
+Feed, episode-page, subscription and list reads expose cached content/freshness
+without fetching publishers. Missing content admits durable demand; list repair
+admits at most three candidates synchronously before rereading status, never via
+an after-response fetch. Missing visible episode content produces 202 only for
+accepted repair, otherwise 503; hidden/mismatched identities stay 404. SSR keeps
+the canonical episode URL and renders preparing/unavailable without inline I/O.
+
+Refresh POST accepts only a podcast ID and returns admission status/freshness,
+not a full podcast. All clients re-read content instead of repeating POST, retain
+current-scope cached episodes, honor retry advice and bound foreground checks to
+two minutes. Shared-link readiness fences account, navigation and newer intent
+before playback; cancellation or window expiry does not imply removal/completion.

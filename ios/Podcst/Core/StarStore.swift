@@ -16,6 +16,7 @@ extension APIClient: StarAPI {}
 struct Star: Hashable, Identifiable {
     var membership: ListMembership
     var episode: Episode?
+    var freshness: FeedFreshness? = nil
     var id: Int { membership.episodeId }
     var starredAt: Date { Date(timeIntervalSince1970: Double(membership.addedAt) / 1000) }
 }
@@ -44,6 +45,8 @@ private struct StarScope: Codable {
     var flight: StarFlight?
     var blocked: Int?
     var failures: Set<Int> = []
+    var freshness: [Int: FeedFreshness] = [:]
+    enum CodingKeys: String, CodingKey { case scope, unresolved, clientId, sequence, listId, snapshot, episodes, queued, flight, blocked, failures }
 
     var stars: [Star] {
         var members = (snapshot?.items ?? []).reduce(into: [Int: ListMembership]()) { $0[$1.episodeId] = $1 }
@@ -56,7 +59,7 @@ private struct StarScope: Codable {
             else if members[id] == nil { members[id] = ListMembership(episodeId: id, addedAt: intent.at, availability: .contentMissing) }
         }
         return members.values.sorted { $0.addedAt == $1.addedAt ? $0.episodeId > $1.episodeId : $0.addedAt > $1.addedAt }.map {
-            Star(membership: $0, episode: $0.availability == .unavailable ? nil : episodes[$0.episodeId])
+            Star(membership: $0, episode: $0.availability == .unavailable ? nil : episodes[$0.episodeId], freshness: $0.availability == .unavailable ? nil : freshness[$0.episodeId])
         }
     }
 
@@ -110,6 +113,7 @@ private struct StarScope: Codable {
         for item in page.items {
             let id = item.membership.episodeId
             guard let index = snapshot?.items.firstIndex(where: { $0.episodeId == id }) else { continue }
+            freshness[id] = item.membership.availability == .unavailable ? nil : item.freshness
             if item.membership.availability == .unavailable {
                 snapshot?.items[index].availability = .unavailable
                 episodes[id] = nil

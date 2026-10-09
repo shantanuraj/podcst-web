@@ -17,6 +17,7 @@ import {
   type StateScope,
   stateErrorStatus,
 } from '@/shared/state-contract';
+import { type FeedReadState, feedFreshness } from '../ingest/feed-demand';
 import { podcastAccess } from '../podcast-access';
 import { nextStateRevision } from '../state/database';
 import { readGeneration } from '../state/generation';
@@ -63,7 +64,13 @@ async function readItems(
   page?: { limit: number; cursor?: ListCursor },
 ) {
   const cursor = page?.cursor;
-  return sql<(ListMembership & { episode?: ListEpisodeItem['episode'] })[]>`
+  return sql<
+    (ListMembership &
+      FeedReadState & {
+        podcastId: string | null;
+        episode?: ListEpisodeItem['episode'];
+      })[]
+  >`
     SELECT i.episode_id::text AS "episodeId",
       (extract(epoch FROM i.added_at) * 1000)::bigint AS "addedAt",
       CASE WHEN p.id IS NULL THEN 'unavailable'
@@ -81,14 +88,18 @@ async function readItems(
           'file', jsonb_build_object('url', c.file_url,
             'length', CASE WHEN c.file_length BETWEEN 0 AND 9007199254740991 THEN c.file_length ELSE 0 END,
             'type', coalesce(c.file_type, 'audio/mpeg'))
-        ) ELSE NULL END AS episode`
+        ) ELSE NULL END AS episode,
+          p.id AS "podcastId", s.last_success_at, s.last_rebuilt_at, s.next_poll_at,
+          coalesce(s.failures, 0) AS failures, s.refresh_expires_at,
+          s.demand_token, s.demand_expires_at, coalesce(s.demand_rebuild, false) AS demand_rebuild,
+          c.episode_id IS NOT NULL AS has_content, false AS empty_feed, clock_timestamp() AS observed_at`
           : sql``
       }
     FROM episode_list_items i
     JOIN episodes e ON e.id = i.episode_id
     LEFT JOIN podcasts p ON p.id = e.podcast_id AND ${podcastAccess(sql, userId)}
     LEFT JOIN episode_content c ON c.episode_id = e.id AND p.id IS NOT NULL
-    ${page ? sql`LEFT JOIN authors a ON a.id = p.author_id` : sql``}
+    ${page ? sql`LEFT JOIN authors a ON a.id = p.author_id LEFT JOIN feed_poll_state s ON s.podcast_id = p.id` : sql``}
     WHERE i.list_id = ${listId}
       ${cursor ? sql`AND (i.added_at, i.episode_id) < (${new Date(cursor.addedAt)}, ${cursor.episodeId})` : sql``}
     ORDER BY i.added_at DESC, i.episode_id DESC
@@ -307,10 +318,11 @@ export function createEpisodeListService(
           const items: ListEpisodeItem[] = rows
             .slice(0, page.limit)
             .map((row) => ({
-              ...row,
               episodeId: String(row.episodeId),
               addedAt: Number(row.addedAt),
+              availability: row.availability,
               episode: row.episode ?? null,
+              freshness: row.podcastId ? feedFreshness(row) : null,
             }));
           const last = items.at(-1);
           return {

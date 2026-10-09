@@ -10,6 +10,11 @@ export async function GET(
   return publicEpisodeResponse(
     episodeId,
     request.nextUrl.searchParams.get('podcastId'),
-    (id) => getEpisodeWithPodcast(id, null),
+    (id) =>
+      getEpisodeWithPodcast(
+        id,
+        null,
+        request.nextUrl.searchParams.get('podcastId') ?? undefined,
+      ),
   );
 }

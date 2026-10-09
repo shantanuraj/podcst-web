@@ -1,77 +1,98 @@
-import { CancelledError, hashKey, queryOptions } from '@tanstack/react-query';
+import { CancelledError, queryOptions } from '@tanstack/react-query';
 import type { AccountSession } from '@/shared/auth/account-session';
-import { ApiError, isAccessDenied } from './api';
-import { episodesQueryKey } from './episode-query';
+import {
+  type FeedRefreshResponse,
+  feedRecheckDelay,
+  feedValidator,
+  requireFreshness,
+} from '@/shared/feed-contract';
+import type { IPaginatedEpisodes } from '@/types';
+import { get, post } from './api';
 
-class FeedRefreshBusy extends Error {}
+type RefreshProgress = FeedRefreshResponse & { startedAt: number };
 
 export function feedRefreshOptions(
   session: AccountSession,
   podcastId: string,
   refreshRoute: () => void,
   empty = false,
+  attempt = 0,
 ) {
-  const queryClient = session.client;
   const token = session.token();
-  const options = session.query('feed-refresh', podcastId, async (signal) => {
-    const res = await fetch('/api/feed/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ podcastId, onlyIfStale: true }),
-      signal,
-    });
-    if (res.status === 202) {
-      throw new FeedRefreshBusy('Feed refresh in progress');
-    }
-    if (!res.ok) {
-      throw new ApiError(res.status, 'Feed refresh unavailable');
-    }
-    const { status }: { status?: unknown } = await res.json();
-    if (
-      status !== 'updated' &&
-      status !== 'not_modified' &&
-      status !== 'skipped'
-    ) {
-      throw new Error('Invalid feed refresh status');
-    }
-    if (!session.current(token, podcastId) || signal.aborted)
-      throw new CancelledError();
-    const wasBusy =
-      queryClient.getQueryState(options.queryKey)?.fetchFailureReason instanceof
-      FeedRefreshBusy;
-    if (status === 'updated' || empty || wasBusy) {
-      const queries = {
-        predicate: ({ queryKey }: { queryKey: readonly unknown[] }) =>
-          queryKey[0] === 'account' &&
-          queryKey[1] === token.scope &&
-          ['episodes', 'podcast', 'podcast-info'].includes(
-            String(queryKey[2]),
-          ) &&
-          queryKey[3] === podcastId,
-      };
-      await queryClient.cancelQueries(queries);
-      await queryClient.invalidateQueries({
-        ...queries,
-        refetchType: 'none',
-      });
+  const queryKey = [
+    'account',
+    token.scope,
+    'feed-refresh',
+    podcastId,
+    attempt,
+  ] as const;
+  const options = session.query(
+    'feed-refresh',
+    podcastId,
+    async (signal): Promise<RefreshProgress> => {
+      const previous = session.client.getQueryData<RefreshProgress>(queryKey);
+      const startedAt = previous?.startedAt ?? Date.now();
+      const result = previous
+        ? {
+            podcastId,
+            freshness: requireFreshness(
+              await get<IPaginatedEpisodes>(
+                '/feed/episodes',
+                { podcastId, limit: 1 },
+                undefined,
+                signal,
+              ),
+            ).freshness,
+          }
+        : await post<FeedRefreshResponse>(
+            '/feed/refresh',
+            { podcastId },
+            signal,
+          );
+      if (
+        !feedValidator('refreshResponse')(result) ||
+        result.podcastId !== podcastId
+      )
+        throw new TypeError('Invalid refresh response');
       if (!session.current(token, podcastId) || signal.aborted)
         throw new CancelledError();
-      refreshRoute();
-      void queryClient.refetchQueries({
-        type: 'active',
-        predicate: (query) =>
-          queries.predicate(query) &&
-          query.queryHash !== hashKey(episodesQueryKey(token.scope, podcastId)),
-      });
-    }
-    return status;
-  });
+      if (
+        (previous &&
+          (previous.freshness.checkedAtMs !== result.freshness.checkedAtMs ||
+            previous.freshness.content !== result.freshness.content)) ||
+        (!previous && empty && result.freshness.content === 'cached')
+      ) {
+        await session.client.invalidateQueries({
+          predicate: ({ queryKey: key }) =>
+            key[0] === 'account' &&
+            key[1] === token.scope &&
+            ['episodes', 'podcast', 'podcast-info', 'subscriptions'].includes(
+              String(key[2]),
+            ) &&
+            (key[3] === podcastId || key[2] === 'subscriptions'),
+          refetchType: 'active',
+        });
+        if (!session.current(token, podcastId) || signal.aborted)
+          throw new CancelledError();
+        refreshRoute();
+      }
+      return { ...result, startedAt };
+    },
+  );
   return queryOptions({
     ...options,
-    staleTime: empty ? 0 : 5 * 60 * 1000,
+    queryKey,
+    staleTime: Infinity,
+    gcTime: 120_000,
     refetchOnWindowFocus: false,
-    retry: (count, error) =>
-      !isAccessDenied(error) && !(error instanceof CancelledError) && count < 6,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+    refetchOnReconnect: false,
+    retry: false,
+    refetchInterval: (query) =>
+      typeof document !== 'undefined' && document.visibilityState === 'hidden'
+        ? false
+        : feedRecheckDelay(
+            query.state.data?.freshness,
+            query.state.data?.startedAt ?? Date.now(),
+          ),
   });
 }

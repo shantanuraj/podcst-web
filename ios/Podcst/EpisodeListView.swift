@@ -23,8 +23,11 @@ enum EpisodeList: Hashable {
 struct EpisodeListView: View {
     @Environment(StarStore.self) private var stars
     @Environment(MediaStore.self) private var media
+    @Environment(APIClient.self) private var api
+    @Environment(\.scenePhase) private var scenePhase
     let list: EpisodeList
     @State private var titleVisible = false
+    @State private var feedWindow = Date()
 
     private var episodes: [Episode] {
         switch list {
@@ -64,9 +67,12 @@ struct EpisodeListView: View {
                 if list == .starred {
                     if let error = stars.error { Text(error).font(.sans(.footnote)).accessibilityAddTraits(.updatesFrequently) }
                     else if stars.pending { Text("Saved on this device. Waiting to sync…").font(.sans(.footnote)) }
+                    if stars.stars.contains(where: { $0.freshness?.content == .missing }) {
+                        Button("Retry episode content") { Task { feedWindow = Date(); await stars.refresh() } }.font(.footnote)
+                    }
                     ForEach(stars.stars.filter { $0.episode == nil }) { star in
                         HStack {
-                            Text(star.membership.availability == .unavailable ? "Episode unavailable" : "Episode details unavailable")
+                            Text(star.membership.availability == .unavailable ? "Episode unavailable" : star.freshness?.message ?? "Episode details unavailable")
                             Spacer()
                             Button("Unstar") { stars.remove(id: star.id) }
                         }
@@ -99,8 +105,13 @@ struct EpisodeListView: View {
         } action: { _, visible in
             withAnimation(.easeInOut(duration: 0.2)) { titleVisible = visible }
         }
-        .refreshable { if list == .starred { await stars.refresh() } }
+        .refreshable { if list == .starred { feedWindow = Date(); await stars.refresh() } }
         .task { if list == .starred { await stars.refresh() } }
+        .task(id: "\(api.activityToken):\(scenePhase):\(stars.stars.compactMap { $0.freshness?.retryAtMs }.min() ?? 0)") {
+            guard list == .starred, scenePhase == .active, let delay = stars.stars.compactMap({ $0.freshness?.recheckDelay(startedAt: feedWindow) }).min() else { return }
+            do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() } catch { return }
+            await stars.refresh()
+        }
         .podcstPage()
         .navigationTitle(titleVisible ? list.title : "")
         .navigationBarTitleDisplayMode(.inline)

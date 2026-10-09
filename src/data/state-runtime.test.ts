@@ -29,6 +29,54 @@ const id = '9007199254740993';
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
 });
+test('import sources persist before an offline bootstrap without creating follows', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  const feed = 'https://example.invalid/offline-import';
+  await expect(sync.resolveFeeds([feed])).rejects.toThrow('imports retained');
+  const root = await f.storage.load();
+  expect(root.accounts.a.follows.importFailures).toEqual([feed]);
+  expect(root.accounts.a.follows.queued).toEqual([]);
+  expect(f.requests).toEqual([]);
+  const restart = f.make();
+  await restart.activate('a');
+  expect(
+    restart.getSnapshot().state?.accounts.a.follows.importFailures,
+  ).toEqual([feed]);
+});
+
+test('import bootstrap retirement cannot move selected sources into the next scope', async () => {
+  const f = fixture();
+  await f.online();
+  const sync = f.make();
+  await sync.activate('a');
+  const original = f.api.request;
+  const started = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let held = false;
+  f.api.request = async (...args) => {
+    if (!held) {
+      held = true;
+      started.resolve();
+      await release.promise;
+    }
+    return original(...args);
+  };
+  const feed = 'https://example.invalid/retired-import';
+  const work = sync.resolveFeeds([feed]).catch((error) => error);
+  await started.promise;
+  await sync.activate(null);
+  release.resolve();
+  expect(await work).toBeInstanceOf(Error);
+  const root = await f.storage.load();
+  expect(root.accounts.a.follows.importFailures).toEqual([feed]);
+  expect(root.guest.imports).toBeUndefined();
+  expect(
+    f.requests.some((path) => path.includes('/subscriptions/resolve')),
+  ).toBe(false);
+});
+
 test('opaque account IDs cannot alias inherited object properties', async () => {
   const storage = browserStateStorage();
   for (const account of ['__proto__', 'constructor', 'toString']) {

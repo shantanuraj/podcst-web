@@ -2,6 +2,7 @@ import { validateCatalogue } from '@/data/catalogue';
 import { sameScope, validStateScope } from '@/data/progress-outbox';
 import { StateProtocolError } from '@/data/state-runtime';
 import { compareCanonicalIds, isCanonicalId } from '@/shared/canonical-id';
+import type { FeedFreshness } from '@/shared/feed-contract';
 import type {
   LegacyListBatch,
   ListAcknowledgement,
@@ -27,6 +28,7 @@ export interface StarScope {
   listId?: string;
   snapshot?: ListSnapshot;
   episodes: Record<string, IEpisodeInfo>;
+  freshness?: Record<string, FeedFreshness | null>;
   queued: Intent[];
   flight?: { batch: ListBatch; intents: Intent[]; ack?: ListAcknowledgement };
   blocked?: number;
@@ -34,6 +36,7 @@ export interface StarScope {
 }
 export type StarRoot = Record<string, StarScope>;
 export interface StarItem extends ListMembership {
+  freshness?: FeedFreshness | null;
   episode: IEpisodeInfo | null;
 }
 export const scopeKey = (account: string | null) =>
@@ -84,6 +87,10 @@ export function project(state: StarScope): StarItem[] {
     )
     .map((item) => ({
       ...item,
+      freshness:
+        item.availability === 'unavailable'
+          ? null
+          : state.freshness?.[item.episodeId],
       episode:
         item.availability === 'unavailable'
           ? null
@@ -258,6 +265,9 @@ export function hydratePage(state: StarScope, page: ListEpisodePage) {
       ({ episodeId }) => episodeId === item.episodeId,
     );
     if (!member) continue;
+    state.freshness ??= {};
+    state.freshness[item.episodeId] =
+      item.availability === 'unavailable' ? null : (item.freshness ?? null);
     if (item.availability === 'unavailable') {
       member.availability = 'unavailable';
       delete state.episodes[item.episodeId];
@@ -271,6 +281,7 @@ export function hydratePage(state: StarScope, page: ListEpisodePage) {
 
 export function purgeMetadata(state: StarScope) {
   state.episodes = {};
+  delete state.freshness;
   delete state.snapshot;
 }
 

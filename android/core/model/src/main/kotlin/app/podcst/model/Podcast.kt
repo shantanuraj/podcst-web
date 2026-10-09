@@ -21,6 +21,7 @@ data class Podcast(
     val episodeCount: Int = 0,
     val episodes: List<Episode> = emptyList(),
     val isPrivate: Boolean = false,
+    val freshness: FeedFreshness? = null,
 ) {
     val identity: String get() = id?.let { "podcast:$it" } ?: "local:$feed"
     val shareUrl: String? get() = if (isPrivate || id == null) null else ShareLinks.url(ShareTarget(id))
@@ -32,6 +33,7 @@ data class EpisodePage(
     val total: Int,
     val hasMore: Boolean,
     val nextCursor: Int? = null,
+    val freshness: FeedFreshness? = null,
 )
 
 enum class EpisodeSort(val field: String) {

@@ -63,13 +63,17 @@ final class ContractFixtureTests: XCTestCase {
                 failure = error
             }
 
-            if (200..<300).contains(fixture.status) {
+            if (200..<300).contains(fixture.status) && fixture.type != "ContentReadiness" {
                 XCTAssertNil(failure, "\(name): \(String(describing: failure))")
             } else {
                 let apiError = try XCTUnwrap(failure as? APIError, name)
                 XCTAssertEqual(apiError.statusCode, fixture.status, name)
                 let expected = try JSONDecoder().decode(ErrorFixture.self, from: data).message
                 XCTAssertEqual(apiError.message, expected, name)
+                if fixture.type == "ContentReadiness" {
+                    XCTAssertEqual(apiError.freshness?.content, .missing, name)
+                    XCTAssertEqual(apiError.code, fixture.status == 202 ? "content_pending" : "content_unavailable", name)
+                }
             }
 
             let request = try XCTUnwrap(ContractURLProtocol.requests().first, name)
@@ -122,6 +126,49 @@ final class ContractFixtureTests: XCTestCase {
         var data = Data(); var buffer = [UInt8](repeating: 0, count: 4096)
         while stream.hasBytesAvailable { let count = stream.read(&buffer, maxLength: buffer.count); if count <= 0 { break }; data.append(buffer, count: count) }
         return data
+    }
+
+    func testEpisodeReadinessHonorsAdviceAndRetiresSupersededIntent() async throws {
+        let freshness = try JSONDecoder().decode(FeedFreshness.self, from: Data(#"{"content":"missing","state":"pending","checkedAtMs":null,"retryAtMs":5000}"#.utf8))
+        let pending = APIError(statusCode: 202, message: "Preparing episode", code: "content_pending", freshness: freshness)
+        var seconds: TimeInterval = 0
+        var reads = 0
+        var notices = 0
+        let result: String = try await awaitFeedContent(read: {
+            reads += 1
+            if reads == 1 { throw pending }
+            return "ready"
+        }, active: { true }, pending: { _ in notices += 1 }, now: { Date(timeIntervalSince1970: seconds) }, wait: { seconds += $0 })
+        XCTAssertEqual(result, "ready")
+        XCTAssertEqual(reads, 2)
+        XCTAssertEqual(notices, 1)
+        XCTAssertEqual(seconds, 5)
+        var active = true
+        do {
+            let _: String = try await awaitFeedContent(read: { active = false; return "late" }, active: { active }, pending: { _ in XCTFail("Not pending") })
+            XCTFail("A retired intent cannot publish")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        active = true; reads = 0
+        do {
+            let _: String = try await awaitFeedContent(read: { reads += 1; throw pending }, active: { active }, pending: { _ in }, now: { Date(timeIntervalSince1970: 0) }, wait: { _ in active = false })
+            XCTFail("A retired intent cannot retry")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertEqual(reads, 1)
+    }
+
+    func testEpisodeReadinessWindowPreservesPendingInsteadOfInventingCompletion() async throws {
+        let freshness = try JSONDecoder().decode(FeedFreshness.self, from: Data(#"{"content":"missing","state":"pending","checkedAtMs":null,"retryAtMs":5000}"#.utf8))
+        var seconds: TimeInterval = 0
+        var reads = 0
+        do {
+            let _: String = try await awaitFeedContent(read: { reads += 1; throw APIError(statusCode: 202, message: "Preparing episode", code: "content_pending", freshness: freshness) }, active: { true }, pending: { _ in }, now: { Date(timeIntervalSince1970: seconds) }, wait: { seconds += $0 })
+            XCTFail("Unresolved content is not success")
+        } catch {
+            XCTAssertEqual((error as? APIError)?.code, "content_pending")
+            XCTAssertEqual((error as? APIError)?.freshness, freshness)
+        }
+        XCTAssertEqual(reads, 24)
+        XCTAssertLessThan(seconds, 120)
     }
 
     func testBoundedOPMLFixtures() throws {
@@ -320,10 +367,9 @@ final class ContractFixtureTests: XCTestCase {
     }
 
     private func consumeStandalone(data: Data, name: String, fixture: APIFixture) async throws -> Bool {
-        guard fixture.type == "RefreshStatus" || fixture.type == "ResolvedPodcast" || fixture.endpoint.contains("/api/auth/login") || fixture.endpoint.contains("/api/auth/register") || (fixture.endpoint == "POST /api/auth/verify" && fixture.type == "Verified") else { return false }
+        guard fixture.type == "ResolvedPodcast" || fixture.endpoint.contains("/api/auth/login") || fixture.endpoint.contains("/api/auth/register") || (fixture.endpoint == "POST /api/auth/verify" && fixture.type == "Verified") else { return false }
         switch fixture.type {
         case "ErrorMessage": _ = try JSONDecoder().decode(ErrorFixture.self, from: data)
-        case "RefreshStatus": _ = try JSONDecoder().decode(RefreshStatusFixture.self, from: data)
         case "ResolvedPodcast": _ = try JSONDecoder().decode(ResolvedPodcastFixture.self, from: data)
         case "PasskeyLoginStart": _ = try JSONDecoder().decode(PasskeyLoginStartFixture.self, from: data)
         case "PasskeyLoginResult": _ = try JSONDecoder().decode(PasskeyLoginResultFixture.self, from: data)
@@ -348,7 +394,7 @@ final class ContractFixtureTests: XCTestCase {
         case "GET /api/feed/episodes": _ = try await api.episodes(podcastID: 910001)
         case "POST /api/feed/resolve":
             _ = try await api.detail(of: Podcast(itunesId: 910001, itunesLocale: "us", feed: "https://fixture.example/feed.xml", title: "Fixture"))
-        case "POST /api/feed/refresh": _ = try await api.refresh(podcastID: 910001)
+        case "POST /api/feed/refresh": _ = try await api.refresh(podcastID: 1)
         case "GET /api/auth/session": _ = try await api.sessionUser()
         case "POST /api/auth/verify": try await api.sendCode(email: "fixture@example.test")
         case "POST /api/auth/email-login": _ = try await api.signIn(email: "fixture@example.test", code: "123456")
@@ -438,7 +484,6 @@ private struct APIFixture: Decodable {
 }
 
 private struct ErrorFixture: Decodable { let message: String }
-private struct RefreshStatusFixture: Decodable { let status: String }
 private struct ResolvedPodcastFixture: Decodable { let id: StateID }
 private struct SuccessFixture: Decodable { let success: Bool }
 private struct VerifiedFixture: Decodable { let verified: Bool }

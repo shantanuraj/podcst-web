@@ -12,6 +12,36 @@ export interface FeedFreshness {
   retryAtMs: number | null;
 }
 
+export function feedRecheckDelay(
+  freshness: FeedFreshness | undefined,
+  startedAt: number,
+  now = Date.now(),
+): number | false {
+  if (!freshness || !['pending', 'backoff'].includes(freshness.state))
+    return false;
+  const remaining =
+    FEED_LIMITS.client.pollWindowSeconds * 1000 - (now - startedAt);
+  const delay = Math.max(
+    FEED_LIMITS.client.recheckSeconds * 1000,
+    (freshness.retryAtMs ?? now + FEED_LIMITS.client.recheckSeconds * 1000) -
+      now,
+  );
+  return delay < remaining ? delay : false;
+}
+
+export function requireFreshness<T>(
+  value: T,
+): T & { freshness: FeedFreshness } {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('freshness' in value) ||
+    !feedValidator('freshness')(value.freshness)
+  )
+    throw new TypeError('Invalid feed freshness');
+  return value as T & { freshness: FeedFreshness };
+}
+
 export interface FeedRefreshRequest {
   podcastId: string;
 }

@@ -44,6 +44,11 @@ export interface PrivateImportScope {
   admit?: (signal: AbortSignal) => Promise<ImportLease>;
 }
 
+export interface PublicImportScope {
+  signal: AbortSignal;
+  beforeCommit(): Promise<void>;
+}
+
 interface ImportAdmission {
   beforeFetch(signal: AbortSignal): Promise<AbortSignal>;
   beforeCommit(): Promise<void>;
@@ -87,7 +92,9 @@ async function index(
   if (fetched && fetched.status !== 'updated')
     throw new Error('Feed was not returned');
   const moveVerification =
-    !ownerUserId && fetched?.publicRedirect ? await verifyMove(feedUrl) : null;
+    !ownerUserId && fetched?.publicRedirect
+      ? await verifyMove(feedUrl, undefined, signal)
+      : null;
   const move =
     moveVerification?.status === 'verified' ? moveVerification.evidence : null;
   if (move && move.requestedUrl !== feedUrl)
@@ -170,7 +177,9 @@ async function index(
           },
         });
       }
-      return claim(tx, found);
+      const claimed = await claim(tx, found);
+      signal?.throwIfAborted();
+      return claimed;
     }
     if (fetched?.status !== 'updated')
       throw new Error('Feed changed during import; retry');
@@ -204,9 +213,11 @@ async function index(
       if (!winner)
         throw new PodcastIdentityConflict('Unable to resolve podcast identity');
       signal?.throwIfAborted();
-      return ownerUserId
+      const claimed = ownerUserId
         ? authorizePrivate(winner, ownerUserId)
-        : claim(tx, winner);
+        : await claim(tx, winner);
+      signal?.throwIfAborted();
+      return claimed;
     }
     const id = String(podcast.id);
     if (move)
@@ -234,8 +245,24 @@ export function indexPodcast(
   itunesId?: string,
   verifyMove = verifyPublicFeedMove,
   verification?: AppleListingVerification,
+  scope?: PublicImportScope,
 ) {
-  return index(sql, feedUrl, null, itunesId, verifyMove, verification);
+  return index(
+    sql,
+    feedUrl,
+    null,
+    itunesId,
+    verifyMove,
+    verification,
+    scope?.signal,
+    undefined,
+    scope
+      ? {
+          beforeFetch: async (signal) => signal,
+          beforeCommit: scope.beforeCommit,
+        }
+      : undefined,
+  );
 }
 
 export async function indexPrivatePodcast(

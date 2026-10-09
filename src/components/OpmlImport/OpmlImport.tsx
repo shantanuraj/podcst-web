@@ -1,8 +1,9 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useId, useState } from 'react';
+import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { fetchEpisodesInfo } from '@/data/episodes';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
+import type { AccountToken } from '@/shared/auth/account-session';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
 import { OPML_ERROR, readOpml } from '@/shared/opml';
@@ -17,6 +18,7 @@ export function OpmlImport({ className }: { className?: string }) {
   const id = useId();
   const { data: user } = useSession();
   const session = useAccountSession();
+  const intake = useRef<AccountToken | null>(null);
   const pending = useSubscriptions((state) => state.imports);
   const syncToCloud = useSyncToCloud();
   const [busy, setBusy] = useState(false);
@@ -77,7 +79,12 @@ export function OpmlImport({ className }: { className?: string }) {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    const token = session.token();
+    const token = intake.current;
+    intake.current = null;
+    if (!token || !session.current(token)) {
+      setError('Account changed. Select the file again.');
+      return;
+    }
     try {
       const feeds = await readOpml(file);
       if (session.current(token)) await run(feeds);
@@ -96,7 +103,13 @@ export function OpmlImport({ className }: { className?: string }) {
         type="file"
         accept=".opml,.xml,text/xml,text/x-opml"
         onChange={choose}
-        disabled={busy}
+        onClick={() => {
+          intake.current = session.token();
+        }}
+        onDrop={() => {
+          intake.current = session.token();
+        }}
+        disabled={busy || user === undefined}
         className={styles.file}
       />
       <label htmlFor={id} className={styles.button} data-busy={busy}>

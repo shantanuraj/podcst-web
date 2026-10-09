@@ -1,27 +1,41 @@
 import type postgres from 'postgres';
-import { refreshFeed } from './feed-refresh';
+import { podcastAccess } from '../podcast-access';
+import {
+  feedFreshness,
+  readFeedState,
+  requestFeedRefresh,
+} from './feed-demand';
+import { interactiveAdmission } from './interactive-admission';
 
 export async function prepareEpisodeRead(
   sql: postgres.Sql,
   podcastId: string,
-): Promise<void> {
-  const [{ has_episodes, has_content }] = await sql`
-    WITH accessed AS (
-      UPDATE podcasts
-      SET last_accessed_at = now()
-      WHERE id = ${podcastId}
-        AND (last_accessed_at IS NULL OR last_accessed_at < now() - interval '1 hour')
-      RETURNING id
-    )
-    SELECT
-      EXISTS (SELECT 1 FROM episodes WHERE podcast_id = ${podcastId}) AS has_episodes,
-      EXISTS (
-        SELECT 1 FROM episode_content c JOIN episodes e ON e.id = c.episode_id
-        WHERE e.podcast_id = ${podcastId}
-      ) AS has_content
+  userId: string | null = null,
+  episodeId?: string,
+  admit = async () =>
+    (await interactiveAdmission()).refresh(
+      userId
+        ? { kind: 'account', id: userId }
+        : { kind: 'source', id: 'unattributed' },
+    ),
+) {
+  const row = await readFeedState(sql, podcastId, userId, episodeId);
+  if (!row) return null;
+  await sql`
+    UPDATE podcasts p SET last_accessed_at = now()
+    WHERE p.id = ${podcastId} AND ${podcastAccess(sql, userId)}
+      AND (last_accessed_at IS NULL OR last_accessed_at < now() - interval '1 hour')
   `;
-  if (has_episodes && !has_content) {
-    await refreshFeed(sql, podcastId, 'rebuild');
+  if (feedFreshness(row).content === 'cached') return feedFreshness(row);
+  try {
+    return await requestFeedRefresh(sql, podcastId, userId, admit, episodeId);
+  } catch {
+    const current = await readFeedState(sql, podcastId, userId, episodeId);
+    if (!current) return null;
+    const freshness = feedFreshness(current);
+    return freshness.state === 'stale'
+      ? { ...freshness, state: 'unavailable' as const, retryAtMs: null }
+      : freshness;
   }
 }
 
@@ -62,6 +76,7 @@ export async function readEpisodePage(
     sortDir = 'desc',
     unplayedBy,
   }: EpisodePageOptions,
+  userId: string | null = null,
 ) {
   const filter = sql`
     ${search ? sql`AND (c.title ILIKE ${`%${search}%`} OR c.summary ILIKE ${`%${search}%`})` : sql``}
@@ -87,7 +102,8 @@ export async function readEpisodePage(
     sql`
       SELECT COUNT(*)::text AS count FROM episodes e
       JOIN episode_content c ON c.episode_id = e.id
-      WHERE e.podcast_id = ${podcastId} ${filter}
+      JOIN podcasts p ON p.id = e.podcast_id
+      WHERE e.podcast_id = ${podcastId} AND ${podcastAccess(sql, userId)} ${filter}
     `,
     sql<EpisodeRow[]>`
       SELECT e.id, e.guid, e.published,
@@ -95,7 +111,8 @@ export async function readEpisodePage(
              c.file_url, c.file_length, c.file_type
       FROM episodes e
       JOIN episode_content c ON c.episode_id = e.id
-      WHERE e.podcast_id = ${podcastId} ${filter}
+      JOIN podcasts p ON p.id = e.podcast_id
+      WHERE e.podcast_id = ${podcastId} AND ${podcastAccess(sql, userId)} ${filter}
       ORDER BY ${sortColumn} ${direction} ${nulls}, e.id ${direction}
       LIMIT ${limit + 1}
       ${cursor ? sql`OFFSET ${cursor}` : sql``}
