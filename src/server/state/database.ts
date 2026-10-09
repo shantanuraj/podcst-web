@@ -7,6 +7,8 @@ import type {
   StateScope,
 } from '@/shared/state-contract';
 import { stateValidator } from '@/shared/state-contract';
+import { activeAccount } from '../auth/account-guard';
+import { readGeneration } from './generation';
 import {
   assertStateScope,
   StateError,
@@ -29,7 +31,7 @@ export async function readStateScope(
     SELECT g.generation, coalesce(h.revision, 0)::text AS revision
     FROM users u LEFT JOIN state_generation g ON g.singleton
     LEFT JOIN ${tx(tables[resource].head)} h ON h.user_id = u.id
-    WHERE u.id = ${accountId}
+    WHERE u.id = ${accountId} AND ${activeAccount(tx, accountId)}
   `;
   if (!row) throw new StateError('unauthenticated', 'Authentication required');
   if (!row.generation) throw new StateError('unavailable', 'State unavailable');
@@ -55,13 +57,8 @@ export async function lockStateChange(
   )
     throw new StateError('invalid_request', 'Invalid state changes');
   await tx`SET LOCAL lock_timeout = '3s'`;
-  const [generation] =
-    await tx`SELECT generation FROM state_generation WHERE singleton FOR SHARE`;
-  if (!generation) throw new StateError('unavailable', 'State unavailable');
-  assertStateScope(accountId, String(generation.generation), batch);
-  const [user] =
-    await tx`SELECT id FROM users WHERE id = ${accountId} FOR KEY SHARE`;
-  if (!user) throw new StateError('unauthenticated', 'Authentication required');
+  const { scope } = await readGeneration(tx, accountId, true);
+  assertStateScope(accountId, scope.generation, batch);
   const table = tables[resource];
   const registered = await tx`
     INSERT INTO ${tx(table.clients)} (user_id, client_id)

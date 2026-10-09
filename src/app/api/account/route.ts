@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server';
 import { getAccount } from '@/server/account';
+import { AuthError } from '@/server/auth/error';
+import { authResponse } from '@/server/auth/http';
 import { getSession } from '@/server/auth/session';
-import { privateFeedHeaders as headers } from '@/server/podcast-access';
+import { erasureHandlers } from '@/server/erasure/runtime';
 
 export async function GET() {
-  const session = await getSession();
-  if (!session)
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  return NextResponse.json(await getAccount(session.userId), { headers });
+  return authResponse(async () => {
+    const session = await getSession();
+    if (!session) throw new AuthError(401, 'Unauthorized');
+    return getAccount(session.userId);
+  });
 }
+
+export const DELETE = erasureHandlers.erase;

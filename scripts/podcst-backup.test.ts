@@ -26,6 +26,8 @@ const tables = [...script.matchAll(/-t ([a-z_]+\.[a-z_]+)/g)].map(
   (match) => match[1],
 );
 const excluded = {
+  account_erasure_proofs:
+    'Unaccepted short-lived proofs are invalidated on recovery; no receipt bearer is backed up',
   feed_poll_state:
     'Rebuildable validators and scheduling; cold polling costs I/O',
   poll_metrics:
@@ -54,6 +56,7 @@ test('selected backup includes coherent parents, content and the migration ledge
     'public.state_generation',
     'public.progress_clients',
     'public.follow_clients',
+    'public.account_erasure_intents',
   ]) {
     expect(tables).toContain(table);
   }
@@ -325,6 +328,8 @@ describe.skipIf(!process.env.PG_BIN)(
         INSERT INTO chart_history (country_id,day,podcast_id,rank) VALUES
           ('aa','2026-01-01',1,3), ('aa','2026-01-02',1,1), ('bb','2026-01-01',1,8)
       `;
+      await sql`INSERT INTO account_erasure_intents (operation_id, action, account_id, accepted_at, receipt_expires_at)
+        VALUES (${randomUUID()}, 'erase_account', 'retired-synthetic-account', now(), now() + interval '7 days')`;
       const before = await snapshot(sql);
       const beforeSequences = await sequences(sql);
       for (const rows of Object.values(before))

@@ -23,6 +23,7 @@ pg_dump "$BACKUP_DATABASE_URL" -Fc --strict-names --no-owner --no-privileges \
   -t public.progress_clients -t public.follow_clients \
   -t public.subscriptions -t public.playback_progress \
   -t public.passkeys -t public.sessions -t public.email_verifications \
+  -t public.account_erasure_intents \
   -t public.transcripts -t public.podcast_feed_aliases \
   -t public.podcast_apple_aliases -t public.account_preferences \
   -t public.episode_lists -t public.episode_list_items \

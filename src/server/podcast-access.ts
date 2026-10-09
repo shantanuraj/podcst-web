@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { activeAccount } from './auth/account-guard';
 
 export const privateFeedHeaders = {
   'Cache-Control': 'private, no-store',
@@ -9,7 +10,7 @@ export function podcastAccess(
   sql: postgres.ISql,
   userId: string | null = null,
 ) {
-  return sql`(p.owner_user_id IS NULL OR p.owner_user_id = ${userId})`;
+  return sql`(p.owner_user_id IS NULL OR (p.owner_user_id = ${userId} AND ${activeAccount(sql, sql`p.owner_user_id`)}))`;
 }
 
 export async function canAccessPodcast(

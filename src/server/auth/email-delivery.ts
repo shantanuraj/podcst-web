@@ -1,3 +1,4 @@
+import { ERASURE_PROOF_MS } from '../erasure/journal-contract';
 import { CODE_EXPIRY_MINUTES } from './email-service';
 import { AuthError } from './error';
 
@@ -14,6 +15,7 @@ export function createCodeDelivery(
   ) => Promise<{ error: unknown; data: { id: string } | null }>,
   from: string,
   timeoutMs = 10_000,
+  purpose: 'authentication' | 'account-erasure' = 'authentication',
 ) {
   return async (email: string, code: string) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -22,8 +24,14 @@ export function createCodeDelivery(
         send({
           from,
           to: email,
-          subject: 'Your Podcst verification code',
-          text: `Your verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.`,
+          subject:
+            purpose === 'account-erasure'
+              ? 'Confirm deletion of your Podcst account'
+              : 'Your Podcst verification code',
+          text:
+            purpose === 'account-erasure'
+              ? `Use this code only to confirm deleting your Podcst account: ${code}\n\nThis code expires in ${ERASURE_PROOF_MS / 60_000} minutes.`
+              : `Your verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.`,
         }),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error()), timeoutMs);

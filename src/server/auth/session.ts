@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { sql } from '../db';
+import { activeAccount, activePasskey } from './account-guard';
 
 const SESSION_COOKIE = 'session';
 
@@ -36,10 +37,10 @@ export async function getSession() {
       u.email,
       u.name,
       u.image,
-      EXISTS(SELECT 1 FROM passkeys p WHERE p.user_id = u.id) as has_passkey
+      EXISTS(SELECT 1 FROM passkeys p WHERE p.user_id = u.id AND ${activePasskey(sql, sql`p.id`)}) as has_passkey
     FROM sessions s
     JOIN users u ON u.id = s.user_id
-    WHERE s.id = ${sessionId} AND s.expires_at > now()
+    WHERE s.id = ${sessionId} AND s.expires_at > now() AND ${activeAccount(sql, sql`u.id`)}
   `;
 
   if (!session) return null;

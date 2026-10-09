@@ -15,6 +15,7 @@ import fixtures from '../../../contracts/state/fixtures.json';
 import transitions from '../../../contracts/state/transitions.json';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+import { loadMigrations } from '../../../scripts/migrations';
 import { legacyListHash } from '../lists/legacy';
 import { createEpisodeListService } from '../lists/service';
 import { createFollowStateService } from './follows';
@@ -686,6 +687,10 @@ describe.skipIf(!process.env.PG_BIN)(
       `;
         await upgrade`INSERT INTO subscriptions (user_id, podcast_id, subscribed_at) VALUES (${accountId}, ${first}, NULL)`;
         await upgrade.begin((tx) => tx.unsafe(migration));
+        for (const forward of loadMigrations().filter(
+          ({ name }) => name > '0010-durable-state.sql',
+        ))
+          await upgrade.begin((tx) => tx.unsafe(forward.source));
         const service = createProgressStateService(upgrade);
         const snapshot = await service.read(accountId, [first, second]);
         expect(snapshot.revision).toBe('2');

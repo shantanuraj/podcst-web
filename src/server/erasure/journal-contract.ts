@@ -1,4 +1,5 @@
 import { createHash, type KeyObject, sign, verify } from 'node:crypto';
+import { isAccountOperationId } from '@/shared/account-erasure';
 
 export type ErasurePayload = {
   version: 1;
@@ -56,13 +57,11 @@ export interface JournalClient {
   } | null>;
 }
 
+export const ERASURE_PROOF_MS = 5 * 60_000;
+export const ERASURE_RETRY_SECONDS = 5;
 export const RECEIPT_LIFETIME_MS = 7 * 86_400_000;
 export const JOURNAL_GENESIS = '0'.repeat(64);
-export const isOperationId = (value: unknown): value is string =>
-  typeof value === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+export const isOperationId = isAccountOperationId;
 export const isDigest = (value: unknown): value is string =>
   typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const isIdentity = (value: unknown) =>

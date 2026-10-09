@@ -3,6 +3,7 @@ import {
   createHash,
   generateKeyPairSync,
   randomBytes,
+  randomUUID,
   sign,
 } from 'node:crypto';
 import type {
@@ -220,6 +221,38 @@ describe.skipIf(!process.env.PG_BIN)(
         await sql.unsafe(
           'DROP TRIGGER reject_session ON sessions; DROP FUNCTION reject_session()',
         );
+      }
+    });
+
+    test('accepted passkey and account fences reject otherwise-valid signed authentication', async () => {
+      const [key] = await sql`SELECT id FROM passkeys WHERE user_id = 'owner'`;
+      const start = await service.getDiscoverableAuthOptions();
+      const registrationStart = await service.getRegistrationOptions(session);
+      const before = await sql`SELECT id FROM sessions ORDER BY id`;
+      const operationId = randomUUID();
+      await sql`INSERT INTO account_erasure_intents (operation_id, action, account_id, credential_id, accepted_at, receipt_expires_at)
+        VALUES (${operationId}, 'revoke_passkey', 'owner', ${key.id}, now(), now() + interval '7 days')`;
+      try {
+        await expect(
+          service.verifyAuthentication(
+            start.flowId,
+            assertion(start.options.challenge, 3),
+          ),
+        ).rejects.toMatchObject({ status: 400 });
+        await sql`INSERT INTO account_erasure_intents (operation_id, action, account_id, accepted_at, receipt_expires_at)
+          VALUES (${randomUUID()}, 'erase_account', 'owner', now(), now() + interval '7 days')`;
+        await expect(
+          service.verifyRegistration(
+            session,
+            registrationStart.flowId,
+            registration(registrationStart.options.challenge),
+          ),
+        ).rejects.toMatchObject({ status: 401 });
+        expect(
+          Array.from(await sql`SELECT id FROM sessions ORDER BY id`),
+        ).toEqual(Array.from(before));
+      } finally {
+        await sql`DELETE FROM account_erasure_intents`;
       }
     });
 

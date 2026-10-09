@@ -222,7 +222,13 @@ class PodcstApi(
         send<WirePreferences>("PUT", url("api/account/preferences"), json.encodeToJsonElement(WirePreferences.serializer(), options.wire())).domain()
 
     suspend fun removePasskey(id: String) {
-        send<WireSuccess>("DELETE", baseUrl.resolve("api/account/passkeys")!!.newBuilder().addPathSegment(id).build(), null)
+        val result = send<WireAccountOperation>("DELETE", baseUrl.resolve("api/account/passkeys")!!.newBuilder().addPathSegment(id).build(), null)
+        if (runCatching { java.util.UUID.fromString(result.operationId) }.isFailure) throw ApiException(502, "Invalid API response")
+        when (result.status) {
+            "completed" -> Unit
+            "pending" -> throw ApiException(202, result.message ?: "Account operation pending", "account_operation_pending", 5)
+            else -> throw ApiException(502, "Invalid API response")
+        }
     }
 
     private suspend inline fun <reified T> get(path: String, vararg query: Pair<String, String?>, session: Boolean = true): T =

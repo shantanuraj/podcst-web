@@ -64,6 +64,7 @@ parents in the same snapshot:
 - `state_generation`: current recovery fence and immutable initial legacy generation
 - `progress_revision_heads`, `follow_revision_heads`: independent accepted-action heads
 - `progress_clients`, `follow_clients`: stream sequences, hashes and saved acknowledgements
+- `account_erasure_intents`: accepted account/credential fences and publication/application outcomes; this primary copy is not independent recovery evidence
 
 All selected tables share one `pg_dump` snapshot. `--strict-names` refuses missing
 tables; a dump failure prevents encryption/upload. Owned serial sequences are
@@ -76,6 +77,7 @@ Only these current application tables are excluded:
 
 | Table | Recovery consequence |
 | --- | --- |
+| `account_erasure_proofs` | Unaccepted short-lived deletion proofs must be invalidated, never restored as authority; receipt capabilities live outside this archive |
 | `feed_poll_state` | Rebuild validators/backoff/scheduling; cold polling adds I/O and must be rate-controlled |
 | `poll_metrics` | Historical operational telemetry is lost; do not use it as durable recovery evidence |
 | `top_podcasts` | Current charts need a refresh; `chart_history` remains included |

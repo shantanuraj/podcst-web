@@ -92,7 +92,7 @@ class AccountRepositoryTest {
         val after = JsonObject(before + ("passkeys" to JsonArray(before.getValue("passkeys").jsonArray.take(1))))
         val (repository, server) = signedIn({ (if (removed.get()) after else before).toString() }) { call ->
             if (call.path == "/api/account/passkeys/pk-legacy") removed.set(true)
-            Reply(if (call.path == "/api/account/preferences") call.body else """{"success":true}""")
+            Reply(if (call.path == "/api/account/preferences") call.body else """{"status":"completed","operationId":"00000000-0000-4000-8000-000000000013"}""")
         }
         repository.account.first { it != null }
         repository.removePasskey("pk-legacy")
@@ -100,6 +100,17 @@ class AccountRepositoryTest {
         assertTrue(removed.get())
         assertEquals(2, server.calls.count { it.path == "/api/auth/session" })
         assertEquals(listOf("pk-mac"), repository.account.first { it?.passkeys?.size == 1 }!!.passkeys.map { it.id })
+    }
+
+    @Test
+    fun pendingPasskeyRemovalRetainsTheAccountKey() = runTest {
+        val (repository, _) = signedIn({ ACCOUNT.replace("PREFERENCES", """{"speed":0.75,"volumeBoost":false,"trimSilence":false}""") }) {
+            Reply("""{"status":"pending","operationId":"00000000-0000-4000-8000-000000000013","message":"Account operation pending; try again shortly."}""", 202)
+        }
+        repository.account.first { it != null }
+        val failure = runCatching { repository.removePasskey("pk-legacy") }.exceptionOrNull()
+        assertEquals(202, (failure as? app.podcst.network.ApiException)?.status)
+        assertEquals(listOf("pk-mac", "pk-legacy"), repository.account.value?.passkeys?.map { it.id })
     }
 
     private companion object {
