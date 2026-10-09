@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { IDBFactory } from 'fake-indexeddb';
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { freezeProgress, queueProgress } from '@/data/progress-outbox';
 import { stateRuntime } from '@/data/state-browser';
 import { accountState } from '@/data/state-storage';
 import { AccountContext } from '@/shared/auth/AccountBoundary';
@@ -192,6 +193,7 @@ async function fixture({
         ...(error ? { status: 'error', error: new Error('Unavailable') } : {}),
       });
   return {
+    fetcher,
     session,
     sync,
     render: () =>
@@ -536,25 +538,81 @@ test('guest catalogue loading waits for its own hydration after durable state is
   }
 });
 
-test('pending listening progress does not keep missing podcast details loading', async () => {
+test.each([
+  'queued',
+  'frozen',
+])('%s listening progress stays quiet without keeping missing podcast details loading', async (phase) => {
   const f = await fixture({ catalogue: [podcast] });
   try {
     await f.sync.storage.update((root) => {
-      accountState(root, scope.accountId).progress.queued.push({
-        episodeId: '701',
-        positionSeconds: 12,
-        completed: null,
-      });
+      const progress = accountState(root, scope.accountId).progress;
+      queueProgress(progress, '701', 'checkpoint', 12);
+      if (phase === 'frozen') freezeProgress(progress);
     });
     await f.sync.reload();
+    const before = await f.sync.storage.load();
     const markup = f.render();
-    expect(markup).toContain('Saved on this device. Waiting to sync…');
+    expect(markup).not.toContain('Saved on this device. Waiting to sync…');
     const subscriptions = section(markup, 'Subscriptions');
     expect(subscriptions).toContain(podcast.title);
     expect(subscriptions).toContain('Podcast details unavailable');
     expect(subscriptions).toContain('>Unfollow</button>');
     expect(subscriptions).not.toContain('aria-busy="true"');
     expect(subscriptions).not.toContain('aria-hidden="true"');
+    expect(await f.sync.storage.load()).toEqual(before);
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('a failed progress write still reports that it was not saved on this device', async () => {
+  const f = await fixture({ items: [membership('7')], catalogue: [podcast] });
+  const update = spyOn(f.sync.storage, 'update').mockRejectedValueOnce(
+    new Error('Disk full'),
+  );
+  try {
+    await expect(f.sync.progress('701', 'checkpoint', 12)).rejects.toThrow(
+      'Disk full',
+    );
+    const markup = f.render();
+    expect(markup).toContain('Progress could not be saved on this device.');
+    expect(markup).not.toContain('Saved on this device. Waiting to sync…');
+    expect(section(markup, 'Subscriptions')).toContain(podcast.title);
+  } finally {
+    update.mockRestore();
+    await f.dispose();
+  }
+});
+
+test('a failed sync remains visible while cached subscriptions stay available', async () => {
+  const f = await fixture({ items: [membership('7')], catalogue: [podcast] });
+  try {
+    f.fetcher.mockRejectedValueOnce(new Error('Offline'));
+    await f.sync.refresh();
+    const markup = f.render();
+    expect(markup).toContain(
+      'Sync paused. Pending work is retained for this account.',
+    );
+    expect(markup).not.toContain('Saved on this device. Waiting to sync…');
+    expect(section(markup, 'Subscriptions')).toContain(podcast.title);
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('blocked progress still asks for recovery instead of hiding the failure', async () => {
+  const f = await fixture({ items: [membership('7')], catalogue: [podcast] });
+  try {
+    await f.sync.storage.update((root) => {
+      const progress = accountState(root, scope.accountId).progress;
+      queueProgress(progress, '701', 'checkpoint', 12);
+      progress.blocked = 'Progress needs recovery';
+    });
+    await f.sync.reload();
+    const markup = f.render();
+    expect(markup).toContain('Progress needs recovery');
+    expect(markup).not.toContain('Saved on this device. Waiting to sync…');
+    expect(section(markup, 'Subscriptions')).toContain(podcast.title);
   } finally {
     await f.dispose();
   }

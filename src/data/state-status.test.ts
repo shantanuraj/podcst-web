@@ -31,9 +31,22 @@ test('player identifies an unavailable current episode and clears the notice for
     'Listening progress could not be saved because this episode is unavailable.',
   );
   queueProgress(progress, episodeId, 'checkpoint', 12);
-  expect(progressSyncStatus(progress, episodeId)).toBe(
-    'Saved on this device. Waiting to sync…',
-  );
+  expect(progressSyncStatus(progress, episodeId)).toBeUndefined();
+});
+
+test('saving the current position stays quiet while queued and in flight', () => {
+  const progress = emptyProgress();
+  progress.scope = {
+    protocol: 1,
+    accountId: 'account',
+    generation: '17adbd84-d0e4-4e2d-ad9f-b084efee3211',
+  };
+  queueProgress(progress, episodeId, 'checkpoint', 42);
+  expect(progressSyncStatus(progress, episodeId)).toBeUndefined();
+  expect(progress.queued[0].positionSeconds).toBe(42);
+  freezeProgress(progress);
+  expect(progressSyncStatus(progress, episodeId)).toBeUndefined();
+  expect(progress.flight?.batch.changes[0].positionSeconds).toBe(42);
 });
 
 test('player preserves blocked streams and device errors without inventing progress for guest episodes', () => {

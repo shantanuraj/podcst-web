@@ -190,10 +190,6 @@ export function useDurableState() {
     unresolvedFollows: state?.legacyFollows?.unresolved ?? [],
     unresolvedImports: follows?.importFailures ?? [],
     followsPending,
-    pending:
-      followsPending ||
-      (session.scope !== null &&
-        !!(progress?.flight || progress?.queued.length)),
     error: current
       ? (progress?.blocked ??
         follows?.blocked ??
@@ -203,10 +199,4 @@ export function useDurableState() {
         view.error)
       : undefined,
   };
-}
-export function DurableStateStatus() {
-  const state = useDurableState();
-  return state.error || state.pending
-    ? `${state.error ?? 'Saved on this device. Waiting to sync…'}`
-    : null;
 }

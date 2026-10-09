@@ -9,7 +9,7 @@ import {
   useEpisodeProgress,
   useRecentProgress,
 } from '@/data/progress';
-import { DurableStateStatus, useDurableState } from '@/data/state-browser';
+import { useDurableState } from '@/data/state-browser';
 import { localeForLanguage } from '@/messages';
 import { useSession } from '@/shared/auth/useAuth';
 import { useTranslation } from '@/shared/i18n';
@@ -98,7 +98,7 @@ export default function LibraryPage() {
         </div>
       </header>
       <p role="status" className={styles.status}>
-        <DurableStateStatus />
+        {durable.error}
         {queueError}
       </p>
       {durable.failedProgress.length > 0 && (

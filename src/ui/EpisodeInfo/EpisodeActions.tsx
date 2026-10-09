@@ -125,11 +125,7 @@ export function EpisodeActions({
           Mark unplayed
         </Button>
       )}
-      {(durable.error || durable.pending) && (
-        <span role="status">
-          {durable.error ?? 'Saved on this device. Waiting to sync…'}
-        </span>
-      )}
+      {durable.error && <span role="status">{durable.error}</span>}
       <ShareButton request={{ mode: 'episode', episode }} />
     </div>
   );
