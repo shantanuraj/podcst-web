@@ -21,6 +21,7 @@ export interface BrowserState {
     follows: string[];
     progress: ProgressOutbox;
     catalog?: ISubscriptionsMap;
+    imports?: string[];
   };
   legacyFollows?: { source: unknown; unresolved: string[]; activated: true };
   erased: string[];
@@ -92,6 +93,9 @@ export const browserStateStorage = () =>
         !!root.guest &&
         Array.isArray(root.guest.follows) &&
         root.guest.follows.every(isCanonicalId) &&
+        (root.guest.imports === undefined ||
+          (Array.isArray(root.guest.imports) &&
+            root.guest.imports.every((feed) => typeof feed === 'string'))) &&
         validProgress(root.guest.progress) &&
         Object.entries(root.accounts).every(
           ([account, state]) =>

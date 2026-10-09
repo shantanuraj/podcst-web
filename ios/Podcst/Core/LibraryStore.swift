@@ -245,9 +245,18 @@ public final class LibraryStore {
                 }
                 await durable.flush()
             } else {
-                for feed in feeds {
-                    let podcast = try await api.podcast(feed: feed)
-                    if podcast.isPrivate != true { try durable.setFollow(podcast, followed: true) }
+                let token = durable.activityToken
+                try durable.stageGuestImport(feeds)
+                for feed in durable.pendingImportFeeds {
+                    guard !Task.isCancelled, durable.activityToken == token, session.user == nil, durable.accountID == nil, !session.isLoading else { throw CancellationError() }
+                    do {
+                        let podcast = try await api.podcast(feed: feed)
+                        guard !Task.isCancelled, durable.activityToken == token, session.user == nil, durable.accountID == nil, !session.isLoading else { throw CancellationError() }
+                        try durable.resolvedGuestImport(feed, podcast: podcast)
+                    } catch {
+                        if error is CancellationError { throw error }
+                        self.error = "Some feeds need retry or are unavailable. Pending imports retained."
+                    }
                 }
                 podcasts = durable.guestFollows
             }

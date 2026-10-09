@@ -124,6 +124,33 @@ final class ContractFixtureTests: XCTestCase {
         return data
     }
 
+    func testBoundedOPMLFixtures() throws {
+        struct Vector: Decodable {
+            let name: String
+            let xml: String?
+            let prefix: String?
+            let fragment: String?
+            let `repeat`: Int?
+            let suffix: String?
+            let closeRepeat: Int?
+            let tail: String?
+            let valid: Bool
+            let feeds: [String]?
+            let count: Int?
+        }
+        struct Vectors: Decodable { let cases: [Vector] }
+        let vectors = try JSONDecoder().decode(Vectors.self, from: contractData("feeds/opml.json"))
+        for item in vectors.cases {
+            let repeated = (0..<(item.repeat ?? 0)).map { (item.fragment ?? "").replacingOccurrences(of: "{i}", with: String($0)) }.joined()
+            let document = item.xml ?? (item.prefix ?? "") + repeated + String(repeating: item.suffix ?? "", count: item.closeRepeat ?? 0) + (item.tail ?? "")
+            if item.valid {
+                let feeds = try OPML.feeds(in: document)
+                XCTAssertEqual(feeds.count, item.count, item.name)
+                if let expected = item.feeds { XCTAssertEqual(feeds, expected, item.name) }
+            } else { XCTAssertThrowsError(try OPML.feeds(in: document), item.name) }
+        }
+    }
+
     func testImportBatchesBoundEncodedBytesAndPreserveOrder() throws {
         let scope = StateScope(accountId: "synthetic", generation: "17adbd84-d0e4-4e2d-ad9f-b084efee3211")
         let feeds = (0..<45).map { "https://example.invalid/\($0)?token=" + String(repeating: "音", count: 4000) }

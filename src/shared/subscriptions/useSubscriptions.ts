@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { fetchEpisodesInfo } from '@/data/episodes';
 import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
 import { isCanonicalId } from '@/shared/canonical-id';
+import { FEED_LIMITS } from '@/shared/feed-contract';
 import type { IPodcastEpisodesInfo, ISubscriptionsMap } from '@/types';
 
 export type SubscriptionsState = {
@@ -16,99 +17,127 @@ export type SubscriptionsState = {
     feed: string,
     info: IPodcastEpisodesInfo,
   ) => Promise<void>;
-  addSubscriptions: (podcasts: IPodcastEpisodesInfo[]) => Promise<void>;
+  addSubscriptions: (
+    podcasts: IPodcastEpisodesInfo[],
+    current?: () => boolean,
+    source?: string,
+  ) => Promise<void>;
+  imports: string[];
+  stageImports: (feeds: readonly string[]) => Promise<void>;
   syncSubscription: (feed: string, info: IPodcastEpisodesInfo) => Promise<void>;
   isSyncing: boolean;
   syncAllSubscriptions: () => Promise<void>;
 };
-const storage = browserStateStorage();
 export const isSubscribed = (feed: string) => (state: SubscriptionsState) =>
   !!state.subs[feed];
-export const useSubscriptions = create<SubscriptionsState>((set, get) => {
-  const persist = async (change: Parameters<typeof storage.update>[0]) => {
-    try {
-      const root = await storage.update(change);
-      set({
-        initialized: true,
-        subs: Object.fromEntries(
-          Object.entries(root.guest.catalog ?? {}).filter(
-            ([, item]) => item.id && root.guest.follows.includes(item.id),
-          ),
-        ),
-        error: undefined,
-      });
-      if (typeof BroadcastChannel !== 'undefined') {
-        const channel = new BroadcastChannel('podcst-durable-state');
-        channel.postMessage('changed');
-        channel.close();
-      }
-    } catch (error) {
-      set({
-        error:
-          'Guest follows could not be saved or read. Source data retained.',
-      });
-      throw error;
-    }
-  };
-  return {
-    subs: {},
-    initialized: false,
-    isSyncing: false,
-    init: async () => {
+export function createSubscriptions(storage = browserStateStorage()) {
+  return create<SubscriptionsState>((set, get) => {
+    const persist = async (change: Parameters<typeof storage.update>[0]) => {
       try {
-        const source = await readLegacy('subscriptions');
-        await persist((root) => {
-          if (source !== undefined) convertGuestFollows(root, source);
-        });
-      } catch {
+        const root = await storage.update(change);
         set({
           initialized: true,
-          error: 'Guest follows could not be opened. Source data retained.',
+          subs: Object.fromEntries(
+            Object.entries(root.guest.catalog ?? {}).filter(
+              ([, item]) => item.id && root.guest.follows.includes(item.id),
+            ),
+          ),
+          imports: root.guest.imports ?? [],
+          error: undefined,
         });
-      }
-    },
-    addSubscription: async (feed, info) => {
-      if (info.isPrivate) return;
-      await get().addSubscriptions([{ ...info, feed }]);
-    },
-    addSubscriptions: (podcasts) =>
-      persist((root) => {
-        root.guest.catalog ??= {};
-        for (const info of podcasts) {
-          if (info.isPrivate) continue;
-          if (!isCanonicalId(info.id))
-            throw new Error('Resolve this podcast before following');
-          root.guest.catalog[info.feed] = info;
-          if (!root.guest.follows.includes(info.id))
-            root.guest.follows.push(info.id);
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('podcst-durable-state');
+          channel.postMessage('changed');
+          channel.close();
         }
-      }),
-    removeSubscription: (feed) =>
-      persist((root) => {
-        const id = root.guest.catalog?.[feed]?.id;
-        root.guest.follows = root.guest.follows.filter((item) => item !== id);
-        if (root.guest.catalog) delete root.guest.catalog[feed];
-      }),
-    toggleSubscription: (feed, info) =>
-      isSubscribed(feed)(get())
-        ? get().removeSubscription(feed)
-        : get().addSubscription(feed, info),
-    syncSubscription: (feed, info) =>
-      persist((root) => {
-        if (root.guest.catalog?.[feed] && !info.isPrivate)
-          root.guest.catalog[feed] = info;
-      }),
-    syncAllSubscriptions: async () => {
-      set({ isSyncing: true });
-      try {
-        for (const feed of Object.keys(get().subs))
-          await fetchEpisodesInfo(feed);
-      } catch {
-        set({ error: 'Some followed podcasts could not be refreshed.' });
-      } finally {
-        set({ isSyncing: false });
+      } catch (error) {
+        set({
+          error:
+            'Guest follows could not be saved or read. Source data retained.',
+        });
+        throw error;
       }
-    },
-  };
-});
+    };
+    return {
+      subs: {},
+      imports: [],
+      stageImports: (feeds) =>
+        persist((root) => {
+          const before = root.guest.imports ?? [];
+          const merged = [...new Set([...before, ...feeds])];
+          if (
+            merged.length > FEED_LIMITS.opml.pendingPerScope &&
+            merged.length > before.length
+          )
+            throw new Error(
+              'Too many unresolved imports. Retry pending feeds first.',
+            );
+          root.guest.imports = merged;
+        }),
+      initialized: false,
+      isSyncing: false,
+      init: async () => {
+        try {
+          const source = await readLegacy('subscriptions');
+          await persist((root) => {
+            if (source !== undefined) convertGuestFollows(root, source);
+          });
+        } catch {
+          set({
+            initialized: true,
+            error: 'Guest follows could not be opened. Source data retained.',
+          });
+        }
+      },
+      addSubscription: async (feed, info) => {
+        if (info.isPrivate) return;
+        await get().addSubscriptions([{ ...info, feed }]);
+      },
+      addSubscriptions: (podcasts, current = () => true, source) =>
+        persist((root) => {
+          if (!current()) return;
+          root.guest.catalog ??= {};
+          for (const info of podcasts) {
+            if (info.isPrivate) continue;
+            if (!isCanonicalId(info.id))
+              throw new Error('Resolve this podcast before following');
+            root.guest.catalog[info.feed] = info;
+            if (!root.guest.follows.includes(info.id))
+              root.guest.follows.push(info.id);
+            if (source)
+              root.guest.imports = root.guest.imports?.filter(
+                (feed) => feed !== source,
+              );
+          }
+        }),
+      removeSubscription: (feed) =>
+        persist((root) => {
+          const id = root.guest.catalog?.[feed]?.id;
+          root.guest.follows = root.guest.follows.filter((item) => item !== id);
+          if (root.guest.catalog) delete root.guest.catalog[feed];
+        }),
+      toggleSubscription: (feed, info) =>
+        isSubscribed(feed)(get())
+          ? get().removeSubscription(feed)
+          : get().addSubscription(feed, info),
+      syncSubscription: (feed, info) =>
+        persist((root) => {
+          if (root.guest.catalog?.[feed] && !info.isPrivate)
+            root.guest.catalog[feed] = info;
+        }),
+      syncAllSubscriptions: async () => {
+        set({ isSyncing: true });
+        try {
+          for (const feed of Object.keys(get().subs))
+            await fetchEpisodesInfo(feed);
+        } catch {
+          set({ error: 'Some followed podcasts could not be refreshed.' });
+        } finally {
+          set({ isSyncing: false });
+        }
+      },
+    };
+  });
+}
+export const useSubscriptions = createSubscriptions();
 export const getInit = (state: SubscriptionsState) => state.init;

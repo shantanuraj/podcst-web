@@ -120,7 +120,7 @@ fun SettingsScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             val document = withContext(Dispatchers.IO) {
-                runCatching { resolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } }.getOrNull()
+                runCatching { resolver.openInputStream(uri)?.use { app.podcst.model.Opml.read(it) } }.getOrNull()
             }
             if (document == null) toaster.show(resources.getString(R.string.unreadable)) else viewModel.import(document)
         }

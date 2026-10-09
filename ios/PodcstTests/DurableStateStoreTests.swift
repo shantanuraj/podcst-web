@@ -28,6 +28,20 @@ import XCTest
         XCTAssertTrue(state.followedIDs.contains(9_007_199_254_740_993))
     }
 
+    func testGuestImportBoundPersistsAndDoesNotConsumeSourcesOnRefusal() throws {
+        var state = store(StateServer())
+        let feeds = (0..<FeedLimits.current.opml.pendingPerScope).map { "https://example.invalid/\($0)" }
+        try state.stageGuestImport(feeds)
+        XCTAssertThrowsError(try state.stageGuestImport(["https://example.invalid/overflow"]))
+        state = store(StateServer())
+        XCTAssertEqual(state.pendingImportFeeds, feeds)
+        XCTAssertNoThrow(try state.stageGuestImport([feeds[0]]))
+        let token = state.activityToken
+        state.suspend()
+        XCTAssertNotEqual(state.activityToken, token)
+        XCTAssertEqual(state.pendingImportFeeds, feeds)
+    }
+
     func testPendingImportBoundRejectsAdditionsWithoutConsumingSources() async throws {
         let state = store(StateServer())
         try await state.activate(accountID: "a")

@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
     @State private var showingLogin = false
     @State private var importing = false
+    @State private var importError: String?
     @State private var showingAudio = false
     @State private var removing: Passkey?
     @State private var removalError: String?
@@ -118,9 +119,14 @@ struct SettingsView: View {
                 guard case .success(let url) = result else { return }
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
-                Task { await library.importFeeds(OPML.feeds(in: text)) }
+                do {
+                    let feeds = try OPML.read(url)
+                    Task { await library.importFeeds(feeds) }
+                } catch { importError = OPML.invalidMessage }
             }
+            .alert("Couldn’t import OPML", isPresented: Binding { importError != nil } set: { if !$0 { importError = nil } }) {
+                Button("OK", role: .cancel) {}
+            } message: { Text(importError ?? "") }
         }
         .tint(PodcstPalette.accent)
         .presentationDragIndicator(.visible)
@@ -206,11 +212,59 @@ enum OPML {
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?><opml version=\"1.0\"><head><title>Podcst Subscriptions</title></head><body>\(rows)</body></opml>"
     }
 
-    static func feeds(in document: String) -> [String] {
-        let regex = try! NSRegularExpression(pattern: #"xmlUrl\s*=\s*["']([^"']+)["']"#, options: .caseInsensitive)
-        return regex.matches(in: document, range: NSRange(document.startIndex..., in: document)).compactMap { match in
-            Range(match.range(at: 1), in: document).map { unescape(String(document[$0])) }
+    static let invalidMessage = "Invalid or oversized OPML. Existing imports retained."
+
+    static func read(_ url: URL) throws -> [String] {
+        let limit = FeedLimits.current.opml.bytes
+        if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > limit { throw FeedContractError.invalidResponse }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var data = Data()
+        while let part = try handle.read(upToCount: min(8192, limit + 1 - data.count)), !part.isEmpty {
+            data.append(part)
+            guard data.count <= limit else { throw FeedContractError.invalidResponse }
         }
+        guard let text = String(data: data, encoding: .utf8) else { throw FeedContractError.invalidResponse }
+        return try feeds(in: text)
+    }
+
+    static func feeds(in document: String) throws -> [String] {
+        guard document.utf8.count <= FeedLimits.current.opml.bytes else { throw FeedContractError.invalidResponse }
+        let declarations = try NSRegularExpression(pattern: #"<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<!DOCTYPE"#, options: .caseInsensitive)
+        for match in declarations.matches(in: document, range: NSRange(document.startIndex..., in: document)) {
+            guard let range = Range(match.range, in: document), !document[range].uppercased().hasPrefix("<!DOCTYPE") else { throw FeedContractError.invalidResponse }
+        }
+        let delegate = OutlineParser()
+        let parser = XMLParser(data: Data(document.utf8))
+        parser.shouldResolveExternalEntities = false
+        parser.delegate = delegate
+        guard parser.parse(), !delegate.invalid else { throw FeedContractError.invalidResponse }
+        return delegate.feeds
+    }
+
+    private final class OutlineParser: NSObject, XMLParserDelegate {
+        var feeds: [String] = []
+        var invalid = false
+        private var seen = Set<String>()
+        private var depth = 0
+        private var outlines = 0
+
+        func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes: [String: String]) {
+            depth += 1
+            let limits = FeedLimits.current.opml
+            guard depth <= limits.depth else { invalid = true; parser.abortParsing(); return }
+            guard elementName == "outline" else { return }
+            outlines += 1
+            guard outlines <= limits.outlines else { invalid = true; parser.abortParsing(); return }
+            guard let url = attributes.first(where: { $0.key.lowercased() == "xmlurl" })?.value.trimmingCharacters(in: .whitespacesAndNewlines), !url.isEmpty else { return }
+            guard url.utf16.count <= 4096 else { invalid = true; parser.abortParsing(); return }
+            if seen.insert(url).inserted { feeds.append(url) }
+            if feeds.count > limits.feeds { invalid = true; parser.abortParsing() }
+        }
+        func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) { depth -= 1 }
+        func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) { invalid = true }
+        func parser(_ parser: XMLParser, foundInternalEntityDeclarationWithName name: String, value: String?) { invalid = true; parser.abortParsing() }
+        func parser(_ parser: XMLParser, foundExternalEntityDeclarationWithName name: String, publicID: String?, systemID: String?) { invalid = true; parser.abortParsing() }
     }
 
     private static let entities = [("&", "&amp;"), ("\"", "&quot;"), ("'", "&apos;"), ("<", "&lt;"), (">", "&gt;")]
@@ -219,9 +273,6 @@ enum OPML {
         entities.reduce(value) { $0.replacingOccurrences(of: $1.0, with: $1.1) }
     }
 
-    private static func unescape(_ value: String) -> String {
-        entities.reversed().reduce(value) { $0.replacingOccurrences(of: $1.1, with: $1.0) }
-    }
 }
 
 enum DiscoveryRegion: String, CaseIterable, Identifiable {

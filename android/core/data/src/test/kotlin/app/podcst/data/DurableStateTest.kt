@@ -196,6 +196,18 @@ class DurableStateTest {
         assertEquals(malformed, file.readText())
     }
 
+    @Test fun guestImportBoundPreservesPendingWorkAcrossRestart() {
+        val feeds = (0 until app.podcst.model.FeedLimits.PENDING_PER_SCOPE).map { "https://example.invalid/$it" }
+        val store = open()
+        store.queueGuestImports(feeds)
+        val bytes = file.readBytes()
+        assertTrue(runCatching { store.queueGuestImports(listOf("https://example.invalid/overflow")) }.isFailure)
+        assertArrayEquals(bytes, file.readBytes())
+        assertEquals(feeds, open().guestImportFeeds())
+        store.queueGuestImports(listOf(feeds.first()))
+        assertEquals(feeds, open().guestImportFeeds())
+    }
+
     @Test fun guestImportWriteFailureCannotConsumeItsFailedSource() {
         val feed = "https://guest.test/rss"
         val store = open()

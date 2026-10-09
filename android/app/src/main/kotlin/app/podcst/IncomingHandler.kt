@@ -39,10 +39,14 @@ class IncomingHandler(private val context: Context, private val graph: AppGraph)
             is Incoming.Show -> navigator.podcast(incoming.podcast)
             is Incoming.Short -> resolve(incoming.slug)?.let { handle(it, navigator, toaster) }
             is Incoming.Opml -> {
-                val text = withContext(Dispatchers.IO) {
-                    runCatching { context.contentResolver.openInputStream(incoming.uri)?.use { it.reader().readText() } }.getOrNull()
-                } ?: return
-                val result = graph.library.import(Opml.feeds(text))
+                val feeds = withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.openInputStream(incoming.uri)?.use { Opml.feeds(Opml.read(it)) } }.getOrNull()
+                }
+                if (feeds == null) {
+                    toaster.show("Invalid or oversized OPML. Existing imports retained.")
+                    return
+                }
+                val result = graph.library.import(feeds)
                 toaster.show(
                     context.getString(R.string.imported, result.succeeded),
                     context.getString(R.string.import_failed, result.failed).takeIf { result.failed > 0 },

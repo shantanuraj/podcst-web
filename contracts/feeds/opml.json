@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {"name":"nested entities and deduplication","xml":"<?xml version=\"1.0\"?><opml><body><outline><outline xmlUrl=\"https://example.invalid/a?x=1&amp;y=&#50;\"/></outline><outline XMLURL=' https://example.invalid/a?x=1&amp;y=2 '/><outline xmlUrl='https://example.invalid/b'/></body></opml>","valid":true,"feeds":["https://example.invalid/a?x=1&y=2","https://example.invalid/b"],"count":2},
+    {"name":"ignore comments text and non-outlines","xml":"<opml><!-- <outline xmlUrl='https://example.invalid/fake'/> --><![CDATA[<!DOCTYPE fake><outline xmlUrl='https://example.invalid/fake'/>]]><head xmlUrl='https://example.invalid/fake'/><outline xmlUrl='https://example.invalid/real'/></opml>","valid":true,"feeds":["https://example.invalid/real"],"count":1},
+    {"name":"empty document","xml":"<opml><body/></opml>","valid":true,"feeds":[],"count":0},
+    {"name":"unclosed XML","xml":"<opml><outline xmlUrl='https://example.invalid/real'/>","valid":false},
+    {"name":"mismatched XML","xml":"<opml><body></opml>","valid":false},
+    {"name":"multiple roots","xml":"<opml/><opml/>","valid":false},
+    {"name":"duplicate attributes","xml":"<opml><outline xmlUrl='a' xmlUrl='b'/></opml>","valid":false},
+    {"name":"DTD without entities","xml":"<!DOCTYPE opml><opml/>","valid":false},
+    {"name":"external DTD","xml":"<!DOCTYPE opml SYSTEM 'https://example.invalid/xxe'><opml/>","valid":false},
+    {"name":"entity expansion","xml":"<!DOCTYPE opml [<!ENTITY a 'expanded'>]><opml><outline xmlUrl='&a;'/></opml>","valid":false},
+    {"name":"undeclared entity","xml":"<opml><outline xmlUrl='&unknown;'/></opml>","valid":false},
+    {"name":"depth boundary","prefix":"<opml>","fragment":"<outline>","repeat":31,"suffix":"</outline>","closeRepeat":31,"tail":"</opml>","valid":true,"count":0},
+    {"name":"depth overflow","prefix":"<opml>","fragment":"<outline>","repeat":32,"suffix":"</outline>","closeRepeat":32,"tail":"</opml>","valid":false},
+    {"name":"outline boundary","prefix":"<opml>","fragment":"<outline/>","repeat":10000,"tail":"</opml>","valid":true,"count":0},
+    {"name":"outline overflow","prefix":"<opml>","fragment":"<outline/>","repeat":10001,"tail":"</opml>","valid":false},
+    {"name":"feed boundary","prefix":"<opml>","fragment":"<outline xmlUrl='https://example.invalid/{i}'/>","repeat":1000,"tail":"</opml>","valid":true,"count":1000},
+    {"name":"feed overflow","prefix":"<opml>","fragment":"<outline xmlUrl='https://example.invalid/{i}'/>","repeat":1001,"tail":"</opml>","valid":false},
+    {"name":"distinct feeds not outline count","prefix":"<opml>","fragment":"<outline xmlUrl='https://example.invalid/same'/>","repeat":1001,"tail":"</opml>","valid":true,"count":1},
+    {"name":"UTF-8 byte overflow","prefix":"<opml>","fragment":"音","repeat":1747627,"tail":"</opml>","valid":false}
+  ]
+}

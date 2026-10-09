@@ -839,14 +839,14 @@ final class PlaybackTests: XCTestCase {
         XCTAssertEqual(controller.currentEpisode?.guid, "c")
     }
 
-    func testOPMLRoundTripsFeeds() {
+    func testOPMLRoundTripsFeeds() throws {
         let podcasts = [
             Podcast(feed: "https://example.com/a.xml?x=1&y=2", title: "A & B"),
             Podcast(feed: "https://example.com/\"quoted\".xml", title: "Quoted"),
         ]
 
-        XCTAssertEqual(OPML.feeds(in: OPML.document(podcasts)), podcasts.map(\.feed))
-        XCTAssertEqual(OPML.feeds(in: "<outline text='x' xmlUrl='https://example.com/feed'/>"), ["https://example.com/feed"])
+        XCTAssertEqual(try OPML.feeds(in: OPML.document(podcasts)), podcasts.map(\.feed))
+        XCTAssertEqual(try OPML.feeds(in: "<outline text='x' xmlUrl='https://example.com/feed'/>"), ["https://example.com/feed"])
     }
 
     func testReadinessHonorsPauseDuringLoading() {

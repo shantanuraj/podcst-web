@@ -103,7 +103,9 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
 
     @Synchronized fun guestImportFeeds(): List<String> { check(readable); return root.guestImportFeeds }
     @Synchronized fun queueGuestImports(feeds: List<String>) {
-        commit(root.copy(guestImportFeeds = (root.guestImportFeeds + feeds).distinct()))
+        val merged = (root.guestImportFeeds + feeds).distinct()
+        check(merged.size <= FeedLimits.PENDING_PER_SCOPE || merged.size == root.guestImportFeeds.size) { "Too many unresolved imports. Retry pending feeds first." }
+        commit(root.copy(guestImportFeeds = merged))
     }
     @Synchronized fun completeGuestImport(feed: String, podcast: Podcast) {
         check(!podcast.isPrivate)

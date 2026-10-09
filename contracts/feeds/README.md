@@ -7,6 +7,14 @@ server/web/iOS/Android. Refresh/freshness DTOs are not yet wired into read/refre
 endpoints; the [API reference](../api/README.md) distinguishes current behavior.
 No frozen progress, follow or Starred request changes as part of this contract.
 
+OPML uses strict streaming parsers across all clients with shared `opml.json`
+fixtures: reject unsafe declarations, malformed XML, excessive depth/outlines,
+more than 1000 distinct feeds and documents over 5 MiB. File intake checks known
+size before loading or uses a byte-bounded stream; UTF-8 decoding is strict.
+Errors never consume prior imports. Guest imports are persisted before resolution,
+with atomic successful membership/input updates and the same pending capacity
+rule as accounts. Existing larger pending sets remain retryable.
+
 ## Freshness
 
 Podcast, episode-page and hydrated subscription responses carry `freshness`:

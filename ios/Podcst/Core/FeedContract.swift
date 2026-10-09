@@ -68,7 +68,7 @@ struct FeedResolutionItem: Decodable, Sendable {
 
 struct FeedLimits: Decodable {
     struct Imports: Decodable { let items: Int; let retrySeconds: Int }
-    struct Opml: Decodable { let pendingPerScope: Int }
+    struct Opml: Decodable { let pendingPerScope: Int; let bytes: Int; let feeds: Int; let outlines: Int; let depth: Int }
     let bodyBytes: Int
     let imports: Imports
     let opml: Opml

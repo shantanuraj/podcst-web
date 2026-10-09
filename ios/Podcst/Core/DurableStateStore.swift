@@ -65,6 +65,7 @@ private struct DurableRoot: Codable {
     var legacyGuestSource: Data?
     var guestImported = false
     var unresolvedGuest: [Podcast] = []
+    var guestImportFeeds: [String]?
 }
 
 @MainActor @Observable final class DurableStateStore {
@@ -78,6 +79,7 @@ private struct DurableRoot: Codable {
     @ObservationIgnored private let api: any DurableStateAPI
     @ObservationIgnored private let save: (Data, URL) throws -> Void
     @ObservationIgnored private var epoch = UUID()
+    var activityToken: UUID { epoch }
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var retryAfter = Date.distantPast
     @ObservationIgnored private var authenticationPaused = false
@@ -125,7 +127,27 @@ private struct DurableRoot: Codable {
     var legacyProgress: [PlaybackProgressWriter.Update] { verified ? account.legacyProgress : [] }
     var unresolvedCount: Int { root.unresolvedGuest.count + legacyProgress.filter { $0.episodeID > 9_007_199_254_740_991 || $0.episodeID <= 0 }.count }
     var failures: [String] { verified ? account.failures : [] }
-    var pendingImportFeeds: [String] { verified ? account.importFeeds : [] }
+    var pendingImportFeeds: [String] { accountID == nil ? root.guestImportFeeds ?? [] : verified ? account.importFeeds : [] }
+
+    func stageGuestImport(_ feeds: [String]) throws {
+        guard accountID == nil else { throw DurableStateFailure.suspended }
+        try commit { root in
+            var pending = root.guestImportFeeds ?? []
+            let additions = Set(feeds).subtracting(pending)
+            guard additions.isEmpty || pending.count + additions.count <= FeedLimits.current.opml.pendingPerScope else { throw FeedContractError.invalidResponse }
+            for feed in feeds where !pending.contains(feed) { pending.append(feed) }
+            root.guestImportFeeds = pending
+        }
+    }
+
+    func resolvedGuestImport(_ feed: String, podcast: Podcast) throws {
+        guard accountID == nil, podcast.isPrivate != true, let id = podcast.id, id > 0 else { throw DurableStateFailure.suspended }
+        try commit { root in
+            root.guestFollows.removeAll { $0.id == id }
+            root.guestFollows.append(podcast)
+            root.guestImportFeeds?.removeAll { $0 == feed }
+        }
+    }
     func importReady(_ feed: String, now: Date = Date()) -> Bool { (account.importRetryAt?[feed] ?? .distantPast) <= now }
     func deferImport(_ feeds: [String], seconds: Int, now: Date = Date()) throws {
         try update { state in
