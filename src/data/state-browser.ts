@@ -59,18 +59,35 @@ export function connectState(session: AccountSession) {
   channel.onmessage = () => {
     void runtime.sync.reload();
   };
-  let installed = '';
+  let installedProgress = '';
+  let installedFollows = '';
   const watch = runtime.sync.subscribe(() => {
     const view = runtime.sync.getSnapshot();
+    if (!session.getSnapshot().ready || session.scope !== view.account) return;
     const state = view.account ? view.state?.accounts[view.account] : undefined;
-    const key = `${view.account}:${state?.progress.revision}:${state?.follows.snapshot?.revision}`;
-    if (key === installed) return;
-    installed = key;
-    if (session.scope !== view.account) return;
-    for (const kind of ['subscriptions', 'podcast-progress', 'recent-progress'])
+    const progress = JSON.stringify([
+      view.account,
+      state?.progress.scope?.generation,
+      state?.progress.revision,
+    ]);
+    const follows = JSON.stringify([
+      view.account,
+      state?.follows.snapshot?.generation,
+      state?.follows.snapshot?.revision,
+    ]);
+    if (progress !== installedProgress) {
+      installedProgress = progress;
+      for (const kind of ['podcast-progress', 'recent-progress'])
+        void session.client.invalidateQueries({
+          queryKey: ['account', session.scope, kind],
+        });
+    }
+    if (follows !== installedFollows) {
+      installedFollows = follows;
       void session.client.invalidateQueries({
-        queryKey: ['account', session.scope, kind],
+        queryKey: ['account', session.scope, 'subscriptions'],
       });
+    }
   });
   let revision = -1;
   let ready = false;
