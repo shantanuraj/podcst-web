@@ -10,6 +10,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FeedContractTest {
+    @Test fun importBatchesBoundEncodedBytesAndPreserveOrder() {
+        val feeds = (0..<45).map { "https://example.invalid/$it?token=" + "音".repeat(4000) }
+        val batches = FeedImportRequest.batches("synthetic", "17adbd84-d0e4-4e2d-ad9f-b084efee3211", feeds)
+        assertEquals(feeds, batches.flatten())
+        org.junit.Assert.assertTrue(batches.size > 3)
+        batches.forEach {
+            org.junit.Assert.assertTrue(it.size <= FeedLimits.IMPORT_ITEMS)
+            val bytes = Json.encodeToString(FeedImportRequest.serializer(), FeedImportRequest(1, "synthetic", "17adbd84-d0e4-4e2d-ad9f-b084efee3211", it)).toByteArray(Charsets.UTF_8)
+            org.junit.Assert.assertTrue(bytes.size <= FeedLimits.BODY_BYTES)
+        }
+    }
+
     @Test fun sharedFreshnessAndImportFixtures() {
         val root = File(checkNotNull(System.getProperty("podcst.contracts")))
         val fixtures = Json.parseToJsonElement(File(root, "feeds/fixtures.json").readText()).jsonArray

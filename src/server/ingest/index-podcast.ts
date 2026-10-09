@@ -1,7 +1,6 @@
 import type postgres from 'postgres';
 import { FEED_LIMITS } from '@/shared/feed-contract';
 import { readGeneration } from '../state/generation';
-import { StateError } from '../state/protocol';
 import {
   claimAppleIdentity,
   findAppleSource,
@@ -11,6 +10,7 @@ import { upsertEpisodes } from './episodes';
 import { claimPublicAliases } from './feed-aliases';
 import { fetchFeed, savePollState } from './feed-refresh';
 import { getPollInterval } from './feed-schedule';
+import { assertImportScope } from './import-scope';
 import {
   type AppleListingVerification,
   claimPublicIdentity,
@@ -18,6 +18,7 @@ import {
   lockPodcastIdentities,
   PodcastAccessDenied,
   type PodcastIdentity,
+  PodcastIdentityBusy,
   PodcastIdentityConflict,
 } from './podcast-identity';
 import { verifyPublicFeedMove } from './public-feed-moves';
@@ -31,9 +32,21 @@ export {
   PodcastIdentityConflict,
 } from './podcast-identity';
 
+export interface ImportLease {
+  signal: AbortSignal;
+  assertOwned(): Promise<void>;
+  release(): Promise<void>;
+}
+
 export interface PrivateImportScope {
   generation: string;
   sessionId?: string;
+  admit?: (signal: AbortSignal) => Promise<ImportLease>;
+}
+
+interface ImportAdmission {
+  beforeFetch(signal: AbortSignal): Promise<AbortSignal>;
+  beforeCommit(): Promise<void>;
 }
 
 function authorizePrivate(podcast: PodcastIdentity, userId: string) {
@@ -52,6 +65,7 @@ async function index(
   verification?: AppleListingVerification,
   signal?: AbortSignal,
   scope?: PrivateImportScope,
+  admission?: ImportAdmission,
 ): Promise<string> {
   signal?.throwIfAborted();
   const applePlan =
@@ -64,6 +78,9 @@ async function index(
   if (existing && ownerUserId) authorizePrivate(existing, ownerUserId);
   if (!ownerUserId && existing?.owner_user_id && itunesId === undefined)
     throw new PodcastAccessDenied('Feed unavailable');
+  if (!existing && admission && signal)
+    signal = await admission.beforeFetch(signal);
+  signal?.throwIfAborted();
   const fetched = existing
     ? null
     : await fetchFeed(feedUrl, undefined, ownerUserId !== null, signal);
@@ -107,25 +124,16 @@ async function index(
       ? claimAppleIdentity(tx, source, applePlan, identities)
       : claimPublicIdentity(tx, source, feedUrl, itunesId, verification);
 
+  await admission?.beforeCommit();
+  signal?.throwIfAborted();
   return sql.begin(async (tx) => {
     if (signal) {
       await tx`SET LOCAL lock_timeout = '3s'`;
       await tx`SET LOCAL statement_timeout = '10s'`;
     }
     signal?.throwIfAborted();
-    if (ownerUserId) {
-      const current = await readGeneration(tx, ownerUserId, true);
-      if (current.scope.generation !== scope?.generation)
-        throw new StateError('recovery_required', 'Account recovery required');
-      if (scope.sessionId !== undefined) {
-        const [session] = await tx`
-          SELECT id FROM sessions WHERE id = ${scope.sessionId} AND user_id = ${ownerUserId}
-            AND expires_at > clock_timestamp() FOR SHARE
-        `;
-        if (!session)
-          throw new StateError('unauthenticated', 'Authentication required');
-      }
-    }
+    if (ownerUserId && scope)
+      await assertImportScope(tx, ownerUserId, scope, true);
     await lockPodcastIdentities(tx, identities);
     signal?.throwIfAborted();
     let found: PodcastIdentity | undefined;
@@ -145,7 +153,7 @@ async function index(
     }
     if (found) {
       if (!locators.includes(found.feed_url))
-        throw new PodcastIdentityConflict(
+        throw new PodcastIdentityBusy(
           'Canonical source changed during import; retry',
         );
       signal?.throwIfAborted();
@@ -244,14 +252,28 @@ export async function indexPrivatePodcast(
     : deadline;
   signal.throwIfAborted();
   const expected = scope ?? (await readGeneration(sql, userId)).scope;
-  return index(
-    sql,
-    feedUrl,
-    userId,
-    undefined,
-    undefined,
-    undefined,
-    signal,
-    expected,
-  );
+  let lease: ImportLease | undefined;
+  try {
+    return await index(
+      sql,
+      feedUrl,
+      userId,
+      undefined,
+      undefined,
+      undefined,
+      signal,
+      expected,
+      {
+        async beforeFetch(signal) {
+          lease = await scope?.admit?.(signal);
+          return lease ? AbortSignal.any([signal, lease.signal]) : signal;
+        },
+        async beforeCommit() {
+          await lease?.assertOwned();
+        },
+      },
+    );
+  } finally {
+    if (lease) await lease.release().catch(() => {});
+  }
 }

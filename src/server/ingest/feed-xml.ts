@@ -1,9 +1,10 @@
 import { Parser } from 'htmlparser2';
+import { FeedUnavailableError } from './feed-errors';
 import { MAX_FEED_BYTES } from './feed-limits';
 
 export function validateFeedXml(xml: string) {
   const refuse = () => {
-    throw new Error('Invalid or unsafe feed XML');
+    throw new FeedUnavailableError('Invalid or unsafe feed XML');
   };
   if (Buffer.byteLength(xml) > MAX_FEED_BYTES) refuse();
   let depth = 0;

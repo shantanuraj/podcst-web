@@ -6,12 +6,20 @@
     {
       "index": 0,
       "podcastId": "910001",
-      "status": "resolved"
+      "status": "resolved",
+      "retryAfterSeconds": null
     },
     {
       "index": 1,
       "podcastId": null,
-      "status": "unavailable"
+      "status": "unavailable",
+      "retryAfterSeconds": null
+    },
+    {
+      "index": 2,
+      "podcastId": null,
+      "status": "retry",
+      "retryAfterSeconds": 30
     }
   ]
 }

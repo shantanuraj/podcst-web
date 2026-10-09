@@ -20,6 +20,7 @@ export interface FollowOutbox {
   blocked?: string;
   failures: string[];
   importFailures: string[];
+  importRetryAt?: Record<string, number>;
 }
 export const emptyFollows = (): FollowOutbox => ({
   clientId: crypto.randomUUID(),
@@ -133,6 +134,13 @@ export function validFollows(value: unknown): value is FollowOutbox {
     Array.isArray(state.failures) &&
     Array.isArray(state.importFailures) &&
     state.importFailures.every((url) => typeof url === 'string') &&
+    (state.importRetryAt === undefined ||
+      (!!state.importRetryAt &&
+        typeof state.importRetryAt === 'object' &&
+        !Array.isArray(state.importRetryAt) &&
+        Object.values(state.importRetryAt).every(
+          (time) => Number.isSafeInteger(time) && time >= 0,
+        ))) &&
     (!state.scope || validStateScope(state.scope)) &&
     (!state.snapshot ||
       (stateValidator('followSnapshot')(state.snapshot) &&

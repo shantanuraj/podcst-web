@@ -219,19 +219,29 @@ public final class LibraryStore {
             if let accountID = session.user?.id {
                 await durable.flush()
                 guard let scope = durable.scope else { throw DurableStateFailure.suspended }
+                _ = try FeedImportRequest.batches(feeds, scope: scope)
                 try durable.stageImport(feeds)
-                let pending = durable.pendingImportFeeds
-                for offset in stride(from: 0, to: pending.count, by: 20) {
-                    let batch = Array(pending[offset..<min(offset + 20, pending.count)])
-                    let result = try await api.resolveFollows(batch, scope: scope)
+                let batches = try FeedImportRequest.batches(durable.pendingImportFeeds.filter { durable.importReady($0) }, scope: scope)
+                for (offset, batch) in batches.enumerated() {
+                    guard !Task.isCancelled, session.user?.id == accountID, durable.scope == scope else { throw CancellationError() }
+                    let result: FollowResolution
+                    do { result = try await api.resolveFollows(batch, scope: scope) }
+                    catch {
+                        guard !Task.isCancelled, session.user?.id == accountID, durable.scope == scope else { throw CancellationError() }
+                        if let failure = error as? APIError, failure.statusCode == 429 || failure.statusCode >= 500 {
+                            let delay = min(86400, max(1, failure.retryAfter ?? Double(FeedLimits.current.imports.retrySeconds)))
+                            try durable.deferImport(batches.dropFirst(offset).flatMap { $0 }, seconds: Int(delay))
+                        }
+                        throw error
+                    }
                     guard session.user?.id == accountID, durable.scope == scope,
                           result.protocol == 1, result.accountId == scope.accountId, result.generation == scope.generation,
-                          result.items.map(\.index) == Array(batch.indices),
-                          result.items.allSatisfy({ ($0.status == "resolved" && $0.podcastId != nil) || ($0.status == "unavailable" && $0.podcastId == nil) }) else { throw DurableStateFailure.protocolViolation }
+                          result.items.map(\.index) == Array(batch.indices) else { throw DurableStateFailure.protocolViolation }
                     for item in result.items {
                         if let id = item.podcastId { try durable.resolvedImport(feed: batch[item.index], id: id) }
+                        else if let delay = item.retryAfterSeconds { try durable.deferImport([batch[item.index]], seconds: delay) }
                     }
-                    if result.items.contains(where: { $0.status == "unavailable" }) { error = "Some feeds could not be resolved. Retry the import to resolve them." }
+                    if result.items.contains(where: { $0.status != .resolved }) { error = "Some feeds need retry or are unavailable. Pending imports retained." }
                 }
                 await durable.flush()
             } else {

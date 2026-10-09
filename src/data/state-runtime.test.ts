@@ -510,8 +510,18 @@ test('OPML preserves per-URL failures across restart without retrying successful
       ? {
           ...scope,
           items: [
-            { index: 0, podcastId: id, status: 'resolved' },
-            { index: 1, podcastId: null, status: 'unavailable' },
+            {
+              index: 0,
+              podcastId: id,
+              status: 'resolved',
+              retryAfterSeconds: null,
+            },
+            {
+              index: 1,
+              podcastId: null,
+              status: 'unavailable',
+              retryAfterSeconds: null,
+            },
           ],
         }
       : request(...args);
@@ -530,6 +540,102 @@ test('OPML preserves per-URL failures across restart without retrying successful
   expect(
     restart.getSnapshot().state?.accounts.a.follows.importFailures,
   ).toEqual([bad]);
+});
+
+test('import retry advice persists across restart and does not block a new source', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await f.online();
+  await sync.refresh();
+  const deferred = 'https://retry.invalid/feed';
+  const fresh = 'https://new.invalid/feed';
+  const calls: string[][] = [];
+  const request = f.api.request;
+  f.api.request = async (path, method, body) => {
+    if (path !== '/subscriptions/resolve') return request(path, method, body);
+    const feeds = (body as { feedUrls: string[] }).feedUrls;
+    calls.push(feeds);
+    return {
+      ...scope,
+      items: feeds.map((feed, index) =>
+        feed === deferred
+          ? { index, podcastId: null, status: 'retry', retryAfterSeconds: 60 }
+          : {
+              index,
+              podcastId: id,
+              status: 'resolved',
+              retryAfterSeconds: null,
+            },
+      ),
+    };
+  };
+  expect(await sync.resolveFeeds([deferred])).toEqual({
+    succeeded: 0,
+    failed: [deferred],
+  });
+  const retryAt = (await f.storage.load()).accounts.a.follows.importRetryAt?.[
+    deferred
+  ];
+  expect(retryAt).toBeGreaterThan(Date.now());
+  const restart = f.make();
+  await restart.activate('a');
+  expect(await restart.resolveFeeds([deferred, fresh])).toEqual({
+    succeeded: 1,
+    failed: [deferred],
+  });
+  expect(calls).toEqual([[deferred], [fresh]]);
+  expect((await f.storage.load()).accounts.a.follows.importFailures).toEqual([
+    deferred,
+  ]);
+  await f.storage.update((root) => {
+    root.accounts.a.follows.importRetryAt = { [deferred]: 0 };
+  });
+  await restart.resolveFeeds([deferred]);
+  expect(calls).toEqual([[deferred], [fresh], [deferred]]);
+});
+
+test('new pending-import bounds preserve older oversized work without truncation', async () => {
+  const f = fixture();
+  const sync = f.make();
+  await sync.activate('a');
+  await f.online();
+  await sync.refresh();
+  const old = Array.from(
+    { length: 1001 },
+    (_, i) => `https://example.invalid/${i}`,
+  );
+  await f.storage.update((root) => {
+    root.accounts.a.follows.importFailures = old;
+  });
+  await expect(sync.resolveFeeds(['https://new.invalid/feed'])).rejects.toThrow(
+    'Too many unresolved imports',
+  );
+  expect((await f.storage.load()).accounts.a.follows.importFailures).toEqual(
+    old,
+  );
+  const request = f.api.request;
+  f.api.request = async (...args) =>
+    args[0] === '/subscriptions/resolve'
+      ? {
+          ...scope,
+          items: [
+            {
+              index: 0,
+              podcastId: id,
+              status: 'resolved',
+              retryAfterSeconds: null,
+            },
+          ],
+        }
+      : request(...args);
+  expect(await sync.resolveFeeds([old[0]])).toEqual({
+    succeeded: 1,
+    failed: [],
+  });
+  expect((await f.storage.load()).accounts.a.follows.importFailures).toEqual(
+    old.slice(1),
+  );
 });
 
 async function guestSelectionFixture() {

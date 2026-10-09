@@ -1,4 +1,5 @@
 import type { PublicResolver } from '../http/public-destination';
+import { FeedUnavailableError } from './feed-errors';
 import {
   type FeedResponse,
   type FeedValidators,
@@ -40,15 +41,15 @@ export async function fetchFeedResponse(
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       if (!response.location || redirects >= 5)
-        throw new Error('Feed redirect limit');
+        throw new FeedUnavailableError('Feed redirect limit');
       let next: URL;
       try {
         next = feedDestination(new URL(response.location, url).href);
       } catch {
-        throw new Error('Unsafe feed redirect');
+        throw new FeedUnavailableError('Unsafe feed redirect');
       }
       if (url.protocol === 'https:' && next.protocol !== 'https:')
-        throw new Error('Unsafe feed redirect downgrade');
+        throw new FeedUnavailableError('Unsafe feed redirect downgrade');
       if (url.origin !== next.origin) conditions = {};
       url = next;
       continue;

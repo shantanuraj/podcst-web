@@ -242,11 +242,10 @@ extension StateID {
 }
 
 struct FollowResolution: Decodable {
-    struct Item: Decodable { var index: Int; var podcastId: StateID?; var status: String }
     var `protocol`: Int
     var accountId: String
     var generation: String
-    var items: [Item]
+    var items: [FeedResolutionItem]
 }
 
 func readPreservedState(_ url: URL) throws -> Data? {

@@ -124,6 +124,19 @@ final class ContractFixtureTests: XCTestCase {
         return data
     }
 
+    func testImportBatchesBoundEncodedBytesAndPreserveOrder() throws {
+        let scope = StateScope(accountId: "synthetic", generation: "17adbd84-d0e4-4e2d-ad9f-b084efee3211")
+        let feeds = (0..<45).map { "https://example.invalid/\($0)?token=" + String(repeating: "音", count: 4000) }
+        let batches = try FeedImportRequest.batches(feeds, scope: scope)
+        XCTAssertEqual(batches.flatMap { $0 }, feeds)
+        XCTAssertGreaterThan(batches.count, 3)
+        for batch in batches {
+            XCTAssertLessThanOrEqual(batch.count, FeedLimits.current.imports.items)
+            let bytes = try JSONEncoder().encode(FeedImportRequest(accountId: scope.accountId, generation: scope.generation, feedUrls: batch))
+            XCTAssertLessThanOrEqual(bytes.count, FeedLimits.current.bodyBytes)
+        }
+    }
+
     func testFeedFreshnessAndImportContractFixtures() throws {
         let data = try contractData("feeds/fixtures.json")
         let fixtures = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])

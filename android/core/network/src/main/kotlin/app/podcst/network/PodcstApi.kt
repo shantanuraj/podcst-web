@@ -177,10 +177,7 @@ class PodcstApi(
         post("api/subscriptions", json.encodeToJsonElement(StateBatch.serializer(StateFollowChange.serializer()), batch))
 
     suspend fun resolveSubscriptions(accountId: String, generation: String, feeds: List<String>): FollowResolution =
-        post("api/subscriptions/resolve", body {
-            put("protocol", 1); put("accountId", accountId); put("generation", generation)
-            putJsonArray("feedUrls") { feeds.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
-        })
+        post("api/subscriptions/resolve", json.encodeToJsonElement(FeedImportRequest.serializer(), FeedImportRequest(1, accountId, generation, feeds)))
 
     suspend fun progressState(ids: List<Long>? = null): StateSnapshot<StateProgressItem> =
         if (ids == null) get("api/progress", "view" to "state", "recent" to "1")

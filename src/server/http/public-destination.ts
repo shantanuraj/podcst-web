@@ -43,6 +43,8 @@ export function isPublicAddress(address: string) {
         !blocked.check(address, 'ipv6');
 }
 
+export class NonpublicDestination extends Error {}
+
 export async function resolvePublicAddress(
   hostname: string,
   resolve: (
@@ -55,7 +57,7 @@ export async function resolvePublicAddress(
     !addresses.length ||
     addresses.some(({ address }) => !isPublicAddress(address))
   )
-    throw new Error('Nonpublic feed destination');
+    throw new NonpublicDestination('Nonpublic feed destination');
   return addresses[0].address;
 }
 

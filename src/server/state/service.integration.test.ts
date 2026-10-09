@@ -552,10 +552,25 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(result).toEqual({
         ...scope,
         items: [
-          { index: 0, podcastId: first, status: 'resolved' },
-          { index: 1, podcastId: null, status: 'unavailable' },
-          { index: 2, podcastId: null, status: 'unavailable' },
-          { index: 3, podcastId: second, status: 'resolved' },
+          {
+            index: 0,
+            podcastId: first,
+            status: 'resolved',
+            retryAfterSeconds: null,
+          },
+          {
+            index: 1,
+            podcastId: null,
+            status: 'unavailable',
+            retryAfterSeconds: null,
+          },
+          { index: 2, podcastId: null, status: 'retry', retryAfterSeconds: 30 },
+          {
+            index: 3,
+            podcastId: second,
+            status: 'resolved',
+            retryAfterSeconds: null,
+          },
         ],
       });
       expect(stateValidator('followResolution')(result)).toBe(true);
@@ -613,9 +628,7 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(maximum).toBeLessThanOrEqual(2);
       expect(active).toBe(0);
       expect(result.items).toHaveLength(20);
-      expect(result.items.every(({ status }) => status === 'unavailable')).toBe(
-        true,
-      );
+      expect(result.items.every(({ status }) => status === 'retry')).toBe(true);
       expect(await sql`SELECT * FROM subscriptions`).toHaveLength(0);
     });
 

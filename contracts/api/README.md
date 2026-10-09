@@ -300,14 +300,28 @@ Unversioned one-item writers and `DELETE /api/subscriptions` return 426
 
 ### `POST /api/subscriptions/resolve` — required
 
-Body: durable scope plus `feedUrls`, 1–20 strings of at most 4096 characters.
-Returns the same scope and ordered `{index, podcastId:string|null,
-status:"resolved"|"unavailable"}` outcomes. It resolves identities but does **not**
-follow them. Clients persist ordinary follow intents for successful items and keep
-failures for explicit retry. Resolution uses the existing safe indexer, at most two
-concurrent fetches and one ten-second upstream deadline; work not resolved in that
-budget remains unavailable. Admission is six requests/account/minute. Scope is
-rechecked after resolution. Fixture: `follow-resolution.result.json`.
+Body: durable scope plus `feedUrls`, 1–20 strings of at most 4096 characters,
+within 64 KiB of encoded UTF-8. Returns the same scope and one ordered item/input:
+`{index, podcastId:string|null, status:"resolved"|"retry"|"unavailable", retryAfterSeconds:number|null}`.
+Only resolved items have IDs; only retry items have a positive bounded retry delay.
+Unsafe/invalid/hidden/conflicting sources are unavailable. Temporary upstream,
+admission and deadline failures are retryable, including inputs not yet started.
+Duplicate normalized locators share work without dropping their input positions.
+
+This resolves identities, never membership. All clients persist successful results
+as ordinary follow intents and retain other inputs. Retry deadlines survive local
+restart/account departure. Batches respect both item and byte limits. New pending
+imports are capped at 1000/account; older larger sets remain available for bounded
+retry instead of being discarded. This is not an asynchronous import-job API.
+
+The existing safe indexer uses two workers and one ten-second upstream deadline.
+Shared admission allows six new-work requests/account/minute, 120 starts/minute,
+two active imports/account and 16 globally. Already indexed sources need no fetch
+permit. Redis failure refuses new fetching without hiding cached authorized results.
+The initiating session, account and recovery generation are rechecked at commit
+and before returning the batch; revocation cancels/drains sibling work. Private
+identity ownership is rechecked after fetching. Fixture: `follow-resolution.result.json`.
+See the [feed contract](../feeds/README.md) for exact shapes and limits.
 
 ### `GET /api/progress` — required
 

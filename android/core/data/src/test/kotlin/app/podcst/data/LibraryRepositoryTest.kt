@@ -136,10 +136,34 @@ class LibraryRepositoryTest {
         assertEquals(1, server.calls.size)
     }
 
+    @Test fun retryableImportWaitsAcrossRestartAndRetainsOtherPendingWork() = runTest {
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        var now = System.currentTimeMillis()
+        val feed = "https://retry.test/rss"
+        val server = FakeServer { call ->
+            if (call.path.endsWith("resolve")) Reply(json.encodeToString(FollowResolution(1, "owner", generation, listOf(FeedResolutionItem(0, null, FeedResolutionItem.Status.retry, 60)))))
+            else Reply(json.encodeToString(StateSnapshot<StateFollowItem>(1, "owner", generation, StateRevision("0"), emptyList())))
+        }
+        val library = LibraryRepository(server.api, scopes, CatalogRepository(server.api, scopes), clock = { now })
+        assertEquals(ImportResult(0, 1), library.import(listOf(feed)))
+        scopes.close()
+        val restarted = Scopes(context, "owner")
+        try {
+            restarted.resumeSync("owner")
+            val retry = LibraryRepository(server.api, restarted, CatalogRepository(server.api, restarted), clock = { now })
+            assertEquals(ImportResult(0, 1), retry.retryImports())
+            assertEquals(1, server.calls.count { it.path.endsWith("resolve") })
+            assertEquals(listOf(feed), restarted.durable.account("owner").importFeeds)
+            now += 60000
+            retry.retryImports()
+            assertEquals(2, server.calls.count { it.path.endsWith("resolve") })
+        } finally { restarted.close() }
+    }
+
     @Test fun opmlResolutionQueuesOnlySuccessfulIdsAndRetainsFailuresForRetry() = runTest {
         scopes.switch("owner"); scopes.resumeSync("owner")
         val server = FakeServer { call ->
-            if (call.path.endsWith("resolve")) Reply(json.encodeToString(FollowResolution(1, "owner", generation, listOf(FollowResolutionItem(0, StateID("9007199254740993"), "resolved"), FollowResolutionItem(1, null, "unavailable")))))
+            if (call.path.endsWith("resolve")) Reply(json.encodeToString(FollowResolution(1, "owner", generation, listOf(FeedResolutionItem(0, StateID("9007199254740993"), FeedResolutionItem.Status.resolved, null), FeedResolutionItem(1, null, FeedResolutionItem.Status.unavailable, null)))))
             else Reply(json.encodeToString(StateSnapshot<StateFollowItem>(1, "owner", generation, StateRevision("0"), emptyList())))
         }
         val result = library(server).import(listOf("https://ok.test/rss", "https://bad.test/rss"))

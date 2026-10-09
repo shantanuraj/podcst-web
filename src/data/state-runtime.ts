@@ -13,8 +13,9 @@ import {
   type BrowserState,
   unionGuestFollows,
 } from '@/data/state-storage';
+import { FEED_LIMITS } from '@/shared/feed-contract';
+import { feedImportBatches } from '@/shared/feed-import';
 import type { ProgressEvent } from '@/shared/player/progress-intent';
-import type { StateScope } from '@/shared/state-contract';
 import { stateValidator } from '@/shared/state-contract';
 import type { DurableStorage } from '@/shared/storage/durable';
 import {
@@ -489,38 +490,49 @@ export class StateRuntime {
       : undefined;
     if (!account || !scope)
       throw new Error('Verified follow scope unavailable');
+    const selected = [...new Set(feedUrls)];
+    feedImportBatches(scope, selected);
     await this.update(epoch, (root) => {
       const follows = accountState(root, account).follows;
-      follows.importFailures = [
-        ...new Set([...follows.importFailures, ...feedUrls]),
-      ];
+      const merged = [...new Set([...follows.importFailures, ...selected])];
+      if (
+        !legacy &&
+        merged.length > FEED_LIMITS.opml.pendingPerScope &&
+        merged.length > follows.importFailures.length
+      )
+        throw new Error(
+          'Too many unresolved imports. Retry pending feeds first.',
+        );
+      follows.importFailures = merged;
     });
-    const failed: string[] = [];
+    const retryAt =
+      this.view.state?.accounts[account].follows.importRetryAt ?? {};
+    const now = Date.now();
+    const deferred = selected.filter((url) => (retryAt[url] ?? 0) > now);
+    const failed: string[] = [...deferred];
+    const batches = feedImportBatches(
+      scope,
+      selected.filter((url) => !deferred.includes(url)),
+    );
     let succeeded = 0;
-    for (let start = 0; start < feedUrls.length; start += 20) {
-      const urls = feedUrls.slice(start, start + 20);
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const urls = batches[batchIndex];
+      if (epoch !== this.epoch) throw new Error('Session retired');
       try {
-        const response = (await this.api.request(
+        const response = await this.api.request(
           '/subscriptions/resolve',
           'POST',
           { ...scope, feedUrls: urls },
-        )) as StateScope & {
-          items: { index: number; podcastId: string | null; status: string }[];
-        };
+        );
         if (epoch !== this.epoch) throw new Error('Session retired');
         if (
+          !stateValidator('followResolution')(response) ||
           response.protocol !== 1 ||
           response.accountId !== scope.accountId ||
           response.generation !== scope.generation ||
           !Array.isArray(response.items) ||
           response.items.length !== urls.length ||
-          response.items.some(
-            (item, index) =>
-              item.index !== index ||
-              (item.status === 'resolved'
-                ? !stateValidator('id')(item.podcastId)
-                : item.status !== 'unavailable' || item.podcastId !== null),
-          )
+          response.items.some((item, index) => item.index !== index)
         )
           throw new StateProtocolError('Invalid resolver response');
         await this.update(epoch, (root) => {
@@ -528,10 +540,12 @@ export class StateRuntime {
             if (item.status === 'resolved') {
               queueFollow(
                 accountState(root, account).follows,
-                item.podcastId!,
+                item.podcastId,
                 true,
               );
               const follows = accountState(root, account).follows;
+              if (follows.importRetryAt)
+                delete follows.importRetryAt[urls[item.index]];
               follows.importFailures = follows.importFailures.filter(
                 (url) => url !== urls[item.index],
               );
@@ -540,6 +554,16 @@ export class StateRuntime {
                   root.legacyFollows.unresolved.filter(
                     (feed) => feed !== urls[item.index],
                   );
+            } else {
+              const follows = accountState(root, account).follows;
+              if (item.status === 'retry')
+                follows.importRetryAt = {
+                  ...follows.importRetryAt,
+                  [urls[item.index]]:
+                    Date.now() + item.retryAfterSeconds * 1000,
+                };
+              else if (follows.importRetryAt)
+                delete follows.importRetryAt[urls[item.index]];
             }
           }
         });
@@ -558,12 +582,35 @@ export class StateRuntime {
           await this.update(epoch, (root) => {
             accountState(root, account).follows.blocked = error.message;
           });
-          failed.push(...feedUrls.slice(start + 20));
+          failed.push(...batches.slice(batchIndex + 1).flat());
           break;
         }
-        this.emit({
-          error: 'Some feed URLs could not be resolved. Retained for retry.',
+        const remaining = batches.slice(batchIndex).flat();
+        const seconds =
+          error instanceof ApiError ? error.retryAfter : undefined;
+        if (error instanceof ApiError && error.status === 401) {
+          await this.activate(undefined);
+          throw error;
+        }
+        await this.update(epoch, (root) => {
+          const follows = accountState(root, account).follows;
+          for (const url of remaining)
+            follows.importRetryAt = {
+              ...follows.importRetryAt,
+              [url]:
+                Date.now() +
+                Math.min(
+                  86400,
+                  Math.max(1, seconds ?? FEED_LIMITS.imports.retrySeconds),
+                ) *
+                  1000,
+            };
         });
+        failed.push(...batches.slice(batchIndex + 1).flat());
+        this.emit({
+          error: 'Some feed URLs need retry. Pending imports retained.',
+        });
+        break;
       }
     }
     void this.refresh();

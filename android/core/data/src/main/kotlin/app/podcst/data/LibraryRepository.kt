@@ -145,21 +145,41 @@ class LibraryRepository(
             val snapshot = api.followState()
             check(active(owner, epoch))
             durable.installFollows(account, snapshot)
-            durable.change(account) { it.copy(importFeeds = (it.importFeeds + feeds).distinct()) }
-            for (batch in feeds.distinct().chunked(20)) {
-                val result = api.resolveSubscriptions(account, snapshot.generation, batch)
+            val selected = feeds.distinct()
+            FeedImportRequest.batches(account, snapshot.generation, selected)
+            durable.change(account) {
+                val merged = (it.importFeeds + selected).distinct()
+                check(merged.size <= FeedLimits.PENDING_PER_SCOPE || merged.size == it.importFeeds.size) { "Too many unresolved imports. Retry pending feeds first." }
+                it.copy(importFeeds = merged)
+            }
+            val ready = selected.filter { (durable.account(account).importRetryAt[it] ?: 0L) <= clock() }
+            val batches = FeedImportRequest.batches(account, snapshot.generation, ready)
+            for ((offset, batch) in batches.withIndex()) {
+                check(active(owner, epoch))
+                val result = try { api.resolveSubscriptions(account, snapshot.generation, batch) }
+                catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    check(active(owner, epoch))
+                    if (failure is ApiException && (failure.status == 429 || failure.status >= 500)) {
+                        val retry = clock() + (failure.retryAfterSeconds ?: FeedLimits.RETRY_SECONDS.toLong()).coerceIn(1, 86400) * 1000L
+                        durable.change(account) { it.copy(importRetryAt = it.importRetryAt + batches.drop(offset).flatten().associateWith { retry }) }
+                    }
+                    throw failure
+                }
                 check(active(owner, epoch))
                 validateStateScope(result.protocol, result.accountId, result.generation, account, snapshot.generation)
                 check(result.items.map { it.index } == batch.indices.toList())
                 for (item in result.items) {
-                    check(item.status in listOf("resolved", "unavailable") && (item.podcastId != null) == (item.status == "resolved"))
                     if (item.podcastId != null) {
-                        durable.change(account) { state -> state.copy(importFeeds = state.importFeeds - batch[item.index], followQueued = state.followQueued.filterNot { it.podcastId == item.podcastId } + StateFollowChange(checkNotNull(item.podcastId), true)) }
+                        durable.change(account) { state -> state.copy(importFeeds = state.importFeeds - batch[item.index], importRetryAt = state.importRetryAt - batch[item.index], followQueued = state.followQueued.filterNot { it.podcastId == item.podcastId } + StateFollowChange(checkNotNull(item.podcastId), true)) }
                         succeeded++
+                    } else if (item.retryAfterSeconds != null) {
+                        val retry = clock() + checkNotNull(item.retryAfterSeconds) * 1000L
+                        durable.change(account) { it.copy(importRetryAt = it.importRetryAt + (batch[item.index] to retry)) }
                     }
                 }
             }
-            if (succeeded != feeds.distinct().size) durable.error(account, "Some imported feeds are unavailable. Retry import to resolve retained failures.")
+            if (succeeded != feeds.distinct().size) durable.error(account, "Some feeds need retry or are unavailable. Pending imports retained.")
             return ImportResult(succeeded, feeds.distinct().size - succeeded)
         }
         val epoch = scopes.epoch

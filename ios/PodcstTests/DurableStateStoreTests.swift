@@ -9,6 +9,35 @@ import XCTest
         DurableStateStore(directory: directory, api: server, save: save)
     }
 
+    func testImportRetryDeadlinesSurviveRestartWithoutChangingOtherAccountWork() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        let feed = "https://example.invalid/retry"
+        try state.stageImport([feed])
+        let now = Date()
+        try state.deferImport([feed], seconds: 60, now: now)
+        XCTAssertFalse(state.importReady(feed, now: now))
+        state = store(api)
+        try await state.activate(accountID: "a")
+        XCTAssertEqual(state.pendingImportFeeds, [feed])
+        XCTAssertFalse(state.importReady(feed, now: now.addingTimeInterval(59)))
+        XCTAssertTrue(state.importReady(feed, now: now.addingTimeInterval(60)))
+        try state.resolvedImport(feed: feed, id: StateID("9007199254740993"))
+        XCTAssertTrue(state.pendingImportFeeds.isEmpty)
+        XCTAssertTrue(state.followedIDs.contains(9_007_199_254_740_993))
+    }
+
+    func testPendingImportBoundRejectsAdditionsWithoutConsumingSources() async throws {
+        let state = store(StateServer())
+        try await state.activate(accountID: "a")
+        let feeds = (0..<FeedLimits.current.opml.pendingPerScope).map { "https://example.invalid/\($0)" }
+        try state.stageImport(feeds)
+        XCTAssertThrowsError(try state.stageImport(["https://example.invalid/overflow"]))
+        XCTAssertEqual(state.pendingImportFeeds, feeds)
+        XCTAssertNoThrow(try state.stageImport([feeds[0]]))
+    }
+
     func testLostAckOppositeActionAndRestartRetiresOnlyWithAuthoritativeRead() async throws {
         let api = StateServer()
         var state = store(api)

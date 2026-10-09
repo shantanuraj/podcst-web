@@ -55,6 +55,7 @@ private struct DurableAccount: Codable {
     var legacyProgressImported = false
     var failures: [String] = []
     var importFeeds: [String] = []
+    var importRetryAt: [String: Date]?
 }
 private struct DurableRoot: Codable {
     var version = 1
@@ -125,9 +126,19 @@ private struct DurableRoot: Codable {
     var unresolvedCount: Int { root.unresolvedGuest.count + legacyProgress.filter { $0.episodeID > 9_007_199_254_740_991 || $0.episodeID <= 0 }.count }
     var failures: [String] { verified ? account.failures : [] }
     var pendingImportFeeds: [String] { verified ? account.importFeeds : [] }
+    func importReady(_ feed: String, now: Date = Date()) -> Bool { (account.importRetryAt?[feed] ?? .distantPast) <= now }
+    func deferImport(_ feeds: [String], seconds: Int, now: Date = Date()) throws {
+        try update { state in
+            for feed in feeds where state.importFeeds.contains(feed) {
+                state.importRetryAt = (state.importRetryAt ?? [:]).merging([feed: now.addingTimeInterval(Double(min(86400, max(1, seconds))))]) { _, next in next }
+            }
+        }
+    }
     var unresolvedGuest: [Podcast] { root.unresolvedGuest }
     func stageImport(_ feeds: [String]) throws {
         try update { state in
+            let additions = Set(feeds).subtracting(state.importFeeds)
+            guard additions.isEmpty || state.importFeeds.count + additions.count <= FeedLimits.current.opml.pendingPerScope else { throw FeedContractError.invalidResponse }
             for feed in feeds where !state.importFeeds.contains(feed) { state.importFeeds.append(feed) }
         }
     }
@@ -136,6 +147,7 @@ private struct DurableRoot: Codable {
             state.follows.queued.removeAll { $0.podcastId == id }
             state.follows.queued.append(StateFollowChange(podcastId: id, followed: true))
             state.importFeeds.removeAll { $0 == feed }
+            state.importRetryAt?.removeValue(forKey: feed)
         }
     }
 

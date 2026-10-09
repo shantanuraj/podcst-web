@@ -186,18 +186,7 @@
         "generation": { "$ref": "#/definitions/uuid" },
         "items": {
           "type": "array", "minItems": 1, "maxItems": 20,
-          "items": {
-            "type": "object", "additionalProperties": false,
-            "required": ["index", "podcastId", "status"],
-            "properties": {
-              "index": { "type": "integer", "minimum": 0, "maximum": 19 },
-              "podcastId": { "anyOf": [{ "$ref": "#/definitions/id" }, { "type": "null" }] },
-              "status": { "enum": ["resolved", "unavailable"] }
-            },
-            "if": { "properties": { "status": { "const": "resolved" } } },
-            "then": { "properties": { "podcastId": { "$ref": "#/definitions/id" } } },
-            "else": { "properties": { "podcastId": { "type": "null" } } }
-          }
+          "items": { "$ref": "https://www.podcst.app/contracts/feeds/v1#/definitions/resolutionItem" }
         }
       }
     },

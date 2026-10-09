@@ -2,8 +2,9 @@
 
 `schema.json`, `fixtures.json` and `limits.json` define the coordinated refresh/read
 and import cutover. TypeScript, Swift and Kotlin consume the shared validation
-vectors. The foundation types are not yet wired into HTTP endpoints; until that
-cutover, the existing [API reference](../api/README.md) describes serving behavior.
+vectors. Scoped follow resolution now uses the retryable import contract across
+server/web/iOS/Android. Refresh/freshness DTOs are not yet wired into read/refresh
+endpoints; the [API reference](../api/README.md) distinguishes current behavior.
 No frozen progress, follow or Starred request changes as part of this contract.
 
 ## Freshness
@@ -59,8 +60,8 @@ The scoped resolution envelope and input order stay unchanged. Each input gets o
 
 Retain unresolved input locally for retry; never guess IDs or treat a timeout as
 proof that nothing committed. Imports remain synchronous and bounded, not another
-job service. Admission is shared across RSS search, single import, batch import
-and public interactive resolution. Private commits recheck account/session,
+job service. The scoped batch route wires shared admission; RSS search, single import
+and public interactive resolution still need the same integration. Private commits recheck account/session,
 recovery generation and source identity after network work. Resolution never writes
 membership directly.
 

@@ -5,6 +5,7 @@ import { adaptFeed } from '../../app/api/feed/parser';
 import type { IEpisodeListing } from '../../types';
 import { FOLLOWED_IDS_SQL } from '../tiering';
 import { sanitize, upsertEpisodes } from './episodes';
+import { FeedUnavailableError } from './feed-errors';
 import { fetchFeedResponse } from './feed-http';
 import {
   getPollInterval,
@@ -73,7 +74,15 @@ export async function fetchFeed(
       hash: previous.hash,
     };
   }
-  if (res.status !== 200) throw new Error(`Feed returned HTTP ${res.status}`);
+  if (res.status !== 200) {
+    if (
+      res.status >= 400 &&
+      res.status < 500 &&
+      ![408, 425, 429].includes(res.status)
+    )
+      throw new FeedUnavailableError('Feed unavailable');
+    throw new Error(`Feed returned HTTP ${res.status}`);
+  }
 
   const body = res.body;
   const meta: FeedMeta = {
@@ -86,7 +95,7 @@ export async function fetchFeed(
   }
 
   const data = await adaptFeed(body, !privateFeed);
-  if (!data) throw new Error('Invalid feed');
+  if (!data) throw new FeedUnavailableError('Invalid feed');
   return { status: 'updated', data, ...meta, ...movement };
 }
 

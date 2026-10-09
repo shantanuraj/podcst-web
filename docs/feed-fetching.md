@@ -107,7 +107,12 @@ The shared Redis admission implementation atomically enforces principal/global
 refresh budgets, import-start budgets and expiring import concurrency permits.
 Principal keys are keyed hashes; no locators are stored. A stale permit cannot pass
 its publication check or release a replacement. Limiter failure refuses new work.
-Route integration must supply the session binding and retain the permit through
-bounded indexing; these helpers alone do not close every interactive entry point.
-Serving reads still await content rebuilds until the coordinated route/client
-cutover. The foundation does not activate those response changes by itself.
+The scoped follow resolver supplies session binding and acquires a permit only
+when the existing indexer needs network work. It checks ownership before its short
+commit and releases the permit afterward, including failures. A fatal scope change
+cancels/drains sibling work. Ordered retry outcomes and persisted retry timing are
+wired through all three clients. Batch bodies are bounded by encoded bytes and count.
+
+RSS search, single import and public interactive resolution still need this shared
+admission integration. Serving reads still await content rebuilds until the coordinated
+refresh/read/client cutover. The import slice does not activate freshness responses.

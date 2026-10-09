@@ -10,9 +10,11 @@ val contracts = rootProject.layout.projectDirectory.dir("../contracts")
 val generateRules by tasks.registering {
     val rules = contracts.file("playback/rules.json")
     val links = contracts.file("sharing/links.json")
+    val feedLimits = contracts.file("feeds/limits.json")
     val output = layout.buildDirectory.dir("generated/rules/kotlin")
     inputs.file(rules)
     inputs.file(links)
+    inputs.file(feedLimits)
     outputs.dir(output)
     doLast {
         @Suppress("UNCHECKED_CAST")
@@ -30,6 +32,9 @@ val generateRules by tasks.registering {
         val regions = discovery["regions"] as List<Map<String, String>>
         @Suppress("UNCHECKED_CAST")
         val sharing = JsonSlurper().parse(links.asFile) as Map<String, Any?>
+        val feed = JsonSlurper().parse(feedLimits.asFile) as Map<String, Any?>
+        val imports = feed["imports"] as Map<String, Any?>
+        val opml = feed["opml"] as Map<String, Any?>
         val file = output.get().file("app/podcst/model/Rules.kt").asFile
         file.parentFile.mkdirs()
         file.writeText(
@@ -55,6 +60,13 @@ val generateRules by tasks.registering {
                 appendLine("    const val ARTWORK_HOST = \"${artwork["variantHost"]}\"")
                 appendLine("    const val ARTWORK_PARAMETER = \"${artwork["variantParameter"]}\"")
                 appendLine("    const val CHART_LIMIT = ${long(discovery["chartLimit"])}")
+                appendLine("}")
+                appendLine()
+                appendLine("object FeedLimits {")
+                appendLine("    const val BODY_BYTES = ${long(feed["bodyBytes"])}")
+                appendLine("    const val IMPORT_ITEMS = ${long(imports["items"])}")
+                appendLine("    const val RETRY_SECONDS = ${long(imports["retrySeconds"])}")
+                appendLine("    const val PENDING_PER_SCOPE = ${long(opml["pendingPerScope"])}")
                 appendLine("}")
                 appendLine()
                 appendLine("object ShareRules {")

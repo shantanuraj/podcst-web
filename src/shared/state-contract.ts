@@ -1,5 +1,7 @@
 import Ajv, { type ValidateFunction } from 'ajv';
+import feedSchema from '../../contracts/feeds/schema.json';
 import schema from '../../contracts/state/schema.json';
+import type { FeedResolutionItem } from './feed-contract';
 
 export interface StateScope {
   protocol: 1;
@@ -36,11 +38,7 @@ export interface FollowResolutionRequest extends StateScope {
 }
 
 export interface FollowResolution extends StateScope {
-  items: {
-    index: number;
-    podcastId: string | null;
-    status: 'resolved' | 'unavailable';
-  }[];
+  items: FeedResolutionItem[];
 }
 
 export type StateResult = 'applied' | 'unchanged' | 'not_found';
@@ -116,6 +114,7 @@ interface StateShapes {
 }
 
 const ajv = new Ajv({ strict: true, allErrors: false });
+ajv.addSchema(feedSchema);
 ajv.addSchema(schema);
 
 export function stateValidator<K extends keyof StateShapes>(shape: K) {

@@ -39,7 +39,8 @@ let actor: string | null = null;
 let cachedTop: unknown[] = [];
 let shortLink: { feed: string; guid: string } | null = null;
 mock.module('@/server/auth/session', () => ({
-  getSession: async () => (actor ? { userId: actor } : null),
+  getSession: async () =>
+    actor ? { userId: actor, id: `fixture-${actor}` } : null,
 }));
 mock.module('@/app/api/redis', () => ({
   isCached: () => true,
@@ -80,6 +81,7 @@ mock.module('@/server/state', () => ({
   ),
 }));
 const [{ generation }] = await sql`SELECT generation FROM state_generation`;
+await sql`INSERT INTO sessions (id, user_id, expires_at) SELECT 'fixture-' || id, id, now() + interval '1 day' FROM users`;
 const scope = () => ({ protocol: 1, accountId: actor, generation });
 const batch = (changes: unknown[]) => ({
   ...scope(),
@@ -304,7 +306,14 @@ try {
     ).json(),
     {
       ...scope(),
-      items: [{ index: 0, podcastId: null, status: 'unavailable' }],
+      items: [
+        {
+          index: 0,
+          podcastId: null,
+          status: 'unavailable',
+          retryAfterSeconds: null,
+        },
+      ],
     },
   );
   await seedFollow(sql, 'other', id);
@@ -370,7 +379,17 @@ try {
         }),
       )
     ).json(),
-    { ...scope(), items: [{ index: 0, podcastId: id, status: 'resolved' }] },
+    {
+      ...scope(),
+      items: [
+        {
+          index: 0,
+          podcastId: id,
+          status: 'resolved',
+          retryAfterSeconds: null,
+        },
+      ],
+    },
   );
   actor = null;
   shortLink = { feed: alias, guid: episode.guid };

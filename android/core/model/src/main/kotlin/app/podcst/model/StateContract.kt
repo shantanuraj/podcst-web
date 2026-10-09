@@ -139,9 +139,7 @@ enum class StateProgressEvent {
 }
 
 @Serializable
-data class FollowResolution(val protocol: Int, val accountId: String, val generation: String, val items: List<FollowResolutionItem>)
-@Serializable
-data class FollowResolutionItem(val index: Int, val podcastId: StateID?, val status: String)
+data class FollowResolution(val protocol: Int, val accountId: String, val generation: String, val items: List<FeedResolutionItem>)
 
 fun validateStateScope(protocol: Int, accountId: String, generation: String, expectedAccount: String, expectedGeneration: String? = null) {
     check(protocol == 1 && accountId == expectedAccount && accountId.length in 1..128)

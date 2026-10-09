@@ -1,5 +1,6 @@
 import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import {
+  NonpublicDestination,
   type PublicResolver,
   pinnedAddress,
   pinnedRequest,
@@ -7,6 +8,7 @@ import {
 } from '../http/public-destination';
 import { validEtag, validLastModified } from '../http/validators';
 
+import { FeedUnavailableError } from './feed-errors';
 import { MAX_FEED_BYTES } from './feed-limits';
 
 export interface FeedValidators {
@@ -33,7 +35,7 @@ export function feedDestination(input: string) {
       throw new Error();
     return url;
   } catch {
-    throw new Error('Invalid feed protocol or destination');
+    throw new FeedUnavailableError('Invalid feed protocol or destination');
   }
 }
 
@@ -64,8 +66,10 @@ export async function requestFeed(
   let address: string;
   try {
     address = await pinnedAddress(hostname, signal, resolve);
-  } catch {
-    throw new Error('Nonpublic feed destination or lookup timed out');
+  } catch (error) {
+    if (error instanceof NonpublicDestination)
+      throw new FeedUnavailableError('Nonpublic feed destination');
+    throw new Error('Feed destination lookup failed or timed out');
   }
   signal.throwIfAborted();
   return new Promise((accept, reject) => {
@@ -102,17 +106,18 @@ export async function requestFeed(
         }
         const length = response.headers['content-length'];
         if (length && (!/^\d+$/.test(length) || Number(length) > maxBytes)) {
+          reject(new FeedUnavailableError('Feed response too large'));
           response.destroy();
-          fail();
           return;
         }
         const chunks: Buffer[] = [];
         let size = 0;
         response.on('data', (chunk: Buffer) => {
           size += chunk.length;
-          if (size > maxBytes)
-            response.destroy(new Error('Feed response too large'));
-          else chunks.push(chunk);
+          if (size > maxBytes) {
+            reject(new FeedUnavailableError('Feed response too large'));
+            response.destroy();
+          } else chunks.push(chunk);
         });
         response.on('close', () => {
           if (!response.complete) fail();
@@ -140,7 +145,9 @@ export async function requestFeed(
             else throw new Error();
             accept({ ...meta, body: body.toString('utf8') });
           } catch {
-            reject(new Error('Invalid or oversized feed encoding'));
+            reject(
+              new FeedUnavailableError('Invalid or oversized feed encoding'),
+            );
           }
         });
       },

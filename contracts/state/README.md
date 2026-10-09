@@ -93,6 +93,21 @@ example: A saves position 90 and loses the acknowledgement; B saves position 12;
 A's identical retry acknowledges its old revision, leaving B's 12 current. The
 same rule prevents a lost-ack follow retry from undoing B's later unfollow.
 
+## Import resolution
+
+`POST /api/subscriptions/resolve` returns one ordered item per input with
+`status: resolved | retry | unavailable` and explicit `retryAfterSeconds` nullability.
+Its executable item schema is shared with the [feed contract](../feeds/README.md).
+Only resolved IDs become follow intents; deadline, capacity and temporary failures
+remain retryable without claiming that an import job was queued. Unsafe/hidden
+sources remain generic unavailable. Session/generation errors are whole-request
+refusals, not successful empty resolution.
+
+Clients preserve unresolved input and per-feed retry deadlines across restart,
+account departure and transport failures, and batch by UTF-8 bytes as well as count.
+A new-import capacity check never truncates older over-limit pending work. Existing
+frozen follow/progress/Starred payloads, sequences and generations are unchanged.
+
 ## Completion and account lifecycle
 
 Only an ended event or explicit Mark played completes an episode. A checkpoint

@@ -388,8 +388,7 @@ public final class APIClient {
     }
 
     func resolveFollows(_ feeds: [String], scope: StateScope) async throws -> FollowResolution {
-        struct Body: Encodable { var `protocol` = 1; var accountId: String; var generation: String; var feedUrls: [String] }
-        return try await post(path: "/api/subscriptions/resolve", body: Body(accountId: scope.accountId, generation: scope.generation, feedUrls: feeds))
+        return try await post(path: "/api/subscriptions/resolve", body: FeedImportRequest(accountId: scope.accountId, generation: scope.generation, feedUrls: feeds))
     }
 
     func lists() async throws -> StarLists {

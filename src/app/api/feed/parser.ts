@@ -4,6 +4,7 @@
  */
 
 import { Parser } from 'xml2js';
+import { FeedUnavailableError } from '@/server/ingest/feed-errors';
 import { validateFeedXml } from '@/server/ingest/feed-xml';
 import { artworkFallback, directArtwork } from '@/shared/artwork';
 import type { IEpisode, IEpisodeListing, IFileInfo } from '@/types';
@@ -332,7 +333,7 @@ const xmlToJSON = async (xml: string) => {
       normalize: true,
     }).parseStringPromise(xml);
   } catch {
-    throw new Error('Invalid or unsafe feed XML');
+    throw new FeedUnavailableError('Invalid or unsafe feed XML');
   }
 };
 

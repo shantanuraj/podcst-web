@@ -1,6 +1,7 @@
 package app.podcst.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 @Serializable
 data class FeedFreshness(
@@ -20,6 +21,28 @@ data class FeedFreshness(
 }
 
 @Serializable
+data class FeedImportRequest(val protocol: Int, val accountId: String, val generation: String, val feedUrls: List<String>) {
+    companion object {
+        fun batches(accountId: String, generation: String, feeds: List<String>): List<List<String>> {
+            val batches = mutableListOf<List<String>>()
+            var batch = mutableListOf<String>()
+            fun fits(urls: List<String>) = Json.encodeToString(serializer(), FeedImportRequest(1, accountId, generation, urls)).toByteArray(Charsets.UTF_8).size <= FeedLimits.BODY_BYTES
+            for (feed in feeds) {
+                require(feed.isNotEmpty() && feed.length <= 4096)
+                if (batch.size == FeedLimits.IMPORT_ITEMS || !fits(batch + feed)) {
+                    if (batch.isNotEmpty()) batches.add(batch)
+                    batch = mutableListOf()
+                }
+                batch.add(feed)
+                require(fits(batch))
+            }
+            if (batch.isNotEmpty()) batches.add(batch)
+            return batches
+        }
+    }
+}
+
+@Serializable
 data class FeedRefreshResponse(val podcastId: StateID, val freshness: FeedFreshness)
 
 @Serializable
@@ -32,7 +55,7 @@ data class FeedResolutionItem(
     @Serializable enum class Status { resolved, retry, unavailable }
 
     init {
-        require(index in 0..<20)
+        require(index in 0..<FeedLimits.IMPORT_ITEMS)
         require((status == Status.resolved) == (podcastId != null))
         require((status == Status.retry) == (retryAfterSeconds != null))
         require(retryAfterSeconds == null || retryAfterSeconds in 1..86400)

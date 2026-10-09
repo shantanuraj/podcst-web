@@ -40,6 +40,7 @@ internal data class DurableAccount(
     val guestProgressTransfers: Map<String, GuestProgressSource> = emptyMap(),
     val reappliedLegacy: Map<String, Long> = emptyMap(),
     val importFeeds: List<String> = emptyList(),
+    val importRetryAt: Map<String, Long> = emptyMap(),
     val failures: Set<String> = emptySet(),
 ) {
     fun progressOverlay(): Map<Long, ProgressProjection> {
