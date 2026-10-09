@@ -1,8 +1,9 @@
 import type postgres from 'postgres';
+import { FEED_LIMITS } from '@/shared/feed-contract';
 import { FOLLOWED_IDS_SQL } from '../tiering';
 
 export const HOURLY_POLL_INTERVAL = 3600;
-export const STALE_FEED_INTERVAL = 15 * 60;
+export const STALE_FEED_INTERVAL = FEED_LIMITS.refresh.freshSeconds;
 export const MAX_POLL_FAILURES = 5;
 const DEFAULT_POLL_INTERVAL = 24 * HOURLY_POLL_INTERVAL;
 
@@ -56,34 +57,44 @@ export function isRefreshDue(
   );
 }
 
-export async function getDuePodcasts(sql: postgres.Sql, limit: number) {
+export async function getDuePodcasts(
+  sql: postgres.Sql,
+  limit: number,
+  kind: 'all' | 'demand' | 'scheduled' = 'all',
+) {
   const rows = await sql<{ id: string | number }[]>`
     WITH followed AS (${sql.unsafe(FOLLOWED_IDS_SQL)}),
     candidates AS (
       SELECT id FROM podcasts WHERE is_essential = true
       UNION
       SELECT id FROM followed
+      UNION
+      SELECT podcast_id FROM feed_poll_state
+      WHERE demand_token IS NOT NULL AND demand_expires_at > now()
     )
     SELECT p.id
     FROM candidates c
     JOIN podcasts p ON p.id = c.id
     LEFT JOIN feed_poll_state s ON s.podcast_id = p.id
-    WHERE p.is_active = true
-      AND (s.refresh_expires_at IS NULL OR s.refresh_expires_at <= now())
+    WHERE (s.refresh_expires_at IS NULL OR s.refresh_expires_at <= now())
+      AND (coalesce(s.failures, 0) = 0 OR s.next_poll_at IS NULL OR s.next_poll_at <= now())
       AND (
-        s.next_poll_at IS NULL OR s.next_poll_at <= now()
-        OR (
-          s.failures = 0
-          AND s.last_polled_at <= now() - interval '1 second' * ${HOURLY_POLL_INTERVAL}
-          AND p.id IN (SELECT id FROM followed)
+        (${kind !== 'scheduled'} AND s.demand_expires_at > now())
+        OR (${kind !== 'demand'} AND coalesce(s.demand_expires_at <= now(), true)
+          AND p.is_active AND (p.is_essential OR p.id IN (SELECT id FROM followed))
+          AND (
+            s.next_poll_at IS NULL OR s.next_poll_at <= now()
+            OR (s.failures = 0
+              AND s.last_polled_at <= now() - interval '1 second' * ${HOURLY_POLL_INTERVAL}
+              AND p.id IN (SELECT id FROM followed))
+          )
+          AND (p.id IN (SELECT id FROM followed) OR p.last_published IS NULL
+            OR p.last_published > now() - interval '180 days')
         )
       )
-      AND (
-        p.id IN (SELECT id FROM followed)
-        OR p.last_published IS NULL
-        OR p.last_published > now() - interval '180 days'
-      )
     ORDER BY
+      coalesce(s.demand_expires_at > now(), false) DESC,
+      CASE WHEN s.demand_expires_at > now() THEN s.demand_requested_at END ASC NULLS LAST,
       p.priority DESC NULLS LAST,
       p.popularity_score DESC NULLS LAST,
       CASE WHEN s.next_poll_at IS NULL THEN 0 ELSE 1 END,

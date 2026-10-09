@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type postgres from 'postgres';
+import { FEED_LIMITS } from '@/shared/feed-contract';
 import { adaptFeed } from '../../app/api/feed/parser';
 import type { IEpisodeListing } from '../../types';
 import { FOLLOWED_IDS_SQL } from '../tiering';
@@ -44,9 +45,14 @@ interface PodcastForRefresh extends PollState {
   hash: string | null;
   refresh_token: string | null;
   refreshing: boolean;
+  demand_token: string | null;
+  demanded: boolean;
+  demand_rebuild: boolean;
 }
 
-const REFRESH_LEASE_SECONDS = 60;
+const REFRESH_LEASE_SECONDS = FEED_LIMITS.refresh.leaseSeconds;
+
+class ExpiredRefresh extends Error {}
 
 export async function fetchFeed(
   feedUrl: string,
@@ -89,14 +95,16 @@ export async function savePollState(
   podcastId: string,
   meta: FeedMeta,
   intervalSeconds: number,
+  rebuilt = true,
 ): Promise<void> {
   await sql`
     INSERT INTO feed_poll_state (
       podcast_id, etag, last_modified, hash,
-      last_polled_at, next_poll_at, failures
+      last_polled_at, next_poll_at, failures, last_success_at, last_rebuilt_at
     ) VALUES (
       ${podcastId}, ${meta.etag}, ${meta.lastModified}, ${meta.hash},
-      now(), now() + interval '1 second' * ${intervalSeconds}, 0
+      now(), now() + interval '1 second' * ${intervalSeconds}, 0, now(),
+      ${rebuilt ? sql`now()` : null}
     )
     ON CONFLICT (podcast_id) DO UPDATE SET
       etag = EXCLUDED.etag,
@@ -104,6 +112,8 @@ export async function savePollState(
       hash = EXCLUDED.hash,
       last_polled_at = EXCLUDED.last_polled_at,
       next_poll_at = EXCLUDED.next_poll_at,
+      last_success_at = EXCLUDED.last_success_at,
+      last_rebuilt_at = coalesce(EXCLUDED.last_rebuilt_at, feed_poll_state.last_rebuilt_at),
       failures = 0
   `;
 }
@@ -124,7 +134,9 @@ async function readRefresh(tx: postgres.TransactionSql, podcastId: string) {
            p.id IN (${tx.unsafe(FOLLOWED_IDS_SQL)}) AS is_followed,
            s.etag, s.last_modified, s.hash, s.last_polled_at, s.next_poll_at,
            coalesce(s.failures, 0) AS failures, s.refresh_token,
-           coalesce(s.refresh_expires_at > clock_timestamp(), false) AS refreshing
+           coalesce(s.refresh_expires_at > clock_timestamp(), false) AS refreshing,
+           s.demand_token, coalesce(s.demand_rebuild, false) AS demand_rebuild,
+           coalesce(s.demand_expires_at > clock_timestamp(), false) AS demanded
     FROM podcasts p
     LEFT JOIN feed_poll_state s ON s.podcast_id = p.id
     WHERE p.id = ${podcastId}
@@ -144,7 +156,12 @@ async function releaseRefresh(
 }
 
 type RefreshClaim =
-  | { status: 'claimed'; token: string; podcast: PodcastForRefresh }
+  | {
+      status: 'claimed';
+      token: string;
+      podcast: PodcastForRefresh;
+      rebuild: boolean;
+    }
   | { status: 'busy' | 'skipped' | 'not_found' };
 
 export async function refreshFeed(
@@ -154,15 +171,26 @@ export async function refreshFeed(
   resolveMove = resolvePublicFeedMove,
 ): Promise<RefreshResult> {
   const claim = await sql.begin(async (tx): Promise<RefreshClaim> => {
+    await tx`SET LOCAL lock_timeout = '1s'`;
+    await tx`SET LOCAL statement_timeout = '5s'`;
     if (!(await lockRefresh(tx, podcastId))) return { status: 'busy' };
     const podcast = await readRefresh(tx, podcastId);
     if (!podcast) return { status: 'not_found' };
     if (podcast.refreshing) return { status: 'busy' };
+    const rebuild =
+      mode === 'rebuild' || (podcast.demanded && podcast.demand_rebuild);
     if (
-      (mode === 'scheduled' && !podcast.is_active) ||
-      !isRefreshDue(podcast, mode)
+      (mode === 'scheduled' && !podcast.is_active && !podcast.demanded) ||
+      !isRefreshDue(podcast, rebuild || podcast.demanded ? 'rebuild' : mode)
     )
       return { status: 'skipped' };
+    await tx`SELECT pg_advisory_xact_lock(hashtext('feed-execution'), 0)`;
+    const [{ count }] = await tx`
+      SELECT count(*)::int AS count FROM feed_poll_state
+      WHERE refresh_token IS NOT NULL AND refresh_expires_at > clock_timestamp()
+    `;
+    if (count >= FEED_LIMITS.refresh.concurrencyGlobal)
+      return { status: 'busy' };
     const token = randomUUID();
     await tx`
       INSERT INTO feed_poll_state (podcast_id, refresh_token, refresh_expires_at)
@@ -171,7 +199,7 @@ export async function refreshFeed(
         refresh_token = EXCLUDED.refresh_token,
         refresh_expires_at = EXCLUDED.refresh_expires_at
     `;
-    return { status: 'claimed', token, podcast };
+    return { status: 'claimed', token, podcast, rebuild };
   });
   if (claim.status !== 'claimed') return claim.status;
 
@@ -179,7 +207,7 @@ export async function refreshFeed(
   try {
     result = await fetchFeed(
       claim.podcast.feed_url,
-      mode === 'rebuild'
+      claim.rebuild
         ? undefined
         : {
             etag: claim.podcast.etag,
@@ -187,10 +215,13 @@ export async function refreshFeed(
             hash: claim.podcast.hash,
           },
       claim.podcast.owner_user_id !== null,
+      AbortSignal.timeout((REFRESH_LEASE_SECONDS - 5) * 1000),
     );
   } catch {}
 
   const outcome = await sql.begin(async (tx): Promise<RefreshResult> => {
+    await tx`SET LOCAL lock_timeout = '1s'`;
+    await tx`SET LOCAL statement_timeout = '10s'`;
     if (!(await lockRefresh(tx, podcastId))) return 'busy';
     const podcast = await readRefresh(tx, podcastId);
     if (!podcast) return 'not_found';
@@ -203,6 +234,7 @@ export async function refreshFeed(
       await releaseRefresh(tx, podcastId, claim.token);
       return 'skipped';
     }
+    let settled = false;
     try {
       if (!result) throw new Error('Feed fetch failed');
       const fetched = result;
@@ -232,10 +264,23 @@ export async function refreshFeed(
           podcastId,
           fetched,
           getPollInterval(podcast.update_frequency, podcast.is_followed),
+          fetched.status === 'updated',
         );
+        const [lease] = await write`
+          SELECT refresh_expires_at > clock_timestamp() AS valid
+          FROM feed_poll_state WHERE podcast_id = ${podcastId} AND refresh_token = ${claim.token}
+        `;
+        if (!lease?.valid) throw new ExpiredRefresh();
+        settled = true;
         return fetched.status;
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof ExpiredRefresh) return 'skipped';
+      const [lease] = await tx`
+        SELECT refresh_expires_at > clock_timestamp() AS valid
+        FROM feed_poll_state WHERE podcast_id = ${podcastId} AND refresh_token = ${claim.token}
+      `;
+      if (!lease?.valid) return 'skipped';
       const failures = podcast.failures + 1;
       await tx`
         UPDATE feed_poll_state SET
@@ -249,8 +294,15 @@ export async function refreshFeed(
       console.warn(
         `Failed to refresh podcast ${podcastId} (attempt ${failures})`,
       );
+      settled = true;
       return 'error';
     } finally {
+      if (settled)
+        await tx`
+        UPDATE feed_poll_state SET demand_token = NULL, demand_requested_at = NULL,
+          demand_expires_at = NULL, demand_rebuild = false
+        WHERE podcast_id = ${podcastId} AND demand_token = ${claim.podcast.demand_token}
+      `;
       await releaseRefresh(tx, podcastId, claim.token);
     }
   });

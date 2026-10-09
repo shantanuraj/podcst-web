@@ -59,6 +59,31 @@ trigger also requires source writers to retain their existing poll-state UPDATE
 permission. Leases are reconstructible scheduler state, not durable user intent;
 restores may omit them and resume cold polling.
 
+## Durable refresh demand
+
+`0012-feed-refresh-demand.sql` adds coalesced, expiring demand and separate successful
+validation/full-rebuild timestamps to poll state. Source changes invalidate them
+alongside leases. Unknown historical validation times remain null rather than
+claiming a failed or source-obsolete poll was successful.
+
+The demand service admits at most 256 distinct sources for 15 minutes, rechecking
+visibility under the source lock. It does no publisher I/O. The existing refresher
+drains demand, including inactive/nonessential sources, and all refresh entry points
+share a ten-lease execution ceiling. A rebuild arriving during an older conditional
+fetch retains its own token; the older 304 cannot consume it. Publication rechecks
+expiry after content writes and rolls back late results. Rebuild cooldown/backoff
+avoid repeatedly fetching retained episodes absent from their publisher feed.
+
+The poller rechecks demand between ten-source batches, reserving two slots for
+ordinary scheduled feeds, with a five-second idle recheck. Queue state and successful
+validation timestamps are reconstructible metadata, excluded with poll state from
+the selected backup. Restore begins with unknown freshness and no pending work;
+clients can request fresh repair without reconstructing user intent from a cache.
+
+HTTP admission/rate limits and three-client response wiring are not yet switched to
+this service. The [feed contract](../contracts/feeds/README.md) defines that cutover;
+its fixture/DTO foundation must not be mistaken for serving endpoint behavior.
+
 ## Verification and remaining work
 
 Synthetic suites cover private/mixed/IPv6 destinations, pinning and rebinding,
@@ -74,6 +99,6 @@ refusal, source/owner/deletion races, exact large IDs, Starred retention, popula
 migration rollback and trigger search-path isolation.
 
 Import fetching already precedes its write transaction, but global interactive
-admission and import identity/ownership races still require review. Reads still
-await content rebuilds. No pending/freshness DTO or background-job API is introduced
-here; nonblocking reads and changed response contracts remain separate work.
+admission and import identity/ownership races still require integration. Serving
+reads still await content rebuilds until the coordinated route/client cutover.
+The demand/schema foundation does not activate those response changes by itself.

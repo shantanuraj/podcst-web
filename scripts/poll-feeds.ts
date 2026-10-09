@@ -3,10 +3,11 @@
 import postgres from 'postgres';
 import { refreshFeed } from '../src/server/ingest/feed-refresh';
 import { getDuePodcasts } from '../src/server/ingest/feed-schedule';
+import { FEED_LIMITS } from '../src/shared/feed-contract';
 
 const BATCH_SIZE = 500;
-const CONCURRENCY = 10;
-const IDLE_SLEEP_MS = 60_000;
+const CONCURRENCY = FEED_LIMITS.refresh.concurrencyGlobal;
+const IDLE_SLEEP_MS = FEED_LIMITS.client.recheckSeconds * 1000;
 
 const DAEMON_MODE = process.argv.includes('--daemon');
 
@@ -25,10 +26,6 @@ async function recordMetrics(
 }
 
 async function processBatch(sql: postgres.Sql): Promise<number> {
-  const podcasts = await getDuePodcasts(sql, BATCH_SIZE);
-
-  if (podcasts.length === 0) return 0;
-
   const startTime = Date.now();
   let updated = 0;
   let unchanged = 0;
@@ -45,20 +42,27 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     const rate = (processed / ((Date.now() - startTime) / 1000)).toFixed(1);
     process.stdout.write(
-      `\r[${processed}/${podcasts.length}] [${elapsed}s ${rate}/s] ✓${updated} ○${unchanged} ✗${failed}`,
+      `\r[${processed}/${BATCH_SIZE}] [${elapsed}s ${rate}/s] ✓${updated} ○${unchanged} ✗${failed}`,
     );
   }
 
-  for (let i = 0; i < podcasts.length; i += CONCURRENCY) {
-    const batch = podcasts.slice(i, i + CONCURRENCY);
+  while (processed < BATCH_SIZE) {
+    const demand = await getDuePodcasts(sql, CONCURRENCY - 2, 'demand');
+    const scheduled = await getDuePodcasts(
+      sql,
+      CONCURRENCY - demand.length,
+      'scheduled',
+    );
+    const batch = [...demand, ...scheduled];
+    if (batch.length === 0) break;
+    const completed = updated + unchanged + failed;
     await Promise.all(batch.map(processPodcast));
+    if (updated + unchanged + failed === completed) break;
   }
+  if (processed === 0) return 0;
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  const finalRate = (
-    podcasts.length /
-    ((Date.now() - startTime) / 1000)
-  ).toFixed(1);
+  const finalRate = (processed / ((Date.now() - startTime) / 1000)).toFixed(1);
 
   await recordMetrics(sql, {
     feeds_updated: updated,
