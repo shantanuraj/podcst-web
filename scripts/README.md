@@ -65,6 +65,7 @@ parents in the same snapshot:
 - `progress_revision_heads`, `follow_revision_heads`: independent accepted-action heads
 - `progress_clients`, `follow_clients`: stream sequences, hashes and saved acknowledgements
 - `account_erasure_intents`: accepted account/credential fences and publication/application outcomes; this primary copy is not independent recovery evidence
+- `recovery_state`: transactionally applied journal prefix and incarnation bindings; this row cannot open external admission
 
 All selected tables share one `pg_dump` snapshot. `--strict-names` refuses missing
 tables; a dump failure prevents encryption/upload. Owned serial sequences are
@@ -92,7 +93,7 @@ receipts and erasure/revocation records.
 
 1. Before activation, compare the exact installed helper revision, migration
    ledger and schema with the reviewed candidate. Require migrations through
-   `0010`, SELECT on every selected table (including the migration ledger), schema
+   `0014`, SELECT on every selected table (including the migration ledger), schema
    USAGE and sequence read privileges. Stop on drift or permission errors; do not
    broaden grants, skip tables or migrate to make a backup pass. Use the
    [schema comparison](../docs/schema-inventory.md) separately: a ledger alone
@@ -166,6 +167,83 @@ Generation rotation fences all three resources, including legacy Starred work.
 Every missing selected table refuses a dump. A synthetic size/runtime comparison
 prints selected/full archive bytes and elapsed times; it is not a storage budget.
 
-New migrations must update this coverage decision. These tests do not implement
-account deletion or later erasure replay, and do not prove production ciphertext
-recovery, off-host key availability, alert delivery or recovery objectives.
+New migrations must update this coverage decision. Backup coverage tests alone do
+not establish deletion-aware admission. The recovery suite below exercises actual
+publication/replay; neither suite proves production ciphertext recovery, off-host
+key availability, physical retention or recovery objectives.
+
+## Recovery admission
+
+`recover-account-state.ts` is operator-only tooling. It requires a private,
+operator-owned configuration outside the repository, explicit database/socket/
+role/tool identities, a trusted schema reference, independent journal/authority/
+receipt stores and recovery keys. Configuration types live in that script and
+`erasure-journal/configuration.ts`. No command provisions services or broadens grants.
+
+```sh
+bun --no-env-file scripts/recover-account-state.ts reference --config CONFIG
+bun --no-env-file scripts/recover-account-state.ts capture --config CONFIG
+bun --no-env-file scripts/recover-account-state.ts recover --config CONFIG
+bun --no-env-file scripts/erasure-journal/serve.ts JOURNAL_CONFIG
+bun --no-env-file scripts/recovery-gateway.ts GATEWAY_CONFIG
+```
+
+- `reference` builds a schema fingerprint from the trusted migration chain in a
+  disposable PostgreSQL instance. A ledger alone is insufficient.
+- `bootstrap` establishes the first verified prefix on a trusted current primary;
+  it is single-use, not a fallback for an unsupported restore.
+- `capture` exports one MVCC snapshot, binds its already-verified applied prefix,
+  streams an age-encrypted selected/full archive and registers its signed manifest
+  in current independent inventory. Overlapping recovery refuses registration.
+- `recover` requires an eligible artifact and restores only into an isolated empty
+  target under matching constraints. Effects and replay watermarks commit together.
+  Pending intents reconcile under a gated provisional epoch before the final seal.
+  All sessions/codes/proofs and OAuth tokens retire; only the current state
+  generation changes. Stream history and the legacy generation remain untouched.
+- `rotate-auth` retires Redis authentication after a restart/rollback on the exact
+  still-running admitted primary. It cannot waive a changed PostgreSQL incarnation
+  or substitute for artifact recovery. Existing authenticated revocation does not
+  depend on healthy Redis; new authentication requires the admitted Redis instance.
+- `retire` removes logical artifact eligibility, not its bytes or suppression
+  evidence. `abandon` leaves admission closed and does not destroy a failed target.
+
+Recovery permanently renames retired database roles into disabled identities and
+uses a fresh serving role, publication epoch and encrypted runtime credential.
+The protected result includes the new runtime token; never log or publish it.
+A lost acknowledgement requires inspecting/resuming the same run ID. A failed
+restore without its durable receipt requires a new isolated target, not disabled
+constraints or a blind overwrite. Restore scratch contains protected plaintext;
+its storage encryption, capacity, crash leftovers and disposition need an approved
+operational plan. Capture creates no plaintext archive.
+
+`0014` installs statement-level write guards on every application table. Missing
+or stale incarnation/role/generation/server bindings refuse ordinary writes,
+including workers reconnecting after a PostgreSQL restart. It is **not** a
+schema-only rollout: coordinate the fence, bootstrap and fresh role/configuration.
+Runtime needs SELECT on recovery metadata, EXECUTE on `pg_control_system()` and
+only UPDATE on `state_generation.singleton` for shared locking, never write access
+to recovery metadata or either generation. The controller refuses unsafe ownership,
+column-level grants, replication bypass and unaccounted login roles.
+
+Serve all traffic through the external gateway; keep upstream origins inaccessible
+as bypasses. Configure every app/worker with `RECOVERY_ADMISSION_REQUIRED=1` and
+current `ERASURE_JOURNAL_URL`, `ERASURE_JOURNAL_ID`, `ERASURE_JOURNAL_TOKEN`,
+`ERASURE_WRITER_EPOCH` and public `ERASURE_VERIFICATION_KEYS`. The journal configuration
+contains only recovery/admission management tokens; runtime tokens are per-run.
+The gateway and upstream exchange fresh signed nonces, not cached ready flags.
+`ACCOUNT_ERASURE_ENABLED` remains a separate feature switch and also requires
+admission. Authentication additionally checks its Redis epoch and server identity.
+
+```sh
+PG_BIN=/path/to/postgresql/bin REQUIRE_ERASURE_TESTS=1 \
+  bun --no-env-file test src/server/erasure
+BUILT_APP_DIRECTORY=/path/to/isolated-build PG_BIN=/path/to/postgresql/bin \
+  bun --no-env-file scripts/test-recovery-admission.ts
+```
+
+The controller suite requires age, age-keygen and Redis. Built admission checks
+also require Node and OpenSSL; they use a synthetic TLS certificate trusted only
+by the child app and test gateway. No system trust store changes. They test actual
+API/private-read refusal, state access and authenticated revocation during Redis
+outages. All datasets and keys are disposable. No local test or commit authorizes
+production migration, service installation, credential changes or deletion.

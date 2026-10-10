@@ -143,6 +143,7 @@ describe.skipIf(!required)(
       await sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${sql(role)}`;
       await sql`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${sql(role)}`;
       await sql`REVOKE INSERT, UPDATE, DELETE ON public.recovery_state, public.state_generation FROM ${sql(role)}`;
+      await sql`GRANT UPDATE (singleton) ON public.state_generation TO ${sql(role)}`;
     };
     const controller = (sql = source) =>
       createRecoveryController({
@@ -1300,6 +1301,27 @@ describe.skipIf(!required)(
         for (const name of names)
           await stores[0]`DROP DATABASE IF EXISTS ${stores[0](name)} WITH (FORCE)`;
       }
+    }, 30_000);
+
+    test('column-level control writes and replication bypass privileges refuse admission', async () => {
+      await boot();
+      await capture();
+      await prepareTarget();
+      await target`GRANT UPDATE (auth_epoch) ON recovery_state TO next_worker`;
+      await expect(recover()).rejects.toThrow();
+      await closed();
+      await target`REVOKE UPDATE (auth_epoch) ON recovery_state FROM next_worker`;
+      await target`GRANT SET ON PARAMETER session_replication_role TO next_worker`;
+      try {
+        await expect(recover()).rejects.toThrow();
+        await closed();
+      } finally {
+        await target`REVOKE SET ON PARAMETER session_replication_role FROM next_worker`;
+      }
+      const proof = await recover();
+      expect((await guard(runtime, proof.value.writerEpoch)()).runId).toBe(
+        state.id,
+      );
     }, 30_000);
 
     test('controller exclusion and runtime publication fencing hold while recovery is closed', async () => {

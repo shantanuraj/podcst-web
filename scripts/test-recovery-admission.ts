@@ -88,7 +88,9 @@ async function main() {
     await primary.sql`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO gate_new`;
     await primary.sql`GRANT EXECUTE ON FUNCTION pg_control_system() TO gate_new`;
     await primary.sql`REVOKE INSERT, UPDATE, DELETE ON recovery_state, state_generation FROM gate_new`;
+    await primary.sql`GRANT UPDATE (singleton) ON state_generation TO gate_new`;
     await primary.sql`INSERT INTO users (id,email) VALUES ('gate-user','gate@example.invalid')`;
+    await primary.sql`INSERT INTO passkeys (id,user_id,credential_id,public_key) VALUES ('gate-key','gate-user','synthetic-credential',decode('12','hex'))`;
     for (const name of ['journal', 'authority', 'receipts'])
       await stores[0].unsafe(
         readFileSync(
@@ -201,7 +203,9 @@ async function main() {
         DATABASE_URL: primaryUrl.toString(),
         REDIS_URL: cache.url,
         RECOVERY_ADMISSION_REQUIRED: '1',
+        ACCOUNT_ERASURE_ENABLED: '1',
         ERASURE_JOURNAL_URL: url,
+        ERASURE_JOURNAL_ID: journalId,
         ERASURE_JOURNAL_TOKEN: token,
         ERASURE_WRITER_EPOCH: permission.value.writerEpoch,
         ERASURE_VERIFICATION_KEYS: JSON.stringify({
@@ -272,6 +276,9 @@ async function main() {
       '/api/health',
       '/api/auth/session',
       '/api/account',
+      '/api/lists',
+      '/api/progress',
+      '/api/subscriptions',
       '/manifest.json',
     ]) {
       const response = await fetch(`${publicOrigin}${path}`, {
@@ -296,6 +303,41 @@ async function main() {
       `Gateway redirect escaped its public origin: ${root.status} ${root.headers.get('location')}`,
     );
     await root.body?.cancel();
+    await cache.close();
+    cache = undefined;
+    const revoked = await fetch(
+      `${publicOrigin}/api/account/passkeys/gate-key`,
+      {
+        method: 'DELETE',
+        headers: {
+          cookie: 'session=gate-session',
+          'x-podcst-client': 'native',
+        },
+      },
+    );
+    check(
+      revoked.status === 200,
+      `Authenticated revocation depended on Redis: ${revoked.status}`,
+    );
+    await revoked.body?.cancel();
+    check(
+      (await primary.sql`SELECT 1 FROM passkeys WHERE id = 'gate-key'`)
+        .length === 0,
+      'Revocation did not apply',
+    );
+    const authentication = await fetch(`${publicOrigin}/api/auth/email-login`, {
+      method: 'POST',
+      headers: {
+        'x-podcst-client': 'native',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: 'gate@example.invalid', code: '123456' }),
+    });
+    check(
+      authentication.status === 503,
+      `New authentication returned ${authentication.status} without epoch evidence`,
+    );
+    await authentication.body?.cancel();
     await control.exclusive((lease) => lease.close());
     for (const path of [
       '/api/health',

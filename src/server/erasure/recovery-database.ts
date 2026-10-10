@@ -114,10 +114,20 @@ export async function assertServingPrivileges(sql: postgres.Sql, role: string) {
   const [rights] =
     await sql`SELECT has_database_privilege(${role}, current_database(), 'CREATE') OR has_schema_privilege(${role}, 'public', 'CREATE') OR has_parameter_privilege(${role}, 'session_replication_role', 'SET') AS ddl,
     has_table_privilege(${role}, 'public.recovery_state', 'INSERT,UPDATE,DELETE,TRUNCATE') OR has_table_privilege(${role}, 'public.state_generation', 'INSERT,UPDATE,DELETE,TRUNCATE') OR has_schema_privilege(${role}, 'podcst_migrations', 'USAGE') AS control,
-    has_table_privilege(${role}, 'public.recovery_state', 'SELECT') AND has_table_privilege(${role}, 'public.state_generation', 'SELECT') AND has_function_privilege(${role}, 'pg_control_system()', 'EXECUTE') AS probe`;
+    has_table_privilege(${role}, 'public.recovery_state', 'SELECT') AND has_table_privilege(${role}, 'public.state_generation', 'SELECT') AND has_function_privilege(${role}, 'pg_control_system()', 'EXECUTE') AND has_column_privilege(${role}, 'public.state_generation', 'singleton', 'UPDATE') AS probe`;
   const owned =
     await sql`SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = ${role}) UNION ALL SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proowner = (SELECT oid FROM pg_roles WHERE rolname = ${role})`;
-  if (rights.ddl || rights.control || !rights.probe || owned.length)
+  const writable =
+    await sql`SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname IN ('recovery_state', 'state_generation') AND a.attnum > 0 AND NOT a.attisdropped
+      AND (has_column_privilege(${role}, c.oid, a.attnum, 'INSERT') OR (has_column_privilege(${role}, c.oid, a.attnum, 'UPDATE') AND NOT (c.relname = 'state_generation' AND a.attname = 'singleton')))`;
+  if (
+    rights.ddl ||
+    rights.control ||
+    !rights.probe ||
+    owned.length ||
+    writable.length
+  )
     throw new JournalError(503);
 }
 export async function enableServingRole(sql: postgres.Sql, plan: RecoveryPlan) {
