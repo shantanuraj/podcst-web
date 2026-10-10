@@ -11,6 +11,8 @@ import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
+import { openJournalConfiguration } from '../../../scripts/erasure-journal/configuration';
+import { readProtected, writeProtected } from '../../../scripts/lib/artifacts';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import {
   type ArchiveTools,
@@ -20,6 +22,7 @@ import {
 } from '../../../scripts/lib/recovery-artifact';
 import { startRedis } from '../../../scripts/lib/redis-sandbox';
 import { migrate } from '../../../scripts/migrations';
+import { runRecoveryCommand } from '../../../scripts/recover-account-state';
 import { recoveryForwarder } from '../../../scripts/recovery-gateway';
 import { createChallengeStore } from '../auth/challenges';
 import {
@@ -1082,6 +1085,166 @@ describe.skipIf(!required)(
       expect(await source`SELECT 1 FROM sessions`).toHaveLength(0);
       expect(proof.value.authEpoch).not.toBe(oldEpoch);
       expect(await cache.redis.get(authFlowKey(oldEpoch, flow))).toBe(value);
+    }, 30_000);
+
+    test('operator entrypoints execute reference, bootstrap, encrypted capture and isolated recovery without ambient targets', async () => {
+      const names = ['cli_journal', 'cli_authority', 'cli_receipts'];
+      const connections: postgres.Sql[] = [];
+      try {
+        for (let i = 0; i < names.length; i++) {
+          await stores[0]`CREATE DATABASE ${stores[0](names[i])} TEMPLATE template0`;
+          const db = postgres({ ...independent.options, database: names[i] });
+          connections.push(db);
+          await db.unsafe(
+            readFileSync(
+              new URL(
+                `../../../scripts/erasure-journal/${['journal', 'authority', 'receipts'][i]}.sql`,
+                import.meta.url,
+              ),
+              'utf8',
+            ),
+          );
+        }
+        const id = randomUUID();
+        await initializeJournalStores(
+          connections[0],
+          connections[1],
+          id,
+          randomUUID(),
+        );
+        const configuration = join(directory, 'journal.json');
+        const address = (name: string) =>
+          `postgres://postgres@localhost:${independent.options.port}/${name}?host=${encodeURIComponent(independent.directory)}`;
+        writeProtected(configuration, {
+          port: 3123,
+          journalId: id,
+          databases: {
+            journal: address(names[0]),
+            authority: address(names[1]),
+            receipts: address(names[2]),
+          },
+          tokens: {
+            recovery: tokens.get('recovery'),
+            admission: tokens.get('admission'),
+          },
+          keys: {
+            current: keys.current,
+            signing: keys.signing
+              .export({ type: 'pkcs8', format: 'pem' })
+              .toString(),
+            versions: [
+              {
+                id: keys.current,
+                encryption: keys.encryption
+                  .get(keys.current)
+                  ?.toString('base64'),
+                verification: keys.verification
+                  .get(keys.current)
+                  ?.export({ type: 'spki', format: 'pem' })
+                  .toString(),
+              },
+            ],
+          },
+        });
+        const reference = join(directory, 'reference.json');
+        const refConfig = join(directory, 'reference-config.json');
+        writeProtected(refConfig, {
+          pgBin: process.env.PG_BIN,
+          output: reference,
+        });
+        await runRecoveryCommand('reference', refConfig);
+        const base = {
+          pgBin: process.env.PG_BIN,
+          age: Bun.which('age'),
+          primary: {
+            socket: primary.directory,
+            port: primary.options.port,
+            database: 'postgres',
+            role: 'postgres',
+          },
+          journalConfiguration: configuration,
+          redisUrl: cache.url,
+          reference,
+        };
+        const first = join(directory, 'bootstrap-result.json');
+        const bootConfig = join(directory, 'bootstrap-config.json');
+        writeProtected(bootConfig, {
+          ...base,
+          output: first,
+          run: {
+            id: randomUUID(),
+            retiredRoles: ['old_worker'],
+            servingRole: 'first_worker',
+          },
+        });
+        await runRecoveryCommand('bootstrap', bootConfig);
+        const started = readProtected(first) as {
+          attestation: Signed<AdmissionAttestation>;
+          runtimeToken: string;
+        };
+        expect(started.runtimeToken.length).toBe(43);
+        const cipher = join(directory, 'cli.age');
+        const manifestPath = join(directory, 'cli-manifest.json');
+        const captureConfig = join(directory, 'capture-config.json');
+        writeProtected(captureConfig, {
+          ...base,
+          output: manifestPath,
+          artifact: { path: cipher, recipient, kind: 'selected' },
+        });
+        await runRecoveryCommand('capture', captureConfig);
+        const manifest = readProtected(
+          manifestPath,
+        ) as Signed<RecoveryManifest>;
+        expect(manifest.value.artifactHash).toBe(await artifactHash(cipher));
+        const backend = await openJournalConfiguration(configuration);
+        try {
+          await backend.journal.publish(started.attestation.value.writerEpoch, {
+            version: 1,
+            operationId: randomUUID(),
+            accountId: a.userId,
+            action: 'erase_account',
+            acceptedAt: new Date().toISOString(),
+          });
+        } finally {
+          await backend.close();
+        }
+        await source`CREATE DATABASE restored TEMPLATE template0`;
+        target = db('restored');
+        await migrate(target);
+        await grant(target, 'next_worker');
+        const output = join(directory, 'recovered.json');
+        const recoverConfig = join(directory, 'recover-config.json');
+        writeProtected(recoverConfig, {
+          ...base,
+          primary: { ...base.primary, database: 'restored' },
+          output,
+          run: {
+            id: randomUUID(),
+            retiredRoles: ['first_worker'],
+            servingRole: 'next_worker',
+          },
+          artifact: { path: cipher, identity, scratch: directory },
+        });
+        await runRecoveryCommand('recover', recoverConfig);
+        const result = readProtected(output) as {
+          attestation: Signed<AdmissionAttestation>;
+          runtimeToken: string;
+        };
+        expect(result.attestation.value.artifactHash).toBe(
+          manifest.value.artifactHash,
+        );
+        expect(result.runtimeToken === started.runtimeToken).toBe(false);
+        expect(
+          await target`SELECT 1 FROM users WHERE id = ${a.userId}`,
+        ).toHaveLength(0);
+        expect(
+          await target`SELECT 1 FROM users WHERE id = ${b.userId}`,
+        ).toHaveLength(1);
+      } finally {
+        await Promise.all(connections.map((db) => db.end({ timeout: 1 })));
+        for (const name of names)
+          await stores[0]`DROP DATABASE IF EXISTS ${stores[0](name)} WITH (FORCE)`;
+      }
     }, 30_000);
 
     test('controller exclusion and runtime publication fencing hold while recovery is closed', async () => {

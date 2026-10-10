@@ -260,9 +260,9 @@ export function createRecoveryControl(
       }) => Promise<T>,
     ) {
       const connection = await sql.reserve();
-      await connection`SET synchronous_commit = on`;
       let locked = false;
       try {
+        await connection`SET synchronous_commit = on`;
         const [lock] =
           await connection`SELECT pg_try_advisory_lock(${LOCK}) AS held`;
         if (!lock.held) throw new JournalError(409);

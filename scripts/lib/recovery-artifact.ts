@@ -10,7 +10,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type postgres from 'postgres';
 import {
@@ -49,6 +49,14 @@ export interface ArchiveTools {
 }
 const executable = (tools: ArchiveTools, name: string) =>
   join(tools.pgBin, name);
+const toolEnvironment = () => ({
+  PATH: process.env.PATH ?? '',
+  LC_ALL: 'C',
+  PGPASSFILE: '/dev/null',
+  PGSERVICEFILE: '/dev/null',
+  PGCONNECT_TIMEOUT: '5',
+  PGAPPNAME: 'podcst-recovery-archive',
+});
 async function result(process: ReturnType<typeof Bun.spawn>) {
   if ((await process.exited) !== 0) throw new JournalError(503);
 }
@@ -83,6 +91,12 @@ async function writeStream(
       createWriteStream('', { fd, autoClose: false }),
     );
     fsyncSync(fd);
+    const directory = openSync(dirname(path), constants.O_RDONLY);
+    try {
+      fsyncSync(directory);
+    } finally {
+      closeSync(directory);
+    }
   } finally {
     closeSync(fd);
   }
@@ -106,17 +120,20 @@ export async function captureEncryptedArchive(
       '--strict-names',
       '--no-owner',
       '--no-privileges',
+      '--no-password',
+      '--lock-wait-timeout=10s',
       `--snapshot=${snapshot}`,
       ...(kind === 'selected'
         ? selectedRecoveryTables().flatMap((table) => ['-t', table])
         : []),
     ],
-    { stdout: 'pipe', stderr: 'ignore' },
+    { stdout: 'pipe', stderr: 'ignore', env: toolEnvironment() },
   );
   const encryption = Bun.spawn([tools.age, '-r', recipient], {
     stdin: dump.stdout,
     stdout: 'pipe',
     stderr: 'ignore',
+    env: toolEnvironment(),
   });
   try {
     await writeStream(output, encryption.stdout);
@@ -147,6 +164,7 @@ export async function restoreEncryptedArchive(
   const decryption = Bun.spawn([tools.age, '-d', '-i', identity, path], {
     stdout: 'pipe',
     stderr: 'ignore',
+    env: toolEnvironment(),
   });
   let created = false;
   try {
@@ -158,7 +176,7 @@ export async function restoreEncryptedArchive(
       throw new JournalError(503);
     const listing = Bun.spawn(
       [executable(tools, 'pg_restore'), '--list', archive],
-      { stdout: 'pipe', stderr: 'ignore' },
+      { stdout: 'pipe', stderr: 'ignore', env: toolEnvironment() },
     );
     const toc = await new Response(listing.stdout).text();
     await result(listing);
@@ -239,11 +257,12 @@ export async function restoreEncryptedArchive(
         '--data-only',
         '--exit-on-error',
         '--single-transaction',
+        '--no-password',
         '--use-list',
         orderPath,
         archive,
       ],
-      { stdout: 'ignore', stderr: 'ignore' },
+      { stdout: 'ignore', stderr: 'ignore', env: toolEnvironment() },
     );
     await result(restore);
     await sql.begin(async (tx) => {

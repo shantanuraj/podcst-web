@@ -23,6 +23,9 @@ export async function main(args: string[]) {
   try {
     let after = '0';
     for (;;) {
+      await (
+        await import('../src/server/erasure/admission')
+      ).requireRuntimeAdmission(sql);
       const rows = await sql<(Row & { public: boolean })[]>`
         SELECT ec.episode_id, ec.episode_art, p.cover,
           p.owner_user_id IS NULL AS public
