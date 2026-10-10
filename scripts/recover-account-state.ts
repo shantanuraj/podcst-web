@@ -1,6 +1,6 @@
 import { lstatSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
-import { Redis } from 'ioredis';
+import type { Redis } from 'ioredis';
 import postgres from 'postgres';
 import {
   isDigest,
@@ -22,6 +22,10 @@ import {
   captureEncryptedArchive,
   restoreEncryptedArchive,
 } from './lib/recovery-artifact';
+import {
+  createRecoveryRedis,
+  type RecoveryRedisConfiguration,
+} from './lib/recovery-redis';
 import { loadMigrations, migrate } from './migrations';
 
 interface Configuration {
@@ -29,7 +33,7 @@ interface Configuration {
   age: string;
   primary: { socket: string; port: number; database: string; role: string };
   journalConfiguration: string;
-  redisUrl: string;
+  redis: RecoveryRedisConfiguration;
   reference: string;
   output: string;
   run: { id: string; retiredRoles: string[]; servingRole: string };
@@ -123,7 +127,7 @@ export async function runRecoveryCommand(
       target.port > 65535 ||
       !target.database ||
       !target.role ||
-      !config.redisUrl
+      !config.redis
     )
       throw new Error('Explicit recovery target required');
     sql = postgres({
@@ -147,18 +151,9 @@ export async function runRecoveryCommand(
       actual.writes !== 'on'
     )
       throw new Error('Recovery target refused');
-    const cache = new URL(config.redisUrl);
-    if (!['redis:', 'rediss:'].includes(cache.protocol) || !cache.hostname)
-      throw new Error('Recovery cache refused');
     if (['capture', 'recover'].includes(command) && !isAbsolute(config.age))
       throw new Error('Explicit encryption tool required');
-    redis = new Redis(config.redisUrl, {
-      lazyConnect: true,
-      connectTimeout: 1000,
-      commandTimeout: 2000,
-      maxRetriesPerRequest: 1,
-    });
-    redis.on('error', () => {});
+    redis = createRecoveryRedis(config.redis);
     const controller = createRecoveryController({
       sql,
       redis,

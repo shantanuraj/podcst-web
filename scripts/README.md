@@ -179,6 +179,11 @@ operator-owned configuration outside the repository, explicit database/socket/
 role/tool identities, a trusted schema reference, independent journal/authority/
 receipt stores and recovery keys. Configuration types live in that script and
 `erasure-journal/configuration.ts`. No command provisions services or broadens grants.
+The controller's `redis` object contains `url` and optional `tls` PEM material
+(`ca`, plus paired `cert`/`key` for mutual TLS). Keep it in the same protected
+configuration, never a URL query or command argument. Non-loopback Redis requires
+`rediss:` with certificate/hostname verification; no plaintext fallback or trust
+bypass is supported. Authentication/ACL/TLS refusal leaves recovery closed.
 
 ```sh
 bun --no-env-file scripts/recover-account-state.ts reference --config CONFIG
@@ -244,8 +249,8 @@ BUILT_APP_DIRECTORY=/path/to/isolated-build PG_BIN=/path/to/postgresql/bin \
   bun --no-env-file scripts/test-recovery-admission.ts
 ```
 
-The controller suite requires age, age-keygen and Redis. Built admission checks
-also require Node and OpenSSL; they use a synthetic TLS certificate trusted only
+The controller suite requires age, age-keygen, Redis and OpenSSL. Built admission
+checks also require Node; they use a synthetic TLS certificate trusted only
 by the child app and test gateway. No system trust store changes. They test actual
 API/private-read refusal, state access and authenticated revocation during Redis
 outages. All datasets and keys are disposable. No local test or commit authorizes

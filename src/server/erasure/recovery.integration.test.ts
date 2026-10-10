@@ -21,6 +21,7 @@ import {
   restoreEncryptedArchive,
 } from '../../../scripts/lib/recovery-artifact';
 import { startRedis } from '../../../scripts/lib/redis-sandbox';
+import { createTLSFixture } from '../../../scripts/lib/tls-fixture';
 import { migrate } from '../../../scripts/migrations';
 import { runRecoveryCommand } from '../../../scripts/recover-account-state';
 import { recoveryForwarder } from '../../../scripts/recovery-gateway';
@@ -60,10 +61,11 @@ const required =
   !!process.env.PG_BIN &&
   !!Bun.which('age') &&
   !!Bun.which('age-keygen') &&
-  !!Bun.which('redis-server');
+  !!Bun.which('redis-server') &&
+  !!Bun.which('openssl');
 if (process.env.REQUIRE_ERASURE_TESTS === '1' && !required)
   throw new Error(
-    'age, age-keygen and redis-server required for recovery tests',
+    'age, age-keygen, redis-server and openssl required for recovery tests',
   );
 
 describe.skipIf(!required)(
@@ -258,12 +260,11 @@ describe.skipIf(!required)(
     };
     const suppress = async () => {
       await erasure().revoke(b, 'key-b');
-      await source`INSERT INTO account_erasure_intents (operation_id, action, account_id, accepted_at, receipt_expires_at) VALUES (${randomUUID()},'erase_account',${a.userId},${new Date(time)},${new Date(time + 604800000)})`;
-      expect(
-        (await erasure().reconcilePending()).every(
-          (row) => row.status === 'completed',
-        ),
-      ).toBe(true);
+      const operationId = randomUUID();
+      await source`INSERT INTO account_erasure_intents (operation_id, action, account_id, accepted_at, receipt_expires_at, next_attempt_at) VALUES (${operationId},'erase_account',${a.userId},${new Date(time)},${new Date(time + 604800000)},${new Date(time)})`;
+      expect(await erasure().reconcilePending()).toEqual([
+        { operationId, status: 'completed' },
+      ]);
     };
     beforeAll(async () => {
       primary = startPostgres();
@@ -558,7 +559,7 @@ describe.skipIf(!required)(
     }, 30_000);
 
     test('nonzero conservative bases and overlapping coherent captures do not claim an asynchronous observed head', async () => {
-      await source`INSERT INTO account_erasure_intents (operation_id,action,account_id,credential_id,accepted_at,receipt_expires_at) VALUES (${randomUUID()},'revoke_passkey',${b.userId},'key-b',${new Date(time)},${new Date(time + 604800000)})`;
+      await source`INSERT INTO account_erasure_intents (operation_id,action,account_id,credential_id,accepted_at,receipt_expires_at,next_attempt_at) VALUES (${randomUUID()},'revoke_passkey',${b.userId},'key-b',${new Date(time)},${new Date(time + 604800000)},${new Date(time)})`;
       await boot();
       expect(bootstrap.value.base.sequence).toBe('1');
       const first = join(directory, 'first.age');
@@ -1143,7 +1144,27 @@ describe.skipIf(!required)(
       expect(await cache.redis.get(authFlowKey(oldEpoch, flow))).toBe(value);
     }, 30_000);
 
-    test('operator entrypoints execute reference, bootstrap, encrypted capture and isolated recovery without ambient targets', async () => {
+    test('operator entrypoints execute reference, bootstrap, capture and recovery with mutual TLS and constrained Redis ACLs', async () => {
+      const tls = createTLSFixture(directory);
+      await cache.close();
+      cache = await startRedis({ tls });
+      const password = randomUUID();
+      await cache.redis.acl(
+        'SETUSER',
+        'controller',
+        'on',
+        `>${password}`,
+        '~auth:epoch:*',
+        '~auth:flow:*',
+        '+get',
+        '+set',
+        '+scan',
+        '+info',
+        '+client|setinfo',
+      );
+      const cacheUrl = new URL(cache.url);
+      cacheUrl.username = 'controller';
+      cacheUrl.password = password;
       const names = ['cli_journal', 'cli_authority', 'cli_receipts'];
       const connections: postgres.Sql[] = [];
       try {
@@ -1219,12 +1240,19 @@ describe.skipIf(!required)(
             role: 'postgres',
           },
           journalConfiguration: configuration,
-          redisUrl: cache.url,
+          redis: {
+            url: cacheUrl.toString(),
+            tls: {
+              ca: readFileSync(tls.ca, 'utf8'),
+              cert: readFileSync(tls.client.cert, 'utf8'),
+              key: readFileSync(tls.client.key, 'utf8'),
+            },
+          },
           reference,
         };
         const first = join(directory, 'bootstrap-result.json');
         const bootConfig = join(directory, 'bootstrap-config.json');
-        writeProtected(bootConfig, {
+        const bootstrapInput = {
           ...base,
           output: first,
           run: {
@@ -1232,7 +1260,27 @@ describe.skipIf(!required)(
             retiredRoles: ['old_worker'],
             servingRole: 'first_worker',
           },
+        };
+        writeProtected(bootConfig, bootstrapInput);
+        const refusedConfig = join(directory, 'missing-client-identity.json');
+        writeProtected(refusedConfig, {
+          ...bootstrapInput,
+          redis: { url: base.redis.url, tls: { ca: base.redis.tls.ca } },
         });
+        await expect(
+          runRecoveryCommand('bootstrap', refusedConfig),
+        ).rejects.toThrow();
+        const inspection = await openJournalConfiguration(configuration);
+        try {
+          expect((await inspection.control.current())?.admitted).toBe(false);
+          expect(
+            (
+              await source`SELECT rolcanlogin FROM pg_roles WHERE rolname = 'first_worker'`
+            )[0].rolcanlogin,
+          ).toBe(false);
+        } finally {
+          await inspection.close();
+        }
         await runRecoveryCommand('bootstrap', bootConfig);
         const started = readProtected(first) as {
           attestation: Signed<AdmissionAttestation>;
