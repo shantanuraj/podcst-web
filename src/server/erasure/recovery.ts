@@ -386,6 +386,8 @@ export function createRecoveryController({
             await tx`UPDATE state_generation SET generation = ${plan.generation} WHERE singleton`;
             await tx`UPDATE recovery_state SET auth_epoch = ${plan.authEpoch}, generation = ${plan.generation} WHERE singleton`;
           }
+          await tx`UPDATE recovery_state SET database_oid = (SELECT oid FROM pg_database WHERE datname = current_database()),
+            database_cluster = (SELECT system_identifier::text FROM pg_control_system()), database_started_at = pg_postmaster_start_time(), serving_role = ${plan.servingRole} WHERE singleton`;
           const unsafe =
             await tx`SELECT 1 FROM sessions UNION ALL SELECT 1 FROM email_verifications UNION ALL SELECT 1 FROM account_erasure_proofs UNION ALL SELECT 1 FROM oauth_accounts WHERE access_token IS NOT NULL OR refresh_token IS NOT NULL OR expires_at IS NOT NULL`;
           if (unsafe.length) throw new JournalError(503);

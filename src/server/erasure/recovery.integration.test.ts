@@ -816,6 +816,61 @@ describe.skipIf(!required)(
       );
     }, 30_000);
 
+    test('a reconnected stale worker cannot write after an admitted primary restarts', async () => {
+      await boot();
+      await live`UPDATE users SET name = 'before restart' WHERE id = ${b.userId}`;
+      await source.end({ timeout: 1 });
+      await Promise.all(pools.map((pool) => pool.end({ timeout: 1 })));
+      pools = [];
+      for (const args of [
+        [
+          '-D',
+          join(primary.directory, 'data'),
+          '-m',
+          'immediate',
+          '-w',
+          'stop',
+        ],
+        [
+          '-D',
+          join(primary.directory, 'data'),
+          '-l',
+          join(primary.directory, 'restart.log'),
+          '-o',
+          `-k ${primary.directory} -p ${primary.options.port} -h ''`,
+          '-w',
+          'start',
+        ],
+      ]) {
+        expect(
+          Bun.spawnSync([join(process.env.PG_BIN ?? '', 'pg_ctl'), ...args], {
+            stdout: 'pipe',
+            stderr: 'pipe',
+          }).exitCode,
+        ).toBe(0);
+      }
+      source = postgres({ ...primary.options, max: 8 });
+      live = db('postgres', 'first_worker');
+      await expect(
+        live`UPDATE users SET name = 'stale worker' WHERE id = ${b.userId}`.execute(),
+      ).rejects.toThrow('Recovery admission required');
+      expect(
+        (await source`SELECT name FROM users WHERE id = ${b.userId}`)[0].name,
+      ).toBe('before restart');
+      await expect(guard(live)()).rejects.toThrow();
+      await grant(source, 'next_worker');
+      await expect(
+        controller().recover({
+          id: randomUUID(),
+          mode: 'auth-rotation',
+          artifactHash: bootstrap.value.artifactHash,
+          retiredRoles: ['first_worker'],
+          servingRole: 'next_worker',
+        }),
+      ).rejects.toThrow();
+      expect((await control.current())?.admitted).toBe(false);
+    }, 30_000);
+
     test('publication racing the seal is either suppressed before admission or refused under the retired epoch', async () => {
       await boot();
       await capture();

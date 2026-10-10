@@ -18,7 +18,12 @@ export async function recoverySchemaInTransaction(
     await sql`SELECT n.nspname, p.proname, pg_get_functiondef(p.oid) AS definition FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.prokind IN ('f','p') ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)`;
   const unsafe =
     await sql`SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND t.tgenabled <> 'O' UNION ALL SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'public' AND NOT c.convalidated`;
-  if (unsafe.length) throw new JournalError(503);
+  const unfenced =
+    await sql`SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT EXISTS (
+    SELECT 1 FROM pg_trigger t WHERE t.tgrelid = c.oid AND t.tgname = 'recovery_admission' AND t.tgtype = 62 AND t.tgenabled = 'O'
+      AND t.tgfoid = 'public.require_recovery_admission()'::regprocedure
+  )`;
+  if (unsafe.length || unfenced.length) throw new JournalError(503);
   const rows = await sql<
     { name: string; checksum: string }[]
   >`SELECT name, checksum FROM podcst_migrations.history ORDER BY name`;
@@ -107,7 +112,7 @@ export async function assertWritersFenced(sql: postgres.ISql, roles: string[]) {
 }
 export async function assertServingPrivileges(sql: postgres.Sql, role: string) {
   const [rights] =
-    await sql`SELECT has_database_privilege(${role}, current_database(), 'CREATE') OR has_schema_privilege(${role}, 'public', 'CREATE') AS ddl,
+    await sql`SELECT has_database_privilege(${role}, current_database(), 'CREATE') OR has_schema_privilege(${role}, 'public', 'CREATE') OR has_parameter_privilege(${role}, 'session_replication_role', 'SET') AS ddl,
     has_table_privilege(${role}, 'public.recovery_state', 'INSERT,UPDATE,DELETE,TRUNCATE') OR has_table_privilege(${role}, 'public.state_generation', 'INSERT,UPDATE,DELETE,TRUNCATE') OR has_schema_privilege(${role}, 'podcst_migrations', 'USAGE') AS control,
     has_table_privilege(${role}, 'public.recovery_state', 'SELECT') AND has_table_privilege(${role}, 'public.state_generation', 'SELECT') AND has_function_privilege(${role}, 'pg_control_system()', 'EXECUTE') AS probe`;
   const owned =
