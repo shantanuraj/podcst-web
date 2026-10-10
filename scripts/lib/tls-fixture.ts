@@ -4,6 +4,7 @@ import { join } from 'node:path';
 export function createTLSFixture(
   directory: string,
   serverNames = 'DNS:localhost,IP:127.0.0.1',
+  clientName = 'client',
 ) {
   const openssl = Bun.which('openssl');
   if (!openssl) throw new Error('openssl required');
@@ -82,7 +83,7 @@ export function createTLSFixture(
       `basicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\nsubjectAltName=${serverNames}\n`,
     ),
     client: leaf(
-      'client',
+      clientName,
       'basicConstraints=CA:FALSE\nextendedKeyUsage=clientAuth\n',
     ),
   };

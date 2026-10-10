@@ -277,6 +277,16 @@ current `ERASURE_JOURNAL_URL`, `ERASURE_JOURNAL_ID`, `ERASURE_JOURNAL_TOKEN`,
 `ERASURE_WRITER_EPOCH` and public `ERASURE_VERIFICATION_KEYS`. The journal configuration
 contains only recovery/admission management tokens; runtime tokens are per-run.
 The gateway and upstream exchange fresh signed nonces, not cached ready flags.
+Its protected `primary` configuration is an explicit object, not a database URL:
+`{socket, port, database, role}` for local peer access, or
+`{host, port, database, role, password, tls: {ca, cert, key}}` for remote mutual TLS.
+TCP always requires the complete client identity and verified CA/hostname (including
+IP SAN); no URL overrides, trust bypass, fallback hosts or plaintext retry exist.
+The transport negotiates verified TLS before giving PostgreSQL its socket or any
+startup/credential bytes. A bounded handshake and explicit pre-authentication close
+error prevent the driver's silent-close reconnect loop. Gateway sessions default to
+read-only but still use the admitted serving role; this is not a new SQL privilege
+boundary. Actual HBA/SCRAM/client-CN or peer mappings remain operator-reviewed scope.
 `ACCOUNT_ERASURE_ENABLED` gates new full-account deletion proofs/acceptance and
 also requires admission. With `RECOVERY_ADMISSION_REQUIRED=1`, protected passkey
 revocation, receipt reconciliation and accepted obligations remain available even

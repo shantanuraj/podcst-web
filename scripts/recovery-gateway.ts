@@ -1,5 +1,4 @@
 import { createPublicKey, type KeyObject, randomUUID } from 'node:crypto';
-import postgres from 'postgres';
 import {
   ADMISSION_CHALLENGE,
   ADMISSION_RESPONSE,
@@ -15,10 +14,14 @@ import type {
   AdmissionResponse,
 } from '../src/server/erasure/recovery-control';
 import { protectedExternalPath, readProtected } from './lib/artifacts';
+import {
+  createGatewayDatabase,
+  type GatewayDatabaseConfiguration,
+} from './lib/gateway-database';
 
 interface Configuration {
   port: number;
-  primary: string;
+  primary: GatewayDatabaseConfiguration;
   journal: string;
   token: string;
   epoch: string;
@@ -131,22 +134,7 @@ async function main(path: string) {
     config.port > 65535
   )
     throw new Error();
-  const primary = new URL(config.primary);
-  if (
-    !['postgres:', 'postgresql:'].includes(primary.protocol) ||
-    !primary.hostname ||
-    !primary.username ||
-    primary.pathname.length < 2
-  )
-    throw new Error();
-  const host = primary.searchParams.get('host');
-  primary.searchParams.delete('host');
-  const sql = postgres(primary.toString(), {
-    ...(host ? { host } : {}),
-    max: 6,
-    connect_timeout: 5,
-    onnotice: () => {},
-  });
+  const sql = createGatewayDatabase(config.primary);
   try {
     const keys = new Map(
       Object.entries(config.keys).map(([id, pem]) => [
