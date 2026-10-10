@@ -24,10 +24,14 @@ export const journalStorePermissions = {
   },
 } as const;
 
-export async function grantJournalStore(
-  sql: postgres.Sql,
-  store: keyof typeof journalStorePermissions,
-  expected: { database: string; role: string },
+type Store = keyof typeof journalStorePermissions;
+type Target = { database: string; role: string };
+
+async function journalStoreAccess(
+  tx: postgres.TransactionSql,
+  store: Store,
+  expected: Target,
+  grant: boolean,
 ) {
   const permissions = journalStorePermissions[store];
   if (
@@ -37,50 +41,72 @@ export async function grantJournalStore(
     )
   )
     throw new Error('Journal grant target refused');
-  await sql.begin(async (tx) => {
-    const [identity] =
-      await tx`SELECT current_database() AS database, current_user AS operator`;
-    const [role] =
-      await tx`SELECT oid, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls, rolinherit FROM pg_roles WHERE rolname = ${expected.role}`;
-    if (
-      identity.database !== expected.database ||
-      identity.operator === expected.role ||
-      !role ||
-      role.rolsuper ||
-      role.rolcreaterole ||
-      role.rolcreatedb ||
-      role.rolreplication ||
-      role.rolbypassrls ||
-      role.rolinherit
-    )
-      throw new Error('Journal grant identity refused');
-    const owners =
-      await tx`SELECT 1 FROM pg_database WHERE datname = current_database() AND datdba = ${role.oid}
-      UNION ALL SELECT 1 FROM pg_namespace WHERE nspowner = ${role.oid}
-      UNION ALL SELECT 1 FROM pg_class WHERE relowner = ${role.oid}
-      UNION ALL SELECT 1 FROM pg_proc WHERE proowner = ${role.oid}
-      UNION ALL SELECT 1 FROM pg_auth_members WHERE member = ${role.oid}`;
-    if (owners.length) throw new Error('Journal role isolation refused');
+  const [identity] =
+    await tx`SELECT current_database() AS database, current_user AS operator`;
+  const [role] =
+    await tx`SELECT oid, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls, rolinherit FROM pg_roles WHERE rolname = ${expected.role}`;
+  if (
+    identity.database !== expected.database ||
+    identity.operator === expected.role ||
+    !role ||
+    role.rolsuper ||
+    role.rolcreaterole ||
+    role.rolcreatedb ||
+    role.rolreplication ||
+    role.rolbypassrls ||
+    role.rolinherit
+  )
+    throw new Error('Journal grant identity refused');
+  const owners =
+    await tx`SELECT 1 FROM pg_database WHERE datname = current_database() AND datdba = ${role.oid}
+    UNION ALL SELECT 1 FROM pg_namespace WHERE nspowner = ${role.oid}
+    UNION ALL SELECT 1 FROM pg_class WHERE relowner = ${role.oid}
+    UNION ALL SELECT 1 FROM pg_proc WHERE proowner = ${role.oid}
+    UNION ALL SELECT 1 FROM pg_auth_members WHERE member = ${role.oid} OR roleid = ${role.oid}`;
+  if (owners.length) throw new Error('Journal role isolation refused');
+  if (grant) {
     await tx`REVOKE ALL ON DATABASE ${tx(expected.database)} FROM PUBLIC`;
     await tx`REVOKE CREATE ON SCHEMA public FROM PUBLIC`;
     await tx`GRANT CONNECT ON DATABASE ${tx(expected.database)} TO ${tx(expected.role)}`;
     await tx`GRANT USAGE ON SCHEMA ${tx(permissions.schema)} TO ${tx(expected.role)}`;
-    const [unsafe] =
-      await tx`SELECT has_database_privilege(${expected.role}, current_database(), 'CREATE')
-      OR has_schema_privilege(${expected.role}, 'public', 'CREATE')
-      OR has_schema_privilege(${expected.role}, ${permissions.schema}, 'CREATE')
-      OR has_parameter_privilege(${expected.role}, 'session_replication_role', 'SET') AS allowed`;
-    if (unsafe.allowed) throw new Error('Journal role isolation refused');
-    for (const [table, privileges] of Object.entries(permissions.tables)) {
-      const relation = `${permissions.schema}.${table}`;
-      const extra =
-        await tx`SELECT privilege FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) privilege
-        WHERE (has_table_privilege(${expected.role}, ${relation}, privilege)
-          OR CASE WHEN privilege IN ('SELECT','INSERT','UPDATE','REFERENCES')
-            THEN has_any_column_privilege(${expected.role}, ${relation}, privilege) ELSE false END)
-          AND NOT privilege = ANY(${privileges}::text[])`;
-      if (extra.length) throw new Error('Unexpected journal role privileges');
+  }
+  const [unsafe] =
+    await tx`SELECT has_database_privilege(${expected.role}, current_database(), 'CREATE,TEMPORARY')
+    OR has_schema_privilege(${expected.role}, 'public', 'CREATE')
+    OR has_schema_privilege(${expected.role}, ${permissions.schema}, 'CREATE')
+    OR has_parameter_privilege(${expected.role}, 'session_replication_role', 'SET')
+    OR NOT has_database_privilege(${expected.role}, current_database(), 'CONNECT')
+    OR NOT has_schema_privilege(${expected.role}, ${permissions.schema}, 'USAGE') AS allowed`;
+  if (unsafe.allowed) throw new Error('Journal role isolation refused');
+  for (const [table, privileges] of Object.entries(permissions.tables)) {
+    const relation = `${permissions.schema}.${table}`;
+    const extra =
+      await tx`SELECT privilege FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) privilege
+      WHERE (has_table_privilege(${expected.role}, ${relation}, privilege)
+        OR CASE WHEN privilege IN ('SELECT','INSERT','UPDATE','REFERENCES')
+          THEN has_any_column_privilege(${expected.role}, ${relation}, privilege) ELSE false END)
+        AND NOT privilege = ANY(${privileges}::text[])`;
+    if (extra.length) throw new Error('Unexpected journal role privileges');
+    if (grant)
       await tx`GRANT ${tx.unsafe(privileges.join(', '))} ON TABLE ${tx(relation)} TO ${tx(expected.role)}`;
-    }
-  });
+    const missing =
+      await tx`SELECT privilege FROM unnest(${privileges}::text[]) privilege WHERE NOT has_table_privilege(${expected.role}, ${relation}, privilege)`;
+    if (missing.length) throw new Error('Missing journal role privileges');
+  }
+}
+
+export function assertJournalStore(
+  tx: postgres.TransactionSql,
+  store: Store,
+  expected: Target,
+) {
+  return journalStoreAccess(tx, store, expected, false);
+}
+
+export async function grantJournalStore(
+  sql: postgres.Sql,
+  store: Store,
+  expected: Target,
+) {
+  await sql.begin((tx) => journalStoreAccess(tx, store, expected, true));
 }

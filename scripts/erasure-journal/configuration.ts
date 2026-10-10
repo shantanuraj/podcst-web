@@ -15,6 +15,37 @@ export interface JournalConfiguration {
     versions: { id: string; encryption: string; verification: string }[];
   };
 }
+export function journalConfigurationKeys(config: JournalConfiguration) {
+  if (
+    !config.keys.versions.length ||
+    new Set(config.keys.versions.map((key) => key.id)).size !==
+      config.keys.versions.length ||
+    config.keys.versions.some(
+      (key) =>
+        !/^[A-Za-z0-9_-]{1,128}$/.test(key.id) ||
+        Buffer.from(key.encryption, 'base64').length !== 32 ||
+        Buffer.from(key.encryption, 'base64').toString('base64') !==
+          key.encryption,
+    )
+  )
+    throw new Error('Journal keys refused');
+  return {
+    current: config.keys.current,
+    signing: createPrivateKey(config.keys.signing),
+    encryption: new Map(
+      config.keys.versions.map((key) => [
+        key.id,
+        Buffer.from(key.encryption, 'base64'),
+      ]),
+    ),
+    verification: new Map(
+      config.keys.versions.map((key) => [
+        key.id,
+        createPublicKey(key.verification),
+      ]),
+    ),
+  };
+}
 export async function openJournalConfiguration(path: string) {
   const config = readProtected(
     protectedExternalPath(path, new URL('../../', import.meta.url)),
@@ -62,22 +93,7 @@ export async function openJournalConfiguration(path: string) {
       if (settings.fsync !== 'on' || settings.full_page_writes !== 'on')
         throw new Error('Journal durability unavailable');
     }
-    const keys = {
-      current: config.keys.current,
-      signing: createPrivateKey(config.keys.signing),
-      encryption: new Map(
-        config.keys.versions.map((key) => [
-          key.id,
-          Buffer.from(key.encryption, 'base64'),
-        ]),
-      ),
-      verification: new Map(
-        config.keys.versions.map((key) => [
-          key.id,
-          createPublicKey(key.verification),
-        ]),
-      ),
-    };
+    const keys = journalConfigurationKeys(config);
     const journal = createPostgresJournal(
       databases[0],
       databases[1],

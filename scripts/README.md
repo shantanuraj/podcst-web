@@ -187,6 +187,39 @@ operator, not as a service role. The helper creates no role/database and grants 
 primary application access. Co-location is supported technically, but separate
 roles/databases on one host do not establish independent recovery completeness.
 
+`erasure-journal/initialize.ts` initializes existing **dormant** stores, without
+creating databases, roles, schemas, grants, passwords or services. Its protected
+`InitializationConfiguration` pins the local socket/port/operator/cluster, service
+configuration, initial epoch, trusted reference, intent, inspection and new output.
+All three service roles must remain NOLOGIN/passwordless throughout initialization.
+It does not narrow the primary's CONNECT policy or authorize later role activation.
+
+```sh
+bun --no-env-file scripts/erasure-journal/initialize.ts reference --config CONFIG
+bun --no-env-file scripts/erasure-journal/initialize.ts inspect --config CONFIG
+bun --no-env-file scripts/erasure-journal/initialize.ts initialize --config CONFIG
+bun --no-env-file scripts/erasure-journal/initialize.ts complete-authority --config CONFIG
+```
+
+`reference` uses only `{pgBin, output}` and creates a disposable PostgreSQL 16
+reference from the three source SQL files. Keep those files beside the bundled
+initializer. `inspect` reads stores in read-only transactions and writes a new
+protected observation. It verifies schema fingerprints, identities, exact grants,
+NOLOGIN roles, no other clients and only empty or exact genesis contents.
+
+`initialize` requires the saved empty observation, rechecks it under table/role
+locks and durably writes the exclusive intent and an `OUTPUT.attempt` before either
+commit. The journal/epoch commits first; authority commits second. A lost response
+is unknown: inspect again before any separately approved completion. With the same
+intent/configuration/keys/database identities and a fresh observation,
+`complete-authority` can insert only the missing matching authority head, or emit
+the missing receipt for an already-completed genesis. It cannot reset heads, repair
+grants or resume an advanced/activated journal. Existing outputs refuse overwrite.
+A retained intent with entirely empty stores also refuses automatic retry: preserve
+it for explicit operator disposition, never delete it to make initialization pass.
+Genesis is not primary admission, an eligible checkpoint or independent evidence
+of completeness after a common rollback. Keep the intent/results in protected custody.
+
 The controller's `redis` object contains `url` and optional `tls` PEM material
 (`ca`, plus paired `cert`/`key` for mutual TLS). Keep it in the same protected
 configuration, never a URL query or command argument. Non-loopback Redis requires

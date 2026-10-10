@@ -333,10 +333,25 @@ export async function initializeJournalStores(
 ) {
   if (!isOperationId(journalId) || !isOperationId(epoch))
     throw new JournalError(400);
-  await sql.begin(async (tx) => {
-    await tx`SET LOCAL synchronous_commit = on`;
-    await tx`INSERT INTO erasure_journal.epochs (epoch) VALUES (${epoch})`;
-    await tx`INSERT INTO erasure_journal.head (journal_id, epoch, hash) VALUES (${journalId}, ${epoch}, ${JOURNAL_GENESIS})`;
-  });
-  await authority`INSERT INTO erasure_authority.head (journal_id, epoch, sequence, revision, hash, sealed) VALUES (${journalId}, ${epoch}, 0, 0, ${JOURNAL_GENESIS}, false)`;
+  await sql.begin((tx) => initializeJournalHead(tx, journalId, epoch));
+  await authority.begin((tx) => initializeAuthorityHead(tx, journalId, epoch));
+}
+
+export async function initializeJournalHead(
+  tx: postgres.TransactionSql,
+  journalId: string,
+  epoch: string,
+) {
+  await tx`SET LOCAL synchronous_commit = on`;
+  await tx`INSERT INTO erasure_journal.epochs (epoch) VALUES (${epoch})`;
+  await tx`INSERT INTO erasure_journal.head (journal_id, epoch, hash) VALUES (${journalId}, ${epoch}, ${JOURNAL_GENESIS})`;
+}
+
+export async function initializeAuthorityHead(
+  tx: postgres.TransactionSql,
+  journalId: string,
+  epoch: string,
+) {
+  await tx`SET LOCAL synchronous_commit = on`;
+  await tx`INSERT INTO erasure_authority.head (journal_id, epoch, sequence, revision, hash, sealed) VALUES (${journalId}, ${epoch}, 0, 0, ${JOURNAL_GENESIS}, false)`;
 }
