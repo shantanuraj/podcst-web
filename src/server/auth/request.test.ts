@@ -8,7 +8,7 @@ const request = (headers: Record<string, string>) =>
     headers,
   });
 
-test('guards browser mutations and explicitly admits native clients', () => {
+test('guards browser mutations and explicitly admits native clients', async () => {
   const origin =
     process.env.WEBAUTHN_RP_ORIGIN ||
     process.env.WEBAUTHN_ORIGIN ||
@@ -17,7 +17,7 @@ test('guards browser mutations and explicitly admits native clients', () => {
     { origin, 'sec-fetch-site': 'same-origin' },
     { 'x-podcst-client': 'native' },
   ] as Record<string, string>[])
-    expect(proxy(request(headers)).status).toBe(200);
+    expect((await proxy(request(headers))).status).toBe(200);
   for (const headers of [
     {},
     { origin: 'https://attacker.invalid' },
@@ -26,7 +26,7 @@ test('guards browser mutations and explicitly admits native clients', () => {
     { 'x-podcst-client': 'native', origin: 'https://attacker.invalid' },
     { 'x-podcst-client': 'native', 'sec-fetch-mode': 'no-cors' },
   ] as Record<string, string>[]) {
-    const response = proxy(request(headers));
+    const response = await proxy(request(headers));
     expect(response.status).toBe(403);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
   }

@@ -88,6 +88,7 @@ export function createErasureService(
     proofSecret,
     deliver,
     now = () => new Date(),
+    admission = async () => {},
   }: {
     journal: JournalClient;
     journalId: string;
@@ -96,6 +97,7 @@ export function createErasureService(
     proofSecret: string;
     deliver: (email: string, code: string) => Promise<void>;
     now?: () => Date;
+    admission?: () => Promise<unknown>;
   },
 ) {
   if (
@@ -135,12 +137,16 @@ export function createErasureService(
     >`SELECT * FROM account_erasure_intents WHERE operation_id = ${operationId}`;
     return row;
   };
-  const complete = async (envelope: Signed<JournalEntry>, claim?: string) => {
+  const complete = async (
+    envelope: Signed<JournalEntry>,
+    claim?: string,
+    transaction?: postgres.TransactionSql,
+  ) => {
     const entry = verifyEntry(envelope, keys, journalId);
     const payload = entry.payload;
     const { payload: _payload, ...metadata } = entry;
     const publication = { ...envelope, value: metadata };
-    return sql.begin(async (tx) => {
+    const apply = async (tx: postgres.TransactionSql) => {
       await tx`SET LOCAL lock_timeout = '3s'`;
       await tx`SET LOCAL statement_timeout = '10s'`;
       const [identity] =
@@ -171,9 +177,11 @@ export function createErasureService(
       await applyErasure(tx, payload);
       await tx`UPDATE account_erasure_intents SET publication = ${tx.json(publication)}, applied_at = coalesce(applied_at, ${now()}) WHERE operation_id = ${payload.operationId}`;
       return true;
-    });
+    };
+    return transaction ? apply(transaction) : sql.begin(apply);
   };
   const reconcile = async (operationId: string): Promise<Outcome> => {
+    await admission();
     if (!isOperationId(operationId))
       throw new AuthError(400, 'Invalid account operation');
     const token = randomUUID();
@@ -204,6 +212,7 @@ export function createErasureService(
 
   return {
     async prepare(session: Session) {
+      await admission();
       const operationId = randomUUID();
       const receipt = randomBytes(32).toString('base64url');
       const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -249,6 +258,7 @@ export function createErasureService(
       code: string,
       confirmed: boolean,
     ) {
+      await admission();
       if (!confirmed || !isOperationId(operationId) || !/^\d{6}$/.test(code))
         throw new AuthError(400, 'Invalid account operation');
       const accepted = await sql.begin(async (tx) => {
@@ -279,6 +289,7 @@ export function createErasureService(
       return reconcile(operationId);
     },
     async revoke(session: Session, credentialId: string) {
+      await admission();
       if (!/^[A-Za-z0-9_-]{1,128}$/.test(credentialId))
         throw new AuthError(400, 'Invalid account operation');
       const operationId = await sql.begin(async (tx) => {
@@ -301,6 +312,7 @@ export function createErasureService(
     },
     reconcile,
     async reconcilePending(limit = 20) {
+      await admission();
       if (!Number.isInteger(limit) || limit < 1 || limit > 100)
         throw new AuthError(400, 'Invalid account operation');
       const rows = await sql`
@@ -318,6 +330,7 @@ export function createErasureService(
     async status(
       receipt: string,
     ): Promise<{ status: 'pending' | 'completed' | 'unknown' }> {
+      await admission();
       if (!/^[A-Za-z0-9_-]{43}$/.test(receipt)) return { status: 'unknown' };
       const resolution = await journal.resolveReceipt(digest(receipt));
       if (!resolution) return { status: 'unknown' };
@@ -331,6 +344,7 @@ export function createErasureService(
       const result = await reconcile(resolution.operationId);
       return { status: result.status };
     },
-    replay: complete,
+    replay: (entry: Signed<JournalEntry>, tx?: postgres.TransactionSql) =>
+      complete(entry, undefined, tx),
   };
 }

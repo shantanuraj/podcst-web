@@ -1,9 +1,4 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  type KeyObject,
-  randomBytes,
-} from 'node:crypto';
+import type { KeyObject } from 'node:crypto';
 import type postgres from 'postgres';
 import {
   canonical,
@@ -30,6 +25,7 @@ import {
   verifyReplayPage,
   verifyValue,
 } from './journal-contract';
+import { decryptEvidence, encryptEvidence } from './journal-crypto';
 
 type HeadRow = {
   journal_id: string;
@@ -72,29 +68,17 @@ export function createPostgresJournal(
     throw new JournalError(503);
   const sign = <T>(value: T) => signValue(value, keys.current, keys.signing);
   verifyValue(sign({ journalId }), keys.verification);
-  const encode = (entry: Signed<JournalEntry>) => {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv(
-      'aes-256-gcm',
-      keys.encryption.get(keys.current) as Buffer,
-      iv,
+  const encode = (entry: Signed<JournalEntry>) =>
+    encryptEvidence(
+      Buffer.from(canonical(entry)),
+      keys.encryption.get(keys.current),
+      [
+        journalId,
+        entry.value.sequence,
+        entry.value.payload.operationId,
+        keys.current,
+      ],
     );
-    cipher.setAAD(
-      Buffer.from(
-        canonical([
-          journalId,
-          entry.value.sequence,
-          entry.value.payload.operationId,
-          keys.current,
-        ]),
-      ),
-    );
-    const encrypted = Buffer.concat([
-      cipher.update(canonical(entry)),
-      cipher.final(),
-    ]);
-    return Buffer.concat([iv, cipher.getAuthTag(), encrypted]);
-  };
   const decode = (row: {
     key_id: string;
     body: Buffer;
@@ -102,26 +86,12 @@ export function createPostgresJournal(
     operation_id: string;
   }) => {
     try {
-      const key = keys.encryption.get(row.key_id);
-      if (key?.length !== 32) throw new Error();
-      const data = Buffer.from(row.body);
-      const cipher = createDecipheriv('aes-256-gcm', key, data.subarray(0, 12));
-      cipher.setAAD(
-        Buffer.from(
-          canonical([
-            journalId,
-            String(row.sequence),
-            row.operation_id,
-            row.key_id,
-          ]),
-        ),
-      );
-      cipher.setAuthTag(data.subarray(12, 28));
       const result = JSON.parse(
-        Buffer.concat([
-          cipher.update(data.subarray(28)),
-          cipher.final(),
-        ]).toString(),
+        decryptEvidence(
+          Buffer.from(row.body),
+          keys.encryption.get(row.key_id),
+          [journalId, String(row.sequence), row.operation_id, row.key_id],
+        ).toString(),
       ) as Signed<JournalEntry>;
       const entry = verifyEntry(result, keys.verification, journalId);
       if (
@@ -321,6 +291,9 @@ export function createPostgresJournal(
         const head = await readHead(tx, 'update');
         if (!head.sealed || canonical(head) !== canonical(expected))
           throw new JournalError(409);
+        const created =
+          await tx`INSERT INTO erasure_journal.epochs (epoch) VALUES (${epoch}) ON CONFLICT DO NOTHING RETURNING epoch`;
+        if (!created.length) throw new JournalError(409);
         await tx`UPDATE erasure_journal.head SET epoch = ${epoch}, sealed = false, revision = revision + 1 WHERE singleton`;
       });
       return sign(await anchor());
@@ -360,6 +333,10 @@ export async function initializeJournalStores(
 ) {
   if (!isOperationId(journalId) || !isOperationId(epoch))
     throw new JournalError(400);
-  await sql`INSERT INTO erasure_journal.head (journal_id, epoch, hash) VALUES (${journalId}, ${epoch}, ${JOURNAL_GENESIS})`;
+  await sql.begin(async (tx) => {
+    await tx`SET LOCAL synchronous_commit = on`;
+    await tx`INSERT INTO erasure_journal.epochs (epoch) VALUES (${epoch})`;
+    await tx`INSERT INTO erasure_journal.head (journal_id, epoch, hash) VALUES (${journalId}, ${epoch}, ${JOURNAL_GENESIS})`;
+  });
   await authority`INSERT INTO erasure_authority.head (journal_id, epoch, sequence, revision, hash, sealed) VALUES (${journalId}, ${epoch}, 0, 0, ${JOURNAL_GENESIS}, false)`;
 }

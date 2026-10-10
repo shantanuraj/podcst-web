@@ -1,3 +1,5 @@
+import { requireRuntimeAdmission } from '../erasure/admission';
+import { assertAuthEpoch } from '../erasure/recovery-auth';
 import { createRedis } from '../redis';
 import { createChallengeStore } from './challenges';
 import { AuthError } from './error';
@@ -20,7 +22,19 @@ function authRedis() {
   return redis;
 }
 
-export const challengeStore = () => createChallengeStore(authRedis());
+async function authNamespace() {
+  const admission = await requireRuntimeAdmission();
+  if (!admission) return 'initial';
+  await assertAuthEpoch(
+    authRedis(),
+    admission.authEpoch,
+    admission.runId,
+    admission.redisIdentity,
+  );
+  return admission.authEpoch;
+}
+export const challengeStore = () =>
+  createChallengeStore(authRedis(), authNamespace);
 
 export async function limitAuth(
   request: Request,
@@ -28,6 +42,7 @@ export async function limitAuth(
   subject: string,
 ) {
   const secret = authSecret();
+  await authNamespace();
   await createAuthLimiter(authRedis(), secret)(
     kind,
     subject,

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import postgres from 'postgres';
+import { requireRuntimeAdmission } from '../src/server/erasure/admission';
 import { i18n } from '../src/i18.conf';
 import { refreshTopCharts } from '../src/server/ingest/charts';
 import { refreshFeed } from '../src/server/ingest/feed-refresh';
@@ -38,6 +39,7 @@ async function pollMissingEpisodes(sql: postgres.Sql, locales: string[]) {
   let failed = 0;
   let skipped = 0;
   for (let i = 0; i < podcasts.length; i += POLL_CONCURRENCY) {
+    await requireRuntimeAdmission(sql);
     const batch = podcasts.slice(i, i + POLL_CONCURRENCY);
     const results = await Promise.all(
       batch.map(async ({ id }) => {
@@ -67,6 +69,7 @@ export async function runChartJob(
   args: string[],
   jobs = { refreshCharts: refreshTopCharts, pollEpisodes: pollMissingEpisodes },
 ) {
+  await requireRuntimeAdmission(sql);
   const mode = parseChartJobArgs(args);
   const locales = [...i18n.locales];
   let failedLocales: string[] = [];

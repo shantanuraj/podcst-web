@@ -13,6 +13,10 @@ import {
   verifyEntry,
 } from './journal-contract';
 import type { createPostgresJournal } from './journal-postgres';
+import type {
+  AdmissionBinding,
+  createRecoveryControl,
+} from './recovery-control';
 
 type Service = ReturnType<typeof createPostgresJournal>;
 type Role = 'runtime' | 'recovery' | 'admission';
@@ -22,9 +26,15 @@ const hash = (value: string) => createHash('sha256').update(value).digest();
 export function createJournalHandler(
   service: Service,
   tokens: ReadonlyMap<Role, string>,
+  control: Pick<
+    ReturnType<typeof createRecoveryControl>,
+    'runtime' | 'probe' | 'publication'
+  >,
 ) {
   if (
-    tokens.size !== 3 ||
+    tokens.size !== 2 ||
+    !tokens.has('recovery') ||
+    !tokens.has('admission') ||
     new Set(tokens.values()).size !== tokens.size ||
     [...tokens.values()].some((token) => token.length < 43)
   )
@@ -40,9 +50,13 @@ export function createJournalHandler(
           { status: 405, headers },
         );
       const supplied = hash(request.headers.get('authorization') ?? '');
-      const role = credentials.find(([, expected]) =>
-        timingSafeEqual(supplied, expected),
-      )?.[0];
+      const role =
+        credentials.find(([, expected]) =>
+          timingSafeEqual(supplied, expected),
+        )?.[0] ??
+        ((await control.runtime(supplied.toString('hex')))
+          ? 'runtime'
+          : undefined);
       if (!role) throw new JournalError(403);
       const body = await readJsonBody(request, 16 * 1024, 5000, {});
       if (!body || typeof body !== 'object' || Array.isArray(body))
@@ -55,8 +69,15 @@ export function createJournalHandler(
       };
       let result: unknown;
       if (role === 'runtime') {
-        if (path === '/publish') {
+        if (path === '/admission/check') {
+          fields(['binding', 'nonce']);
+          result = await control.probe(
+            value.binding as AdmissionBinding,
+            value.nonce as string,
+          );
+        } else if (path === '/publish') {
           fields(['epoch', 'payload']);
+          await control.publication(value.epoch as string);
           result = await service.publish(
             value.epoch as string,
             value.payload as ErasurePayload,

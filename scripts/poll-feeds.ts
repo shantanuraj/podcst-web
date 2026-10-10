@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import postgres from 'postgres';
+import { requireRuntimeAdmission } from '../src/server/erasure/admission';
 import { refreshFeed } from '../src/server/ingest/feed-refresh';
 import { getDuePodcasts } from '../src/server/ingest/feed-schedule';
 import { FEED_LIMITS } from '../src/shared/feed-contract';
@@ -47,6 +48,7 @@ async function processBatch(sql: postgres.Sql): Promise<number> {
   }
 
   while (processed < BATCH_SIZE) {
+    await requireRuntimeAdmission(sql);
     const demand = await getDuePodcasts(sql, CONCURRENCY - 2, 'demand');
     const scheduled = await getDuePodcasts(
       sql,

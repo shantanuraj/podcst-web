@@ -1,10 +1,12 @@
 import { sql } from '../src/server/db';
+import { requireRuntimeAdmission } from '../src/server/erasure/admission';
 import { erasureService } from '../src/server/erasure/runtime';
 
 if (import.meta.main) {
   let started = false;
   try {
     if (process.argv.slice(2).join(' ') !== '--once') throw new Error();
+    await requireRuntimeAdmission();
     const service = erasureService();
     started = true;
     const outcomes = await service.reconcilePending();

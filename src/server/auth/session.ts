@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { sql } from '../db';
+import { requireRuntimeAdmission } from '../erasure/admission';
 import { activeAccount, activePasskey } from './account-guard';
 
 const SESSION_COOKIE = 'session';
@@ -25,6 +26,7 @@ export async function setSessionCookie({
 }
 
 export async function getSession() {
+  await requireRuntimeAdmission();
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;

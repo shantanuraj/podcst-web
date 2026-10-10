@@ -5,6 +5,7 @@ import { createCodeDelivery } from '../auth/email-delivery';
 import { AuthError } from '../auth/error';
 import { deleteSession, getSession } from '../auth/session';
 import { sql } from '../db';
+import { requireRuntimeAdmission } from './admission';
 import { createErasureHandlers } from './http';
 import { createJournalClient } from './journal-http';
 import { createErasureService } from './service';
@@ -47,6 +48,7 @@ export function erasureService() {
       epoch,
       keys,
       proofSecret: authSecret(),
+      admission: requireRuntimeAdmission,
       deliver,
     });
     return instance;

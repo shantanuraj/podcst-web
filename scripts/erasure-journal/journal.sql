@@ -10,6 +10,10 @@ CREATE TABLE erasure_journal.head (
   sealed BOOLEAN NOT NULL DEFAULT false
 );
 
+CREATE TABLE erasure_journal.epochs (
+  epoch UUID PRIMARY KEY
+);
+
 CREATE TABLE erasure_journal.entries (
   sequence BIGINT PRIMARY KEY CHECK (sequence > 0),
   operation_id UUID NOT NULL UNIQUE,

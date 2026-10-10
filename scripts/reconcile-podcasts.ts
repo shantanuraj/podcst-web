@@ -811,6 +811,7 @@ if (import.meta.main) {
     invariant(planPath && backupPath, 'Plan and backup paths are required');
     const plan = readProtected(planPath, 16 * 1024) as ReconciliationPlan;
     sql = openDatabase('RECONCILE_DATABASE_URL');
+    await (await import('../src/server/erasure/admission')).requireRuntimeAdmission(sql);
     const result = await reconcile(sql, {
       plan,
       backupPath,

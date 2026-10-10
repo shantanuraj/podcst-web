@@ -63,7 +63,8 @@ export const RECEIPT_LIFETIME_MS = 7 * 86_400_000;
 export const JOURNAL_GENESIS = '0'.repeat(64);
 export const JOURNAL_PAGE_LIMIT = 256;
 export type ReplayCursor = Pick<JournalHead, 'journalId' | 'sequence' | 'hash'>;
-export const isOperationId = isAccountOperationId;
+export const isOperationId = (value: unknown): value is string =>
+  isAccountOperationId(value) && value === value.toLowerCase();
 export const isDigest = (value: unknown): value is string =>
   typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const isIdentity = (value: unknown) =>
@@ -199,8 +200,7 @@ export function verifyEntry(
     !isInstant(e.publishedAt)
   )
     throw new JournalError(503);
-  parsePayload(e.payload);
-  return e;
+  return { ...e, payload: parsePayload(e.payload) };
 }
 
 export function verifyHead(

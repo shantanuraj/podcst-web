@@ -31,6 +31,26 @@ import {
 } from './journal-postgres';
 import { readVerifiedReplay } from './recovery-manifest';
 
+const publicationHandler = (
+  service: Parameters<typeof createJournalHandler>[0],
+  tokens: ReadonlyMap<'runtime' | 'recovery' | 'admission', string>,
+) =>
+  createJournalHandler(
+    service,
+    new Map([
+      ['recovery', tokens.get('recovery') ?? ''],
+      ['admission', tokens.get('admission') ?? ''],
+    ]),
+    {
+      runtime: async (hash) =>
+        hash === digest(`Bearer ${tokens.get('runtime')}`),
+      publication: async () => {},
+      probe: async () => {
+        throw new Error('Admission is tested by the recovery controller suite');
+      },
+    },
+  );
+
 if (process.env.REQUIRE_ERASURE_TESTS === '1' && !process.env.PG_BIN)
   throw new Error('PG_BIN required for erasure tests');
 
@@ -155,7 +175,7 @@ describe.skipIf(!process.env.PG_BIN)(
         ['recovery', randomBytes(32).toString('base64url')],
         ['admission', randomBytes(32).toString('base64url')],
       ] as const);
-      const handler = createJournalHandler(service, tokens);
+      const handler = publicationHandler(service, tokens);
       let lose = true;
       const server = Bun.serve({
         hostname: '127.0.0.1',
@@ -487,7 +507,7 @@ describe.skipIf(!process.env.PG_BIN)(
         ['recovery', randomBytes(32).toString('base64url')],
         ['admission', randomBytes(32).toString('base64url')],
       ] as const);
-      const handler = createJournalHandler(service, tokens);
+      const handler = publicationHandler(service, tokens);
       const request = (role: 'runtime' | 'recovery', limit?: number) =>
         new Request('http://127.0.0.1/range', {
           method: 'POST',

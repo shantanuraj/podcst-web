@@ -169,6 +169,8 @@ async function patch(): Promise<void> {
     idle_timeout: 20,
   });
 
+  const admission = (await import('../src/server/erasure/admission')).requireRuntimeAdmission;
+  await admission(sql);
   const authorCache = await loadAuthorCache(sql);
 
   const countQuery = sqlite.query<{ count: number }, []>(`
@@ -208,6 +210,7 @@ async function patch(): Promise<void> {
   const startTime = Date.now();
 
   while (processed < totalCount) {
+    await admission(sql);
     const batch = selectQuery.all({
       $limit: BATCH_SIZE,
       $offset: offset,
