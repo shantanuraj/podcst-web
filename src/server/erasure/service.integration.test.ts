@@ -217,6 +217,14 @@ describe.skipIf(!process.env.PG_BIN)(
 
     test('fresh purpose-bound confirmation publishes independently before erasing canonical state', async () => {
       const prepared = await service.prepare(owner);
+      expect(prepared.accountId).toBe(owner.userId);
+      expect(Object.keys(prepared).sort()).toEqual([
+        'accountId',
+        'expiresAt',
+        'operationId',
+        'proofExpiresAt',
+        'receipt',
+      ]);
       expect(
         await sql`SELECT 1 FROM users WHERE id = ${owner.userId}`,
       ).toHaveLength(1);

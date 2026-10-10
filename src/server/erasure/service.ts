@@ -246,6 +246,7 @@ export function createErasureService(
         throw new AuthError(503, 'Account operation unavailable');
       }
       return {
+        accountId: session.userId,
         operationId,
         receipt,
         expiresAt: expiresAt.toISOString(),
