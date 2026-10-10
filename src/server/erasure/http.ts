@@ -10,11 +10,13 @@ type Session = Parameters<Service['prepare']>[0];
 
 export function createErasureHandlers({
   service,
+  deletionEnabled,
   session,
   limit,
   clearSession,
 }: {
   service: () => Service;
+  deletionEnabled: () => boolean;
   session: () => Promise<Session | null>;
   limit: (
     request: Request,
@@ -65,6 +67,10 @@ export function createErasureHandlers({
       );
     }
   };
+  const requireDeletion = () => {
+    if (!deletionEnabled())
+      throw new AuthError(503, 'Account deletion unavailable');
+  };
   const signedIn = async () => {
     const user = await session();
     if (!user) throw new AuthError(401, 'Authentication required');
@@ -79,6 +85,7 @@ export function createErasureHandlers({
   return {
     prepare: (request: Request) =>
       respond(request, async () => {
+        requireDeletion();
         const user = await signedIn();
         await body(request, []);
         await limit(request, 'send', user.email);
@@ -86,6 +93,7 @@ export function createErasureHandlers({
       }),
     erase: (request: Request) =>
       respond(request, async () => {
+        requireDeletion();
         const user = await signedIn();
         const value = await body(request, ['operationId', 'code', 'confirmed']);
         if (

@@ -436,8 +436,10 @@ describe.skipIf(!process.env.PG_BIN)(
     test('mounted HTTP reports pending honestly and receipt reconciliation cannot clear another session', async () => {
       let current: typeof owner | null = owner;
       let clears = 0;
+      let deletionEnabled = true;
       const handlers = createErasureHandlers({
         service: () => service,
+        deletionEnabled: () => deletionEnabled,
         session: async () => current,
         limit: async () => {},
         clearSession: async () => {
@@ -471,6 +473,7 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(clears).toBe(0);
       current = other;
       available = true;
+      deletionEnabled = false;
       const reconciled = await handlers.status(
         request('POST', { receipt: prepared.receipt }),
       );
@@ -488,9 +491,56 @@ describe.skipIf(!process.env.PG_BIN)(
       }
     });
 
-    test('authenticated revocation remains available when the auth admission dependency is down', async () => {
+    test('disabled deletion refuses proofs and new acceptance without cancelling prior receipts', async () => {
+      const proof = await service.prepare(owner);
+      let limits = 0;
       const handlers = createErasureHandlers({
         service: () => service,
+        deletionEnabled: () => false,
+        session: async () => owner,
+        limit: async () => {
+          limits++;
+        },
+        clearSession: async () => {
+          throw new Error('Unexpected session removal');
+        },
+      });
+      const request = (method: string, body: unknown) =>
+        new Request('http://localhost:3000/api/account', {
+          method,
+          headers: { 'X-Podcst-Client': 'native' },
+          body: JSON.stringify(body),
+        });
+      for (const response of [
+        await handlers.prepare(request('POST', {})),
+        await handlers.erase(
+          request('DELETE', {
+            operationId: proof.operationId,
+            code,
+            confirmed: true,
+          }),
+        ),
+      ]) {
+        expect(response.status).toBe(503);
+        expect(response.headers.get('cache-control')).toBe('private, no-store');
+      }
+      expect(limits).toBe(0);
+      expect(await sql`SELECT 1 FROM account_erasure_intents`).toHaveLength(0);
+      expect(await sql`SELECT 1 FROM account_erasure_proofs`).toHaveLength(1);
+      expect(
+        await sql`SELECT 1 FROM users WHERE id = ${owner.userId}`,
+      ).toHaveLength(1);
+      const status = await handlers.status(
+        request('POST', { receipt: proof.receipt }),
+      );
+      expect(status.status).toBe(200);
+      expect(await status.json()).toEqual({ status: 'unknown' });
+    });
+
+    test('authenticated revocation remains available with deletion disabled and the auth dependency down', async () => {
+      const handlers = createErasureHandlers({
+        service: () => service,
+        deletionEnabled: () => false,
         session: async () => other,
         limit: async () => {
           throw new Error('Synthetic auth admission outage');

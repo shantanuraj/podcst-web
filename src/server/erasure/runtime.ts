@@ -5,7 +5,7 @@ import { createCodeDelivery } from '../auth/email-delivery';
 import { AuthError } from '../auth/error';
 import { deleteSession, getSession } from '../auth/session';
 import { sql } from '../db';
-import { requireRuntimeAdmission } from './admission';
+import { admissionRequired, requireRuntimeAdmission } from './admission';
 import { createErasureHandlers } from './http';
 import { createJournalClient } from './journal-http';
 import { createErasureService } from './service';
@@ -14,7 +14,7 @@ let instance: ReturnType<typeof createErasureService> | undefined;
 let resend: Resend | undefined;
 
 export function erasureService() {
-  if (process.env.ACCOUNT_ERASURE_ENABLED !== '1')
+  if (!admissionRequired())
     throw new AuthError(503, 'Account operation unavailable');
   if (instance) return instance;
   try {
@@ -59,6 +59,7 @@ export function erasureService() {
 
 export const erasureHandlers = createErasureHandlers({
   service: erasureService,
+  deletionEnabled: () => process.env.ACCOUNT_ERASURE_ENABLED === '1',
   session: getSession,
   limit: limitAuth,
   clearSession: deleteSession,

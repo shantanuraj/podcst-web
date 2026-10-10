@@ -203,7 +203,7 @@ async function main() {
         DATABASE_URL: primaryUrl.toString(),
         REDIS_URL: cache.url,
         RECOVERY_ADMISSION_REQUIRED: '1',
-        ACCOUNT_ERASURE_ENABLED: '1',
+        ACCOUNT_ERASURE_ENABLED: '0',
         ERASURE_JOURNAL_URL: url,
         ERASURE_JOURNAL_ID: journalId,
         ERASURE_JOURNAL_TOKEN: token,
@@ -303,6 +303,39 @@ async function main() {
       `Gateway redirect escaped its public origin: ${root.status} ${root.headers.get('location')}`,
     );
     await root.body?.cancel();
+    for (const [path, method, body] of [
+      ['/api/account/deletion', 'POST', {}],
+      [
+        '/api/account',
+        'DELETE',
+        { operationId: randomUUID(), code: '123456', confirmed: true },
+      ],
+    ] as const) {
+      const response = await fetch(`${publicOrigin}${path}`, {
+        method,
+        headers: {
+          cookie: 'session=gate-session',
+          'x-podcst-client': 'native',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      check(
+        response.status === 503,
+        `Disabled deletion admitted ${method} ${path}`,
+      );
+      check(
+        response.headers.get('cache-control') === 'private, no-store',
+        'Deletion refusal was cacheable',
+      );
+      await response.body?.cancel();
+    }
+    check(
+      (
+        await primary.sql`SELECT 1 FROM account_erasure_proofs UNION ALL SELECT 1 FROM account_erasure_intents`
+      ).length === 0,
+      'Disabled deletion created an obligation',
+    );
     await cache.close();
     cache = undefined;
     const revoked = await fetch(

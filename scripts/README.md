@@ -231,8 +231,11 @@ current `ERASURE_JOURNAL_URL`, `ERASURE_JOURNAL_ID`, `ERASURE_JOURNAL_TOKEN`,
 `ERASURE_WRITER_EPOCH` and public `ERASURE_VERIFICATION_KEYS`. The journal configuration
 contains only recovery/admission management tokens; runtime tokens are per-run.
 The gateway and upstream exchange fresh signed nonces, not cached ready flags.
-`ACCOUNT_ERASURE_ENABLED` remains a separate feature switch and also requires
-admission. Authentication additionally checks its Redis epoch and server identity.
+`ACCOUNT_ERASURE_ENABLED` gates new full-account deletion proofs/acceptance and
+also requires admission. With `RECOVERY_ADMISSION_REQUIRED=1`, protected passkey
+revocation, receipt reconciliation and accepted obligations remain available even
+when account deletion is disabled. There is no unjournaled fallback. Authentication
+additionally checks its Redis epoch and server identity.
 
 ```sh
 PG_BIN=/path/to/postgresql/bin REQUIRE_ERASURE_TESTS=1 \
