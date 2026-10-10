@@ -323,9 +323,23 @@ describe.skipIf(!process.env.PG_BIN)('verified Apple listing aliases', () => {
     const other = postgres(cluster.options);
     try {
       await other`SELECT 1`;
+      let arrivals = 0;
+      const prepared = Promise.withResolvers<void>();
+      const barrier = (sql: postgres.Sql) =>
+        new Proxy(sql, {
+          get(target, property) {
+            if (property !== 'begin') return Reflect.get(target, property);
+            return async (...args: Parameters<postgres.Sql['begin']>) => {
+              if (++arrivals === 2) prepared.resolve();
+              await prepared.promise;
+              return target.begin(...args);
+            };
+          },
+        });
+      const evidence = verification();
       const results = await Promise.allSettled([
-        indexPodcast(sql, feed, 303, undefined, verification()),
-        indexPodcast(other, otherFeed, 303, undefined, verification()),
+        indexPodcast(barrier(sql), feed, 303, undefined, evidence),
+        indexPodcast(barrier(other), otherFeed, 303, undefined, evidence),
       ]);
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
       expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
