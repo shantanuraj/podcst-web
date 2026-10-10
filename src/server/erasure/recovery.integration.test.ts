@@ -12,6 +12,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
 import { openJournalConfiguration } from '../../../scripts/erasure-journal/configuration';
+import { grantJournalStore } from '../../../scripts/erasure-journal/permissions';
 import { readProtected, writeProtected } from '../../../scripts/lib/artifacts';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import {
@@ -217,6 +218,8 @@ describe.skipIf(!required)(
     };
     const prepareTarget = async () => {
       await source`CREATE DATABASE restored TEMPLATE template0`;
+      await source`REVOKE CONNECT ON DATABASE restored FROM PUBLIC`;
+      await source`GRANT CONNECT ON DATABASE restored TO next_worker`;
       target = db('restored');
       await migrate(target);
       await grant(target, 'next_worker');
@@ -244,6 +247,53 @@ describe.skipIf(!required)(
       });
       tokens.set('runtime', await control.credential(proof.value.runId));
       return proof;
+    };
+    const restartPrimary = async () => {
+      await source.end({ timeout: 1 });
+      await Promise.all(pools.map((pool) => pool.end({ timeout: 1 })));
+      pools = [];
+      for (const args of [
+        [
+          '-D',
+          join(primary.directory, 'data'),
+          '-m',
+          'immediate',
+          '-w',
+          'stop',
+        ],
+        [
+          '-D',
+          join(primary.directory, 'data'),
+          '-l',
+          join(primary.directory, 'restart.log'),
+          '-o',
+          `-k ${primary.directory} -p ${primary.options.port} -h ''`,
+          '-w',
+          'start',
+        ],
+      ])
+        expect(
+          Bun.spawnSync([join(process.env.PG_BIN ?? '', 'pg_ctl'), ...args], {
+            stdout: 'pipe',
+            stderr: 'pipe',
+          }).exitCode,
+        ).toBe(0);
+      source = postgres({ ...primary.options, max: 8 });
+    };
+    const serveJournal = () => {
+      server = Bun.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        fetch: createJournalHandler(
+          journal,
+          new Map([
+            ['recovery', tokens.get('recovery') ?? ''],
+            ['admission', tokens.get('admission') ?? ''],
+          ]),
+          control,
+        ),
+      });
+      url = `http://127.0.0.1:${server.port}/`;
     };
     const closed = async () => {
       expect((await control.current())?.admitted).toBe(false);
@@ -362,19 +412,7 @@ describe.skipIf(!required)(
           randomBytes(32).toString('base64url'),
         ]),
       );
-      server = Bun.serve({
-        hostname: '127.0.0.1',
-        port: 0,
-        fetch: createJournalHandler(
-          journal,
-          new Map([
-            ['recovery', tokens.get('recovery') ?? ''],
-            ['admission', tokens.get('admission') ?? ''],
-          ]),
-          control,
-        ),
-      });
-      url = `http://127.0.0.1:${server.port}/`;
+      serveJournal();
       await cache.redis.flushdb();
       expected = await recoverySchema(source);
     });
@@ -675,10 +713,12 @@ describe.skipIf(!required)(
       await capture();
       await prepareTarget();
       await target`CREATE ROLE unaccounted LOGIN`;
+      await target`GRANT CONNECT ON DATABASE restored TO unaccounted`;
       try {
         await expect(recover()).rejects.toThrow();
         await closed();
       } finally {
+        await target`REVOKE CONNECT ON DATABASE restored FROM unaccounted`;
         await target`DROP ROLE unaccounted`;
       }
       const proof = await recover();
@@ -757,36 +797,7 @@ describe.skipIf(!required)(
       await expect(recover()).rejects.toThrow();
       await closed();
       const cursor = await recoveryRow(target);
-      await source.end({ timeout: 1 });
-      await Promise.all(pools.map((pool) => pool.end({ timeout: 1 })));
-      pools = [];
-      for (const args of [
-        [
-          '-D',
-          join(primary.directory, 'data'),
-          '-m',
-          'immediate',
-          '-w',
-          'stop',
-        ],
-        [
-          '-D',
-          join(primary.directory, 'data'),
-          '-l',
-          join(primary.directory, 'restart.log'),
-          '-o',
-          `-k ${primary.directory} -p ${primary.options.port} -h ''`,
-          '-w',
-          'start',
-        ],
-      ]) {
-        const command = Bun.spawnSync(
-          [join(process.env.PG_BIN ?? '', 'pg_ctl'), ...args],
-          { stdout: 'pipe', stderr: 'pipe' },
-        );
-        expect(command.exitCode).toBe(0);
-      }
-      source = postgres({ ...primary.options, max: 8 });
+      await restartPrimary();
       target = db('restored');
       runtime = db('restored', 'next_worker');
       live = db('postgres', 'first_worker');
@@ -799,19 +810,7 @@ describe.skipIf(!required)(
         keys,
         () => new Date(time),
       );
-      server = Bun.serve({
-        hostname: '127.0.0.1',
-        port: 0,
-        fetch: createJournalHandler(
-          journal,
-          new Map([
-            ['recovery', tokens.get('recovery') ?? ''],
-            ['admission', tokens.get('admission') ?? ''],
-          ]),
-          control,
-        ),
-      });
-      url = `http://127.0.0.1:${server.port}/`;
+      serveJournal();
       const proof = await recover();
       expect((await guard(runtime, proof.value.writerEpoch)()).runId).toBe(
         state.id,
@@ -821,37 +820,7 @@ describe.skipIf(!required)(
     test('a reconnected stale worker cannot write after an admitted primary restarts', async () => {
       await boot();
       await live`UPDATE users SET name = 'before restart' WHERE id = ${b.userId}`;
-      await source.end({ timeout: 1 });
-      await Promise.all(pools.map((pool) => pool.end({ timeout: 1 })));
-      pools = [];
-      for (const args of [
-        [
-          '-D',
-          join(primary.directory, 'data'),
-          '-m',
-          'immediate',
-          '-w',
-          'stop',
-        ],
-        [
-          '-D',
-          join(primary.directory, 'data'),
-          '-l',
-          join(primary.directory, 'restart.log'),
-          '-o',
-          `-k ${primary.directory} -p ${primary.options.port} -h ''`,
-          '-w',
-          'start',
-        ],
-      ]) {
-        expect(
-          Bun.spawnSync([join(process.env.PG_BIN ?? '', 'pg_ctl'), ...args], {
-            stdout: 'pipe',
-            stderr: 'pipe',
-          }).exitCode,
-        ).toBe(0);
-      }
-      source = postgres({ ...primary.options, max: 8 });
+      await restartPrimary();
       live = db('postgres', 'first_worker');
       await expect(
         live`UPDATE users SET name = 'stale worker' WHERE id = ${b.userId}`.execute(),
@@ -871,6 +840,146 @@ describe.skipIf(!required)(
         }),
       ).rejects.toThrow();
       expect((await control.current())?.admitted).toBe(false);
+    }, 30_000);
+
+    test('one-cluster store restart stays closed until full encrypted recovery into a fresh database', async () => {
+      const names = ['journal', 'authority', 'receipts'] as const;
+      const openStores = () => {
+        const clients = names.map((name) =>
+          db(`colocated_${name}`, `colocated_${name}`),
+        );
+        journal = createPostgresJournal(
+          clients[0],
+          clients[1],
+          clients[2],
+          journalId,
+          keys,
+          () => new Date(time),
+        );
+        control = createRecoveryControl(
+          clients[1],
+          journal,
+          keys,
+          () => new Date(time),
+        );
+        serveJournal();
+      };
+      await server.stop(true);
+      await source`REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`;
+      await source`GRANT CONNECT ON DATABASE postgres TO first_worker`;
+      try {
+        const admins = [];
+        for (const name of names) {
+          const database = `colocated_${name}`;
+          await source`CREATE ROLE ${source(database)} NOLOGIN NOINHERIT`;
+          await source`CREATE DATABASE ${source(database)} TEMPLATE template0`;
+          const admin = db(database);
+          admins.push(admin);
+          await admin.unsafe(
+            readFileSync(
+              new URL(
+                `../../../scripts/erasure-journal/${name}.sql`,
+                import.meta.url,
+              ),
+              'utf8',
+            ),
+          );
+          await grantJournalStore(admin, name, { database, role: database });
+          await source`ALTER ROLE ${source(database)} LOGIN`;
+        }
+        await initializeJournalStores(
+          admins[0],
+          admins[1],
+          journalId,
+          initialEpoch,
+        );
+        openStores();
+        await boot();
+        const generation = (
+          await source`SELECT generation, legacy_generation FROM state_generation`
+        )[0];
+        const streams = canonical(
+          Array.from(await source`SELECT * FROM follow_clients`),
+        );
+        await capture('full');
+        expect((await erasure().revoke(b, 'key-b')).status).toBe('completed');
+        const retainedHead = await journal.head();
+        expect(retainedHead.value.sequence).toBe('1');
+        await server.stop(true);
+        await restartPrimary();
+        openStores();
+        expect(await journal.head()).toEqual(retainedHead);
+        live = db('postgres', 'first_worker');
+        await expect(
+          live`UPDATE users SET name = 'stale' WHERE id = ${b.userId}`.execute(),
+        ).rejects.toThrow('Recovery admission required');
+        await expect(guard(live)()).rejects.toThrow();
+        let forwarded = 0;
+        const request = new Request('http://example.invalid/api/private');
+        const gateway = createAdmissionGateway(guard(live), async () => {
+          forwarded++;
+          return Response.json({ cached: true });
+        });
+        expect((await gateway(request)).status).toBe(503);
+        expect(forwarded).toBe(0);
+        await prepareTarget();
+        for (const name of names) {
+          const role = `colocated_${name}`;
+          for (const database of [
+            'postgres',
+            'restored',
+            ...names.map((n) => `colocated_${n}`),
+          ]) {
+            const [access] =
+              await source`SELECT has_database_privilege(${role}, ${database}, 'CONNECT') AS allowed`;
+            expect(access.allowed).toBe(database === role);
+          }
+        }
+        const proof = await recover();
+        expect(proof.value.database.startedAt).not.toBe(
+          bootstrap.value.database.startedAt,
+        );
+        expect(proof.value.database.cluster).toBe(
+          bootstrap.value.database.cluster,
+        );
+        expect(proof.value.database.oid).not.toBe(bootstrap.value.database.oid);
+        expect((await guard(runtime, proof.value.writerEpoch)()).runId).toBe(
+          state.id,
+        );
+        expect(await target`SELECT id FROM users`).toHaveLength(2);
+        expect(
+          await target`SELECT id FROM passkeys WHERE id = 'key-b'`,
+        ).toHaveLength(0);
+        expect(
+          await target`SELECT id FROM passkeys WHERE id = 'key-kept'`,
+        ).toHaveLength(1);
+        expect(await target`SELECT id FROM sessions`).toHaveLength(0);
+        expect(await target`SELECT id FROM podcasts`).toHaveLength(2);
+        expect(
+          canonical(Array.from(await target`SELECT * FROM follow_clients`)),
+        ).toBe(streams);
+        const current = (
+          await target`SELECT generation, legacy_generation FROM state_generation`
+        )[0];
+        expect(current.generation).not.toBe(generation.generation);
+        expect(current.legacy_generation).toBe(generation.legacy_generation);
+        await expect(
+          guard(runtime, bootstrap.value.writerEpoch)(),
+        ).rejects.toThrow();
+        await runtime`UPDATE users SET name = 'readmitted' WHERE id = ${b.userId}`;
+        expect(
+          (await target`SELECT name FROM users WHERE id = ${b.userId}`)[0].name,
+        ).toBe('readmitted');
+      } finally {
+        await server.stop(true);
+        await Promise.all(pools.map((pool) => pool.end({ timeout: 1 })));
+        pools = [];
+        for (const name of names) {
+          await source`DROP DATABASE IF EXISTS ${source(`colocated_${name}`)} WITH (FORCE)`;
+          await source`DROP ROLE IF EXISTS ${source(`colocated_${name}`)}`;
+        }
+        await source`GRANT CONNECT ON DATABASE postgres TO PUBLIC`;
+      }
     }, 30_000);
 
     test('publication racing the seal is either suppressed before admission or refused under the retired epoch', async () => {

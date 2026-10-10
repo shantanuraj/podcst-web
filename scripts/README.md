@@ -257,6 +257,13 @@ BUILT_APP_DIRECTORY=/path/to/isolated-build PG_BIN=/path/to/postgresql/bin \
   bun --no-env-file scripts/test-recovery-admission.ts
 ```
 
+The controller suite includes a single-cluster crash with three restricted store
+roles/databases, primary-specific CONNECT denial, and a full encrypted checkpoint.
+After restart, stale SQL writes and gateway reads refuse; readmission requires
+restoring into a fresh database with a new serving role/token/epoch. This tests
+retained evidence across a known restart, not completeness after common rollback
+or host loss. It does not establish production restore capacity or peer/HBA access.
+
 The controller suite requires age, age-keygen, Redis and OpenSSL. Built admission
 checks also require Node; they use a synthetic TLS certificate trusted only
 by the child app and test gateway. No system trust store changes. They test actual
