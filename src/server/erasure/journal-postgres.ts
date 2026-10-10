@@ -14,6 +14,7 @@ import {
   isOperationId,
   isSequence,
   JOURNAL_GENESIS,
+  JOURNAL_PAGE_LIMIT,
   type JournalClient,
   type JournalEntry,
   JournalError,
@@ -22,10 +23,11 @@ import {
   payloadHash,
   RECEIPT_LIFETIME_MS,
   type ReceiptRegistration,
+  type ReplayCursor,
   type Signed,
   signValue,
   verifyEntry,
-  verifyReplay,
+  verifyReplayPage,
   verifyValue,
 } from './journal-contract';
 
@@ -148,9 +150,14 @@ export function createPostgresJournal(
       await tx`SELECT sequence::text, operation_id, key_id, body FROM erasure_journal.entries WHERE operation_id = ${operationId}`;
     return row ? decode(row as Parameters<typeof decode>[0]) : null;
   };
-  const range = async (tx: postgres.ISql, sequence: string, through: string) =>
+  const range = async (
+    tx: postgres.ISql,
+    sequence: string,
+    through: string,
+    limit = JOURNAL_PAGE_LIMIT,
+  ) =>
     (
-      await tx`SELECT sequence::text, operation_id, key_id, body FROM erasure_journal.entries WHERE sequence > ${sequence}::bigint AND sequence <= ${through}::bigint ORDER BY sequence`
+      await tx`SELECT e.sequence::text, e.operation_id, e.key_id, e.body FROM erasure_journal.entries e WHERE e.sequence > ${sequence}::bigint AND e.sequence <= ${through}::bigint ORDER BY e.sequence LIMIT ${limit}`
     ).map((row) => decode(row as Parameters<typeof decode>[0]));
 
   const anchor = async () =>
@@ -172,13 +179,19 @@ export function createPostgresJournal(
           if (canonical(previous) !== canonical(head))
             throw new JournalError(503);
         } else {
-          const entries = await range(tx, previous.sequence, head.sequence);
-          verifyReplay(
-            entries,
-            previous,
-            sign({ ...head, sealed: true }),
-            keys.verification,
-          );
+          let cursor: ReplayCursor = previous;
+          const sealed = sign({ ...head, sealed: true });
+          for (;;) {
+            const entries = await range(tx, cursor.sequence, head.sequence);
+            const page = verifyReplayPage(
+              entries,
+              cursor,
+              sealed,
+              keys.verification,
+            );
+            cursor = page.cursor;
+            if (page.done) break;
+          }
           await control`
           UPDATE erasure_authority.head SET epoch = ${head.epoch}, sequence = ${head.sequence}::bigint,
             revision = ${head.revision}::bigint, hash = ${head.hash}, sealed = ${head.sealed}
@@ -313,10 +326,14 @@ export function createPostgresJournal(
       return sign(await anchor());
     },
     async readRange(
-      base: Pick<JournalHead, 'journalId' | 'sequence' | 'hash'>,
+      base: ReplayCursor,
       expected: JournalHead,
+      limit = JOURNAL_PAGE_LIMIT,
     ) {
       if (
+        !Number.isInteger(limit) ||
+        limit < 1 ||
+        limit > JOURNAL_PAGE_LIMIT ||
         base.journalId !== journalId ||
         !isSequence(base.sequence) ||
         !isDigest(base.hash)
@@ -325,9 +342,9 @@ export function createPostgresJournal(
       const head = await anchor();
       if (!head.sealed || canonical(head) !== canonical(expected))
         throw new JournalError(409);
-      const entries = await range(sql, base.sequence, head.sequence);
+      const entries = await range(sql, base.sequence, head.sequence, limit);
       const sealed = sign(head);
-      verifyReplay(entries, base, sealed, keys.verification);
+      verifyReplayPage(entries, base, sealed, keys.verification);
       if (canonical(await anchor()) !== canonical(head))
         throw new JournalError(409);
       return { entries, head: sealed };

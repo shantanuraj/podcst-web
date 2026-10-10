@@ -84,10 +84,11 @@ export function createJournalHandler(
           fields(['epoch']);
           result = await service.seal(value.epoch as string);
         } else if (path === '/range') {
-          fields(['base', 'head']);
+          fields(['base', 'head', 'limit']);
           result = await service.readRange(
             value.base as JournalHead,
             value.head as JournalHead,
+            value.limit as number,
           );
         } else throw new JournalError(403);
       } else if (path === '/epochs/open') {

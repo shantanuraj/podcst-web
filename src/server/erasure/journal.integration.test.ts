@@ -17,8 +17,10 @@ import {
   type ErasurePayload,
   entryHash,
   JOURNAL_GENESIS,
+  JOURNAL_PAGE_LIMIT,
   payloadHash,
   verifyReplay,
+  verifyReplayPage,
   verifyValue,
 } from './journal-contract';
 import { createJournalClient, createJournalHandler } from './journal-http';
@@ -27,6 +29,7 @@ import {
   initializeJournalStores,
   type JournalKeys,
 } from './journal-postgres';
+import { readVerifiedReplay } from './recovery-manifest';
 
 if (process.env.REQUIRE_ERASURE_TESTS === '1' && !process.env.PG_BIN)
   throw new Error('PG_BIN required for erasure tests');
@@ -428,6 +431,79 @@ describe.skipIf(!process.env.PG_BIN)(
         ),
       ).rejects.toThrow();
       expect(ack.value.payload).toEqual(event);
+    });
+
+    test('recovery pages and authority catch-up remain bounded without omitting a signed tail', async () => {
+      for (let i = 0; i < JOURNAL_PAGE_LIMIT + 3; i++)
+        await service.publish(epoch, payload());
+      const sealed = await service.seal(epoch);
+      const first = await service.readRange(
+        { journalId, sequence: '0', hash: JOURNAL_GENESIS },
+        sealed.value,
+      );
+      expect(first.entries).toHaveLength(JOURNAL_PAGE_LIMIT);
+      expect(
+        verifyReplayPage(
+          first.entries,
+          { journalId, sequence: '0', hash: JOURNAL_GENESIS },
+          first.head,
+          keys.verification,
+        ).done,
+      ).toBe(false);
+      expect(() =>
+        verifyReplay(
+          first.entries,
+          { journalId, sequence: '0', hash: JOURNAL_GENESIS },
+          first.head,
+          keys.verification,
+        ),
+      ).toThrow();
+      const sizes: number[] = [];
+      for await (const page of readVerifiedReplay(
+        service,
+        { journalId, sequence: '0', hash: JOURNAL_GENESIS },
+        sealed,
+        keys.verification,
+      ))
+        sizes.push(page.entries.length);
+      expect(sizes).toEqual([JOURNAL_PAGE_LIMIT, 3]);
+      await authority.sql`UPDATE erasure_authority.head SET sequence = 0, revision = 0, hash = ${JOURNAL_GENESIS}, sealed = false`;
+      expect((await build().head()).value).toEqual(sealed.value);
+      await journal.sql`DELETE FROM erasure_journal.entries WHERE sequence = ${String(JOURNAL_PAGE_LIMIT + 1)}::bigint`;
+      const cursor = verifyReplayPage(
+        first.entries,
+        { journalId, sequence: '0', hash: JOURNAL_GENESIS },
+        first.head,
+        keys.verification,
+      ).cursor;
+      await expect(service.readRange(cursor, sealed.value)).rejects.toThrow();
+    }, 30_000);
+
+    test('recovery HTTP requires an explicit bounded page size and never exposes it to runtime tokens', async () => {
+      for (let i = 0; i < 3; i++) await service.publish(epoch, payload());
+      const head = await service.seal(epoch);
+      const tokens = new Map([
+        ['runtime', randomBytes(32).toString('base64url')],
+        ['recovery', randomBytes(32).toString('base64url')],
+        ['admission', randomBytes(32).toString('base64url')],
+      ] as const);
+      const handler = createJournalHandler(service, tokens);
+      const request = (role: 'runtime' | 'recovery', limit?: number) =>
+        new Request('http://127.0.0.1/range', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tokens.get(role)}` },
+          body: JSON.stringify({
+            base: { journalId, sequence: '0', hash: JOURNAL_GENESIS },
+            head: head.value,
+            ...(limit === undefined ? {} : { limit }),
+          }),
+        });
+      const page = await handler(request('recovery', 2));
+      expect(page.status).toBe(200);
+      expect((await page.json()).entries).toHaveLength(2);
+      for (const limit of [undefined, 0, -1, 1.5, JOURNAL_PAGE_LIMIT + 1])
+        expect((await handler(request('recovery', limit))).status).toBe(400);
+      expect((await handler(request('runtime', 2))).status).toBe(403);
     });
 
     test('publication committed before authority outage is pending until reconciliation advances the witness', async () => {

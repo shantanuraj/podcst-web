@@ -61,6 +61,8 @@ export const ERASURE_PROOF_MS = 5 * 60_000;
 export const ERASURE_RETRY_SECONDS = 5;
 export const RECEIPT_LIFETIME_MS = 7 * 86_400_000;
 export const JOURNAL_GENESIS = '0'.repeat(64);
+export const JOURNAL_PAGE_LIMIT = 256;
+export type ReplayCursor = Pick<JournalHead, 'journalId' | 'sequence' | 'hash'>;
 export const isOperationId = isAccountOperationId;
 export const isDigest = (value: unknown): value is string =>
   typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -201,23 +203,46 @@ export function verifyEntry(
   return e;
 }
 
-export function verifyReplay(
-  entries: Signed<JournalEntry>[],
-  base: Pick<JournalHead, 'journalId' | 'sequence' | 'hash'>,
-  sealed: Signed<JournalHead>,
+export function verifyHead(
+  envelope: Signed<JournalHead>,
   keys: ReadonlyMap<string, KeyObject>,
 ) {
-  const head = verifyValue(sealed, keys);
+  const head = verifyValue(envelope, keys);
   if (
-    !head.sealed ||
-    head.journalId !== base.journalId ||
-    !isSequence(base.sequence) ||
-    !isDigest(base.hash) ||
+    !head ||
+    typeof head !== 'object' ||
+    Object.keys(head).sort().join(',') !==
+      'epoch,hash,journalId,revision,sealed,sequence' ||
+    typeof head.sealed !== 'boolean' ||
+    !isOperationId(head.journalId) ||
     !isSequence(head.sequence) ||
     !isSequence(head.revision) ||
     !isDigest(head.hash) ||
     !isOperationId(head.epoch) ||
-    BigInt(head.sequence) < BigInt(base.sequence)
+    BigInt(head.revision) < BigInt(head.sequence) ||
+    (head.sequence === '0' && head.hash !== JOURNAL_GENESIS)
+  )
+    throw new JournalError(503);
+  return head;
+}
+
+export function verifyReplayPage(
+  entries: Signed<JournalEntry>[],
+  base: ReplayCursor,
+  sealed: Signed<JournalHead>,
+  keys: ReadonlyMap<string, KeyObject>,
+) {
+  const head = verifyHead(sealed, keys);
+  if (
+    !Array.isArray(entries) ||
+    entries.length > JOURNAL_PAGE_LIMIT ||
+    head.sealed !== true ||
+    head.journalId !== base.journalId ||
+    !isSequence(base.sequence) ||
+    !isDigest(base.hash) ||
+    BigInt(head.sequence) < BigInt(base.sequence) ||
+    (base.sequence === '0' && base.hash !== JOURNAL_GENESIS) ||
+    (!entries.length && head.sequence !== base.sequence)
   )
     throw new JournalError(503);
   let sequence = BigInt(base.sequence);
@@ -227,6 +252,7 @@ export function verifyReplay(
     const entry = verifyEntry(signed, keys, head.journalId);
     if (
       BigInt(entry.sequence) !== ++sequence ||
+      sequence > BigInt(head.sequence) ||
       entry.previousHash !== hash ||
       operations.has(entry.payload.operationId)
     )
@@ -234,7 +260,22 @@ export function verifyReplay(
     operations.add(entry.payload.operationId);
     hash = entryHash(entry);
   }
-  if (String(sequence) !== head.sequence || hash !== head.hash)
-    throw new JournalError(503);
-  return head;
+  const done = String(sequence) === head.sequence;
+  if (done && hash !== head.hash) throw new JournalError(503);
+  return {
+    head,
+    cursor: { journalId: head.journalId, sequence: String(sequence), hash },
+    done,
+  };
+}
+
+export function verifyReplay(
+  entries: Signed<JournalEntry>[],
+  base: ReplayCursor,
+  sealed: Signed<JournalHead>,
+  keys: ReadonlyMap<string, KeyObject>,
+) {
+  const verified = verifyReplayPage(entries, base, sealed, keys);
+  if (!verified.done) throw new JournalError(503);
+  return verified.head;
 }
