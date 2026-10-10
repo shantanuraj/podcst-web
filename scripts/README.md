@@ -179,6 +179,14 @@ operator-owned configuration outside the repository, explicit database/socket/
 role/tool identities, a trusted schema reference, independent journal/authority/
 receipt stores and recovery keys. Configuration types live in that script and
 `erasure-journal/configuration.ts`. No command provisions services or broadens grants.
+`erasure-journal/permissions.ts` defines the narrow store-role grant matrix. It
+requires an explicit database/role identity, refuses privileged/owning/inherited
+roles and excess table/column rights, and applies each database's grants atomically.
+Create the three databases/schemas and initialize their heads as the reviewed
+operator, not as a service role. The helper creates no role/database and grants no
+primary application access. Co-location is supported technically, but separate
+roles/databases on one host do not establish independent recovery completeness.
+
 The controller's `redis` object contains `url` and optional `tls` PEM material
 (`ca`, plus paired `cert`/`key` for mutual TLS). Keep it in the same protected
 configuration, never a URL query or command argument. Non-loopback Redis requires
