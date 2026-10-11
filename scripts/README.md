@@ -270,7 +270,15 @@ bun --no-env-file scripts/recovery-gateway.ts GATEWAY_CONFIG
 ```
 
 - `reference` builds a schema fingerprint from the trusted migration chain in a
-  disposable PostgreSQL instance. A ledger alone is insufficient.
+  disposable PostgreSQL instance. A ledger alone is insufficient. Recovery identity
+  excludes only physical column ordinals of ordinary public tables: named-column
+  archive restoration does not depend on tuple slots or historical dropped-column
+  gaps. Column definitions, constraints, indexes, triggers, routine bodies, environment
+  and privilege checks remain strict; view projection order remains significant.
+  Raw schema inventory/comparison still reports physical positions unchanged.
+  Regenerate protected recovery references with the reviewed implementation; run,
+  attestation and artifact-origin fingerprints must agree. Never edit an old hash
+  or treat an unrelated schema difference as a column-order exception.
 - `bootstrap` establishes the first verified prefix on a trusted current primary;
   it is single-use, not a fallback for an unsupported restore. Its protected config
   must include `initialCheckpoint: {path, recipient}` and an explicit `age` binary.

@@ -76,9 +76,19 @@ export function createRecoveryController({
       now,
     });
   const runtimeProof = async (plan: RecoveryPlan, auth = true) => {
+    if (
+      plan.schemaHash !== expected.schemaHash ||
+      plan.catalogHash !== expected.catalogHash
+    )
+      throw new JournalError(503);
     const binding = await admissionBinding(sql, plan.servingEpoch);
     binding.role = plan.servingRole;
     const proof = await control.check(binding);
+    if (
+      proof.value.schemaHash !== plan.schemaHash ||
+      proof.value.catalogHash !== plan.catalogHash
+    )
+      throw new JournalError(503);
     if (auth)
       await assertAuthEpoch(
         redis,
@@ -192,15 +202,16 @@ export function createRecoveryController({
                   : original?.id) ?? '',
               )
             : null;
+        const origin = artifact?.origin ?? previous;
         if (
-          previous &&
-          (canonical(previous.database) !== canonical(target) ||
-            previous.artifactHash !== input.artifactHash ||
-            previous.schemaHash !== expected.schemaHash ||
-            previous.catalogHash !== expected.catalogHash)
+          (previous &&
+            (canonical(previous.database) !== canonical(target) ||
+              previous.artifactHash !== input.artifactHash)) ||
+          (origin &&
+            (origin.schemaHash !== expected.schemaHash ||
+              origin.catalogHash !== expected.catalogHash))
         )
           throw new JournalError(503);
-        const origin = artifact?.origin ?? previous;
         const plan: RecoveryPlan =
           original?.id === input.id
             ? original.plan

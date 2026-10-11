@@ -24,10 +24,15 @@ import {
 } from '../../../scripts/lib/recovery-artifact';
 import { startRedis } from '../../../scripts/lib/redis-sandbox';
 import { createTLSFixture } from '../../../scripts/lib/tls-fixture';
-import { migrate } from '../../../scripts/migrations';
+import { loadMigrations, migrate } from '../../../scripts/migrations';
 import { runRecoveryCommand } from '../../../scripts/recover-account-state';
 import { recoveryForwarder } from '../../../scripts/recovery-gateway';
 import { grantPrimaryRole } from '../../../scripts/recovery-permissions';
+import {
+  captureSchema,
+  compareSchemas,
+  inventoryArtifact,
+} from '../../../scripts/schema-catalog';
 import { createChallengeStore } from '../auth/challenges';
 import { createEmailService } from '../auth/email-service';
 import { refreshTopCharts } from '../ingest/charts';
@@ -49,6 +54,7 @@ import {
   digest,
   type JournalClient,
   type Signed,
+  signValue,
 } from './journal-contract';
 import { createJournalClient, createJournalHandler } from './journal-http';
 import {
@@ -160,6 +166,24 @@ describe.skipIf(!required)(
         reference: await recoverySchema(sql),
       });
     };
+    const reorderDescription = async () => {
+      const snapshot = await captureSchema(source);
+      const definition = snapshot.objects.find(
+        (object) =>
+          object.kind === 'index' &&
+          object.parent === 'podcasts' &&
+          object.name === 'idx_podcasts_search',
+      )?.definition.definition;
+      if (typeof definition !== 'string')
+        throw new Error('Synthetic index definition missing');
+      await source`ALTER TABLE podcasts DROP COLUMN description CASCADE`;
+      await source`ALTER TABLE podcasts ADD COLUMN historical_slot TEXT`;
+      await source`ALTER TABLE podcasts DROP COLUMN historical_slot`;
+      await source`ALTER TABLE podcasts ADD COLUMN description TEXT`;
+      await source`UPDATE podcasts SET description = 'retained-description-' || id::text`;
+      await source.unsafe(definition);
+      return snapshot;
+    };
     const controller = (sql = source) =>
       createRecoveryController({
         sql,
@@ -210,7 +234,7 @@ describe.skipIf(!required)(
       await source`INSERT INTO email_verifications (id,email,code_digest,expires_at,ready) VALUES ('email-b',${b.email},${digest('synthetic-code')},'2030-01-01',true) ON CONFLICT DO NOTHING`;
       await source`INSERT INTO oauth_accounts (user_id,provider,provider_account_id,access_token,refresh_token,expires_at) VALUES (${b.userId},'synthetic','identity-b','old-access','old-refresh','2030-01-01') ON CONFLICT DO NOTHING`;
     };
-    const bootstrapInput = (id = randomUUID()) => ({
+    const bootstrapInput = (id: string = randomUUID()) => ({
       id,
       artifactHash: null,
       retiredRoles: ['old_worker'],
@@ -446,6 +470,137 @@ describe.skipIf(!required)(
       await primary?.stop();
       await independent?.stop();
     }, 30_000);
+
+    test('physical column order and dropped slots stay visible in inventory but preserve named-column encrypted recovery', async () => {
+      const original = await reorderDescription();
+      const reordered = await captureSchema(source);
+      const raw = compareSchemas(
+        inventoryArtifact(
+          original,
+          loadMigrations().map(({ name, checksum }) => ({ name, checksum })),
+        ),
+        inventoryArtifact(reordered),
+      );
+      expect(raw.schemaMatches).toBe(false);
+      expect(raw.changed).toHaveLength(1);
+      expect(raw.changed[0].key).toBe(
+        '["column","public","podcasts","description"]',
+      );
+      expect(await recoverySchema(source)).toEqual(expected);
+      const values = Array.from(
+        await source`SELECT id::text, title, description, feed_url, author_id FROM podcasts ORDER BY id`,
+      );
+      const streams = canonical(
+        Array.from(await source`SELECT * FROM follow_clients`),
+      );
+      const legacy = (
+        await source`SELECT legacy_generation FROM state_generation`
+      )[0].legacy_generation;
+      await boot();
+      await capture('full');
+      await prepareTarget();
+      const proof = await recover();
+      expect((await guard(runtime, proof.value.writerEpoch)()).runId).toBe(
+        state.id,
+      );
+      expect(
+        Array.from(
+          await target`SELECT id::text, title, description, feed_url, author_id FROM podcasts ORDER BY id`,
+        ),
+      ).toEqual(values);
+      expect(
+        canonical(Array.from(await target`SELECT * FROM follow_clients`)),
+      ).toBe(streams);
+      expect(
+        (await target`SELECT legacy_generation FROM state_generation`)[0]
+          .legacy_generation,
+      ).toBe(legacy);
+      const restored = await captureSchema(target);
+      const position = (snapshot: typeof restored) =>
+        snapshot.objects.find(
+          (object) =>
+            object.kind === 'column' &&
+            object.parent === 'podcasts' &&
+            object.name === 'description',
+        )?.definition.position;
+      expect(position(restored)).toBe(position(original));
+      expect(position(restored)).not.toBe(position(reordered));
+      expect(await recoverySchema(target)).toEqual(expected);
+    }, 30_000);
+
+    test('authentic artifacts cannot mix catalogue fingerprint definitions across capture and recovery', async () => {
+      await boot();
+      await capture('full');
+      const oldReference = signValue(
+        { ...bootstrap.value, catalogHash: 'd'.repeat(64) },
+        keys.current,
+        keys.signing,
+      );
+      await stores[3]`UPDATE erasure_authority.recovery_runs SET attestation = ${stores[3].json(JSON.parse(canonical(oldReference)))} WHERE id = ${bootstrap.value.runId}`;
+      await expect(
+        controller().recover(bootstrapInput(bootstrap.value.runId)),
+      ).rejects.toThrow();
+      let exported = false;
+      await expect(
+        controller().capture(async () => {
+          exported = true;
+          return 'a'.repeat(64);
+        }),
+      ).rejects.toThrow();
+      expect(exported).toBe(false);
+      await prepareTarget();
+      await expect(recover()).rejects.toThrow();
+      expect(await target`SELECT id FROM users`).toHaveLength(0);
+      expect((await control.current())?.admitted).toBe(false);
+    });
+
+    test('logical view projection order remains part of the recovery fingerprint', async () => {
+      await source.unsafe(
+        "CREATE VIEW synthetic_projection AS SELECT 'left'::text AS first, 'right'::text AS second",
+      );
+      const first = await recoverySchema(source);
+      await source`DROP VIEW synthetic_projection`;
+      await source.unsafe(
+        "CREATE VIEW synthetic_projection AS SELECT 'right'::text AS second, 'left'::text AS first",
+      );
+      expect((await recoverySchema(source)).catalogHash).not.toBe(
+        first.catalogHash,
+      );
+      await source`DROP VIEW synthetic_projection`;
+    });
+
+    test.each([
+      'type',
+      'nullability',
+      'default',
+      'constraint',
+      'index',
+      'trigger',
+      'routine',
+      'extra-column',
+    ])('reordered columns do not hide %s drift from recovery admission', async (kind) => {
+      await reorderDescription();
+      expect(await recoverySchema(source)).toEqual(expected);
+      if (kind === 'type')
+        await source`ALTER TABLE podcasts ALTER COLUMN description TYPE varchar(2048)`;
+      if (kind === 'nullability')
+        await source`ALTER TABLE podcasts ALTER COLUMN description SET NOT NULL`;
+      if (kind === 'default')
+        await source`ALTER TABLE podcasts ALTER COLUMN description SET DEFAULT 'unapproved'`;
+      if (kind === 'constraint')
+        await source`ALTER TABLE podcasts DROP CONSTRAINT podcasts_author_id_fkey`;
+      if (kind === 'index') await source`DROP INDEX idx_podcasts_search`;
+      if (kind === 'trigger')
+        await source`ALTER TABLE podcasts DISABLE TRIGGER recovery_admission`;
+      if (kind === 'routine')
+        await source.unsafe(
+          'CREATE OR REPLACE FUNCTION guard_erasure_identity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$',
+        );
+      if (kind === 'extra-column')
+        await source`ALTER TABLE podcasts ADD COLUMN unexpected TEXT`;
+      await expect(controller().recover(bootstrapInput())).rejects.toThrow();
+      expect((await control.current())?.admitted).not.toBe(true);
+    });
 
     test('bootstrap without an initial capture refuses before retiring roles or authentication', async () => {
       const { initialCheckpoint: _capture, ...input } = bootstrapInput();

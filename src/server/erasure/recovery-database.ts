@@ -14,6 +14,16 @@ export async function recoverySchemaInTransaction(
   sql: postgres.TransactionSql,
 ) {
   const snapshot = await captureSchemaInTransaction(sql);
+  const physicalTables = new Set(
+    snapshot.objects
+      .filter(
+        (object) =>
+          object.kind === 'relation' &&
+          object.schema === 'public' &&
+          object.definition.kind === 'r',
+      )
+      .map((object) => object.name),
+  );
   const routines =
     await sql`SELECT n.nspname, p.proname, pg_get_functiondef(p.oid) AS definition FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.prokind IN ('f','p') ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)`;
   const unsafe =
@@ -41,7 +51,16 @@ export async function recoverySchemaInTransaction(
           collationVersion: snapshot.database.collationVersion,
         },
         objects: snapshot.objects.map(
-          ({ access: _a, manualReview: _m, ...object }) => object,
+          ({ access: _a, manualReview: _m, ...object }) => {
+            if (
+              object.kind !== 'column' ||
+              object.schema !== 'public' ||
+              !physicalTables.has(object.parent)
+            )
+              return object;
+            const { position: _position, ...definition } = object.definition;
+            return { ...object, definition };
+          },
         ),
         routines: Array.from(routines),
       }),
