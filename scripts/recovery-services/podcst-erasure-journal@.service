@@ -1,0 +1,13 @@
+[Unit]
+Description=Podcst erasure evidence service (%i)
+
+[Service]
+User=svc-podcst-journal
+Group=svc-podcst-journal
+StateDirectory=podcst-journal
+WorkingDirectory=/opt/podcst/recovery/%i
+ExecStart=/usr/local/bin/bun --no-env-file /opt/podcst/recovery/%i/scripts/erasure-journal/serve.js /var/lib/podcst-journal/config.json
+ReadOnlyPaths=/var/lib/podcst-journal
+
+[Install]
+WantedBy=multi-user.target

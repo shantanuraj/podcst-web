@@ -5,6 +5,17 @@ service. Adapt their paths and accounts before installing them. They assume a
 checkout at `/opt/podcst`, a `svc-podcst` user, and private configuration files
 under `/etc/podcst/`. No script provisions those resources.
 
+`recovery-services/` contains separate evidence/gateway systemd instance templates
+and a Caddy import template. Instantiate each unit with the reviewed full commit SHA
+under `/opt/podcst/recovery/`; install the shared `hardening.conf` into **both** unit
+names' `.service.d/` directories. It is required, not an optional tuning drop-in.
+The units require the existing PostgreSQL 16 service without starting/restarting it,
+use distinct OS identities and private read-only state/configuration directories,
+and disable swap for their own cgroups. They do not install identities, peer maps,
+keys, DNS, TLS certificates or global Caddy routing. Static source tests are not
+Linux systemd/Caddy acceptance: validate syntax/effective settings and actual
+identity/negative-access behavior in the approved staging environment first.
+
 Poller/chart/tier units read application connection settings from `app.env`.
 Backup units read `backup.env`, which must set:
 
