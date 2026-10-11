@@ -309,6 +309,18 @@ current `ERASURE_JOURNAL_URL`, `ERASURE_JOURNAL_ID`, `ERASURE_JOURNAL_TOKEN`,
 `ERASURE_WRITER_EPOCH` and public `ERASURE_VERIFICATION_KEYS`. The journal configuration
 contains only recovery/admission management tokens; runtime tokens are per-run.
 The gateway and upstream exchange fresh signed nonces, not cached ready flags.
+For a protected Vercel origin, set the gateway's protected
+`upstreamProtection: {provider: 'vercel', token: SECRET}`. Only an HTTPS
+`*.vercel.app` upstream on its normal port is accepted. The gateway routes with the
+upstream Host and fixed public forwarded origin, injects the credential as a header
+only, and strips client provider controls, provider cookies and middleware override
+headers. Provider access redirects, reflected credential headers and missing/stale
+nonce receipts refuse before releasing the body. Application cookies survive;
+provider cookies/proof headers do not. All gateway output is private/no-store,
+including its CDN controls. These adapter tests do not enable or certify provider
+protection: cover all old/current URLs and revoke unapproved sharing/bypass access.
+Vercel can also expose an automation token to deployments via its system environment;
+provider access tokens must never be reused as journal/controller custody keys.
 Its protected `primary` configuration is an explicit object, not a database URL:
 `{socket, port, database, role}` for local peer access, or
 `{host, port, database, role, password, tls: {ca, cert, key}}` for remote mutual TLS.
