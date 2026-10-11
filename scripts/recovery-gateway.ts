@@ -19,7 +19,7 @@ import {
   type GatewayDatabaseConfiguration,
 } from './lib/gateway-database';
 
-interface Configuration {
+export interface GatewayConfiguration {
   port: number;
   primary: GatewayDatabaseConfiguration;
   journal: string;
@@ -213,17 +213,26 @@ export function recoveryForwarder(
     }
   };
 }
-async function main(path: string) {
+function readGatewayConfiguration(path: string) {
   const config = readProtected(
     protectedExternalPath(path, new URL('../', import.meta.url)),
     64 * 1024,
-  ) as Configuration;
+  ) as GatewayConfiguration;
   if (
     !Number.isInteger(config.port) ||
     config.port < 1024 ||
     config.port > 65535
   )
     throw new Error();
+  return config;
+}
+
+export async function startRecoveryGateway(
+  path: string,
+  hostname: '127.0.0.1' | '0.0.0.0' = '127.0.0.1',
+) {
+  if (!['127.0.0.1', '0.0.0.0'].includes(hostname)) throw new Error();
+  const config = readGatewayConfiguration(path);
   const sql = createGatewayDatabase(config.primary);
   try {
     const keys = new Map(
@@ -240,7 +249,7 @@ async function main(path: string) {
       keys,
     });
     const server = Bun.serve({
-      hostname: '127.0.0.1',
+      hostname,
       port: config.port,
       fetch: createAdmissionGateway(
         assert,
@@ -257,13 +266,7 @@ async function main(path: string) {
       await server.stop(true);
       await sql.end({ timeout: 5 });
     };
-    process.once('SIGTERM', () => {
-      void stop();
-    });
-    process.once('SIGINT', () => {
-      void stop();
-    });
-    console.log(`Recovery gateway listening on loopback port ${server.port}`);
+    return { server, close: stop, configuration: config };
   } catch {
     await sql.end({ timeout: 5 });
     throw new Error();
@@ -275,8 +278,18 @@ if (import.meta.main) {
     console.error('Usage: recovery-gateway.ts CONFIG');
     process.exitCode = 1;
   } else
-    void main(path).catch(() => {
-      console.error('Recovery gateway startup refused');
-      process.exitCode = 1;
-    });
+    void startRecoveryGateway(path)
+      .then((gateway) => {
+        for (const signal of ['SIGTERM', 'SIGINT'] as const)
+          process.once(signal, () => {
+            void gateway.close();
+          });
+        console.log(
+          `Recovery gateway listening on loopback port ${gateway.server.port}`,
+        );
+      })
+      .catch(() => {
+        console.error('Recovery gateway startup refused');
+        process.exitCode = 1;
+      });
 }

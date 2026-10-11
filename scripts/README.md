@@ -53,6 +53,26 @@ Sandbox processes are stopped on success, failure or interruption; failed runs
 retain their private log directory for diagnosis. These checks do not authorize a
 production migration or prove physical-device behavior.
 
+## Fly admission layout
+
+The container now starts `fly-recovery.ts`, not a publicly bound Next process.
+Its required `RECOVERY_GATEWAY_CONFIG` secret is the protected gateway JSON plus
+`journalId`, with `port: 3000` and `upstream: 'http://127.0.0.1:3001'`. Remote primary
+mTLS is mandatory. The launcher creates a private temporary configuration, starts
+the external gate on port 3000 and binds Next only to loopback port 3001. Next's
+primary connection, certificate and admission settings derive from that one config;
+old PG/MTLS/admission overrides and the whole gateway config variable are removed
+from the child environment. Existing unrelated application/Redis/auth settings stay.
+Admission is forced on and full account deletion off. Verify the shared client
+certificate also remains valid for the separately approved Redis transport.
+
+The supervisor closes both listeners when Next exits or on termination. Missing or
+invalid configuration refuses startup; there is no raw-Next fallback. The image
+exposes only the gateway and pins Bun alongside Node. Loopback/child-process tests
+are not proof of Fly edge/private-route isolation or deployment credential custody.
+Do not publish/deploy this container until the coordinated source/schema/credential
+handoff and actual provider acceptance are approved.
+
 ## Backup coverage and recovery
 
 [`podcst-backup.sh`](podcst-backup.sh) is the authoritative selected-table list.
