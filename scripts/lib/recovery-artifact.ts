@@ -6,7 +6,6 @@ import {
   createWriteStream,
   fsyncSync,
   openSync,
-  readFileSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -18,16 +17,10 @@ import {
   JournalError,
 } from '../../src/server/erasure/journal-contract';
 import { recoverySchema } from '../../src/server/erasure/recovery-database';
+import { selectedRecoveryTables } from '../backup-selection';
 import { migrate } from '../migrations';
 import { protectedExternalPath, protectedPath } from './artifacts';
 
-export const selectedRecoveryTables = () =>
-  [
-    ...readFileSync(
-      new URL('../podcst-backup.sh', import.meta.url),
-      'utf8',
-    ).matchAll(/\s-t\s+([a-z_][a-z_0-9]*\.[a-z_][a-z_0-9]*)/g),
-  ].map((match) => match[1]);
 export async function artifactHash(path: string) {
   const fd = openSync(
     protectedPath(path),

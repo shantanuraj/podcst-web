@@ -271,6 +271,38 @@ only UPDATE on `state_generation.singleton` for shared locking, never write acce
 to recovery metadata or either generation. The controller refuses unsafe ownership,
 column-level grants, replication bypass and unaccounted login roles.
 
+`recovery-permissions.ts` provides `inspect|grant --config CONFIG` for separately
+reviewed primary roles. Configuration pins `{socket, port, database, operator,
+cluster}` in `target`, `profile: 'serving' | 'backup'`, grantee `role`, trusted
+recovery `reference` and a new protected `output`. The role/database must already
+exist. Granting requires NOLOGIN/NOINHERIT, no ownership/membership/elevated powers,
+no active grantee clients and the exact trusted migration/schema reference.
+Existing excess rights refuse the whole transaction; no privilege repair, role
+creation/activation, password, PUBLIC-policy change or migration is hidden here.
+Read-only `inspect` refuses missing rights instead of filling them in.
+
+The serving table/column matrix is defined once in that script. It grants only
+required table operations, USAGE on their owned insert sequences and the admission
+probe function. User/session/country/episode row locks use column UPDATE grants;
+B retains only `state_generation.singleton` UPDATE. Generation/recovery writes,
+TRUNCATE, grant options and migration-ledger access stay denied. Unused legacy
+OAuth/transcript tables receive no runtime rights. Operator-only catalogue repair
+is not included in the app/poller/chart/tier role.
+
+The backup profile derives SELECT coverage from `podcst-backup.sh`, grants SELECT
+on only its owned sequences and separate ledger-schema USAGE. It grants no table
+writes, sequence USAGE/UPDATE or functions; ordinary existing PostgreSQL PUBLIC
+function access is not a denied-function boundary. It is selected-backup coverage,
+not a full-restore/capture role, eligible manifest or new retention/job policy.
+A backup LOGIN role with CONNECT must still be fenced for controller recovery.
+Bundle the runner under `scripts/` beside `podcst-backup.sh`, with the unchanged
+`migrations/active/` chain beside `scripts/`. Freeze/checksum the selection too.
+
+Primary PUBLIC CONNECT/TEMPORARY and schema CREATE policies need a separate scoped
+review before the fresh role can satisfy these checks. Do not disable unrelated
+cluster roles, revive an old serving name or give the runtime ledger access to make
+backup jobs work. Lost grant acknowledgement requires inspection before retry.
+
 Serve all traffic through the external gateway; keep upstream origins inaccessible
 as bypasses. Configure every app/worker with `RECOVERY_ADMISSION_REQUIRED=1` and
 current `ERASURE_JOURNAL_URL`, `ERASURE_JOURNAL_ID`, `ERASURE_JOURNAL_TOKEN`,

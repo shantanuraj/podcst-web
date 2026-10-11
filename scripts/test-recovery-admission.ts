@@ -21,6 +21,7 @@ import { startPostgres } from './lib/postgres-sandbox';
 import { startRedis } from './lib/redis-sandbox';
 import { migrate } from './migrations';
 import { recoveryForwarder } from './recovery-gateway';
+import { grantPrimaryRole } from './recovery-permissions';
 
 async function main() {
   if (
@@ -81,14 +82,14 @@ async function main() {
     );
     await migrate(primary.sql);
     await primary.sql.unsafe(
-      'CREATE ROLE gate_old NOLOGIN; CREATE ROLE gate_new NOLOGIN',
+      'CREATE ROLE gate_old NOLOGIN NOINHERIT; CREATE ROLE gate_new NOLOGIN NOINHERIT',
     );
-    await primary.sql`GRANT USAGE ON SCHEMA public TO gate_new`;
-    await primary.sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gate_new`;
-    await primary.sql`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO gate_new`;
-    await primary.sql`GRANT EXECUTE ON FUNCTION pg_control_system() TO gate_new`;
-    await primary.sql`REVOKE INSERT, UPDATE, DELETE ON recovery_state, state_generation FROM gate_new`;
-    await primary.sql`GRANT UPDATE (singleton) ON state_generation TO gate_new`;
+    await primary.sql`REVOKE TEMPORARY ON DATABASE postgres FROM PUBLIC`;
+    await grantPrimaryRole(primary.sql, 'serving', {
+      database: 'postgres',
+      role: 'gate_new',
+      reference: await recoverySchema(primary.sql),
+    });
     await primary.sql`INSERT INTO users (id,email) VALUES ('gate-user','gate@example.invalid')`;
     await primary.sql`INSERT INTO passkeys (id,user_id,credential_id,public_key) VALUES ('gate-key','gate-user','synthetic-credential',decode('12','hex'))`;
     for (const name of ['journal', 'authority', 'receipts'])

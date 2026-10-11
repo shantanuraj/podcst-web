@@ -110,7 +110,10 @@ export async function assertWritersFenced(sql: postgres.ISql, roles: string[]) {
   if (unexpected.length || active.length || open.length)
     throw new JournalError(503);
 }
-export async function assertServingPrivileges(sql: postgres.Sql, role: string) {
+export async function assertServingPrivileges(
+  sql: postgres.ISql,
+  role: string,
+) {
   const [rights] =
     await sql`SELECT has_database_privilege(${role}, current_database(), 'CREATE') OR has_schema_privilege(${role}, 'public', 'CREATE') OR has_parameter_privilege(${role}, 'session_replication_role', 'SET') AS ddl,
     has_table_privilege(${role}, 'public.recovery_state', 'INSERT,UPDATE,DELETE,TRUNCATE') OR has_table_privilege(${role}, 'public.state_generation', 'INSERT,UPDATE,DELETE,TRUNCATE') OR has_schema_privilege(${role}, 'podcst_migrations', 'USAGE') AS control,

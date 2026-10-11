@@ -26,7 +26,17 @@ import { createTLSFixture } from '../../../scripts/lib/tls-fixture';
 import { migrate } from '../../../scripts/migrations';
 import { runRecoveryCommand } from '../../../scripts/recover-account-state';
 import { recoveryForwarder } from '../../../scripts/recovery-gateway';
+import { grantPrimaryRole } from '../../../scripts/recovery-permissions';
 import { createChallengeStore } from '../auth/challenges';
+import { createEmailService } from '../auth/email-service';
+import { refreshTopCharts } from '../ingest/charts';
+import { upsertEpisodes } from '../ingest/episodes';
+import { requestFeedRefresh } from '../ingest/feed-demand';
+import { savePollState } from '../ingest/feed-refresh';
+import { createEpisodeListService } from '../lists/service';
+import { createFollowStateService } from '../state/follows';
+import { createProgressStateService } from '../state/progress';
+import { evictWarm } from '../tiering';
 import {
   ADMISSION_CHALLENGE,
   ADMISSION_RESPONSE,
@@ -141,12 +151,12 @@ describe.skipIf(!required)(
       ],
     });
     const grant = async (sql: postgres.Sql, role: string) => {
-      await sql`GRANT USAGE ON SCHEMA public TO ${sql(role)}`;
-      await sql`GRANT EXECUTE ON FUNCTION pg_control_system() TO ${sql(role)}`;
-      await sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${sql(role)}`;
-      await sql`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${sql(role)}`;
-      await sql`REVOKE INSERT, UPDATE, DELETE ON public.recovery_state, public.state_generation FROM ${sql(role)}`;
-      await sql`GRANT UPDATE (singleton) ON public.state_generation TO ${sql(role)}`;
+      const [identity] = await sql`SELECT current_database() AS database`;
+      await grantPrimaryRole(sql, 'serving', {
+        database: identity.database,
+        role,
+        reference: await recoverySchema(sql),
+      });
     };
     const controller = (sql = source) =>
       createRecoveryController({
@@ -218,7 +228,7 @@ describe.skipIf(!required)(
     };
     const prepareTarget = async () => {
       await source`CREATE DATABASE restored TEMPLATE template0`;
-      await source`REVOKE CONNECT ON DATABASE restored FROM PUBLIC`;
+      await source`REVOKE CONNECT, TEMPORARY ON DATABASE restored FROM PUBLIC`;
       await source`GRANT CONNECT ON DATABASE restored TO next_worker`;
       target = db('restored');
       await migrate(target);
@@ -321,6 +331,7 @@ describe.skipIf(!required)(
       independent = startPostgres();
       cache = await startRedis();
       source = postgres({ ...primary.options, max: 8 });
+      await source`REVOKE TEMPORARY ON DATABASE postgres FROM PUBLIC`;
       stores = Array.from({ length: 4 }, () =>
         postgres({ ...independent.options, max: 6 }),
       );
@@ -350,8 +361,8 @@ describe.skipIf(!required)(
         if (
           !(await source`SELECT 1 FROM pg_roles WHERE rolname = ${role}`).length
         )
-          await source`CREATE ROLE ${source(role)} NOLOGIN`;
-        await source`ALTER ROLE ${source(role)} NOLOGIN`;
+          await source`CREATE ROLE ${source(role)} NOLOGIN NOINHERIT`;
+        await source`ALTER ROLE ${source(role)} NOLOGIN NOINHERIT`;
       }
       await migrate(source);
       await grant(source, 'first_worker');
@@ -428,6 +439,135 @@ describe.skipIf(!required)(
       await primary?.stop();
       await independent?.stop();
     }, 30_000);
+
+    test('restricted serving grants support authentication, B state, list changes and F2 worker SQL', async () => {
+      await boot();
+      let code = '';
+      const email = createEmailService(
+        live,
+        'synthetic-secret'.repeat(4),
+        async (_email, value) => {
+          code = value;
+        },
+      );
+      await email.send('new@example.invalid');
+      expect(await email.login('new@example.invalid', code)).not.toBeNull();
+      await upsertEpisodes(live, '1', '', [
+        {
+          guid: 'grant-episode',
+          title: 'Grant episode',
+          summary: null,
+          published: Date.now(),
+          cover: '',
+          explicit: false,
+          duration: 60,
+          link: null,
+          file: {
+            url: 'https://example.invalid/audio.mp3',
+            length: 100,
+            type: 'audio/mpeg',
+          },
+          author: null,
+          episodeArt: null,
+          showNotes: '',
+        },
+      ]);
+      const [episode] =
+        await live`SELECT id::text FROM episodes WHERE guid = 'grant-episode'`;
+      const scope = {
+        protocol: 1 as const,
+        accountId: b.userId,
+        generation: bootstrap.value.generation,
+      };
+      const follows = createFollowStateService(live);
+      const follow = {
+        ...scope,
+        clientId: randomUUID(),
+        sequence: '1',
+        changes: [{ podcastId: '1', followed: true }],
+      };
+      expect((await follows.change(b.userId, follow)).revision).toBe('1');
+      expect((await follows.change(b.userId, follow)).revision).toBe('1');
+      expect((await follows.read(b.userId)).items).toHaveLength(1);
+      await follows.change(b.userId, {
+        ...follow,
+        sequence: '2',
+        changes: [{ podcastId: '1', followed: false }],
+      });
+      const progress = createProgressStateService(live);
+      const change = {
+        ...scope,
+        clientId: randomUUID(),
+        sequence: '1',
+        changes: [
+          { episodeId: episode.id, positionSeconds: 42, completed: false },
+        ],
+      };
+      expect((await progress.change(b.userId, change)).revision).toBe('1');
+      expect((await progress.change(b.userId, change)).revision).toBe('1');
+      expect(
+        (await progress.read(b.userId, [episode.id])).items[0].progress
+          ?.positionSeconds,
+      ).toBe(42);
+      const lists = createEpisodeListService(live);
+      const list = (await lists.lists(b.userId)).lists[0];
+      const batch = {
+        ...scope,
+        clientId: randomUUID(),
+        sequence: '1',
+        changes: [{ op: 'add' as const, episodeId: episode.id }],
+      };
+      expect((await lists.change(b.userId, list.id, batch)).revision).toBe('1');
+      expect((await lists.membership(b.userId, list.id)).items).toHaveLength(1);
+      await lists.change(b.userId, list.id, {
+        ...batch,
+        sequence: '2',
+        changes: [{ op: 'remove', episodeId: episode.id }],
+      });
+      expect(
+        (
+          await requestFeedRefresh(live, '1', null, async () => {
+            await guard(live)();
+          })
+        )?.state,
+      ).toBe('pending');
+      await savePollState(
+        live,
+        '1',
+        { etag: 'synthetic', lastModified: null, hash: 'synthetic' },
+        3600,
+      );
+      await source`SELECT setval('authors_id_seq', 1), setval('podcasts_id_seq', 2)`;
+      const chart = [
+        {
+          itunesId: '700',
+          author: 'Grant author',
+          feed: 'https://example.invalid/chart',
+          title: 'Grant chart',
+          cover: '',
+          thumbnail: null,
+          explicit: false,
+          count: 1,
+          rank: 1,
+          verifiedAt: new Date().toISOString(),
+          genres: [26],
+        },
+      ];
+      for (let index = 0; index < 2; index++) {
+        const result = await refreshTopCharts(live, ['zz'], async () => chart);
+        expect(result.failedLocales).toEqual([]);
+        expect(result.stored).toBe(1);
+      }
+      expect(
+        await live`SELECT 1 FROM chart_history WHERE country_id = 'zz'`,
+      ).toHaveLength(1);
+      expect(await live`SELECT 1 FROM poll_metrics`).toHaveLength(8);
+      expect(await evictWarm(0, live)).toBe(1);
+      expect((await erasure().revoke(b, 'key-b')).status).toBe('completed');
+      expect(
+        await live`SELECT id FROM passkeys WHERE id = 'key-kept'`,
+      ).toHaveLength(1);
+    });
 
     test.each([
       'selected',
@@ -819,15 +959,16 @@ describe.skipIf(!required)(
 
     test('a reconnected stale worker cannot write after an admitted primary restarts', async () => {
       await boot();
-      await live`UPDATE users SET name = 'before restart' WHERE id = ${b.userId}`;
+      await live`UPDATE passkeys SET counter = 7 WHERE id = 'key-kept'`;
       await restartPrimary();
       live = db('postgres', 'first_worker');
       await expect(
-        live`UPDATE users SET name = 'stale worker' WHERE id = ${b.userId}`.execute(),
+        live`UPDATE passkeys SET counter = 8 WHERE id = 'key-kept'`.execute(),
       ).rejects.toThrow('Recovery admission required');
       expect(
-        (await source`SELECT name FROM users WHERE id = ${b.userId}`)[0].name,
-      ).toBe('before restart');
+        (await source`SELECT counter FROM passkeys WHERE id = 'key-kept'`)[0]
+          .counter,
+      ).toBe(7);
       await expect(guard(live)()).rejects.toThrow();
       await grant(source, 'next_worker');
       await expect(
@@ -911,7 +1052,7 @@ describe.skipIf(!required)(
         expect(await journal.head()).toEqual(retainedHead);
         live = db('postgres', 'first_worker');
         await expect(
-          live`UPDATE users SET name = 'stale' WHERE id = ${b.userId}`.execute(),
+          live`UPDATE passkeys SET counter = 8 WHERE id = 'key-kept'`.execute(),
         ).rejects.toThrow('Recovery admission required');
         await expect(guard(live)()).rejects.toThrow();
         let forwarded = 0;
@@ -966,10 +1107,11 @@ describe.skipIf(!required)(
         await expect(
           guard(runtime, bootstrap.value.writerEpoch)(),
         ).rejects.toThrow();
-        await runtime`UPDATE users SET name = 'readmitted' WHERE id = ${b.userId}`;
+        await runtime`UPDATE passkeys SET counter = 42 WHERE id = 'key-kept'`;
         expect(
-          (await target`SELECT name FROM users WHERE id = ${b.userId}`)[0].name,
-        ).toBe('readmitted');
+          (await target`SELECT counter FROM passkeys WHERE id = 'key-kept'`)[0]
+            .counter,
+        ).toBe(42);
       } finally {
         await server.stop(true);
         await Promise.all(pools.map((pool) => pool.end({ timeout: 1 })));
@@ -1422,6 +1564,7 @@ describe.skipIf(!required)(
           await backend.close();
         }
         await source`CREATE DATABASE restored TEMPLATE template0`;
+        await source`REVOKE CONNECT, TEMPORARY ON DATABASE restored FROM PUBLIC`;
         target = db('restored');
         await migrate(target);
         await grant(target, 'next_worker');
