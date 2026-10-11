@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import postgres from 'postgres';
 import { openJournalConfiguration } from '../../../scripts/erasure-journal/configuration';
 import { grantJournalStore } from '../../../scripts/erasure-journal/permissions';
+import { createAgeFixture } from '../../../scripts/lib/age-fixture';
 import { readProtected, writeProtected } from '../../../scripts/lib/artifacts';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import {
@@ -100,6 +101,7 @@ describe.skipIf(!required)(
     let bootstrap: Signed<AdmissionAttestation>;
     let artifact: Signed<RecoveryManifest>;
     let encrypted: string;
+    let initialEncrypted: string;
     let recipient: string;
     let identity: string;
     let time: number;
@@ -208,13 +210,24 @@ describe.skipIf(!required)(
       await source`INSERT INTO email_verifications (id,email,code_digest,expires_at,ready) VALUES ('email-b',${b.email},${digest('synthetic-code')},'2030-01-01',true) ON CONFLICT DO NOTHING`;
       await source`INSERT INTO oauth_accounts (user_id,provider,provider_account_id,access_token,refresh_token,expires_at) VALUES (${b.userId},'synthetic','identity-b','old-access','old-refresh','2030-01-01') ON CONFLICT DO NOTHING`;
     };
+    const bootstrapInput = (id = randomUUID()) => ({
+      id,
+      artifactHash: null,
+      retiredRoles: ['old_worker'],
+      servingRole: 'first_worker',
+      initialCheckpoint: (snapshot: string) => {
+        initialEncrypted = join(directory, `${randomUUID()}.initial.dump.age`);
+        return captureEncryptedArchive(
+          tools(),
+          snapshot,
+          recipient,
+          initialEncrypted,
+          'full',
+        );
+      },
+    });
     const boot = async () => {
-      bootstrap = await controller().recover({
-        id: randomUUID(),
-        artifactHash: null,
-        retiredRoles: ['old_worker'],
-        servingRole: 'first_worker',
-      });
+      bootstrap = await controller().recover(bootstrapInput());
       tokens.set('runtime', await control.credential(bootstrap.value.runId));
       live = db('postgres', 'first_worker');
       await sessions();
@@ -335,13 +348,7 @@ describe.skipIf(!required)(
       stores = Array.from({ length: 4 }, () =>
         postgres({ ...independent.options, max: 6 }),
       );
-      identity = join(primary.directory, 'synthetic.agekey');
-      const gen = Bun.spawnSync(
-        [Bun.which('age-keygen') ?? '', '-o', identity],
-        { stdout: 'pipe', stderr: 'pipe' },
-      );
-      if (gen.exitCode) throw new Error('Synthetic key generation failed');
-      recipient = gen.stderr.toString().match(/age1[a-z0-9]+/)?.[0] ?? '';
+      ({ identity, recipient } = createAgeFixture(primary.directory));
     }, 30_000);
     beforeEach(async () => {
       pools = [];
@@ -438,6 +445,117 @@ describe.skipIf(!required)(
       await cache?.close();
       await primary?.stop();
       await independent?.stop();
+    }, 30_000);
+
+    test('bootstrap without an initial capture refuses before retiring roles or authentication', async () => {
+      const { initialCheckpoint: _capture, ...input } = bootstrapInput();
+      await expect(controller().recover(input)).rejects.toThrow();
+      expect(
+        await source`SELECT 1 FROM pg_roles WHERE rolname = 'old_worker'`,
+      ).toHaveLength(1);
+      expect(await source`SELECT id FROM sessions`).toHaveLength(2);
+      expect(
+        await stores[3]`SELECT 1 FROM erasure_authority.recovery_runs`,
+      ).toHaveLength(0);
+    });
+
+    test.each([
+      'before-initial-capture',
+      'after-initial-capture',
+      'before-admit',
+    ])('bootstrap interruption at %s stays closed across a primary restart and resumes the same run', async (point) => {
+      const input = bootstrapInput();
+      faultAt = point;
+      await expect(controller().recover(input)).rejects.toThrow();
+      expect((await control.current())?.admitted).toBe(false);
+      expect(
+        await stores[3]`SELECT 1 FROM erasure_authority.recovery_artifacts`,
+      ).toHaveLength(0);
+      expect(
+        (
+          await source`SELECT rolcanlogin FROM pg_roles WHERE rolname = 'first_worker'`
+        )[0].rolcanlogin,
+      ).toBe(false);
+      await restartPrimary();
+      bootstrap = await controller().recover(input);
+      tokens.set('runtime', await control.credential(bootstrap.value.runId));
+      live = db('postgres', 'first_worker');
+      expect((await guard(live)()).runId).toBe(input.id);
+      const eligible = await control.artifact(
+        await artifactHash(initialEncrypted),
+        expected.schemaHash,
+        journalId,
+      );
+      expect(eligible.origin.runId).toBe(input.id);
+      expect(
+        await stores[3]`SELECT 1 FROM erasure_authority.recovery_artifacts`,
+      ).toHaveLength(1);
+    }, 30_000);
+
+    test('initial eligibility and admission roll back together when the authority commit refuses', async () => {
+      const input = bootstrapInput();
+      await stores[3]`ALTER TABLE erasure_authority.recovery_runs ADD CONSTRAINT synthetic_admission_failure CHECK (NOT admitted)`;
+      await expect(controller().recover(input)).rejects.toThrow();
+      const failedHash = await artifactHash(initialEncrypted);
+      expect((await control.current())?.admitted).toBe(false);
+      expect(
+        await stores[3]`SELECT 1 FROM erasure_authority.recovery_artifacts`,
+      ).toHaveLength(0);
+      await stores[3]`ALTER TABLE erasure_authority.recovery_runs DROP CONSTRAINT synthetic_admission_failure`;
+      bootstrap = await controller().recover(input);
+      const saved = await artifactHash(initialEncrypted);
+      expect(saved).not.toBe(failedHash);
+      expect(
+        (await control.artifact(saved, expected.schemaHash, journalId)).origin
+          .runId,
+      ).toBe(input.id);
+      await expect(
+        control.artifact(failedHash, expected.schemaHash, journalId),
+      ).rejects.toThrow();
+    });
+
+    test('lost bootstrap acknowledgement resumes without creating another initial archive', async () => {
+      const input = bootstrapInput();
+      faultAt = 'after-admit';
+      await expect(controller().recover(input)).rejects.toThrow();
+      expect((await control.current())?.admitted).toBe(true);
+      const saved = await artifactHash(initialEncrypted);
+      const result = await controller().recover({
+        ...input,
+        initialCheckpoint: async () => {
+          throw new Error('Unexpected second capture');
+        },
+      });
+      expect(result.value.runId).toBe(input.id);
+      expect(
+        (await control.artifact(saved, expected.schemaHash, journalId)).origin
+          .runId,
+      ).toBe(input.id);
+      expect(
+        await stores[3]`SELECT 1 FROM erasure_authority.recovery_artifacts`,
+      ).toHaveLength(1);
+    });
+
+    test('a restart immediately after first admission recovers from its mandatory full checkpoint', async () => {
+      const input = bootstrapInput();
+      faultAt = 'after-admit';
+      await expect(controller().recover(input)).rejects.toThrow();
+      const current = await control.current();
+      expect(current?.admitted).toBe(true);
+      bootstrap = current?.attestation as Signed<AdmissionAttestation>;
+      encrypted = initialEncrypted;
+      const [saved] =
+        await stores[3]`SELECT manifest FROM erasure_authority.recovery_artifacts`;
+      artifact = saved.manifest;
+      await restartPrimary();
+      await expect(controller().recover(input)).rejects.toThrow();
+      await prepareTarget();
+      const proof = await recover();
+      expect((await guard(runtime, proof.value.writerEpoch)()).runId).toBe(
+        state.id,
+      );
+      expect(await target`SELECT id FROM users`).toHaveLength(2);
+      expect(await target`SELECT id FROM sessions`).toHaveLength(0);
     }, 30_000);
 
     test('restricted serving grants support authentication, B state, list changes and F2 worker SQL', async () => {
@@ -1189,6 +1307,9 @@ describe.skipIf(!required)(
     test('a changed admission closes an overlapping capture before it can register eligibility', async () => {
       await boot();
       const path = join(directory, 'overlap.age');
+      const initial = Array.from(
+        await stores[3]`SELECT digest FROM erasure_authority.recovery_artifacts`,
+      );
       await expect(
         controller().capture(async (snapshot) => {
           const hash = await captureEncryptedArchive(
@@ -1203,8 +1324,10 @@ describe.skipIf(!required)(
         }),
       ).rejects.toThrow();
       expect(
-        await stores[3]`SELECT 1 FROM erasure_authority.recovery_artifacts`,
-      ).toHaveLength(0);
+        Array.from(
+          await stores[3]`SELECT digest FROM erasure_authority.recovery_artifacts`,
+        ),
+      ).toEqual(initial);
     });
 
     test('authentic stale heads cannot finish controller admission', async () => {
@@ -1505,6 +1628,10 @@ describe.skipIf(!required)(
         const bootConfig = join(directory, 'bootstrap-config.json');
         const bootstrapInput = {
           ...base,
+          initialCheckpoint: {
+            path: join(directory, 'initial.dump.age'),
+            recipient,
+          },
           output: first,
           run: {
             id: randomUUID(),

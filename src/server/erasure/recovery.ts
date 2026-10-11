@@ -14,6 +14,7 @@ import {
 import type { createPostgresJournal, JournalKeys } from './journal-postgres';
 import { assertAuthEpoch, authEpochKey, redisIdentity } from './recovery-auth';
 import {
+  type AdmissionBinding,
   type createRecoveryControl,
   type RecoveryPlan,
   recoveryIds,
@@ -87,6 +88,41 @@ export function createRecoveryController({
       );
     return proof;
   };
+  const captureManifest = async (
+    binding: AdmissionBinding,
+    exportArchive: (snapshot: string) => Promise<string>,
+  ): Promise<RecoveryManifest> => {
+    const createdAt = now();
+    const capture = await sql.begin(
+      'isolation level repeatable read read only',
+      async (tx) => {
+        const captured = await admissionBinding(tx, binding.writerEpoch);
+        captured.role = binding.role;
+        if (
+          canonical(captured) !== canonical(binding) ||
+          canonical(await recoverySchemaInTransaction(tx)) !==
+            canonical(expected)
+        )
+          throw new JournalError(503);
+        await tx`SET LOCAL idle_in_transaction_session_timeout = '1h'`;
+        const [snapshot] = await tx`SELECT pg_export_snapshot() AS id`;
+        return {
+          artifactHash: await exportArchive(snapshot.id),
+          base: captured.base,
+        };
+      },
+    );
+    return {
+      version: 1,
+      purpose: 'account-recovery-checkpoint',
+      ...capture,
+      schemaHash: expected.schemaHash,
+      createdAt: createdAt.toISOString(),
+      expiresAt: new Date(
+        createdAt.getTime() + CHECKPOINT_MAX_AGE_MS,
+      ).toISOString(),
+    };
+  };
   return {
     async recover(input: {
       id: string;
@@ -95,6 +131,7 @@ export function createRecoveryController({
       retiredRoles: string[];
       servingRole: string;
       restore?: () => Promise<void>;
+      initialCheckpoint?: (snapshot: string) => Promise<string>;
     }) {
       if (
         !isOperationId(input.id) ||
@@ -106,6 +143,11 @@ export function createRecoveryController({
         (input.artifactHash === null ? 'bootstrap' : 'checkpoint');
       if (!['bootstrap', 'checkpoint', 'auth-rotation'].includes(mode))
         throw new JournalError(400);
+      if (
+        (mode === 'bootstrap') !==
+        (typeof input.initialCheckpoint === 'function')
+      )
+        throw new JournalError(503);
       return control.exclusive(async (lease) => {
         const original = await lease.current();
         const target = await databaseIdentity(sql);
@@ -421,21 +463,35 @@ export function createRecoveryController({
           binding.generation !== plan.generation
         )
           throw new JournalError(503);
+        let checkpoint: RecoveryManifest | undefined;
+        if (input.initialCheckpoint) {
+          await fault('before-initial-capture');
+          checkpoint = await captureManifest(binding, input.initialCheckpoint);
+          await fault('after-initial-capture');
+          const captured = await admissionBinding(sql, plan.servingEpoch);
+          captured.role = plan.servingRole;
+          if (canonical(captured) !== canonical(binding))
+            throw new JournalError(503);
+        }
         await assertWritersFenced(sql, [
           ...plan.retiredRoles,
           plan.servingRole,
         ]);
         await assertAuthEpoch(redis, plan.authEpoch, plan.id, cacheIdentity);
         await fault('before-admit');
-        const proof = await lease.admit(plan, {
-          ...binding,
-          version: 1,
-          purpose: 'recovery-admission',
-          artifactHash: plan.artifactHash,
-          redisIdentity: cacheIdentity,
-          ...expected,
-          head: finalHead,
-        });
+        const proof = await lease.admit(
+          plan,
+          {
+            ...binding,
+            version: 1,
+            purpose: 'recovery-admission',
+            artifactHash: plan.artifactHash,
+            redisIdentity: cacheIdentity,
+            ...expected,
+            head: finalHead,
+          },
+          checkpoint,
+        );
         await fault('after-admit');
         await lease.assert();
         await enableServingRole(sql, plan);
@@ -446,41 +502,16 @@ export function createRecoveryController({
       const run = await control.current();
       if (!run?.admitted || !run.attestation) throw new JournalError(503);
       const origin = await runtimeProof(run.plan, false);
-      await schema();
-      const createdAt = now();
-      const capture = await sql.begin(
-        'isolation level repeatable read read only',
-        async (tx) => {
-          const row = await recoveryRow(tx);
-          if (
-            !row ||
-            row.run_id !== run.id ||
-            row.incarnation !== run.plan.incarnation ||
-            canonical(rowCursor(row)) !==
-              canonical(verifyValue(origin, keys.verification).base)
-          )
-            throw new JournalError(503);
-          if (
-            canonical(await recoverySchemaInTransaction(tx)) !==
-            canonical(expected)
-          )
-            throw new JournalError(503);
-          await tx`SET LOCAL idle_in_transaction_session_timeout = '1h'`;
-          const [snapshot] = await tx`SELECT pg_export_snapshot() AS id`;
-          const artifactHash = await exportArchive(snapshot.id);
-          return { artifactHash, base: rowCursor(row) };
-        },
-      );
-      const manifest: RecoveryManifest = {
-        version: 1,
-        purpose: 'account-recovery-checkpoint',
-        ...capture,
-        schemaHash: expected.schemaHash,
-        createdAt: createdAt.toISOString(),
-        expiresAt: new Date(
-          createdAt.getTime() + CHECKPOINT_MAX_AGE_MS,
-        ).toISOString(),
-      };
+      const {
+        version: _v,
+        purpose: _p,
+        schemaHash: _s,
+        catalogHash: _c,
+        redisIdentity: _r,
+        head: _h,
+        ...binding
+      } = verifyValue(origin, keys.verification);
+      const manifest = await captureManifest(binding, exportArchive);
       await fault('before-manifest-register');
       return control.register(manifest, origin);
     },

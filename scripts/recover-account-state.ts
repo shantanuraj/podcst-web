@@ -37,6 +37,7 @@ interface Configuration {
   reference: string;
   output: string;
   run: { id: string; retiredRoles: string[]; servingRole: string };
+  initialCheckpoint?: { path: string; recipient: string };
   artifact: {
     path: string;
     recipient: string;
@@ -151,7 +152,10 @@ export async function runRecoveryCommand(
       actual.writes !== 'on'
     )
       throw new Error('Recovery target refused');
-    if (['capture', 'recover'].includes(command) && !isAbsolute(config.age))
+    if (
+      ['bootstrap', 'capture', 'recover'].includes(command) &&
+      !isAbsolute(config.age)
+    )
       throw new Error('Explicit encryption tool required');
     redis = createRecoveryRedis(config.redis);
     const controller = createRecoveryController({
@@ -206,6 +210,15 @@ export async function runRecoveryCommand(
           : (current?.plan.artifactHash ?? null);
       if (['bootstrap', 'rotate-auth'].includes(command) && config.artifact)
         throw new Error('This operation cannot restore an artifact');
+      if (
+        command === 'bootstrap'
+          ? !config.initialCheckpoint?.recipient
+          : config.initialCheckpoint !== undefined
+      )
+        throw new Error(
+          'Initial bootstrap checkpoint required only for bootstrap',
+        );
+      const initial = config.initialCheckpoint;
       const primary = sql;
       const attestation = await controller.recover({
         ...config.run,
@@ -216,6 +229,18 @@ export async function runRecoveryCommand(
               ? 'checkpoint'
               : 'bootstrap',
         artifactHash: hash,
+        ...(initial
+          ? {
+              initialCheckpoint: (snapshot: string) =>
+                captureEncryptedArchive(
+                  tools,
+                  snapshot,
+                  initial.recipient,
+                  external(initial.path),
+                  'full',
+                ),
+            }
+          : {}),
         ...(command === 'recover' && hash
           ? {
               restore: () =>
@@ -231,9 +256,19 @@ export async function runRecoveryCommand(
             }
           : {}),
       });
+      const checkpoint = initial
+        ? await opened.control.artifact(
+            await artifactHash(external(initial.path)),
+            expected.schemaHash,
+            opened.config.journalId,
+          )
+        : undefined;
+      if (checkpoint && checkpoint.origin.runId !== attestation.value.runId)
+        throw new Error('Initial checkpoint origin refused');
       result = {
         attestation,
         runtimeToken: await opened.control.credential(attestation.value.runId),
+        ...(checkpoint ? { initialCheckpoint: checkpoint.manifest } : {}),
       };
     }
     writeProtected(output, result, 64 * 1024);

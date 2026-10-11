@@ -17,7 +17,9 @@ import {
 import { createRecoveryController } from '../src/server/erasure/recovery';
 import { createRecoveryControl } from '../src/server/erasure/recovery-control';
 import { recoverySchema } from '../src/server/erasure/recovery-database';
+import { createAgeFixture } from './lib/age-fixture';
 import { startPostgres } from './lib/postgres-sandbox';
+import { captureEncryptedArchive } from './lib/recovery-artifact';
 import { startRedis } from './lib/redis-sandbox';
 import { migrate } from './migrations';
 import { recoveryForwarder } from './recovery-gateway';
@@ -28,10 +30,12 @@ async function main() {
     !process.env.BUILT_APP_DIRECTORY ||
     !process.env.PG_BIN ||
     !Bun.which('openssl') ||
+    !Bun.which('age') ||
+    !Bun.which('age-keygen') ||
     !Bun.which('redis-server')
   )
     throw new Error(
-      'BUILT_APP_DIRECTORY, PG_BIN, openssl and redis-server required',
+      'BUILT_APP_DIRECTORY, PG_BIN, openssl, age, age-keygen and redis-server required',
     );
   const candidate = resolve(process.env.BUILT_APP_DIRECTORY);
   const standalone = join(candidate, '.next/standalone');
@@ -129,11 +133,33 @@ async function main() {
       redis: cache.redis,
       expected: await recoverySchema(primary.sql),
     });
+    const { recipient } = createAgeFixture(primary.directory);
     const permission = await controller.recover({
       id: randomUUID(),
       artifactHash: null,
       retiredRoles: ['gate_old'],
       servingRole: 'gate_new',
+      initialCheckpoint: (snapshot) =>
+        captureEncryptedArchive(
+          {
+            pgBin: process.env.PG_BIN ?? '',
+            age: Bun.which('age') ?? '',
+            connection: [
+              '-h',
+              primary.directory,
+              '-p',
+              String(primary.options.port),
+              '-U',
+              'postgres',
+              '-d',
+              'postgres',
+            ],
+          },
+          snapshot,
+          recipient,
+          join(primary.directory, 'initial.dump.age'),
+          'full',
+        ),
     });
     const token = await control.credential(permission.value.runId);
     await primary.sql`INSERT INTO sessions (id,user_id,expires_at) VALUES ('gate-session','gate-user',now()+interval '1 day')`;

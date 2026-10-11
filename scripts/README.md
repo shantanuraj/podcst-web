@@ -237,7 +237,12 @@ bun --no-env-file scripts/recovery-gateway.ts GATEWAY_CONFIG
 - `reference` builds a schema fingerprint from the trusted migration chain in a
   disposable PostgreSQL instance. A ledger alone is insufficient.
 - `bootstrap` establishes the first verified prefix on a trusted current primary;
-  it is single-use, not a fallback for an unsupported restore.
+  it is single-use, not a fallback for an unsupported restore. Its protected config
+  must include `initialCheckpoint: {path, recipient}` and an explicit `age` binary.
+  While the serving role is still NOLOGIN, bootstrap captures a coherent encrypted
+  **full** checkpoint. Eligibility and first admission commit together in the
+  authority, before serving LOGIN can open. The protected result includes the
+  verified initial manifest; there is no admitted-before-first-checkpoint interval.
 - `capture` exports one MVCC snapshot, binds its already-verified applied prefix,
   streams an age-encrypted selected/full archive and registers its signed manifest
   in current independent inventory. Overlapping recovery refuses registration.
@@ -256,7 +261,13 @@ bun --no-env-file scripts/recovery-gateway.ts GATEWAY_CONFIG
 Recovery permanently renames retired database roles into disabled identities and
 uses a fresh serving role, publication epoch and encrypted runtime credential.
 The protected result includes the new runtime token; never log or publish it.
-A lost acknowledgement requires inspecting/resuming the same run ID. A failed
+A lost acknowledgement requires inspecting/resuming the same run ID. Before initial
+admission, a known interrupted bootstrap can resume on the same fenced primary after
+a PostgreSQL restart; after admission, a restart requires eligible-artifact recovery.
+A partial/completed capture file from a failed pre-admission attempt is not overwritten
+or assumed eligible: retain it and select a new protected path after inspection.
+A committed bootstrap resumes without recapturing; its configured initial artifact
+must still verify before the CLI writes another result. A failed
 restore without its durable receipt requires a new isolated target, not disabled
 constraints or a blind overwrite. Restore scratch contains protected plaintext;
 its storage encryption, capacity, crash leftovers and disposition need an approved

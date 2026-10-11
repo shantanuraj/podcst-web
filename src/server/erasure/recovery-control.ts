@@ -254,6 +254,7 @@ export function createRecoveryControl(
         admit: (
           plan: RecoveryPlan,
           proof: AdmissionAttestation,
+          checkpoint?: RecoveryManifest,
         ) => Promise<Signed<AdmissionAttestation>>;
         retireArtifact: (hash: string) => Promise<void>;
         abandon: (id: string) => Promise<void>;
@@ -342,8 +343,26 @@ export function createRecoveryControl(
               return row;
             });
           },
-          async admit(plan, proof) {
+          async admit(plan, proof, checkpoint) {
             await assert();
+            if ((plan.mode === 'bootstrap') !== Boolean(checkpoint))
+              throw new JournalError(503);
+            const capture = checkpoint ? sign(checkpoint) : undefined;
+            if (capture) {
+              const manifest = verifyCheckpointManifest(
+                capture,
+                keys.verification,
+                {
+                  artifactHash: capture.value.artifactHash,
+                  schemaHash: proof.schemaHash,
+                  journalId: proof.base.journalId,
+                  eligibleArtifacts: new Set([capture.value.artifactHash]),
+                  now: now(),
+                },
+              );
+              if (canonical(manifest.base) !== canonical(proof.base))
+                throw new JournalError(503);
+            }
             const envelope = sign(proof);
             await transaction(async (tx) => {
               await tx`SET LOCAL synchronous_commit = on`;
@@ -362,6 +381,8 @@ export function createRecoveryControl(
                 head.sealed
               )
                 throw new JournalError(503);
+              if (capture)
+                await tx`INSERT INTO erasure_authority.recovery_artifacts (digest, manifest, origin_run) VALUES (${capture.value.artifactHash}, ${tx.json(JSON.parse(canonical(capture)))}, ${plan.id})`;
               await tx`UPDATE erasure_authority.recovery_runs SET attestation = ${tx.json(JSON.parse(canonical(envelope)))}, admitted = true WHERE id = ${plan.id}`;
             });
             return envelope;
