@@ -208,10 +208,18 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     respond = async () => new Response(null, { status: 503 });
     expect(await refreshFeed(sql, 139)).toBe('error');
     const [state] = await sql`
-      SELECT failures, extract(epoch FROM next_poll_at - last_polled_at)::int AS seconds
+      SELECT failures, extract(epoch FROM next_poll_at - last_polled_at)::int AS seconds,
+             last_error_kind, last_error_status, last_error_at, failing_since
       FROM feed_poll_state
     `;
-    expect(state).toEqual({ failures: 1, seconds: 7200 });
+    expect(state).toMatchObject({
+      failures: 1,
+      seconds: 7200,
+      last_error_kind: 'http_server',
+      last_error_status: 503,
+    });
+    expect(state.last_error_at).toBeInstanceOf(Date);
+    expect(state.failing_since).toBeInstanceOf(Date);
     expect(await getDuePodcasts(sql, 500)).toEqual([]);
     for (const mode of ['stale', 'scheduled', 'rebuild'] as const) {
       expect(await refreshFeed(sql, 139, mode)).toBe('skipped');
@@ -219,16 +227,28 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     expect(requests).toBe(1);
   });
 
-  test('repeated failures deactivate a feed and successful retries reactivate it', async () => {
+  test('repeated failures keep catalogue state and successful retries recover', async () => {
     await sql`UPDATE feed_poll_state SET failures = 4, next_poll_at = now() - interval '1 second'`;
     respond = async () => new Response(null, { status: 503 });
     expect(await refreshFeed(sql, 139)).toBe('error');
-    const [inactive] = await sql`SELECT is_active FROM podcasts WHERE id = 139`;
-    expect(inactive.is_active).toBe(false);
+    const [stillActive] =
+      await sql`SELECT is_active FROM podcasts WHERE id = 139`;
+    expect(stillActive.is_active).toBe(true);
     expect(await getDuePodcasts(sql, 500)).toEqual([]);
     await sql`UPDATE feed_poll_state SET next_poll_at = now() - interval '1 second', last_polled_at = now() - interval '2 days'`;
     respond = async () => new Response(xml);
     expect(await refreshFeed(sql, 139)).toBe('updated');
+    const [cleared] = await sql`
+      SELECT failures, last_error_kind, last_error_status, last_error_at, failing_since
+      FROM feed_poll_state
+    `;
+    expect(cleared).toEqual({
+      failures: 0,
+      last_error_kind: null,
+      last_error_status: null,
+      last_error_at: null,
+      failing_since: null,
+    });
     const [active] = await sql`SELECT is_active FROM podcasts WHERE id = 139`;
     expect(active.is_active).toBe(true);
   });

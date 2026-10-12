@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { installFeedTransportFixture } from '../../../scripts/fixtures/feed-transport';
+import { FeedFetchError } from './feed-errors';
 import { fetchFeed } from './feed-refresh';
 
 installFeedTransportFixture();
@@ -69,11 +70,38 @@ describe('RSS fetching', () => {
     expect((await fetchFeed(server.url.href)).status).toBe('updated');
   });
 
-  test('rejects HTTP failures and malformed feeds', async () => {
-    handle = () => new Response(null, { status: 503 });
-    await expect(fetchFeed(server.url.href)).rejects.toThrow('HTTP 503');
+  test('classifies HTTP failures and malformed feeds without retaining bodies', async () => {
+    for (const [status, kind] of [
+      [400, 'http_client'],
+      [401, 'http_auth'],
+      [404, 'http_gone'],
+      [408, 'timeout'],
+      [425, 'http_rate_limit'],
+      [429, 'http_rate_limit'],
+      [503, 'http_server'],
+    ] as const) {
+      handle = () =>
+        new Response(null, {
+          status,
+          headers: status === 429 ? { 'Retry-After': '60' } : undefined,
+        });
+      try {
+        await fetchFeed(server.url.href);
+        throw new Error('accepted');
+      } catch (error) {
+        expect(error).toBeInstanceOf(FeedFetchError);
+        expect(error).toMatchObject({ kind, status });
+        if (status === 429)
+          expect((error as FeedFetchError).retryAfterSeconds).toBe(60);
+      }
+    }
     handle = () => new Response('<rss>');
-    await expect(fetchFeed(server.url.href)).rejects.toThrow();
+    try {
+      await fetchFeed(server.url.href);
+      throw new Error('accepted');
+    } catch (error) {
+      expect(error).toMatchObject({ kind: 'invalid_feed' });
+    }
     await expect(fetchFeed('file:///tmp/feed.xml')).rejects.toThrow('protocol');
   });
 

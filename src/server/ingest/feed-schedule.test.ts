@@ -34,11 +34,18 @@ describe('poll intervals', () => {
     expect(getPollInterval(604800, true)).toBe(3600);
   });
 
-  test('backs failures off exponentially with a seven-day cap', () => {
+  test('backs transient failures off exponentially with a seven-day cap', () => {
     expect(getRetryInterval(1)).toBe(7200);
     expect(getRetryInterval(2)).toBe(14400);
     expect(getRetryInterval(5)).toBe(115200);
     expect(getRetryInterval(20)).toBe(604800);
+  });
+
+  test('allows persistent failures a thirty-day cap and honors Retry-After', () => {
+    expect(getRetryInterval(20, true)).toBe(30 * 86400);
+    expect(getRetryInterval(1, false, 100_000)).toBe(100_000);
+    expect(getRetryInterval(1, false, 1_000_000)).toBe(604800);
+    expect(getRetryInterval(1, false, 10_000)).toBe(10_000);
   });
 });
 
@@ -74,8 +81,8 @@ describe('refresh eligibility', () => {
     ).toBe(false);
   });
 
-  test('all refresh modes respect failure backoff', () => {
-    for (const mode of ['scheduled', 'stale', 'rebuild'] as const) {
+  test('scheduled and stale refreshes respect failure backoff', () => {
+    for (const mode of ['scheduled', 'stale'] as const) {
       expect(
         isRefreshDue(state({ is_followed: true, failures: 1 }), mode, now),
       ).toBe(false);
@@ -87,6 +94,9 @@ describe('refresh eligibility', () => {
         ),
       ).toBe(true);
     }
+    expect(
+      isRefreshDue(state({ is_followed: true, failures: 1 }), 'rebuild', now),
+    ).toBe(true);
   });
 
   test('unpolled feeds can refresh immediately', () => {
@@ -99,9 +109,16 @@ describe('refresh eligibility', () => {
     ).toBe(true);
   });
 
-  test('rebuilds bypass freshness but not backoff', () => {
+  test('rebuilds bypass freshness and backoff', () => {
     const fresh = state({ last_polled_at: new Date(now) });
     expect(isRefreshDue(fresh, 'stale', now)).toBe(false);
     expect(isRefreshDue(fresh, 'rebuild', now)).toBe(true);
+    expect(
+      isRefreshDue(
+        { ...fresh, failures: 1, next_poll_at: new Date(now + 60_000) },
+        'rebuild',
+        now,
+      ),
+    ).toBe(true);
   });
 });

@@ -94,8 +94,12 @@ export async function requestFeedRefresh(
 ): Promise<FeedFreshness | null> {
   const needsDemand = (row: FeedReadState) => {
     const freshness = feedFreshness(row);
-    if (['fresh', 'backoff', 'unavailable'].includes(freshness.state))
-      return false;
+    if (['fresh', 'unavailable'].includes(freshness.state)) return false;
+    if (freshness.state === 'backoff')
+      return !(
+        row.demand_token &&
+        (row.demand_expires_at?.getTime() ?? 0) > row.observed_at.getTime()
+      );
     if (freshness.state !== 'pending') return true;
     return (
       freshness.content === 'missing' &&
@@ -108,7 +112,18 @@ export async function requestFeedRefresh(
   const before = await readFeedState(sql, podcastId, userId, episodeId);
   if (!before) return null;
   if (!needsDemand(before)) return feedFreshness(before);
-  await admit();
+  try {
+    await admit();
+  } catch (error) {
+    if (error instanceof FeedAdmissionError && error.code === 'unavailable') {
+      console.warn(`Feed admission unavailable for podcast ${podcastId}`);
+      await sql`
+        INSERT INTO poll_metrics (metric_name, metric_value)
+        VALUES ('feed_admission_unavailable', 1)
+      `.catch(() => {});
+    }
+    throw error;
+  }
   return sql.begin(async (tx) => {
     await tx`SET LOCAL lock_timeout = '1s'`;
     await tx`SET LOCAL statement_timeout = '5s'`;

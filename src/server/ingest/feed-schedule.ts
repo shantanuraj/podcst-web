@@ -4,8 +4,9 @@ import { FOLLOWED_IDS_SQL } from '../tiering';
 
 export const HOURLY_POLL_INTERVAL = 3600;
 export const STALE_FEED_INTERVAL = FEED_LIMITS.refresh.freshSeconds;
-export const MAX_POLL_FAILURES = 5;
 const DEFAULT_POLL_INTERVAL = 24 * HOURLY_POLL_INTERVAL;
+const TRANSIENT_RETRY_CAP = 7 * DEFAULT_POLL_INTERVAL;
+const PERSISTENT_RETRY_CAP = 30 * DEFAULT_POLL_INTERVAL;
 
 export type RefreshMode = 'scheduled' | 'stale' | 'rebuild';
 
@@ -29,11 +30,17 @@ export function getPollInterval(
   );
 }
 
-export function getRetryInterval(failures: number): number {
-  return Math.min(
-    HOURLY_POLL_INTERVAL * 2 ** failures,
-    7 * DEFAULT_POLL_INTERVAL,
+export function getRetryInterval(
+  failures: number,
+  persistent = false,
+  retryAfterSeconds?: number | null,
+): number {
+  const cap = persistent ? PERSISTENT_RETRY_CAP : TRANSIENT_RETRY_CAP;
+  const exponential = Math.min(
+    cap,
+    HOURLY_POLL_INTERVAL * 2 ** Math.min(Math.max(failures, 0), 30),
   );
+  return Math.min(cap, Math.max(exponential, retryAfterSeconds ?? 0));
 }
 
 export function isRefreshDue(
@@ -42,8 +49,8 @@ export function isRefreshDue(
   now = Date.now(),
 ): boolean {
   const nextPoll = state.next_poll_at?.getTime() ?? 0;
-  if (state.failures > 0 && nextPoll > now) return false;
   if (mode === 'rebuild') return true;
+  if (state.failures > 0 && nextPoll > now) return false;
   if (!state.last_polled_at) return true;
 
   const age = now - state.last_polled_at.getTime();
@@ -81,7 +88,7 @@ export async function getDuePodcasts(
       AND (
         (${kind !== 'scheduled'} AND s.demand_expires_at > now())
         OR (${kind !== 'demand'} AND coalesce(s.demand_expires_at <= now(), true)
-          AND p.is_active AND (p.is_essential OR p.id IN (SELECT id FROM followed))
+          AND (p.is_essential OR p.id IN (SELECT id FROM followed))
           AND (
             s.next_poll_at IS NULL OR s.next_poll_at <= now()
             OR (s.failures = 0

@@ -5,13 +5,19 @@ import { adaptFeed } from '../../app/api/feed/parser';
 import type { IEpisodeListing } from '../../types';
 import { FOLLOWED_IDS_SQL } from '../tiering';
 import { sanitize, upsertEpisodes } from './episodes';
-import { FeedUnavailableError } from './feed-errors';
+import {
+  classifyFeedError,
+  type FeedFailure,
+  FeedFetchError,
+  FeedUnavailableError,
+  isTransientFeedError,
+} from './feed-errors';
 import { fetchFeedResponse } from './feed-http';
 import {
   getPollInterval,
   getRetryInterval,
+  HOURLY_POLL_INTERVAL,
   isRefreshDue,
-  MAX_POLL_FAILURES,
   type PollState,
   type RefreshMode,
 } from './feed-schedule';
@@ -35,6 +41,11 @@ export type RefreshResult =
   | 'busy'
   | 'not_found'
   | 'error';
+
+export interface RefreshOptions {
+  deferFailure?: boolean;
+  onFailure?: (failure: FeedFailure) => void;
+}
 
 interface PodcastForRefresh extends PollState {
   feed_url: string;
@@ -75,13 +86,40 @@ export async function fetchFeed(
     };
   }
   if (res.status !== 200) {
+    const kind =
+      res.status === 401 || res.status === 403
+        ? 'http_auth'
+        : res.status === 404 || res.status === 410
+          ? 'http_gone'
+          : res.status === 408
+            ? 'timeout'
+            : res.status === 425 || res.status === 429
+              ? 'http_rate_limit'
+              : res.status >= 400 && res.status < 500
+                ? 'http_client'
+                : res.status >= 500
+                  ? 'http_server'
+                  : 'network';
+    const retryAfterSeconds = [429, 503].includes(res.status)
+      ? (res.retryAfterSeconds ?? null)
+      : null;
     if (
       res.status >= 400 &&
       res.status < 500 &&
       ![408, 425, 429].includes(res.status)
     )
-      throw new FeedUnavailableError('Feed unavailable');
-    throw new Error(`Feed returned HTTP ${res.status}`);
+      throw new FeedUnavailableError(
+        'Feed unavailable',
+        kind,
+        res.status,
+        retryAfterSeconds,
+      );
+    throw new FeedFetchError(
+      `Feed returned HTTP ${res.status}`,
+      kind,
+      res.status,
+      retryAfterSeconds,
+    );
   }
 
   const body = res.body;
@@ -109,11 +147,12 @@ export async function savePollState(
   await sql`
     INSERT INTO feed_poll_state (
       podcast_id, etag, last_modified, hash,
-      last_polled_at, next_poll_at, failures, last_success_at, last_rebuilt_at
+      last_polled_at, next_poll_at, failures, last_success_at, last_rebuilt_at,
+      last_error_kind, last_error_status, last_error_at, failing_since
     ) VALUES (
       ${podcastId}, ${meta.etag}, ${meta.lastModified}, ${meta.hash},
       now(), now() + interval '1 second' * ${intervalSeconds}, 0, now(),
-      ${rebuilt ? sql`now()` : null}
+      ${rebuilt ? sql`now()` : null}, NULL, NULL, NULL, NULL
     )
     ON CONFLICT (podcast_id) DO UPDATE SET
       etag = EXCLUDED.etag,
@@ -123,7 +162,11 @@ export async function savePollState(
       next_poll_at = EXCLUDED.next_poll_at,
       last_success_at = EXCLUDED.last_success_at,
       last_rebuilt_at = coalesce(EXCLUDED.last_rebuilt_at, feed_poll_state.last_rebuilt_at),
-      failures = 0
+      failures = 0,
+      last_error_kind = NULL,
+      last_error_status = NULL,
+      last_error_at = NULL,
+      failing_since = NULL
   `;
 }
 
@@ -164,6 +207,53 @@ async function releaseRefresh(
   `;
 }
 
+async function persistPollFailure(
+  tx: postgres.TransactionSql,
+  podcastId: string,
+  failure: FeedFailure,
+  failures: number,
+  deferred: boolean,
+) {
+  const retry = getRetryInterval(
+    failures,
+    !isTransientFeedError(failure.kind),
+    failure.retryAfterSeconds,
+  );
+  await tx`
+    UPDATE feed_poll_state SET
+      last_polled_at = now(),
+      next_poll_at = ${deferred ? tx`now() + interval '1 second' * ${HOURLY_POLL_INTERVAL}` : tx`now() + interval '1 second' * ${retry}`},
+      failures = ${deferred ? tx`failures` : failures},
+      last_error_kind = ${failure.kind},
+      last_error_status = ${failure.status},
+      last_error_at = now(),
+      failing_since = coalesce(failing_since, now())
+    WHERE podcast_id = ${podcastId}
+  `;
+}
+
+export async function recordPollFailure(
+  sql: postgres.Sql,
+  podcastId: string,
+  failure: FeedFailure,
+) {
+  await sql.begin(async (tx) => {
+    await tx`SET LOCAL lock_timeout = '1s'`;
+    await tx`SET LOCAL statement_timeout = '5s'`;
+    const [state] = await tx`
+      SELECT failures FROM feed_poll_state WHERE podcast_id = ${podcastId} FOR UPDATE
+    `;
+    if (!state) return;
+    await persistPollFailure(
+      tx,
+      podcastId,
+      failure,
+      Number(state.failures ?? 0) + 1,
+      false,
+    );
+  });
+}
+
 type RefreshClaim =
   | {
       status: 'claimed';
@@ -178,6 +268,7 @@ export async function refreshFeed(
   podcastId: string,
   mode: RefreshMode = 'stale',
   resolveMove = resolvePublicFeedMove,
+  options: RefreshOptions = {},
 ): Promise<RefreshResult> {
   const claim = await sql.begin(async (tx): Promise<RefreshClaim> => {
     await tx`SET LOCAL lock_timeout = '1s'`;
@@ -188,10 +279,7 @@ export async function refreshFeed(
     if (podcast.refreshing) return { status: 'busy' };
     const rebuild =
       mode === 'rebuild' || (podcast.demanded && podcast.demand_rebuild);
-    if (
-      (mode === 'scheduled' && !podcast.is_active && !podcast.demanded) ||
-      !isRefreshDue(podcast, rebuild || podcast.demanded ? 'rebuild' : mode)
-    )
+    if (!isRefreshDue(podcast, rebuild || podcast.demanded ? 'rebuild' : mode))
       return { status: 'skipped' };
     await tx`SELECT pg_advisory_xact_lock(hashtext('feed-execution'), 0)`;
     const [{ count }] = await tx`
@@ -213,6 +301,8 @@ export async function refreshFeed(
   if (claim.status !== 'claimed') return claim.status;
 
   let result: FeedFetchResult | undefined;
+  let fetchFailure: FeedFailure | undefined;
+  let failureForOutcome: FeedFailure | undefined;
   try {
     result = await fetchFeed(
       claim.podcast.feed_url,
@@ -226,7 +316,9 @@ export async function refreshFeed(
       claim.podcast.owner_user_id !== null,
       AbortSignal.timeout((REFRESH_LEASE_SECONDS - 5) * 1000),
     );
-  } catch {}
+  } catch (error) {
+    fetchFailure = classifyFeedError(error);
+  }
 
   const outcome = await sql.begin(async (tx): Promise<RefreshResult> => {
     await tx`SET LOCAL lock_timeout = '1s'`;
@@ -290,18 +382,18 @@ export async function refreshFeed(
         FROM feed_poll_state WHERE podcast_id = ${podcastId} AND refresh_token = ${claim.token}
       `;
       if (!lease?.valid) return 'skipped';
+      const failure = fetchFailure ?? classifyFeedError(error);
       const failures = podcast.failures + 1;
-      await tx`
-        UPDATE feed_poll_state SET
-          last_polled_at = now(),
-          next_poll_at = now() + interval '1 second' * ${getRetryInterval(failures)},
-          failures = ${failures}
-        WHERE podcast_id = ${podcastId}
-      `;
-      if (failures >= MAX_POLL_FAILURES)
-        await tx`UPDATE podcasts SET is_active = false WHERE id = ${podcastId}`;
+      await persistPollFailure(
+        tx,
+        podcastId,
+        failure,
+        failures,
+        options.deferFailure === true,
+      );
+      failureForOutcome = failure;
       console.warn(
-        `Failed to refresh podcast ${podcastId} (attempt ${failures})`,
+        `Failed to refresh podcast ${podcastId} (${failure.kind}${failure.status ? ` HTTP ${failure.status}` : ''}, attempt ${failures})`,
       );
       settled = true;
       return 'error';
@@ -315,6 +407,8 @@ export async function refreshFeed(
       await releaseRefresh(tx, podcastId, claim.token);
     }
   });
+  if (outcome === 'error' && failureForOutcome)
+    options.onFailure?.(failureForOutcome);
   if (
     result?.publicRedirect &&
     (outcome === 'updated' || outcome === 'not_modified')
@@ -335,4 +429,18 @@ export async function refreshFeed(
     }
   }
   return outcome;
+}
+
+export function refreshFeedForPoller(
+  sql: postgres.Sql,
+  podcastId: string,
+  options: RefreshOptions,
+) {
+  return refreshFeed(
+    sql,
+    podcastId,
+    'scheduled',
+    resolvePublicFeedMove,
+    options,
+  );
 }

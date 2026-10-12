@@ -22,6 +22,18 @@ export interface FeedResponse {
   body: string;
   etag: string | null;
   lastModified: string | null;
+  retryAfterSeconds?: number | null;
+}
+
+function retryAfterSeconds(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const timestamp = Date.parse(raw);
+  return Number.isFinite(timestamp)
+    ? Math.max(0, Math.ceil((timestamp - Date.now()) / 1000))
+    : null;
 }
 
 export function feedDestination(input: string) {
@@ -93,6 +105,7 @@ export async function requestFeed(
           lastModified: validLastModified(response.headers['last-modified'])
             ? response.headers['last-modified']
             : null,
+          retryAfterSeconds: retryAfterSeconds(response.headers['retry-after']),
         };
         if (status >= 300 && status < 400) {
           accept({ ...meta, location: response.headers.location, body: '' });
@@ -106,7 +119,9 @@ export async function requestFeed(
         }
         const length = response.headers['content-length'];
         if (length && (!/^\d+$/.test(length) || Number(length) > maxBytes)) {
-          reject(new FeedUnavailableError('Feed response too large'));
+          reject(
+            new FeedUnavailableError('Feed response too large', 'too_large'),
+          );
           response.destroy();
           return;
         }
@@ -115,7 +130,9 @@ export async function requestFeed(
         response.on('data', (chunk: Buffer) => {
           size += chunk.length;
           if (size > maxBytes) {
-            reject(new FeedUnavailableError('Feed response too large'));
+            reject(
+              new FeedUnavailableError('Feed response too large', 'too_large'),
+            );
             response.destroy();
           } else chunks.push(chunk);
         });
@@ -142,11 +159,20 @@ export async function requestFeed(
               body = brotliDecompressSync(compressed, options);
             else if (encoding === 'deflate')
               body = inflateSync(compressed, options);
-            else throw new Error();
+            else
+              throw new FeedUnavailableError(
+                'Unsupported feed encoding',
+                'invalid_feed',
+              );
             accept({ ...meta, body: body.toString('utf8') });
-          } catch {
+          } catch (error) {
             reject(
-              new FeedUnavailableError('Invalid or oversized feed encoding'),
+              error instanceof FeedUnavailableError
+                ? error
+                : new FeedUnavailableError(
+                    'Invalid or oversized feed encoding',
+                    'too_large',
+                  ),
             );
           }
         });

@@ -14,6 +14,7 @@ import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
 import { loadMigrations } from '../../../scripts/migrations';
 import {
+  FeedAdmissionError,
   feedFreshness,
   readFeedState,
   requestFeedRefresh,
@@ -136,7 +137,7 @@ describe.skipIf(!process.env.PG_BIN)('durable feed demand', () => {
     expect(admissions).toBe(2);
   });
 
-  test('failures preserve successful validation time and backoff cannot be bypassed', async () => {
+  test('failures preserve successful validation time while demand gets one bypass attempt', async () => {
     await demand();
     await refreshFeed(sql, id, 'scheduled');
     await sql`UPDATE feed_poll_state SET last_success_at = now() - interval '2 hours', last_polled_at = now() - interval '2 hours'`;
@@ -150,7 +151,8 @@ describe.skipIf(!process.env.PG_BIN)('durable feed demand', () => {
     expect(failure.checkedAtMs).toBe(before.checkedAtMs);
     const count = admissions;
     expect((await demand())?.state).toBe('backoff');
-    expect(admissions).toBe(count);
+    expect(admissions).toBe(count + 1);
+    expect(await refreshFeed(sql, id, 'scheduled')).toBe('error');
     expect(await getDuePodcasts(sql, 10)).toEqual([]);
   });
 
@@ -291,6 +293,22 @@ describe.skipIf(!process.env.PG_BIN)('durable feed demand', () => {
       await sql`DROP TRIGGER expire_content ON episode_content`;
       await sql`DROP FUNCTION expire_during_content()`;
     }
+  });
+
+  test('unavailable admission is logged and counted without claiming demand', async () => {
+    await expect(
+      requestFeedRefresh(sql, id, 'owner', async () => {
+        throw new FeedAdmissionError('unavailable');
+      }),
+    ).rejects.toMatchObject({ code: 'unavailable' });
+    const metrics = await sql`
+      SELECT metric_name, metric_value FROM poll_metrics
+      WHERE metric_name = 'feed_admission_unavailable'
+    `;
+    expect(Array.from(metrics)).toEqual([
+      { metric_name: 'feed_admission_unavailable', metric_value: 1 },
+    ]);
+    expect(await sql`SELECT * FROM feed_poll_state`).toHaveLength(0);
   });
 
   test('failed admission does not claim pending or discard cached content', async () => {
