@@ -42,6 +42,7 @@ const TEMP_DIR =
 const DEFAULT_TGZ_PATH = join(TEMP_DIR, 'podcastindex_feeds.db.tgz');
 
 const BATCH_SIZE = 1000;
+const ROW_CONCURRENCY = 20;
 
 const normalizeItunesId = (
   id: number | string | null | undefined,
@@ -146,6 +147,27 @@ async function ensureAuthor(sql: postgres.Sql, name: string): Promise<number> {
   return created.id;
 }
 
+async function loadAuthors(
+  sql: postgres.Sql,
+  batch: PodcastIndexRow[],
+  authorCache: Map<string, number>,
+): Promise<void> {
+  const names = [
+    ...new Set(batch.map((row) => row.itunesAuthor || 'Unknown')),
+  ].filter((name) => !authorCache.has(name));
+  if (names.length === 0) return;
+
+  const existing = await sql`
+    SELECT id, name FROM authors WHERE name = ANY(${names}::text[])
+  `;
+  for (const row of existing) authorCache.set(row.name, row.id);
+
+  for (const name of names) {
+    if (!authorCache.has(name))
+      authorCache.set(name, await ensureAuthor(sql, name));
+  }
+}
+
 async function syncBatch(
   sql: postgres.Sql,
   batch: PodcastIndexRow[],
@@ -156,10 +178,6 @@ async function syncBatch(
   skipped: number;
   failed: number;
 }> {
-  let inserted = 0;
-  let updated = 0;
-  let skipped = 0;
-  let failed = 0;
   const privateRows = await sql`
     SELECT id, feed_url FROM podcasts
     WHERE owner_user_id IS NOT NULL AND feed_url = ANY(${batch.map((row) => row.url)}::text[])
@@ -167,47 +185,53 @@ async function syncBatch(
   const privateIds = new Map(
     privateRows.map((row) => [row.feed_url, String(row.id)]),
   );
+  await loadAuthors(sql, batch, authorCache);
 
-  for (const row of batch) {
-    const itunesId = normalizeItunesId(row.itunesId);
-    try {
-      const privateId = privateIds.get(row.url);
-      if (
-        privateId !== undefined &&
-        (!itunesId || (await resolvePodcast(sql, itunesId)) !== privateId)
-      ) {
-        skipped++;
-        continue;
-      }
-      const authorName = row.itunesAuthor || 'Unknown';
-      let authorId = authorCache.get(authorName);
-      if (!authorId) {
-        authorId = await ensureAuthor(sql, authorName);
-        authorCache.set(authorName, authorId);
-      }
-      const result = await storeCatalogPodcast(
-        sql,
-        catalogInput(row, authorId, itunesId),
-      );
-      if (result === 'inserted') inserted++;
-      else if (result === 'updated') updated++;
-      else skipped++;
-    } catch (err) {
-      logAction({
-        timestamp: new Date().toISOString(),
-        action: 'skipped',
-        itunes_id: itunesId,
-        name: row.title,
-        podcast_index_id: row.id,
-        feed_url: row.url,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      skipped++;
-      failed++;
-    }
+  const results: Array<'inserted' | 'updated' | 'skipped' | 'failed'> = [];
+  for (let offset = 0; offset < batch.length; offset += ROW_CONCURRENCY) {
+    const rows = batch.slice(offset, offset + ROW_CONCURRENCY);
+    results.push(
+      ...(await Promise.all(
+        rows.map(async (row) => {
+          const itunesId = normalizeItunesId(row.itunesId);
+          try {
+            const privateId = privateIds.get(row.url);
+            if (
+              privateId !== undefined &&
+              (!itunesId || (await resolvePodcast(sql, itunesId)) !== privateId)
+            ) {
+              return 'skipped' as const;
+            }
+            const authorId = authorCache.get(row.itunesAuthor || 'Unknown');
+            if (authorId === undefined) throw new Error('Author is missing');
+            const result = await storeCatalogPodcast(
+              sql,
+              catalogInput(row, authorId, itunesId),
+            );
+            return result;
+          } catch (err) {
+            logAction({
+              timestamp: new Date().toISOString(),
+              action: 'skipped',
+              itunes_id: itunesId,
+              name: row.title,
+              podcast_index_id: row.id,
+              feed_url: row.url,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            return 'failed' as const;
+          }
+        }),
+      )),
+    );
   }
 
-  return { inserted, updated, skipped, failed };
+  return {
+    inserted: results.filter((result) => result === 'inserted').length,
+    updated: results.filter((result) => result === 'updated').length,
+    skipped: results.filter((result) => result === 'skipped').length,
+    failed: results.filter((result) => result === 'failed').length,
+  };
 }
 
 async function sync(): Promise<void> {
