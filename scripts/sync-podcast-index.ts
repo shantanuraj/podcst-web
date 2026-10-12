@@ -83,11 +83,8 @@ async function downloadAndExtract(): Promise<string> {
       throw new Error(`Failed to download: ${response.status}`);
     }
 
-    const buffer = await response.arrayBuffer();
-    await Bun.write(tgzPath, buffer);
-    console.log(
-      `Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`,
-    );
+    const bytes = await Bun.write(tgzPath, response);
+    console.log(`Downloaded ${(bytes / 1024 / 1024).toFixed(1)} MB`);
   }
 
   console.log('Extracting...');

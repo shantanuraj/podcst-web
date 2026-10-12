@@ -12,7 +12,7 @@ Environment=PODCAST_INDEX_WORK_DIR=/var/lib/podcst/podcast-index
 EnvironmentFile=/etc/podcst/app.env
 WorkingDirectory=/opt/podcst
 ExecStart=/usr/local/bin/bun run scripts/sync-podcast-index.ts
-TimeoutStartSec=6h
+TimeoutStartSec=12h
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=tmpfs
