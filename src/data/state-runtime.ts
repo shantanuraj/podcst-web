@@ -6,6 +6,7 @@ import {
   type ProgressPosition,
   progressProjection,
   queueProgress,
+  resetProgress,
   sameScope,
 } from '@/data/progress-outbox';
 import {
@@ -16,16 +17,35 @@ import {
 import { FEED_LIMITS } from '@/shared/feed-contract';
 import { feedImportBatches } from '@/shared/feed-import';
 import type { ProgressEvent } from '@/shared/player/progress-intent';
-import { stateValidator } from '@/shared/state-contract';
+import { type StateScope, stateValidator } from '@/shared/state-contract';
 import type { DurableStorage } from '@/shared/storage/durable';
 import {
   acknowledgeFollows,
   freezeFollows,
   installFollows,
   queueFollow,
+  resetFollows,
 } from '@/shared/subscriptions/follow-outbox';
 
 export class StateProtocolError extends Error {}
+
+function resetForGenerationChange<T extends { scope?: StateScope }>(
+  state: T,
+  value: unknown,
+  reset: (state: T) => void,
+) {
+  if (
+    !state.scope ||
+    !value ||
+    typeof value !== 'object' ||
+    !('generation' in value) ||
+    typeof value.generation !== 'string' ||
+    state.scope.generation === value.generation
+  )
+    return;
+  reset(state);
+}
+
 export interface StateView {
   account: string | null | undefined;
   state?: BrowserState;
@@ -131,15 +151,11 @@ export class StateRuntime {
       `/progress?view=state&episodeIds=${ids.join(',')}`,
     );
     const root = await this.update(epoch, (root) =>
-      this.protocol(() =>
-        installProgress(
-          accountState(root, account).progress,
-          value,
-          account,
-          ids,
-          false,
-        ),
-      ),
+      this.protocol(() => {
+        const progress = accountState(root, account).progress;
+        resetForGenerationChange(progress, value, resetProgress);
+        installProgress(progress, value, account, ids, false);
+      }),
     );
     return ids
       .map((id) => root.accounts[account].progress.saved[id])
@@ -312,6 +328,16 @@ export class StateRuntime {
     ) => {
       if (epoch !== this.epoch) return;
       hadError = true;
+      if (error instanceof ApiError && error.code === 'recovery_required') {
+        try {
+          await this.update(epoch, (root) => {
+            const accountData = accountState(root, account);
+            if (resource === 'progress') resetProgress(accountData.progress);
+            else resetFollows(accountData.follows);
+          });
+          return;
+        } catch {}
+      }
       if (
         error instanceof StateProtocolError ||
         (error instanceof ApiError &&
@@ -348,13 +374,11 @@ export class StateRuntime {
             );
             active();
             root = await this.update(epoch, (root) =>
-              this.protocol(() =>
-                installProgress(
-                  accountState(root, account).progress,
-                  snapshot,
-                  account,
-                ),
-              ),
+              this.protocol(() => {
+                const progress = accountState(root, account).progress;
+                resetForGenerationChange(progress, snapshot, resetProgress);
+                installProgress(progress, snapshot, account);
+              }),
             );
             progress = root.accounts[account].progress;
           }
@@ -393,14 +417,11 @@ export class StateRuntime {
             );
             active();
             root = await this.update(epoch, (root) =>
-              this.protocol(() =>
-                installProgress(
-                  accountState(root, account).progress,
-                  snapshot,
-                  account,
-                  ids,
-                ),
-              ),
+              this.protocol(() => {
+                const progress = accountState(root, account).progress;
+                resetForGenerationChange(progress, snapshot, resetProgress);
+                installProgress(progress, snapshot, account, ids);
+              }),
             );
             progress = root.accounts[account].progress;
           } while (progress.queued.length);
@@ -417,13 +438,11 @@ export class StateRuntime {
         );
         active();
         root = await this.update(epoch, (root) => {
-          this.protocol(() =>
-            installFollows(
-              accountState(root, account).follows,
-              snapshot,
-              account,
-            ),
-          );
+          this.protocol(() => {
+            const follows = accountState(root, account).follows;
+            resetForGenerationChange(follows, snapshot, resetFollows);
+            installFollows(follows, snapshot, account);
+          });
           unionGuestFollows(root, account);
         });
         follows = root.accounts[account].follows;
@@ -452,13 +471,11 @@ export class StateRuntime {
           );
           active();
           root = await this.update(epoch, (root) =>
-            this.protocol(() =>
-              installFollows(
-                accountState(root, account).follows,
-                snapshot,
-                account,
-              ),
-            ),
+            this.protocol(() => {
+              const follows = accountState(root, account).follows;
+              resetForGenerationChange(follows, snapshot, resetFollows);
+              installFollows(follows, snapshot, account);
+            }),
           );
           follows = root.accounts[account].follows;
         }

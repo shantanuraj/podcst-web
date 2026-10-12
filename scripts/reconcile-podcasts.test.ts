@@ -103,13 +103,65 @@ describe.skipIf(!pgBin)('guarded reconciliation on isolated PostgreSQL', () => {
     const before =
       await sql`SELECT to_jsonb(p)::text AS value FROM playback_progress p ORDER BY episode_id`;
     await expect(inspect()).rejects.toThrow(
-      'Revisioned state requires a reviewed identity and stream reconciliation',
+      'Revisioned state requires explicit stream reset approval',
     );
     expect(
       Array.from(
         await sql`SELECT to_jsonb(p)::text AS value FROM playback_progress p ORDER BY episode_id`,
       ),
     ).toEqual(Array.from(before));
+  });
+
+  test('revisioned state can be explicitly reset after review', async () => {
+    await sql.unsafe(
+      readFileSync(
+        new URL('../migrations/active/0010-durable-state.sql', import.meta.url),
+        'utf8',
+      ),
+    );
+    await sql`DELETE FROM subscriptions`;
+    await sql`DELETE FROM playback_progress`;
+    expect((await sql`SELECT count(*)::int AS n FROM subscriptions`)[0].n).toBe(
+      0,
+    );
+    expect(
+      (await sql`SELECT count(*)::int AS n FROM playback_progress`)[0].n,
+    ).toBe(0);
+    await sql`
+      INSERT INTO progress_clients(user_id,client_id)
+      VALUES ('listener','0c339753-cb50-477c-843e-e641b414a060')
+    `;
+    await sql`
+      INSERT INTO follow_clients(user_id,client_id)
+      VALUES ('listener','1c339753-cb50-477c-843e-e641b414a060')
+    `;
+    const durablePlan = { ...plan, resetRevisionedState: true };
+    const inspected = await inspect(durablePlan);
+    durablePlan.reviewedStateGeneration = digest(
+      inspected.artifact.stateGeneration,
+    );
+    expect((await apply('dry-run', durablePlan))?.postconditionsVerified).toBe(
+      true,
+    );
+    expect(
+      (await sql`SELECT count(*)::int AS n FROM progress_clients`)[0].n,
+    ).toBe(1);
+    const before = (
+      await sql`SELECT generation, legacy_generation FROM state_generation`
+    )[0];
+    const result = await apply('apply', durablePlan);
+    expect(result?.postconditionsVerified).toBe(true);
+    expect(
+      (await sql`SELECT count(*)::int AS n FROM progress_clients`)[0].n,
+    ).toBe(0);
+    expect(
+      (await sql`SELECT count(*)::int AS n FROM follow_clients`)[0].n,
+    ).toBe(0);
+    const after = (
+      await sql`SELECT generation, legacy_generation FROM state_generation`
+    )[0];
+    expect(after.generation).not.toBe(before.generation);
+    expect(after.generation).toBe(after.legacy_generation);
   });
 
   test.each([

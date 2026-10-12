@@ -34,6 +34,9 @@ export const emptyProgress = (): ProgressOutbox => ({
   queued: [],
   failures: [],
 });
+export function resetProgress(state: ProgressOutbox) {
+  Object.assign(state, emptyProgress());
+}
 export function progressProjection(state: ProgressOutbox) {
   const rows = new Map(Object.entries(state.saved));
   for (const change of [

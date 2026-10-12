@@ -104,10 +104,15 @@ async function ensureAuthors(
   if (newNames.length === 0) return;
 
   const unique = [...new Set(newNames)];
+  // Author names are not unique by design, so check for existing rows instead
+  // of using ON CONFLICT(name), which would require a unique constraint.
   const inserted = await sql`
     INSERT INTO authors (name)
-    SELECT * FROM unnest(${unique}::text[])
-    ON CONFLICT (name) DO NOTHING
+    SELECT requested.name
+    FROM unnest(${unique}::text[]) AS requested(name)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM authors AS existing WHERE existing.name = requested.name
+    )
     RETURNING id, name
   `;
 

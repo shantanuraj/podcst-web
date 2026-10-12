@@ -16,8 +16,11 @@ export interface ReconciliationPlan {
   reviewedMissingMedia?: string;
   reviewedMediaDifferences?: string;
   reviewedProviderRetirements?: string;
+  reviewedProviderTransfer?: string;
   reviewedEmptyCanonical?: string;
   reviewedCatalogChanges?: string;
+  resetRevisionedState?: boolean;
+  reviewedStateGeneration?: string;
   reactivateCanonical?: boolean;
 }
 
@@ -108,14 +111,25 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     ),
     'Reconciliation requires two public sources on the ownership schema',
   );
+  const providerTransfer =
+    canonical.itunes_id === null && duplicate.itunes_id !== null
+      ? {
+          podcastId: plan.duplicateId,
+          field: 'itunes_id',
+          value: duplicate.itunes_id,
+          targetPodcastId: plan.canonicalId,
+        }
+      : null;
   invariant(
-    canonical.itunes_id !== null,
-    'Canonical record requires verified provider identity',
+    canonical.itunes_id !== null || providerTransfer !== null,
+    'Canonical record requires verified provider identity or a reviewed provider transfer',
   );
   const providerRetirements = ['itunes_id', 'podcast_index_id']
     .filter(
       (field) =>
-        duplicate[field] !== null && duplicate[field] !== canonical[field],
+        duplicate[field] !== null &&
+        duplicate[field] !== canonical[field] &&
+        !(providerTransfer && field === providerTransfer.field),
     )
     .map((field) => ({
       podcastId: plan.duplicateId,
@@ -163,6 +177,7 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
     ),
     appleAliases: state.podcast_apple_aliases,
     sourceEvidenceReference: plan.sourceEvidenceReference,
+    providerTransfer,
     providerRetirements,
     ...(plan.reactivateCanonical ? { reactivateCanonical: true } : {}),
   };
@@ -293,6 +308,8 @@ export function analyze(state: Snapshot, plan: ReconciliationPlan) {
   missingMedia.sort((a, b) => a.guid.localeCompare(b.guid));
   mediaDifferences.sort((a, b) => a.guid.localeCompare(b.guid));
   return {
+    providerTransfer,
+    providerTransferDigest: digest(providerTransfer),
     providerRetirements,
     providerRetirementsDigest: digest(providerRetirements),
     mediaDifferences,
@@ -364,6 +381,8 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
   const ids = [plan.canonicalId, plan.duplicateId];
   const rolledBack = new Error('Reconciliation dry run');
   let result: Row | undefined;
+  let revisionedStateBefore: Row | null = null;
+  let revisionedStateAfter: Row | null = null;
   try {
     await sql.begin(async (tx) => {
       await tx`SET LOCAL statement_timeout = '30s'`;
@@ -373,10 +392,30 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       await tx`SET LOCAL search_path = pg_catalog, public, pg_temp`;
       const [protocol] =
         await tx`SELECT to_regclass('public.state_generation') IS NOT NULL AS revisioned`;
-      invariant(
-        !protocol.revisioned,
-        'Revisioned state requires a reviewed identity and stream reconciliation',
-      );
+      if (protocol.revisioned) {
+        invariant(
+          plan.resetRevisionedState === true,
+          'Revisioned state requires explicit stream reset approval',
+        );
+        const [state] = await tx`
+          SELECT generation, legacy_generation
+          FROM public.state_generation
+          WHERE singleton
+          FOR UPDATE
+        `;
+        invariant(state, 'Revisioned state generation row is missing');
+        revisionedStateBefore = state;
+        if (mode !== 'inspect')
+          invariant(
+            plan.reviewedStateGeneration === digest(state),
+            'State generation changed; inspect again',
+          );
+      } else {
+        invariant(
+          plan.resetRevisionedState !== true,
+          'Revisioned state reset requested on a non-revisioned database',
+        );
+      }
       const [settings] =
         await tx`SELECT current_setting('transaction_isolation') AS isolation, to_jsonb(now()) AS now`;
       invariant(
@@ -498,6 +537,12 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           ),
         'Accepted aliases changed while acquiring locks',
       );
+      if (revisionedStateBefore)
+        invariant(
+          before.subscriptions.length === 0 &&
+            before.playback_progress.length === 0,
+          'Revisioned merge requires zero affected subscriptions and playback rows',
+        );
       const analysis = analyze(before, plan);
       if (mode !== 'inspect') {
         invariant(
@@ -514,6 +559,12 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
             plan.reviewedProviderRetirements,
             analysis.providerRetirementsDigest,
             'Provider retirements require exact review',
+          ],
+          [
+            analysis.providerTransfer !== null,
+            plan.reviewedProviderTransfer,
+            analysis.providerTransferDigest,
+            'Provider transfer requires exact review',
           ],
           [
             analysis.mediaDifferences.length > 0,
@@ -549,6 +600,9 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         version: 3,
         capturedAt: new Date().toISOString(),
         plan,
+        stateGeneration: revisionedStateBefore,
+        providerTransfer: analysis.providerTransfer,
+        providerTransferDigest: analysis.providerTransferDigest,
         providerRetirements: analysis.providerRetirements,
         providerRetirementsDigest: analysis.providerRetirementsDigest,
         mediaDifferences: analysis.mediaDifferences,
@@ -571,11 +625,14 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
       writeProtected(options.backupPath, artifact, 64 * 1024 * 1024);
       result = {
         mode,
+        stateGeneration: revisionedStateBefore,
         identitiesDigest: analysis.identitiesDigest,
         retainedFeedAliases: analysis.identities.feedAliases.length,
         retainedAppleAliases: before.podcast_apple_aliases.length,
         retiredProviderClaims: analysis.providerRetirements.length,
         providerRetirementsDigest: analysis.providerRetirementsDigest,
+        providerTransfer: analysis.providerTransfer,
+        providerTransferDigest: analysis.providerTransferDigest,
         mediaDifferences: analysis.mediaDifferences.length,
         mediaDifferencesDigest: analysis.mediaDifferencesDigest,
         emptyCanonical: analysis.emptyCanonical !== null,
@@ -628,6 +685,16 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
             );
         }
       }
+      if (analysis.providerTransfer) {
+        await tx`
+          UPDATE public.podcasts SET itunes_id=NULL
+          WHERE id=${plan.duplicateId}
+        `;
+        await tx`
+          UPDATE public.podcasts SET itunes_id=${analysis.providerTransfer.value}
+          WHERE id=${plan.canonicalId}
+        `;
+      }
       await tx`DELETE FROM public.podcasts WHERE id=${plan.duplicateId}`;
       const canonicalBefore = before.podcasts.find(
         (row) => row.id === plan.canonicalId,
@@ -659,6 +726,20 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
         INSERT INTO public.feed_poll_state (podcast_id,next_poll_at,failures) VALUES (${plan.canonicalId},now(),0)
         ON CONFLICT (podcast_id) DO UPDATE SET etag=NULL,last_modified=NULL,hash=NULL,last_polled_at=NULL,next_poll_at=EXCLUDED.next_poll_at,failures=0
       `;
+      if (revisionedStateBefore) {
+        const [next] = await tx`
+          WITH next AS (SELECT gen_random_uuid() AS generation)
+          UPDATE public.state_generation AS state
+          SET generation=next.generation, legacy_generation=next.generation
+          FROM next
+          WHERE state.singleton
+          RETURNING state.generation, state.legacy_generation
+        `;
+        invariant(next, 'State generation reset failed');
+        revisionedStateAfter = next;
+        await tx`DELETE FROM public.progress_clients`;
+        await tx`DELETE FROM public.follow_clients`;
+      }
       const after = await snapshot(tx, ids);
       const map = new Map(analysis.moves.map((move) => [move.from, move.to]));
       const expectedEpisodes = before.episodes
@@ -693,10 +774,17 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           after.podcasts[0].feed_url === plan.canonicalFeedUrl,
         'Canonical identity postcondition failed',
       );
+      if (analysis.providerTransfer)
+        invariant(
+          String(after.podcasts[0].itunes_id) ===
+            String(analysis.providerTransfer.value),
+          'Provider transfer postcondition failed',
+        );
       invariant(
         stable(
           without(after.podcasts[0], [
             'feed_url',
+            ...(analysis.providerTransfer ? ['itunes_id'] : []),
             'episode_count',
             'is_active',
             'is_essential',
@@ -707,6 +795,7 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           stable(
             without(canonicalBefore, [
               'feed_url',
+              ...(analysis.providerTransfer ? ['itunes_id'] : []),
               'episode_count',
               'is_active',
               'is_essential',
@@ -776,6 +865,26 @@ export async function reconcile(sql: postgres.Sql, options: Options) {
           poll.failures === 0,
         'Polling reset failed',
       );
+      if (revisionedStateBefore) {
+        invariant(
+          revisionedStateAfter &&
+            String(revisionedStateAfter.generation) !==
+              String(revisionedStateBefore.generation) &&
+            String(revisionedStateAfter.generation) ===
+              String(revisionedStateAfter.legacy_generation),
+          'State generation reset failed',
+        );
+        const [clients] = await tx`
+          SELECT
+            (SELECT count(*) FROM public.progress_clients) AS progress_clients,
+            (SELECT count(*) FROM public.follow_clients) AS follow_clients
+        `;
+        invariant(
+          Number(clients.progress_clients) === 0 &&
+            Number(clients.follow_clients) === 0,
+          'State client reset failed',
+        );
+      }
       result = {
         ...result,
         retainedEpisodes: after.episodes.length,

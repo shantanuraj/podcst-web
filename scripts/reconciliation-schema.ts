@@ -27,6 +27,18 @@ const guards = [
     columns: ['itunes_id', 'owner_user_id'],
     body: '531d908b3b1107cb951332007b54ed45844b1737de48e0c82c153c6c3344f5f9',
   },
+  {
+    table: 'podcasts',
+    name: 'invalidate_feed_refresh',
+    optional: true,
+    type: 17,
+    unconditional: false,
+    columns: ['feed_url', 'owner_user_id'],
+    body: [
+      'a95ec7a73df0c078d573571e2be78d67d157b72dc0b84430e66ff801e44742f2',
+      'd4055d79b2de389d54e1ac555e4bffc9f652fdaf4816865d94d19145973776e5',
+    ],
+  },
 ];
 
 export async function verifyReconciliationTriggers(
@@ -53,17 +65,25 @@ export async function verifyReconciliationTriggers(
     JOIN pg_language l ON l.oid=p.prolang
     WHERE NOT t.tgisinternal AND t.tgrelid=ANY(${relations}::regclass[])
   `;
+  const expectedGuards = guards.filter(
+    (guard) =>
+      !guard.optional ||
+      triggers.some(
+        (trigger) =>
+          trigger.table === guard.table && trigger.name === guard.name,
+      ),
+  );
   if (
-    triggers.length !== guards.length ||
-    !guards.every((guard) => {
+    triggers.length !== expectedGuards.length ||
+    !expectedGuards.every((guard) => {
       const actual = triggers.find(
         (t) => t.table === guard.table && t.name === guard.name,
       );
       return (
         actual &&
         actual.tgenabled === 'O' &&
-        actual.tgtype === 23 &&
-        actual.unconditional &&
+        actual.tgtype === (guard.type ?? 23) &&
+        actual.unconditional === (guard.unconditional ?? true) &&
         actual.tgnargs === 0 &&
         actual.tgconstraint === '0' &&
         stable(actual.columns) === stable(guard.columns) &&
@@ -75,7 +95,12 @@ export async function verifyReconciliationTriggers(
         actual.lanname === 'plpgsql' &&
         stable(actual.proconfig) ===
           stable(['search_path=pg_catalog, public, pg_temp']) &&
-        createHash('sha256').update(actual.prosrc).digest('hex') === guard.body
+        (Array.isArray(guard.body)
+          ? guard.body.includes(
+              createHash('sha256').update(actual.prosrc).digest('hex'),
+            )
+          : createHash('sha256').update(actual.prosrc).digest('hex') ===
+            guard.body)
       );
     })
   )

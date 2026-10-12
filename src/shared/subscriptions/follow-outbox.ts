@@ -30,6 +30,9 @@ export const emptyFollows = (): FollowOutbox => ({
   failures: [],
   importFailures: [],
 });
+export function resetFollows(state: FollowOutbox) {
+  Object.assign(state, emptyFollows());
+}
 export function followProjection(state: FollowOutbox) {
   const items = new Map(
     (state.snapshot?.items ?? []).map((item) => [
