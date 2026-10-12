@@ -1,7 +1,5 @@
 import { cookies } from 'next/headers';
 import { sql } from '../db';
-import { requireRuntimeAdmission } from '../erasure/admission';
-import { activeAccount, activePasskey } from './account-guard';
 
 const SESSION_COOKIE = 'session';
 
@@ -26,7 +24,6 @@ export async function setSessionCookie({
 }
 
 export async function getSession() {
-  await requireRuntimeAdmission();
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
@@ -39,10 +36,10 @@ export async function getSession() {
       u.email,
       u.name,
       u.image,
-      EXISTS(SELECT 1 FROM passkeys p WHERE p.user_id = u.id AND ${activePasskey(sql, sql`p.id`)}) as has_passkey
+      EXISTS(SELECT 1 FROM passkeys p WHERE p.user_id = u.id) as has_passkey
     FROM sessions s
     JOIN users u ON u.id = s.user_id
-    WHERE s.id = ${sessionId} AND s.expires_at > now() AND ${activeAccount(sql, sql`u.id`)}
+    WHERE s.id = ${sessionId} AND s.expires_at > now()
   `;
 
   if (!session) return null;

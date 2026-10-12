@@ -124,9 +124,6 @@ export async function main(args: string[]) {
     );
   const sql = openDatabase('ALIAS_DATABASE_URL');
   try {
-    await (
-      await import('../src/server/erasure/admission')
-    ).requireRuntimeAdmission(sql);
     if (mode === 'verify') {
       if (!/^[1-9]\d*$/.test(input) || !Number.isSafeInteger(Number(input)))
         throw new TypeError('Invalid podcast ID');

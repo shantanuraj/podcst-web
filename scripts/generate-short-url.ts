@@ -81,7 +81,6 @@ async function generateShortUrl(
   customSlug: string | null = null,
 ) {
   try {
-    await (await import('../src/server/erasure/admission')).requireRuntimeAdmission();
     // Parse the episode URL
     const { feed: feedUrl, guid } = parseEpisodeUrl(episodeUrl);
 

@@ -457,10 +457,7 @@ public final class APIClient {
     }
 
     func removePasskey(id: String) async throws {
-        let raw: RawAccountOperation = try await delete(path: "/api/account/passkeys/\(id)", query: [])
-        guard UUID(uuidString: raw.operationId) != nil else { throw APIError(statusCode: 502, message: "Invalid API response") }
-        if raw.status == "pending" { throw APIError(statusCode: 202, message: raw.message ?? "Account operation pending", code: "account_operation_pending", retryAfter: 5) }
-        guard raw.status == "completed" else { throw APIError(statusCode: 502, message: "Invalid API response") }
+        let _: RawSuccess = try await delete(path: "/api/account/passkeys/\(id)", query: [])
     }
 
     private nonisolated static func isoDate(_ value: String) -> Date? {
@@ -890,7 +887,6 @@ private struct PasskeyVerification: Encodable {
 }
 private struct RawError: Decodable { var message: String?; var code: String?; var freshness: FeedFreshness? }
 private struct RawSuccess: Decodable { var success: Bool }
-private struct RawAccountOperation: Decodable { var status: String; var operationId: String; var message: String? }
 private struct RawSent: Decodable { var sent: Bool }
 private struct RawVerified: Decodable { var verified: Bool }
 private struct RawPasskeyResult: Decodable { var verified: Bool }

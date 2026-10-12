@@ -7,12 +7,7 @@
   "account-passkey-remove.success.json": {
     "endpoint": "DELETE /api/account/passkeys/:id",
     "status": 200,
-    "decodesAs": "AccountOperation"
-  },
-  "account-passkey-remove.pending.json": {
-    "endpoint": "DELETE /api/account/passkeys/:id",
-    "status": 202,
-    "decodesAs": "AccountOperationPending"
+    "decodesAs": "Success"
   },
   "account-preferences.invalid.json": {
     "endpoint": "PUT /api/account/preferences",

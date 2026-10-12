@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Redis } from 'ioredis';
 import { startPostgres } from './lib/postgres-sandbox';
-import { createSchemaFixture } from './lib/schema-fixture';
+import { migrate } from './migrations';
 
 const root = resolve(import.meta.dir, '..');
 const build = process.env.BUILT_APP_DIRECTORY;
@@ -122,10 +122,13 @@ try {
     return (await client.ping()) === 'PONG';
   }, redis);
   probe.disconnect();
-  await createSchemaFixture(cluster.sql);
-  await cluster.sql.unsafe(
-    readFileSync(join(root, 'scripts/fixtures/web-smoke.sql'), 'utf8'),
-  );
+  await migrate(cluster.sql);
+  for (const fixture of ['web-smoke.sql', 'web-runtime.sql'])
+    await cluster.sql.unsafe(
+      readFileSync(join(root, 'scripts/fixtures', fixture), 'utf8'),
+    );
+  const runtime = new URL(cluster.url);
+  runtime.username = 'web_runtime';
   abort.signal.throwIfAborted();
   if (!existsSync(join(standalone, 'public')))
     symlinkSync(join(candidate, 'public'), join(standalone, 'public'));
@@ -150,7 +153,7 @@ try {
       HOSTNAME: '127.0.0.1',
       PORT: String(appPort),
       APP_URL: base,
-      DATABASE_URL: cluster.url,
+      DATABASE_URL: runtime.toString(),
       REDIS_URL: socket,
       AUTH_CODE_SECRET: 'a'.repeat(64),
       WEBAUTHN_ORIGIN: base,

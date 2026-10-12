@@ -403,19 +403,9 @@ Body: `Preferences`. Every field is required; `speed` must be one of `rules.json
 
 ### `DELETE /api/account/passkeys/:id` — required
 
-Accepts removal of one of the account's passkeys. Returns `{status: "completed", operationId: UUID}` only after independently acknowledged publication and local removal, or 202 `{status: "pending", operationId: UUID, message: string}` with `Retry-After`. Pending removal blocks that registration, not other sign-in methods. Retry the same passkey ID; do not remove it from client state on 202. Existing sessions are not revoked merely by removing a passkey. 404 `{message: "Passkey not found"}` covers an unknown ID or another account's passkey; 401 requires authentication. Removing the last passkey leaves email-code sign-in. Unavailable publication/configuration never falls back to an unjournaled delete. All responses are private/no-store.
+Removes one of the account's passkeys. Returns `Success`, 404 `{message: "Passkey not found"}` for an unknown ID or another account's passkey, 401 `{message: "Unauthorized"}`. Removing the last passkey leaves email-code sign-in.
 
-Fixtures (derived from the routes): `account.details.json`, `account.unsaved.json`, `account.unauthorized.json`, `account-preferences.saved.json`, `account-preferences.invalid.json`, `account-passkey-remove.success.json`, `account-passkey-remove.pending.json`, `account-passkey-remove.not-found.json`.
-
-### Account-erasure protocol
-
-New full-account proof/acceptance is disabled unless `ACCOUNT_ERASURE_ENABLED=1` and recovery admission is configured. Protected revocation and existing receipt/intent reconciliation remain available with admission enabled while account deletion is disabled. Server completion is distinct from the [acknowledged client cleanup protocol](../deletion/README.md).
-
-- `POST /api/account/deletion`, authenticated, body `{}`: prepare a non-destructive same-account/session operation and send a purpose-bound email code. Returns `{accountId, operationId, receipt, expiresAt, proofExpiresAt}`. Verify the returned session-derived account ID matches the initiating account, then save the opaque receipt durably before submitting. The code expires after five minutes, allows at most five guesses and cannot create an account or session. The receipt expires seven days after preparation; it authorizes status only.
-- `DELETE /api/account`, authenticated, body `{operationId, code, confirmed: true}`: atomically consume the proof and fence the account. Returns `{status: "completed", operationId}` only after independent publication and canonical erasure commit, or 202 `{status: "pending", operationId, message}` with `Retry-After`. Once accepted the operation cannot be cancelled. Clear local account data only through acknowledged terminal cleanup, not on mere submission.
-- `POST /api/account/deletion/status`, body `{receipt}`: narrowly scoped reconciliation without a session. Returns `{status: "completed" | "unknown"}`, or 202 `{status: "pending", message}` with `Retry-After`. It never clears another signed-in account's cookie. A completed result rechecks/applies the independently published intent on the current database; an old primary success flag is insufficient.
-
-Every mutation enforces request-origin/native-client defenses and bounded bodies; all responses, including errors, are private/no-store. Receipt absence, expiry, a 401, an outage or a lost acknowledgement is never proof of deletion. Keep unresolved account work suspended and retry status with the same receipt. Do not sign up again to probe the outcome. Completed canonical erasure does not imply immediate derived-cache, backup or disconnected-device cleanup, nor revocation of a publisher's RSS token. A later intentional signup is a new identity.
+Fixtures (derived from the routes): `account.details.json`, `account.unsaved.json`, `account.unauthorized.json`, `account-preferences.saved.json`, `account-preferences.invalid.json`, `account-passkey-remove.success.json`, `account-passkey-remove.not-found.json`.
 
 ### `GET /api/lists` — required
 

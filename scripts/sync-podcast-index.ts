@@ -222,8 +222,6 @@ async function sync(): Promise<void> {
     idle_timeout: 20,
   });
 
-  const admission = (await import('../src/server/erasure/admission')).requireRuntimeAdmission;
-  await admission(sql);
   const lastSync = await getLastSyncTime(sql);
   const isFirstSync = !lastSync;
   console.log(
@@ -272,7 +270,6 @@ async function sync(): Promise<void> {
   const startTime = Date.now();
 
   while (processed < totalCount) {
-    await admission(sql);
     const batch = selectQuery.all({
       $lastSync: lastSyncUnix,
       $limit: BATCH_SIZE,

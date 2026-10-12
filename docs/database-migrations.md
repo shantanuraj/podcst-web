@@ -5,6 +5,11 @@ Only [`migrations/active/`](../migrations/active/) is run by the migration tool.
 Historical migrations and tier-swap scripts have been retired. Do not retrieve
 and replay them from older checkouts; they are not an upgrade sequence.
 
+The current chain ends at `0013-account-erasure.sql`. That bookkeeping schema does
+not enable account deletion. `0014` is reserved for parked recovery work and is not
+part of this release chain; do not reuse its number. Application builds, container
+startup and deployment do not run migrations automatically.
+
 ## Commands
 
 Set `MIGRATION_DATABASE_URL` to the intended database. The CLI does not fall back

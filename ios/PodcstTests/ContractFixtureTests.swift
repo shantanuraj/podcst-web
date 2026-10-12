@@ -63,7 +63,7 @@ final class ContractFixtureTests: XCTestCase {
                 failure = error
             }
 
-            if (200..<300).contains(fixture.status) && fixture.type != "ContentReadiness" && fixture.type != "AccountOperationPending" {
+            if (200..<300).contains(fixture.status) && fixture.type != "ContentReadiness" {
                 XCTAssertNil(failure, "\(name): \(String(describing: failure))")
             } else {
                 let apiError = try XCTUnwrap(failure as? APIError, name)

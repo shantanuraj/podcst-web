@@ -54,6 +54,11 @@ describe.skipIf(!configured)(
       ).toBe(realpathSync(join(directory, 'data')));
       await sql`INSERT INTO users (id, email) VALUES (${accountId}, 'transport-owner@example.invalid'), ('transport-other', 'transport-other@example.invalid')`;
       await sql`INSERT INTO sessions (id, user_id, expires_at) VALUES (${cookie}, ${accountId}, now() + interval '1 hour'), (${otherCookie}, 'transport-other', now() + interval '1 hour')`;
+      await sql`INSERT INTO passkeys (id, user_id, credential_id, public_key) VALUES
+        ('transport-own-key', ${accountId}, 'transport-own-credential', decode('12', 'hex')),
+        ('transport-other-key', 'transport-other', 'transport-other-credential', decode('34', 'hex'))`;
+      await sql`INSERT INTO podcasts (id, author_id, feed_url, title, owner_user_id)
+        VALUES (990003, 1, 'https://example.invalid/private.xml', 'Private synthetic podcast', ${accountId})`;
     });
     afterAll(async () => {
       await sql?.end();
@@ -82,6 +87,102 @@ describe.skipIf(!configured)(
       expect(response.headers.get('Vary')).toContain('Cookie');
       return { status: response.status, body: await response.json() };
     }
+
+    test('serves accounts without access to dormant erasure or migration bookkeeping', async () => {
+      expect(
+        Array.from(
+          await sql`SELECT checksum FROM podcst_migrations.history WHERE name = '0013-account-erasure.sql'`,
+        ),
+      ).toEqual([
+        {
+          checksum:
+            '0a0d3cd65e6369267f16085f37c1389029fae10db99abce8933c6445c03a2733',
+        },
+      ]);
+      expect(
+        (await sql`SELECT to_regclass('public.recovery_state') AS relation`)[0]
+          .relation,
+      ).toBeNull();
+      expect(
+        Array.from(
+          await sql`SELECT rolsuper, rolinherit FROM pg_roles WHERE rolname = 'web_runtime'`,
+        ),
+      ).toEqual([{ rolsuper: false, rolinherit: false }]);
+      for (const table of ['account_erasure_intents', 'account_erasure_proofs'])
+        expect(
+          (
+            await sql`SELECT has_table_privilege('web_runtime', ${`public.${table}`}, 'SELECT,INSERT,UPDATE,DELETE') AS permitted`
+          )[0].permitted,
+        ).toBe(false);
+      expect(
+        (
+          await sql`SELECT has_schema_privilege('web_runtime', 'podcst_migrations', 'USAGE') AS permitted`
+        )[0].permitted,
+      ).toBe(false);
+      expect((await request('/api/auth/session')).body.user.id).toBe(accountId);
+      expect((await request('/api/account')).body.passkeys).toHaveLength(1);
+      const preferences = {
+        speed: 1.25,
+        volumeBoost: true,
+        trimSilence: false,
+      };
+      await request('/api/account/preferences', 'PUT', preferences);
+      expect((await request('/api/account')).body.preferences).toEqual(
+        preferences,
+      );
+      expect(
+        (
+          await sql`SELECT count(*)::int AS count FROM pg_stat_activity WHERE usename = 'web_runtime'`
+        )[0].count,
+      ).toBeGreaterThan(0);
+    });
+
+    test('removes only the authenticated account passkey without a journal', async () => {
+      const path = '/api/account/passkeys/transport-own-key';
+      await request(path, 'DELETE', undefined, 'missing-session', 401);
+      await request(
+        '/api/account/passkeys/transport-other-key',
+        'DELETE',
+        undefined,
+        cookie,
+        404,
+      );
+      expect((await request(path, 'DELETE')).body).toEqual({ success: true });
+      await request(path, 'DELETE', undefined, cookie, 404);
+      expect((await request('/api/account')).body.passkeys).toEqual([]);
+      expect(
+        (await request('/api/account', 'GET', undefined, otherCookie)).body
+          .passkeys,
+      ).toHaveLength(1);
+      expect((await request('/api/auth/session')).body.user.hasPasskey).toBe(
+        false,
+      );
+    });
+
+    test('keeps private feeds owner-scoped without recovery infrastructure', async () => {
+      const path = '/api/feed?id=990003';
+      await request(path);
+      await request(path, 'GET', undefined, otherCookie, 404);
+      await request(path, 'GET', undefined, 'missing-session', 404);
+    });
+
+    test('does not expose account deletion routes', async () => {
+      for (const [path, method] of [
+        ['/api/account', 'DELETE'],
+        ['/api/account/deletion', 'POST'],
+        ['/api/account/deletion/status', 'POST'],
+      ]) {
+        const response = await fetch(`${base}${path}`, {
+          method,
+          headers: { 'X-Podcst-Client': 'native', Cookie: `session=${cookie}` },
+          signal: AbortSignal.timeout(15_000),
+          redirect: 'error',
+        });
+        expect([404, 405]).toContain(response.status);
+        await response.body?.cancel();
+      }
+      expect((await request('/api/auth/session')).body.user.id).toBe(accountId);
+    });
 
     test('preserves intent through actual authenticated routes and refuses obsolete/wrong-account writers', async () => {
       const initial = await request('/api/progress?view=state&recent=1');

@@ -5,21 +5,6 @@ service. Adapt their paths and accounts before installing them. They assume a
 checkout at `/opt/podcst`, a `svc-podcst` user, and private configuration files
 under `/etc/podcst/`. No script provisions those resources.
 
-`recovery-services/` contains separate evidence/gateway systemd instance templates
-and a Caddy import template. Instantiate each unit with the reviewed full commit SHA
-under `/opt/podcst-recovery/`, outside any private existing worker tree; install
-the shared `hardening.conf` into **both** unit
-names' `.service.d/` directories. It is required, not an optional tuning drop-in.
-The units require the existing PostgreSQL 16 service without starting/restarting it,
-use distinct OS identities and private read-only state/configuration directories,
-and disable swap for their own cgroups. They do not install identities, peer maps,
-keys, DNS, TLS certificates or global Caddy routing. Static source tests are not
-Linux systemd/Caddy acceptance: validate syntax/effective settings and actual
-identity/negative-access behavior in the approved staging environment first.
-Recheck each host's architecture before selecting native executables. Portable Bun
-bundles are not portable native binaries; never loosen a private worker directory's
-permissions or install a compatibility layer to make the wrong packet executable.
-
 Poller/chart/tier units read application connection settings from `app.env`.
 Backup units read `backup.env`, which must set:
 
@@ -45,9 +30,11 @@ BUILT_APP_DIRECTORY=/path/to/built-checkout PG_BIN=/path/to/postgresql/bin \
 ```
 
 The runner needs Node, Bun and `redis-server`. It starts disposable PostgreSQL and
-Redis, seeds synthetic data, and serves the standalone build on loopback. It runs
-SSR checks and authenticated progress/follow/list HTTP tests, including lost-ack
-replay, the numeric Starred bridge, checkpoint completion and rejected writers.
+Redis, applies the active migration chain, seeds synthetic data, and serves the
+standalone build on loopback under a non-superuser role with no access to dormant
+erasure bookkeeping. It runs SSR, account/passkey/private-feed checks and authenticated
+progress/follow/list HTTP tests, including lost-ack replay, the numeric Starred
+bridge, checkpoint completion and rejected writers.
 The app and test processes receive an explicit environment, not inherited
 application credentials. Redis uses an owner-protected local socket.
 
@@ -56,26 +43,6 @@ current checkout's schema/tests aligned. Standalone environment files are refuse
 Sandbox processes are stopped on success, failure or interruption; failed runs
 retain their private log directory for diagnosis. These checks do not authorize a
 production migration or prove physical-device behavior.
-
-## Fly admission layout
-
-The container now starts `fly-recovery.ts`, not a publicly bound Next process.
-Its required `RECOVERY_GATEWAY_CONFIG` secret is the protected gateway JSON plus
-`journalId`, with `port: 3000` and `upstream: 'http://127.0.0.1:3001'`. Remote primary
-mTLS is mandatory. The launcher creates a private temporary configuration, starts
-the external gate on port 3000 and binds Next only to loopback port 3001. Next's
-primary connection, certificate and admission settings derive from that one config;
-old PG/MTLS/admission overrides and the whole gateway config variable are removed
-from the child environment. Existing unrelated application/Redis/auth settings stay.
-Admission is forced on and full account deletion off. Verify the shared client
-certificate also remains valid for the separately approved Redis transport.
-
-The supervisor closes both listeners when Next exits or on termination. Missing or
-invalid configuration refuses startup; there is no raw-Next fallback. The image
-exposes only the gateway and pins Bun alongside Node. Loopback/child-process tests
-are not proof of Fly edge/private-route isolation or deployment credential custody.
-Do not publish/deploy this container until the coordinated source/schema/credential
-handoff and actual provider acceptance are approved.
 
 ## Backup coverage and recovery
 
@@ -99,8 +66,8 @@ parents in the same snapshot:
 - `state_generation`: current recovery fence and immutable initial legacy generation
 - `progress_revision_heads`, `follow_revision_heads`: independent accepted-action heads
 - `progress_clients`, `follow_clients`: stream sequences, hashes and saved acknowledgements
-- `account_erasure_intents`: accepted account/credential fences and publication/application outcomes; this primary copy is not independent recovery evidence
-- `recovery_state`: transactionally applied journal prefix and incarnation bindings; this row cannot open external admission
+- `account_erasure_intents`: retained bookkeeping from schema `0013`; including it
+  does not activate deletion or establish post-checkpoint suppression
 
 All selected tables share one `pg_dump` snapshot. `--strict-names` refuses missing
 tables; a dump failure prevents encryption/upload. Owned serial sequences are
@@ -113,7 +80,7 @@ Only these current application tables are excluded:
 
 | Table | Recovery consequence |
 | --- | --- |
-| `account_erasure_proofs` | Unaccepted short-lived deletion proofs must be invalidated, never restored as authority; receipt capabilities live outside this archive |
+| `account_erasure_proofs` | Unaccepted short-lived proofs are invalidated on recovery |
 | `feed_poll_state` | Rebuild validators/backoff/scheduling; cold polling adds I/O and must be rate-controlled |
 | `poll_metrics` | Historical operational telemetry is lost; do not use it as durable recovery evidence |
 | `top_podcasts` | Current charts need a refresh; `chart_history` remains included |
@@ -128,7 +95,7 @@ receipts and erasure/revocation records.
 
 1. Before activation, compare the exact installed helper revision, migration
    ledger and schema with the reviewed candidate. Require migrations through
-   `0014`, SELECT on every selected table (including the migration ledger), schema
+   `0013`, SELECT on every selected table (including the migration ledger), schema
    USAGE and sequence read privileges. Stop on drift or permission errors; do not
    broaden grants, skip tables or migrate to make a backup pass. Use the
    [schema comparison](../docs/schema-inventory.md) separately: a ledger alone
@@ -202,212 +169,6 @@ Generation rotation fences all three resources, including legacy Starred work.
 Every missing selected table refuses a dump. A synthetic size/runtime comparison
 prints selected/full archive bytes and elapsed times; it is not a storage budget.
 
-New migrations must update this coverage decision. Backup coverage tests alone do
-not establish deletion-aware admission. The recovery suite below exercises actual
-publication/replay; neither suite proves production ciphertext recovery, off-host
-key availability, physical retention or recovery objectives.
-
-## Recovery admission
-
-`recover-account-state.ts` is operator-only tooling. It requires a private,
-operator-owned configuration outside the repository, explicit database/socket/
-role/tool identities, a trusted schema reference, independent journal/authority/
-receipt stores and recovery keys. Configuration types live in that script and
-`erasure-journal/configuration.ts`. No command provisions services or broadens grants.
-`erasure-journal/permissions.ts` defines the narrow store-role grant matrix. It
-requires an explicit database/role identity, refuses privileged/owning/inherited
-roles and excess table/column rights, and applies each database's grants atomically.
-Create the three databases/schemas and initialize their heads as the reviewed
-operator, not as a service role. The helper creates no role/database and grants no
-primary application access. Co-location is supported technically, but separate
-roles/databases on one host do not establish independent recovery completeness.
-
-`erasure-journal/initialize.ts` initializes existing **dormant** stores, without
-creating databases, roles, schemas, grants, passwords or services. Its protected
-`InitializationConfiguration` pins the local socket/port/operator/cluster, service
-configuration, initial epoch, trusted reference, intent, inspection and new output.
-All three service roles must remain NOLOGIN/passwordless throughout initialization.
-It does not narrow the primary's CONNECT policy or authorize later role activation.
-
-```sh
-bun --no-env-file scripts/erasure-journal/initialize.ts reference --config CONFIG
-bun --no-env-file scripts/erasure-journal/initialize.ts inspect --config CONFIG
-bun --no-env-file scripts/erasure-journal/initialize.ts initialize --config CONFIG
-bun --no-env-file scripts/erasure-journal/initialize.ts complete-authority --config CONFIG
-```
-
-`reference` uses only `{pgBin, output}` and creates a disposable PostgreSQL 16
-reference from the three source SQL files. Keep those files beside the bundled
-initializer. `inspect` reads stores in read-only transactions and writes a new
-protected observation. It verifies schema fingerprints, identities, exact grants,
-NOLOGIN roles, no other clients and only empty or exact genesis contents.
-
-`initialize` requires the saved empty observation, rechecks it under table/role
-locks and durably writes the exclusive intent and an `OUTPUT.attempt` before either
-commit. The journal/epoch commits first; authority commits second. A lost response
-is unknown: inspect again before any separately approved completion. With the same
-intent/configuration/keys/database identities and a fresh observation,
-`complete-authority` can insert only the missing matching authority head, or emit
-the missing receipt for an already-completed genesis. It cannot reset heads, repair
-grants or resume an advanced/activated journal. Existing outputs refuse overwrite.
-A retained intent with entirely empty stores also refuses automatic retry: preserve
-it for explicit operator disposition, never delete it to make initialization pass.
-Genesis is not primary admission, an eligible checkpoint or independent evidence
-of completeness after a common rollback. Keep the intent/results in protected custody.
-
-The controller's `redis` object contains `url` and optional `tls` PEM material
-(`ca`, plus paired `cert`/`key` for mutual TLS). Keep it in the same protected
-configuration, never a URL query or command argument. Non-loopback Redis requires
-`rediss:` with certificate/hostname verification; no plaintext fallback or trust
-bypass is supported. Authentication/ACL/TLS refusal leaves recovery closed.
-
-```sh
-bun --no-env-file scripts/recover-account-state.ts reference --config CONFIG
-bun --no-env-file scripts/recover-account-state.ts capture --config CONFIG
-bun --no-env-file scripts/recover-account-state.ts recover --config CONFIG
-bun --no-env-file scripts/erasure-journal/serve.ts JOURNAL_CONFIG
-bun --no-env-file scripts/recovery-gateway.ts GATEWAY_CONFIG
-```
-
-- `reference` builds a schema fingerprint from the trusted migration chain in a
-  disposable PostgreSQL instance. A ledger alone is insufficient. Recovery identity
-  excludes only physical column ordinals of ordinary public tables: named-column
-  archive restoration does not depend on tuple slots or historical dropped-column
-  gaps. Column definitions, constraints, indexes, triggers, routine bodies, environment
-  and privilege checks remain strict; view projection order remains significant.
-  Raw schema inventory/comparison still reports physical positions unchanged.
-  Regenerate protected recovery references with the reviewed implementation; run,
-  attestation and artifact-origin fingerprints must agree. Never edit an old hash
-  or treat an unrelated schema difference as a column-order exception.
-- `bootstrap` establishes the first verified prefix on a trusted current primary;
-  it is single-use, not a fallback for an unsupported restore. Its protected config
-  must include `initialCheckpoint: {path, recipient}` and an explicit `age` binary.
-  While the serving role is still NOLOGIN, bootstrap captures a coherent encrypted
-  **full** checkpoint. Eligibility and first admission commit together in the
-  authority, before serving LOGIN can open. The protected result includes the
-  verified initial manifest; there is no admitted-before-first-checkpoint interval.
-- `capture` exports one MVCC snapshot, binds its already-verified applied prefix,
-  streams an age-encrypted selected/full archive and registers its signed manifest
-  in current independent inventory. Overlapping recovery refuses registration.
-- `recover` requires an eligible artifact and restores only into an isolated empty
-  target under matching constraints. Effects and replay watermarks commit together.
-  Pending intents reconcile under a gated provisional epoch before the final seal.
-  All sessions/codes/proofs and OAuth tokens retire; only the current state
-  generation changes. Stream history and the legacy generation remain untouched.
-- `rotate-auth` retires Redis authentication after a restart/rollback on the exact
-  still-running admitted primary. It cannot waive a changed PostgreSQL incarnation
-  or substitute for artifact recovery. Existing authenticated revocation does not
-  depend on healthy Redis; new authentication requires the admitted Redis instance.
-- `retire` removes logical artifact eligibility, not its bytes or suppression
-  evidence. `abandon` leaves admission closed and does not destroy a failed target.
-
-Recovery permanently renames retired database roles into disabled identities and
-uses a fresh serving role, publication epoch and encrypted runtime credential.
-The protected result includes the new runtime token; never log or publish it.
-A lost acknowledgement requires inspecting/resuming the same run ID. Before initial
-admission, a known interrupted bootstrap can resume on the same fenced primary after
-a PostgreSQL restart; after admission, a restart requires eligible-artifact recovery.
-A partial/completed capture file from a failed pre-admission attempt is not overwritten
-or assumed eligible: retain it and select a new protected path after inspection.
-A committed bootstrap resumes without recapturing; its configured initial artifact
-must still verify before the CLI writes another result. A failed
-restore without its durable receipt requires a new isolated target, not disabled
-constraints or a blind overwrite. Restore scratch contains protected plaintext;
-its storage encryption, capacity, crash leftovers and disposition need an approved
-operational plan. Capture creates no plaintext archive.
-
-`0014` installs statement-level write guards on every application table. Missing
-or stale incarnation/role/generation/server bindings refuse ordinary writes,
-including workers reconnecting after a PostgreSQL restart. It is **not** a
-schema-only rollout: coordinate the fence, bootstrap and fresh role/configuration.
-Runtime needs SELECT on recovery metadata, EXECUTE on `pg_control_system()` and
-only UPDATE on `state_generation.singleton` for shared locking, never write access
-to recovery metadata or either generation. The controller refuses unsafe ownership,
-column-level grants, replication bypass and unaccounted login roles.
-
-`recovery-permissions.ts` provides `inspect|grant --config CONFIG` for separately
-reviewed primary roles. Configuration pins `{socket, port, database, operator,
-cluster}` in `target`, `profile: 'serving' | 'backup'`, grantee `role`, trusted
-recovery `reference` and a new protected `output`. The role/database must already
-exist. Granting requires NOLOGIN/NOINHERIT, no ownership/membership/elevated powers,
-no active grantee clients and the exact trusted migration/schema reference.
-Existing excess rights refuse the whole transaction; no privilege repair, role
-creation/activation, password, PUBLIC-policy change or migration is hidden here.
-Read-only `inspect` refuses missing rights instead of filling them in.
-
-The serving table/column matrix is defined once in that script. It grants only
-required table operations, USAGE on their owned insert sequences and the admission
-probe function. User/session/country/episode row locks use column UPDATE grants;
-B retains only `state_generation.singleton` UPDATE. Generation/recovery writes,
-TRUNCATE, grant options and migration-ledger access stay denied. Unused legacy
-OAuth/transcript tables receive no runtime rights. Operator-only catalogue repair
-is not included in the app/poller/chart/tier role.
-
-The backup profile derives SELECT coverage from `podcst-backup.sh`, grants SELECT
-on only its owned sequences and separate ledger-schema USAGE. It grants no table
-writes, sequence USAGE/UPDATE or functions; ordinary existing PostgreSQL PUBLIC
-function access is not a denied-function boundary. It is selected-backup coverage,
-not a full-restore/capture role, eligible manifest or new retention/job policy.
-A backup LOGIN role with CONNECT must still be fenced for controller recovery.
-Bundle the runner under `scripts/` beside `podcst-backup.sh`, with the unchanged
-`migrations/active/` chain beside `scripts/`. Freeze/checksum the selection too.
-
-Primary PUBLIC CONNECT/TEMPORARY and schema CREATE policies need a separate scoped
-review before the fresh role can satisfy these checks. Do not disable unrelated
-cluster roles, revive an old serving name or give the runtime ledger access to make
-backup jobs work. Lost grant acknowledgement requires inspection before retry.
-
-Serve all traffic through the external gateway; keep upstream origins inaccessible
-as bypasses. Configure every app/worker with `RECOVERY_ADMISSION_REQUIRED=1` and
-current `ERASURE_JOURNAL_URL`, `ERASURE_JOURNAL_ID`, `ERASURE_JOURNAL_TOKEN`,
-`ERASURE_WRITER_EPOCH` and public `ERASURE_VERIFICATION_KEYS`. The journal configuration
-contains only recovery/admission management tokens; runtime tokens are per-run.
-The gateway and upstream exchange fresh signed nonces, not cached ready flags.
-For a protected Vercel origin, set the gateway's protected
-`upstreamProtection: {provider: 'vercel', token: SECRET}`. Only an HTTPS
-`*.vercel.app` upstream on its normal port is accepted. The gateway routes with the
-upstream Host and fixed public forwarded origin, injects the credential as a header
-only, and strips client provider controls, provider cookies and middleware override
-headers. Provider access redirects, reflected credential headers and missing/stale
-nonce receipts refuse before releasing the body. Application cookies survive;
-provider cookies/proof headers do not. All gateway output is private/no-store,
-including its CDN controls. These adapter tests do not enable or certify provider
-protection: cover all old/current URLs and revoke unapproved sharing/bypass access.
-Vercel can also expose an automation token to deployments via its system environment;
-provider access tokens must never be reused as journal/controller custody keys.
-Its protected `primary` configuration is an explicit object, not a database URL:
-`{socket, port, database, role}` for local peer access, or
-`{host, port, database, role, password, tls: {ca, cert, key}}` for remote mutual TLS.
-TCP always requires the complete client identity and verified CA/hostname (including
-IP SAN); no URL overrides, trust bypass, fallback hosts or plaintext retry exist.
-The transport negotiates verified TLS before giving PostgreSQL its socket or any
-startup/credential bytes. A bounded handshake and explicit pre-authentication close
-error prevent the driver's silent-close reconnect loop. Gateway sessions default to
-read-only but still use the admitted serving role; this is not a new SQL privilege
-boundary. Actual HBA/SCRAM/client-CN or peer mappings remain operator-reviewed scope.
-`ACCOUNT_ERASURE_ENABLED` gates new full-account deletion proofs/acceptance and
-also requires admission. With `RECOVERY_ADMISSION_REQUIRED=1`, protected passkey
-revocation, receipt reconciliation and accepted obligations remain available even
-when account deletion is disabled. There is no unjournaled fallback. Authentication
-additionally checks its Redis epoch and server identity.
-
-```sh
-PG_BIN=/path/to/postgresql/bin REQUIRE_ERASURE_TESTS=1 \
-  bun --no-env-file test src/server/erasure
-BUILT_APP_DIRECTORY=/path/to/isolated-build PG_BIN=/path/to/postgresql/bin \
-  bun --no-env-file scripts/test-recovery-admission.ts
-```
-
-The controller suite includes a single-cluster crash with three restricted store
-roles/databases, primary-specific CONNECT denial, and a full encrypted checkpoint.
-After restart, stale SQL writes and gateway reads refuse; readmission requires
-restoring into a fresh database with a new serving role/token/epoch. This tests
-retained evidence across a known restart, not completeness after common rollback
-or host loss. It does not establish production restore capacity or peer/HBA access.
-
-The controller suite requires age, age-keygen, Redis and OpenSSL. Built admission
-checks also require Node; they use a synthetic TLS certificate trusted only
-by the child app and test gateway. No system trust store changes. They test actual
-API/private-read refusal, state access and authenticated revocation during Redis
-outages. All datasets and keys are disposable. No local test or commit authorizes
-production migration, service installation, credential changes or deletion.
+New migrations must update this coverage decision. These tests do not implement
+account deletion or later erasure replay, and do not prove production ciphertext
+recovery, off-host key availability, alert delivery or recovery objectives.

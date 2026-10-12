@@ -81,16 +81,13 @@ describe.skipIf(!databaseUrl)('account with PostgreSQL', () => {
     expect((await account.getAccount('other')).preferences).toBeNull();
   });
 
-  test('preference writes refuse an accepted erasure without changing other accounts', async () => {
-    await sql`INSERT INTO account_erasure_intents (operation_id, action, account_id, accepted_at, receipt_expires_at)
-      VALUES (${randomUUID()}, 'erase_account', 'owner', now(), now() + interval '7 days')`;
-    await expect(
-      account.savePreferences('owner', {
-        speed: 1,
-        volumeBoost: false,
-        trimSilence: false,
-      }),
-    ).rejects.toThrow('Authentication required');
+  test('removes only the account’s own passkeys', async () => {
+    expect(await account.deletePasskey('owner', 'theirs')).toBe(false);
+    expect(await account.deletePasskey('owner', 'legacy')).toBe(true);
+    expect(await account.deletePasskey('owner', 'legacy')).toBe(false);
+    expect(
+      (await account.getAccount('owner')).passkeys.map(({ id }) => id),
+    ).toEqual(['mac']);
     expect((await account.getAccount('other')).passkeys).toHaveLength(1);
   });
 });

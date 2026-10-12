@@ -118,7 +118,6 @@ internal fun WireListEpisodePage.domain() = ListEpisodePage(listId, revision, it
 @Serializable internal data class WireProgress(val episode: WireEpisode, val position: Double)
 @Serializable internal data class WireIdentity(@Serializable(CatalogueId::class) val id: Long)
 @Serializable internal data class WireSuccess(val success: Boolean = false)
-@Serializable internal data class WireAccountOperation(val status: String, val operationId: String, val message: String? = null)
 @Serializable internal data class WireSent(val sent: Boolean = false)
 @Serializable internal data class WireVerified(val verified: Boolean = false, val userId: String? = null)
 @Serializable internal data class WireError(val message: String? = null, val code: String? = null, val freshness: FeedFreshness? = null)

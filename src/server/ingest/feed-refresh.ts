@@ -3,7 +3,6 @@ import type postgres from 'postgres';
 import { FEED_LIMITS } from '@/shared/feed-contract';
 import { adaptFeed } from '../../app/api/feed/parser';
 import type { IEpisodeListing } from '../../types';
-import { readActiveAccount } from '../auth/account-guard';
 import { FOLLOWED_IDS_SQL } from '../tiering';
 import { sanitize, upsertEpisodes } from './episodes';
 import { FeedUnavailableError } from './feed-errors';
@@ -129,13 +128,6 @@ export async function savePollState(
 }
 
 async function lockRefresh(tx: postgres.TransactionSql, podcastId: string) {
-  const [source] =
-    await tx`SELECT owner_user_id FROM podcasts WHERE id = ${podcastId}`;
-  if (
-    source?.owner_user_id &&
-    !(await readActiveAccount(tx, source.owner_user_id, 'share'))
-  )
-    return false;
   const [lock] = await tx`
     SELECT pg_try_advisory_xact_lock(${podcastId}::bigint) AS acquired
   `;

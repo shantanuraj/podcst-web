@@ -1,7 +1,0 @@
-https://{$RECOVERY_JOURNAL_HOST} {
-	reverse_proxy 127.0.0.1:4311
-}
-
-https://{$RECOVERY_PUBLIC_HOST} {
-	reverse_proxy 127.0.0.1:4312
-}

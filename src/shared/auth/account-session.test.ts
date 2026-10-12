@@ -12,7 +12,7 @@ import { getCurrentEpisode, usePlayer } from '@/shared/player/usePlayer';
 import type { IEpisodeInfo } from '@/types';
 import { type AccountUser, accountQueryKey } from './account';
 import { ACCOUNT_EVENT, connectAccountEvents } from './account-events';
-import { AccountSession, accountLifecycleKinds } from './account-session';
+import { AccountSession } from './account-session';
 
 const owner: AccountUser = {
   id: 'owner-a',
@@ -53,15 +53,9 @@ function fixture(user: AccountUser | null = owner) {
   });
   clients.push(client);
   const identity = { user };
-  const blocked = new Set<string>();
-  const storage = { unavailable: false };
   const reload = mock();
   const publish = mock();
   const session = new AccountSession(client, user, {
-    isBlocked: (account) => {
-      if (storage.unavailable) throw new Error('Storage unavailable');
-      return blocked.has(account);
-    },
     readSession: async () => identity.user,
     resetPlayer: (scope, revision) =>
       usePlayer.getState().setAccount(scope, revision),
@@ -69,7 +63,7 @@ function fixture(user: AccountUser | null = owner) {
     publish,
   });
   session.synchronizePlayer();
-  return { client, session, identity, reload, publish, blocked, storage };
+  return { client, session, identity, reload, publish };
 }
 
 afterEach(() => {
@@ -80,72 +74,6 @@ afterEach(() => {
 });
 
 describe('web account boundary', () => {
-  test('cleanup requires every named lifecycle hook and awaits their acknowledgements', async () => {
-    const f = fixture();
-    await expect(f.session.eraseConfirmedAccount(owner.id)).rejects.toThrow(
-      'not initialized',
-    );
-    await expect(f.session.checkpointAndSuspend()).rejects.toThrow(
-      'not initialized',
-    );
-    const completion = deferred<void>();
-    const erased: string[] = [];
-    for (const kind of accountLifecycleKinds)
-      f.session.registerLifecycle(kind, {
-        suspend: async () => {},
-        erase: async (account) => {
-          erased.push(`${kind}:${account}`);
-          if (kind === 'state') await completion.promise;
-        },
-      });
-    let acknowledged = false;
-    const work = f.session.eraseConfirmedAccount(owner.id).then(() => {
-      acknowledged = true;
-    });
-    await Promise.resolve();
-    expect(acknowledged).toBe(false);
-    completion.resolve();
-    await work;
-    expect(erased).toEqual(
-      accountLifecycleKinds.map((kind) => `${kind}:${owner.id}`),
-    );
-  });
-
-  test('a persistent deletion fence blocks old callbacks before cross-tab notification and survives A-B-A', async () => {
-    const f = fixture();
-    const old = f.session.token();
-    f.blocked.add(owner.id);
-    expect(f.session.current(old)).toBe(false);
-    expect(f.session.getSnapshot().ready).toBe(false);
-    expect(f.session.verifiedAccount).toBe(owner.id);
-    f.session.refreshLocalFence(owner.id);
-    expect(old.signal.aborted).toBe(true);
-    await f.session.refresh();
-    expect(f.session.getSnapshot().ready).toBe(false);
-    f.identity.user = other;
-    await f.session.refresh();
-    const next = f.session.token();
-    f.session.refreshLocalFence(owner.id);
-    expect(f.session.current(next)).toBe(true);
-    expect(f.session.scope).toBe(other.id);
-    f.identity.user = owner;
-    await f.session.refresh();
-    expect(f.session.getSnapshot().ready).toBe(false);
-    f.blocked.delete(owner.id);
-    f.session.refreshLocalFence(owner.id);
-    expect(f.session.getSnapshot().ready).toBe(true);
-  });
-
-  test('unreadable deletion storage fails closed for accounts without blocking guest work', async () => {
-    const f = fixture();
-    f.storage.unavailable = true;
-    expect(f.session.current(f.session.token())).toBe(false);
-    f.identity.user = null;
-    await f.session.refresh();
-    expect(f.session.getSnapshot().ready).toBe(true);
-    expect(f.session.scope).toBeNull();
-  });
-
   test('all private-capable keys include distinct owner and guest scopes', () => {
     for (const kind of [
       'feed',

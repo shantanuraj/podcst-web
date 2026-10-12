@@ -330,8 +330,6 @@ describe.skipIf(!process.env.PG_BIN)(
       `;
       await sql`INSERT INTO account_erasure_intents (operation_id, action, account_id, accepted_at, receipt_expires_at)
         VALUES (${randomUUID()}, 'erase_account', 'retired-synthetic-account', now(), now() + interval '7 days')`;
-      await sql`INSERT INTO recovery_state (run_id, incarnation, journal_id, sequence, hash, artifact_hash, auth_epoch, generation)
-        SELECT ${randomUUID()}, ${randomUUID()}, ${randomUUID()}, 9007199254740993, ${'a'.repeat(64)}, ${'b'.repeat(64)}, ${randomUUID()}, generation FROM state_generation WHERE singleton`;
       const before = await snapshot(sql);
       const beforeSequences = await sequences(sql);
       for (const rows of Object.values(before))

@@ -16,7 +16,7 @@ export function connectQueueSession(session: AccountSession) {
     if (player.accountScope === account)
       player.setAccount(undefined, player.accountRevision + 1);
   };
-  const unregister = session.registerLifecycle('queue', {
+  const unregister = session.registerLifecycle({
     suspend: async () => {
       const scope = session.scope;
       const player = usePlayer.getState();

@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { requireCompletedAccountOperation } from '@/shared/account-erasure';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { accountQueryKey } from '@/shared/auth/account';
 import type { Preferences } from '@/shared/preferences';
@@ -71,15 +70,17 @@ export function useRemovePasskey() {
   return useMutation({
     mutationKey: accountQueryKey(token.scope, 'remove-passkey'),
     mutationFn: (passkeyId: string) =>
-      session.run(token, 'account', async (signal) => {
-        const result = await responseData(
+      session.run(token, 'account', async (signal) =>
+        responseData(
           await fetch(
             `/api/account/passkeys/${encodeURIComponent(passkeyId)}`,
-            { method: 'DELETE', signal },
+            {
+              method: 'DELETE',
+              signal,
+            },
           ),
-        );
-        requireCompletedAccountOperation(result);
-      }),
+        ),
+      ),
     onSettled: () => {
       if (!session.current(token)) return;
       void session.client.invalidateQueries({

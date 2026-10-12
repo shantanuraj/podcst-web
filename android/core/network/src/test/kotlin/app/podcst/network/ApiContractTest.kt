@@ -86,7 +86,7 @@ class ApiContractTest {
             assertEquals(name, "301", request.url.queryParameter("podcastId"))
             assertEquals(name, null, request.headers["Cookie"])
         }
-        if (status in 200..299 && type != "ContentReadiness" && type != "AccountOperationPending") {
+        if (status in 200..299 && type != "ContentReadiness") {
             if (failure != null) throw AssertionError(name, failure)
         } else {
             assertTrue("$name should fail", failure is ApiException)

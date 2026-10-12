@@ -1,6 +1,5 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import type postgres from 'postgres';
-import { guardEmailIdentity } from './account-guard';
 import { AuthError } from './error';
 import { generateId, insertSession } from './session-record';
 
@@ -30,7 +29,6 @@ export function createEmailService(
   ): Promise<T | null> => {
     return sql.begin(async (tx) => {
       await lockEmailIdentity(tx, email);
-      await guardEmailIdentity(tx, email);
       const [row] = await tx`
         UPDATE email_verifications SET attempts = attempts + 1
         WHERE email = ${email} AND ready AND NOT used
@@ -57,7 +55,6 @@ export function createEmailService(
       const codeDigest = digest(id, email, code);
       await sql.begin(async (tx) => {
         await lockEmailIdentity(tx, email);
-        await guardEmailIdentity(tx, email);
         await tx`DELETE FROM email_verifications WHERE email = ${email}`;
         await tx`
           INSERT INTO email_verifications (id, email, code_digest, expires_at)
@@ -68,7 +65,6 @@ export function createEmailService(
         await deliver(email, code);
         const activated = await sql.begin(async (tx) => {
           await lockEmailIdentity(tx, email);
-          await guardEmailIdentity(tx, email);
           return tx`
             UPDATE email_verifications SET ready = true
             WHERE id = ${id} AND NOT used AND expires_at > clock_timestamp()

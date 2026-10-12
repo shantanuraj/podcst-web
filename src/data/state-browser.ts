@@ -121,7 +121,7 @@ export function connectState(session: AccountSession) {
   window.addEventListener('focus', refresh);
   document.addEventListener('visibilitychange', refresh);
   const timer = setInterval(refresh, 5000);
-  const unregister = session.registerLifecycle('state', {
+  const unregister = session.registerLifecycle({
     suspend: () => runtime.sync.suspend(),
     erase: (account) => runtime.sync.erase(account),
   });

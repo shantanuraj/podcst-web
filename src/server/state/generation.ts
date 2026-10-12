@@ -1,6 +1,5 @@
 import type postgres from 'postgres';
 import type { StateScope } from '@/shared/state-contract';
-import { readActiveAccount } from '../auth/account-guard';
 import { StateError } from './protocol';
 
 export async function readGeneration(
@@ -13,7 +12,10 @@ export async function readGeneration(
     WHERE singleton ${lock ? sql`FOR SHARE` : sql``}
   `;
   if (!generation) throw new StateError('unavailable', 'State unavailable');
-  const user = await readActiveAccount(sql, accountId, lock ? 'share' : false);
+  const [user] = await sql`
+    SELECT id FROM users WHERE id = ${accountId}
+    ${lock ? sql`FOR KEY SHARE` : sql``}
+  `;
   if (!user) throw new StateError('unauthenticated', 'Authentication required');
   return {
     scope: {

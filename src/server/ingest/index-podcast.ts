@@ -1,6 +1,5 @@
 import type postgres from 'postgres';
 import { FEED_LIMITS } from '@/shared/feed-contract';
-import { requireActiveAccount } from '../auth/account-guard';
 import { readGeneration } from '../state/generation';
 import {
   claimAppleIdentity,
@@ -142,8 +141,6 @@ async function index(
     signal?.throwIfAborted();
     if (ownerUserId && scope)
       await assertImportScope(tx, ownerUserId, scope, true);
-    if (!ownerUserId && existing?.owner_user_id)
-      await requireActiveAccount(tx, existing.owner_user_id);
     await lockPodcastIdentities(tx, identities);
     signal?.throwIfAborted();
     let found: PodcastIdentity | undefined;
@@ -167,14 +164,6 @@ async function index(
           'Canonical source changed during import; retry',
         );
       signal?.throwIfAborted();
-      if (
-        !ownerUserId &&
-        found.owner_user_id &&
-        found.owner_user_id !== existing?.owner_user_id
-      )
-        throw new PodcastIdentityBusy(
-          'Source ownership changed during import; retry',
-        );
       if (ownerUserId) return authorizePrivate(found, ownerUserId);
       if (move) {
         await claimPublicAliases(tx, {

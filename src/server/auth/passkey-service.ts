@@ -9,7 +9,6 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 import type postgres from 'postgres';
-import { activePasskey, requireActiveAccount } from './account-guard';
 import type { createChallengeStore } from './challenges';
 import { AuthError } from './error';
 import { generateId, insertSession } from './session-record';
@@ -67,7 +66,6 @@ export function createPasskeyService(
       throw new AuthError(400, 'Passkey verification failed');
     const { credential, aaguid } = verification.registrationInfo;
     await sql.begin(async (tx) => {
-      await requireActiveAccount(tx, session.userId);
       const [active] =
         await tx`SELECT user_id FROM sessions WHERE id = ${session.id} AND user_id = ${session.userId} AND expires_at > clock_timestamp() FOR UPDATE`;
       if (!active) throw new AuthError(401, 'Authentication required');
@@ -99,17 +97,10 @@ export function createPasskeyService(
     });
     if (typeof response.id !== 'string' || response.id.length > 2048)
       throw new AuthError(400, 'Passkey verification failed');
-    const [identity] =
-      await sql`SELECT user_id FROM passkeys WHERE credential_id = ${response.id}`;
-    if (!identity) throw new AuthError(400, 'Passkey verification failed');
     return sql.begin(async (tx) => {
-      await requireActiveAccount(tx, identity.user_id);
       const [passkey] =
-        await tx`SELECT id, user_id, credential_id, public_key, counter FROM passkeys WHERE credential_id = ${response.id} AND user_id = ${identity.user_id} FOR UPDATE`;
+        await tx`SELECT id, user_id, credential_id, public_key, counter FROM passkeys WHERE credential_id = ${response.id} FOR UPDATE`;
       if (!passkey) throw new AuthError(400, 'Passkey verification failed');
-      const [usable] =
-        await tx`SELECT 1 WHERE ${activePasskey(tx, passkey.id)}`;
-      if (!usable) throw new AuthError(400, 'Passkey verification failed');
       const verification = await verifyAuthenticationResponse({
         response,
         expectedChallenge: challenge,

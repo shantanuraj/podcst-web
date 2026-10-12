@@ -70,6 +70,17 @@ describe('migration files and CLI safety', () => {
     );
   });
 
+  test('retains the applied erasure schema without activating recovery admission', () => {
+    const migrations = loadMigrations();
+    expect(
+      migrations.find(({ name }) => name === '0013-account-erasure.sql')
+        ?.checksum,
+    ).toBe('0a0d3cd65e6369267f16085f37c1389029fae10db99abce8933c6445c03a2733');
+    expect(migrations.map(({ name }) => name)).not.toContain(
+      '0014-recovery-admission.sql',
+    );
+  });
+
   test('checksums include exact source bytes and pending files sort by version', () => {
     const migrations = files({
       '0002-second.sql': 'SELECT 2;',

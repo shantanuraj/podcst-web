@@ -30,13 +30,13 @@ for attempt in {1..30}; do
   sleep 1
 done
 docker exec "$database" pg_isready -h 127.0.0.1 -U postgres
-for migration in migrations/active/*.sql scripts/fixtures/web-smoke.sql; do
+for migration in migrations/active/*.sql scripts/fixtures/web-smoke.sql scripts/fixtures/web-runtime.sql; do
   docker exec -i "$database" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 \
     --single-transaction -q < "$migration"
 done
 
 docker run -d --network "$network" --name "$web" -p 127.0.0.1::3000 \
-  -e "DATABASE_URL=postgres://postgres@$database:5432/postgres" \
+  -e "DATABASE_URL=postgres://web_runtime@$database:5432/postgres" \
   -e "REDIS_URL=redis://$redis:6379" \
   -e "AUTH_CODE_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
   "$image" >/dev/null

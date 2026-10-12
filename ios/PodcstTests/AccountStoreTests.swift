@@ -45,27 +45,13 @@ final class AccountStoreTests: XCTestCase {
     }
 
     func testRemovingAPasskeyDropsItFromTheAccount() async throws {
-        let (store, _, _) = signedIn([account(#"{"speed":1,"volumeBoost":false,"trimSilence":false}"#), response(#"{"status":"completed","operationId":"00000000-0000-4000-8000-000000000013"}"#)])
+        let (store, _, _) = signedIn([account(#"{"speed":1,"volumeBoost":false,"trimSilence":false}"#), response(#"{"success":true}"#)])
         await store.load(accountID: "u1")
         let legacy = try XCTUnwrap(store.account?.passkeys.last)
         try await store.removePasskey(legacy)
         XCTAssertEqual(ContractURLProtocol.requests().last?.url?.path, "/api/account/passkeys/pk-legacy")
         XCTAssertEqual(ContractURLProtocol.requests().last?.httpMethod, "DELETE")
         XCTAssertEqual(store.account?.passkeys.map(\.id), ["pk-mac"])
-    }
-
-    func testPendingPasskeyRemovalRetainsTheAccountKey() async throws {
-        let pending = ContractResponse(status: 202, data: Data(#"{"status":"pending","operationId":"00000000-0000-4000-8000-000000000013","message":"Account operation pending; try again shortly."}"#.utf8))
-        let (store, _, _) = signedIn([account(#"{"speed":1,"volumeBoost":false,"trimSilence":false}"#), pending])
-        await store.load(accountID: "u1")
-        let legacy = try XCTUnwrap(store.account?.passkeys.last)
-        do {
-            try await store.removePasskey(legacy)
-            XCTFail("Pending removal must not be reported as completed")
-        } catch {
-            XCTAssertEqual((error as? APIError)?.statusCode, 202)
-        }
-        XCTAssertEqual(store.account?.passkeys.map(\.id), ["pk-mac", "pk-legacy"])
     }
 
     private func signedIn(_ responses: [ContractResponse]) -> (AccountStore, AudioPreferences, APIClient) {

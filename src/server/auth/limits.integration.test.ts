@@ -157,7 +157,7 @@ describe.skipIf(!executable)('auth limits on disposable Redis', () => {
       first.issue({ ...binding, challenge: 'synthetic-challenge' });
     const flowId = await issue();
     expect(flowId).toHaveLength(43);
-    expect(await redis.ttl(`auth:flow:initial:${flowId}`)).toBeGreaterThan(0);
+    expect(await redis.ttl(`auth:flow:${flowId}`)).toBeGreaterThan(0);
     const results = await Promise.allSettled(
       Array.from({ length: 10 }, () => second.consume(flowId, binding)),
     );
@@ -178,7 +178,7 @@ describe.skipIf(!executable)('auth limits on disposable Redis', () => {
       });
     }
     const expired = await issue();
-    await redis.pexpire(`auth:flow:initial:${expired}`, 1);
+    await redis.pexpire(`auth:flow:${expired}`, 1);
     await Bun.sleep(5);
     await expect(second.consume(expired, binding)).rejects.toMatchObject({
       status: 400,

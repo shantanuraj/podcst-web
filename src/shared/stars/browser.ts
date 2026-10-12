@@ -175,7 +175,7 @@ export function connectStars(session: AccountSession) {
   };
   const unsubscribe = session.subscribe(activate);
   activate();
-  const unregister = session.registerLifecycle('stars', {
+  const unregister = session.registerLifecycle({
     suspend: () => runtime.sync.suspend(),
     erase: (account) => runtime.sync.erase(account),
   });

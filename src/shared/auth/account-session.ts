@@ -23,15 +23,7 @@ export interface AccountToken {
   signal: AbortSignal;
 }
 
-export const accountLifecycleKinds = ['queue', 'stars', 'state'] as const;
-type LifecycleKind = (typeof accountLifecycleKinds)[number];
-interface LifecycleHooks {
-  suspend: () => Promise<void>;
-  erase: (account: string) => Promise<void>;
-}
-
 interface Effects {
-  isBlocked?: (account: string) => boolean;
   resetPlayer: (scope: AccountScope | undefined, revision: number) => void;
   reload: () => void;
   publish: () => void;
@@ -45,8 +37,10 @@ export class AccountSession {
   private checking?: { controller: AbortController; promise: Promise<void> };
   private tokenState?: AccountSnapshot;
   private cachedToken?: AccountToken;
-  private lifecycle = new Map<LifecycleKind, LifecycleHooks>();
-  private blockedSnapshot?: { source: AccountSnapshot; value: AccountSnapshot };
+  private lifecycle = new Set<{
+    suspend: () => Promise<void>;
+    erase: (account: string) => Promise<void>;
+  }>();
   private checkpoints = new Set<() => Promise<void>>();
 
   registerCheckpoint(checkpoint: () => Promise<void>) {
@@ -56,34 +50,23 @@ export class AccountSession {
     };
   }
 
-  registerLifecycle(kind: LifecycleKind, hooks: LifecycleHooks) {
-    if (this.lifecycle.has(kind))
-      throw new Error('Account lifecycle already registered');
-    this.lifecycle.set(kind, hooks);
+  registerLifecycle(hooks: {
+    suspend: () => Promise<void>;
+    erase: (account: string) => Promise<void>;
+  }) {
+    this.lifecycle.add(hooks);
     return () => {
-      if (this.lifecycle.get(kind) === hooks) this.lifecycle.delete(kind);
+      this.lifecycle.delete(hooks);
     };
   }
 
-  private requiredLifecycle() {
-    return accountLifecycleKinds.map((kind) => {
-      const hooks = this.lifecycle.get(kind);
-      if (!hooks)
-        throw new Error('Account cleanup is not initialized; retry required');
-      return hooks;
-    });
-  }
-
   async checkpointAndSuspend() {
-    const hooks = this.requiredLifecycle();
     await Promise.all([...this.checkpoints].map((checkpoint) => checkpoint()));
-    await Promise.all(hooks.map((value) => value.suspend()));
+    await Promise.all([...this.lifecycle].map((hooks) => hooks.suspend()));
   }
 
   async eraseConfirmedAccount(account: string) {
-    await Promise.all(
-      this.requiredLifecycle().map((value) => value.erase(account)),
-    );
+    await Promise.all([...this.lifecycle].map((hooks) => hooks.erase(account)));
   }
 
   constructor(
@@ -94,33 +77,7 @@ export class AccountSession {
     this.state = { user, ready: true, revision: 0, denied: new Set() };
   }
 
-  getSnapshot = () => {
-    let blocked = false;
-    if (this.scope !== null) {
-      try {
-        blocked = this.effects.isBlocked?.(this.scope) ?? false;
-      } catch {
-        blocked = true;
-      }
-    }
-    if (!blocked) return this.state;
-    if (this.blockedSnapshot?.source !== this.state)
-      this.blockedSnapshot = {
-        source: this.state,
-        value: { ...this.state, ready: false },
-      };
-    return this.blockedSnapshot.value;
-  };
-
-  get verifiedAccount() {
-    return this.state.ready ? this.scope : undefined;
-  }
-
-  refreshLocalFence(account: string) {
-    if (this.scope !== account) return;
-    this.retire(this.state.denied, true);
-    this.synchronizePlayer();
-  }
+  getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {
@@ -146,7 +103,7 @@ export class AccountSession {
 
   current(token: AccountToken, resource?: string | number) {
     return (
-      this.getSnapshot().ready &&
+      this.state.ready &&
       token.scope === this.scope &&
       token.revision === this.state.revision &&
       !token.signal.aborted &&
@@ -173,14 +130,11 @@ export class AccountSession {
       if (matches(mutation.options.mutationKey)) mutations.remove(mutation);
   }
 
-  private retire(
-    denied: ReadonlySet<string | number> = new Set(),
-    preserveVerification = false,
-  ) {
+  private retire(denied: ReadonlySet<string | number> = new Set()) {
     const previous = this.scope;
     this.state = {
       ...this.state,
-      ready: preserveVerification && this.state.ready,
+      ready: false,
       revision: this.state.revision + 1,
       denied,
     };
@@ -195,7 +149,7 @@ export class AccountSession {
 
   synchronizePlayer() {
     this.effects.resetPlayer(
-      this.getSnapshot().ready ? this.scope : undefined,
+      this.state.ready ? this.scope : undefined,
       this.state.revision,
     );
   }
