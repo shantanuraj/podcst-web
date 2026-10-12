@@ -35,6 +35,9 @@ export const emptyProgress = (): ProgressOutbox => ({
   failures: [],
 });
 export function resetProgress(state: ProgressOutbox) {
+  delete state.scope;
+  delete state.flight;
+  delete state.blocked;
   Object.assign(state, emptyProgress());
 }
 export function progressProjection(state: ProgressOutbox) {

@@ -2,7 +2,7 @@ import { get } from 'idb-keyval';
 import { useSyncExternalStore } from 'react';
 import { responseData } from '@/data/api';
 import { type StateFailures, StateRuntime } from '@/data/state-runtime';
-import { progressSyncStatus } from '@/data/state-status';
+import { blockedSyncStatus, progressSyncStatus } from '@/data/state-status';
 import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import type { AccountSession } from '@/shared/auth/account-session';
@@ -191,8 +191,8 @@ export function useDurableState() {
     unresolvedImports: follows?.importFailures ?? [],
     followsPending,
     error: current
-      ? (progress?.blocked ??
-        follows?.blocked ??
+      ? (blockedSyncStatus('progress', progress?.blocked) ??
+        blockedSyncStatus('follows', follows?.blocked) ??
         (state?.legacyFollows?.unresolved.length
           ? 'Some older follows need resolution; source data retained.'
           : undefined) ??

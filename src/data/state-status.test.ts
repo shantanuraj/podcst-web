@@ -51,8 +51,14 @@ test('saving the current position stays quiet while queued and in flight', () =>
 
 test('player preserves blocked streams and device errors without inventing progress for guest episodes', () => {
   const progress = emptyProgress();
-  progress.blocked = 'Progress needs recovery';
-  expect(progressSyncStatus(progress, episodeId)).toBe(progress.blocked);
+  progress.blocked = 'Invalid or stale progress snapshot';
+  expect(progressSyncStatus(progress, episodeId)).toBe(
+    'Listening progress syncing is paused.',
+  );
+  expect(progress.blocked).toBe('Invalid or stale progress snapshot');
+  expect(progressSyncStatus(progress, episodeId, 'Storage unavailable')).toBe(
+    'Storage unavailable',
+  );
   expect(progressSyncStatus(undefined, episodeId, 'Storage unavailable')).toBe(
     'Storage unavailable',
   );

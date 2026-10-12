@@ -29,20 +29,22 @@ import {
 
 export class StateProtocolError extends Error {}
 
-function resetForGenerationChange<T extends { scope?: StateScope }>(
+function resetForGenerationChange<
+  T extends { scope?: StateScope; queued: unknown[]; flight?: unknown },
+>(
   state: T,
   value: unknown,
+  account: string,
+  shape: 'progressSnapshot' | 'followSnapshot',
   reset: (state: T) => void,
 ) {
-  if (
-    !state.scope ||
-    !value ||
-    typeof value !== 'object' ||
-    !('generation' in value) ||
-    typeof value.generation !== 'string' ||
-    state.scope.generation === value.generation
-  )
-    return;
+  if (!stateValidator(shape)(value) || value.accountId !== account)
+    throw new StateProtocolError('Invalid account state snapshot');
+  if (!state.scope || state.scope.generation === value.generation) return;
+  if (state.queued.length || state.flight)
+    throw new StateProtocolError(
+      'Saved changes need recovery before syncing can continue.',
+    );
   reset(state);
 }
 
@@ -153,8 +155,15 @@ export class StateRuntime {
     const root = await this.update(epoch, (root) =>
       this.protocol(() => {
         const progress = accountState(root, account).progress;
-        resetForGenerationChange(progress, value, resetProgress);
-        installProgress(progress, value, account, ids, false);
+        resetForGenerationChange(
+          progress,
+          value,
+          account,
+          'progressSnapshot',
+          resetProgress,
+        );
+        if (!progress.blocked)
+          installProgress(progress, value, account, ids, false);
       }),
     );
     return ids
@@ -328,16 +337,6 @@ export class StateRuntime {
     ) => {
       if (epoch !== this.epoch) return;
       hadError = true;
-      if (error instanceof ApiError && error.code === 'recovery_required') {
-        try {
-          await this.update(epoch, (root) => {
-            const accountData = accountState(root, account);
-            if (resource === 'progress') resetProgress(accountData.progress);
-            else resetFollows(accountData.follows);
-          });
-          return;
-        } catch {}
-      }
       if (
         error instanceof StateProtocolError ||
         (error instanceof ApiError &&
@@ -366,22 +365,26 @@ export class StateRuntime {
         accountState(root, account);
       });
       try {
-        if (!root.accounts[account].progress.blocked) {
-          let progress = root.accounts[account].progress;
-          if (!progress.scope) {
-            const snapshot = await this.api.request(
-              '/progress?view=state&recent=1',
+        const snapshot = await this.api.request(
+          '/progress?view=state&recent=1',
+        );
+        active();
+        root = await this.update(epoch, (root) =>
+          this.protocol(() => {
+            const progress = accountState(root, account).progress;
+            resetForGenerationChange(
+              progress,
+              snapshot,
+              account,
+              'progressSnapshot',
+              resetProgress,
             );
-            active();
-            root = await this.update(epoch, (root) =>
-              this.protocol(() => {
-                const progress = accountState(root, account).progress;
-                resetForGenerationChange(progress, snapshot, resetProgress);
-                installProgress(progress, snapshot, account);
-              }),
-            );
-            progress = root.accounts[account].progress;
-          }
+            if (!progress.blocked)
+              installProgress(progress, snapshot, account, undefined, false);
+          }),
+        );
+        let progress = root.accounts[account].progress;
+        if (!progress.blocked) {
           do {
             root = await this.update(epoch, (root) =>
               this.protocol(() =>
@@ -419,7 +422,13 @@ export class StateRuntime {
             root = await this.update(epoch, (root) =>
               this.protocol(() => {
                 const progress = accountState(root, account).progress;
-                resetForGenerationChange(progress, snapshot, resetProgress);
+                resetForGenerationChange(
+                  progress,
+                  snapshot,
+                  account,
+                  'progressSnapshot',
+                  resetProgress,
+                );
                 installProgress(progress, snapshot, account, ids);
               }),
             );
@@ -431,21 +440,26 @@ export class StateRuntime {
         active();
       }
       resource = 'follows';
-      if (!root.accounts[account].follows.blocked) {
-        let follows = root.accounts[account].follows;
-        const snapshot = await this.api.request(
-          '/subscriptions?view=membership',
-        );
-        active();
-        root = await this.update(epoch, (root) => {
-          this.protocol(() => {
-            const follows = accountState(root, account).follows;
-            resetForGenerationChange(follows, snapshot, resetFollows);
+      const snapshot = await this.api.request('/subscriptions?view=membership');
+      active();
+      root = await this.update(epoch, (root) => {
+        this.protocol(() => {
+          const follows = accountState(root, account).follows;
+          resetForGenerationChange(
+            follows,
+            snapshot,
+            account,
+            'followSnapshot',
+            resetFollows,
+          );
+          if (!follows.blocked) {
             installFollows(follows, snapshot, account);
-          });
-          unionGuestFollows(root, account);
+            unionGuestFollows(root, account);
+          }
         });
-        follows = root.accounts[account].follows;
+      });
+      let follows = root.accounts[account].follows;
+      if (!follows.blocked) {
         while (follows.flight || follows.queued.length) {
           root = await this.update(epoch, (root) =>
             this.protocol(() =>
@@ -473,7 +487,13 @@ export class StateRuntime {
           root = await this.update(epoch, (root) =>
             this.protocol(() => {
               const follows = accountState(root, account).follows;
-              resetForGenerationChange(follows, snapshot, resetFollows);
+              resetForGenerationChange(
+                follows,
+                snapshot,
+                account,
+                'followSnapshot',
+                resetFollows,
+              );
               installFollows(follows, snapshot, account);
             }),
           );
@@ -560,6 +580,9 @@ export class StateRuntime {
         )
           throw new StateProtocolError('Invalid resolver response');
         await this.update(epoch, (root) => {
+          const current = accountState(root, account).follows.scope;
+          if (!current || !sameScope(current, scope))
+            throw new Error('Follow scope changed; imports retained.');
           for (const item of response.items) {
             if (item.status === 'resolved') {
               queueFollow(

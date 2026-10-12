@@ -31,7 +31,12 @@ export const emptyFollows = (): FollowOutbox => ({
   importFailures: [],
 });
 export function resetFollows(state: FollowOutbox) {
-  Object.assign(state, emptyFollows());
+  const { importFailures } = state;
+  delete state.scope;
+  delete state.snapshot;
+  delete state.flight;
+  delete state.blocked;
+  Object.assign(state, emptyFollows(), { importFailures });
 }
 export function followProjection(state: FollowOutbox) {
   const items = new Map(

@@ -214,3 +214,41 @@ test('a currently followed podcast stays clean even when an older failure receip
     await f.dispose();
   }
 });
+
+test('blocked follows show a friendly status and retain the raw diagnostic', async () => {
+  const f = await fixture();
+  const diagnostic = 'Invalid or stale follow snapshot';
+  try {
+    await f.sync.storage.update((root) => {
+      accountState(root, scope.accountId).follows.blocked = diagnostic;
+    });
+    await f.sync.reload();
+    const before = await f.sync.storage.load();
+    const markup = f.render();
+    expect(markup).toContain(
+      '<span role="status">Subscription syncing is paused.</span>',
+    );
+    expect(markup).not.toContain(diagnostic);
+    expect(markup).not.toContain('Saved on this device. Waiting to sync…');
+    expect(before.accounts[scope.accountId].follows.blocked).toBe(diagnostic);
+    expect(await f.sync.storage.load()).toEqual(before);
+  } finally {
+    await f.dispose();
+  }
+});
+
+test('a failed local follow save still reports the device error', async () => {
+  const f = await fixture();
+  const update = spyOn(f.sync.storage, 'update').mockRejectedValueOnce(
+    new Error('Disk full'),
+  );
+  try {
+    await expect(f.subscribe()).rejects.toThrow('Disk full');
+    expect(f.render()).toContain(
+      '<span role="status">Follow could not be saved on this device.</span>',
+    );
+  } finally {
+    update.mockRestore();
+    await f.dispose();
+  }
+});

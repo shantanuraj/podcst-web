@@ -111,6 +111,8 @@ async function fixture({
     Object.assign(
       async (input: RequestInfo | URL) => {
         const path = String(input);
+        if (path.startsWith('/api/progress?'))
+          return Response.json({ ...scope, revision: '0', items: [] });
         if (starred && path === '/api/auth/session')
           return Response.json({ user: { id: scope.accountId } });
         if (starred && path === '/api/lists')
@@ -600,19 +602,34 @@ test('a failed sync remains visible while cached subscriptions stay available', 
   }
 });
 
-test('blocked progress still asks for recovery instead of hiding the failure', async () => {
+test.each([
+  [
+    'progress',
+    'Invalid or stale progress snapshot',
+    'Listening progress syncing is paused.',
+  ],
+  [
+    'follows',
+    'Invalid or stale follow snapshot',
+    'Subscription syncing is paused.',
+  ],
+] as const)('blocked %s displays a friendly status while retaining its diagnostic', async (resource, diagnostic, status) => {
   const f = await fixture({ items: [membership('7')], catalogue: [podcast] });
   try {
     await f.sync.storage.update((root) => {
-      const progress = accountState(root, scope.accountId).progress;
-      queueProgress(progress, '701', 'checkpoint', 12);
-      progress.blocked = 'Progress needs recovery';
+      const state = accountState(root, scope.accountId);
+      queueProgress(state.progress, '701', 'checkpoint', 12);
+      state[resource].blocked = diagnostic;
     });
     await f.sync.reload();
     const markup = f.render();
-    expect(markup).toContain('Progress needs recovery');
+    expect(markup).toContain(status);
+    expect(markup).not.toContain(diagnostic);
     expect(markup).not.toContain('Saved on this device. Waiting to sync…');
     expect(section(markup, 'Subscriptions')).toContain(podcast.title);
+    expect(
+      (await f.sync.storage.load()).accounts[scope.accountId][resource].blocked,
+    ).toBe(diagnostic);
   } finally {
     await f.dispose();
   }
