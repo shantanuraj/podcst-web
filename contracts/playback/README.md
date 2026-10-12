@@ -53,7 +53,9 @@ Each case starts from an empty preference store and applies `steps`. Options are
 
 Chapter lines may start with a timestamp separated from the title by whitespace,
 a closing bracket, or punctuation (`–`, `|`, `:`, `.`), or end with an explicit marker:
-`Title (12:34)`, `Title [12:34]`, `Title – 12:34`, or `Title | 12:34`.
+`Title (12:34)`, `Title [12:34]`, `Title – 12:34`, `Title | 12:34`, or
+`Title: 12:34`. A colon delimiter requires whitespace before the timestamp;
+whitespace before the colon is optional. Colons within the title are preserved.
 Parentheses and brackets also accept `starts at` / `starts around`, optionally
 prefixed by `story`, `chapter`, or `segment`, case-insensitively; `start` is also
 accepted. For example, `Title by Author (Story starts around 00:05:45)` yields
@@ -61,7 +63,8 @@ accepted. For example, `Title by Author (Story starts around 00:05:45)` yields
 both forms may appear in the same notes.
 
 Trailing markers must occupy the end of their line, with matching brackets and a
-complete, valid timestamp. Ordinary prose such as `Intro at 12:34` is not a chapter marker.
+complete, valid timestamp. Four-part timecodes such as `00:13:00:22` are not
+interpreted as timestamps. Ordinary prose such as `Intro at 12:34` is not a chapter marker.
 Chapters need nonempty titles and at least two strictly increasing start times;
 duplicate or reversed starts invalidate the timeline rather than being reordered.
 

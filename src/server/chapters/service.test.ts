@@ -309,22 +309,23 @@ for (const result of [
   { ...metadata, chapters: [] },
   { status: 'failed' },
 ] satisfies ChapterFetchResult[]) {
-  test(`returns title-first show-note chapters when embedded extraction is ${result.status}`, async () => {
-    const h = fixture();
-    const notes = showNotesVectors.chapters[0];
-    h.current.summary = notes.html;
-    h.fetch.mockResolvedValue(result);
-    const service = h.instance();
-    for (let request = 0; request < 2; request++) {
-      const response = await chapterResponse('42', null, service);
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
-        source: 'shownotes',
-        chapters: notes.expected,
-      });
-    }
-    expect(h.fetch).toHaveBeenCalledTimes(1);
-  });
+  for (const notes of showNotesVectors.chapters.slice(0, 2)) {
+    test(`returns title-first chapters for ${notes.expected[0].title} when embedded extraction is ${result.status}`, async () => {
+      const h = fixture();
+      h.current.summary = notes.html;
+      h.fetch.mockResolvedValue(result);
+      const service = h.instance();
+      for (let request = 0; request < 2; request++) {
+        const response = await chapterResponse('42', null, service);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+          source: 'shownotes',
+          chapters: notes.expected,
+        });
+      }
+      expect(h.fetch).toHaveBeenCalledTimes(1);
+    });
+  }
 }
 
 for (const status of ['absent', 'failure'] as const) {

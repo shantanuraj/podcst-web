@@ -78,7 +78,7 @@ export function showNoteChapters(html: string): Chapter[] {
     const trailing = leading
       ? null
       : line.match(
-          /^(.*\S)\s+(?:\(([^()]*)\)|\[([^[\]]*)\]|[\p{Pd}|]\s+(\S+))\s*$/u,
+          /^(.*\S)(?:\s+(?:\(([^()]*)\)|\[([^[\]]*)\]|[\p{Pd}|]\s+(\S+))|\s*:\s+(\S+))\s*$/u,
         );
     const timestamp = leading?.[1] ?? trailing?.slice(2).find(Boolean);
     const name = leading?.[2] ?? trailing?.[1];

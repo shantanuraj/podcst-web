@@ -31,7 +31,7 @@ enum ShowNotesParser {
     private static let timestampPattern = #"(?<![A-Za-z0-9])(?:[0-9]{1,2}:)?[0-9]{1,2}:[0-5][0-9](?![A-Za-z0-9])"#
     private static let timestampRegex = try! NSRegularExpression(pattern: timestampPattern)
     private static let chapterRegex = try! NSRegularExpression(pattern: #"^\s*[\p{P}\p{S}]*\s*(\#(timestampPattern))(?:[\])]\s*|[\p{Pd}|.]\s*|:(?![0-9])\s*|\s+)(.+?)\s*$"#)
-    private static let trailingChapterRegex = try! NSRegularExpression(pattern: #"^(.*\S)\s+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|]\s+(\S+))\s*$"#)
+    private static let trailingChapterRegex = try! NSRegularExpression(pattern: #"^(.*\S)(?:\s+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|]\s+(\S+))|\s*:\s+(\S+))\s*$"#)
 
     static func notes(of episode: Episode) -> String {
         episode.showNotes.isEmpty ? episode.summary ?? "" : episode.showNotes
@@ -66,7 +66,7 @@ enum ShowNotesParser {
             let leading = chapterRegex.firstMatch(in: line, range: range)
             let trailing = leading == nil ? trailingChapterRegex.firstMatch(in: line, range: range) : nil
             guard let match = leading ?? trailing,
-                  let timestamp = (leading == nil ? [2, 3, 4] : [1]).compactMap({ Range(match.range(at: $0), in: line) }).first,
+                  let timestamp = (leading == nil ? 2..<match.numberOfRanges : 1..<2).compactMap({ Range(match.range(at: $0), in: line) }).first,
                   let title = Range(match.range(at: leading == nil ? 1 : 2), in: line) else { return nil }
             let value = line[timestamp].trimmingCharacters(in: .whitespaces)
                 .replacingOccurrences(of: #"^(?:(?:story|chapter|segment)\s+)?starts?\s+(?:at|around)\s+"#, with: "", options: [.regularExpression, .caseInsensitive])

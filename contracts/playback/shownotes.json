@@ -11,6 +11,54 @@
       ]
     },
     {
+      "html": "<p>Intro from Tim: 00:00:00</p><p>Esther Perel: 00:01:58</p><p>Brené Brown: 00:08:21</p>",
+      "expected": [
+        { "title": "Intro from Tim", "start": 0 },
+        { "title": "Esther Perel", "start": 118 },
+        { "title": "Brené Brown", "start": 501 }
+      ]
+    },
+    {
+      "html": "<ul><li>Opening:&nbsp;<a href=\"https://example.invalid\">00:00</a></li><li><b>Part 1: The setup</b> : 01:00</li><li>Closing:\t1:02:03</li></ul>",
+      "expected": [
+        { "title": "Opening", "start": 0 },
+        { "title": "Part 1: The setup", "start": 60 },
+        { "title": "Closing", "start": 3723 }
+      ]
+    },
+    {
+      "html": "00:00 Opening<br>Middle: 01:00<br>Closing (02:00)",
+      "expected": [
+        { "title": "Opening", "start": 0 },
+        { "title": "Middle", "start": 60 },
+        { "title": "Closing", "start": 120 }
+      ]
+    },
+    {
+      "html": "Opening: 00:13:00:22<br>Closing: 00:20:18:27<br>Invalid: 01:60<br>Also invalid: 1:60:00",
+      "expected": []
+    },
+    {
+      "html": "Opening: at 00:00<br>Closing: 01:00 with more prose",
+      "expected": []
+    },
+    {
+      "html": ": 00:00<br> : 01:00<br>Opening:00:00<br>Closing:01:00",
+      "expected": []
+    },
+    {
+      "html": "Only one: 00:00",
+      "expected": []
+    },
+    {
+      "html": "Opening: 00:00<br>Same start: 00:00",
+      "expected": []
+    },
+    {
+      "html": "Late: 10:00<br>Early: 02:00",
+      "expected": []
+    },
+    {
       "html": "00:00 Opening<br>First topic (02:14)<br>Second topic [17:40]<br>Third topic – 25:00<br>Closing | 1:02:05",
       "expected": [
         { "title": "Opening", "start": 0 },
@@ -49,10 +97,11 @@
       ]
     },
     {
-      "html": "00:00 Opening (03:00)<br>01:00 Closing [05:00]",
+      "html": "00:00 Opening (03:00)<br>01:00 Closing [05:00]<br>02:00 Outro: 06:00",
       "expected": [
         { "title": "Opening (03:00)", "start": 0 },
-        { "title": "Closing [05:00]", "start": 60 }
+        { "title": "Closing [05:00]", "start": 60 },
+        { "title": "Outro: 06:00", "start": 120 }
       ]
     },
     {

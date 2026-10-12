@@ -22,7 +22,7 @@ object ShowNotes {
     private const val TIMESTAMP = "(?<![A-Za-z0-9])(?:[0-9]{1,2}:)?[0-9]{1,2}:[0-5][0-9](?![A-Za-z0-9])"
     private val timestamp = Regex(TIMESTAMP)
     private val chapter = Regex("""^[\s\p{Z}]*[\p{P}\p{S}]*[\s\p{Z}]*($TIMESTAMP)(?:[\])][\s\p{Z}]*|[\p{Pd}|.][\s\p{Z}]*|:(?![0-9])[\s\p{Z}]*|[\s\p{Z}]+)(.+?)[\s\p{Z}]*$""")
-    private val trailingChapter = Regex("""^(.*[^\s\p{Z}])[\s\p{Z}]+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|][\s\p{Z}]+([^\s\p{Z}]+))[\s\p{Z}]*$""")
+    private val trailingChapter = Regex("""^(.*[^\s\p{Z}])(?:[\s\p{Z}]+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|][\s\p{Z}]+([^\s\p{Z}]+))|[\s\p{Z}]*:[\s\p{Z}]+([^\s\p{Z}]+))[\s\p{Z}]*$""")
     private val chapterAnnotation = Regex("""^(?:(?:story|chapter|segment)[\s\p{Z}]+)?starts?[\s\p{Z}]+(?:at|around)[\s\p{Z}]+""", RegexOption.IGNORE_CASE)
     private val titleSeparator = Regex("""^[\p{Pd}:|.]+[\s\p{Z}]+""")
     private val lineBreak = Regex("<(br|/p|/li|/div|/h[1-6])[^>]*>", RegexOption.IGNORE_CASE)
