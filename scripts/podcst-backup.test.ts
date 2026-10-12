@@ -180,6 +180,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await target`DELETE FROM podcst_migrations.history`;
       await target`DELETE FROM genres`;
       await target`DELETE FROM state_generation`;
+      await target`DELETE FROM podcast_index_sync_state`;
       for (const table of tables) {
         expect(
           (await target`SELECT count(*)::int AS count FROM ${target(table)}`)[0]

@@ -113,8 +113,8 @@ receipts and erasure/revocation records.
    Do not restore selected archive DDL as a schema: table selection omits function
    dependencies such as ownership guards. Keep foreign keys and triggers enabled,
    fence all writers and admit no traffic. Remove only the disposable bootstrap
-   `genres`, `state_generation` and migration-ledger rows before loading captured
-   data; do not preseed catalogue or account parents.
+   `genres`, `state_generation`, `podcast_index_sync_state` and migration-ledger
+   rows before loading captured data; do not preseed catalogue or account parents.
 5. Review `pg_restore --list` and construct a `--use-list` containing each selected
    `TABLE DATA` entry in the script's parent-first selection order, followed by all
    owned `SEQUENCE SET` entries. Use `--data-only --exit-on-error
