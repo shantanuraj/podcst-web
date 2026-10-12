@@ -204,7 +204,7 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     expect(requests).toBe(2);
   });
 
-  test('failed requests back off across page opens, rebuilds, and scheduled polls', async () => {
+  test('failed requests back off across page opens and scheduled polls while rebuilds get one demand attempt', async () => {
     respond = async () => new Response(null, { status: 503 });
     expect(await refreshFeed(sql, 139)).toBe('error');
     const [state] = await sql`
@@ -221,10 +221,11 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     expect(state.last_error_at).toBeInstanceOf(Date);
     expect(state.failing_since).toBeInstanceOf(Date);
     expect(await getDuePodcasts(sql, 500)).toEqual([]);
-    for (const mode of ['stale', 'scheduled', 'rebuild'] as const) {
+    for (const mode of ['stale', 'scheduled'] as const) {
       expect(await refreshFeed(sql, 139, mode)).toBe('skipped');
     }
-    expect(requests).toBe(1);
+    expect(await refreshFeed(sql, 139, 'rebuild')).toBe('error');
+    expect(requests).toBe(2);
   });
 
   test('repeated failures keep catalogue state and successful retries recover', async () => {
