@@ -30,8 +30,8 @@ extension [Chapter] {
 enum ShowNotesParser {
     private static let timestampPattern = #"(?<![A-Za-z0-9])(?:[0-9]{1,2}:)?[0-9]{1,2}:[0-5][0-9](?![A-Za-z0-9])"#
     private static let timestampRegex = try! NSRegularExpression(pattern: timestampPattern)
-    private static let chapterRegex = try! NSRegularExpression(pattern: #"^\s*[\p{P}\p{S}]*\s*(\#(timestampPattern))(?:[\])]\s*|[\p{Pd}|.]\s*|:(?![0-9])\s*|\s+)(.+?)\s*$"#)
-    private static let trailingChapterRegex = try! NSRegularExpression(pattern: #"^(.*\S)(?:\s+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|]\s+(\S+))|\s*:\s+(\S+))\s*$"#)
+    private static let chapterRegex = try! NSRegularExpression(pattern: #"^[\p{P}\p{S}]*\s*(\#(timestampPattern))(?:[\])]\s*|[\p{Pd}|.]\s*|:(?![0-9])\s*|\s+)(.+)$"#)
+    private static let trailingChapterRegex = try! NSRegularExpression(pattern: #"^(.*\S)(?:\s+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|]\s+(\S+))|\s*:\s+(\S+))$"#)
 
     static func notes(of episode: Episode) -> String {
         episode.showNotes.isEmpty ? episode.summary ?? "" : episode.showNotes

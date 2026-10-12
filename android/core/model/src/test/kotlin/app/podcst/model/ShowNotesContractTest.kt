@@ -30,6 +30,17 @@ class ShowNotesContractTest {
     }
 
     @Test
+    fun parsesLongWhitespaceRunsInChapterTitles() {
+        for (whitespace in listOf(" ", "\t", "\u00a0")) {
+            val title = "Intro${whitespace.repeat(100_000)}more text"
+            assertEquals(
+                listOf(Chapter(title, 0.seconds), Chapter("End", 60.seconds)),
+                ShowNotes.chapters("00:00 $title<br>01:00 End"),
+            )
+        }
+    }
+
+    @Test
     fun timestampsMatchSharedVectors() {
         vectors.getValue("timestamps").jsonArray.map { it.jsonObject }.forEach { case ->
             val text = case.getValue("text").string

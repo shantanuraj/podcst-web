@@ -339,6 +339,16 @@ final class ContractFixtureTests: XCTestCase {
         XCTAssertEqual(ShowNotesParser.chapters("\(whitespace)Prose without a chapter"), [])
     }
 
+    func testShowNotesParseLongWhitespaceRunsInChapterTitles() {
+        for whitespace in [" ", "\t", "\u{00a0}"] {
+            let title = "Intro\(String(repeating: whitespace, count: 100_000))more text"
+            XCTAssertEqual(ShowNotesParser.chapters("00:00 \(title)<br>01:00 End"), [
+                Chapter(title: title, start: 0),
+                Chapter(title: "End", start: 60),
+            ])
+        }
+    }
+
     func testReleaseVectorsMatch() throws {
         let vectors = try JSONDecoder().decode(ReleaseVectors.self, from: contractData("playback/releases.json"))
         for vector in vectors.sections {

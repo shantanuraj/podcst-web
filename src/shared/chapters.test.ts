@@ -40,6 +40,19 @@ test('rejects long non-chapter lines with large whitespace runs', () => {
   expect(showNoteChapters(`${whitespace}Prose without a chapter`)).toEqual([]);
 });
 
+for (const whitespace of [' ', '\t', '\u00a0']) {
+  test(`parses timestamp-first titles containing long ${JSON.stringify(whitespace)} runs`, () => {
+    expect(
+      showNoteChapters(
+        `00:00 Intro${whitespace.repeat(100_000)}more text<br>01:00 End`,
+      ),
+    ).toEqual([
+      { title: 'Intro more text', start: 0 },
+      { title: 'End', start: 60 },
+    ]);
+  });
+}
+
 test('chapter boundaries and navigation follow source-time rules', () => {
   const chapters = [
     { start: 10, title: 'First' },
