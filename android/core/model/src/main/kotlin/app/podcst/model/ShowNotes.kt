@@ -21,16 +21,25 @@ data class Timestamp(val text: String, val range: IntRange, val position: Durati
 object ShowNotes {
     private const val TIMESTAMP = "(?<![A-Za-z0-9])(?:[0-9]{1,2}:)?[0-9]{1,2}:[0-5][0-9](?![A-Za-z0-9])"
     private val timestamp = Regex(TIMESTAMP)
-    private val chapter = Regex("^[\\s\\p{Z}\\p{P}\\p{S}]*($TIMESTAMP)[\\s\\p{Z}\\p{Pd}:|)\\].]*(.+)$")
+    private val chapter = Regex("""^[\s\p{Z}]*[\p{P}\p{S}]*[\s\p{Z}]*($TIMESTAMP)(?:[\])][\s\p{Z}]*|[\p{Pd}|.][\s\p{Z}]*|:(?![0-9])[\s\p{Z}]*|[\s\p{Z}]+)(.+?)[\s\p{Z}]*$""")
+    private val trailingChapter = Regex("""^(.*[^\s\p{Z}])[\s\p{Z}]+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|][\s\p{Z}]+([^\s\p{Z}]+))[\s\p{Z}]*$""")
+    private val chapterAnnotation = Regex("""^(?:(?:story|chapter|segment)[\s\p{Z}]+)?starts?[\s\p{Z}]+(?:at|around)[\s\p{Z}]+""", RegexOption.IGNORE_CASE)
+    private val titleSeparator = Regex("""^[\p{Pd}:|.]+[\s\p{Z}]+""")
     private val lineBreak = Regex("<(br|/p|/li|/div|/h[1-6])[^>]*>", RegexOption.IGNORE_CASE)
     private val tag = Regex("<[^>]+>")
     private val entities = listOf("&nbsp;" to " ", "&amp;" to "&", "&#39;" to "'", "&quot;" to "\"")
 
     fun chapters(html: String): List<Chapter> {
-        val chapters = plainText(lineBreak.replace(html, "\n")).lineSequence().mapNotNull { line ->
-            val match = chapter.find(line) ?: return@mapNotNull null
-            val start = position(match.groupValues[1]) ?: return@mapNotNull null
-            val title = match.groupValues[2].trim { it.isWhitespace() }
+        val chapters = plainText(lineBreak.replace(html, "\n")).lineSequence().mapNotNull { raw ->
+            val line = raw.trim { it.isWhitespace() }
+            val leading = chapter.find(line)
+            val trailing = if (leading == null) trailingChapter.find(line) else null
+            val value = (leading?.groupValues?.get(1) ?: trailing?.groupValues?.drop(2)?.firstOrNull { it.isNotEmpty() })
+                ?.trim { it.isWhitespace() }?.replaceFirst(chapterAnnotation, "") ?: return@mapNotNull null
+            if (!timestamp.matches(value)) return@mapNotNull null
+            val start = position(value) ?: return@mapNotNull null
+            val title = (leading?.groupValues?.get(2) ?: trailing?.groupValues?.get(1))
+                ?.trim { it.isWhitespace() }?.replaceFirst(titleSeparator, "") ?: return@mapNotNull null
             title.takeIf { it.isNotEmpty() }?.let { Chapter(it, start) }
         }.toList()
         return chapters.takeIf { it.size >= PlaybackRules.MINIMUM_CHAPTERS && it.zipWithNext().all { (a, b) -> a.start < b.start } } ?: emptyList()

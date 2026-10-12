@@ -1,6 +1,104 @@
 {
   "chapters": [
     {
+      "html": "<p>Five stories tonight.</p><p>\"First Story\" by A. Author (Story starts around 00:05:45)<br>Produced by Someone<br>Cast: A narrator</p><p>\"Second Story\" by B. Author (Story starts around 00:19:45)</p><p>\"Third Story\" by C. Author (Story starts around 00:29:30)</p><p>\"Fourth Story\" by D. Author (Story starts around 01:12:05)</p><p>\"Final Story\" by E. Author (Story starts around 01:36:00)</p>",
+      "expected": [
+        { "title": "\"First Story\" by A. Author", "start": 345 },
+        { "title": "\"Second Story\" by B. Author", "start": 1185 },
+        { "title": "\"Third Story\" by C. Author", "start": 1770 },
+        { "title": "\"Fourth Story\" by D. Author", "start": 4325 },
+        { "title": "\"Final Story\" by E. Author", "start": 5760 }
+      ]
+    },
+    {
+      "html": "00:00 Opening<br>First topic (02:14)<br>Second topic [17:40]<br>Third topic – 25:00<br>Closing | 1:02:05",
+      "expected": [
+        { "title": "Opening", "start": 0 },
+        { "title": "First topic", "start": 134 },
+        { "title": "Second topic", "start": 1060 },
+        { "title": "Third topic", "start": 1500 },
+        { "title": "Closing", "start": 3725 }
+      ]
+    },
+    {
+      "html": "<ul><li><b>Opening</b> ( STORY STARTS AT <a href=\"https://example.invalid\">00:00</a> )</li><li>Topic [Chapter starts around 01:00]</li><li>Q&amp;A (segment start at 02:00)</li><li>Closing (starts around 03:00)</li></ul>",
+      "expected": [
+        { "title": "Opening", "start": 0 },
+        { "title": "Topic", "start": 60 },
+        { "title": "Q&A", "start": 120 },
+        { "title": "Closing", "start": 180 }
+      ]
+    },
+    {
+      "html": "Revisiting (part one) (00:00)<br>   - Revisiting [part two] [01:00]<br>Two - parts — 02:00",
+      "expected": [
+        { "title": "Revisiting (part one)", "start": 0 },
+        { "title": "Revisiting [part two]", "start": 60 },
+        { "title": "Two - parts", "start": 120 }
+      ]
+    },
+    {
+      "html": "00:00: Opening<br>01:00–First topic<br>02:00|Second topic<br>[03:00]Third topic<br>(04:00): Fourth topic<br>05:00. Closing",
+      "expected": [
+        { "title": "Opening", "start": 0 },
+        { "title": "First topic", "start": 60 },
+        { "title": "Second topic", "start": 120 },
+        { "title": "Third topic", "start": 180 },
+        { "title": "Fourth topic", "start": 240 },
+        { "title": "Closing", "start": 300 }
+      ]
+    },
+    {
+      "html": "00:00 Opening (03:00)<br>01:00 Closing [05:00]",
+      "expected": [
+        { "title": "Opening (03:00)", "start": 0 },
+        { "title": "Closing [05:00]", "start": 60 }
+      ]
+    },
+    {
+      "html": "Opening (00:00)<br>Invalid (01:60)<br>Also invalid [1:60:00]<br>Closing (02:00)",
+      "expected": [
+        { "title": "Opening", "start": 0 },
+        { "title": "Closing", "start": 120 }
+      ]
+    },
+    {
+      "html": "We start at 00:00 today.<br>Later at 02:00 we discuss the news.<br>Recorded (at 03:00)<br>Released [around 04:00]",
+      "expected": []
+    },
+    {
+      "html": "Opening (00:00]<br>Closing [01:00)",
+      "expected": []
+    },
+    {
+      "html": "Opening (00:00:00:00)<br>Closing [00:00:01:00]<br>00:00:02:00 Invalid prefix<br>00:00:03:00 Invalid again",
+      "expected": []
+    },
+    {
+      "html": "Opening (-01:00)<br>Closing (01:00.5)<br>Afterwards (1:00pm)",
+      "expected": []
+    },
+    {
+      "html": "Late (10:00)<br>Early (02:00)",
+      "expected": []
+    },
+    {
+      "html": "Opening (00:00)<br>Same start [00:00]",
+      "expected": []
+    },
+    {
+      "html": "Only one story (Story starts around 00:05:45)",
+      "expected": []
+    },
+    {
+      "html": "(00:00)<br>[01:00]<br>   (02:00)",
+      "expected": []
+    },
+    {
+      "html": "Opening (Story starts around 00:00 today)<br>Closing (Story starts at 01:00) with more prose",
+      "expected": []
+    },
+    {
       "html": "<p>Why attention feels free.</p><ul><li>00:00 Cold open</li><li>(02:14) The price of a glance</li><li>17:40 – Scarcity, reconsidered</li><li>1:02:05 What we owe each other</li></ul><p>At 12:30 we digress.</p>",
       "expected": [
         {
@@ -196,10 +294,7 @@
   "timestamps": [
     {
       "text": "Jump to 02:14 or 1:02:03.",
-      "expected": [
-        "02:14",
-        "1:02:03"
-      ]
+      "expected": ["02:14", "1:02:03"]
     },
     {
       "text": "Version2:30 and 2:30pm and 12:345",
@@ -207,47 +302,31 @@
     },
     {
       "text": "Minutes 75:00 and 5:60",
-      "expected": [
-        "75:00"
-      ]
+      "expected": ["75:00"]
     },
     {
       "text": "1:2:03",
-      "expected": [
-        "1:2:03"
-      ]
+      "expected": ["1:2:03"]
     },
     {
       "text": "(00:00) start",
-      "expected": [
-        "00:00"
-      ]
+      "expected": ["00:00"]
     },
     {
       "text": "10:00:00:00",
-      "expected": [
-        "10:00:00"
-      ]
+      "expected": ["10:00:00"]
     },
     {
       "text": "at 3:33.",
-      "expected": [
-        "3:33"
-      ]
+      "expected": ["3:33"]
     },
     {
       "text": "00:00–05:00",
-      "expected": [
-        "00:00",
-        "05:00"
-      ]
+      "expected": ["00:00", "05:00"]
     },
     {
       "text": "1:02:03:04 and 99:59:59",
-      "expected": [
-        "1:02:03",
-        "99:59:59"
-      ]
+      "expected": ["1:02:03", "99:59:59"]
     }
   ],
   "seconds": [

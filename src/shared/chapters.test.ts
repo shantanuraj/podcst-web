@@ -34,6 +34,12 @@ test('decodes HTML entities and discards scripts without rendering HTML', () => 
   ]);
 });
 
+test('rejects long non-chapter lines with large whitespace runs', () => {
+  const whitespace = ' '.repeat(100_000);
+  expect(showNoteChapters(`Prose${whitespace}without a chapter`)).toEqual([]);
+  expect(showNoteChapters(`${whitespace}Prose without a chapter`)).toEqual([]);
+});
+
 test('chapter boundaries and navigation follow source-time rules', () => {
   const chapters = [
     { start: 10, title: 'First' },

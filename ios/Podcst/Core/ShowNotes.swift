@@ -30,7 +30,8 @@ extension [Chapter] {
 enum ShowNotesParser {
     private static let timestampPattern = #"(?<![A-Za-z0-9])(?:[0-9]{1,2}:)?[0-9]{1,2}:[0-5][0-9](?![A-Za-z0-9])"#
     private static let timestampRegex = try! NSRegularExpression(pattern: timestampPattern)
-    private static let chapterRegex = try! NSRegularExpression(pattern: #"^[\s\p{P}\p{S}]*(\#(timestampPattern))[\s\p{Pd}:|)\].]*(.+)$"#)
+    private static let chapterRegex = try! NSRegularExpression(pattern: #"^\s*[\p{P}\p{S}]*\s*(\#(timestampPattern))(?:[\])]\s*|[\p{Pd}|.]\s*|:(?![0-9])\s*|\s+)(.+?)\s*$"#)
+    private static let trailingChapterRegex = try! NSRegularExpression(pattern: #"^(.*\S)\s+(?:\(([^()]*)\)|\[([^\[\]]*)\]|[\p{Pd}|]\s+(\S+))\s*$"#)
 
     static func notes(of episode: Episode) -> String {
         episode.showNotes.isEmpty ? episode.summary ?? "" : episode.showNotes
@@ -60,12 +61,20 @@ enum ShowNotesParser {
             .replacingOccurrences(of: #"<(br|/p|/li|/div|/h[1-6])[^>]*>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
             .strippingHTML
         let chapters = text.split(whereSeparator: \.isNewline).compactMap { line -> Chapter? in
-            let line = String(line)
-            guard let match = chapterRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-                  let timestamp = Range(match.range(at: 1), in: line),
-                  let title = Range(match.range(at: 2), in: line),
-                  let start = seconds(from: String(line[timestamp])) else { return nil }
+            let line = line.trimmingCharacters(in: .whitespaces)
+            let range = NSRange(line.startIndex..., in: line)
+            let leading = chapterRegex.firstMatch(in: line, range: range)
+            let trailing = leading == nil ? trailingChapterRegex.firstMatch(in: line, range: range) : nil
+            guard let match = leading ?? trailing,
+                  let timestamp = (leading == nil ? [2, 3, 4] : [1]).compactMap({ Range(match.range(at: $0), in: line) }).first,
+                  let title = Range(match.range(at: leading == nil ? 1 : 2), in: line) else { return nil }
+            let value = line[timestamp].trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: #"^(?:(?:story|chapter|segment)\s+)?starts?\s+(?:at|around)\s+"#, with: "", options: [.regularExpression, .caseInsensitive])
+            let timestampRange = NSRange(value.startIndex..., in: value)
+            guard timestampRegex.firstMatch(in: value, range: timestampRange)?.range == timestampRange,
+                  let start = seconds(from: value) else { return nil }
             let name = line[title].trimmingCharacters(in: .whitespaces)
+                .replacingOccurrences(of: #"^[\p{Pd}:|.]+\s+"#, with: "", options: .regularExpression)
             return name.isEmpty ? nil : Chapter(title: name, start: start)
         }
         guard chapters.count >= 2, zip(chapters, chapters.dropFirst()).allSatisfy({ $0.start < $1.start }) else { return [] }

@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import showNotesVectors from '../../../contracts/playback/shownotes.json';
 import { MemoryChapterCache } from './__fixtures__/cache';
 import {
   ABSENT_TTL_MS,
@@ -303,6 +304,28 @@ test('enclosure changes invalidate identity while notes are always derived from 
   await service(42, null);
   expect(h.fetch).toHaveBeenCalledTimes(3);
 });
+
+for (const result of [
+  { ...metadata, chapters: [] },
+  { status: 'failed' },
+] satisfies ChapterFetchResult[]) {
+  test(`returns title-first show-note chapters when embedded extraction is ${result.status}`, async () => {
+    const h = fixture();
+    const notes = showNotesVectors.chapters[0];
+    h.current.summary = notes.html;
+    h.fetch.mockResolvedValue(result);
+    const service = h.instance();
+    for (let request = 0; request < 2; request++) {
+      const response = await chapterResponse('42', null, service);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        source: 'shownotes',
+        chapters: notes.expected,
+      });
+    }
+    expect(h.fetch).toHaveBeenCalledTimes(1);
+  });
+}
 
 for (const status of ['absent', 'failure'] as const) {
   test(`${status} results use short TTLs, not six-month retention`, async () => {

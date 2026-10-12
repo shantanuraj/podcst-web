@@ -51,6 +51,20 @@ Each case starts from an empty preference store and applies `steps`. Options are
 
 `chapters[].html` is show-notes HTML and `expected` the parsed chapters, with `start` in seconds. `timestamps[].text` is plain text and `expected` the timestamp strings that become seek links. `seconds[]` converts a timestamp to seconds; `null` means rejected.
 
+Chapter lines may start with a timestamp separated from the title by whitespace,
+a closing bracket, or punctuation (`–`, `|`, `:`, `.`), or end with an explicit marker:
+`Title (12:34)`, `Title [12:34]`, `Title – 12:34`, or `Title | 12:34`.
+Parentheses and brackets also accept `starts at` / `starts around`, optionally
+prefixed by `story`, `chapter`, or `segment`, case-insensitively; `start` is also
+accepted. For example, `Title by Author (Story starts around 00:05:45)` yields
+`Title by Author` at 345 seconds. Timestamp-first lines take precedence, and
+both forms may appear in the same notes.
+
+Trailing markers must occupy the end of their line, with matching brackets and a
+complete, valid timestamp. Ordinary prose such as `Intro at 12:34` is not a chapter marker.
+Chapters need nonempty titles and at least two strictly increasing start times;
+duplicate or reversed starts invalidate the timeline rather than being reordered.
+
 The iOS patterns use ICU semantics. `\s`, `\p{P}`, `\p{S}` and `\p{Pd}` are Unicode classes, line splitting accepts every Unicode newline, and title trimming removes Unicode spaces but not newlines. A Java or Kotlin port needs `Pattern.UNICODE_CHARACTER_CLASS` or equivalent explicit classes to match.
 
 ## Library listening state

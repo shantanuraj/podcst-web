@@ -333,6 +333,12 @@ final class ContractFixtureTests: XCTestCase {
         }
     }
 
+    func testShowNotesIgnoreLongNonChapterLines() {
+        let whitespace = String(repeating: " ", count: 100_000)
+        XCTAssertEqual(ShowNotesParser.chapters("Prose\(whitespace)without a chapter"), [])
+        XCTAssertEqual(ShowNotesParser.chapters("\(whitespace)Prose without a chapter"), [])
+    }
+
     func testReleaseVectorsMatch() throws {
         let vectors = try JSONDecoder().decode(ReleaseVectors.self, from: contractData("playback/releases.json"))
         for vector in vectors.sections {

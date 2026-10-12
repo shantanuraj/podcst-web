@@ -23,6 +23,13 @@ class ShowNotesContractTest {
     }
 
     @Test
+    fun ignoresLongNonChapterLines() {
+        val whitespace = " ".repeat(100_000)
+        assertEquals(emptyList<Chapter>(), ShowNotes.chapters("Prose${whitespace}without a chapter"))
+        assertEquals(emptyList<Chapter>(), ShowNotes.chapters("${whitespace}Prose without a chapter"))
+    }
+
+    @Test
     fun timestampsMatchSharedVectors() {
         vectors.getValue("timestamps").jsonArray.map { it.jsonObject }.forEach { case ->
             val text = case.getValue("text").string
