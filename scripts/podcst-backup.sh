@@ -15,7 +15,8 @@ trap 'rm -rf "$TMP"' EXIT
 DUMP="$TMP/dump"
 
 pg_dump "$BACKUP_DATABASE_URL" -Fc --strict-names --no-owner --no-privileges \
-  -t podcst_migrations.history -t public.state_generation -t public.users \
+  -t podcst_migrations.history -t public.state_generation \
+  -t public.podcast_index_sync_state -t public.users \
   -t public.authors -t public.countries -t public.genres \
   -t public.podcasts -t public.episodes -t public.episode_content \
   -t public.podcasts_genres -t public.oauth_accounts \

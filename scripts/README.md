@@ -64,6 +64,7 @@ parents in the same snapshot:
 - `episode_list_clients`: sequence, request hash and saved result for retry deduplication
 - `chart_history`: historical daily ranks, not reconstructible from current charts
 - `state_generation`: current recovery fence and immutable initial legacy generation
+- `podcast_index_sync_state`: durable Podcast Index source cursor for catalog imports
 - `progress_revision_heads`, `follow_revision_heads`: independent accepted-action heads
 - `progress_clients`, `follow_clients`: stream sequences, hashes and saved acknowledgements
 - `account_erasure_intents`: retained bookkeeping from schema `0013`; including it

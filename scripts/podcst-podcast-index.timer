@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Podcst Podcast Index catalog sync
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00 UTC
+Persistent=true
+Unit=podcst-podcast-index.service
+
+[Install]
+WantedBy=timers.target

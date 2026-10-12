@@ -1,0 +1,30 @@
+[Unit]
+Description=Podcst Podcast Index catalog sync
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=svc-podcst
+Group=svc-podcst
+Environment=HOME=/var/lib/podcst
+Environment=PODCAST_INDEX_WORK_DIR=/var/lib/podcst/podcast-index
+EnvironmentFile=/etc/podcst/app.env
+WorkingDirectory=/opt/podcst
+ExecStart=/usr/local/bin/bun run scripts/sync-podcast-index.ts
+TimeoutStartSec=6h
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/opt/podcst
+ReadWritePaths=/var/lib/podcst
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=podcst-podcast-index

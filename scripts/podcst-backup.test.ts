@@ -54,6 +54,7 @@ test('selected backup includes coherent parents, content and the migration ledge
     'public.episode_list_clients',
     'public.chart_history',
     'public.state_generation',
+    'public.podcast_index_sync_state',
     'public.progress_clients',
     'public.follow_clients',
     'public.account_erasure_intents',
