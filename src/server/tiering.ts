@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { MAIN_CHART_REGIONS } from './ingest/chart-regions';
 
 export const FOLLOWED_IDS_SQL = `
   SELECT podcast_id AS id FROM subscriptions
@@ -13,6 +14,7 @@ export const ESSENTIAL_IDS_SQL = `
   ${FOLLOWED_IDS_SQL}
   UNION
   SELECT podcast_id AS id FROM top_podcasts
+  WHERE country_id IN (${MAIN_CHART_REGIONS.map((region) => `'${region}'`).join(', ')})
 `;
 
 export async function recomputeEssential(): Promise<number> {

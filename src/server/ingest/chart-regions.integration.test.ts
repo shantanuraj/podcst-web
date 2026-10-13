@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { startPostgres } from '../../../scripts/lib/postgres-sandbox';
 import { createSchemaFixture } from '../../../scripts/lib/schema-fixture';
+import { ESSENTIAL_IDS_SQL } from '../tiering';
 import { claimRotationRegions, requestChartRefresh } from './chart-regions';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -114,6 +115,13 @@ describe.skipIf(!databaseAvailable)(
       await sql`UPDATE countries SET chart_attempted_at = now() - interval '30 seconds' WHERE id = 'it'`;
       expect(await claimRotationRegions(sql, 1)).toEqual(['gb']);
       expect(await claimRotationRegions(sql, 1)).toEqual(['it']);
+    });
+
+    test('only main-region charts make podcasts essential', async () => {
+      const rows = await sql.unsafe(
+        `SELECT id FROM (${ESSENTIAL_IDS_SQL}) e ORDER BY id`,
+      );
+      expect(rows.map(({ id }) => Number(id))).toEqual([1]);
     });
   },
 );
