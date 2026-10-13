@@ -66,6 +66,7 @@ export async function findUnlisted(
 ) {
   let missing = [...new Set(itunesIds)];
   let requests = 0;
+  const skipped: string[] = [];
   for (const country of storefronts) {
     if (missing.length === 0) break;
     const found = new Set<string>();
@@ -81,6 +82,10 @@ export async function findUnlisted(
         signal: AbortSignal.timeout(30_000),
         redirect: 'error',
       });
+      if (response.status === 400) {
+        skipped.push(country);
+        break;
+      }
       if (!response.ok)
         throw new UnlistedAppleIdError(
           `Apple lookup failed with HTTP ${response.status} for ${country}`,
@@ -97,7 +102,7 @@ export async function findUnlisted(
     }
     missing = missing.filter((id) => !found.has(id));
   }
-  return { unlisted: new Set(missing), requests };
+  return { unlisted: new Set(missing), requests, skipped };
 }
 
 export async function clearUnlisted(
@@ -178,7 +183,7 @@ export async function main(args: string[]) {
         SELECT id FROM countries ORDER BY id = 'us' DESC, id
       `
     ).map(({ id }) => id);
-    const { unlisted, requests } = await findUnlisted(
+    const { unlisted, requests, skipped } = await findUnlisted(
       claims.map(({ itunesId }) => itunesId),
       storefronts,
     );
@@ -211,6 +216,7 @@ export async function main(args: string[]) {
         unlisted: unlisted.size,
         podcasts: podcasts.length,
         lookups: requests,
+        skippedStorefronts: skipped,
       }),
     );
   } finally {

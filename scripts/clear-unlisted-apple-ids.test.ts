@@ -65,6 +65,21 @@ describe('unlisted Apple ID lookups', () => {
     expect(requests).toEqual(['us:101']);
   });
 
+  test('storefronts Apple does not run are skipped', async () => {
+    const listed = storefront({ jp: [101] });
+    const result = await findUnlisted(
+      ['101', '202'],
+      ['bi', 'jp'],
+      async (url) =>
+        new URL(url).searchParams.get('country') === 'bi'
+          ? new Response(null, { status: 400 })
+          : listed(url),
+      async () => {},
+    );
+    expect([...result.unlisted]).toEqual(['202']);
+    expect(result.skipped).toEqual(['bi']);
+  });
+
   test('a failed lookup aborts rather than declaring IDs unlisted', async () => {
     await expect(
       findUnlisted(
