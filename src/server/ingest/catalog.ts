@@ -123,6 +123,13 @@ export async function insertCatalogPodcasts(
   });
 }
 
+async function isUnlistedAppleId(sql: postgres.Sql, itunesId: string) {
+  const [unlisted] = await sql`
+    SELECT 1 FROM unlisted_apple_ids WHERE itunes_id = ${itunesId}
+  `;
+  return unlisted !== undefined;
+}
+
 export async function storeCatalogPodcast(
   sql: postgres.Sql,
   input: CatalogPodcast,
@@ -135,9 +142,12 @@ export async function storeCatalogPodcast(
     input.podcastIndexId > 2147483647
   )
     throw new TypeError('Invalid catalog identity');
-  const itunesId = input.itunesId ?? undefined;
-  if (itunesId !== undefined && !isCanonicalId(itunesId))
+  if (input.itunesId !== null && !isCanonicalId(input.itunesId))
     throw new TypeError('Invalid Apple identity');
+  const itunesId =
+    input.itunesId === null || (await isUnlistedAppleId(sql, input.itunesId))
+      ? undefined
+      : input.itunesId;
   const observed = await findPodcastIdentity(
     sql,
     feed,

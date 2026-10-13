@@ -33,6 +33,7 @@ const excluded = {
   poll_metrics:
     'Operational telemetry, not listener state or recovery evidence',
   top_podcasts: 'Refreshable current charts; historical ranks remain selected',
+  unlisted_apple_ids: 'Rebuildable by rerunning the Apple listing check',
 };
 const privatePodcast = '9007199254740993';
 const privateEpisode = '9007199254740995';
