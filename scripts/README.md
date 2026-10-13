@@ -19,6 +19,23 @@ environment-file permissions. Backup scripts require Linux/GNU coreutils,
 PostgreSQL client tools, age, AWS CLI and (for identity snapshots) zstd on `PATH`.
 Missing required configuration stops the script before a dump or upload.
 
+## Egress-blocked feeds
+
+A publisher may refuse the server's egress address while serving the same feed
+elsewhere. A 403 alone cannot show that, so an operator marks the feed after
+confirming it from a second vantage point:
+
+```sh
+EGRESS_DATABASE_URL=… bun scripts/mark-egress-blocked.ts mark 14477 --evidence "…"
+EGRESS_DATABASE_URL=… bun scripts/mark-egress-blocked.ts unmark 14477
+```
+
+Without `--apply` the change runs in a rolled-back transaction and prints the
+before and after poll state. Only an existing public podcast can be marked, and
+exactly one `feed_poll_state` row changes. Evidence is one trimmed line of at
+most 200 characters without URLs, headers or bodies. The mark does not change
+polling; a successful refresh from the server clears it.
+
 ## Built application checks
 
 Build the reviewed candidate in an isolated checkout with frozen dependencies and
