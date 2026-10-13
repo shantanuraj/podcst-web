@@ -11,6 +11,15 @@ import {
 
 type Claim = { feedUrl: string; itunesId?: string };
 
+const evidenceReference = (evidence: object) =>
+  createHash('sha256').update(JSON.stringify(evidence)).digest('hex');
+
+const titleKey = (title: string) =>
+  title
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+
 export interface AppleIdentityPlan {
   listing: AppleListing;
   identities: Claim[];
@@ -78,6 +87,42 @@ export async function findAppleSource(
     undefined,
     forUpdate,
   );
+}
+
+export async function adoptAppleFeed(
+  tx: postgres.TransactionSql,
+  plan: AppleIdentityPlan,
+  title: string,
+): Promise<PodcastIdentity | undefined> {
+  const { listing, previousSourceId } = plan;
+  assertFreshAppleListing(listing);
+  if (previousSourceId === null) return undefined;
+  const [holder] = await tx<{ title: string }[]>`
+    SELECT title FROM podcasts
+    WHERE id = ${previousSourceId} AND owner_user_id IS NULL
+    FOR UPDATE
+  `;
+  const key = titleKey(title);
+  if (!holder || !key || titleKey(holder.title) !== key) return undefined;
+  const proof = { ...listing, title };
+  const { feedUrl, ...evidence } = proof;
+  const reference = evidenceReference(proof);
+  await tx`
+    INSERT INTO podcast_feed_aliases (feed_url, podcast_id, evidence_type, evidence_reference, evidence)
+    VALUES (${feedUrl}, ${previousSourceId}, 'apple_lookup', ${reference}, ${tx.json(evidence)})
+    ON CONFLICT (feed_url) DO NOTHING
+  `;
+  console.info(
+    JSON.stringify({
+      event: 'apple_feed_adopted',
+      itunesId: listing.itunesId,
+      podcastId: previousSourceId,
+      country: listing.country,
+      verifiedAt: listing.verifiedAt,
+      evidence: reference,
+    }),
+  );
+  return findAppleSource(tx, listing, true);
 }
 
 function keys(identities: Claim[]) {
@@ -157,9 +202,7 @@ export async function claimAppleIdentity(
         to: id,
         country: listing.country,
         verifiedAt: listing.verifiedAt,
-        evidence: createHash('sha256')
-          .update(JSON.stringify(listing))
-          .digest('hex'),
+        evidence: evidenceReference(listing),
       }),
     );
   return id;

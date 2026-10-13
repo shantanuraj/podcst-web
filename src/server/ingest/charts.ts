@@ -3,6 +3,7 @@ import { isCanonicalId, migrateStoredId } from '@/shared/canonical-id';
 import { ITUNES_API } from '../../data/constants';
 import {
   type AppleIdentityPlan,
+  adoptAppleFeed,
   claimAppleIdentity,
   findAppleSource,
   prepareAppleIdentity,
@@ -237,7 +238,9 @@ async function claimChartPodcast(
   plan: AppleIdentityPlan,
   identities: AppleIdentityPlan['identities'],
 ) {
-  let podcast = await findAppleSource(tx, plan.listing, true);
+  let podcast =
+    (await findAppleSource(tx, plan.listing, true)) ??
+    (await adoptAppleFeed(tx, plan, p.title));
   let created = false;
   if (!podcast) {
     let [author] =

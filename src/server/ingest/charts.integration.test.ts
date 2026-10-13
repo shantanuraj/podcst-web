@@ -16,6 +16,7 @@ import {
   refreshTopCharts,
   storeTopPodcasts,
 } from './charts';
+import { registerPublicAliases } from './feed-aliases';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseAvailable = Boolean(databaseUrl || process.env.PG_BIN);
@@ -212,6 +213,125 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     const [row] = await sql`SELECT id, itunes_id::text FROM podcasts`;
     expect(row.id).toBe(existing.id);
     expect(row.itunes_id).toBe('6806963519');
+  });
+
+  const moved = { ...podcast(101), feed: 'https://example.com/moved/feed' };
+  const quietly = async <T>(work: () => Promise<T>) => {
+    const info = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      return {
+        result: await work(),
+        logged: info.mock.calls.map(([line]) => JSON.parse(line).event),
+      };
+    } finally {
+      info.mockRestore();
+    }
+  };
+
+  test('keeps a moved show on its source and records the Apple feed as an alias', async () => {
+    const [source] = await sql`SELECT id FROM podcasts WHERE itunes_id = 101`;
+    await sql`UPDATE podcasts SET title = '  PODCAST · 101 ' WHERE id = ${source.id}`;
+    for (const logged of [['apple_feed_adopted'], []])
+      expect(await quietly(() => storeTopPodcasts(sql, [moved], 'my'))).toEqual(
+        {
+          result: { stored: 1, newPodcasts: 0, skipped: 0 },
+          logged,
+        },
+      );
+    expect([
+      ...(await sql`SELECT id, itunes_id::text, feed_url FROM podcasts`),
+    ]).toEqual([
+      { id: source.id, itunes_id: '101', feed_url: podcast(101).feed },
+    ]);
+    expect([
+      ...(await sql`SELECT feed_url, podcast_id, evidence_type, evidence FROM podcast_feed_aliases`),
+    ]).toEqual([
+      {
+        feed_url: moved.feed,
+        podcast_id: source.id,
+        evidence_type: 'apple_lookup',
+        evidence: {
+          itunesId: '101',
+          country: 'my',
+          verifiedAt: moved.verifiedAt,
+          title: 'Podcast 101',
+        },
+      },
+    ]);
+    expect([
+      ...(await sql`SELECT podcast_id FROM top_podcasts WHERE country_id = 'my'`),
+    ]).toEqual([{ podcast_id: source.id }]);
+  });
+
+  test('a different show behind a known Apple ID still gets its own source', async () => {
+    const [source] = await sql`SELECT id FROM podcasts WHERE itunes_id = 101`;
+    const other = { ...moved, title: 'Another show' };
+    expect(await quietly(() => storeTopPodcasts(sql, [other], 'my'))).toEqual({
+      result: { stored: 1, newPodcasts: 1, skipped: 0 },
+      logged: ['apple_association_staged'],
+    });
+    const rows =
+      await sql`SELECT id, itunes_id::text, feed_url FROM podcasts ORDER BY id`;
+    expect(
+      rows.map(({ itunes_id, feed_url }) => [itunes_id, feed_url]),
+    ).toEqual([
+      [null, podcast(101).feed],
+      ['101', other.feed],
+    ]);
+    expect(rows[0].id).toBe(source.id);
+    expect(await sql`SELECT * FROM podcast_feed_aliases`).toHaveLength(0);
+  });
+
+  test('a moved secondary listing stays with its source', async () => {
+    const [source] = await sql`SELECT id FROM podcasts WHERE itunes_id = 101`;
+    await sql`INSERT INTO podcast_apple_aliases (itunes_id, podcast_id, evidence_type, evidence_reference) VALUES (202, ${source.id}, 'reviewed', 'fixture')`;
+    const regional = {
+      ...podcast(202),
+      title: 'Podcast 101',
+      feed: 'https://example.com/regional/feed',
+    };
+    expect(
+      (await quietly(() => storeTopPodcasts(sql, [regional], 'my'))).result,
+    ).toEqual({ stored: 1, newPodcasts: 0, skipped: 0 });
+    expect([...(await sql`SELECT id, itunes_id::text FROM podcasts`)]).toEqual([
+      { id: source.id, itunes_id: '101' },
+    ]);
+    expect([
+      ...(await sql`SELECT itunes_id::text, podcast_id FROM podcast_apple_aliases`),
+    ]).toEqual([{ itunes_id: '202', podcast_id: source.id }]);
+    expect([
+      ...(await sql`SELECT feed_url, podcast_id FROM podcast_feed_aliases`),
+    ]).toEqual([{ feed_url: regional.feed, podcast_id: source.id }]);
+  });
+
+  test('a verified redirect later makes the adopted Apple feed canonical', async () => {
+    const [source] = await sql`SELECT id FROM podcasts WHERE itunes_id = 101`;
+    await quietly(() => storeTopPodcasts(sql, [moved], 'my'));
+    await registerPublicAliases(sql, {
+      podcastId: source.id,
+      expectedFeedUrl: podcast(101).feed,
+      aliases: [podcast(101).feed, moved.feed],
+      canonicalFeedUrl: moved.feed,
+      evidence: { type: 'permanent_redirect', reference: 'fixture-redirect' },
+    });
+    expect([
+      ...(await sql`SELECT id, itunes_id::text, feed_url FROM podcasts`),
+    ]).toEqual([{ id: source.id, itunes_id: '101', feed_url: moved.feed }]);
+    expect([
+      ...(await sql`SELECT feed_url, evidence_type FROM podcast_feed_aliases`),
+    ]).toEqual([
+      { feed_url: podcast(101).feed, evidence_type: 'permanent_redirect' },
+    ]);
+  });
+
+  test('rolls back an adopted Apple feed when a later chart row fails', async () => {
+    await expect(
+      quietly(() =>
+        storeTopPodcasts(sql, [moved, podcast(301, 2), podcast(302, 2)], 'my'),
+      ),
+    ).rejects.toThrow('duplicate key');
+    expect(await sql`SELECT * FROM podcast_feed_aliases`).toHaveLength(0);
+    expect(await sql`SELECT id FROM podcasts`).toHaveLength(1);
   });
 
   test('preserves the last chart and history when every entry conflicts', async () => {
