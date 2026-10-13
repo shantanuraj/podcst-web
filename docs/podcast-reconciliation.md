@@ -129,3 +129,21 @@ MERGE_DATABASE_URL=... bun scripts/merge-duplicate-podcasts.ts \
 The plan is `{"reference": "<review id>", "pairs": [{"survivor": "…",
 "duplicate": "…"}]}`. The output reports a digest of the duplicate's feed URL,
 not the URL. Removed podcast IDs do not redirect.
+
+## Apple IDs Apple no longer lists
+
+[`scripts/clear-unlisted-apple-ids.ts`](../scripts/clear-unlisted-apple-ids.ts)
+looks up the preferred Apple ID and Apple aliases of every essential and
+followed podcast, plus any IDs named with `--ids`. It asks the US storefront
+first, then each other storefront in `countries` for the IDs still missing. An
+ID that no storefront returns is unlisted. A failed lookup aborts the run.
+
+For each podcast with an unlisted ID, in its own transaction, unlisted aliases
+are deleted. An unlisted preferred ID is replaced by the oldest listed alias, or
+cleared. The IDs are recorded in `unlisted_apple_ids`, which keeps the Podcast
+Index sync from writing them back. A later run removes IDs that Apple lists
+again. Charts and Apple lookups still claim a relisted ID directly.
+
+```sh
+APPLE_IDS_DATABASE_URL=... bun scripts/clear-unlisted-apple-ids.ts [--ids ids.json] [--apply]
+```
