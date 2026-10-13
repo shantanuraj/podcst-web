@@ -16,7 +16,10 @@ import { seedFollow, seedProgress } from '../../../scripts/lib/state-fixture';
 
 installFeedTransportFixture();
 
-import { refreshFeed as refreshCanonicalFeed } from './feed-refresh';
+import {
+  recordPollFailure,
+  refreshFeed as refreshCanonicalFeed,
+} from './feed-refresh';
 import { getDuePodcasts } from './feed-schedule';
 
 const refreshFeed = withFixtureId(refreshCanonicalFeed);
@@ -303,6 +306,30 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
       egress_blocked_at: null,
       egress_block_evidence: null,
     });
+  });
+
+  test('deferred failures leave rows another writer holds', async () => {
+    const failure = {
+      kind: 'http_server' as const,
+      status: 503,
+      retryAfterSeconds: null,
+    };
+    const holder = await sql.reserve();
+    try {
+      await holder`BEGIN`;
+      await holder`SELECT 1 FROM feed_poll_state WHERE podcast_id = 139 FOR UPDATE`;
+      await recordPollFailure(sql, '139', failure);
+      await holder`COMMIT`;
+    } finally {
+      holder.release();
+    }
+    const [held] =
+      await sql`SELECT failures, last_error_kind FROM feed_poll_state`;
+    expect(held).toEqual({ failures: 0, last_error_kind: null });
+    await recordPollFailure(sql, '139', failure);
+    const [recorded] =
+      await sql`SELECT failures, last_error_kind FROM feed_poll_state`;
+    expect(recorded).toEqual({ failures: 1, last_error_kind: 'http_server' });
   });
 
   test('episode write failures roll back metadata and still persist backoff', async () => {

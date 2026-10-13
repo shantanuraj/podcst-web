@@ -243,7 +243,8 @@ export async function recordPollFailure(
     await tx`SET LOCAL lock_timeout = '1s'`;
     await tx`SET LOCAL statement_timeout = '5s'`;
     const [state] = await tx`
-      SELECT failures FROM feed_poll_state WHERE podcast_id = ${podcastId} FOR UPDATE
+      SELECT failures FROM feed_poll_state WHERE podcast_id = ${podcastId}
+      FOR UPDATE SKIP LOCKED
     `;
     if (!state) return;
     await persistPollFailure(
