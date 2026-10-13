@@ -254,6 +254,38 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     expect(active.is_active).toBe(true);
   });
 
+  test('egress block marks survive failures and clear when our egress succeeds', async () => {
+    await sql`
+      UPDATE feed_poll_state SET failures = 2, next_poll_at = now() - interval '1 second',
+        egress_blocked_at = now(), egress_block_evidence = 'Second vantage point returned 200'
+    `;
+    respond = async () => new Response(null, { status: 403 });
+    expect(await refreshFeed(sql, 139)).toBe('error');
+    const [failed] = await sql`
+      SELECT failures, last_error_kind, egress_blocked_at IS NOT NULL AS marked,
+             egress_block_evidence, extract(epoch FROM next_poll_at - last_polled_at)::int AS seconds
+      FROM feed_poll_state
+    `;
+    expect(failed).toEqual({
+      failures: 3,
+      last_error_kind: 'http_auth',
+      marked: true,
+      egress_block_evidence: 'Second vantage point returned 200',
+      seconds: 28800,
+    });
+    await sql`UPDATE feed_poll_state SET next_poll_at = now() - interval '1 second'`;
+    respond = async () => new Response(xml);
+    expect(await refreshFeed(sql, 139, 'scheduled')).toBe('updated');
+    const [cleared] = await sql`
+      SELECT failures, egress_blocked_at, egress_block_evidence FROM feed_poll_state
+    `;
+    expect(cleared).toEqual({
+      failures: 0,
+      egress_blocked_at: null,
+      egress_block_evidence: null,
+    });
+  });
+
   test('episode write failures roll back metadata and still persist backoff', async () => {
     await sql`
       ALTER TABLE episode_content ADD CONSTRAINT reject_six

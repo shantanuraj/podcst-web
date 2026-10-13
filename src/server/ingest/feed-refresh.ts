@@ -166,7 +166,9 @@ export async function savePollState(
       last_error_kind = NULL,
       last_error_status = NULL,
       last_error_at = NULL,
-      failing_since = NULL
+      failing_since = NULL,
+      egress_blocked_at = NULL,
+      egress_block_evidence = NULL
   `;
 }
 
