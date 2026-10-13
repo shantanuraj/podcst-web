@@ -190,7 +190,11 @@ function Tools({
         </button>
       )}
       <button type="button" onClick={onExpand} aria-label={t('player.open')}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
+        <svg
+          className={styles.strokeIcon}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
           <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
         </svg>
       </button>
