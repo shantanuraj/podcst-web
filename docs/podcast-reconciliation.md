@@ -103,3 +103,29 @@ PG_BIN=/path/to/postgresql/bin bun test scripts/reconcile-podcasts.test.ts
 The suite uses synthetic sources in a disposable PostgreSQL cluster. It covers
 preservation, refusal cases, concurrent claims, snapshot drift and restore/replay.
 Without `PG_BIN` it skips.
+
+## Bulk merges of reviewed duplicates
+
+[`scripts/merge-duplicate-podcasts.ts`](../scripts/merge-duplicate-podcasts.ts)
+merges many reviewed public pairs that no account references. Each pair is
+its own read-committed transaction. The duplicate's episodes that share a GUID
+with the survivor are deleted; its other episodes keep their IDs and move to the
+survivor. Its feed URL and feed aliases become reviewed aliases of the survivor.
+Its Apple ID becomes the survivor's preferred listing when the survivor has none,
+or an Apple alias otherwise. Chart ranks and history move where the survivor has
+none for that chart and day. Then the duplicate is deleted.
+
+A pair is refused when either podcast is private, the duplicate has
+subscriptions, playback or saved episodes, or the two share no episode GUID.
+Refusals do not stop the remaining pairs.
+
+```sh
+MERGE_DATABASE_URL=... bun scripts/merge-duplicate-podcasts.ts \
+  --plan /private/review/plan.json > /private/review/inspection.jsonl
+MERGE_DATABASE_URL=... bun scripts/merge-duplicate-podcasts.ts \
+  --plan /private/review/plan.json --apply > /private/review/receipt.jsonl
+```
+
+The plan is `{"reference": "<review id>", "pairs": [{"survivor": "…",
+"duplicate": "…"}]}`. The output reports a digest of the duplicate's feed URL,
+not the URL. Removed podcast IDs do not redirect.
