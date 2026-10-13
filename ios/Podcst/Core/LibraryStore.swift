@@ -20,6 +20,7 @@ public final class LibraryStore {
     let durable: DurableStateStore
     var syncPending: Bool { durable.pending }
     var syncBlocked: Bool { durable.blocked }
+    var canUseSyncedState: Bool { durable.canUseSyncedState && unsavedProgress.isEmpty }
     var syncError: String? { durable.error ?? error }
     var legacyProgress: [PlaybackProgressWriter.Update] { durable.legacyProgress }
     var unresolvedCount: Int { durable.unresolvedCount }
@@ -62,11 +63,14 @@ public final class LibraryStore {
 
     func loadProgress(for episodes: [Episode]) async {
         let accountID = session.user?.id
+        var activity: UUID?
         do {
             try await activateState()
+            activity = durable.activityToken
             try await durable.refreshProgress(ids: episodes.compactMap(\.id))
         } catch {
-            guard !Task.isCancelled, session.user?.id == accountID, !session.isLoading else { return }
+            guard !Task.isCancelled, session.user?.id == accountID, !session.isLoading,
+                  activity == nil || activity == durable.activityToken else { return }
             self.error = error.localizedDescription
         }
     }
@@ -115,6 +119,30 @@ public final class LibraryStore {
         } catch let failure {
             guard api.activityToken == activity, session.user?.id == accountID, !Task.isCancelled else { return }
             error = failure.localizedDescription
+        }
+    }
+
+    func useSyncedState(playback: PlaybackController) async {
+        guard canUseSyncedState, !playback.isPlaying, !playback.isPlaybackRequested, playback.clip == nil else { return }
+        let activity = api.activityToken
+        let playbackToken = playback.progressActivityToken
+        let episode = playback.currentEpisode
+        do {
+            try await durable.useSyncedState(episodeIDs: episode?.id.map { [$0] } ?? [], isCurrent: {
+                self.unsavedProgress.isEmpty && self.api.activityToken == activity && !self.session.isLoading &&
+                playback.progressActivityToken == playbackToken && !playback.isPlaying && !playback.isPlaybackRequested
+            }, didRecover: {
+                if let episode {
+                    let position = episode.id.flatMap { self.durable.position($0)?.positionSeconds } ?? 0
+                    playback.restore(episode, at: Double(position))
+                }
+            })
+            guard api.activityToken == activity, !session.isLoading else { return }
+            error = nil
+            await load()
+        } catch {
+            guard api.activityToken == activity, !session.isLoading, !Task.isCancelled, !(error is CancellationError) else { return }
+            self.error = error.localizedDescription
         }
     }
 
@@ -215,15 +243,19 @@ public final class LibraryStore {
 
     public func importFeeds(_ feeds: [String], expectedActivity: UUID? = nil) async {
         guard !feeds.isEmpty else { return }
+        let selectedAccount = session.user?.id
+        let activity = expectedActivity ?? api.activityToken
+        var importToken = durable.activityToken
+        guard api.activityToken == activity, !session.isLoading, durable.accountID == selectedAccount else {
+            error = DurableStateFailure.suspended.localizedDescription
+            return
+        }
         do {
-            let selectedAccount = session.user?.id
-            let activity = expectedActivity ?? api.activityToken
-            guard api.activityToken == activity, !session.isLoading, durable.accountID == selectedAccount else { throw DurableStateFailure.suspended }
             guard feeds.allSatisfy({ !$0.isEmpty && $0.utf16.count <= 4096 }) else { throw FeedContractError.invalidResponse }
             if selectedAccount != nil { try durable.stageImport(feeds) } else { try durable.stageGuestImport(feeds) }
             try await activateState()
             guard api.activityToken == activity, session.user?.id == selectedAccount, durable.accountID == selectedAccount else { throw CancellationError() }
-            let importToken = durable.activityToken
+            importToken = durable.activityToken
             if let accountID = selectedAccount {
                 await durable.flush()
                 guard api.activityToken == activity, durable.activityToken == importToken, let scope = durable.scope else { throw DurableStateFailure.suspended }
@@ -266,7 +298,11 @@ public final class LibraryStore {
                 }
                 podcasts = durable.guestFollows
             }
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            guard !Task.isCancelled, api.activityToken == activity, durable.activityToken == importToken,
+                  session.user?.id == selectedAccount else { return }
+            self.error = error.localizedDescription
+        }
     }
 
     private func loadGuest() -> [Podcast] { durable.guestFollows + durable.unresolvedGuest }

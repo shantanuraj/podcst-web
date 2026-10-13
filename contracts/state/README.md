@@ -156,6 +156,18 @@ restored traffic is admitted, the recovery procedure must rotate the generation
 and fence old writers. Clients must never automatically replace a persisted
 batch's generation, renumber it, or upload cached collections after a mismatch.
 
+Native clients may adopt a new generation automatically when both resource
+streams have no queued or frozen actions. They validate progress and complete
+membership snapshots for the verified account and the same new generation before
+replacing the shared scope atomically. Already-blocked clients still perform these
+reads so an idle device can recover without clearing its storage.
+
+When pending actions prevent adoption, the user may explicitly choose **Use synced
+version** to replace those actions with the account's current saved state. The
+client validates fresh snapshots and rejects the replacement if the account or
+pending work changes during the reads. This choice does not replay or renumber the
+old actions. Unresolved import sources remain available for resolution.
+
 The schema also retains the initial `legacy_generation`. Numeric Starred flights
 predate generation fencing. The migration service checks the authenticated account
 and current generation, then refuses legacy replay if the current generation has

@@ -226,7 +226,7 @@ enum DurableStateFailure: Error, LocalizedError {
     case protocolViolation, storageUnavailable, suspended, unresolved
     var errorDescription: String? {
         switch self {
-        case .protocolViolation: "Sync blocked: server state needs reconciliation. Saved work has been preserved."
+        case .protocolViolation: "Syncing is paused. Your saved changes are preserved."
         case .storageUnavailable: "Device storage is unavailable. This change was not saved."
         case .suspended: "Sync paused until this account signs in again."
         case .unresolved: "Legacy identity is unresolved. Original data has been preserved."

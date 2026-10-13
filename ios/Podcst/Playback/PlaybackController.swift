@@ -69,6 +69,7 @@ public final class PlaybackController {
     public var isActive: Bool { currentEpisode != nil && state != .idle }
     public var isPlaying: Bool { state == .playing }
     public var isPlaybackRequested: Bool { shouldPlay }
+    var progressActivityToken: UUID { progressRevision }
 
     public var upNext: [Episode] {
         guard queue.indices.contains(currentIndex) else { return queue }

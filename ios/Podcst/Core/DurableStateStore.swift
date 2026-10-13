@@ -10,7 +10,7 @@ import Observation
 }
 extension APIClient: DurableStateAPI {}
 
-private struct StateStream<Change: Codable & Equatable & Sendable, Result: Codable & Equatable & Sendable>: Codable {
+private struct StateStream<Change: Codable & Equatable & Sendable, Result: Codable & Equatable & Sendable>: Codable, Equatable {
     var clientID = UUID().uuidString.lowercased()
     var sequence: Int64 = 0
     var queued: [Change] = []
@@ -73,6 +73,7 @@ private struct DurableRoot: Codable {
     private(set) var accountID: String?
     private(set) var verified = false
     private var isSuspended = false
+    private var recoveryScope: StateScope?
     private(set) var error: String?
     private(set) var readable = true
     @ObservationIgnored private let url: URL
@@ -115,6 +116,7 @@ private struct DurableRoot: Codable {
     var progressBlocked: Bool { !readable || account.progress.blocked != nil }
     var pending: Bool { accountID != nil && (account.progress.pending || account.follows.pending) && !isSuspended }
     var blocked: Bool { !readable || (verified && (account.progress.blocked != nil || account.follows.blocked != nil)) }
+    var canUseSyncedState: Bool { verified && readable && recoveryScope != nil && recoveryScope != account.scope }
     var guestFollows: [Podcast] { root.guestFollows }
     var guestPositions: [LocalProgress] { verified ? root.guestProgress.values.sorted { $0.episodeId.number < $1.episodeId.number } : [] }
     func reapplyGuest(_ change: LocalProgress) throws {
@@ -300,6 +302,7 @@ private struct DurableRoot: Codable {
 
     func suspend() {
         isSuspended = true
+        recoveryScope = nil
         epoch = UUID()
         worker?.cancel()
         worker = nil
@@ -352,27 +355,114 @@ private struct DurableRoot: Codable {
         try Task.checkCancellation()
         guard epoch == token else { throw DurableStateFailure.suspended }
     }
-    private func validate<Item>(_ snapshot: StateSnapshot<Item>) throws {
+    private func snapshotScope<Item>(_ snapshot: StateSnapshot<Item>) throws -> StateScope {
         guard let accountID else { throw DurableStateFailure.suspended }
         let scope = StateScope(protocol: snapshot.protocol, accountId: snapshot.accountId, generation: snapshot.generation)
         try scope.validate(account: accountID)
+        return scope
+    }
+    private func validate<Item>(_ snapshot: StateSnapshot<Item>) throws {
+        let scope = try snapshotScope(snapshot)
         if let existing = account.scope, existing != scope { throw DurableStateFailure.protocolViolation }
     }
-    private func installScope<Item>(_ snapshot: StateSnapshot<Item>) throws {
-        try validate(snapshot)
-        try update { $0.scope = StateScope(protocol: snapshot.protocol, accountId: snapshot.accountId, generation: snapshot.generation) }
+    private func validateProgress(_ snapshot: StateSnapshot<StateProgressItem>, requested: [Int]?) throws {
+        _ = try snapshotScope(snapshot)
+        let ids = snapshot.items.map { $0.episodeId.number }
+        guard Set(ids).count == ids.count,
+              requested.map({ Set(ids) == Set($0) && ids.count == $0.count }) ?? (ids.count <= 1),
+              snapshot.items.allSatisfy({ item in
+                  item.progress.map { (0...Int(Int32.max)).contains($0.positionSeconds) && $0.revision.number <= snapshot.revision.number } ?? true
+              }) else { throw DurableStateFailure.protocolViolation }
+    }
+    private func validateFollows(_ snapshot: StateSnapshot<StateFollowItem>) throws {
+        _ = try snapshotScope(snapshot)
+        guard Set(snapshot.items.map(\.podcastId)).count == snapshot.items.count,
+              snapshot.items.allSatisfy({ $0.revision.number <= snapshot.revision.number }) else { throw DurableStateFailure.protocolViolation }
+    }
+    private func installRecovery(progress: StateSnapshot<StateProgressItem>, follows: StateSnapshot<StateFollowItem>, replacing previous: DurableAccount) throws {
+        let scope = try snapshotScope(progress)
+        try update { state in
+            guard state.scope == previous.scope, state.progress == previous.progress, state.follows == previous.follows else { throw DurableStateFailure.protocolViolation }
+            state.scope = scope
+            state.progress = StateStream()
+            state.follows = StateStream()
+            state.positions = [:]
+            try state.progress.install(revision: progress.revision.number, retire: false)
+            for item in progress.items {
+                state.positions[item.episodeId.number] = item.progress.map { LocalProgress(episodeId: item.episodeId, positionSeconds: $0.positionSeconds, completed: $0.completed) }
+            }
+            try state.follows.install(revision: follows.revision.number, retire: false)
+            state.memberships = follows.items
+        }
+        epoch = UUID()
+        worker?.cancel()
+        worker = nil
+        recoveryScope = nil
+        retryAfter = .distantPast
+        error = nil
+    }
+    private func recoverScope(_ progress: StateSnapshot<StateProgressItem>, requested: [Int]?, expectedScope: StateScope?, token: UUID) async throws -> Bool {
+        guard account.scope == expectedScope else { throw CancellationError() }
+        try validateProgress(progress, requested: requested)
+        let scope = try snapshotScope(progress)
+        guard let previousScope = account.scope, previousScope != scope else { recoveryScope = nil; return false }
+        let previous = account
+        let follows = try await api.followState()
+        try check(token)
+        try validateFollows(follows)
+        guard try snapshotScope(follows) == scope, account.scope == previousScope else { throw DurableStateFailure.protocolViolation }
+        recoveryScope = scope
+        guard !previous.progress.pending, !previous.follows.pending else { throw DurableStateFailure.protocolViolation }
+        try installRecovery(progress: progress, follows: follows, replacing: previous)
+        return true
+    }
+    func useSyncedState(episodeIDs: [Int] = [], isCurrent: () -> Bool = { true }, didRecover: () -> Void = {}) async throws {
+        guard canUseSyncedState, let recoveryScope else { throw DurableStateFailure.suspended }
+        let token = epoch
+        let previous = account
+        do {
+            var progress = try await api.progressState(ids: nil)
+            try check(token)
+            try validateProgress(progress, requested: nil)
+            guard try snapshotScope(progress) == recoveryScope else { throw DurableStateFailure.protocolViolation }
+            let ids = Set(episodeIDs).union(previous.positions.keys).union((previous.progress.flight?.changes ?? []).map { $0.episodeId.number }).union(previous.progress.queued.map { $0.episodeId.number }).sorted()
+            for offset in stride(from: 0, to: ids.count, by: 200) {
+                let requested = Array(ids[offset..<min(offset + 200, ids.count)])
+                let snapshot = try await api.progressState(ids: requested)
+                try check(token)
+                try validateProgress(snapshot, requested: requested)
+                guard try snapshotScope(snapshot) == recoveryScope, snapshot.revision.number >= progress.revision.number else { throw DurableStateFailure.protocolViolation }
+                progress.revision = snapshot.revision
+                progress.items.removeAll { requested.contains($0.episodeId.number) }
+                progress.items += snapshot.items
+            }
+            let follows = try await api.followState()
+            try check(token)
+            try validateFollows(follows)
+            guard try snapshotScope(progress) == recoveryScope, try snapshotScope(follows) == recoveryScope else { throw DurableStateFailure.protocolViolation }
+            guard isCurrent() else { throw CancellationError() }
+            try installRecovery(progress: progress, follows: follows, replacing: previous)
+            didRecover()
+        } catch {
+            try check(token)
+            pauseIfUnauthenticated(error)
+            if !(error is CancellationError) { self.error = error.localizedDescription }
+            throw error
+        }
     }
 
     func refreshProgress(ids: [Int]) async throws {
         guard verified else { return }
-        let token = epoch
+        var token = epoch
         let ids = Array(Set(ids)).sorted()
         for offset in stride(from: 0, to: ids.count, by: 200) {
             let requested = Array(ids[offset..<min(offset + 200, ids.count)])
             do {
+                let expectedScope = account.scope
                 let snapshot = try await api.progressState(ids: requested)
                 try check(token)
-                try installProgress(snapshot, requested: requested, retire: false)
+                if try await recoverScope(snapshot, requested: requested, expectedScope: expectedScope, token: token) { token = epoch }
+                if account.progress.blocked == nil { try installProgress(snapshot, requested: requested, retire: false) }
             } catch {
                 try check(token)
                 pauseIfUnauthenticated(error)
@@ -380,12 +470,9 @@ private struct DurableRoot: Codable {
             }
         }
     }
-    private func installProgress(_ snapshot: StateSnapshot<StateProgressItem>, requested: [Int], retire: Bool) throws {
+    private func installProgress(_ snapshot: StateSnapshot<StateProgressItem>, requested: [Int]?, retire: Bool) throws {
         try validate(snapshot)
-        guard Set(snapshot.items.map { $0.episodeId.number }) == Set(requested), snapshot.items.count == requested.count,
-              snapshot.items.allSatisfy({ item in
-                  item.progress.map { (0...Int(Int32.max)).contains($0.positionSeconds) && Int64($0.revision.value)! <= snapshot.revision.number } ?? true
-              }) else { throw DurableStateFailure.protocolViolation }
+        try validateProgress(snapshot, requested: requested)
         try update { state in
             state.scope = StateScope(protocol: snapshot.protocol, accountId: snapshot.accountId, generation: snapshot.generation)
             try state.progress.install(revision: snapshot.revision.number, retire: retire)
@@ -396,8 +483,7 @@ private struct DurableRoot: Codable {
     }
     private func installFollows(_ snapshot: StateSnapshot<StateFollowItem>) throws {
         try validate(snapshot)
-        guard Set(snapshot.items.map(\.podcastId)).count == snapshot.items.count,
-              snapshot.items.allSatisfy({ Int64($0.revision.value)! <= snapshot.revision.number }) else { throw DurableStateFailure.protocolViolation }
+        try validateFollows(snapshot)
         try update { state in
             state.scope = StateScope(protocol: snapshot.protocol, accountId: snapshot.accountId, generation: snapshot.generation)
             try state.follows.install(revision: snapshot.revision.number, retire: true)
@@ -417,11 +503,11 @@ private struct DurableRoot: Codable {
             defer { if epoch == token { worker = nil } }
             do {
                 try check(token)
-                if account.scope == nil {
-                    let initial = try await api.progressState(ids: nil)
-                    try check(token)
-                    try installScope(initial)
-                }
+                let expectedScope = account.scope
+                let initial = try await api.progressState(ids: nil)
+                try check(token)
+                if try await recoverScope(initial, requested: nil, expectedScope: expectedScope, token: token) { return }
+                if account.progress.blocked == nil { try installProgress(initial, requested: nil, retire: false) }
                 guard let scope = account.scope else { throw DurableStateFailure.protocolViolation }
                 if account.progress.blocked == nil {
                     do { try await syncProgress(scope, token: token) }
@@ -434,8 +520,7 @@ private struct DurableRoot: Codable {
                 if !account.progress.pending && (!includeFollows || !account.follows.pending) && !blocked { error = nil }
             } catch {
                 guard epoch == token, !Task.isCancelled else { return }
-                pauseIfUnauthenticated(error)
-                self.error = error.localizedDescription
+                try? record(error, progress: true)
             }
         }
         worker = task

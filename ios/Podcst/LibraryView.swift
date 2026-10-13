@@ -7,6 +7,7 @@ struct LibraryView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(PlaybackController.self) private var playback
     @State private var showingLogin = false
+    @State private var showingSyncRecovery = false
     @State private var feedWindow = Date()
 
     private var continueAndNew: [Episode] {
@@ -25,8 +26,11 @@ struct LibraryView: View {
                     Button("Recheck episodes") { Task { feedWindow = Date(); await library.load() } }.font(.footnote)
                 }
                 if let error = library.syncError { Text(error).font(.footnote).foregroundStyle(.red).padding(.vertical, 8) }
-                if library.syncBlocked { Text("Sync blocked — saved changes are preserved").font(.footnote) }
+                else if library.syncBlocked { Text("Syncing is paused. Your saved changes are preserved.").font(.footnote) }
                 else if library.syncPending { Text("Changes pending sync").font(.footnote) }
+                if library.canUseSyncedState {
+                    Button("Use synced version") { showingSyncRecovery = true }.font(.footnote).disabled(playback.isPlaying || playback.isPlaybackRequested || playback.clip != nil)
+                }
                 if library.unresolvedCount > 0 { Text("\(library.unresolvedCount) legacy identities remain unresolved; original data is preserved.").font(.footnote) }
                 ForEach(library.durable.guestPositions, id: \.episodeId) { change in
                     Button("Use guest position for episode \(change.episodeId.value)") {
@@ -118,6 +122,13 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $showingLogin) { LoginView() }
+        .confirmationDialog("Use synced version?", isPresented: $showingSyncRecovery, titleVisibility: .visible) {
+            Button("Use synced version", role: .destructive) {
+                Task { await library.useSyncedState(playback: playback) }
+            }
+        } message: {
+            Text("Replace unsynced listening positions and subscription changes on this device with the versions saved to your account?")
+        }
     }
 }
 

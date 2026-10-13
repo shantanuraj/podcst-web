@@ -494,6 +494,370 @@ import XCTest
         XCTAssertEqual(try JSONDecoder().decode(Episode.self, from: JSONEncoder().encode(episode)).id, episode.id)
     }
 
+    private func savedAccount() throws -> [String: Any] {
+        let data = try Data(contentsOf: directory.appendingPathComponent("durable-state-v1.json"))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return try XCTUnwrap((root["accounts"] as? [String: [String: Any]])?["a"])
+    }
+
+    private func blockSavedStreams() throws {
+        let url = directory.appendingPathComponent("durable-state-v1.json")
+        var root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        var accounts = try XCTUnwrap(root["accounts"] as? [String: [String: Any]])
+        var account = try XCTUnwrap(accounts["a"])
+        for name in ["progress", "follows"] {
+            var stream = try XCTUnwrap(account[name] as? [String: Any])
+            stream["blocked"] = "protocol_error"
+            account[name] = stream
+        }
+        accounts["a"] = account
+        root["accounts"] = accounts
+        try DurableStateStore.protectedWrite(JSONSerialization.data(withJSONObject: root), url)
+    }
+
+    func testIdleBlockedGenerationRecoversBothStreamsAtomicallyAndSurvivesRestart() async throws {
+        let api = StateServer()
+        api.progressRevision = 352
+        api.followRevision = 25
+        api.members = Set(1...14)
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try await state.refreshProgress(ids: [1, 2])
+        try state.stageImport(["https://example.invalid/pending"])
+        let now = Date()
+        try state.deferImport(state.pendingImportFeeds, seconds: 60, now: now)
+        let before = try savedAccount()
+        try blockSavedStreams()
+        state = store(api)
+        try await state.activate(accountID: "a")
+        XCTAssertTrue(state.blocked)
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        api.progressRevision = 1
+        api.followRevision = 1
+        api.members = Set(2...15)
+        await state.flush()
+        XCTAssertEqual(state.scope?.generation, api.generation)
+        XCTAssertFalse(state.blocked)
+        XCTAssertNil(state.error)
+        XCTAssertEqual(state.followedIDs, api.members)
+        XCTAssertNil(state.position(1))
+        XCTAssertFalse(state.importReady("https://example.invalid/pending", now: now))
+        XCTAssertTrue(api.progressBatches.isEmpty)
+        XCTAssertTrue(api.followBatches.isEmpty)
+        let after = try savedAccount()
+        for name in ["progress", "follows"] {
+            XCTAssertNotEqual((before[name] as? NSDictionary)?["clientID"] as? String, (after[name] as? NSDictionary)?["clientID"] as? String)
+        }
+        state = store(api)
+        try await state.activate(accountID: "a")
+        XCTAssertEqual(state.scope?.generation, api.generation)
+        XCTAssertEqual(state.followedIDs, api.members)
+        XCTAssertFalse(state.blocked)
+        XCTAssertEqual(state.pendingImportFeeds, ["https://example.invalid/pending"])
+    }
+
+    func testSameGenerationProbeCannotClearAProtocolBlock() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try blockSavedStreams()
+        state = store(api)
+        try await state.activate(accountID: "a")
+        let before = try savedAccount()
+        await state.flush()
+        XCTAssertEqual(try savedAccount() as NSDictionary, before as NSDictionary)
+        XCTAssertTrue(state.blocked)
+        XCTAssertTrue(api.progressBatches.isEmpty)
+        XCTAssertTrue(api.followBatches.isEmpty)
+    }
+
+    func testGenerationChangePreservesQueuedAndFrozenWorkInEitherStream() async throws {
+        for resource in ["progress", "follows"] {
+            for frozen in [false, true] {
+                directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                let api = StateServer()
+                var state = store(api)
+                try await state.activate(accountID: "a")
+                await state.flush()
+                if resource == "progress" {
+                    try state.setProgress(id: 1, position: 42, event: .checkpoint)
+                    api.loseAck = frozen
+                } else {
+                    try state.setFollow(Podcast(id: 1, feed: "fixture", title: "Fixture"), followed: true)
+                    api.loseFollowAck = frozen
+                }
+                if frozen { await state.flush() }
+                try blockSavedStreams()
+                let before = try savedAccount()
+                let writes = api.progressBatches.count + api.followBatches.count
+                api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+                state = store(api)
+                try await state.activate(accountID: "a")
+                await state.flush()
+                XCTAssertEqual(try savedAccount() as NSDictionary, before as NSDictionary)
+                XCTAssertEqual(api.progressBatches.count + api.followBatches.count, writes)
+                XCTAssertTrue(state.pending)
+                XCTAssertTrue(state.blocked)
+                try FileManager.default.removeItem(at: directory)
+            }
+        }
+    }
+
+    func testMalformedOrWrongAccountSnapshotsCannotResetIdleState() async throws {
+        for failure in ["account", "generation", "progress", "follows", "mixed-generation"] {
+            directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            let api = StateServer()
+            api.members = [1]
+            api.followRevision = 1
+            var state = store(api)
+            try await state.activate(accountID: "a")
+            await state.flush()
+            try blockSavedStreams()
+            let before = try savedAccount()
+            api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+            if failure == "account" { api.progressTransform = { snapshot in var next = snapshot; next.accountId = "b"; return next } }
+            if failure == "generation" { api.progressTransform = { snapshot in var next = snapshot; next.generation = "invalid"; return next } }
+            if failure == "progress" {
+                api.progressTransform = { snapshot in
+                    var next = snapshot
+                    next.items = try JSONDecoder().decode([StateProgressItem].self, from: Data(#"[{"episodeId":"1","progress":{"positionSeconds":2,"completed":false,"revision":"2","updatedAtMs":null}}]"#.utf8))
+                    return next
+                }
+            }
+            if failure == "follows" { api.followTransform = { snapshot in var next = snapshot; next.items += snapshot.items; return next } }
+            if failure == "mixed-generation" { api.followTransform = { snapshot in var next = snapshot; next.generation = "37adbd84-d0e4-4e2d-ad9f-b084efee3211"; return next } }
+            state = store(api)
+            try await state.activate(accountID: "a")
+            await state.flush()
+            XCTAssertEqual(try savedAccount() as NSDictionary, before as NSDictionary, failure)
+            XCTAssertTrue(state.blocked)
+            XCTAssertTrue(api.progressBatches.isEmpty)
+            XCTAssertTrue(api.followBatches.isEmpty)
+            try FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    func testNewLocalWorkDuringRecoveryPreventsReset() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        let oldScope = state.scope
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        api.beforeFollowRead = {
+            api.beforeFollowRead = nil
+            try! state.setProgress(id: 1, position: 42, event: .checkpoint)
+        }
+        await state.flush()
+        XCTAssertEqual(state.scope, oldScope)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 42)
+        XCTAssertTrue(state.pending)
+        XCTAssertTrue(api.progressBatches.isEmpty)
+    }
+
+    func testAccountSwitchDuringRecoveryCannotInstallThePreviousAccountsSnapshot() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        let before = try savedAccount()
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        api.beforeFollowRead = {
+            api.beforeFollowRead = nil
+            state.selectAccount("b")
+        }
+        await state.flush()
+        XCTAssertEqual(try savedAccount() as NSDictionary, before as NSDictionary)
+        XCTAssertEqual(state.accountID, "b")
+        XCTAssertNil(state.scope)
+    }
+
+    func testRecentProgressProbeCannotRetireAnAcknowledgedFlight() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        try state.setProgress(id: 1, position: 42, event: .checkpoint)
+        api.beforeProgressRead = { ids in
+            if ids != nil { throw URLError(.networkConnectionLost) }
+        }
+        await state.flush()
+        XCTAssertTrue(state.pending)
+        XCTAssertNotNil((try savedAccount()["progress"] as? NSDictionary)?["acknowledgement"])
+        state = store(api)
+        try await state.activate(accountID: "a")
+        api.beforeProgressRead = { ids in
+            if ids != nil { XCTAssertTrue(state.pending) }
+        }
+        await state.flush()
+        XCTAssertFalse(state.pending)
+        XCTAssertEqual(api.progressBatches.count, 1)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 42)
+    }
+
+    func testExplicitRecoveryUsesCurrentServerStateWithoutReplayingTheOldFlight() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        try state.setProgress(id: 1, position: 30, event: .checkpoint)
+        api.loseAck = true
+        await state.flush()
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        api.position = 66
+        api.progressRevision = 2
+        api.recentIDs = [2]
+        api.members = Set(1...14)
+        api.followRevision = 25
+        state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        XCTAssertTrue(state.canUseSyncedState)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 30)
+        XCTAssertTrue(state.pending)
+        try await state.useSyncedState()
+        XCTAssertFalse(state.canUseSyncedState)
+        XCTAssertFalse(state.blocked)
+        XCTAssertFalse(state.pending)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 66)
+        XCTAssertEqual(state.followedIDs, api.members)
+        XCTAssertEqual(api.progressBatches.count, 1)
+        XCTAssertTrue(api.followBatches.isEmpty)
+        state = store(api)
+        try await state.activate(accountID: "a")
+        XCTAssertEqual(state.position(1)?.positionSeconds, 66)
+        XCTAssertEqual(state.followedIDs, api.members)
+        XCTAssertFalse(state.pending)
+        await state.flush()
+        XCTAssertFalse(state.blocked)
+        XCTAssertEqual(api.progressBatches.count, 1)
+    }
+
+    func testExplicitRecoveryRequiresValidatedNewGeneration() async throws {
+        let api = StateServer()
+        var state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try blockSavedStreams()
+        state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        XCTAssertFalse(state.canUseSyncedState)
+        do { try await state.useSyncedState(); XCTFail("Same-generation protocol blocks cannot be reset") } catch {}
+        XCTAssertTrue(state.blocked)
+    }
+
+    func testExplicitRecoveryRetainsOriginalStateWhenStorageFails() async throws {
+        let api = StateServer()
+        var deny = false
+        let state = store(api, save: { data, url in
+            if deny { throw CocoaError(.fileWriteNoPermission) }
+            try DurableStateStore.protectedWrite(data, url)
+        })
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try state.setProgress(id: 1, position: 30, event: .checkpoint)
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        await state.flush()
+        let before = try savedAccount()
+        deny = true
+        do { try await state.useSyncedState(); XCTFail("Failed storage must not replace pending work") } catch {}
+        XCTAssertEqual(try savedAccount() as NSDictionary, before as NSDictionary)
+        XCTAssertEqual(state.position(1)?.positionSeconds, 30)
+        XCTAssertTrue(state.pending)
+        XCTAssertTrue(state.canUseSyncedState)
+    }
+
+    func testExplicitRecoveryCannotConsumeChangesMadeWhileReadingServerState() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try state.setProgress(id: 1, position: 30, event: .checkpoint)
+        let oldScope = state.scope
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        await state.flush()
+        api.beforeFollowRead = {
+            api.beforeFollowRead = nil
+            try! state.setProgress(id: 1, position: 31, event: .checkpoint)
+        }
+        do { try await state.useSyncedState(); XCTFail("A newer position needs a new recovery decision") } catch {}
+        XCTAssertEqual(state.position(1)?.positionSeconds, 31)
+        XCTAssertEqual(state.scope, oldScope)
+        XCTAssertTrue(state.pending)
+        XCTAssertTrue(api.progressBatches.isEmpty)
+    }
+
+    func testLateFollowSnapshotCannotBlockARecoveredGeneration() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        let oldGeneration = api.generation
+        let started = expectation(description: "Old follow snapshot delayed")
+        var release: CheckedContinuation<Void, Never>?
+        api.afterFollowRead = { snapshot in
+            if snapshot.generation == oldGeneration {
+                started.fulfill()
+                await withCheckedContinuation { release = $0 }
+            }
+            return snapshot
+        }
+        let oldFlush = Task { await state.flush() }
+        await fulfillment(of: [started], timeout: 2)
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        try await state.refreshProgress(ids: [1])
+        XCTAssertEqual(state.scope?.generation, api.generation)
+        release?.resume()
+        await oldFlush.value
+        XCTAssertFalse(state.blocked)
+        XCTAssertNil(state.error)
+        XCTAssertTrue(api.progressBatches.isEmpty)
+        XCTAssertTrue(api.followBatches.isEmpty)
+    }
+
+    func testExplicitRecoveryChecksPlaybackActivityBeforeCommitting() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try state.setProgress(id: 1, position: 30, event: .checkpoint)
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        await state.flush()
+        let before = try savedAccount()
+        var current = true
+        var restored = false
+        api.beforeFollowRead = { current = false }
+        do {
+            try await state.useSyncedState(isCurrent: { current }, didRecover: { restored = true })
+            XCTFail("Playback changes must cancel recovery before commit")
+        } catch {}
+        XCTAssertEqual(try savedAccount() as NSDictionary, before as NSDictionary)
+        XCTAssertFalse(restored)
+        XCTAssertTrue(state.pending)
+    }
+
+    func testExplicitRecoveryRestoresRequestedPlaybackAlongsideTheDurableCommit() async throws {
+        let api = StateServer()
+        let state = store(api)
+        try await state.activate(accountID: "a")
+        await state.flush()
+        try state.setProgress(id: 1, position: 30, event: .checkpoint)
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        api.recentIDs = [2]
+        api.position = 66
+        api.progressRevision = 1
+        await state.flush()
+        var restored: Int?
+        try await state.useSyncedState(episodeIDs: [3], didRecover: {
+            XCTAssertFalse(state.pending)
+            XCTAssertFalse(state.blocked)
+            restored = state.position(3)?.positionSeconds
+        })
+        XCTAssertEqual(restored, 66)
+        XCTAssertTrue(api.progressBatches.isEmpty)
+    }
+
     private var processDirectory: URL { FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("DurableStateSyntheticRestart") }
     func testProcessRestartWrite() async throws {
         try? FileManager.default.removeItem(at: processDirectory)
@@ -530,6 +894,7 @@ import XCTest
     var user = "a"
     var generation = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
     var position = 0
+    var recentIDs: [Int] = []
     var completed = false
     var progressRevision = 0
     var followRevision = 0
@@ -546,21 +911,32 @@ import XCTest
     var sessionStatus: Int?
     var readStatus: Int?
     var beforeProgress: (() -> Void)?
+    var beforeProgressRead: (([Int]?) throws -> Void)?
+    var beforeFollowRead: (() -> Void)?
+    var afterFollowRead: ((StateSnapshot<StateFollowItem>) async throws -> StateSnapshot<StateFollowItem>)?
+    var progressTransform: ((StateSnapshot<StateProgressItem>) throws -> StateSnapshot<StateProgressItem>)?
+    var followTransform: ((StateSnapshot<StateFollowItem>) throws -> StateSnapshot<StateFollowItem>)?
     func sessionUser() async throws -> User? {
         if let sessionStatus { throw APIError(statusCode: sessionStatus, message: "Synthetic session failure") }
         return User(id: user, email: "synthetic@example.invalid")
     }
     func progressState(ids: [Int]?) async throws -> StateSnapshot<StateProgressItem> {
+        try beforeProgressRead?(ids)
         if let readStatus { throw APIError(statusCode: readStatus, message: "Synthetic snapshot failure") }
-        let items = try (ids ?? []).map { id in
+        let items = try (ids ?? recentIDs).map { id in
             let progress: StateProgress? = progressRevision == 0 ? nil : StateProgress(positionSeconds: position, completed: completed, revision: try StateID(String(progressRevision)), updatedAtMs: try JSONDecoder().decode(StateTimestamp.self, from: Data("null".utf8)))
             return try JSONDecoder().decode(StateProgressItem.self, from: JSONEncoder().encode(Item(episodeId: StateID(String(id)), progress: progress)))
         }
-        return StateSnapshot(protocol: 1, accountId: user, generation: generation, revision: try StateRevision(String(stale ? 0 : progressRevision)), items: items)
+        let snapshot = StateSnapshot(protocol: 1, accountId: user, generation: generation, revision: try StateRevision(String(stale ? 0 : progressRevision)), items: items)
+        return try progressTransform?(snapshot) ?? snapshot
     }
     private struct Item: Encodable { var episodeId: StateID; var progress: StateProgress?; func encode(to encoder: Encoder) throws { var c = encoder.container(keyedBy: Keys.self); try c.encode(episodeId, forKey: .episodeId); try c.encode(progress, forKey: .progress) }; enum Keys: String, CodingKey { case episodeId, progress } }
     func followState() async throws -> StateSnapshot<StateFollowItem> {
-        StateSnapshot(protocol: 1, accountId: user, generation: generation, revision: try StateRevision(String(followRevision)), items: try members.sorted().map { StateFollowItem(podcastId: try StateID(String($0)), revision: try StateID(String(max(1, followRevision))), followedAtMs: try JSONDecoder().decode(StateTimestamp.self, from: Data("null".utf8)), availability: .available) })
+        beforeFollowRead?()
+        let snapshot = StateSnapshot(protocol: 1, accountId: user, generation: generation, revision: try StateRevision(String(followRevision)), items: try members.sorted().map { StateFollowItem(podcastId: try StateID(String($0)), revision: try StateID(String(max(1, followRevision))), followedAtMs: try JSONDecoder().decode(StateTimestamp.self, from: Data("null".utf8)), availability: .available) })
+        let transformed = try followTransform?(snapshot) ?? snapshot
+        if let afterFollowRead { return try await afterFollowRead(transformed) }
+        return transformed
     }
     func changeProgress(_ batch: StateBatch<StateProgressChange>) async throws -> StateAcknowledgement<StateProgressResult> {
         progressBatches.append(batch)
