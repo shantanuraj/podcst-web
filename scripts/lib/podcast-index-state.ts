@@ -46,6 +46,19 @@ export async function readPodcastIndexCursor(
   return cursor;
 }
 
+export async function checkpointPodcastIndexCursor(
+  sql: postgres.Sql,
+  cursor: PodcastIndexCursor,
+): Promise<void> {
+  const result = await sql`
+    UPDATE podcast_index_sync_state
+    SET last_update = ${cursor.lastUpdate}, last_id = ${cursor.lastId}
+    WHERE singleton = true
+  `;
+  if (result.count !== 1)
+    throw new Error('Podcast Index sync state is missing');
+}
+
 export async function writePodcastIndexCursor(
   sql: postgres.Sql,
   cursor: PodcastIndexCursor,

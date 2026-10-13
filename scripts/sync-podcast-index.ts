@@ -18,6 +18,7 @@ import {
 import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
 import { migrateStoredId } from '../src/shared/canonical-id';
 import {
+  checkpointPodcastIndexCursor,
   type PodcastIndexCursor,
   readPodcastIndexCursor,
   writePodcastIndexCursor,
@@ -336,7 +337,15 @@ async function sync(): Promise<void> {
     if (!lastRow || lastRow.lastUpdate === null) {
       throw new Error('Podcast Index source cursor is invalid');
     }
-    highWater = { lastUpdate: lastRow.lastUpdate, lastId: lastRow.id };
+    const batchHighWater = {
+      lastUpdate: lastRow.lastUpdate,
+      lastId: lastRow.id,
+    };
+    // Keep failed rows in the next run instead of checkpointing past them.
+    if (totalFailed === 0) {
+      highWater = batchHighWater;
+      await checkpointPodcastIndexCursor(sql, highWater);
+    }
 
     const percent = ((processed / totalCount) * 100).toFixed(1);
     const elapsed = Date.now() - startTime;
