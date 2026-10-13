@@ -86,6 +86,54 @@ class LibraryRepositoryTest {
         assertEquals(listOf(guest.id), failed.unavailable.first())
     }
 
+    @Test fun blockedIdleFollowsRecoverFromMembershipWithoutSendingCachedState() = runTest {
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        val stale = "17adbd84-d0e4-4e2d-ad9f-b084efee3212"
+        scopes.durable.installFollows("owner", StateSnapshot<StateFollowItem>(1, "owner", stale, StateRevision("25"), emptyList()))
+        scopes.durable.change("owner") { it.copy(followBlocked = "generation changed") }
+        val server = FakeServer { call ->
+            if (call.path == "/api/progress") Reply(json.encodeToString(StateSnapshot<StateProgressItem>(1, "owner", generation, StateRevision("0"), emptyList())))
+            else if (call.query == "view=membership") Reply(json.encodeToString(StateSnapshot(1, "owner", generation, StateRevision("1"), listOf(StateFollowItem(StateID(guest.id.toString()), StateID("1"), null, StateAvailability.available)))))
+            else Reply("[]")
+        }
+        library(server).refresh()
+        assertEquals(generation, scopes.durable.account("owner").generation)
+        assertEquals(setOf(guest.id), scopes.durable.account("owner").followed())
+        assertFalse(scopes.durable.status.value.blocked)
+        assertNull(scopes.durable.status.value.error)
+        assertTrue(server.calls.all { it.body.isEmpty() })
+    }
+
+    @Test fun delayedImportResolutionCannotEnqueueOldIdentityAfterRecovery() = runTest {
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        val arrived = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val feed = "https://pending.test/rss"
+        val server = FakeServer { call ->
+            if (call.path.endsWith("resolve")) {
+                arrived.complete(Unit)
+                runBlocking { release.await() }
+                Reply(json.encodeToString(FollowResolution(1, "owner", generation, listOf(FeedResolutionItem(0, StateID("152"), FeedResolutionItem.Status.resolved, null)))))
+            } else Reply(json.encodeToString(StateSnapshot<StateFollowItem>(1, "owner", generation, StateRevision("25"), emptyList())))
+        }
+        val importing = async { runCatching { library(server).import(listOf(feed)) } }
+        arrived.await()
+        val replacement = "17adbd84-d0e4-4e2d-ad9f-b084efee3212"
+        val expected = scopes.durable.account("owner")
+        scopes.durable.recover("owner", expected, RecoverySnapshots(
+            listOf(StateSnapshot<StateProgressItem>(1, "owner", replacement, StateRevision("1"), emptyList())),
+            StateSnapshot<StateFollowItem>(1, "owner", replacement, StateRevision("1"), emptyList()), emptyList(),
+        ))
+        release.complete(Unit)
+        assertTrue(importing.await().isFailure)
+        val state = scopes.durable.account("owner")
+        assertEquals(replacement, state.generation)
+        assertEquals(listOf(feed), state.importFeeds)
+        assertTrue(state.followQueued.isEmpty())
+        assertNull(state.followFlight)
+        assertNull(state.followBlocked)
+    }
+
     @Test fun guestImportContinuesAfterFailureAndRetriesOnlyRemainingFeedsAfterRestart() = runTest {
         val bad = "https://bad.test/rss"
         val good = "https://good.test/rss"

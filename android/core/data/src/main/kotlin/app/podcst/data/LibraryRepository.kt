@@ -20,6 +20,7 @@ class LibraryRepository(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val durable = scopes.durable
+    private val recovery = StateRecovery(api, scopes)
     private val sender = Mutex()
     private var retryAt = 0L
     val status = durable.status
@@ -72,11 +73,12 @@ class LibraryRepository(
         val epoch = scopes.epoch
         if (!active(owner, epoch) || clock() < retryAt) return
         sender.withLock {
+            var syncGeneration = durable.account(account).generation
             try {
-                if (durable.account(account).followBlocked != null) return@withLock
-                val snapshot = api.followState()
+                recovery.follows(owner, epoch)
+                syncGeneration = durable.account(account).generation
                 if (!active(owner, epoch)) return@withLock
-                durable.installFollows(account, snapshot)
+                if (durable.account(account).followBlocked != null) return@withLock
                 for (guest in durable.guestFollows()) {
                     val resolved = if (guest.id != null) guest else api.podcast(guest.feed)
                     if (!active(owner, epoch)) return@withLock
@@ -89,9 +91,8 @@ class LibraryRepository(
                         if (!active(owner, epoch)) return@withLock
                         durable.acknowledgeFollows(account, ack)
                     }
-                    val value = api.followState()
+                    recovery.follows(owner, epoch)
                     if (!active(owner, epoch)) return@withLock
-                    durable.installFollows(account, value)
                 } while (durable.account(account).followQueued.isNotEmpty())
                 val hydrated = api.subscriptions()
                 if (!active(owner, epoch)) return@withLock
@@ -103,12 +104,13 @@ class LibraryRepository(
                 durable.clearError(account)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
-                if (!active(owner, epoch)) return@withLock
+                if (!active(owner, epoch) || durable.account(account).generation != syncGeneration) return@withLock
                 durable.error(account, "Follow sync paused: ${failure.message}. Pending work retained.")
                 if (failure is ApiException && failure.status == 401) scopes.suspendSync()
-                else if (failure is IllegalArgumentException || failure is IllegalStateException || failure is ApiException && (failure.code == "invalid_response" || failure.status in listOf(400, 403, 404, 409, 413, 426)))
+                else if (failure is IllegalArgumentException || failure is IllegalStateException || failure is ApiException && (failure.code == "invalid_response" || failure.status in listOf(400, 403, 404, 409, 413, 426))) {
                     durable.change(account) { it.copy(followBlocked = "Follow sync blocked: ${failure.message}") }
-                else retryAt = clock() + ((failure as? ApiException)?.retryAfterSeconds?.coerceIn(1, 86400) ?: 30) * 1000
+                    durable.error(account, "Subscription syncing is paused. Saved changes are retained.")
+                } else retryAt = clock() + ((failure as? ApiException)?.retryAfterSeconds?.coerceIn(1, 86400) ?: 30) * 1000
                 throw failure
             }
         }
@@ -157,9 +159,9 @@ class LibraryRepository(
                 it.copy(importFeeds = merged)
             }
             check(active(owner, epoch)) { "Verify your account before importing. Pending inputs retained." }
-            val snapshot = api.followState()
+            val snapshot = recovery.follows(owner, epoch)
             check(active(owner, epoch))
-            durable.installFollows(account, snapshot)
+            check(durable.account(account).followBlocked == null) { "Subscription syncing is paused; imported feeds are retained." }
             val ready = selected.filter { (durable.account(account).importRetryAt[it] ?: 0L) <= clock() }
             val batches = FeedImportRequest.batches(account, snapshot.generation, ready)
             for ((offset, batch) in batches.withIndex()) {
@@ -179,7 +181,10 @@ class LibraryRepository(
                 check(result.items.map { it.index } == batch.indices.toList())
                 for (item in result.items) {
                     if (item.podcastId != null) {
-                        durable.change(account) { state -> state.copy(importFeeds = state.importFeeds - batch[item.index], importRetryAt = state.importRetryAt - batch[item.index], followQueued = state.followQueued.filterNot { it.podcastId == item.podcastId } + StateFollowChange(checkNotNull(item.podcastId), true)) }
+                        durable.change(account) { state ->
+                            check(state.generation == result.generation) { "Sync state changed; imported feeds are retained." }
+                            state.copy(importFeeds = state.importFeeds - batch[item.index], importRetryAt = state.importRetryAt - batch[item.index], followQueued = state.followQueued.filterNot { it.podcastId == item.podcastId } + StateFollowChange(checkNotNull(item.podcastId), true))
+                        }
                         succeeded++
                     } else if (item.retryAfterSeconds != null) {
                         val retry = clock() + checkNotNull(item.retryAfterSeconds) * 1000L

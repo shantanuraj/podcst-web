@@ -20,6 +20,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.podcst.data.Preferences
 import app.podcst.data.ProgressRepository
 import app.podcst.data.Scopes
+import app.podcst.data.StateRecovery
+import app.podcst.data.SyncedVersion
 import app.podcst.database.PlayerEntity
 import app.podcst.database.domain
 import app.podcst.database.entity
@@ -271,6 +273,28 @@ class PlaybackCoordinator internal constructor(
         update { it.copy(queue = it.queue.playing(episode), position = at, duration = episode.duration ?: Duration.ZERO, status = PlaybackStatus.Paused, requested = false) }
         progressCheckpoint = progressAt(state.value)
         persist()
+    }
+
+    suspend fun prepareSyncedVersion(recovery: StateRecovery): PlaybackRecovery? {
+        val revision = playbackRevision
+        checkRecoveryPlayback(revision)
+        val choice = recovery.prepare(listOfNotNull(state.value.episode?.id)) ?: return null
+        checkRecoveryPlayback(revision)
+        return PlaybackRecovery(choice, revision)
+    }
+
+    suspend fun useSyncedVersion(recovery: StateRecovery, choice: PlaybackRecovery) {
+        checkRecoveryPlayback(choice.revision)
+        val episode = state.value.episode
+        val positions = recovery.useSyncedVersion(choice.version) { checkRecoveryPlayback(choice.revision) }
+        if (episode?.id in positions) restore(checkNotNull(episode), positions.getValue(checkNotNull(episode.id)).seconds)
+    }
+
+    private fun checkRecoveryPlayback(revision: Long) {
+        val current = state.value
+        check(!changingAccount && playbackRevision == revision && current.clip == null && !current.requested && current.status != PlaybackStatus.Playing && writes.none { !it.isCompleted }) {
+            "Pause playback and review the synced version again."
+        }
     }
 
     suspend fun restoreProgress() {
@@ -808,3 +832,5 @@ class PlaybackCoordinator internal constructor(
         }
     }
 }
+
+class PlaybackRecovery internal constructor(internal val version: SyncedVersion, internal val revision: Long)

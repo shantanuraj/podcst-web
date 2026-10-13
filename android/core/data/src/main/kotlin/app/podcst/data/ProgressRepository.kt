@@ -30,6 +30,7 @@ class ProgressRepository(
     private val syncMutex = Mutex()
     private val edits = Mutex()
     private val durable = scopes.durable
+    private val recovery = StateRecovery(api, scopes)
     private var retryAt = 0L
     val status = durable.status
 
@@ -193,9 +194,8 @@ class ProgressRepository(
             if (saved.progressFlight != null || saved.progressQueued.isNotEmpty() || saved.progressBlocked != null) return@withLock null
             val latest = api.currentProgress() ?: return@withLock null
             if (!active(owner, epoch)) return@withLock null
-            val snapshot = api.progressState(listOfNotNull(latest.episode.id))
+            val snapshot = recovery.progress(owner, epoch, listOfNotNull(latest.episode.id))
             if (!active(owner, epoch)) return@withLock null
-            durable.installProgress(account, snapshot, listOfNotNull(latest.episode.id))
             if (durable.account(account).progressOverlay().isNotEmpty()) return@withLock null
             val truth = snapshot.items.singleOrNull()?.progress ?: return@withLock null
             if (truth.completed) return@withLock null
@@ -212,9 +212,8 @@ class ProgressRepository(
         if (!active(owner, epoch)) return
         syncMutex.withLock {
             for (ids in episodes.mapNotNull { it.id }.distinct().chunked(200)) {
-                val snapshot = api.progressState(ids)
+                recovery.progress(owner, epoch, ids)
                 if (!active(owner, epoch)) return@withLock
-                durable.installProgress(account, snapshot, ids)
             }
             installProjection(owner)
         }
@@ -236,13 +235,12 @@ class ProgressRepository(
             return SyncOutcome.Retry
         }
         if (clock() < retryAt) return SyncOutcome.Retry
+        var syncGeneration = durable.account(account).generation
         try {
+            recovery.progress(owner, epoch)
+            syncGeneration = durable.account(account).generation
+            if (!active(owner, epoch)) return SyncOutcome.Done
             if (durable.account(account).progressBlocked != null) return SyncOutcome.Done
-            if (durable.account(account).generation == null) {
-                val snapshot = api.progressState()
-                if (!active(owner, epoch)) return SyncOutcome.Done
-                durable.installProgress(account, snapshot)
-            }
             do {
                 if (!active(owner, epoch)) return SyncOutcome.Done
                 val current = durable.freezeProgress(account)
@@ -253,9 +251,8 @@ class ProgressRepository(
                     durable.acknowledgeProgress(account, ack)
                 }
                 val ids = flight.batch.changes.map { it.episodeId.value.toLong() }.distinct()
-                val snapshot = api.progressState(ids)
+                recovery.progress(owner, epoch, ids)
                 if (!active(owner, epoch)) return SyncOutcome.Done
-                durable.installProgress(account, snapshot, ids)
                 installProjection(owner)
             } while (durable.account(account).progressQueued.isNotEmpty())
             installProjection(owner)
@@ -264,11 +261,12 @@ class ProgressRepository(
             return SyncOutcome.Done
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
-            if (!active(owner, epoch)) return SyncOutcome.Done
+            if (!active(owner, epoch) || durable.account(account).generation != syncGeneration) return SyncOutcome.Done
             durable.error(account, "Progress sync paused: ${failure.message}. Pending work retained.")
             if (failure is ApiException && failure.status == 401) { scopes.suspendSync(); return SyncOutcome.Done }
             if (failure is IllegalArgumentException || failure is IllegalStateException || failure is ApiException && (failure.code == "invalid_response" || failure.status in listOf(400, 403, 404, 409, 413, 426))) {
                 durable.change(account) { it.copy(progressBlocked = "Progress sync blocked: ${failure.message}") }
+                durable.error(account, "Listening progress syncing is paused. Saved changes are retained.")
                 return SyncOutcome.Done
             }
             retryAt = clock() + ((failure as? ApiException)?.retryAfterSeconds?.coerceIn(1, 86400) ?: 30) * 1000

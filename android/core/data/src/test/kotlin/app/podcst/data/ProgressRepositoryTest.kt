@@ -1,7 +1,7 @@
 package app.podcst.data
 
 import app.podcst.database.*
-import app.podcst.model.StateProgressEvent
+import app.podcst.model.*
 import app.podcst.network.testing.*
 import app.podcst.network.testing.PlaybackFixtures.episode
 import app.podcst.network.testing.PlaybackFixtures.progress
@@ -154,7 +154,43 @@ class ProgressRepositoryTest {
         assertEquals(flight, scopes.durable.account("owner").progressFlight)
         val count = server.calls.size
         repository.sync()
-        assertEquals(count, server.calls.size)
+        assertEquals(count + 1, server.calls.size)
+        assertTrue(server.calls.last().body.isEmpty())
+    }
+
+    @Test fun blockedIdleProgressRecoversFromCurrentSnapshotWithoutSendingOldWork() = runTest {
+        val remote = StateFixtures { Reply("null") }
+        val server = FakeServer { call ->
+            if (call.path == "/api/subscriptions") Reply("""{"protocol":1,"accountId":"owner","generation":"${remote.generation}","revision":"1","items":[]}""")
+            else remote.route(call)
+        }
+        val stale = "17adbd84-d0e4-4e2d-ad9f-b084efee3212"
+        scopes.durable.installProgress("owner", StateSnapshot<StateProgressItem>(1, "owner", stale, StateRevision("25"), emptyList()))
+        scopes.durable.change("owner") { it.copy(progressBlocked = "generation changed") }
+        assertEquals(SyncOutcome.Done, repository(server).sync())
+        assertEquals(remote.generation, scopes.durable.account("owner").generation)
+        assertFalse(scopes.durable.status.value.blocked)
+        assertNull(scopes.durable.status.value.error)
+        assertTrue(server.calls.all { it.body.isEmpty() })
+    }
+
+    @Test fun changedGenerationNeverUploadsSavedProgressUnderNewScope() = runTest {
+        val remote = StateFixtures { Reply("null") }
+        val server = FakeServer { call ->
+            if (call.path == "/api/subscriptions") Reply("""{"protocol":1,"accountId":"owner","generation":"${remote.generation}","revision":"1","items":[]}""")
+            else remote.route(call)
+        }
+        val stale = "17adbd84-d0e4-4e2d-ad9f-b084efee3212"
+        scopes.durable.installProgress("owner", StateSnapshot<StateProgressItem>(1, "owner", stale, StateRevision("25"), emptyList()))
+        val repository = repository(server)
+        repository.record(phone, 90.seconds, false)
+        val queued = scopes.durable.account("owner").progressQueued
+        assertEquals(SyncOutcome.Done, repository.sync())
+        assertEquals(stale, scopes.durable.account("owner").generation)
+        assertEquals(queued, scopes.durable.account("owner").progressQueued)
+        assertTrue(scopes.durable.status.value.blocked)
+        assertEquals("Listening progress syncing is paused. Saved changes are retained.", scopes.durable.status.value.error)
+        assertTrue(server.calls.all { it.body.isEmpty() })
     }
 
     @Test fun accountChangeFencesInflightReads() = runTest {

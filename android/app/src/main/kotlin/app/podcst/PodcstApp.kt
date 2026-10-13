@@ -92,6 +92,8 @@ private fun Shell(graph: AppGraph) {
     val toaster = remember { Toaster() }
     var listTarget by remember { mutableStateOf<Episode?>(null) }
     var shareRequest by remember { mutableStateOf<ShareRequest?>(null) }
+    var recoveryChoice by remember { mutableStateOf<app.podcst.playback.PlaybackRecovery?>(null) }
+    var recovering by remember { mutableStateOf(false) }
     val share: (ShareRequest) -> Unit = { shareRequest = it }
     val actions = rememberEpisodeActions(graph, navigator, toaster, chooseList = { listTarget = it }, share = share)
     val player: PlayerViewModel = viewModel { PlayerViewModel(graph.playback, graph.stars, graph.downloads, graph.progress, graph.library) }
@@ -139,8 +141,14 @@ private fun Shell(graph: AppGraph) {
                 if (durableStatus.pending || durableStatus.error != null) {
                     androidx.compose.material3.TextButton(onClick = {
                         graph.scope.launch {
-                            graph.progress.sync()
-                            runCatching { graph.library.retryImports(); graph.library.refresh() }
+                            if (durableStatus.blocked) {
+                                runCatching { graph.playback.prepareSyncedVersion(graph.recovery) }
+                                    .onSuccess { recoveryChoice = it }
+                                    .onFailure { toaster.show(it.message ?: "Unable to check the synced version") }
+                            } else {
+                                graph.progress.sync()
+                                runCatching { graph.library.retryImports(); graph.library.refresh() }
+                            }
                         }
                     }) { Text(durableStatus.error ?: "Changes saved on this device — sync pending") }
                 }
@@ -189,6 +197,32 @@ private fun Shell(graph: AppGraph) {
                     .then(if (nowPlaying) Modifier.navigationBarsPadding() else Modifier)
                     .padding(bottom = if (nowPlaying) 72.dp else if (playerState.player.active) 160.dp else 96.dp),
             )
+            recoveryChoice?.let { choice ->
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { if (!recovering) recoveryChoice = null },
+                    title = { Text("Use synced version?") },
+                    text = { Text("Replace unsynced listening positions and subscription changes on this device with the current versions from your account. Imported feed sources are kept.") },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(enabled = !recovering, onClick = {
+                            recovering = true
+                            graph.scope.launch {
+                                try {
+                                    graph.playback.useSyncedVersion(graph.recovery, choice)
+                                    recoveryChoice = null
+                                    graph.progress.sync()
+                                    runCatching { graph.library.refresh() }
+                                } catch (failure: Exception) {
+                                    toaster.show(failure.message ?: "Unable to use the synced version")
+                                    recoveryChoice = null
+                                } finally { recovering = false }
+                            }
+                        }) { Text("Use synced version") }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(enabled = !recovering, onClick = { recoveryChoice = null }) { Text("Cancel") }
+                    },
+                )
+            }
             ClipEndSheet(playerState, player)
             shareRequest?.let { request ->
                 ShareSheet(request, playerState, graph.preview, onPause = graph.playback::pause, onDismiss = { shareRequest = null })

@@ -223,6 +223,94 @@ class PlaybackSyncTest {
         assertNull(scopes.database.progress().get(phone.identity.value))
     }
 
+    @Test
+    fun usingSyncedVersionUpdatesPausedPlayerWithoutReuploadingItsOldPosition() = runTest {
+        val fixture = fixture()
+        fixture.hydrated()
+        fixture.progress.sync()
+        fixture.coordinator.seek(30.seconds)
+        fixture.settle()
+        val server = recoveryServer()
+        val repository = app.podcst.data.ProgressRepository(server.api, scopes, object : app.podcst.data.WorkScheduler {
+            override fun syncProgress() = Unit
+            override fun refreshFeeds() = Unit
+        })
+        repository.sync()
+        assertTrue(scopes.durable.status.value.blocked)
+        val recovery = app.podcst.data.StateRecovery(server.api, scopes)
+        val choice = checkNotNull(fixture.coordinator.prepareSyncedVersion(recovery))
+        fixture.coordinator.useSyncedVersion(recovery, choice)
+        fixture.settle()
+        assertEquals(phone.identity, fixture.coordinator.state.value.episode?.identity)
+        assertEquals(66.seconds, fixture.coordinator.state.value.position)
+        fixture.coordinator.checkpoint()
+        fixture.coordinator.pause()
+        fixture.settle()
+        assertFalse(scopes.durable.status.value.pending)
+        assertEquals(66000L, scopes.database.player().player()?.positionMs)
+        assertTrue(server.calls.all { it.body.isEmpty() })
+    }
+
+    @Test
+    fun seekingAfterReviewingSyncedVersionPreventsReplacingNewPlaybackIntent() = runTest {
+        val fixture = fixture()
+        fixture.hydrated()
+        fixture.progress.sync()
+        fixture.coordinator.seek(30.seconds)
+        fixture.settle()
+        val server = recoveryServer()
+        app.podcst.data.ProgressRepository(server.api, scopes, object : app.podcst.data.WorkScheduler {
+            override fun syncProgress() = Unit
+            override fun refreshFeeds() = Unit
+        }).sync()
+        val recovery = app.podcst.data.StateRecovery(server.api, scopes)
+        val choice = checkNotNull(fixture.coordinator.prepareSyncedVersion(recovery))
+        fixture.coordinator.seek(90.seconds)
+        fixture.settle()
+        assertTrue(runCatching { fixture.coordinator.useSyncedVersion(recovery, choice) }.isFailure)
+        assertEquals(90.seconds, fixture.coordinator.state.value.position)
+        assertTrue(scopes.durable.status.value.pending)
+    }
+
+    @Test
+    fun resumingDuringSyncedVersionFetchPreservesCurrentPlaybackAndPendingWork() = runTest {
+        val fixture = fixture()
+        fixture.hydrated()
+        fixture.progress.sync()
+        fixture.coordinator.seek(30.seconds)
+        fixture.settle()
+        val initial = recoveryServer()
+        app.podcst.data.ProgressRepository(initial.api, scopes, object : app.podcst.data.WorkScheduler {
+            override fun syncProgress() = Unit
+            override fun refreshFeeds() = Unit
+        }).sync()
+        val initialRecovery = app.podcst.data.StateRecovery(initial.api, scopes)
+        val choice = checkNotNull(fixture.coordinator.prepareSyncedVersion(initialRecovery))
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val server = recoveryServer {
+            started.complete(Unit)
+            runBlocking { release.await() }
+        }
+        val request = async { runCatching { fixture.coordinator.useSyncedVersion(app.podcst.data.StateRecovery(server.api, scopes), choice) } }
+        started.await()
+        fixture.coordinator.resume()
+        release.complete(Unit)
+        assertTrue(request.await().isFailure)
+        assertTrue(fixture.coordinator.state.value.requested)
+        assertEquals(30.seconds, fixture.coordinator.state.value.position)
+        assertTrue(scopes.durable.status.value.pending)
+        fixture.coordinator.pause()
+        fixture.settle()
+    }
+
+    private fun recoveryServer(beforeReply: () -> Unit = {}) = app.podcst.network.testing.FakeServer { call ->
+        beforeReply()
+        val generation = "17adbd84-d0e4-4e2d-ad9f-b084efee3212"
+        if (call.path == "/api/progress") Reply("""{"protocol":1,"accountId":"owner","generation":"$generation","revision":"1","items":[{"episodeId":"1","progress":{"positionSeconds":66,"completed":false,"revision":"1","updatedAtMs":null}}]}""")
+        else Reply("""{"protocol":1,"accountId":"owner","generation":"$generation","revision":"1","items":[]}""")
+    }
+
     private fun rejectsLateRestore(action: suspend (PlaybackCoordinator) -> Unit) = runTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()

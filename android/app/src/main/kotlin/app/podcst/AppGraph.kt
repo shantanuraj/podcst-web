@@ -55,6 +55,7 @@ class AppGraph(application: Application) {
     val retained = app.podcst.data.RetainedState(scopes, api, catalog)
     val library = LibraryRepository(api, scopes, catalog)
     val progress = ProgressRepository(api, scopes, scheduler)
+    val recovery = app.podcst.data.StateRecovery(api, scopes)
     val stars = StarRepository(File(application.noBackupFilesDir, "episode-lists.json"), api.starRemote(), scope, session.user?.id)
     val media = MediaStore(application, client)
     val downloads = Downloads(application, media, DownloadsService::class.java, scope)

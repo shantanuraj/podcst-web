@@ -191,25 +191,65 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
         check(ack.results.map { it.podcastId } == flight.batch.changes.map { it.podcastId })
         it.copy(followFlight = flight.copy(ack = ack), failures = it.failures + ack.results.filter { it.status == StateResult.not_found }.map { "Podcast ${it.podcastId.value} unavailable" })
     }
-    internal fun installProgress(account: String, snapshot: StateSnapshot<StateProgressItem>, requested: List<Long>? = null) = change(account) {
-        validateStateScope(snapshot.protocol, snapshot.accountId, snapshot.generation, account, it.generation)
+    internal fun installProgress(account: String, snapshot: StateSnapshot<StateProgressItem>, requested: List<Long>? = null, expectedGeneration: String? = account(account).generation) = change(account) { it.installProgress(account, snapshot, requested, expectedGeneration) }
+    private fun DurableAccount.installProgress(account: String, snapshot: StateSnapshot<StateProgressItem>, requested: List<Long>?, expectedGeneration: String?): DurableAccount {
+        validateStateScope(snapshot.protocol, snapshot.accountId, snapshot.generation, account)
         val head = snapshot.revision.value.toLong()
-        if (head < it.progressRevision || head < (it.progressFlight?.ack?.revision?.value?.toLong() ?: 0)) throw IOException("Progress snapshot is behind; overlay retained")
         val ids = snapshot.items.map { it.episodeId.value.toLong() }
         check(ids.size <= 200 && ids.distinct().size == ids.size)
         if (requested != null) check(ids.toSet() == requested.toSet())
         snapshot.items.forEach { row -> row.progress?.let { p -> check(p.positionSeconds >= 0 && p.revision.value.toLong() <= head && (p.updatedAtMs == null || p.updatedAtMs in 0..8640000000000000L)) } }
-        val retire = it.progressFlight?.let { flight -> flight.ack != null && requested != null && requested.containsAll(flight.batch.changes.map { it.episodeId.value.toLong() }) } == true
-        val next = it.copy(generation = snapshot.generation, progressRevision = head, progress = it.progress + snapshot.items.associate { it.episodeId.value.toLong() to it.progress }, progressFlight = if (retire) null else it.progressFlight)
-        next.copy(progressCompletion = next.progressCompletion.filterKeys { id -> id in next.progressOverlay() })
+        val current = forSnapshot(snapshot.generation, expectedGeneration)
+        if (current.progressBlocked != null) return current
+        if (head < current.progressRevision || head < (current.progressFlight?.ack?.revision?.value?.toLong() ?: 0)) throw IOException("Progress snapshot is behind; overlay retained")
+        val retire = current.progressFlight?.let { flight -> flight.ack != null && requested != null && requested.containsAll(flight.batch.changes.map { it.episodeId.value.toLong() }) } == true
+        val next = current.copy(generation = snapshot.generation, progressRevision = head, progress = current.progress + snapshot.items.associate { it.episodeId.value.toLong() to it.progress }, progressFlight = if (retire) null else current.progressFlight)
+        return next.copy(progressCompletion = next.progressCompletion.filterKeys { id -> id in next.progressOverlay() })
     }
-    internal fun installFollows(account: String, snapshot: StateSnapshot<StateFollowItem>) = change(account) {
-        validateStateScope(snapshot.protocol, snapshot.accountId, snapshot.generation, account, it.generation)
+    internal fun installFollows(account: String, snapshot: StateSnapshot<StateFollowItem>, expectedGeneration: String? = account(account).generation) = change(account) { it.installFollows(account, snapshot, expectedGeneration) }
+    private fun DurableAccount.installFollows(account: String, snapshot: StateSnapshot<StateFollowItem>, expectedGeneration: String?): DurableAccount {
+        validateStateScope(snapshot.protocol, snapshot.accountId, snapshot.generation, account)
         val head = snapshot.revision.value.toLong()
-        if (head < it.followRevision || head < (it.followFlight?.ack?.revision?.value?.toLong() ?: 0)) throw IOException("Follow snapshot is behind; overlay retained")
         check(snapshot.items.map { it.podcastId }.distinct().size == snapshot.items.size)
         snapshot.items.forEach { row -> check(row.revision.value.toLong() <= head && (row.followedAtMs == null || row.followedAtMs in 0..8640000000000000L)) }
-        it.copy(generation = snapshot.generation, followRevision = head, follows = snapshot.items, followFlight = if (it.followFlight?.ack != null) null else it.followFlight)
+        val current = forSnapshot(snapshot.generation, expectedGeneration)
+        if (current.followBlocked != null) return current
+        if (head < current.followRevision || head < (current.followFlight?.ack?.revision?.value?.toLong() ?: 0)) throw IOException("Follow snapshot is behind; overlay retained")
+        return current.copy(generation = snapshot.generation, followRevision = head, follows = snapshot.items, followFlight = if (current.followFlight?.ack != null) null else current.followFlight)
+    }
+
+    private fun DurableAccount.forSnapshot(nextGeneration: String, expectedGeneration: String?): DurableAccount {
+        if (generation == null || generation == nextGeneration) return this
+        if (generation != expectedGeneration) throw IOException("Sync state changed while reading; retry the snapshot")
+        error("Saved changes need recovery before syncing can continue.")
+    }
+
+    internal fun validateRecovery(account: String, expected: DurableAccount, snapshots: RecoverySnapshots): DurableAccount {
+        check(expected.generation != null && expected.generation != snapshots.follows.generation) { "No newer sync version is available." }
+        check(snapshots.progress.isNotEmpty())
+        check(snapshots.requested.containsAll(expected.progress.keys + expected.progressOverlay().keys))
+        val ids = snapshots.progress.flatMap { it.items.map { row -> row.episodeId.value.toLong() } }
+        check(ids.distinct().size == ids.size)
+        if (snapshots.requested.isNotEmpty()) check(ids.toSet() == snapshots.requested.toSet())
+        var current = expected.copy(
+            generation = snapshots.follows.generation,
+            progressClient = UUID.randomUUID().toString(), followClient = UUID.randomUUID().toString(),
+            progressSequence = 0, followSequence = 0, progressRevision = 0, followRevision = 0,
+            progress = emptyMap(), follows = emptyList(), progressCompletion = emptyMap(),
+            progressQueued = emptyList(), followQueued = emptyList(), progressFlight = null, followFlight = null,
+            progressBlocked = null, followBlocked = null, failures = emptySet(),
+        )
+        current = current.installFollows(account, snapshots.follows, current.generation)
+        for (snapshot in snapshots.progress.sortedBy { it.revision.value.toLong() }) {
+            current = current.installProgress(account, snapshot, null, current.generation)
+        }
+        return current
+    }
+
+    internal fun recover(account: String, expected: DurableAccount, snapshots: RecoverySnapshots, discardPending: Boolean = false) = change(account) {
+        check(it == expected) { "Saved changes changed during recovery. Review the synced version again." }
+        check(discardPending || !it.pending) { "Saved changes need recovery before syncing can continue." }
+        validateRecovery(account, expected, snapshots)
     }
 
     private fun decode(bytes: ByteArray): DurableRoot {
@@ -272,6 +312,6 @@ class DurableState(file: File, private val writer: ((ByteArray) -> Unit)? = null
     private fun publish() {
         val account = visible?.let { root.accounts[it] }
         val importFeeds = if (visible == null) root.guestImportFeeds else account?.importFeeds.orEmpty()
-        state.value = DurableStatus(account?.pending == true, if (!readable) "Saved state cannot be opened; source retained." else errors[visible] ?: account?.progressBlocked ?: account?.followBlocked ?: account?.failures?.firstOrNull() ?: importFeeds.takeIf { it.isNotEmpty() }?.let { "${it.size} imported feeds need resolution — Retry" }, !readable || account?.progressBlocked != null || account?.followBlocked != null)
+        state.value = DurableStatus(account?.pending == true, if (!readable) "Saved state cannot be opened; source retained." else errors[visible] ?: account?.progressBlocked?.let { "Listening progress syncing is paused. Saved changes are retained." } ?: account?.followBlocked?.let { "Subscription syncing is paused. Saved changes are retained." } ?: account?.failures?.firstOrNull() ?: importFeeds.takeIf { it.isNotEmpty() }?.let { "${it.size} imported feeds need resolution — Retry" }, !readable || account?.progressBlocked != null || account?.followBlocked != null)
     }
 }
