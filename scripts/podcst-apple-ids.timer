@@ -1,0 +1,10 @@
+[Unit]
+Description=Check stored Apple IDs against Apple every week
+
+[Timer]
+OnCalendar=Mon *-*-* 04:45:00 UTC
+Persistent=true
+Unit=podcst-apple-ids.service
+
+[Install]
+WantedBy=timers.target

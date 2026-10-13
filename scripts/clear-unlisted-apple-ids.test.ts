@@ -11,6 +11,7 @@ import {
   clearUnlisted,
   findUnlisted,
   parseUnlistedArgs,
+  recordAppleIdMetrics,
   servedAppleClaims,
   UnlistedAppleIdError,
 } from './clear-unlisted-apple-ids';
@@ -178,6 +179,25 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(
         await clearUnlisted(cluster.sql, '4', unlisted, true),
       ).toBeUndefined();
+    });
+
+    test('applied runs record every count, including zeros', async () => {
+      await recordAppleIdMetrics(cluster.sql, {
+        checked: 4,
+        unlisted: 1,
+        cleared: 0,
+      });
+      expect(
+        Array.from(
+          await cluster.sql`
+            SELECT metric_name, metric_value FROM poll_metrics ORDER BY metric_name
+          `,
+        ),
+      ).toEqual([
+        { metric_name: 'apple_ids_checked', metric_value: 4 },
+        { metric_name: 'apple_ids_cleared', metric_value: 0 },
+        { metric_name: 'apple_ids_unlisted', metric_value: 1 },
+      ]);
     });
 
     test('the catalogue sync does not restore an unlisted Apple ID', async () => {

@@ -147,3 +147,8 @@ again. Charts and Apple lookups still claim a relisted ID directly.
 ```sh
 APPLE_IDS_DATABASE_URL=... bun scripts/clear-unlisted-apple-ids.ts [--ids ids.json] [--apply]
 ```
+
+`podcst-apple-ids.timer` applies it every Monday at 04:45 UTC. An applied run
+records `apple_ids_checked`, `_unlisted`, `_relisted`, `_promoted`, `_cleared`
+and `_storefronts_skipped` in `poll_metrics`; the service needs
+`APPLE_IDS_DATABASE_URL` in its environment.

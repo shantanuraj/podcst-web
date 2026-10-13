@@ -170,6 +170,20 @@ export async function clearUnlisted(
   return result;
 }
 
+export async function recordAppleIdMetrics(
+  sql: postgres.Sql,
+  metrics: Record<string, number>,
+) {
+  await sql`
+    INSERT INTO poll_metrics ${sql(
+      Object.entries(metrics).map(([name, value]) => ({
+        metric_name: `apple_ids_${name}`,
+        metric_value: value,
+      })),
+    )}
+  `;
+}
+
 export async function main(args: string[]) {
   const options = parseUnlistedArgs(args);
   const extra = options.ids
@@ -190,8 +204,17 @@ export async function main(args: string[]) {
     const listed = [...new Set(claims.map(({ itunesId }) => itunesId))].filter(
       (id) => !unlisted.has(id),
     );
-    if (options.apply && listed.length)
-      await sql`DELETE FROM unlisted_apple_ids WHERE itunes_id IN ${sql(listed)}`;
+    const relisted =
+      options.apply && listed.length
+        ? (
+            await sql`
+              DELETE FROM unlisted_apple_ids WHERE itunes_id IN ${sql(listed)}
+              RETURNING itunes_id
+            `
+          ).length
+        : 0;
+    let promoted = 0;
+    let cleared = 0;
     const podcasts = [
       ...new Set(
         claims
@@ -206,8 +229,21 @@ export async function main(args: string[]) {
         unlisted,
         options.apply,
       );
-      if (result) console.log(JSON.stringify(result));
+      if (!result) continue;
+      console.log(JSON.stringify(result));
+      const preferred = result.preferred as { to: string | null } | null;
+      if (preferred?.to) promoted++;
+      else if (preferred) cleared++;
     }
+    if (options.apply)
+      await recordAppleIdMetrics(sql, {
+        checked: new Set(claims.map(({ itunesId }) => itunesId)).size,
+        unlisted: unlisted.size,
+        relisted,
+        promoted,
+        cleared,
+        storefronts_skipped: skipped.length,
+      });
     console.log(
       JSON.stringify({
         status: 'summary',
