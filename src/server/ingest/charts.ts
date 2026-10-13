@@ -291,6 +291,7 @@ export async function refreshTopCharts(
   sql: postgres.Sql,
   locales: string[],
   fetchChart = fetchTopFromItunes,
+  metrics: 'top_charts' | 'chart_rotation' = 'top_charts',
 ) {
   let stored = 0;
   let newPodcasts = 0;
@@ -317,13 +318,13 @@ export async function refreshTopCharts(
   }
 
   for (const [name, value] of Object.entries({
-    top_charts_stored: stored,
-    top_charts_new_podcasts: newPodcasts,
-    top_charts_failed: failedLocales.length,
-    top_charts_skipped: skipped,
+    stored,
+    new_podcasts: newPodcasts,
+    failed: failedLocales.length,
+    skipped,
   })) {
     await sql`
-      INSERT INTO poll_metrics (metric_name, metric_value) VALUES (${name}, ${value})
+      INSERT INTO poll_metrics (metric_name, metric_value) VALUES (${`${metrics}_${name}`}, ${value})
     `;
   }
   return { stored, newPodcasts, skipped, failedLocales };

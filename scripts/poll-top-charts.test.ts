@@ -5,12 +5,18 @@ import { parseChartJobArgs, runChartJob } from './poll-top-charts';
 
 const sql = {} as postgres.Sql;
 
-function jobs(failedLocales: string[] = []) {
-  const calls: { name: string; locales: string[] }[] = [];
+function jobs(failedLocales: string[] = [], rotation: string[] = []) {
+  const calls: { name: string; locales: string[]; metrics?: string }[] = [];
   return {
     calls,
-    refreshCharts: async (_sql: postgres.Sql, locales: string[]) => {
-      calls.push({ name: 'charts', locales });
+    claimRegions: async () => rotation,
+    refreshCharts: async (
+      _sql: postgres.Sql,
+      locales: string[],
+      _fetch?: unknown,
+      metrics?: string,
+    ) => {
+      calls.push({ name: 'charts', locales, ...(metrics ? { metrics } : {}) });
       return {
         stored: locales.length === failedLocales.length ? 0 : 100,
         newPodcasts: 0,
@@ -99,7 +105,28 @@ describe('bounded chart job modes', () => {
     expect(combined.calls.map((c) => c.name)).toEqual(['charts', 'episodes']);
   });
 
+  test('rotation refreshes only claimed regions under rotation metrics', async () => {
+    const work = jobs(['zz'], ['gb', 'zz']);
+    expect(await runChartJob(sql, ['--rotation'], work)).toEqual({
+      failedLocales: ['zz'],
+      exitCode: 0,
+    });
+    expect(work.calls).toEqual([
+      { name: 'charts', locales: ['gb', 'zz'], metrics: 'chart_rotation' },
+    ]);
+  });
+
+  test('rotation with nothing claimed does no chart work', async () => {
+    const work = jobs();
+    expect(await runChartJob(sql, ['--rotation'], work)).toEqual({
+      failedLocales: [],
+      exitCode: 0,
+    });
+    expect(work.calls).toEqual([]);
+  });
+
   for (const args of [
+    ['--charts-only', '--rotation'],
     ['--charts-only', '--episodes-only'],
     ['--charts-only', '--charts-only'],
     ['--unknown'],

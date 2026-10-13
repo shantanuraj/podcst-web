@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh the stalest non-main Podcst charts every hour
+
+[Timer]
+OnCalendar=*-*-* *:30:00 UTC
+Persistent=true
+Unit=podcst-chart-rotation.service
+
+[Install]
+WantedBy=timers.target

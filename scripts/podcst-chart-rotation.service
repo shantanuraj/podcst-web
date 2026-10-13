@@ -1,0 +1,29 @@
+[Unit]
+Description=Podcst rotating refresh of non-main top charts
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=svc-podcst
+Group=svc-podcst
+Environment=HOME=/var/lib/podcst
+EnvironmentFile=/etc/podcst/app.env
+WorkingDirectory=/opt/podcst
+ExecStart=/usr/local/bin/bun run scripts/poll-top-charts.ts --rotation
+TimeoutStartSec=30min
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/opt/podcst
+ReadWritePaths=/var/lib/podcst
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=podcst-chart-rotation

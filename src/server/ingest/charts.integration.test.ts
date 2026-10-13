@@ -168,6 +168,27 @@ describe.skipIf(!databaseAvailable)('chart ingestion with PostgreSQL', () => {
     });
   });
 
+  test('rotation runs record their own metrics', async () => {
+    await refreshTopCharts(
+      sql,
+      ['gb'],
+      async () => [podcast(6806963519)],
+      'chart_rotation',
+    );
+    const metrics =
+      await sql`SELECT metric_name, metric_value FROM poll_metrics`;
+    expect(
+      Object.fromEntries(
+        metrics.map((row) => [row.metric_name, row.metric_value]),
+      ),
+    ).toEqual({
+      chart_rotation_stored: 1,
+      chart_rotation_new_podcasts: 1,
+      chart_rotation_failed: 0,
+      chart_rotation_skipped: 0,
+    });
+  });
+
   test('upstream failures preserve previous charts and allow other countries to refresh', async () => {
     const before = await chart();
     const result = await refreshTopCharts(sql, ['nl', 'us'], async (locale) => {

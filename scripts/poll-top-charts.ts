@@ -1,21 +1,30 @@
 #!/usr/bin/env bun
 
 import postgres from 'postgres';
-import { i18n } from '../src/i18.conf';
+import {
+  claimRotationRegions,
+  MAIN_CHART_REGIONS,
+} from '../src/server/ingest/chart-regions';
 import { refreshTopCharts } from '../src/server/ingest/charts';
 import { refreshFeed } from '../src/server/ingest/feed-refresh';
 
 const POLL_CONCURRENCY = 10;
+const MODES = ['--episodes-only', '--charts-only', '--rotation'];
+
 export function parseChartJobArgs(args: string[]) {
   if (
-    args.some((arg) => !['--episodes-only', '--charts-only'].includes(arg)) ||
+    args.some((arg) => !MODES.includes(arg)) ||
     new Set(args).size !== args.length ||
     args.length > 1
   )
-    throw new Error('Choose at most one of --charts-only or --episodes-only');
+    throw new Error(
+      'Choose at most one of --charts-only, --episodes-only or --rotation',
+    );
+  const rotation = args.includes('--rotation');
   return {
+    rotation,
     charts: !args.includes('--episodes-only'),
-    episodes: !args.includes('--charts-only'),
+    episodes: !rotation && !args.includes('--charts-only'),
   };
 }
 
@@ -65,10 +74,31 @@ async function pollMissingEpisodes(sql: postgres.Sql, locales: string[]) {
 export async function runChartJob(
   sql: postgres.Sql,
   args: string[],
-  jobs = { refreshCharts: refreshTopCharts, pollEpisodes: pollMissingEpisodes },
+  jobs = {
+    refreshCharts: refreshTopCharts,
+    pollEpisodes: pollMissingEpisodes,
+    claimRegions: claimRotationRegions,
+  },
 ) {
   const mode = parseChartJobArgs(args);
-  const locales = [...i18n.locales];
+  if (mode.rotation) {
+    const regions = await jobs.claimRegions(sql);
+    if (!regions.length) {
+      console.log('Rotation: no regions to refresh');
+      return { failedLocales: [], exitCode: 0 };
+    }
+    const result = await jobs.refreshCharts(
+      sql,
+      regions,
+      undefined,
+      'chart_rotation',
+    );
+    console.log(
+      `Rotation ${regions.join(',')}: ${result.stored} stored, ${result.newPodcasts} new, ${result.skipped} identity conflicts skipped, ${result.failedLocales.length} countries failed`,
+    );
+    return { failedLocales: result.failedLocales, exitCode: 0 };
+  }
+  const locales = [...MAIN_CHART_REGIONS];
   let failedLocales: string[] = [];
   let exitCode = 0;
   if (mode.charts) {
