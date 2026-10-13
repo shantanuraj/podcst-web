@@ -96,7 +96,8 @@ export async function getDuePodcasts(
               AND p.id IN (SELECT id FROM followed))
           )
           AND (p.id IN (SELECT id FROM followed) OR p.last_published IS NULL
-            OR p.last_published > now() - interval '180 days')
+            OR p.last_published > now() - interval '180 days'
+            OR s.last_success_at IS NULL OR s.failures > 0)
         )
       )
     ORDER BY

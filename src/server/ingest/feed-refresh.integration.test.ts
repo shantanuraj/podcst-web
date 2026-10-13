@@ -142,6 +142,25 @@ describe.skipIf(!databaseUrl)('feed refresh with PostgreSQL', () => {
     expect(state.seconds).toBe(7200);
   });
 
+  test('stale publish dates hold back chart feeds only after a clean refresh', async () => {
+    await sql`DELETE FROM subscriptions`;
+    for (const { published, failures, succeeded, due } of [
+      { published: '365 days', failures: 3, succeeded: true, due: true },
+      { published: '365 days', failures: 0, succeeded: false, due: true },
+      { published: '365 days', failures: 0, succeeded: true, due: false },
+      { published: '1 day', failures: 0, succeeded: true, due: true },
+    ]) {
+      await sql`UPDATE podcasts SET last_published = now() - ${published}::interval`;
+      await sql`
+        UPDATE feed_poll_state SET failures = ${failures}, next_poll_at = now() - interval '1 second',
+          last_success_at = ${succeeded ? sql`now() - interval '1 day'` : null}
+      `;
+      expect(await getDuePodcasts(sql, 500)).toEqual(
+        due ? [{ id: '139' }] : [],
+      );
+    }
+  });
+
   test('missing poll-state rows do not prevent polling', async () => {
     await sql`DELETE FROM feed_poll_state`;
     expect(await getDuePodcasts(sql, 500)).toEqual([{ id: '139' }]);
