@@ -270,6 +270,7 @@ describe('durable web stars', () => {
     await sync.activate('owner');
     await sync.edit('1', 'add', episode('1'));
     f.api.membership = async () => {
+      if (!f.sent.length) return snapshot([]);
       throw new Error('Offline');
     };
     f.online();

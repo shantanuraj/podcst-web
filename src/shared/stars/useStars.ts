@@ -5,7 +5,7 @@ import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { feedRecheckDelay } from '@/shared/feed-contract';
 import type { IEpisodeInfo } from '@/types';
 import { starRuntime } from './browser';
-import { project, validEpisodeId } from './state';
+import { hasPendingStars, project, validEpisodeId } from './state';
 
 export function useStars() {
   const session = useAccountSession();
@@ -53,7 +53,9 @@ export function useStars() {
       (!!state.flight || state.queued.length > 0),
     error:
       state?.blocked || state?.unresolved?.length
-        ? 'Star sync needs attention. Pending edits have been kept.'
+        ? hasPendingStars(state)
+          ? 'Star sync needs attention. Pending edits have been kept.'
+          : 'Star sync needs attention. Try refreshing.'
         : state?.failures.length
           ? `${state.failures.length} episode(s) could not be added.`
           : view.error,

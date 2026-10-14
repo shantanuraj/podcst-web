@@ -1,5 +1,4 @@
 import { ApiError } from '@/data/api';
-import { sameScope } from '@/data/progress-outbox';
 import { StateProtocolError } from '@/data/state-runtime';
 import type {
   LegacyListBatch,
@@ -20,6 +19,7 @@ import {
   mergeGuest,
   project,
   purgeMetadata,
+  reconcileSnapshot,
   type StarRoot,
   type StarScope,
   scopeIn,
@@ -201,48 +201,47 @@ export class StarSync {
     const work = this.lock(async () => {
       active();
       this.emit({ syncing: true, error: undefined });
-      let state = await update(() => {});
-      if (state.blocked) return;
-      if (!state.wire || !state.listId) {
-        const envelope = await this.api.lists();
-        if (
-          envelope.protocol !== 1 ||
-          envelope.accountId !== scope ||
-          !stateValidator('uuid')(envelope.generation) ||
-          !Array.isArray(envelope.lists) ||
-          envelope.lists.some(
-            (list) =>
-              !stateValidator('uuid')(list.id) ||
-              !stateValidator('revision')(list.revision) ||
-              !['starred', 'playlist'].includes(list.kind) ||
-              !Number.isSafeInteger(list.itemCount) ||
-              list.itemCount < 0,
-          )
+      const envelope = await this.api.lists();
+      if (
+        envelope?.protocol !== 1 ||
+        envelope.accountId !== scope ||
+        !stateValidator('uuid')(envelope.generation) ||
+        !Array.isArray(envelope.lists) ||
+        new Set(envelope.lists.map((list) => list?.id)).size !==
+          envelope.lists.length ||
+        envelope.lists.some(
+          (list) =>
+            !list ||
+            !stateValidator('uuid')(list.id) ||
+            !stateValidator('revision')(list.revision) ||
+            !['starred', 'playlist'].includes(list.kind) ||
+            !Number.isSafeInteger(list.itemCount) ||
+            list.itemCount < 0,
         )
-          throw new StateProtocolError('Invalid lists scope');
-        const list = envelope.lists.find(({ kind }) => kind === 'starred');
-        active();
-        if (!list) throw new Error('Starred list missing');
-        state = await update((state) => {
-          if (state.wire && !sameScope(state.wire, envelope)) {
-            state.blocked = 409;
-            return;
-          }
-          state.wire = {
-            protocol: 1,
-            accountId: scope,
-            generation: envelope.generation,
-          };
-          state.listId = list.id;
-        });
-      }
-      const id = state.listId as string;
-      do {
+      )
+        throw new StateProtocolError('Invalid lists scope');
+      const lists = envelope.lists.filter(({ kind }) => kind === 'starred');
+      if (lists.length !== 1)
+        throw new StateProtocolError('Invalid starred list');
+      const id = lists[0].id;
+      const wire: StateScope = {
+        protocol: 1,
+        accountId: scope,
+        generation: envelope.generation,
+      };
+      active();
+      const initial = await this.api.membership(id);
+      active();
+      let state = await update((state) =>
+        reconcileSnapshot(state, wire, id, initial),
+      );
+      if (state.blocked) return;
+      while (state.flight || state.legacy || state.queued.length) {
         state = await update(freeze);
         if (state.flight && !state.flight.ack) {
           try {
             const ack = state.legacy
-              ? await this.api.migration(id, state.wire!, state.legacy.batch)
+              ? await this.api.migration(id, wire, state.legacy.batch)
               : await this.api.changes(id, state.flight.batch);
             active();
             await update((state) => acknowledge(state, ack));
@@ -262,7 +261,7 @@ export class StarSync {
         const snapshot = await this.api.membership(id);
         active();
         state = await update((state) => installSnapshot(state, snapshot));
-      } while (state.queued.length);
+      }
       let cursor: string | undefined;
       const cursors = new Set<string>();
       do {

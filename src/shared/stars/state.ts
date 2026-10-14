@@ -53,6 +53,14 @@ export const emptyScope = (): StarScope => ({
 export const scopeIn = (root: StarRoot, account: string | null) =>
   (root[scopeKey(account)] ??= emptyScope());
 
+export const hasPendingStars = (state: StarScope) =>
+  !!(
+    state.flight ||
+    state.legacy ||
+    state.queued.length ||
+    state.unresolved?.length
+  );
+
 export function project(state: StarScope): StarItem[] {
   const items = new Map(
     state.snapshot?.items.map((item) => [item.episodeId, item]),
@@ -204,17 +212,23 @@ export function acknowledge(state: StarScope, ack: ListAcknowledgement) {
   }
 }
 
-export function installSnapshot(state: StarScope, snapshot: ListSnapshot) {
+function validateSnapshot(
+  snapshot: ListSnapshot,
+  wire: StateScope | undefined,
+  listId: string | undefined,
+) {
   if (
-    !state.wire ||
-    !sameScope(state.wire, snapshot) ||
-    snapshot.listId !== state.listId ||
+    !snapshot ||
+    !wire ||
+    !sameScope(wire, snapshot) ||
+    snapshot.listId !== listId ||
     !stateValidator('revision')(snapshot.revision) ||
     !Array.isArray(snapshot.items) ||
-    new Set(snapshot.items.map((item) => item.episodeId)).size !==
+    new Set(snapshot.items.map((item) => item?.episodeId)).size !==
       snapshot.items.length ||
     snapshot.items.some(
       (item) =>
+        !item ||
         !validEpisodeId(item.episodeId) ||
         !Number.isSafeInteger(item.addedAt) ||
         item.addedAt < 0 ||
@@ -224,6 +238,37 @@ export function installSnapshot(state: StarScope, snapshot: ListSnapshot) {
     )
   )
     throw new StateProtocolError('Invalid membership snapshot');
+}
+
+export function reconcileSnapshot(
+  state: StarScope,
+  wire: StateScope,
+  listId: string,
+  snapshot: ListSnapshot,
+) {
+  validateSnapshot(snapshot, wire, listId);
+  if (state.wire && !sameScope(state.wire, wire)) {
+    if (state.wire.accountId !== wire.accountId || hasPendingStars(state))
+      throw new StateProtocolError(
+        'Saved stars need recovery before syncing can continue',
+      );
+    delete state.blocked;
+    delete state.snapshot;
+    delete state.freshness;
+    Object.assign(state, emptyScope(), { wire, listId });
+  }
+  if (state.blocked) return;
+  if (state.wire && state.listId && state.listId !== listId)
+    throw new StateProtocolError(
+      'Starred list changed within the same generation',
+    );
+  state.wire = wire;
+  state.listId = listId;
+  installSnapshot(state, snapshot);
+}
+
+export function installSnapshot(state: StarScope, snapshot: ListSnapshot) {
+  validateSnapshot(snapshot, state.wire, state.listId);
   if (
     BigInt(snapshot.revision) < BigInt(state.revision) ||
     BigInt(snapshot.revision) < BigInt(state.flight?.ack?.revision ?? '0')
