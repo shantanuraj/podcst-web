@@ -15,6 +15,10 @@ import {
   catalogInput,
   storeCatalogPodcast,
 } from '../src/server/ingest/catalog';
+import {
+  PodcastAccessDenied,
+  PodcastIdentityConflict,
+} from '../src/server/ingest/podcast-identity';
 import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
 import { migrateStoredId } from '../src/shared/canonical-id';
 import {
@@ -56,6 +60,39 @@ const localPath = process.argv[2];
 
 interface PodcastIndexRow extends CatalogRow {
   itunesId: number | string | null;
+}
+
+export const isRowRejection = (error: unknown) =>
+  error instanceof PodcastIdentityConflict ||
+  error instanceof PodcastAccessDenied ||
+  error instanceof TypeError;
+
+export function indexSourceOrder(sqlite: Database) {
+  sqlite.run(
+    'CREATE INDEX IF NOT EXISTS podcasts_sync_order ON podcasts (lastUpdate, id)',
+  );
+}
+
+export function sourceBatches(sqlite: Database, limit: number) {
+  const query = sqlite.query<
+    PodcastIndexRow,
+    { $lastUpdate: number; $lastId: number; $limit: number }
+  >(`
+    SELECT
+      id, url, title, lastUpdate, link, dead, itunesId, itunesAuthor,
+      explicit, imageUrl, newestItemPubdate, language, episodeCount,
+      popularityScore, priority, updateFrequency, description
+    FROM podcasts
+    WHERE (lastUpdate, id) > ($lastUpdate, $lastId)
+    ORDER BY lastUpdate ASC, id ASC
+    LIMIT $limit
+  `);
+  return (after: PodcastIndexCursor) =>
+    query.all({
+      $lastUpdate: after.lastUpdate,
+      $lastId: after.lastId,
+      $limit: limit,
+    });
 }
 
 async function downloadAndExtract(): Promise<string> {
@@ -174,7 +211,7 @@ async function syncBatch(
   inserted: number;
   updated: number;
   skipped: number;
-  failed: number;
+  rejected: number;
 }> {
   const privateRows = await sql`
     SELECT id, feed_url FROM podcasts
@@ -185,7 +222,7 @@ async function syncBatch(
   );
   await loadAuthors(sql, batch, authorCache);
 
-  const results: Array<'inserted' | 'updated' | 'skipped' | 'failed'> = [];
+  const results: Array<'inserted' | 'updated' | 'skipped' | 'rejected'> = [];
   for (let offset = 0; offset < batch.length; offset += ROW_CONCURRENCY) {
     const rows = batch.slice(offset, offset + ROW_CONCURRENCY);
     results.push(
@@ -208,6 +245,7 @@ async function syncBatch(
             );
             return result;
           } catch (err) {
+            if (!isRowRejection(err)) throw err;
             logAction({
               timestamp: new Date().toISOString(),
               action: 'skipped',
@@ -217,7 +255,7 @@ async function syncBatch(
               feed_url: row.url,
               error: err instanceof Error ? err.message : String(err),
             });
-            return 'failed' as const;
+            return 'rejected' as const;
           }
         }),
       )),
@@ -228,7 +266,7 @@ async function syncBatch(
     inserted: results.filter((result) => result === 'inserted').length,
     updated: results.filter((result) => result === 'updated').length,
     skipped: results.filter((result) => result === 'skipped').length,
-    failed: results.filter((result) => result === 'failed').length,
+    rejected: results.filter((result) => result === 'rejected').length,
   };
 }
 
@@ -243,7 +281,9 @@ async function sync(): Promise<void> {
   initLogFile();
 
   console.log('Opening SQLite database...');
-  const sqlite = new Database(dbPath, { readonly: true });
+  const sqlite = new Database(dbPath);
+  console.log('Indexing source order...');
+  indexSourceOrder(sqlite);
 
   const sql = postgres(connectionString, {
     max: 5,
@@ -258,19 +298,17 @@ async function sync(): Promise<void> {
       : `Incremental sync after ${new Date(cursor.lastUpdate * 1000).toISOString()} / ${cursor.lastId}`,
   );
 
-  const cursorParams = {
-    $lastUpdate: cursor.lastUpdate,
-    $lastId: cursor.lastId,
-  };
   const countQuery = sqlite.query<
     { count: number },
     { $lastUpdate: number; $lastId: number }
   >(`
     SELECT COUNT(*) as count FROM podcasts
-    WHERE lastUpdate > $lastUpdate
-      OR (lastUpdate = $lastUpdate AND id > $lastId)
+    WHERE (lastUpdate, id) > ($lastUpdate, $lastId)
   `);
-  const countRow = countQuery.get(cursorParams);
+  const countRow = countQuery.get({
+    $lastUpdate: cursor.lastUpdate,
+    $lastId: cursor.lastId,
+  });
   if (!countRow) throw new Error('Podcast Index count query returned no row');
   const { count: totalCount } = countRow;
   console.log(`Found ${totalCount.toLocaleString()} podcasts to sync`);
@@ -284,45 +322,22 @@ async function sync(): Promise<void> {
     return;
   }
 
-  const selectQuery = sqlite.query<
-    PodcastIndexRow,
-    {
-      $lastUpdate: number;
-      $lastId: number;
-      $limit: number;
-      $offset: number;
-    }
-  >(`
-    SELECT
-      id, url, title, lastUpdate, link, dead, itunesId, itunesAuthor,
-      explicit, imageUrl, newestItemPubdate, language, episodeCount,
-      popularityScore, priority, updateFrequency, description
-    FROM podcasts
-    WHERE lastUpdate > $lastUpdate
-      OR (lastUpdate = $lastUpdate AND id > $lastId)
-    ORDER BY lastUpdate ASC, id ASC
-    LIMIT $limit OFFSET $offset
-  `);
+  const nextBatch = sourceBatches(sqlite, BATCH_SIZE);
 
   const authorCache = new Map<string, number>();
   let processed = 0;
   let totalInserted = 0;
   let totalUpdated = 0;
   let totalSkipped = 0;
-  let totalFailed = 0;
-  let offset = 0;
+  let totalRejected = 0;
   let highWater: PodcastIndexCursor = cursor;
   const startTime = Date.now();
 
   while (processed < totalCount) {
-    const batch = selectQuery.all({
-      ...cursorParams,
-      $limit: BATCH_SIZE,
-      $offset: offset,
-    });
+    const batch = nextBatch(highWater);
     if (batch.length === 0) break;
 
-    const { inserted, updated, skipped, failed } = await syncBatch(
+    const { inserted, updated, skipped, rejected } = await syncBatch(
       sql,
       batch,
       authorCache,
@@ -330,22 +345,14 @@ async function sync(): Promise<void> {
     totalInserted += inserted;
     totalUpdated += updated;
     totalSkipped += skipped;
-    totalFailed += failed;
+    totalRejected += rejected;
     processed += batch.length;
-    offset += BATCH_SIZE;
     const lastRow = batch.at(-1);
     if (!lastRow || lastRow.lastUpdate === null) {
       throw new Error('Podcast Index source cursor is invalid');
     }
-    const batchHighWater = {
-      lastUpdate: lastRow.lastUpdate,
-      lastId: lastRow.id,
-    };
-    // Keep failed rows in the next run instead of checkpointing past them.
-    if (totalFailed === 0) {
-      highWater = batchHighWater;
-      await checkpointPodcastIndexCursor(sql, highWater);
-    }
+    highWater = { lastUpdate: lastRow.lastUpdate, lastId: lastRow.id };
+    await checkpointPodcastIndexCursor(sql, highWater);
 
     const percent = ((processed / totalCount) * 100).toFixed(1);
     const elapsed = Date.now() - startTime;
@@ -361,14 +368,15 @@ async function sync(): Promise<void> {
     throw new Error(
       `Podcast Index source changed during sync: processed ${processed} of ${totalCount}`,
     );
-  if (totalFailed > 0)
-    throw new Error(`Podcast Index sync left ${totalFailed} failed rows`);
 
   await writePodcastIndexCursor(sql, highWater);
   console.log(`\nSync complete:`);
   console.log(`  Inserted: ${totalInserted.toLocaleString()}`);
   console.log(`  Updated: ${totalUpdated.toLocaleString()}`);
   console.log(`  Skipped: ${totalSkipped.toLocaleString()}`);
+  console.log(
+    `  Rejected: ${totalRejected.toLocaleString()} (see ${logFilePath})`,
+  );
   console.log(`  Watermark: ${highWater.lastUpdate}/${highWater.lastId}`);
 
   sqlite.close();
