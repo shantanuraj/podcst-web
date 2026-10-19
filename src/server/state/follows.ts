@@ -10,10 +10,84 @@ import { podcastAccess } from '../podcast-access';
 import {
   lockStateChange,
   nextStateRevision,
-  readStateScope,
   saveStateAcknowledgement,
 } from './database';
 import { StateError } from './protocol';
+
+type SnapshotRow = {
+  accountId: string;
+  generation: string | null;
+  revision: string;
+  podcastId: string | null;
+  itemRevision: string | null;
+  followedAtMs: string | number | null;
+  availability: 'available' | 'unavailable' | null;
+};
+
+async function readSnapshot(
+  sql: postgres.ISql,
+  identity: { accountId: string } | { sessionId: string },
+): Promise<FollowSnapshot> {
+  const account =
+    'sessionId' in identity
+      ? sql`(
+          SELECT user_id FROM sessions
+          WHERE id = ${identity.sessionId} AND expires_at > now()
+        )`
+      : identity.accountId;
+  // Authentication, scope and memberships share one statement snapshot without
+  // a separate session lookup or transaction round trips.
+  const rows = await sql<SnapshotRow[]>`
+    SELECT u.id AS "accountId", g.generation,
+      coalesce(h.revision, 0)::text AS revision,
+      membership.podcast_id::text AS "podcastId",
+      membership.revision::text AS "itemRevision",
+      (extract(epoch FROM membership.subscribed_at) * 1000)::bigint AS "followedAtMs",
+      membership.availability
+    FROM users u
+    LEFT JOIN state_generation g ON g.singleton
+    LEFT JOIN follow_revision_heads h ON h.user_id = u.id
+    LEFT JOIN LATERAL (
+      SELECT s.podcast_id, s.revision, s.subscribed_at,
+        CASE WHEN p.owner_user_id IS NULL OR p.owner_user_id = u.id
+          THEN 'available' ELSE 'unavailable' END AS availability
+      FROM subscriptions s JOIN podcasts p ON p.id = s.podcast_id
+      WHERE s.user_id = u.id
+    ) membership ON true
+    WHERE u.id = ${account}
+    ORDER BY membership.subscribed_at DESC NULLS LAST, membership.podcast_id DESC
+  `;
+  const scope = rows[0];
+  if (!scope)
+    throw new StateError(
+      'unauthenticated',
+      'sessionId' in identity ? 'Unauthorized' : 'Authentication required',
+    );
+  if (!scope.generation)
+    throw new StateError('unavailable', 'State unavailable');
+  const result = {
+    protocol: 1,
+    accountId: scope.accountId,
+    generation: String(scope.generation),
+    revision: scope.revision,
+    items: rows.flatMap((row) =>
+      row.podcastId === null
+        ? []
+        : [
+            {
+              podcastId: row.podcastId,
+              revision: row.itemRevision,
+              followedAtMs:
+                row.followedAtMs === null ? null : Number(row.followedAtMs),
+              availability: row.availability,
+            },
+          ],
+    ),
+  };
+  if (!stateValidator('followSnapshot')(result))
+    throw new StateError('unavailable', 'State unavailable');
+  return result;
+}
 
 export function createFollowStateService(
   sql: postgres.Sql,
@@ -78,31 +152,12 @@ export function createFollowStateService(
       });
     },
 
-    async read(accountId: string): Promise<FollowSnapshot> {
-      return sql.begin(
-        'isolation level repeatable read read only',
-        async (tx) => {
-          const scope = await readStateScope(tx, accountId, 'follows');
-          const rows = await tx<FollowSnapshot['items']>`
-          SELECT s.podcast_id::text AS "podcastId", s.revision::text,
-            (extract(epoch FROM s.subscribed_at) * 1000)::bigint AS "followedAtMs",
-            CASE WHEN ${podcastAccess(tx, accountId)} THEN 'available' ELSE 'unavailable' END AS availability
-          FROM subscriptions s JOIN podcasts p ON p.id = s.podcast_id
-          WHERE s.user_id = ${accountId} ORDER BY s.subscribed_at DESC NULLS LAST, s.podcast_id DESC
-        `;
-          const result = {
-            ...scope,
-            items: rows.map((row) => ({
-              ...row,
-              followedAtMs:
-                row.followedAtMs === null ? null : Number(row.followedAtMs),
-            })),
-          };
-          if (!stateValidator('followSnapshot')(result))
-            throw new StateError('unavailable', 'State unavailable');
-          return result;
-        },
-      );
+    read(accountId: string): Promise<FollowSnapshot> {
+      return readSnapshot(sql, { accountId });
+    },
+
+    readForSession(sessionId: string): Promise<FollowSnapshot> {
+      return readSnapshot(sql, { sessionId });
     },
   };
 }

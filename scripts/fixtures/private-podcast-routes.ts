@@ -42,6 +42,7 @@ let actor: string | null = null;
 let cachedTop: unknown[] = [];
 let shortLink: { feed: string; guid: string } | null = null;
 mock.module('@/server/auth/session', () => ({
+  getSessionId: async () => (actor ? `fixture-${actor}` : undefined),
   getSession: async () =>
     actor ? { userId: actor, id: `fixture-${actor}` } : null,
 }));
