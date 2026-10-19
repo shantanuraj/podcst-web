@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   episodeProgressQueries,
@@ -71,9 +72,21 @@ function render(completed?: boolean, scope: string | null = 'fixture') {
   const markup = renderToStaticMarkup(
     <QueryClientProvider client={session.client}>
       <AccountContext.Provider value={session}>
-        <TranslationProvider>
-          <Rows ids={ids} />
-        </TranslationProvider>
+        <AppRouterContext.Provider
+          value={{
+            bfcacheId: 'fixture',
+            back() {},
+            forward() {},
+            refresh() {},
+            push() {},
+            replace() {},
+            prefetch() {},
+          }}
+        >
+          <TranslationProvider>
+            <Rows ids={ids} />
+          </TranslationProvider>
+        </AppRouterContext.Provider>
       </AccountContext.Provider>
     </QueryClientProvider>,
   );

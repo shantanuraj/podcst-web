@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams, useRouter } from 'next/navigation';
 import {
   createContext,
   type ReactNode,
@@ -42,14 +43,30 @@ const TranslationContext = createContext<TranslationContextValue>({
 });
 
 export function TranslationProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>(defaultLanguage);
+  const params = useParams();
+  const router = useRouter();
+  const routeLanguage =
+    typeof params?.language === 'string' && isValidLanguage(params.language)
+      ? params.language
+      : null;
+  const [storedLanguage, setLanguage] = useState<Language>(
+    routeLanguage ?? defaultLanguage,
+  );
+  // Explicit route params keep cached HTML and its first client render aligned.
+  const language = routeLanguage ?? storedLanguage;
 
-  useEffect(() => setLanguage(getStoredLanguage()), []);
+  useEffect(() => {
+    setLanguage(routeLanguage ?? getStoredLanguage());
+  }, [routeLanguage]);
 
-  const chooseLanguage = useCallback((next: Language) => {
-    document.cookie = `${LANGUAGE_COOKIE}=${next};path=/;max-age=31536000;samesite=lax`;
-    setLanguage(next);
-  }, []);
+  const chooseLanguage = useCallback(
+    (next: Language) => {
+      document.cookie = `${LANGUAGE_COOKIE}=${next};path=/;max-age=31536000;samesite=lax`;
+      setLanguage(next);
+      router.refresh();
+    },
+    [router],
+  );
 
   const messages = getMessagesForLanguage(language);
 

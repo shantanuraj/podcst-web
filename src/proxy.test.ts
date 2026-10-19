@@ -82,25 +82,138 @@ describe('chart redirects', () => {
     );
   });
 
-  test('localized charts and unrelated routes do not run the proxy', () => {
-    expect(config.matcher).toEqual(['/', '/feed/top', '/api/:path*']);
+  test('unrelated routes and image endpoints pass through', () => {
     for (const pathname of [
-      ...i18n.locales.map((locale) => `/${locale}/feed/top`),
       '/episodes/1',
       '/episodes/1/123',
       '/api/top',
       '/_next/static/chunk.js',
+      '/us/feed/top/opengraph-image',
+      '/us/feed/top/twitter-image',
+      '/us/feed/top/chart/other',
     ]) {
-      expect(
-        proxy(new NextRequest(`https://www.podcst.app${pathname}`)).headers.get(
-          'location',
-        ),
-      ).toBeNull();
+      const response = proxy(
+        new NextRequest(`https://www.podcst.app${pathname}`),
+      );
+      expect(response.headers.get('location')).toBeNull();
+      expect(response.headers.get('x-middleware-rewrite')).toBeNull();
     }
   });
 
   test('root requests reach locale selection without a prior config redirect', async () => {
     const redirects = await nextConfig.redirects?.();
     expect(redirects?.some(({ source }) => source === '/')).toBe(false);
+  });
+});
+
+describe('shared Discover rewrites', () => {
+  test.each([
+    ...i18n.locales,
+  ])('%s uses its own country cache key', (locale) => {
+    const response = proxy(
+      new NextRequest(`https://www.podcst.app/${locale}/feed/top`),
+    );
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://www.podcst.app/discover-render/en/${locale}/feed/top`,
+    );
+    expect(response.headers.get('location')).toBeNull();
+  });
+
+  test.each([
+    'en',
+    'nl',
+    'fr',
+    'sv',
+    'ko',
+    'es',
+    'hi',
+  ])('%s uses its own language cache key', (language) => {
+    const response = proxy(
+      new NextRequest('https://www.podcst.app/ca/feed/top/chart', {
+        headers: {
+          cookie: `NEXT_UI_LANG=${language}; NEXT_LOCALE=us; session=private-account`,
+        },
+      }),
+    );
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://www.podcst.app/discover-render/${language}/ca/feed/top/chart`,
+    );
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
+  test.each([
+    'unknown',
+    'FR',
+    'constructor',
+    'toString',
+    '__proto__',
+  ])('invalid language %s uses English', (language) => {
+    const response = proxy(
+      new NextRequest('https://www.podcst.app/nl/feed/top', {
+        headers: { cookie: `NEXT_UI_LANG=${language}` },
+      }),
+    );
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      'https://www.podcst.app/discover-render/en/nl/feed/top',
+    );
+  });
+
+  test('rewrites preserve repeated and encoded query values', () => {
+    const response = proxy(
+      new NextRequest(
+        'https://www.podcst.app/fr/feed/top/chart?tag=a&tag=b&term=a%20b&_rsc=fixture',
+      ),
+    );
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      'https://www.podcst.app/discover-render/en/fr/feed/top/chart?tag=a&tag=b&term=a%20b&_rsc=fixture',
+    );
+  });
+
+  test.each([
+    'unknown',
+    'gb',
+    'US',
+    'constructor',
+  ])('unsupported country %s cannot create a cache key', (locale) => {
+    const response = proxy(
+      new NextRequest(`https://www.podcst.app/${locale}/feed/top`),
+    );
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+  });
+
+  test.each([
+    '',
+    '/chart',
+  ])('direct internal %s requests redirect to their public URL', (suffix) => {
+    const response = proxy(
+      new NextRequest(
+        `https://www.podcst.app/discover-render/fr/ca/feed/top${suffix}?source=link`,
+      ),
+    );
+    expect(response.status).toBe(308);
+    expect(response.headers.get('location')).toBe(
+      `https://www.podcst.app/ca/feed/top${suffix}?source=link`,
+    );
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+  });
+
+  test('matcher includes public and internal Discover routes', () => {
+    expect(config.matcher).toContain('/:locale/feed/top/:path*');
+    expect(config.matcher).toContain('/discover-render/:path*');
+  });
+
+  test('cross-origin API mutations are still refused', () => {
+    const response = proxy(
+      new NextRequest('https://www.podcst.app/api/top', {
+        method: 'POST',
+        headers: {
+          origin: 'https://untrusted.invalid',
+          'sec-fetch-site': 'cross-site',
+        },
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
   });
 });

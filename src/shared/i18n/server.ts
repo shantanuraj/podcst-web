@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { defaultLanguage, en, type Language, type Messages } from '@/messages';
+import { defaultLanguage, en, type Language } from '@/messages';
 import {
   getMessagesForLanguage,
   getNestedValue,
@@ -19,7 +19,11 @@ async function getLanguageFromCookie(): Promise<Language> {
 }
 
 export async function translations() {
-  const language = await getLanguageFromCookie();
+  return translationsForLanguage(await getLanguageFromCookie());
+}
+
+export function translationsForLanguage(value: string) {
+  const language = isValidLanguage(value) ? value : defaultLanguage;
   const messages = getMessagesForLanguage(language);
 
   const t = (

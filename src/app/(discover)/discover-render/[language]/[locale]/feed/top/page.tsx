@@ -8,7 +8,7 @@ import {
   getEpisodesPaginated,
   getPodcastInfoById,
 } from '@/server/ingest/podcast';
-import { translations } from '@/shared/i18n/server';
+import { translationsForLanguage } from '@/shared/i18n/server';
 import { isRegion } from '@/shared/region';
 import { ChartRows } from '@/ui/Discover/ChartRows';
 import styles from '@/ui/Discover/Discover.module.css';
@@ -16,7 +16,7 @@ import { LeadStory } from '@/ui/Discover/LeadStory';
 import { Noteworthy } from '@/ui/Discover/Noteworthy';
 
 type PageProps = {
-  params: Promise<{ locale: string }>;
+  params: Promise<{ language: string; locale: string }>;
 };
 
 const CHART_ROWS = 7;
@@ -25,19 +25,29 @@ const NOTEWORTHY = 14;
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { locale } = await params;
-  const { t } = await translations();
+  const { locale, language } = await params;
+  const { t } = translationsForLanguage(language);
   const url = `/${locale}/feed/top`;
   return {
     title: t('feed.topPodcasts'),
-    openGraph: { url },
+    openGraph: {
+      url,
+      images: [
+        {
+          url: `/${locale}/feed/top/opengraph-image`,
+          width: 1200,
+          height: 630,
+        },
+      ],
+    },
+    twitter: { images: [`/${locale}/feed/top/twitter-image`] },
     alternates: { canonical: url },
   };
 }
 
 export default async function Page(props: PageProps) {
-  const { locale } = await props.params;
-  const { t, language } = await translations();
+  const { locale, language } = await props.params;
+  const { t, language: uiLanguage } = translationsForLanguage(language);
   const [podcasts, worthy] = await Promise.all([
     top(100, locale),
     noteworthy(locale, NOTEWORTHY, null),
@@ -49,7 +59,7 @@ export default async function Page(props: PageProps) {
         getEpisodesPaginated({ podcastId: first.id, limit: 1 }),
       ])
     : [null, null];
-  const today = new Date().toLocaleDateString(localeForLanguage[language], {
+  const today = new Date().toLocaleDateString(localeForLanguage[uiLanguage], {
     weekday: 'long',
     day: 'numeric',
     month: 'long',

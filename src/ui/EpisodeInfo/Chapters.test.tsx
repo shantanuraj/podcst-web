@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { chapterQueryOptions } from '@/data/chapters';
 import { messagesByLanguage } from '@/messages';
@@ -35,9 +36,21 @@ function render(data?: EpisodeChapters, item = episode, failed = false) {
   const markup = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <AccountContext.Provider value={session}>
-        <TranslationProvider>
-          <Chapters episode={item} />
-        </TranslationProvider>
+        <AppRouterContext.Provider
+          value={{
+            bfcacheId: 'fixture',
+            back() {},
+            forward() {},
+            refresh() {},
+            push() {},
+            replace() {},
+            prefetch() {},
+          }}
+        >
+          <TranslationProvider>
+            <Chapters episode={item} />
+          </TranslationProvider>
+        </AppRouterContext.Provider>
       </AccountContext.Provider>
     </QueryClientProvider>,
   );

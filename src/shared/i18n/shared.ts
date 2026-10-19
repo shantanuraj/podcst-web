@@ -33,7 +33,7 @@ export function getNestedValue(obj: Messages, path: string): string {
 }
 
 export function isValidLanguage(lang: string): lang is Language {
-  return lang in messagesByLanguage;
+  return Object.hasOwn(messagesByLanguage, lang);
 }
 
 export function getMessagesForLanguage(language: Language): Messages {
