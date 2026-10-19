@@ -31,8 +31,12 @@ for attempt in {1..30}; do
 done
 docker exec "$database" pg_isready -h 127.0.0.1 -U postgres
 for migration in migrations/active/*.sql scripts/fixtures/web-smoke.sql scripts/fixtures/web-discover.sql scripts/fixtures/web-runtime.sql; do
+  transaction=(--single-transaction)
+  if [[ "$(head -n 1 "$migration")" == '-- podcst-migration: concurrent-index' ]]; then
+    transaction=()
+  fi
   docker exec -i "$database" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 \
-    --single-transaction -q < "$migration"
+    "${transaction[@]}" -q < "$migration"
 done
 
 bun --no-env-file scripts/fixtures/web-chart-cache.ts |
