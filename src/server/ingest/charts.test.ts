@@ -85,7 +85,10 @@ describe('Apple chart fetching', () => {
     });
     const [result] = await fetchTopFromItunes('nl', request);
     expect(result.author).toBe('Unknown');
-    expect(result.cover).toBe('https://example.com/thumbnail.jpg');
+    expect(result.cover).toBe(
+      'https://assets.podcst.app/?p=https%3A%2F%2Fexample.com%2Fthumbnail.jpg',
+    );
+    expect(result.thumbnail).toBe(result.cover);
     expect(result.count).toBe(0);
   });
 

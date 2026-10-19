@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { artworkURL } from '@/app/api/feed/parser';
 import { isCanonicalId } from '@/shared/canonical-id';
 import { feedUrl } from '../../shared/feed-url';
 import {
@@ -59,7 +60,9 @@ export function catalogInput(
     feed: row.url,
     title: row.title,
     description: row.description || null,
-    cover: row.imageUrl || 'https://podcst.app/placeholder.png',
+    cover:
+      artworkURL(row.imageUrl, null, true) ||
+      'https://podcst.app/placeholder.png',
     website: row.link || null,
     explicit: row.explicit === 1,
     episodeCount: row.episodeCount || 0,

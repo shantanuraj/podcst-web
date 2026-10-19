@@ -1,4 +1,5 @@
 import type postgres from 'postgres';
+import { artworkURL } from '@/app/api/feed/parser';
 import { isCanonicalId, migrateStoredId } from '@/shared/canonical-id';
 import { ITUNES_API } from '../../data/constants';
 import {
@@ -108,7 +109,11 @@ export async function fetchTopFromItunes(
       continue;
     }
     const title = sanitize(podcast.collectionName)?.trim();
-    const cover = sanitize(podcast.artworkUrl600 || podcast.artworkUrl100);
+    const cover = artworkURL(
+      sanitize(podcast.artworkUrl600 || podcast.artworkUrl100),
+      null,
+      true,
+    );
     const feed = appleFeedForId(lookup.results, id);
     if (!title || !cover || !feed || !/^https?:\/\//i.test(feed)) {
       throw new Error(`Apple returned invalid metadata for podcast ${id}`);
@@ -130,7 +135,7 @@ export async function fetchTopFromItunes(
       feed,
       cover,
       author: sanitize(podcast.artistName)?.trim() || 'Unknown',
-      thumbnail: sanitize(podcast.artworkUrl100),
+      thumbnail: artworkURL(sanitize(podcast.artworkUrl100), null, true),
       explicit: podcast.collectionExplicitness === 'explicit',
       count:
         Number.isInteger(count) &&
