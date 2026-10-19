@@ -25,3 +25,4 @@ For setup and tests, start with [CONTRIBUTING.md](../CONTRIBUTING.md).
 - [Public feed aliases](public-feed-aliases.md)
 - [Apple listing associations](apple-authoritative-associations.md)
 - [Podcast reconciliation](podcast-reconciliation.md)
+- [Podcast Index coverage and recovery](podcast-index-sync.md)

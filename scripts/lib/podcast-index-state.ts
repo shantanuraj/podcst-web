@@ -65,7 +65,33 @@ export async function writePodcastIndexCursor(
 ): Promise<void> {
   const result = await sql`
     UPDATE podcast_index_sync_state
-    SET last_update = ${cursor.lastUpdate}, last_id = ${cursor.lastId}, completed_at = clock_timestamp()
+    SET last_update = ${cursor.lastUpdate}, last_id = ${cursor.lastId},
+      undated_last_id = 0, completed_at = clock_timestamp()
+    WHERE singleton = true
+  `;
+  if (result.count !== 1)
+    throw new Error('Podcast Index sync state is missing');
+}
+
+export async function readUndatedPodcastIndexCursor(
+  sql: postgres.Sql,
+): Promise<number> {
+  const [row] = await sql`
+    SELECT undated_last_id::text FROM podcast_index_sync_state WHERE singleton = true
+  `;
+  if (!row) throw new Error('Podcast Index sync state is missing');
+  const id = Number(row.undated_last_id);
+  if (!Number.isSafeInteger(id) || id < 0)
+    throw new Error('Podcast Index undated sync state is invalid');
+  return id;
+}
+
+export async function checkpointUndatedPodcastIndexCursor(
+  sql: postgres.Sql,
+  lastId: number,
+) {
+  const result = await sql`
+    UPDATE podcast_index_sync_state SET undated_last_id = ${lastId}
     WHERE singleton = true
   `;
   if (result.count !== 1)

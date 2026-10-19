@@ -21,10 +21,13 @@ import {
 } from '../src/server/ingest/podcast-identity';
 import { resolvePodcast } from '../src/server/ingest/resolve-podcast';
 import { migrateStoredId } from '../src/shared/canonical-id';
+import { extractPodcastIndexArchive } from './lib/podcast-index-source';
 import {
   checkpointPodcastIndexCursor,
+  checkpointUndatedPodcastIndexCursor,
   type PodcastIndexCursor,
   readPodcastIndexCursor,
+  readUndatedPodcastIndexCursor,
   writePodcastIndexCursor,
 } from './lib/podcast-index-state';
 
@@ -71,6 +74,61 @@ export function indexSourceOrder(sqlite: Database) {
   sqlite.run(
     'CREATE INDEX IF NOT EXISTS podcasts_sync_order ON podcasts (lastUpdate, id)',
   );
+  sqlite.run(`CREATE INDEX IF NOT EXISTS podcasts_sync_undated ON podcasts (id)
+    WHERE lastUpdate IS NULL OR lastUpdate <= 0`);
+}
+
+// Undated entries have no usable change watermark. Revisit them each completed
+// run, with an independent ID checkpoint so failures do not restart this pass.
+export function undatedSourceBatches(sqlite: Database, limit: number) {
+  const query = sqlite.query<
+    PodcastIndexRow,
+    { $lastId: number; $limit: number }
+  >(`
+    SELECT
+      id, url, title, lastUpdate, link, dead, itunesId, itunesAuthor,
+      explicit, imageUrl, newestItemPubdate, language, episodeCount,
+      popularityScore, priority, updateFrequency, description
+    FROM podcasts
+    WHERE (lastUpdate IS NULL OR lastUpdate <= 0) AND id > $lastId
+    ORDER BY id ASC LIMIT $limit
+  `);
+  return (lastId: number) => query.all({ $lastId: lastId, $limit: limit });
+}
+
+export async function syncUndatedSource(
+  sqlite: Database,
+  limit: number,
+  after: number,
+  processBatch: (batch: PodcastIndexRow[]) => Promise<unknown>,
+  checkpoint: (lastId: number) => Promise<void>,
+) {
+  const next = undatedSourceBatches(sqlite, limit);
+  let processed = 0;
+  for (let batch = next(after); batch.length; batch = next(after)) {
+    await processBatch(batch);
+    after = batch[batch.length - 1].id;
+    await checkpoint(after);
+    processed += batch.length;
+  }
+  return processed;
+}
+
+// Durable timestamps are nonnegative, so the tuple already excludes negatives
+// and NULLs. Exclude zero with != rather than >: a second range constraint can
+// make SQLite seek from zero and rescan earlier dated rows on every page.
+const DATED_SOURCE_PREDICATE =
+  'lastUpdate != 0 AND (lastUpdate, id) > ($lastUpdate, $lastId)';
+
+export function countDatedSource(sqlite: Database, after: PodcastIndexCursor) {
+  const row = sqlite
+    .query<{ count: number }, { $lastUpdate: number; $lastId: number }>(`
+    SELECT COUNT(*) as count FROM podcasts
+    WHERE ${DATED_SOURCE_PREDICATE}
+  `)
+    .get({ $lastUpdate: after.lastUpdate, $lastId: after.lastId });
+  if (!row) throw new Error('Podcast Index count query returned no row');
+  return row.count;
 }
 
 export function sourceBatches(sqlite: Database, limit: number) {
@@ -83,7 +141,7 @@ export function sourceBatches(sqlite: Database, limit: number) {
       explicit, imageUrl, newestItemPubdate, language, episodeCount,
       popularityScore, priority, updateFrequency, description
     FROM podcasts
-    WHERE (lastUpdate, id) > ($lastUpdate, $lastId)
+    WHERE ${DATED_SOURCE_PREDICATE}
     ORDER BY lastUpdate ASC, id ASC
     LIMIT $limit
   `);
@@ -126,17 +184,7 @@ async function downloadAndExtract(): Promise<string> {
   }
 
   console.log('Extracting...');
-  const proc = Bun.spawn(['tar', '-xzf', tgzPath, '-C', extractDir], {
-    stdout: 'inherit',
-    stderr: 'inherit',
-  });
-  await proc.exited;
-
-  if (proc.exitCode !== 0) {
-    throw new Error('Failed to extract archive');
-  }
-
-  return dbPath;
+  return extractPodcastIndexArchive(tgzPath, dbPath);
 }
 
 function initLogFile(): void {
@@ -292,25 +340,23 @@ async function sync(): Promise<void> {
   });
 
   const cursor = await readPodcastIndexCursor(sql);
+  const authorCache = new Map<string, number>();
+  const undatedAfter = await readUndatedPodcastIndexCursor(sql);
+  const undatedCount = await syncUndatedSource(
+    sqlite,
+    BATCH_SIZE,
+    undatedAfter,
+    (batch) => syncBatch(sql, batch, authorCache),
+    (lastId) => checkpointUndatedPodcastIndexCursor(sql, lastId),
+  );
+  console.log(`Processed ${undatedCount.toLocaleString()} undated podcasts`);
   console.log(
     cursor.lastUpdate === 0
       ? 'First sync (slow path)'
       : `Incremental sync after ${new Date(cursor.lastUpdate * 1000).toISOString()} / ${cursor.lastId}`,
   );
 
-  const countQuery = sqlite.query<
-    { count: number },
-    { $lastUpdate: number; $lastId: number }
-  >(`
-    SELECT COUNT(*) as count FROM podcasts
-    WHERE (lastUpdate, id) > ($lastUpdate, $lastId)
-  `);
-  const countRow = countQuery.get({
-    $lastUpdate: cursor.lastUpdate,
-    $lastId: cursor.lastId,
-  });
-  if (!countRow) throw new Error('Podcast Index count query returned no row');
-  const { count: totalCount } = countRow;
+  const totalCount = countDatedSource(sqlite, cursor);
   console.log(`Found ${totalCount.toLocaleString()} podcasts to sync`);
 
   if (totalCount === 0) {
@@ -324,7 +370,6 @@ async function sync(): Promise<void> {
 
   const nextBatch = sourceBatches(sqlite, BATCH_SIZE);
 
-  const authorCache = new Map<string, number>();
   let processed = 0;
   let totalInserted = 0;
   let totalUpdated = 0;
@@ -398,7 +443,7 @@ function cleanup(): void {
 if (import.meta.main) {
   sync().catch((err) => {
     console.error('Sync failed:', err);
-    cleanup();
+    // Keep the source snapshot so retries resume against the same ID ordering.
     process.exit(1);
   });
 }
