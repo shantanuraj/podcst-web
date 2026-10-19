@@ -10,7 +10,6 @@ import { podcastAccess } from '../podcast-access';
 import {
   lockStateChange,
   nextStateRevision,
-  readStateScope,
   saveStateAcknowledgement,
 } from './database';
 import { StateError } from './protocol';
@@ -21,35 +20,72 @@ type ProgressRow = NonNullable<
   episodeId: string;
 };
 
-async function readRows(
+type SnapshotRow = Omit<ProgressRow, 'episodeId' | 'revision'> & {
+  generation: string | null;
+  revision: string;
+  episodeId: string | null;
+  itemRevision: string;
+};
+
+async function readSnapshot(
   tx: postgres.ISql,
   accountId: string,
   selection: { ids: string[] } | { recent: number },
-) {
-  const rows = await tx<ProgressRow[]>`
-    SELECT pp.episode_id::text AS "episodeId", pp.position AS "positionSeconds",
-      pp.completed, pp.revision::text,
-      (extract(epoch FROM pp.updated_at) * 1000)::bigint AS "updatedAtMs"
-    FROM playback_progress pp
-    JOIN episodes e ON e.id = pp.episode_id
-    JOIN podcasts p ON p.id = e.podcast_id
-    WHERE pp.user_id = ${accountId} AND ${podcastAccess(tx, accountId)}
-      ${
-        'ids' in selection
-          ? tx`AND pp.episode_id = ANY(${selection.ids}::bigint[])`
-          : tx`AND NOT pp.completed AND EXISTS (SELECT 1 FROM episode_content c WHERE c.episode_id = e.id)`
-      }
-    ORDER BY pp.revision DESC
-    ${'recent' in selection ? tx`LIMIT ${selection.recent}` : tx``}
+): Promise<ProgressSnapshot> {
+  // One statement gives scope, revision and items the same MVCC snapshot,
+  // without BEGIN/COMMIT and a separate scope query over the network.
+  const rows = await tx<SnapshotRow[]>`
+    SELECT g.generation, coalesce(h.revision, 0)::text AS revision,
+      progress.episode_id::text AS "episodeId", progress.position AS "positionSeconds",
+      progress.completed, progress.revision::text AS "itemRevision",
+      (extract(epoch FROM progress.updated_at) * 1000)::bigint AS "updatedAtMs"
+    FROM users u
+    LEFT JOIN state_generation g ON g.singleton
+    LEFT JOIN progress_revision_heads h ON h.user_id = u.id
+    LEFT JOIN LATERAL (
+      SELECT pp.episode_id, pp.position, pp.completed, pp.revision, pp.updated_at
+      FROM playback_progress pp
+      JOIN episodes e ON e.id = pp.episode_id
+      JOIN podcasts p ON p.id = e.podcast_id
+      WHERE pp.user_id = u.id AND ${podcastAccess(tx, accountId)}
+        ${
+          'ids' in selection
+            ? tx`AND pp.episode_id = ANY(${selection.ids}::bigint[])`
+            : tx`AND NOT pp.completed AND EXISTS (SELECT 1 FROM episode_content c WHERE c.episode_id = e.id)`
+        }
+      ORDER BY pp.revision DESC
+      ${'recent' in selection ? tx`LIMIT ${selection.recent}` : tx``}
+    ) progress ON true
+    WHERE u.id = ${accountId}
+    ORDER BY progress.revision DESC
   `;
-  return rows.map(({ episodeId, ...progress }) => ({
-    episodeId,
-    progress: {
-      ...progress,
-      updatedAtMs:
-        progress.updatedAtMs === null ? null : Number(progress.updatedAtMs),
-    },
-  }));
+  const scope = rows[0];
+  if (!scope)
+    throw new StateError('unauthenticated', 'Authentication required');
+  if (!scope.generation)
+    throw new StateError('unavailable', 'State unavailable');
+  return {
+    protocol: 1,
+    accountId,
+    generation: String(scope.generation),
+    revision: scope.revision,
+    items: rows.flatMap((row) =>
+      row.episodeId === null
+        ? []
+        : [
+            {
+              episodeId: row.episodeId,
+              progress: {
+                positionSeconds: row.positionSeconds,
+                completed: row.completed,
+                revision: row.itemRevision,
+                updatedAtMs:
+                  row.updatedAtMs === null ? null : Number(row.updatedAtMs),
+              },
+            },
+          ],
+    ),
+  };
 }
 
 export function createProgressStateService(
@@ -127,28 +163,20 @@ export function createProgressStateService(
         !ids.every((id) => stateValidator('id')(id))
       )
         throw new StateError('invalid_request', 'Invalid progress selection');
-      return sql.begin(
-        'isolation level repeatable read read only',
-        async (tx) => {
-          const scope = await readStateScope(tx, accountId, 'progress');
-          const rows = new Map(
-            (await readRows(tx, accountId, { ids })).map((row) => [
-              row.episodeId,
-              row.progress,
-            ]),
-          );
-          const result = {
-            ...scope,
-            items: ids.map((episodeId) => ({
-              episodeId,
-              progress: rows.get(episodeId) ?? null,
-            })),
-          };
-          if (!stateValidator('progressSnapshot')(result))
-            throw new StateError('unavailable', 'State unavailable');
-          return result;
-        },
+      const snapshot = await readSnapshot(sql, accountId, { ids });
+      const rows = new Map(
+        snapshot.items.map(({ episodeId, progress }) => [episodeId, progress]),
       );
+      const result = {
+        ...snapshot,
+        items: ids.map((episodeId) => ({
+          episodeId,
+          progress: rows.get(episodeId) ?? null,
+        })),
+      };
+      if (!stateValidator('progressSnapshot')(result))
+        throw new StateError('unavailable', 'State unavailable');
+      return result;
     },
 
     async recent(accountId: string, limit: number): Promise<ProgressSnapshot> {
@@ -157,18 +185,10 @@ export function createProgressStateService(
           'invalid_request',
           'Invalid recent progress limit',
         );
-      return sql.begin(
-        'isolation level repeatable read read only',
-        async (tx) => {
-          const result = {
-            ...(await readStateScope(tx, accountId, 'progress')),
-            items: await readRows(tx, accountId, { recent: limit }),
-          };
-          if (!stateValidator('progressSnapshot')(result))
-            throw new StateError('unavailable', 'State unavailable');
-          return result;
-        },
-      );
+      const result = await readSnapshot(sql, accountId, { recent: limit });
+      if (!stateValidator('progressSnapshot')(result))
+        throw new StateError('unavailable', 'State unavailable');
+      return result;
     },
   };
 }

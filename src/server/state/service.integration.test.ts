@@ -89,10 +89,15 @@ describe.skipIf(!process.env.PG_BIN)(
     let sql: postgres.Sql;
     let progress: ReturnType<typeof createProgressStateService>;
     let follows: ReturnType<typeof createFollowStateService>;
+    let readQueries: string[] | undefined;
 
     beforeAll(async () => {
       cluster = startPostgres();
-      sql = postgres({ ...cluster.options, max: 8 });
+      sql = postgres({
+        ...cluster.options,
+        max: 8,
+        debug: (_connection, query) => readQueries?.push(query),
+      });
       await createSchemaFixture(sql);
       progress = createProgressStateService(sql);
       follows = createFollowStateService(sql);
@@ -104,9 +109,99 @@ describe.skipIf(!process.env.PG_BIN)(
     });
 
     beforeEach(async () => {
+      readQueries = undefined;
       await sql`TRUNCATE users, authors RESTART IDENTITY CASCADE`;
       await sql`UPDATE state_generation SET generation = ${generation}, legacy_generation = ${generation}`;
       await seed(sql);
+    });
+
+    test('reads progress and its revision in one database snapshot without transaction round trips', async () => {
+      await progress.change(accountId, batch());
+      readQueries = [];
+      const recent = await progress.recent(accountId, 1);
+      expect(recent.revision).toBe('1');
+      expect(recent.items).toHaveLength(1);
+      expect(recent.items[0].episodeId).toBe(first);
+      expect(readQueries).toHaveLength(1);
+
+      readQueries = [];
+      const selected = await progress.read(accountId, [second, first]);
+      expect(selected.revision).toBe('1');
+      expect(selected.items[0]).toEqual({ episodeId: second, progress: null });
+      expect(selected.items[1]).toEqual(recent.items[0]);
+      expect(readQueries).toHaveLength(1);
+    });
+
+    test('keeps empty progress, numeric revision order and null timestamps in single-statement reads', async () => {
+      expect(await progress.recent(accountId, 1)).toEqual({
+        protocol: 1,
+        accountId,
+        generation,
+        revision: '0',
+        items: [],
+      });
+      await sql`INSERT INTO progress_revision_heads (user_id, revision) VALUES (${accountId}, 9007199254740993)`;
+      await sql`
+        INSERT INTO playback_progress (user_id, episode_id, position, completed, revision, updated_at)
+        VALUES (${accountId}, ${first}, 42, false, 9, NULL),
+               (${accountId}, ${second}, 73, false, 9007199254740993, '2026-01-02')
+      `;
+      const recent = await progress.recent(accountId, 10);
+      expect(recent.revision).toBe('9007199254740993');
+      expect(recent.items).toEqual([
+        {
+          episodeId: second,
+          progress: {
+            positionSeconds: 73,
+            completed: false,
+            revision: '9007199254740993',
+            updatedAtMs: Date.parse('2026-01-02T00:00:00Z'),
+          },
+        },
+        {
+          episodeId: first,
+          progress: {
+            positionSeconds: 42,
+            completed: false,
+            revision: '9',
+            updatedAtMs: null,
+          },
+        },
+      ]);
+      await sql`DELETE FROM episode_content WHERE episode_id = ${second}`;
+      expect((await progress.recent(accountId, 1)).items).toEqual([
+        recent.items[1],
+      ]);
+      expect((await progress.read(accountId, [second])).items).toEqual([
+        recent.items[0],
+      ]);
+      await sql`UPDATE podcasts SET owner_user_id = 'other' WHERE id = ${first}`;
+      expect((await progress.recent(accountId, 10)).items).toEqual([]);
+      expect((await progress.read(accountId, [first])).items).toEqual([
+        { episodeId: first, progress: null },
+      ]);
+    });
+
+    test('preserves missing-account and missing-generation errors on progress reads', async () => {
+      for (const read of [
+        () => progress.recent('missing', 1),
+        () => progress.read('missing', [first]),
+      ])
+        await expect(read()).rejects.toMatchObject({ code: 'unauthenticated' });
+      await sql`DELETE FROM state_generation`;
+      try {
+        await expect(progress.recent(accountId, 1)).rejects.toMatchObject({
+          code: 'unavailable',
+        });
+        await expect(progress.read(accountId, [first])).rejects.toMatchObject({
+          code: 'unavailable',
+        });
+        await expect(progress.recent('missing', 1)).rejects.toMatchObject({
+          code: 'unauthenticated',
+        });
+      } finally {
+        await sql`INSERT INTO state_generation (generation, legacy_generation) VALUES (${generation}, ${generation})`;
+      }
     });
 
     test('executes shared progress lost-ack/opposite-action, rewind and relisten vectors', async () => {
