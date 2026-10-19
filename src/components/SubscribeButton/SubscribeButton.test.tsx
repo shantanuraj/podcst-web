@@ -1,6 +1,7 @@
 import { expect, spyOn, test } from 'bun:test';
 import * as queries from '@tanstack/react-query';
 import { IDBFactory } from 'fake-indexeddb';
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { stateRuntime } from '@/data/state-browser';
 import { accountState } from '@/data/state-storage';
@@ -39,7 +40,7 @@ const podcast: IPodcastEpisodesInfo = {
 };
 const unavailable = 'This podcast is no longer available.';
 
-async function fixture(failures: string[] = []) {
+async function fixture(failures: string[] = [], unresolved = false) {
   const indexedDB = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
   globalThis.indexedDB = new IDBFactory();
   const client = new queries.QueryClient({
@@ -52,7 +53,7 @@ async function fixture(failures: string[] = []) {
     image: null,
     hasPasskey: false,
   };
-  const session = new AccountSession(client, user, {
+  const session = new AccountSession(client, unresolved ? undefined : user, {
     resetPlayer() {},
     reload() {},
     publish() {},
@@ -90,13 +91,25 @@ async function fixture(failures: string[] = []) {
   );
   const render = (info = podcast) =>
     renderToStaticMarkup(
-      <queries.QueryClientProvider client={client}>
-        <AccountContext.Provider value={session}>
-          <TranslationProvider>
-            <SubscribeButton info={info} />
-          </TranslationProvider>
-        </AccountContext.Provider>
-      </queries.QueryClientProvider>,
+      <AppRouterContext.Provider
+        value={{
+          bfcacheId: 'fixture',
+          back() {},
+          forward() {},
+          refresh() {},
+          push() {},
+          replace() {},
+          prefetch() {},
+        }}
+      >
+        <queries.QueryClientProvider client={client}>
+          <AccountContext.Provider value={session}>
+            <TranslationProvider>
+              <SubscribeButton info={info} />
+            </TranslationProvider>
+          </AccountContext.Provider>
+        </queries.QueryClientProvider>
+      </AppRouterContext.Provider>,
     );
   return {
     session,
@@ -136,6 +149,27 @@ async function fixture(failures: string[] = []) {
     },
   };
 }
+
+test('unresolved identity disables following without claiming guest membership', async () => {
+  const f = await fixture([], true);
+  try {
+    const markup = f.render();
+    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('aria-busy="true"');
+    expect(markup).not.toContain('data-is-subscribed=');
+    expect(markup).not.toContain('>Subscribe<');
+    expect(markup).not.toContain('>Unsubscribe<');
+    await expect(f.subscribe()).rejects.toThrow('Session changed');
+    expect((await f.sync.storage.load()).guest.follows).toEqual([]);
+    await f.session.refresh();
+    expect(f.render()).not.toContain('disabled=""');
+    expect(f.render()).toContain('data-is-subscribed="false"');
+    await f.subscribe();
+    expect(f.render()).toContain('data-is-subscribed="true"');
+  } finally {
+    await f.dispose();
+  }
+});
 
 test('restored follow failures stay quiet until this button makes a rejected attempt', async () => {
   const f = await fixture(['7']);

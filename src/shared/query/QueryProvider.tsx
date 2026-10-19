@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useSelectedLayoutSegment } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { connectState } from '@/data/state-browser';
 import { AccountContext } from '@/shared/auth/AccountBoundary';
@@ -21,6 +22,7 @@ export function QueryProvider({
   children: React.ReactNode;
   user: AccountUser | null;
 }) {
+  const segment = useSelectedLayoutSegment();
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -38,12 +40,17 @@ export function QueryProvider({
   const events = useRef<ReturnType<typeof connectAccountEvents> | null>(null);
   const [session] = useState(
     () =>
-      new AccountSession(queryClient, user, {
-        resetPlayer: (scope, revision) =>
-          usePlayer.getState().setAccount(scope, revision),
-        reload: () => window.location.reload(),
-        publish: () => events.current?.publish(),
-      }),
+      new AccountSession(
+        queryClient,
+        // Shared Discover HTML has no identity; navigation keeps this session.
+        segment === '(discover)' ? undefined : user,
+        {
+          resetPlayer: (scope, revision) =>
+            usePlayer.getState().setAccount(scope, revision),
+          reload: () => window.location.reload(),
+          publish: () => events.current?.publish(),
+        },
+      ),
   );
   useEffect(() => {
     const channel =

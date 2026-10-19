@@ -94,6 +94,13 @@
   line-height: 1;
 }
 
+.accountLoading {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-rule);
+}
+
 .avatar[aria-current="page"] {
   box-shadow:
     0 0 0 2px var(--color-paper),

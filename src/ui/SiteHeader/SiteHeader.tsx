@@ -12,7 +12,7 @@ import styles from './SiteHeader.module.css';
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { data: user } = useSession();
+  const { data: user, isLoading } = useSession();
   const { t } = useTranslation();
 
   const tabs = [
@@ -58,8 +58,14 @@ export function SiteHeader() {
       <div className={styles.search}>
         <Search />
       </div>
-      <div className={styles.end}>
-        {user ? (
+      <div className={styles.end} aria-busy={isLoading || undefined}>
+        {isLoading ? (
+          <span
+            className={styles.accountLoading}
+            role="status"
+            aria-label={t('common.loading')}
+          />
+        ) : user ? (
           <Link
             href="/account"
             className={styles.avatar}

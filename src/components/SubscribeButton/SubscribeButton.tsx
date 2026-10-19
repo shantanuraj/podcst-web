@@ -17,7 +17,7 @@ import { Button } from '@/ui/Button';
 
 export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
   const { t } = useTranslation();
-  const { data: user } = useSession();
+  const { data: user, isLoading: isSessionLoading } = useSession();
   const { membership, syncError, pending } = useServerSubscriptions();
   const localError = useSubscriptions((state) => state.error);
   const {
@@ -41,9 +41,11 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
   const isServerSubscribed = !!podcastId && membership.has(podcastId);
 
   const canUseServer = user && podcastId;
-  const isSubscribedToFeed = canUseServer
-    ? isServerSubscribed
-    : isLocalSubscribed;
+  const isSubscribedToFeed = isSessionLoading
+    ? undefined
+    : canUseServer
+      ? isServerSubscribed
+      : isLocalSubscribed;
   const isPending = isSubscribing || isUnsubscribing;
   const status =
     syncError ??
@@ -55,6 +57,7 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
         : undefined);
 
   const onSubscribeClick = useCallback(() => {
+    if (isSessionLoading) return;
     if (canUseServer) {
       if (isServerSubscribed) {
         serverUnsubscribe(podcastId);
@@ -70,6 +73,7 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
       }
     }
   }, [
+    isSessionLoading,
     canUseServer,
     isServerSubscribed,
     isLocalSubscribed,
@@ -86,14 +90,23 @@ export function SubscribeButton({ info }: { info: IPodcastEpisodesInfo }) {
     <>
       <Button
         data-is-subscribed={isSubscribedToFeed}
-        data-variant={isSubscribedToFeed ? undefined : 'primary'}
+        data-variant={
+          isSessionLoading || isSubscribedToFeed ? undefined : 'primary'
+        }
         onClick={onSubscribeClick}
-        disabled={isPending || (!!info.isPrivate && !canUseServer)}
+        disabled={
+          isSessionLoading || isPending || (!!info.isPrivate && !canUseServer)
+        }
+        aria-busy={isSessionLoading || undefined}
         suppressHydrationWarning
       >
-        {isSubscribedToFeed ? t('podcast.unsubscribe') : t('podcast.subscribe')}
+        {isSessionLoading
+          ? t('common.loading')
+          : isSubscribedToFeed
+            ? t('podcast.unsubscribe')
+            : t('podcast.subscribe')}
       </Button>
-      {status && <span role="status">{status}</span>}
+      {!isSessionLoading && status && <span role="status">{status}</span>}
     </>
   );
 }

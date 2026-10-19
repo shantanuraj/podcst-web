@@ -32,6 +32,7 @@ interface Effects {
 
 export class AccountSession {
   private state: AccountSnapshot;
+  private resolved: boolean;
   private readonly listeners = new Set<() => void>();
   private requests = new AbortController();
   private checking?: { controller: AbortController; promise: Promise<void> };
@@ -71,10 +72,16 @@ export class AccountSession {
 
   constructor(
     readonly client: QueryClient,
-    user: AccountUser | null,
+    user: AccountUser | null | undefined,
     private readonly effects: Effects,
   ) {
-    this.state = { user, ready: true, revision: 0, denied: new Set() };
+    this.resolved = user !== undefined;
+    this.state = {
+      user: user ?? null,
+      ready: this.resolved,
+      revision: 0,
+      denied: new Set(),
+    };
   }
 
   getSnapshot = () => this.state;
@@ -197,11 +204,12 @@ export class AccountSession {
           return;
         if (user !== null && (!user || typeof user.id !== 'string' || !user.id))
           throw new Error('Invalid session response');
-        const changed = (user?.id ?? null) !== this.scope;
+        const changed = this.resolved && (user?.id ?? null) !== this.scope;
         if (changed && this.state.ready) {
           this.checking = undefined;
           this.retire();
         }
+        this.resolved = true;
         this.state = {
           ...this.state,
           user,

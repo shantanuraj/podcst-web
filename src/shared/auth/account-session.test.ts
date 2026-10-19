@@ -47,12 +47,12 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function fixture(user: AccountUser | null = owner) {
+function fixture(user: AccountUser | null | undefined) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   clients.push(client);
-  const identity = { user };
+  const identity = { user: user ?? null };
   const reload = mock();
   const publish = mock();
   const session = new AccountSession(client, user, {
@@ -74,6 +74,97 @@ afterEach(() => {
 });
 
 describe('web account boundary', () => {
+  test('an unresolved account cannot start guest queries or activate guest playback', async () => {
+    const f = fixture(undefined);
+    const operation = mock(async () => 'guest data');
+    expect(f.session.getSnapshot().user).toBeNull();
+    expect(f.session.getSnapshot().ready).toBe(false);
+    expect(f.session.query('feed', 42, operation).enabled).toBe(false);
+    await expect(
+      f.session.run(f.session.token(), 42, operation),
+    ).rejects.toThrow();
+    expect(operation).not.toHaveBeenCalled();
+    expect(usePlayer.getState().accountScope).toBeUndefined();
+  });
+
+  test.each([
+    null,
+    owner,
+  ])('initial identity resolution preserves the revision and page for %j', async (user) => {
+    const f = fixture(undefined);
+    f.identity.user = user;
+    f.client.setQueryData(['top', 'us'], ['public chart']);
+    await f.session.refresh();
+    expect(f.session.getSnapshot()).toMatchObject({
+      user,
+      ready: true,
+      revision: 0,
+    });
+    expect(usePlayer.getState().accountScope).toBe(user?.id ?? null);
+    expect(usePlayer.getState().accountRevision).toBe(0);
+    expect(f.session.current(f.session.token())).toBe(true);
+    expect(f.client.getQueryData<string[]>(['top', 'us'])).toEqual([
+      'public chart',
+    ]);
+    expect(f.reload).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    'offline',
+    'invalid',
+  ])('a failed %s bootstrap remains unresolved and can retry', async (failure) => {
+    const f = fixture(undefined);
+    let attempt = 0;
+    const session = new AccountSession(f.client, undefined, {
+      readSession: async () => {
+        if (++attempt > 1) return owner;
+        if (failure === 'offline') throw new Error('Offline');
+        return {} as AccountUser;
+      },
+      resetPlayer: (scope, revision) =>
+        usePlayer.getState().setAccount(scope, revision),
+      reload: f.reload,
+      publish() {},
+    });
+    await session.refresh();
+    expect(session.getSnapshot().ready).toBe(false);
+    expect(session.current(session.token())).toBe(false);
+    expect(usePlayer.getState().accountScope).toBeUndefined();
+    await session.refresh();
+    expect(session.getSnapshot()).toMatchObject({
+      user: owner,
+      ready: true,
+      revision: 0,
+    });
+    expect(f.reload).not.toHaveBeenCalled();
+  });
+
+  test('identity changes after bootstrap retire private state even when readiness was already suspended', async () => {
+    const f = fixture(undefined);
+    f.identity.user = owner;
+    await f.session.refresh();
+    const token = f.session.token();
+    const key = accountQueryKey(owner.id, 'podcast', 42);
+    f.client.setQueryData(key, episode);
+    usePlayer.getState().restoreEpisode(episode, 19);
+    f.session.beginAuthChange();
+    expect(f.client.getQueryData(key)).toBeUndefined();
+    expect(getCurrentEpisode(usePlayer.getState())).toBeUndefined();
+    f.identity.user = other;
+    await f.session.refresh();
+    expect(f.session.scope).toBe(other.id);
+    expect(f.session.getSnapshot().revision).toBe(1);
+    expect(f.session.current(token)).toBe(false);
+    expect(f.reload).toHaveBeenCalledTimes(1);
+  });
+
+  test('an explicit reload is honored during initial identity resolution', async () => {
+    const f = fixture(undefined);
+    await f.session.refresh(true);
+    expect(f.session.getSnapshot().ready).toBe(true);
+    expect(f.reload).toHaveBeenCalledTimes(1);
+  });
+
   test('all private-capable keys include distinct owner and guest scopes', () => {
     for (const kind of [
       'feed',
@@ -97,7 +188,7 @@ describe('web account boundary', () => {
   test.each([
     401, 403, 404,
   ])('A to B with denied refetch %i purges private data, hydration and player state', async (status) => {
-    const f = fixture();
+    const f = fixture(owner);
     const options = {
       ...f.session.query('episodes', 42, async () => {
         throw new ApiError(status, 'Unavailable');
@@ -146,7 +237,7 @@ describe('web account boundary', () => {
   });
 
   test('a same-account denial clears stale data and disables that resource without a refetch loop', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const options = f.session.query('podcast-info', 42, async () => {
       throw new ApiError(404, 'Unavailable');
     });
@@ -170,7 +261,7 @@ describe('web account boundary', () => {
   });
 
   test('delayed responses that ignore abort cannot repopulate retired account queries', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const response = deferred<typeof episode>();
     const options = f.session.query(
       'podcast',
@@ -189,7 +280,7 @@ describe('web account boundary', () => {
   });
 
   test('a delayed A denial does not erase the new B account', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const response = deferred<never>();
     const request = f.client
       .fetchQuery(f.session.query('podcast', 42, () => response.promise))
@@ -211,7 +302,7 @@ describe('web account boundary', () => {
   });
 
   test('progress restoration is generation-fenced even across A to B to A', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const token = f.session.token();
     f.identity.user = other;
     await f.session.refresh();
@@ -234,7 +325,7 @@ describe('web account boundary', () => {
   });
 
   test('expiry and explicit logout retire owner queries while preserving public caches', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const key = accountQueryKey(owner.id, 'playback', 'playback');
     f.client.setQueryData(key, { episode, position: 99 });
     usePlayer.getState().restoreEpisode(episode, 99);
@@ -250,7 +341,7 @@ describe('web account boundary', () => {
   });
 
   test('failed revalidation never restores an externally retired private account', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const key = accountQueryKey(owner.id, 'podcast', 42);
     const session = new AccountSession(f.client, owner, {
       readSession: async () => {
@@ -274,7 +365,7 @@ describe('web account boundary', () => {
   });
 
   test('a superseded session lookup cannot adopt an obsolete identity', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const old = deferred<AccountUser | null>();
     let calls = 0;
     const session = new AccountSession(f.client, owner, {
@@ -307,8 +398,42 @@ class BrowserEvents extends EventTarget {
 }
 
 describe('central browser session detection', () => {
+  test('the existing browser connection deduplicates an unresolved bootstrap and concurrent revalidation', async () => {
+    const f = fixture(undefined);
+    const result = deferred<AccountUser | null>();
+    const readSession = mock(async () => result.promise);
+    const session = new AccountSession(f.client, undefined, {
+      readSession,
+      resetPlayer: (scope, revision) =>
+        usePlayer.getState().setAccount(scope, revision),
+      reload: f.reload,
+      publish() {},
+    });
+    const browser = new BrowserEvents();
+    const connection = connectAccountEvents(
+      session,
+      browser as unknown as Window,
+    );
+    try {
+      const pending = session.refresh();
+      browser.dispatchEvent(new Event('focus'));
+      browser.tick?.();
+      expect(session.refresh()).toBe(pending);
+      await Promise.resolve();
+      expect(readSession).toHaveBeenCalledTimes(1);
+      expect(usePlayer.getState().accountScope).toBeUndefined();
+      result.resolve(owner);
+      await pending;
+      expect(session.scope).toBe(owner.id);
+      expect(usePlayer.getState().accountScope).toBe(owner.id);
+      expect(f.reload).not.toHaveBeenCalled();
+    } finally {
+      connection.close();
+    }
+  });
+
   test('real storage-event shape retires private state in the receiving tab', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const browser = new BrowserEvents();
     const connection = connectAccountEvents(
       f.session,
@@ -340,7 +465,7 @@ describe('central browser session detection', () => {
   });
 
   test('broadcast and storage notifications deduplicate without trusting supplied identity', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const browser = new BrowserEvents();
     const channel = Object.assign(new EventTarget(), {
       postMessage: mock((_value: { id: string }) => {}),
@@ -380,7 +505,7 @@ describe('central browser session detection', () => {
   });
 
   test('focus, periodic expiry checks and persisted pageshow revalidate centrally', async () => {
-    const f = fixture();
+    const f = fixture(owner);
     const browser = new BrowserEvents();
     const connection = connectAccountEvents(
       f.session,
