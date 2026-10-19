@@ -24,7 +24,9 @@ passes records `completed_at` and atomically resets the undated checkpoint to
 zero. This deliberately revisits undated records on the next completed run:
 without a source change timestamp, retaining an ID watermark forever would miss
 changes and older IDs newly exported without dates. Source rows are loaded one
-batch at a time; neither pass uses OFFSET or a per-page table sort.
+batch at a time; neither pass uses OFFSET or a per-page table sort. Completion
+totals include both passes for the current attempt, even when no dated rows
+remain; work checkpointed by earlier attempts is not included.
 
 Keep the same SQLite snapshot when resuming a failed run. Extraction uses a
 private staging directory and publishes the database only after tar succeeds;

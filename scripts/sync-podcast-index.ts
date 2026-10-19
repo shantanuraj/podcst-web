@@ -341,12 +341,27 @@ async function sync(): Promise<void> {
 
   const cursor = await readPodcastIndexCursor(sql);
   const authorCache = new Map<string, number>();
+  let totalInserted = 0;
+  let totalUpdated = 0;
+  let totalSkipped = 0;
+  let totalRejected = 0;
+  const processBatch = async (batch: PodcastIndexRow[]) => {
+    const { inserted, updated, skipped, rejected } = await syncBatch(
+      sql,
+      batch,
+      authorCache,
+    );
+    totalInserted += inserted;
+    totalUpdated += updated;
+    totalSkipped += skipped;
+    totalRejected += rejected;
+  };
   const undatedAfter = await readUndatedPodcastIndexCursor(sql);
   const undatedCount = await syncUndatedSource(
     sqlite,
     BATCH_SIZE,
     undatedAfter,
-    (batch) => syncBatch(sql, batch, authorCache),
+    processBatch,
     (lastId) => checkpointUndatedPodcastIndexCursor(sql, lastId),
   );
   console.log(`Processed ${undatedCount.toLocaleString()} undated podcasts`);
@@ -357,24 +372,11 @@ async function sync(): Promise<void> {
   );
 
   const totalCount = countDatedSource(sqlite, cursor);
-  console.log(`Found ${totalCount.toLocaleString()} podcasts to sync`);
-
-  if (totalCount === 0) {
-    await writePodcastIndexCursor(sql, cursor);
-    console.log('Nothing to sync');
-    sqlite.close();
-    await sql.end();
-    if (!localPath) cleanup();
-    return;
-  }
+  console.log(`Found ${totalCount.toLocaleString()} dated podcasts to sync`);
 
   const nextBatch = sourceBatches(sqlite, BATCH_SIZE);
 
   let processed = 0;
-  let totalInserted = 0;
-  let totalUpdated = 0;
-  let totalSkipped = 0;
-  let totalRejected = 0;
   let highWater: PodcastIndexCursor = cursor;
   const startTime = Date.now();
 
@@ -382,15 +384,7 @@ async function sync(): Promise<void> {
     const batch = nextBatch(highWater);
     if (batch.length === 0) break;
 
-    const { inserted, updated, skipped, rejected } = await syncBatch(
-      sql,
-      batch,
-      authorCache,
-    );
-    totalInserted += inserted;
-    totalUpdated += updated;
-    totalSkipped += skipped;
-    totalRejected += rejected;
+    await processBatch(batch);
     processed += batch.length;
     const lastRow = batch.at(-1);
     if (!lastRow || lastRow.lastUpdate === null) {
