@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Redis } from 'ioredis';
+import { staleChart } from './fixtures/web-chart-cache';
 import { startPostgres } from './lib/postgres-sandbox';
 import { migrate } from './migrations';
 
@@ -121,9 +122,14 @@ try {
       await client.connect();
     return (await client.ping()) === 'PONG';
   }, redis);
+  await client.set('top@2/us', JSON.stringify(staleChart));
   probe.disconnect();
   await migrate(cluster.sql);
-  for (const fixture of ['web-smoke.sql', 'web-runtime.sql'])
+  for (const fixture of [
+    'web-smoke.sql',
+    'web-discover.sql',
+    'web-runtime.sql',
+  ])
     await cluster.sql.unsafe(
       readFileSync(join(root, 'scripts/fixtures', fixture), 'utf8'),
     );

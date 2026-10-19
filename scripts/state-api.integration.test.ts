@@ -58,7 +58,7 @@ describe.skipIf(!configured)(
         ('transport-own-key', ${accountId}, 'transport-own-credential', decode('12', 'hex')),
         ('transport-other-key', 'transport-other', 'transport-other-credential', decode('34', 'hex'))`;
       await sql`INSERT INTO podcasts (id, author_id, feed_url, title, cover, owner_user_id)
-        VALUES (990003, 1, 'https://example.invalid/private.xml', 'Private synthetic podcast', '', ${accountId})`;
+        VALUES (990003, 1, 'https://example.invalid/transport-private.xml', 'Private synthetic podcast', '', ${accountId})`;
     });
     afterAll(async () => {
       await sql?.end();
