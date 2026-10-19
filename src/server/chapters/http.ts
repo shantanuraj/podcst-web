@@ -11,7 +11,7 @@ import { fingerprint, type HttpValidators } from './cache';
 import { id3TagSize, MAX_TAG_BYTES, parseMp3Chapters } from './mp3';
 
 export const METADATA_TIMEOUT_MS = 8000;
-export const MAX_REDIRECTS = 4;
+export const MAX_REDIRECTS = 10;
 
 type Resolver = (hostname: string) => Promise<string>;
 
@@ -29,7 +29,7 @@ function enclosureUrl(input: string) {
 }
 
 interface PrefixResponse {
-  body: Buffer;
+  body: Buffer | null;
   location?: string;
   validators: HttpValidators;
   notModified?: boolean;
@@ -54,30 +54,21 @@ export type ChapterFetchResult =
 
 async function requestPrefix(
   input: string,
-  bytes: number,
   signal: AbortSignal,
   resolve: Resolver,
-  conditions: { revalidate?: HttpValidators; match?: HttpValidators },
+  cachedValidators?: HttpValidators,
 ): Promise<PrefixResponse> {
   const { url, hostname } = enclosureUrl(input);
   const urlFingerprint = fingerprint(url.href);
   const revalidate =
-    conditions.revalidate?.urlFingerprint === urlFingerprint
-      ? conditions.revalidate
-      : undefined;
-  const match =
-    conditions.match?.urlFingerprint === urlFingerprint
-      ? conditions.match
+    cachedValidators?.urlFingerprint === urlFingerprint
+      ? cachedValidators
       : undefined;
   const conditional: Record<string, string> = {};
   if (validEtag(revalidate?.etag))
     conditional['If-None-Match'] = revalidate.etag;
   else if (validLastModified(revalidate?.lastModified))
     conditional['If-Modified-Since'] = revalidate.lastModified;
-  if (validEtag(match?.etag) && match.etag.startsWith('"'))
-    conditional['If-Match'] = match.etag;
-  else if (validLastModified(match?.lastModified))
-    conditional['If-Unmodified-Since'] = match.lastModified;
   const address = await pinnedAddress(hostname, signal, resolve);
   signal.throwIfAborted();
   return new Promise((accept, reject) => {
@@ -89,7 +80,7 @@ async function requestPrefix(
       {
         'User-Agent': 'Podcst/1.0',
         'Accept-Encoding': 'identity',
-        Range: `bytes=0-${bytes - 1}`,
+        Range: `bytes=0-${MAX_TAG_BYTES - 1}`,
         ...conditional,
       },
       (response) => {
@@ -136,38 +127,81 @@ async function requestPrefix(
         const range = response.headers['content-range']?.match(
           /^bytes 0-(\d+)\/(\d+|\*)$/,
         );
+        const rangeEnd = Number(range?.[1]);
+        const resourceBytes =
+          range?.[2] === '*' ? undefined : Number(range?.[2]);
+        const rangeBytes = rangeEnd + 1;
+        const contentLength = response.headers['content-length'];
         if (
           ![200, 206].includes(status) ||
           (encoding && encoding !== 'identity') ||
           (status === 206 &&
             (!range ||
-              Number(range[1]) !== bytes - 1 ||
-              (range[2] !== '*' && Number(range[2]) < bytes)))
+              !Number.isSafeInteger(rangeEnd) ||
+              rangeBytes < 10 ||
+              rangeEnd >= MAX_TAG_BYTES ||
+              (resourceBytes !== undefined &&
+                (!Number.isSafeInteger(resourceBytes) ||
+                  resourceBytes <= rangeEnd)) ||
+              // A shorter prefix is valid only when it reaches the resource EOF.
+              (rangeBytes < MAX_TAG_BYTES && resourceBytes !== rangeBytes) ||
+              (contentLength !== undefined &&
+                Number(contentLength) !== rangeBytes)))
         ) {
           response.destroy();
           fail();
           return;
         }
-        const chunks: Buffer[] = [];
+        // Inspect the header before retaining any bytes beyond it.
+        let body = Buffer.alloc(10);
         let size = 0;
+        let headerRead = false;
+        let complete = false;
+        const finish = (body: Buffer | null) => {
+          complete = true;
+          accept({ body, validators });
+          response.destroy();
+          connection.destroy();
+        };
         response.on('data', (chunk: Buffer) => {
-          const required = chunk.subarray(0, bytes - size);
-          chunks.push(Buffer.from(required));
-          size += required.length;
-          if (size === bytes) {
-            accept({
-              body: Buffer.concat(chunks, bytes),
-              validators,
-            });
-            response.destroy();
-            connection.destroy();
+          let offset = 0;
+          while (!complete && offset < chunk.length) {
+            const copied = chunk.copy(body, size, offset);
+            size += copied;
+            offset += copied;
+            if (size !== body.length) return;
+            if (!headerRead) {
+              headerRead = true;
+              let tagBytes: number | null;
+              try {
+                tagBytes = id3TagSize(body);
+              } catch {
+                tagBytes = null;
+              }
+              if (tagBytes === null) {
+                finish(null);
+                return;
+              }
+              if (status === 206 && tagBytes > rangeBytes) {
+                response.destroy();
+                connection.destroy();
+                fail();
+                return;
+              }
+              if (tagBytes > body.length) {
+                const tag = Buffer.allocUnsafe(tagBytes);
+                body.copy(tag);
+                body = tag;
+              }
+            }
+            if (size === body.length) finish(body);
           }
         });
         response.on('end', () => {
-          if (size < bytes) fail();
+          if (!complete) fail();
         });
         response.on('close', () => {
-          if (size < bytes) fail();
+          if (!complete) fail();
         });
       },
     );
@@ -187,54 +221,22 @@ export async function readMp3Tag(
     AbortSignal.timeout(METADATA_TIMEOUT_MS),
   ]);
   let redirects = 0;
-  const prefix = async (
-    bytes: number,
-    conditions: { revalidate?: HttpValidators; match?: HttpValidators },
-  ) => {
-    if (bytes > MAX_TAG_BYTES) throw new Error('Metadata too large');
-    for (;;) {
-      const response = await requestPrefix(
-        input,
-        bytes,
-        active,
-        resolve,
-        conditions,
-      );
-      if (response.location === undefined) return response;
-      if (!response.location || redirects++ >= MAX_REDIRECTS)
-        throw new Error('Metadata redirect limit');
-      input = new URL(response.location, input).href;
-      enclosureUrl(input);
+  for (;;) {
+    const response = await requestPrefix(input, active, resolve, validators);
+    if (response.location === undefined) {
+      if (response.notModified)
+        return { status: 'not-modified', validators: response.validators };
+      return {
+        status: 'modified',
+        body: response.body,
+        validators: response.validators,
+      };
     }
-  };
-  const header = await prefix(10, { revalidate: validators });
-  if (header.notModified)
-    return { status: 'not-modified', validators: header.validators };
-  let size: number | null;
-  try {
-    size = id3TagSize(header.body);
-  } catch {
-    size = null;
+    if (!response.location || redirects++ >= MAX_REDIRECTS)
+      throw new Error('Metadata redirect limit');
+    input = new URL(response.location, input).href;
+    enclosureUrl(input);
   }
-  if (size === null || size === 10)
-    return {
-      status: 'modified',
-      body: size === null ? null : header.body,
-      validators: header.validators,
-    };
-  const tag = await prefix(size, { match: header.validators });
-  if (
-    !tag.body.subarray(0, 10).equals(header.body) ||
-    header.validators.urlFingerprint !== tag.validators.urlFingerprint ||
-    (header.validators.etag &&
-      tag.validators.etag &&
-      header.validators.etag !== tag.validators.etag) ||
-    (header.validators.lastModified &&
-      tag.validators.lastModified &&
-      header.validators.lastModified !== tag.validators.lastModified)
-  )
-    throw new Error('Metadata changed during read');
-  return { status: 'modified', body: tag.body, validators: tag.validators };
 }
 
 export async function fetchChapterMetadata(

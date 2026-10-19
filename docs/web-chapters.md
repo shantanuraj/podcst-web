@@ -42,10 +42,12 @@ never accepts a caller-supplied URL. Responses use `private, no-store` and
 
 The HTTP reader validates and pins public DNS destinations on every redirect,
 preserves TLS verification and forwards no cookies or application credentials.
-It reads only a bounded leading tag, using byte ranges and representation
-validators, rather than downloading the episode. Invalid ranges, compressed
-responses, changed resources and truncated tags are rejected. Deadlines, redirect,
-frame and body limits live in the [HTTP reader](../src/server/chapters/http.ts)
+It requests one bounded leading range, reads the ID3 header and tag from the same
+response, and cancels at the tag boundary. Unsupported headers stop after ten
+bytes. Representation validators support revalidation; invalid ranges, compressed
+responses and truncated tags are rejected. Up to ten redirects fit within one
+eight-second metadata deadline, with destination checks at every hop. The 512 KiB
+tag limit and other limits live in the [HTTP reader](../src/server/chapters/http.ts)
 and [parser](../src/server/chapters/mp3.ts).
 
 ## Cache behaviour
@@ -54,6 +56,9 @@ The request path is authorization → in-memory L1 → Redis → bounded extract
 Cache identity includes ownership, episode ID, a hash of the enclosure locator,
 media properties and parser/schema version. Raw URLs are not cache keys or log
 fields. Show-note fallback is parsed from current content rather than cached.
+Cold requests wait for the final extraction result before choosing embedded
+chapters or show-note fallback. Refresh lease acquisition and the cache recheck
+share one atomic Redis command, so a worker observes any preceding publication.
 
 Successful embedded metadata is retained for six months and revalidated after a
 week. A five-minute L1 avoids repeated Redis reads without extending freshness or
