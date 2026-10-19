@@ -396,7 +396,6 @@ function Appearance() {
 
 function Region() {
   const { t, language, setLanguage } = useTranslation();
-  const router = useRouter();
   const [region, setRegion] = useState<Locale | null>(null);
   const [detected, setDetected] = useState<Locale | null>(null);
 
@@ -446,7 +445,6 @@ function Region() {
           aria-label={t('account.language')}
           onChange={(event) => {
             setLanguage(event.currentTarget.value as Language);
-            router.refresh();
           }}
         >
           {(Object.keys(languageNames) as Language[]).map((code) => (

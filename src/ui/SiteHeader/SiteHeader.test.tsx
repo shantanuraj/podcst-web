@@ -112,3 +112,33 @@ test('the root provider retains server identity on dynamic pages', () => {
     segment.mockRestore();
   }
 });
+
+test('Discover stays active for the rewritten server URL and public client URL', () => {
+  const path = spyOn(navigation, 'usePathname');
+  const client = new QueryClient();
+  const session = new AccountSession(client, undefined, {
+    resetPlayer() {},
+    reload() {},
+    publish() {},
+  });
+  try {
+    for (const pathname of [
+      '/discover-render/en/us/feed/top',
+      '/discover-render/fr/ca/feed/top/chart',
+      '/us/feed/top',
+    ]) {
+      path.mockReturnValue(pathname);
+      const markup = render(
+        <QueryClientProvider client={client}>
+          <AccountContext.Provider value={session}>
+            <SiteHeader />
+          </AccountContext.Provider>
+        </QueryClientProvider>,
+      );
+      expect(markup).toMatch(/aria-current="page" href="\/feed\/top"/);
+    }
+  } finally {
+    path.mockRestore();
+    client.clear();
+  }
+});

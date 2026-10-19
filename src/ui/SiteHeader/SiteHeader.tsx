@@ -21,6 +21,7 @@ export function SiteHeader() {
       label: t('nav.discover'),
       active:
         pathname === '/feed/top' ||
+        pathname.startsWith('/discover-render/') ||
         /^\/[a-z]{2}\/feed\//.test(pathname) ||
         pathname.startsWith('/episodes/'),
     },
