@@ -586,7 +586,7 @@ CREATE TRIGGER fixture_trigger BEFORE UPDATE ON podcasts FOR EACH ROW EXECUTE FU
     await apply('apply', reviewed);
     expect(
       Array.from(
-        await sql`SELECT feed_url,podcast_id::int,evidence_reference FROM podcast_feed_aliases ORDER BY feed_url`,
+        await sql`SELECT feed_url,podcast_id::int,evidence_reference FROM podcast_feed_aliases ORDER BY feed_url COLLATE "C"`,
       ),
     ).toEqual([
       {

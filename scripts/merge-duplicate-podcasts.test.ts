@@ -78,7 +78,7 @@ describe.skipIf(!process.env.PG_BIN)(
           await sql`SELECT country_id, podcast_id::text FROM chart_history ORDER BY country_id, podcast_id`,
         ),
         feedAliases: Array.from(
-          await sql`SELECT feed_url, podcast_id::text, evidence_type FROM podcast_feed_aliases ORDER BY feed_url`,
+          await sql`SELECT feed_url, podcast_id::text, evidence_type FROM podcast_feed_aliases ORDER BY feed_url COLLATE "C"`,
         ),
         appleAliases: Array.from(
           await sql`SELECT itunes_id::text, podcast_id::text FROM podcast_apple_aliases ORDER BY itunes_id`,
