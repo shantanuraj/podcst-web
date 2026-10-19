@@ -9,7 +9,12 @@ export async function createSchemaFixture(
   if (through && !migrations.some(({ name }) => name === through))
     throw new Error('Unknown fixture migration boundary');
   for (const migration of migrations) {
-    await sql.unsafe(migration.source);
+    const index = migration.concurrentIndex;
+    if (index) {
+      // Fixtures may run in a transaction and an isolated search_path. Match
+      // the unqualified fixture tables instead of the production schema.
+      await sql`CREATE INDEX ${sql(index.name)} ON ${sql(index.table)} (${sql.unsafe(index.columns)})`;
+    } else await sql.unsafe(migration.source);
     if (migration.name === through) break;
   }
 }

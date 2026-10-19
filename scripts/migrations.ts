@@ -2,6 +2,14 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type postgres from 'postgres';
+import {
+  type ConcurrentIndex,
+  inspectConcurrentIndex,
+  parseConcurrentIndex,
+} from './lib/concurrent-index';
+import { MigrationError } from './lib/migration-error';
+
+export { MigrationError } from './lib/migration-error';
 
 export const migrationDirectory = new URL(
   '../migrations/active/',
@@ -10,12 +18,11 @@ export const migrationDirectory = new URL(
 const baselineName = '0000-baseline.sql';
 const lockKey = 1347372099;
 
-export class MigrationError extends Error {}
-
 export interface Migration {
   name: string;
   checksum: string;
   source: string;
+  concurrentIndex?: ConcurrentIndex;
 }
 
 interface AppliedMigration {
@@ -127,6 +134,7 @@ export function loadMigrations(
       name,
       source,
       checksum: createHash('sha256').update(source).digest('hex'),
+      concurrentIndex: parseConcurrentIndex(source),
     };
   });
 }
@@ -225,14 +233,72 @@ export async function createMigrationLedger(sql: postgres.ISql) {
 export async function migrate(
   sql: postgres.Sql,
   migrations = loadMigrations(),
+  {
+    onlineStatementTimeoutMs = 7_200_000,
+  }: { onlineStatementTimeoutMs?: number } = {},
 ): Promise<string[]> {
-  return sql.begin(async (tx) => {
-    await lockMigrations(tx);
-    await tx`SET LOCAL search_path TO public`;
-    await tx`SET LOCAL standard_conforming_strings TO on`;
-    await tx`SET LOCAL lock_timeout TO '5s'`;
-    await tx`SET LOCAL statement_timeout TO '10min'`;
-    const status = await inspect(tx, migrations);
+  if (
+    !Number.isSafeInteger(onlineStatementTimeoutMs) ||
+    onlineStatementTimeoutMs < 1 ||
+    onlineStatementTimeoutMs > 86_400_000
+  )
+    throw new MigrationError(
+      'Online statement timeout must be between 1 and 86400000 milliseconds',
+    );
+  const connection = await sql.reserve();
+  let locked = false;
+  let usable = true;
+  let settings: Record<string, string> | undefined;
+  const recoverable = (error: unknown) =>
+    error instanceof MigrationError ||
+    (error instanceof sql.PostgresError && error.severity === 'ERROR');
+  const discard = async () => {
+    usable = false;
+    await sql.end({ timeout: 0 });
+  };
+  // postgres.js reserved connections do not expose begin() at runtime.
+  // Explicit boundaries keep every query on the session owning our lock.
+  const transaction = async (work: () => Promise<void>) => {
+    await connection`BEGIN`;
+    try {
+      await connection`SET LOCAL statement_timeout TO '10min'`;
+      await work();
+      await connection`COMMIT`;
+    } catch (error) {
+      // A reserved postgres.js handle cannot reconnect. Even ROLLBACK on a
+      // closed socket can hang or throw asynchronously inside the driver.
+      if (!recoverable(error)) await discard();
+      else {
+        try {
+          await connection`ROLLBACK`;
+        } catch (rollbackError) {
+          await discard();
+          throw rollbackError;
+        }
+      }
+      throw error;
+    }
+  };
+  const record = async (migration: Migration) => {
+    await connection`INSERT INTO podcst_migrations.history (name, checksum)
+      VALUES (${migration.name}, ${migration.checksum})`;
+  };
+  try {
+    const [lock] =
+      await connection`SELECT pg_catalog.pg_try_advisory_lock(${lockKey}, 0) AS acquired`;
+    if (!lock.acquired)
+      throw new MigrationError('Another migration runner holds the lock');
+    locked = true;
+    [settings] =
+      await connection`SELECT current_setting('search_path') AS search_path,
+      current_setting('standard_conforming_strings') AS standard_conforming_strings,
+      current_setting('lock_timeout') AS lock_timeout,
+      current_setting('statement_timeout') AS statement_timeout`;
+    await connection`SELECT set_config('search_path', 'public', false),
+      set_config('standard_conforming_strings', 'on', false),
+      set_config('lock_timeout', '5s', false),
+      set_config('statement_timeout', ${String(onlineStatementTimeoutMs)}, false)`;
+    const status = await inspect(connection, migrations);
     if (status.state === 'untracked') {
       throw new MigrationError(
         'Existing database has no reviewed migration baseline; no changes applied',
@@ -241,14 +307,61 @@ export async function migrate(
     const pending = migrations.slice(
       status.migrations.filter((row) => row.state === 'applied').length,
     );
-    if (status.state === 'empty') await createMigrationLedger(tx);
-    for (const migration of pending) {
-      await tx.unsafe(migration.source);
-      await tx`
-        INSERT INTO podcst_migrations.history (name, checksum)
-        VALUES (${migration.name}, ${migration.checksum})
-      `;
+    let needsLedger = status.state === 'empty';
+    for (let offset = 0; offset < pending.length; ) {
+      const migration = pending[offset];
+      const index = migration.concurrentIndex;
+      if (index) {
+        if (needsLedger)
+          throw new MigrationError('Baseline must be transactional');
+        if (!(await inspectConcurrentIndex(connection, index)))
+          await connection.unsafe(index.source);
+        await transaction(async () => {
+          // Stabilize the table/index against concurrent DDL while checking and
+          // recording it; this lock still permits ordinary application writes.
+          await connection`LOCK TABLE ${connection(`${index.schema}.${index.table}`)} IN SHARE UPDATE EXCLUSIVE MODE`;
+          if (!(await inspectConcurrentIndex(connection, index)))
+            throw new MigrationError(
+              'Completed online index disappeared before recording',
+            );
+          await record(migration);
+        });
+        offset++;
+      } else {
+        let end = offset + 1;
+        while (end < pending.length && !pending[end].concurrentIndex) end++;
+        await transaction(async () => {
+          if (needsLedger) await createMigrationLedger(connection);
+          for (const item of pending.slice(offset, end)) {
+            await connection.unsafe(item.source);
+            await record(item);
+          }
+        });
+        needsLedger = false;
+        offset = end;
+      }
     }
     return pending.map(({ name }) => name);
-  });
+  } catch (error) {
+    if (usable && !recoverable(error)) await discard();
+    throw error;
+  } finally {
+    try {
+      if (usable && settings) {
+        await connection`SELECT set_config('search_path', ${settings.search_path}, false),
+          set_config('standard_conforming_strings', ${settings.standard_conforming_strings}, false),
+          set_config('lock_timeout', ${settings.lock_timeout}, false),
+          set_config('statement_timeout', ${settings.statement_timeout}, false)`;
+      }
+      if (usable && locked)
+        await connection`SELECT pg_catalog.pg_advisory_unlock(${lockKey}, 0)`;
+    } catch (error) {
+      // Never return a session with uncertain settings/locks to the pool.
+      await discard();
+      // biome-ignore lint/correctness/noUnsafeFinally: Failed cleanup must fail even an otherwise successful migration.
+      throw error;
+    } finally {
+      if (usable) connection.release();
+    }
+  }
 }

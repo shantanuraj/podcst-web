@@ -16,7 +16,13 @@ export async function main(args: string[]) {
   const sql = openDatabase('MIGRATION_DATABASE_URL');
   try {
     if (args[0] === 'up') {
-      const applied = await migrate(sql, migrations);
+      const configuredTimeout = process.env.MIGRATION_ONLINE_TIMEOUT_MS;
+      const applied = await migrate(sql, migrations, {
+        onlineStatementTimeoutMs:
+          configuredTimeout === undefined
+            ? undefined
+            : Number(configuredTimeout),
+      });
       console.log(JSON.stringify({ applied }));
     } else {
       console.log(
