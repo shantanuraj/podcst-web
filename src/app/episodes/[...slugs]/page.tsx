@@ -19,9 +19,9 @@ import { EpisodeInfo } from '@/ui/EpisodeInfo/EpisodeInfo';
 import { PaginatedEpisodesList } from '@/ui/EpisodesList';
 import { EpisodesHydration } from '@/ui/EpisodesList/EpisodesHydration';
 import { PodcastInfo } from '@/ui/PodcastInfo/PodcastInfo';
+import podcastStyles from '@/ui/PodcastInfo/PodcastInfo.module.css';
 import { Related } from '@/ui/PodcastInfo/Related';
 import { EpisodePreparing } from './EpisodePreparing';
-import styles from './Episodes.module.css';
 import { EpisodesNotFound } from './EpisodesNotFound';
 import { FeedRefresh } from './FeedRefresh';
 
@@ -329,7 +329,7 @@ export default async function Page(props: {
           initialData={initialEpisodes}
         >
           <PodcastInfo podcast={podcast} episodes={initialEpisodes.episodes} />
-          <div className={styles.body}>
+          <div className={podcastStyles.body}>
             <PaginatedEpisodesList podcast={podcast} />
             <Related podcastId={podcast.id} />
           </div>
