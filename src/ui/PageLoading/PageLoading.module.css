@@ -1,8 +1,94 @@
-.placeholder,
+.artwork,
+.bar,
+.button,
+.fill,
+.thumb,
+.field,
 .cover,
-.line,
-.action {
+.line {
   background-color: var(--color-rule);
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  height: 0.75em;
+  margin-block: calc((1lh - 0.75em) / 2);
+  border-radius: var(--radius-sm);
+}
+
+.artwork {
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+
+.eyebrow {
+  width: 14rem;
+}
+
+.title {
+  width: min(100%, 9ch);
+}
+
+.author {
+  width: 8rem;
+}
+
+.short {
+  width: 70%;
+}
+
+.fact {
+  width: 4.5rem;
+}
+
+.heading {
+  width: 3.5em;
+}
+
+.month {
+  width: 2rem;
+}
+
+.day {
+  width: 1em;
+}
+
+.duration {
+  width: 3.5rem;
+}
+
+.button {
+  width: 7.5rem;
+  height: 42px;
+  border-radius: var(--radius-md);
+}
+
+.square {
+  width: 42px;
+}
+
+.field {
+  height: 32px;
+}
+
+.control {
+  width: 12rem;
+}
+
+.star {
+  width: 40px;
+}
+
+.thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+}
+
+.grow {
+  flex: 1;
 }
 
 .line {
@@ -10,41 +96,9 @@
   height: 1rem;
 }
 
-.meta {
-  align-self: stretch;
-}
-
-.title {
-  width: min(100%, 24rem);
-  height: 2rem;
-  margin-bottom: var(--space-4);
-}
-
 .sectionTitle {
   width: 12rem;
   height: 1.25rem;
-}
-
-.action {
-  width: 8rem;
-  height: 2.5rem;
-  margin-top: var(--space-6);
-}
-
-.details {
-  display: grid;
-  gap: var(--space-4);
-  margin-top: var(--space-8);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--color-rule);
-}
-
-.details .line:nth-child(2) {
-  width: min(100%, 40rem);
-}
-
-.details .line:last-child {
-  width: min(75%, 24rem);
 }
 
 .tile {
