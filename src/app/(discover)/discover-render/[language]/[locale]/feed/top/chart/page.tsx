@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { top } from '@/app/api/top/top';
 import { ItemListSchema } from '@/components/Schema';
+import { getTopPodcasts } from '@/server/ingest/top';
 import { translationsForLanguage } from '@/shared/i18n/server';
 import { isRegion } from '@/shared/region';
 import { ChartRows } from '@/ui/Discover/ChartRows';
@@ -38,7 +38,7 @@ export async function generateMetadata({
 export default async function Page(props: PageProps) {
   const { locale, language } = await props.params;
   const { t } = translationsForLanguage(language);
-  const podcasts = await top(100, locale);
+  const podcasts = await getTopPodcasts(100, locale);
   const region = isRegion(locale) ? t(`regions.${locale}`) : locale;
   return (
     <div className={`${styles.page} ${styles.chartPage}`}>

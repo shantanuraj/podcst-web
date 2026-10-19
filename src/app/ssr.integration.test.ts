@@ -117,7 +117,8 @@ async function inspectHtml(html: string) {
         showNotes += chunk.text;
       },
     })
-    .on('main [aria-busy="true"]', {
+    // Account actions resolve after shared HTML; public content must be ready.
+    .on('main [aria-busy="true"]:not(button)', {
       element: () => {
         pending = true;
       },
@@ -291,4 +292,90 @@ describe.skipIf(!baseUrl)('public HTML without JavaScript', () => {
       }
     }, 35_000);
   }
+});
+
+describe.skipIf(!baseUrl)('shared Discover production cache', () => {
+  async function request(path: string, cookie = '') {
+    const response = await fetch(new URL(path, baseUrl), {
+      headers: { accept: 'text/html', cookie },
+      signal: AbortSignal.timeout(30_000),
+    });
+    return { response, html: await response.text() };
+  }
+
+  test('accounts share the same complete HTML without account or private data', async () => {
+    for (const path of ['/us/feed/top', '/us/feed/top/chart']) {
+      const first = await request(path, 'session=synthetic-session-a');
+      expect(first.response.status).toBe(200);
+      for (const cookie of ['session=synthetic-session-b', '']) {
+        const next = await request(path, cookie);
+        expect(next.response.status).toBe(200);
+        expect(next.response.headers.get('x-nextjs-cache')).toBe('HIT');
+        expect(next.html === first.html).toBe(true);
+      }
+      expect(first.html).not.toContain('ssr-owner-');
+      expect(first.html).not.toContain('ssr-a@example.invalid');
+      expect(first.html).not.toContain('Synthetic Private');
+      expect(first.html).not.toContain('private.xml');
+      expect(first.html).not.toContain('Outdated cached chart');
+      const page = await inspectHtml(first.html);
+      expect(page.pending).toBe(false);
+      expect(new URL(page.canonical).pathname).toBe(path);
+      expect(
+        page.schemas.find((s) => s['@type'] === 'ItemList')?.itemListElement,
+      ).toHaveLength(8);
+    }
+  }, 35_000);
+
+  test('language and country select separate complete cached pages', async () => {
+    const english = await request('/us/feed/top', 'NEXT_UI_LANG=en');
+    const french = await request('/us/feed/top', 'NEXT_UI_LANG=fr');
+    const dutchChart = await request('/nl/feed/top/chart', 'NEXT_UI_LANG=en');
+    for (const { response } of [english, french, dutchChart])
+      expect(response.status).toBe(200);
+    const en = await inspectHtml(english.html);
+    const fr = await inspectHtml(french.html);
+    const nl = await inspectHtml(dutchChart.html);
+    expect(fr.title).not.toBe(en.title);
+    expect(fr.heading).not.toBe(en.heading);
+    expect(french.html.includes('Découvrir')).toBe(true);
+    expect(
+      nl.schemas
+        .find((s) => s['@type'] === 'ItemList')
+        ?.itemListElement?.map((entry) => entry.item.name),
+    ).toEqual(['Synthetic Podcast 8', 'Synthetic Podcast 7']);
+    const again = await request(
+      '/us/feed/top',
+      'NEXT_UI_LANG=en; session=synthetic-session-b',
+    );
+    expect(again.response.headers.get('x-nextjs-cache')).toBe('HIT');
+    expect(again.html === english.html).toBe(true);
+    const invalid = await request('/us/feed/top', 'NEXT_UI_LANG=constructor');
+    expect(invalid.html === english.html).toBe(true);
+  }, 35_000);
+
+  test('static Discover does not suppress authentication on dynamic episode pages', async () => {
+    await request('/us/feed/top', 'session=synthetic-session-a');
+    const owner = await request('/episodes/12', 'session=synthetic-session-a');
+    expect(owner.response.status).toBe(200);
+    expect(owner.response.headers.get('cache-control')).toContain('private');
+    const page = await inspectHtml(owner.html);
+    expect(page.heading).toBe('Synthetic Private Podcast');
+    expect(
+      page.links.some((link) => link.label === 'Synthetic Private Episode'),
+    ).toBe(true);
+    for (const cookie of ['session=synthetic-session-b', '']) {
+      const denied = await request('/episodes/12', cookie);
+      expect(denied.html).not.toContain('Synthetic Private Podcast');
+      expect(denied.html).not.toContain('Synthetic Private Episode');
+      expect(denied.html).not.toContain('private.xml');
+    }
+    const restored = await request(
+      '/episodes/12',
+      'session=synthetic-session-a',
+    );
+    expect((await inspectHtml(restored.html)).heading).toBe(
+      'Synthetic Private Podcast',
+    );
+  }, 35_000);
 });

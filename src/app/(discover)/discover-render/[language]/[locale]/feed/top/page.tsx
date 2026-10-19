@@ -1,13 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { top } from '@/app/api/top/top';
 import { ItemListSchema } from '@/components/Schema';
 import { localeForLanguage } from '@/messages';
-import { noteworthy } from '@/server/discover';
-import {
-  getEpisodesPaginated,
-  getPodcastInfoById,
-} from '@/server/ingest/podcast';
+import { getDiscover } from '@/server/discover';
 import { translationsForLanguage } from '@/shared/i18n/server';
 import { isRegion } from '@/shared/region';
 import { ChartRows } from '@/ui/Discover/ChartRows';
@@ -20,7 +15,6 @@ type PageProps = {
 };
 
 const CHART_ROWS = 7;
-const NOTEWORTHY = 14;
 
 export async function generateMetadata({
   params,
@@ -48,17 +42,7 @@ export async function generateMetadata({
 export default async function Page(props: PageProps) {
   const { locale, language } = await props.params;
   const { t, language: uiLanguage } = translationsForLanguage(language);
-  const [podcasts, worthy] = await Promise.all([
-    top(100, locale),
-    noteworthy(locale, NOTEWORTHY, null),
-  ]);
-  const [first] = podcasts;
-  const [lead, latest] = first
-    ? await Promise.all([
-        getPodcastInfoById(first.id),
-        getEpisodesPaginated({ podcastId: first.id, limit: 1 }),
-      ])
-    : [null, null];
+  const { podcasts, worthy, lead, latest } = await getDiscover(locale);
   const today = new Date().toLocaleDateString(localeForLanguage[uiLanguage], {
     weekday: 'long',
     day: 'numeric',
@@ -75,9 +59,7 @@ export default async function Page(props: PageProps) {
         <span>{t('discover.dateline', { region })}</span>
       </div>
       <div className={styles.front}>
-        {lead && (
-          <LeadStory podcast={lead} latest={latest?.episodes[0] ?? null} />
-        )}
+        {lead && <LeadStory podcast={lead} latest={latest} />}
         <section>
           <div className={styles.sectionHead}>
             <h1 className={styles.sectionTitle}>{t('discover.chart')}</h1>
