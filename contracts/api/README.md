@@ -24,7 +24,7 @@ The messages are human-readable English, not stable codes; clients branch on the
 
 **IDs, numbers and nulls.** PostgreSQL bigint decoding stays exact. Catalogue and Apple IDs are canonical decimal strings from `1` through `9223372036854775807`; numeric wire IDs are rejected. Genre/category IDs, counts and times remain numbers. Timestamps (`published`) are epoch milliseconds; `duration` is whole source seconds. Omitted fields differ from explicit `null`. Durable scope is `{protocol:1, accountId, generation}`; a resource stream adds `clientId` and decimal-string `sequence`. An expected account is an assertion, never authentication authority.
 
-**Artwork.** `cover`, `thumbnail` and `episodeArt` are opaque URLs. A URL on `assets.podcst.app` may receive a `w` parameter to request a square WebP variant; the permitted widths live in [`contracts/playback/rules.json`](../playback/rules.json) under `artwork`, and the server behaviour is documented in [Artwork sizing and transport](../../docs/ios-artwork-cache.md#server-contract). Private artwork is served directly, never through that host.
+**Artwork.** `cover`, `thumbnail` and `episodeArt` are opaque URLs. A URL on `assets.podcst.app` may receive a `w` parameter to request a square WebP variant; the permitted widths live in [`contracts/playback/rules.json`](../playback/rules.json) under `artwork`, and the server behaviour is documented in [Artwork sizing and transport](../../docs/ios-artwork-cache.md#server-contract). Stored artwork, public and private, is served from that host.
 
 **Titles.** Titles and descriptions are stored as the feed supplied them. Some contain HTML entities, for example the captured `top.nl.json` title `Maarten van Rossem &amp; Tom Jessen`; clients decide how to render them.
 

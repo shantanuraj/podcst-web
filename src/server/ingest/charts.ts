@@ -111,8 +111,6 @@ export async function fetchTopFromItunes(
     const title = sanitize(podcast.collectionName)?.trim();
     const cover = artworkURL(
       sanitize(podcast.artworkUrl600 || podcast.artworkUrl100),
-      null,
-      true,
     );
     const feed = appleFeedForId(lookup.results, id);
     if (!title || !cover || !feed || !/^https?:\/\//i.test(feed)) {
@@ -135,7 +133,7 @@ export async function fetchTopFromItunes(
       feed,
       cover,
       author: sanitize(podcast.artistName)?.trim() || 'Unknown',
-      thumbnail: artworkURL(sanitize(podcast.artworkUrl100), null, true),
+      thumbnail: artworkURL(sanitize(podcast.artworkUrl100)),
       explicit: podcast.collectionExplicitness === 'explicit',
       count:
         Number.isInteger(count) &&

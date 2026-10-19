@@ -132,7 +132,7 @@ export async function fetchFeed(
     return { status: 'not_modified', ...meta, ...movement };
   }
 
-  const data = await adaptFeed(body, !privateFeed);
+  const data = await adaptFeed(body);
   if (!data) throw new FeedUnavailableError('Invalid feed');
   return { status: 'updated', data, ...meta, ...movement };
 }

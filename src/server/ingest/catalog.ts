@@ -60,9 +60,7 @@ export function catalogInput(
     feed: row.url,
     title: row.title,
     description: row.description || null,
-    cover:
-      artworkURL(row.imageUrl, null, true) ||
-      'https://podcst.app/placeholder.png',
+    cover: artworkURL(row.imageUrl) || 'https://podcst.app/placeholder.png',
     website: row.link || null,
     explicit: row.explicit === 1,
     episodeCount: row.episodeCount || 0,

@@ -9,13 +9,13 @@ Request the smallest width that meets the display's pixel size; use the original
 when no variant is large enough. Preserve the source URL's query parameters.
 
 Sized responses are square WebP images without upscaling. Unsized requests return
-the original. Clients use HTTP freshness and validators for revalidation. Sizing
-must not reroute private artwork through the public service.
+the original. Clients use HTTP freshness and validators for revalidation.
+All stored artwork, public and private, is served from that host.
 
 ## Web
 
 [`ProxiedImage`](../src/ui/Image/ProxiedImage.tsx) supplies responsive variants
-for already-proxied artwork. A permitted direct-image failure gets one proxy
+for already-proxied artwork. A direct-image failure gets one proxy
 fallback; an already-proxied failure is terminal to prevent recursive requests.
 React owns both `src` and `srcset`, and a source change resets fallback state.
 

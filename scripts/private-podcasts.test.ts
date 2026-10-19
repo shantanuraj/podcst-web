@@ -110,7 +110,7 @@ describe.skipIf(!process.env.PG_BIN)(
         await sql`SELECT owner_user_id, itunes_id, cover FROM podcasts WHERE id = ${id}`;
       expect(row.owner_user_id).toBe('owner');
       expect(row.itunes_id).toBeNull();
-      expect(row.cover).not.toContain('assets.podcst.app');
+      expect(row.cover).toStartWith('https://assets.podcst.app/?p=');
       expect(await canAccessPodcast(sql, id)).toBe(false);
       expect(await canAccessPodcast(sql, id, 'other')).toBe(false);
       expect(await canAccessPodcast(sql, id, 'owner')).toBe(true);
@@ -280,12 +280,12 @@ describe.skipIf(!process.env.PG_BIN)(
       ).toBe(String(id));
     });
 
-    test('private refresh keeps artwork off the shared proxy', async () => {
+    test('private refresh routes artwork through the image proxy', async () => {
       const id = await indexPrivatePodcast(sql, server.url.href, 'owner');
       expect(await refreshFeed(sql, id, 'rebuild')).toBe('updated');
       expect(
         (await sql`SELECT cover FROM podcasts WHERE id = ${id}`)[0].cover,
-      ).not.toContain('assets.podcst.app');
+      ).toStartWith('https://assets.podcst.app/?p=');
     });
 
     test('deleting an owner deletes its private sources, never makes them public', async () => {

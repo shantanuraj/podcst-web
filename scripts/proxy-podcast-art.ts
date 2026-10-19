@@ -13,8 +13,8 @@ export function proxiedPodcastArt({ cover, thumbnail }: Row) {
     cover:
       cover === placeholder
         ? cover
-        : (artworkURL(cover, null, true) ?? placeholder),
-    thumbnail: thumbnail && artworkURL(thumbnail, null, true),
+        : (artworkURL(cover) ?? placeholder),
+    thumbnail: thumbnail && artworkURL(thumbnail),
   };
 }
 

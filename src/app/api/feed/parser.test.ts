@@ -112,13 +112,5 @@ describe('adaptFeed', () => {
       proxied,
       null,
     ]);
-
-    const privateFeed = await adaptFeed(xml, false);
-    expect(privateFeed?.episodes.map((e) => e.episodeArt)).toEqual([
-      'https://cdn.example.com/ep%201.jpg',
-      'https://cdn.example.com/ep%201.jpg',
-      'https://cdn.example.com/ep 1.jpg',
-      null,
-    ]);
   });
 });
