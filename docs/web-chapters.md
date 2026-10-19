@@ -59,9 +59,6 @@ fields. Show-note fallback is parsed from current content rather than cached.
 Cold requests wait for the final extraction result before choosing embedded
 chapters or show-note fallback. Refresh lease acquisition and the cache recheck
 share one atomic Redis command, so a worker observes any preceding publication.
-The Vercel chapter function runs in Frankfurt via the per-function setting in
-[`vercel.json`](../vercel.json), keeping its database/cache round trips near the
-data host instead of using the project's San Francisco default.
 
 Successful embedded metadata is retained for six months and revalidated after a
 week. A five-minute L1 avoids repeated Redis reads without extending freshness or
