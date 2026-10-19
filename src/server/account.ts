@@ -1,3 +1,4 @@
+import type postgres from 'postgres';
 import type { Preferences } from '@/shared/preferences';
 import { passkeyProvider } from './auth/passkey-providers';
 import { sql } from './db';
@@ -17,37 +18,59 @@ export interface Account {
 
 const iso = (value: Date | null) => (value ? value.toISOString() : null);
 
-export async function getAccount(userId: string): Promise<Account> {
-  const [[user], passkeys, [preferences]] = await Promise.all([
-    sql`SELECT created_at FROM users WHERE id = ${userId}`,
-    sql`
-      SELECT id, aaguid, created_at, last_used_at
-      FROM passkeys
-      WHERE user_id = ${userId}
-      ORDER BY created_at, id
-    `,
-    sql`
-      SELECT speed, volume_boost, trim_silence
-      FROM account_preferences
-      WHERE user_id = ${userId}
-    `,
-  ]);
+async function readAccount(
+  userId: string | postgres.PendingQuery<postgres.Row[]>,
+): Promise<Account | null> {
+  const rows = await sql`
+    SELECT u.created_at, p.id AS passkey_id, p.aaguid,
+      p.created_at AS passkey_created_at, p.last_used_at,
+      ap.speed, ap.volume_boost, ap.trim_silence
+    FROM users u
+    LEFT JOIN passkeys p ON p.user_id = u.id
+    LEFT JOIN account_preferences ap ON ap.user_id = u.id
+    WHERE u.id = ${userId}
+    ORDER BY p.created_at, p.id
+  `;
+  const user = rows[0];
+  if (!user) return null;
+
   return {
-    createdAt: iso(user?.created_at ?? null),
-    passkeys: passkeys.map((passkey) => ({
-      id: passkey.id,
-      provider: passkeyProvider(passkey.aaguid),
-      createdAt: iso(passkey.created_at) as string,
-      lastUsedAt: iso(passkey.last_used_at),
-    })),
-    preferences: preferences
-      ? {
-          speed: preferences.speed,
-          volumeBoost: preferences.volume_boost,
-          trimSilence: preferences.trim_silence,
-        }
-      : null,
+    createdAt: iso(user.created_at),
+    passkeys: rows
+      .filter((row) => row.passkey_id !== null)
+      .map((passkey) => ({
+        id: passkey.passkey_id,
+        provider: passkeyProvider(passkey.aaguid),
+        createdAt: iso(passkey.passkey_created_at) as string,
+        lastUsedAt: iso(passkey.last_used_at),
+      })),
+    preferences:
+      user.speed === null
+        ? null
+        : {
+            speed: user.speed,
+            volumeBoost: user.volume_boost,
+            trimSilence: user.trim_silence,
+          },
   };
+}
+
+export async function getAccount(userId: string): Promise<Account> {
+  return (
+    (await readAccount(userId)) ?? {
+      createdAt: null,
+      passkeys: [],
+      preferences: null,
+    }
+  );
+}
+
+export function getAccountForSession(
+  sessionId: string,
+): Promise<Account | null> {
+  return readAccount(sql`
+    (SELECT user_id FROM sessions WHERE id = ${sessionId} AND expires_at > now())
+  `);
 }
 
 export async function savePreferences(

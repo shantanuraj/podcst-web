@@ -23,9 +23,14 @@ export async function setSessionCookie({
   });
 }
 
-export async function getSession() {
+/** Cookie value only; callers must validate it against an unexpired session. */
+export async function getSessionId() {
   const cookieStore = await cookies();
-  const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
+  return cookieStore.get(SESSION_COOKIE)?.value;
+}
+
+export async function getSession() {
+  const sessionId = await getSessionId();
   if (!sessionId) return null;
 
   const [session] = await sql`
