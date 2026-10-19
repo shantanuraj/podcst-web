@@ -43,6 +43,7 @@ describe.skipIf(!process.env.PG_BIN)(
     let sql: postgres.Sql;
     let service: EpisodeListService;
     let listId: string;
+    const queries: string[] = [];
 
     beforeAll(async () => {
       cluster = startPostgres();
@@ -50,6 +51,9 @@ describe.skipIf(!process.env.PG_BIN)(
         ...cluster.options,
         max: 8,
         connection: { timezone: 'UTC' },
+        debug(_connection, query) {
+          queries.push(query);
+        },
       });
       await createSchemaFixture(sql);
       service = createEpisodeListService(sql);
@@ -89,6 +93,135 @@ describe.skipIf(!process.env.PG_BIN)(
       const collection = await service.lists('owner');
       listId = collection.lists[0].id;
       generation = collection.generation;
+    });
+
+    test('reads initialized list summaries and membership in one database roundtrip each', async () => {
+      await service.change('owner', listId, batch([add(101), add(201)]));
+      queries.length = 0;
+      const collection = await service.lists('owner');
+      expect(collection.lists[0]).toMatchObject({
+        revision: '1',
+        itemCount: 2,
+      });
+      expect(queries).toHaveLength(1);
+
+      queries.length = 0;
+      const snapshot = await service.membership('owner', listId);
+      expect(snapshot).toMatchObject({ ...scope(), listId, revision: '1' });
+      expect(snapshot.items.map(({ episodeId }) => episodeId).sort()).toEqual([
+        '101',
+        '201',
+      ]);
+      expect(queries).toHaveLength(1);
+    });
+
+    test('cold concurrent initialization returns the canonical starred list', async () => {
+      await sql`DELETE FROM episode_lists WHERE user_id = 'owner'`;
+      const results = await Promise.all(
+        Array.from({ length: 8 }, () => service.lists('owner')),
+      );
+      expect(new Set(results.map(({ lists }) => lists[0].id)).size).toBe(1);
+      expect(
+        results.every(
+          ({ lists }) => lists.length === 1 && lists[0].kind === 'starred',
+        ),
+      ).toBe(true);
+      expect(
+        await sql`SELECT id FROM episode_lists WHERE user_id = 'owner' AND kind = 'starred'`,
+      ).toHaveLength(1);
+    });
+
+    test('membership orders by timestamp then numeric episode IDs', async () => {
+      await sql`INSERT INTO episodes (id, podcast_id, guid, published) VALUES (9, 1, 'single-digit', now())`;
+      await sql`
+        INSERT INTO episode_list_items (list_id, episode_id, added_at) VALUES
+          (${listId}, 9, '2026-01-01T00:00:00.123Z'),
+          (${listId}, 101, '2026-01-01T00:00:00.123Z'),
+          (${listId}, 201, '2026-01-01T00:00:00.124Z')
+      `;
+      expect(
+        (await service.membership('owner', listId)).items.map(
+          ({ episodeId }) => episodeId,
+        ),
+      ).toEqual(['201', '101', '9']);
+    });
+
+    test('warm snapshots read the committed generation and list state without waiting for a writer', async () => {
+      const nextGeneration = randomUUID();
+      const ready = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const writer = sql.begin(async (tx) => {
+        await tx`UPDATE state_generation SET generation = ${nextGeneration}`;
+        await tx`UPDATE episode_lists SET revision = 9007199254740993 WHERE id = ${listId}`;
+        await tx`INSERT INTO episode_list_items (list_id, episode_id) VALUES (${listId}, 101)`;
+        ready.resolve();
+        await release.promise;
+      });
+      await ready.promise;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const snapshots = await Promise.race([
+          Promise.all([
+            service.lists('owner'),
+            service.membership('owner', listId),
+          ]),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Snapshot blocked on writer')),
+              1000,
+            );
+          }),
+        ]);
+        expect(snapshots[0]).toMatchObject({
+          generation,
+          lists: [{ revision: '0', itemCount: 0 }],
+        });
+        expect(snapshots[1]).toMatchObject({
+          generation,
+          revision: '0',
+          items: [],
+        });
+      } finally {
+        clearTimeout(timer);
+        release.resolve();
+        await writer;
+      }
+      expect(await service.lists('owner')).toMatchObject({
+        generation: nextGeneration,
+        lists: [{ revision: '9007199254740993', itemCount: 1 }],
+      });
+      expect(await service.membership('owner', listId)).toMatchObject({
+        generation: nextGeneration,
+        revision: '9007199254740993',
+        items: [{ episodeId: '101' }],
+      });
+    });
+
+    test('snapshot reads preserve generation, account and ownership errors', async () => {
+      await expect(service.lists('missing')).rejects.toMatchObject({
+        code: 'unauthenticated',
+      });
+      await expect(service.membership('missing', listId)).rejects.toMatchObject(
+        { code: 'unauthenticated' },
+      );
+      await expect(
+        service.membership('owner', randomUUID()),
+      ).rejects.toMatchObject({ status: 404 });
+      await expect(service.membership('other', listId)).rejects.toMatchObject({
+        status: 404,
+      });
+      const rows =
+        await sql`DELETE FROM state_generation RETURNING generation, legacy_generation`;
+      try {
+        await expect(service.lists('missing')).rejects.toMatchObject({
+          code: 'unavailable',
+        });
+        await expect(
+          service.membership('missing', listId),
+        ).rejects.toMatchObject({ code: 'unavailable' });
+      } finally {
+        await sql`INSERT INTO state_generation (generation, legacy_generation) VALUES (${rows[0].generation}, ${rows[0].legacy_generation})`;
+      }
     });
 
     test('bootstraps one built-in list concurrently and isolates accounts', async () => {

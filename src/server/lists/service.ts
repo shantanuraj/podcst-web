@@ -57,7 +57,7 @@ async function ownedList(
   return { id: String(list.id), revision: String(list.revision) };
 }
 
-async function readItems(
+function readItems(
   sql: postgres.ISql,
   userId: string,
   listId: string,
@@ -102,9 +102,20 @@ async function readItems(
     ${page ? sql`LEFT JOIN authors a ON a.id = p.author_id LEFT JOIN feed_poll_state s ON s.podcast_id = p.id` : sql``}
     WHERE i.list_id = ${listId}
       ${cursor ? sql`AND (i.added_at, i.episode_id) < (${new Date(cursor.addedAt)}, ${cursor.episodeId})` : sql``}
-    ORDER BY i.added_at DESC, i.episode_id DESC
+    ${page ? sql`ORDER BY i.added_at DESC, i.episode_id DESC` : sql``}
     ${page ? sql`LIMIT ${page.limit + 1}` : sql``}
   `;
+}
+
+function snapshotScope(row: {
+  generation: string | null;
+  accountId: string | null;
+}): StateScope {
+  if (row.generation === null)
+    throw new StateError('unavailable', 'State unavailable');
+  if (row.accountId === null)
+    throw new StateError('unauthenticated', 'Authentication required');
+  return { protocol: 1, accountId: row.accountId, generation: row.generation };
 }
 
 type StoredAcknowledgement = {
@@ -267,6 +278,45 @@ export function createEpisodeListService(
     async lists(
       userId: string,
     ): Promise<StateScope & { lists: EpisodeList[] }> {
+      // A single statement gives the scope, revisions and counts one snapshot.
+      // Initialized accounts need neither a transaction nor bootstrap locks.
+      const rows = await sql<
+        ({ generation: string | null; accountId: string | null } & {
+          id: string | null;
+          kind: EpisodeList['kind'];
+          name: string | null;
+          revision: string;
+          itemCount: number;
+        })[]
+      >`
+        SELECT g.generation, u.id AS "accountId",
+          l.id, l.kind, l.name, l.revision::text,
+          (SELECT count(*)::int FROM episode_list_items i WHERE i.list_id = l.id) AS "itemCount"
+        FROM (SELECT 1) base
+        LEFT JOIN state_generation g ON g.singleton
+        LEFT JOIN users u ON u.id = ${userId}
+        LEFT JOIN episode_lists l ON l.user_id = u.id
+        ORDER BY l.created_at, l.id
+      `;
+      const scope = snapshotScope(rows[0]);
+      const lists: EpisodeList[] = rows.flatMap((row) =>
+        row.id === null
+          ? []
+          : [
+              {
+                id: row.id,
+                kind: row.kind,
+                name: row.name,
+                revision: row.revision,
+                itemCount: row.itemCount,
+              },
+            ],
+      );
+      if (lists.some(({ kind }) => kind === 'starred'))
+        return { ...scope, lists };
+
+      // Bootstrap still locks the generation and account through commit, and a
+      // second statement sees the winner of a concurrent starred-list insert.
       return sql.begin(async (tx) => {
         const { scope } = await readGeneration(tx, userId, true);
         await tx`
@@ -283,24 +333,46 @@ export function createEpisodeListService(
     },
 
     async membership(userId: string, listId: string): Promise<ListSnapshot> {
-      return sql.begin(
-        'isolation level repeatable read read only',
-        async (tx) => {
-          const { scope } = await readGeneration(tx, userId);
-          const list = await ownedList(tx, userId, listId);
-          const rows = await readItems(tx, userId, listId);
-          return {
-            ...scope,
-            listId: list.id,
-            revision: list.revision,
-            items: rows.map((row) => ({
-              ...row,
-              episodeId: String(row.episodeId),
-              addedAt: Number(row.addedAt),
-            })),
-          };
-        },
-      );
+      const rows = await sql<
+        ({
+          generation: string | null;
+          accountId: string | null;
+          id: string | null;
+          revision: string;
+        } & {
+          episodeId: string | null;
+          addedAt: string | null;
+          availability: ListMembership['availability'];
+        })[]
+      >`
+        SELECT g.generation, u.id AS "accountId", l.id, l.revision::text,
+          items."episodeId", items."addedAt", items.availability
+        FROM (SELECT 1) base
+        LEFT JOIN state_generation g ON g.singleton
+        LEFT JOIN users u ON u.id = ${userId}
+        LEFT JOIN episode_lists l ON l.user_id = u.id AND l.id = ${listId}
+        LEFT JOIN LATERAL (${readItems(sql, userId, listId)}) items ON l.id IS NOT NULL
+        ORDER BY items."addedAt" DESC, items."episodeId"::bigint DESC
+      `;
+      const scope = snapshotScope(rows[0]);
+      const list = rows[0];
+      if (list.id === null) throw new ListError(404, 'List not found');
+      return {
+        ...scope,
+        listId: list.id,
+        revision: list.revision,
+        items: rows.flatMap((row) =>
+          row.episodeId === null
+            ? []
+            : [
+                {
+                  episodeId: row.episodeId,
+                  addedAt: Number(row.addedAt),
+                  availability: row.availability,
+                },
+              ],
+        ),
+      };
     },
 
     async episodes(
