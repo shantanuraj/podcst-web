@@ -44,11 +44,7 @@ export async function EpisodeInfo({
 
   return (
     <article className={styles.episode}>
-      <ArtworkBackdrop
-        src={art}
-        privateSource={episode.isPrivate}
-        className={styles.tint}
-      />
+      <ArtworkBackdrop src={art} className={styles.tint} />
       <div className={styles.page}>
         <nav className={styles.crumbs} aria-label={podcast.title}>
           <PageLink href={getPodcastHref(podcast)} loading="podcast">
@@ -62,7 +58,6 @@ export async function EpisodeInfo({
               fetchPriority="high"
               alt=""
               src={art}
-              privateSource={episode.isPrivate}
               sizes="(max-width: 767px) 140px, 200px"
             />
           </div>

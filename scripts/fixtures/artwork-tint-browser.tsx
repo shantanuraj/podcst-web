@@ -42,15 +42,13 @@ const source = (name: string, width = 384) =>
 function Consumer({
   id = 'tint',
   src,
-  privateSource = false,
   dark = false,
 }: {
   id?: string;
   src?: string;
-  privateSource?: boolean;
   dark?: boolean;
 }) {
-  const tint = useArtworkTint(src, privateSource);
+  const tint = useArtworkTint(src);
   return (
     <output id={id}>{tint?.[dark ? 'dark' : 'light'] ?? 'neutral'}</output>
   );
@@ -66,29 +64,20 @@ async function run() {
       <StrictMode>
         <Consumer src={source('shared')} />
         <Consumer id="second" src={source('shared', 1024)} dark />
-        <Consumer id="private" src={source('private')} privateSource />
         <Consumer id="direct" src="https://images.example.com/direct" />
       </StrictMode>,
     );
   });
   await until(() => value() === '#b8c4c4' && value('second') === '#3d4a4a');
   assert(requests.length === 1, 'Concurrent consumers duplicated the request');
-  assert(value('private') === 'neutral', 'Private source acquired a tint');
   assert(value('direct') === 'neutral', 'Direct source acquired a tint');
 
-  const render = (src: string, privateSource = false, dark = false) => {
-    flushSync(() =>
-      root.render(
-        <Consumer src={src} privateSource={privateSource} dark={dark} />,
-      ),
-    );
+  const render = (src: string, dark = false) => {
+    flushSync(() => root.render(<Consumer src={src} dark={dark} />));
   };
-  render(source('shared'), false, true);
+  render(source('shared'), true);
   await until(() => value() === '#3d4a4a');
   assert(requests.length === 1, 'Theme change reloaded the palette');
-  render(source('shared'), true);
-  assert(value() === 'neutral', 'Private flag retained a public tint');
-  assert(requests.length === 1, 'Private flag triggered a request');
 
   render(source('slow'));
   assert(value() === 'neutral', 'Source change retained the old tint');
@@ -112,15 +101,11 @@ async function run() {
   flushSync(() => root.unmount());
   await until(() => completed.includes('/unmount'));
   assert(!host.textContent, 'Unmounted consumer updated the DOM');
-  assert(
-    !requests.includes('/private') && !requests.includes('/direct'),
-    'Artwork routing changed',
-  );
+  assert(!requests.includes('/direct'), 'Artwork routing changed');
 
   return {
     deduplicated: true,
     themeReuse: true,
-    privateSkipped: true,
     staleResponseIgnored: true,
     corsFallback: true,
     unmounted: true,

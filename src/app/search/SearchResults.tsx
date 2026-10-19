@@ -127,22 +127,13 @@ export function SearchResults({ term }: { term: string }) {
 function TopResult({ podcast }: { podcast: IPodcastSearchResult }) {
   return (
     <article className={styles.top}>
-      <ArtworkBackdrop
-        src={podcast.cover}
-        privateSource={podcast.isPrivate}
-        className={styles.tint}
-      />
+      <ArtworkBackdrop src={podcast.cover} className={styles.tint} />
       <PageLink
         href={getSearchResultHref(podcast)}
         loading="podcast"
         className={styles.topArt}
       >
-        <ProxiedImage
-          alt=""
-          src={podcast.cover}
-          privateSource={podcast.isPrivate}
-          sizes="150px"
-        />
+        <ProxiedImage alt="" src={podcast.cover} sizes="150px" />
       </PageLink>
       <div className={styles.topText}>
         <PageLink
@@ -195,7 +186,6 @@ function PodcastRow({ podcast }: { podcast: IPodcastSearchResult }) {
         <ProxiedImage
           alt=""
           src={podcast.thumbnail || podcast.cover}
-          privateSource={podcast.isPrivate}
           sizes="44px"
           loading="lazy"
           className={styles.rowArt}

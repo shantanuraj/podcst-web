@@ -6,7 +6,7 @@ import { join } from 'node:path';
 const chrome = process.env.CHROME_BIN;
 
 test.skipIf(!chrome)(
-  'artwork tint hook reads CORS metadata and fences stale and private artwork',
+  'artwork tint hook reads CORS metadata and fences stale artwork',
   async () => {
     if (!chrome) throw new Error('CHROME_BIN required');
     const build = await Bun.build({
@@ -115,7 +115,6 @@ test.skipIf(!chrome)(
       expect(outcome.checks).toEqual({
         deduplicated: true,
         themeReuse: true,
-        privateSkipped: true,
         staleResponseIgnored: true,
         corsFallback: true,
         unmounted: true,

@@ -92,14 +92,12 @@ function Current({ episode }: { episode: IEpisodeInfo }) {
     <section className={styles.current} aria-label={t('queue.nowPlaying')}>
       <ArtworkBackdrop
         src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
         className={styles.tint}
       />
       <ProxiedImage
         alt=""
         className={styles.currentArt}
         src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
         sizes="100px"
       />
       <div className={styles.currentText}>
@@ -196,7 +194,6 @@ function UpNext({ episodes }: { episodes: readonly IEpisodeInfo[] }) {
             <ProxiedImage
               alt=""
               src={episode.episodeArt || episode.cover}
-              privateSource={episode.isPrivate}
               sizes="52px"
             />
             <Icon icon="play" size={20} />

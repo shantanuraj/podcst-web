@@ -41,7 +41,6 @@ function EpisodeItem({ episode, podcastId }: EpisodeItemProps) {
           <ProxiedImage
             loading="lazy"
             src={episodeArt || cover || undefined}
-            privateSource={episode.isPrivate}
             alt=""
             sizes="(max-width: 768px) 56px, 64px"
           />

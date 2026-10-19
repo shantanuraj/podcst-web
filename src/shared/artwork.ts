@@ -54,8 +54,7 @@ function sizedArtworkURL(src?: string) {
   return proxy;
 }
 
-export function artworkTintSource(src?: string, privateSource = false) {
-  if (privateSource) return undefined;
+export function artworkTintSource(src?: string) {
   const proxy = sizedArtworkURL(src);
   if (!proxy) return undefined;
   proxy.searchParams.set('w', String(widths[0]));

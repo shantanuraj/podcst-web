@@ -134,7 +134,6 @@ const SearchResult: React.FC<{ podcast: IPodcastSearchResult }> = ({
         loading="lazy"
         alt={`${podcast.title} by ${podcast.author}`}
         src={podcast.cover}
-        privateSource={podcast.isPrivate}
         sizes="56px"
       />
       <div>

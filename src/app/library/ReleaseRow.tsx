@@ -35,7 +35,6 @@ export function ReleaseRow({
       <ProxiedImage
         alt=""
         src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
         sizes="44px"
         loading="lazy"
       />

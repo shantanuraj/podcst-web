@@ -285,13 +285,11 @@ function ContinueCard({ episode, position }: RecentProgress) {
     <article className={styles.card}>
       <ArtworkBackdrop
         src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
         className={styles.tint}
       />
       <ProxiedImage
         alt=""
         src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
         sizes="84px"
         className={styles.cardArt}
       />
@@ -473,7 +471,6 @@ function Subscriptions({
                 <ProxiedImage
                   alt={podcast.title}
                   src={podcast.cover}
-                  privateSource={podcast.isPrivate}
                   sizes="(max-width: 767px) 30vw, 120px"
                   loading="lazy"
                 />

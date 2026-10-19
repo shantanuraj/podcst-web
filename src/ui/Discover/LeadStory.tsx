@@ -21,11 +21,7 @@ export function LeadStory({
   const { t } = useTranslation();
   return (
     <article className={styles.lead}>
-      <ArtworkBackdrop
-        src={podcast.cover}
-        privateSource={podcast.isPrivate}
-        className={styles.tint}
-      />
+      <ArtworkBackdrop src={podcast.cover} className={styles.tint} />
       <PageLink
         href={getPodcastHref(podcast)}
         loading="podcast"

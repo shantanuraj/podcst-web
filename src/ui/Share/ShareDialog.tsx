@@ -96,7 +96,6 @@ function ShowShare({ podcast }: { podcast: SharedPodcast }) {
         art={podcast.cover}
         title={podcast.title}
         detail={podcast.author}
-        privateSource={podcast.isPrivate}
       />
       <LinkActions url={podcastShareUrl(podcast)} title={podcast.title} />
     </>
@@ -191,7 +190,6 @@ function EpisodeShare({
         ]
           .filter(Boolean)
           .join(' · ')}
-        privateSource={episode.isPrivate}
       />
       {shown === 'time' && (
         <StartPicker start={start} duration={duration} onChange={setStart} />
@@ -251,21 +249,14 @@ function Summary({
   art,
   title,
   detail,
-  privateSource,
 }: {
   art: string;
   title: string;
   detail: string;
-  privateSource?: boolean;
 }) {
   return (
     <div className={styles.summary}>
-      <ProxiedImage
-        alt=""
-        src={art}
-        privateSource={privateSource}
-        sizes="48px"
-      />
+      <ProxiedImage alt="" src={art} sizes="48px" />
       <div>
         <p className={styles.summaryTitle}>{title}</p>
         <p className={styles.summaryDetail}>{detail}</p>

@@ -85,7 +85,6 @@ export function NowPlaying({
     >
       <ArtworkBackdrop
         src={episode.episodeArt || episode.cover}
-        privateSource={episode.isPrivate}
         className={styles.backdrop}
       />
       <header className={styles.top}>
@@ -164,7 +163,6 @@ export function NowPlaying({
           <ProxiedImage
             alt=""
             src={episode.episodeArt || episode.cover}
-            privateSource={episode.isPrivate}
             sizes="(max-width: 767px) 80vw, 500px"
           />
         </div>
@@ -331,7 +329,6 @@ function UpNextList({ episodes }: { episodes: readonly IEpisodeInfo[] }) {
             <ProxiedImage
               alt=""
               src={episode.episodeArt || episode.cover}
-              privateSource={episode.isPrivate}
               sizes="44px"
             />
             <span className={styles.upNextText}>

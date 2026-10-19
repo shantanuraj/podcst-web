@@ -1,15 +1,10 @@
 'use client';
 
 import { type ImgHTMLAttributes, useEffect, useRef, useState } from 'react';
-import {
-  artworkFallback,
-  artworkSources,
-  directArtwork,
-} from '@/shared/artwork';
+import { artworkFallback, artworkSources } from '@/shared/artwork';
 
 interface ProxiedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   src?: string;
-  privateSource?: boolean;
 }
 
 export function ProxiedImage(props: ProxiedImageProps) {
@@ -21,16 +16,13 @@ function ArtworkImage({
   srcSet,
   sizes,
   onError,
-  privateSource = false,
   decoding = 'async',
   ...props
 }: ProxiedImageProps) {
   const [failed, setFailed] = useState(false);
   const image = useRef<HTMLImageElement>(null);
-  const fallback = privateSource ? undefined : artworkFallback(src);
-  const sources = privateSource
-    ? { src: directArtwork(src), srcSet: undefined }
-    : artworkSources(failed ? fallback : src, sizes);
+  const fallback = artworkFallback(src);
+  const sources = artworkSources(failed ? fallback : src, sizes);
 
   useEffect(() => {
     const element = image.current;
@@ -50,11 +42,7 @@ function ArtworkImage({
       ref={image}
       decoding={decoding}
       sizes={sizes}
-      srcSet={
-        privateSource
-          ? undefined
-          : (sources.srcSet ?? (failed ? undefined : srcSet))
-      }
+      srcSet={sources.srcSet ?? (failed ? undefined : srcSet)}
       src={sources.src}
       onError={(event) => {
         onError?.(event);

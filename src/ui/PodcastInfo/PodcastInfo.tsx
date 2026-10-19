@@ -42,11 +42,7 @@ export async function PodcastInfo({
 
   return (
     <header className={styles.header}>
-      <ArtworkBackdrop
-        src={cover}
-        privateSource={podcast.isPrivate}
-        className={styles.tint}
-      />
+      <ArtworkBackdrop src={cover} className={styles.tint} />
       <div className={styles.hero}>
         <div className={styles.artwork}>
           <ProxiedImage
@@ -54,7 +50,6 @@ export async function PodcastInfo({
             fetchPriority="high"
             alt=""
             src={cover}
-            privateSource={podcast.isPrivate}
             sizes="(max-width: 767px) 160px, 260px"
           />
         </div>

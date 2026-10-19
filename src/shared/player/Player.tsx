@@ -102,7 +102,6 @@ function PlayerBar({
           <ProxiedImage
             alt=""
             src={episode.episodeArt || episode.cover}
-            privateSource={episode.isPrivate}
             sizes="56px"
           />
         </button>

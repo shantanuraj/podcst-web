@@ -95,9 +95,7 @@ describe('artwork tint sources', () => {
     }
   });
 
-  test('never requests metadata for private or directly hosted artwork', () => {
-    for (const value of [source, proxy, `${proxy}&w=160`])
-      expect(artworkTintSource(value, true)).toBeUndefined();
+  test('never requests metadata for directly hosted artwork', () => {
     expect(artworkTintSource(source)).toBeUndefined();
   });
 
@@ -119,7 +117,7 @@ describe('artwork tint sources', () => {
   });
 });
 
-describe('private artwork', () => {
+describe('direct artwork', () => {
   test('unwraps existing proxy locators without changing credential bytes', () => {
     expect(directArtwork(proxy)).toBe(source);
     expect(
@@ -131,22 +129,6 @@ describe('private artwork', () => {
       directArtwork('https://assets.podcst.app/?p=file:///private'),
     ).toBeUndefined();
     expect(directArtwork(`${proxy}&p=ambiguous`)).toBeUndefined();
-  });
-
-  test('private markup never uses proxy variants or an explicit proxy srcset', () => {
-    const markup = renderToStaticMarkup(
-      <ProxiedImage
-        privateSource
-        src={proxy}
-        srcSet={`${proxy} 160w`}
-        sizes="56px"
-        alt="Private"
-      />,
-    );
-    expect(markup).not.toContain('assets.podcst.app');
-    expect(markup).not.toContain('srcSet=');
-    expect(markup).not.toContain('privateSource');
-    expect(markup).toContain('images.example.com');
   });
 });
 

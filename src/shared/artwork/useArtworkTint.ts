@@ -8,8 +8,8 @@ export type { ArtworkTint } from './tint';
 
 const cache = new ArtworkTintCache();
 
-export function useArtworkTint(src?: string, privateSource = false) {
-  const source = artworkTintSource(src, privateSource);
+export function useArtworkTint(src?: string) {
+  const source = artworkTintSource(src);
   const [result, setResult] = useState<{
     source: string;
     tint: ArtworkTint | null;

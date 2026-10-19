@@ -7,16 +7,11 @@ import styles from './ArtworkBackdrop.module.css';
 
 type ArtworkBackdropProps = {
   src?: string;
-  privateSource?: boolean;
   className?: string;
 };
 
-export function ArtworkBackdrop({
-  src,
-  privateSource,
-  className,
-}: ArtworkBackdropProps) {
-  const tint = useArtworkTint(src, privateSource);
+export function ArtworkBackdrop({ src, className }: ArtworkBackdropProps) {
+  const tint = useArtworkTint(src);
   if (!tint) return null;
   return (
     <div
