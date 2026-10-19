@@ -11,15 +11,8 @@ export default function proxy(request: NextRequest) {
       { message: 'Request origin refused' },
       { status: 403, headers: { 'Cache-Control': 'private, no-store' } },
     );
-  const internal = pathname.match(
-    /^\/discover-render\/[^/]+\/([^/]+)\/feed\/top(\/chart)?\/?$/,
-  );
-  if (internal && isRegion(internal[1])) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/${internal[1]}/feed/top${internal[2] ?? ''}`;
-    return NextResponse.redirect(url, 308);
-  }
-
+  // Internal destinations must pass through if the server follows a rewrite
+  // with another request. Their metadata supplies the public canonical URL.
   const discover = pathname.match(/^\/([^/]+)\/feed\/top(\/chart)?\/?$/);
   if (discover && isRegion(discover[1])) {
     const saved = request.cookies.get(LANGUAGE_COOKIE)?.value;
@@ -40,11 +33,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/',
-    '/feed/top',
-    '/:locale/feed/top/:path*',
-    '/discover-render/:path*',
-    '/api/:path*',
-  ],
+  matcher: ['/', '/feed/top', '/:locale/feed/top/:path*', '/api/:path*'],
 };

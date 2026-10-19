@@ -184,22 +184,27 @@ describe('shared Discover rewrites', () => {
   test.each([
     '',
     '/chart',
-  ])('direct internal %s requests redirect to their public URL', (suffix) => {
+  ])('rewritten %s requests pass through without redirecting to the public URL', (suffix) => {
     const response = proxy(
       new NextRequest(
-        `https://www.podcst.app/discover-render/fr/ca/feed/top${suffix}?source=link`,
+        `https://www.podcst.app/ca/feed/top${suffix}?source=link`,
+        { headers: { cookie: 'NEXT_UI_LANG=fr' } },
       ),
     );
-    expect(response.status).toBe(308);
-    expect(response.headers.get('location')).toBe(
-      `https://www.podcst.app/ca/feed/top${suffix}?source=link`,
+    const destination = response.headers.get('x-middleware-rewrite');
+    expect(destination).toBe(
+      `https://www.podcst.app/discover-render/fr/ca/feed/top${suffix}?source=link`,
     );
-    expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+    if (!destination) throw new Error('Discover rewrite missing');
+    const rewritten = proxy(new NextRequest(destination));
+    expect(rewritten.headers.get('x-middleware-next')).toBe('1');
+    expect(rewritten.headers.get('location')).toBeNull();
+    expect(rewritten.headers.get('x-middleware-rewrite')).toBeNull();
   });
 
-  test('matcher includes public and internal Discover routes', () => {
+  test('matcher includes public Discover routes and skips internal destinations', () => {
     expect(config.matcher).toContain('/:locale/feed/top/:path*');
-    expect(config.matcher).toContain('/discover-render/:path*');
+    expect(config.matcher).not.toContain('/discover-render/:path*');
   });
 
   test('cross-origin API mutations are still refused', () => {
