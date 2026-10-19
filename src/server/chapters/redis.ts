@@ -28,6 +28,11 @@ redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
 redis.call('DEL', KEYS[2])
 return 1
 `;
+const acquire = `
+local entry = redis.call('GETRANGE', KEYS[1], 0, ARGV[3])
+local acquired = redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[2], 'NX')
+return { acquired and 1 or 0, entry }
+`;
 const release = `
 if redis.call('GET', KEYS[1]) == ARGV[1] then
   return redis.call('DEL', KEYS[1])
@@ -63,11 +68,18 @@ export function createRedisChapterCache(
         parseCacheEntry(await redis.getrange(key, 0, MAX_CACHE_BYTES)),
       ),
     acquire: (key, token) =>
-      run(
-        async () =>
-          (await redis.set(`${key}:lock`, token, 'PX', LOCK_TTL_MS, 'NX')) ===
-          'OK',
-      ),
+      run(async () => {
+        const [acquired, entry] = (await redis.eval(
+          acquire,
+          2,
+          key,
+          `${key}:lock`,
+          token,
+          LOCK_TTL_MS,
+          MAX_CACHE_BYTES,
+        )) as [number, string];
+        return { acquired: acquired === 1, entry: parseCacheEntry(entry) };
+      }),
     publish: (key, token, entry, ttl) =>
       run(async () => {
         const data = JSON.stringify(entry);

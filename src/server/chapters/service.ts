@@ -99,11 +99,17 @@ export function createChapterService(
     let acquired: boolean | undefined;
     let published = false;
     try {
+      let latest: ChapterCacheEntry | null;
       try {
-        acquired = await cache.acquire(key, token);
-      } catch {}
-      signal.throwIfAborted();
-      const latest = await readShared(key);
+        const lease = await cache.acquire(key, token);
+        acquired = lease.acquired;
+        latest = usableEntry(lease.entry, now());
+        if (latest) remember(key, latest);
+        else latest = readLocal(key);
+      } catch {
+        signal.throwIfAborted();
+        latest = await readShared(key);
+      }
       signal.throwIfAborted();
       const previous = latest ?? usableEntry(known, now());
       if (acquired === false || (previous && !needsRefresh(previous, now())))

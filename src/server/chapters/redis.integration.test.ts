@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import { Redis } from 'ioredis';
 import {
@@ -56,7 +56,7 @@ describe.skipIf(!url)('shared chapter cache with Redis', () => {
   test('shares entries across clients and applies actual Redis retention TTLs', async () => {
     const id = key();
     expect(await a.get(id)).toBeNull();
-    expect(await a.acquire(id, 'a')).toBe(true);
+    expect(await a.acquire(id, 'a')).toEqual({ acquired: true, entry: null });
     expect(await a.publish(id, 'a', entry, RETENTION_MS)).toBe(true);
     expect(await b.get(id)).toEqual(entry);
     expect(await first.pttl(id)).toBeGreaterThan(RETENTION_MS - 5000);
@@ -66,17 +66,98 @@ describe.skipIf(!url)('shared chapter cache with Redis', () => {
     expect(await b.get(id)).toBeNull();
   });
 
+  test('acquisition returns a result published after the initial miss in one round trip', async () => {
+    const id = key();
+    expect(await a.get(id)).toBeNull();
+    await b.acquire(id, 'publisher');
+    expect(await b.publish(id, 'publisher', entry, RETENTION_MS)).toBe(true);
+    const commands = spyOn(first, 'sendCommand');
+    try {
+      expect(await a.acquire(id, 'reader')).toEqual({
+        acquired: true,
+        entry,
+      });
+      expect(commands).toHaveBeenCalledTimes(1);
+    } finally {
+      commands.mockRestore();
+      await a.release(id, 'reader');
+    }
+  });
+
+  test('a contender reads the latest entry without changing the active lease', async () => {
+    const id = key();
+    await a.acquire(id, 'publisher');
+    await a.publish(id, 'publisher', entry, RETENTION_MS);
+    await a.acquire(id, 'worker');
+    expect(await b.acquire(id, 'contender')).toEqual({
+      acquired: false,
+      entry,
+    });
+    expect(await first.get(`${id}:lock`)).toBe('worker');
+  });
+
+  test('a cold service returns final chapters in three Redis commands', async () => {
+    const episode = {
+      id: '42',
+      owner_user_id: null,
+      file_url: `https://example.invalid/${randomUUID()}`,
+      file_type: 'audio/mpeg',
+      file_length: 1000,
+      summary: '00:00 One<br>01:00 Two',
+    };
+    const id = chapterCacheKey(episode);
+    keys.push(id);
+    const service = createChapterService(async () => episode, {
+      cache: a,
+      now: () => 1000,
+      schedule() {},
+      fetchChapters: async () => ({
+        status: 'modified',
+        chapters: entry.chapters,
+        validators: entry.validators,
+      }),
+    });
+    const commands = spyOn(first, 'sendCommand');
+    try {
+      expect(await service('42', null)).toEqual({
+        source: 'embedded',
+        chapters: entry.chapters,
+      });
+      expect(commands).toHaveBeenCalledTimes(3);
+    } finally {
+      commands.mockRestore();
+    }
+    expect(await b.get(id)).toEqual(entry);
+    expect(await first.exists(`${id}:lock`)).toBe(0);
+  });
+
+  test('invalid cache payloads do not conceal an acquired lease', async () => {
+    const id = key();
+    for (const raw of ['{malformed', ' '.repeat(MAX_CACHE_BYTES + 1)]) {
+      await first.set(id, raw);
+      expect(await a.acquire(id, 'worker')).toEqual({
+        acquired: true,
+        entry: null,
+      });
+      expect(await first.get(`${id}:lock`)).toBe('worker');
+      await a.release(id, 'worker');
+    }
+  });
+
   test('atomically elects one owner and rejects stale release and publication after expiry', async () => {
     const id = key();
     const results = await Promise.all([a.acquire(id, 'a'), b.acquire(id, 'b')]);
-    expect(results.filter(Boolean)).toHaveLength(1);
-    const owner = results[0] ? 'a' : 'b';
+    expect(results.filter(({ acquired }) => acquired)).toHaveLength(1);
+    const owner = results[0].acquired ? 'a' : 'b';
     expect(await first.pttl(`${id}:lock`)).toBeGreaterThan(LOCK_TTL_MS - 5000);
     expect(await first.pttl(`${id}:lock`)).toBeLessThanOrEqual(LOCK_TTL_MS);
     await a.release(id, 'stranger');
     expect(await first.get(`${id}:lock`)).toBe(owner);
     await first.pexpire(`${id}:lock`, 0);
-    expect(await b.acquire(id, 'replacement')).toBe(true);
+    expect(await b.acquire(id, 'replacement')).toEqual({
+      acquired: true,
+      entry: null,
+    });
     expect(await a.publish(id, owner, entry, RETENTION_MS)).toBe(false);
     await a.release(id, owner);
     expect(await first.get(`${id}:lock`)).toBe('replacement');

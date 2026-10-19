@@ -27,6 +27,10 @@ export class MemoryChapterCache implements ChapterCache {
 
   async get(key: string) {
     this.call('get', key);
+    return this.read(key);
+  }
+
+  private read(key: string) {
     const value = this.entries.get(key);
     return value && value.expires > this.now()
       ? structuredClone(value.entry)
@@ -35,9 +39,10 @@ export class MemoryChapterCache implements ChapterCache {
 
   async acquire(key: string, token: string) {
     this.call('acquire', key);
-    if (this.owner(key)) return false;
-    this.locks.set(key, { token, expires: this.now() + LOCK_TTL_MS });
-    return true;
+    const acquired = !this.owner(key);
+    if (acquired)
+      this.locks.set(key, { token, expires: this.now() + LOCK_TTL_MS });
+    return { acquired, entry: this.read(key) };
   }
 
   async publish(

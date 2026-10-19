@@ -39,7 +39,10 @@ export type ChapterCacheEntry =
 
 export interface ChapterCache {
   get(key: string): Promise<ChapterCacheEntry | null>;
-  acquire(key: string, token: string): Promise<boolean>;
+  acquire(
+    key: string,
+    token: string,
+  ): Promise<{ acquired: boolean; entry: ChapterCacheEntry | null }>;
   publish(
     key: string,
     token: string,

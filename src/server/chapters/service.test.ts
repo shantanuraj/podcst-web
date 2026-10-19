@@ -155,6 +155,19 @@ test('Redis hits populate the L1 cache of a new instance', async () => {
   expect(h.fetch).toHaveBeenCalledTimes(1);
 });
 
+test('cold extraction returns final chapters using three shared cache operations', async () => {
+  const h = fixture();
+  expect(await h.instance()(42, null)).toEqual({
+    source: 'embedded',
+    chapters,
+  });
+  expect(h.cache.calls.map(({ operation }) => operation)).toEqual([
+    'get',
+    'acquire',
+    'publish',
+  ]);
+});
+
 test('published chapters return without waiting for a redundant lock release', async () => {
   const h = fixture();
   const release = deferred<void>();
@@ -489,7 +502,7 @@ test('expired locks recover and late workers cannot overwrite or release a newer
   expect((await old)?.source).toBe('shownotes');
   expect(h.fetch.mock.calls[0][2]?.aborted).toBe(true);
   h.clock.value += LOCK_TTL_MS;
-  expect(await h.cache.acquire(h.key(), 'replacement')).toBe(true);
+  expect((await h.cache.acquire(h.key(), 'replacement')).acquired).toBe(true);
   response.resolve(metadata);
   await turn();
   expect(h.cache.locks.get(h.key())?.token).toBe('replacement');
