@@ -1,12 +1,30 @@
 import type { IPodcast } from '@/types';
 import { sql } from './db';
 import { genreColumns, genreJoin, genresOf } from './genres';
+import { getEpisodesPaginated, getPodcastInfoById } from './ingest/podcast';
+import { getTopPodcasts } from './ingest/top';
 
 const DEBUT_DAYS = 180;
 const CHART_SHOWN = 30;
 const SHARED_LISTENERS = 3;
 
 export type Noteworthy = IPodcast & { firstPublished: number | null };
+
+/** The route cache owns freshness; regeneration must read current public data. */
+export async function getDiscover(locale: string) {
+  const [podcasts, worthy] = await Promise.all([
+    getTopPodcasts(100, locale),
+    noteworthy(locale, 14, null),
+  ]);
+  const [first] = podcasts;
+  const [lead, episodes] = first
+    ? await Promise.all([
+        getPodcastInfoById(first.id),
+        getEpisodesPaginated({ podcastId: first.id, limit: 1 }),
+      ])
+    : [null, null];
+  return { podcasts, worthy, lead, latest: episodes?.episodes[0] ?? null };
+}
 
 const podcast = (r: Record<string, unknown>): IPodcast => ({
   id: String(r.id),

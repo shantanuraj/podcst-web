@@ -157,6 +157,28 @@ describe.skipIf(!databaseUrl)('discovery with PostgreSQL', () => {
     ).toEqual(['Podcast 103']);
   });
 
+  test('Discover regeneration reads current public chart content', async () => {
+    const leaderId = ids.get(101);
+    const nextId = ids.get(102);
+    if (!leaderId || !nextId) throw new Error('Missing chart fixture');
+    const first = await server.getDiscover('us');
+    expect(first.podcasts[0].title).toBe('Podcast 101');
+    expect(first.lead?.id).toBe(leaderId);
+    try {
+      await sql`UPDATE podcasts SET title = 'Updated chart leader' WHERE id = ${leaderId}`;
+      const next = await server.getDiscover('us');
+      expect(next.podcasts[0].title).toBe('Updated chart leader');
+      expect(next.lead?.title).toBe('Updated chart leader');
+      await sql`UPDATE podcasts SET owner_user_id = 'a', itunes_id = NULL WHERE id = ${leaderId}`;
+      const filtered = await server.getDiscover('us');
+      expect(filtered.podcasts.some(({ id }) => id === leaderId)).toBe(false);
+      expect(filtered.worthy.some(({ id }) => id === leaderId)).toBe(false);
+      expect(filtered.lead?.id).toBe(nextId);
+    } finally {
+      await sql`UPDATE podcasts SET title = 'Podcast 101', owner_user_id = NULL, itunes_id = 101 WHERE id = ${leaderId}`;
+    }
+  });
+
   test('related podcasts need shared listeners, then share the category', async () => {
     expect(
       (await server.related(ids.get(104)!, 'us', 4)).map(({ title }) => title),
