@@ -97,6 +97,7 @@ export function createChapterService(
   ) {
     const token = randomUUID();
     let acquired: boolean | undefined;
+    let published = false;
     try {
       try {
         acquired = await cache.acquire(key, token);
@@ -146,6 +147,7 @@ export function createChapterService(
             entry,
             expiresAt(entry) - now(),
           );
+          published = stored;
           signal.throwIfAborted();
           if (!stored) return await readShared(key);
           remember(key, entry);
@@ -157,7 +159,7 @@ export function createChapterService(
       remember(key, entry);
       return entry;
     } finally {
-      if (acquired !== false) {
+      if (acquired !== false && !published) {
         try {
           await cache.release(key, token);
         } catch {}

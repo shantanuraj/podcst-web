@@ -155,6 +155,36 @@ test('Redis hits populate the L1 cache of a new instance', async () => {
   expect(h.fetch).toHaveBeenCalledTimes(1);
 });
 
+test('published chapters return without waiting for a redundant lock release', async () => {
+  const h = fixture();
+  const release = deferred<void>();
+  h.cache.release = async () => release.promise;
+  let settled = false;
+  const request = h
+    .instance()(42, null)
+    .then((result) => {
+      settled = true;
+      return result;
+    });
+  try {
+    await turn();
+    expect(h.cache.entries.get(h.key())?.entry.kind).toBe('embedded');
+    expect(h.cache.locks.has(h.key())).toBe(false);
+    expect(settled).toBe(true);
+  } finally {
+    release.resolve();
+    expect((await request)?.chapters).toEqual(chapters);
+  }
+});
+
+test('failed publication still releases the worker lock before returning chapters', async () => {
+  const h = fixture();
+  h.cache.failures.add('publish');
+  expect((await h.instance()(42, null))?.chapters).toEqual(chapters);
+  expect(h.cache.locks.has(h.key())).toBe(false);
+  expect(h.cache.calls.at(-1)?.operation).toBe('release');
+});
+
 test('warm L1 entries still trigger weekly revalidation at the freshness boundary', async () => {
   const h = fixture();
   const service = h.instance();
