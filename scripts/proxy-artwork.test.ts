@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { proxiedPodcastArt } from './proxy-podcast-art';
+import { proxiedEpisodeArt, proxiedPodcastArt } from './proxy-artwork';
 
 const proxied =
   'https://assets.podcst.app/?p=https%3A%2F%2Fcdn.example.com%2Fcover.jpg';
@@ -40,5 +40,27 @@ describe('proxiedPodcastArt', () => {
       cover: 'https://podcst.app/placeholder.png',
       thumbnail: null,
     });
+  });
+});
+
+describe('proxiedEpisodeArt', () => {
+  test('wraps direct artwork like the feed parser', () => {
+    expect(proxiedEpisodeArt('https://cdn.example.com/ép 1.jpg', proxied)).toBe(
+      'https://assets.podcst.app/?p=https%3A%2F%2Fcdn.example.com%2F%25C3%25A9p%25201.jpg',
+    );
+  });
+
+  test('clears artwork equal to the podcast cover', () => {
+    expect(
+      proxiedEpisodeArt('https://cdn.example.com/cover.jpg', proxied),
+    ).toBeNull();
+    expect(proxiedEpisodeArt(proxied, proxied)).toBeNull();
+  });
+
+  test('keeps proxied and unresolvable artwork', () => {
+    const episode =
+      'https://assets.podcst.app/?p=https%3A%2F%2Fcdn.example.com%2Fep.jpg';
+    expect(proxiedEpisodeArt(episode, proxied)).toBe(episode);
+    expect(proxiedEpisodeArt('/relative.jpg', proxied)).toBe('/relative.jpg');
   });
 });
