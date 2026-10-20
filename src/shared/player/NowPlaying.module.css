@@ -47,8 +47,7 @@
   background: color-mix(in oklch, var(--color-ink) 10%, transparent);
 }
 
-.collapse svg,
-.tools svg {
+.collapse svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -58,9 +57,10 @@
   stroke-linejoin: round;
 }
 
-.tools svg circle {
+.tools svg {
+  width: 20px;
+  height: 20px;
   fill: currentColor;
-  stroke: none;
 }
 
 .wordmark {
