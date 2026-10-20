@@ -1,51 +1,12 @@
-import { type NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/server/auth/session';
-import { feedError, readFeedBody } from '@/server/ingest/interactive-response';
-import { privateFeedHeaders as headers } from '@/server/podcast-access';
-import { isFeedUrlInput } from '@/shared/feed-url';
+import { limitSearch } from '@/server/search/admission';
+import { createPodcastSearchHandlers } from '@/server/search/handlers';
 import { search } from './search';
 
-export async function GET(request: NextRequest) {
-  const term = request.nextUrl.searchParams.get('term')?.trim();
-  const locale = request.nextUrl.searchParams.get('locale') || undefined;
-  if (!term || term.length > 4096) {
-    return NextResponse.json(
-      { message: 'A search term is required' },
-      { status: 400 },
-    );
-  }
-  if (isFeedUrlInput(term)) {
-    return NextResponse.json(
-      { message: 'Use authenticated POST for RSS links' },
-      { status: 400, headers },
-    );
-  }
-  return NextResponse.json(await search(term, locale));
-}
+export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await readFeedBody(request);
-    const term = typeof body?.term === 'string' ? body.term.trim() : '';
-    const locale = typeof body?.locale === 'string' ? body.locale : undefined;
-    if (!term || term.length > 4096) {
-      return NextResponse.json(
-        { message: 'A search term is required' },
-        { status: 400, headers },
-      );
-    }
-    const session = await getSession();
-    if (isFeedUrlInput(term) && !session) {
-      return NextResponse.json(
-        { message: 'Sign in to open an RSS link' },
-        { status: 401, headers },
-      );
-    }
-    return NextResponse.json(
-      await search(term, locale, session, request.signal),
-      { headers },
-    );
-  } catch (error) {
-    return feedError(error);
-  }
-}
+export const { GET, POST } = createPodcastSearchHandlers({
+  limit: limitSearch,
+  search,
+  getSession,
+});

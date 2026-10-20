@@ -1,18 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/server/db';
 import { searchEpisodes } from '@/server/search';
-import { isFeedUrlInput } from '@/shared/feed-url';
+import { limitSearch } from '@/server/search/admission';
+import { createEpisodeSearchHandler } from '@/server/search/handlers';
 
-const MAX_TERM = 200;
+export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
-  const term = request.nextUrl.searchParams.get('term')?.trim() ?? '';
-  if (!term || term.length > MAX_TERM || isFeedUrlInput(term))
-    return NextResponse.json(
-      { message: 'A search term is required' },
-      { status: 400 },
-    );
-  return NextResponse.json(await searchEpisodes(sql, term), {
-    headers: { 'Cache-Control': 'public, s-maxage=300' },
-  });
-}
+export const GET = createEpisodeSearchHandler(limitSearch, (term) =>
+  searchEpisodes(sql, term),
+);

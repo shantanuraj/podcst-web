@@ -103,6 +103,14 @@ Body: `{ "term": string, "locale"?: string }`. The term is trimmed and must be 1
 - Text: queries the iTunes Search API for `locale` (default `us`) and annotates matches with indexed IDs (`src/app/api/search/search.ts`). An iTunes failure yields `[]`, not an error.
 - Feed URL (`isFeedUrlInput` in `src/shared/feed-url.ts`: starts with `http:`, `https:` or `scheme://`): requires a session. The server indexes the feed as a private podcast owned by the caller unless it is already indexed, then returns a one-item array, or `[]` if the caller cannot see it. Searching does not subscribe.
 
+Text search shares trusted-source and global rolling-minute budgets with podcast
+GET and episode search. It does not load a user session. Budget exhaustion returns
+429 `{code:"rate_limited", message:"Too many search requests"}`; unavailable
+admission or failed database search returns 503
+`{code:"unavailable", message:"Search unavailable"}`. Both include `Retry-After`
+and private-feed headers. See [search budgets](../../docs/search-budgets.md) for
+required configuration and scope.
+
 Responses carry private-feed headers. RSS imports share the scoped resolver’s
 account budgets, initiating-session/generation fence and ten-second upstream
 deadline. JSON bodies are bounded to 64 KiB/five seconds. Temporary failure is
@@ -121,7 +129,11 @@ Fixtures: `search.text.json` (captured; contains results with and without `id`),
 
 ### `GET /api/search` — public
 
-Query: `term`, `locale`. Text search only: a feed URL returns 400 `{message: "Use authenticated POST for RSS links"}`. The session is ignored, private-feed headers are only sent on that 400, and an identity conflict is not caught. Native clients use `POST`.
+Query: `term`, `locale`. Text search only: a feed URL returns 400
+`{message: "Use authenticated POST for RSS links"}`. The session is ignored.
+Validation errors and the same 429/503 responses described above carry
+private-feed headers. Success caching is unchanged; unexpected errors, including
+identity conflicts, are redacted as 503. Native clients use `POST`.
 
 ### `GET /api/feed?id=` — optional
 
@@ -386,6 +398,13 @@ an ordered `not_found` result. Fixtures: `progress-changes.accepted.json`,
 ### `GET /api/search/episodes?term=` — public
 
 Searches episode titles of public podcasts whose episode content is stored (`searchEpisodes` in `src/server/search.ts`). Words are reduced to letters and numbers and matched as English prefixes (`prefixQuery`), so `field` also matches `fields`; at most 1,000 matches are ranked, by title rank then newest. Returns up to 20 `Episode` objects with `podcastId` and `podcastTitle`, cacheable for five minutes. Feed URLs, empty terms and terms over 200 characters return 400 `{message: "A search term is required"}`.
+
+Requests reaching the application consume the same source/global search budgets
+as podcast search; edge-cache hits do not start origin work. All errors use
+private-feed headers. Budget exhaustion returns 429
+`{code:"rate_limited", message:"Too many search requests"}`; unavailable admission
+or failed database search returns 503
+`{code:"unavailable", message:"Search unavailable"}`. Both include `Retry-After`.
 
 ### `GET /api/noteworthy` — public
 
