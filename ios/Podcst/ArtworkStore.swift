@@ -136,8 +136,12 @@ final class ArtworkStore {
         return task
     }
 
-    func tint(_ url: URL?) async -> ArtworkTint? {
-        guard let image = await image(url, pixelSize: 160) else { return nil }
+    func tint(_ url: URL?, fallbackURL: URL? = nil, pixelSize: Int = 160) async -> ArtworkTint? {
+        var image = await image(url, pixelSize: pixelSize)
+        if image == nil, fallbackURL != url {
+            image = await self.image(fallbackURL, pixelSize: pixelSize)
+        }
+        guard !Task.isCancelled, let image else { return nil }
         return await Task.detached(priority: .utility) { image.cgImage.flatMap { ArtworkPalette($0).tint } }.value
     }
 

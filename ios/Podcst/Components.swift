@@ -12,6 +12,55 @@ extension EnvironmentValues {
     }
 }
 
+struct ArtworkBackdrop: View {
+    private struct Source: Hashable {
+        let url: URL?
+        let fallbackURL: URL?
+        let accountID: String?
+        let pixels: Int
+        let image: ObjectIdentifier?
+    }
+
+    @Environment(\.self) private var environment
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(SessionStore.self) private var session: SessionStore?
+    let url: URL?
+    let artworkSize: CGFloat
+    var fallbackURL: URL? = nil
+    @State private var loaded: (Source, ArtworkTint?)?
+
+    private var source: Source {
+        let pixels = ArtworkStore.pixelSize(for: artworkSize, scale: displayScale)
+        let image = ArtworkStore.shared.cached(url, pixelSize: pixels) ?? ArtworkStore.shared.cached(fallbackURL, pixelSize: pixels)
+        return Source(url: url, fallbackURL: fallbackURL, accountID: session?.user?.id,
+                      pixels: pixels, image: image.map(ObjectIdentifier.init))
+    }
+
+    private var tint: ArtworkTint? { loaded?.0 == source ? loaded?.1 : nil }
+
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: tint?.headerColor(in: environment) ?? .clear, location: 0.2),
+                .init(color: .clear, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: tint)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .task(id: source) {
+            let requested = source
+            let tint = await ArtworkStore.shared.tint(requested.url, fallbackURL: requested.fallbackURL, pixelSize: requested.pixels)
+            guard !Task.isCancelled else { return }
+            loaded = (requested, tint)
+        }
+    }
+}
+
 struct ArtworkView: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.artworkPolicy) private var policy

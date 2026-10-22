@@ -49,6 +49,32 @@ extension Color {
     }
 }
 
+extension ArtworkTint {
+    func headerColor(in environment: EnvironmentValues) -> Color {
+        let color = Color(light: light, dark: dark)
+        let source = color.resolve(in: environment)
+        let paper = PodcstPalette.paper.resolve(in: environment)
+        let text = PodcstPalette.secondary.resolve(in: environment)
+        func luminance(_ color: Color.Resolved) -> Float {
+            0.2126 * color.linearRed + 0.7152 * color.linearGreen + 0.0722 * color.linearBlue
+        }
+        let foreground = luminance(text)
+        var opacity: Float = environment.colorScheme == .dark ? 0.32 : 0.24
+        for _ in 0..<8 {
+            let background = luminance(Color.Resolved(
+                red: source.red * opacity + paper.red * (1 - opacity),
+                green: source.green * opacity + paper.green * (1 - opacity),
+                blue: source.blue * opacity + paper.blue * (1 - opacity)
+            ))
+            if (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05) >= 4.5 {
+                return color.opacity(Double(opacity))
+            }
+            opacity *= 0.75
+        }
+        return .clear
+    }
+}
+
 extension UIColor {
     convenience init(hex: UInt32) {
         self.init(

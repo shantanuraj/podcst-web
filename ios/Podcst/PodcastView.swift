@@ -36,9 +36,10 @@ struct PodcastDetailView: View {
 
     var body: some View {
         let subscribed = library.isSubscribed(content)
+        let artworkSize: CGFloat = 180
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ArtworkView(url: content.artworkURL, size: 180)
+                ArtworkView(url: content.artworkURL, size: artworkSize)
                     .shadow(color: .black.opacity(0.3), radius: 20, y: 14)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
@@ -158,6 +159,10 @@ struct PodcastDetailView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
+            .background(alignment: .top) {
+                ArtworkBackdrop(url: content.artworkURL, artworkSize: artworkSize)
+                    .frame(height: 360)
+            }
         }
         .refreshable { await loadDetails(forceRefresh: true) }
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -395,10 +400,11 @@ struct EpisodeDetailView: View {
     let episode: Episode
 
     var body: some View {
+        let artworkSize: CGFloat = 96
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 16) {
-                    ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 96)
+                    ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: artworkSize)
                     Text(episode.dateline)
                         .eyebrow()
                 }
@@ -451,6 +457,10 @@ struct EpisodeDetailView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 28)
+            .background(alignment: .top) {
+                ArtworkBackdrop(url: episode.artworkURL, artworkSize: artworkSize, fallbackURL: URL(string: episode.cover))
+                    .frame(height: 280)
+            }
         }
         .podcstPage()
         .navigationBarTitleDisplayMode(.inline)

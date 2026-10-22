@@ -13,6 +13,33 @@ final class ArtworkStoreTests: XCTestCase {
         XCTAssertEqual(image.size, CGSize(width: 52, height: 52))
     }
 
+    func testHeaderTintKeepsSecondaryTextReadableInBothThemes() throws {
+        for scheme in [ColorScheme.light, .dark] {
+            var environment = EnvironmentValues()
+            environment.colorScheme = scheme
+            let text = PodcstPalette.secondary.resolve(in: environment)
+            let foreground = 0.2126 * text.linearRed + 0.7152 * text.linearGreen + 0.0722 * text.linearBlue
+            for rgb: UInt32 in [0x101010, 0xF0F0F0, 0x0000FF, 0xFFFF00, 0x306060] {
+                let color = ArtworkTint(light: rgb, dark: rgb).headerColor(in: environment)
+                XCTAssertGreaterThan(color.resolve(in: environment).opacity, 0)
+                let renderer = ImageRenderer(content: color.frame(width: 2, height: 2)
+                    .background(PodcstPalette.paper).environment(\.colorScheme, scheme))
+                let image = try XCTUnwrap(renderer.cgImage)
+                var pixel = [UInt8](repeating: 0, count: 4)
+                let background = try pixel.withUnsafeMutableBytes { bytes -> Float in
+                    let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1,
+                        bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                    context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+                    let resolved = Color.Resolved(red: Float(bytes[0]) / 255, green: Float(bytes[1]) / 255, blue: Float(bytes[2]) / 255)
+                    return 0.2126 * resolved.linearRed + 0.7152 * resolved.linearGreen + 0.0722 * resolved.linearBlue
+                }
+                let contrast = (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05)
+                XCTAssertGreaterThanOrEqual(contrast, 4.5, "\(scheme) \(String(rgb, radix: 16))")
+            }
+        }
+    }
+
     func testFramePixelsSelectSmallestSufficientVariant() {
         XCTAssertEqual(ArtworkStore.pixelSize(for: 44, scale: 3), 160)
         XCTAssertEqual(ArtworkStore.pixelSize(for: 52, scale: 3), 160)
@@ -58,6 +85,48 @@ final class ArtworkStoreTests: XCTestCase {
         let revisit = await store.image(fixture.url, pixelSize: 384)
         XCTAssertNotNil(revisit)
         XCTAssertEqual(fixture.requests.count, 1)
+    }
+
+    func testHeaderTintSharesDisplayedArtworkAndSurvivesOfflineRelaunch() async throws {
+        let fixture = makeFixture(width: 1024)
+        fixture.holdResponses = true
+        let root = temporaryDirectory()
+        let store = makeStore(fixture, root: root)
+        let art = Task { await store.image(fixture.url, pixelSize: 1024) }
+        let tint = Task { await store.tint(fixture.url, pixelSize: 1024) }
+        try await wait { fixture.requests.count == 1 }
+        fixture.releaseResponses()
+        let image = await art.value
+        let color = await tint.value
+        XCTAssertNotNil(image)
+        XCTAssertNotNil(color)
+        XCTAssertEqual(fixture.requests.count, 1)
+        fixture.failure = URLError(.notConnectedToInternet)
+        let relaunched = makeStore(fixture, root: root)
+        let offline = await relaunched.tint(fixture.url, pixelSize: 1024)
+        XCTAssertEqual(offline, color)
+        XCTAssertEqual(fixture.requests.count, 1)
+    }
+
+    func testEpisodeTintUsesCoverOnlyWhenEpisodeArtworkIsUnavailable() async throws {
+        let episode = makeFixture(width: 384)
+        let cover = makeFixture(width: 384)
+        episode.failure = URLError(.fileDoesNotExist)
+        let store = makeStore(episode)
+        let fallback = await store.tint(episode.url, fallbackURL: cover.url, pixelSize: 384)
+        XCTAssertNotNil(fallback)
+        XCTAssertEqual(cover.requests.count, 1)
+
+        episode.failure = nil
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        episode.data = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 32), format: format).pngData { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 32, height: 32))
+        }
+        let neutral = await makeStore(episode).tint(episode.url, fallbackURL: cover.url, pixelSize: 384)
+        XCTAssertNil(neutral)
+        XCTAssertEqual(cover.requests.count, 1)
     }
 
     func testConcurrentImageTransfersAreBoundedAcrossDifferentHosts() async throws {
