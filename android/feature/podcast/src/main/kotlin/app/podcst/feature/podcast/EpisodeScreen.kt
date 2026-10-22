@@ -25,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -81,21 +83,28 @@ fun EpisodeScreen(
     val colors = Podcst.colors
     val episode = state.episode
     val tint = rememberArtworkTint(episode.artwork)
+    val scroll = rememberScrollState()
+    var toolbarHeight by remember { mutableIntStateOf(0) }
+    var headerHeight by remember { mutableIntStateOf(0) }
     val website = webpage(episode.link)
     val uri = LocalUriHandler.current
-    Column(Modifier.fillMaxSize().background(colors.paper)) {
+    Column(
+        Modifier.fillMaxSize().background(colors.paper)
+            .artworkTint(tint, headerHeight = { headerHeight }, toolbarHeight = { toolbarHeight }, scrollOffset = { scroll.value }),
+    ) {
         TopAppBar(
+            modifier = Modifier.onSizeChanged { toolbarHeight = it.height },
             title = {
-                Text(episode.podcastTitle.orEmpty(), style = Podcst.type.callout, color = colors.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(episode.podcastTitle.orEmpty(), style = Podcst.type.callout, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             },
             navigationIcon = {
-                IconButton(onClick = onBack) { Icon(PodcstIcons.Back, stringResource(DesignR.string.back), tint = colors.accent) }
+                IconButton(onClick = onBack) { Icon(PodcstIcons.Back, stringResource(DesignR.string.back), tint = colors.ink) }
             },
             actions = { Overflow(state, actions, onOpenPodcast) },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.paper, actionIconContentColor = colors.ink),
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, actionIconContentColor = colors.ink),
         )
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
-            Column(Modifier.fillMaxWidth().artworkTint(tint).padding(horizontal = 20.dp)) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 28.dp)) {
+            Column(Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }.padding(horizontal = 20.dp)) {
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
                     Artwork(episode.artwork, 96.dp, corner = 12.dp, tint = tint)
                     Eyebrow(dateline(episode))

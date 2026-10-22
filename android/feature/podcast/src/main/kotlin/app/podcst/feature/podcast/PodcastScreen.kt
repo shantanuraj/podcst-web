@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.derivedStateOf
 import app.podcst.model.FeedFreshness
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -53,7 +54,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -66,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.podcst.designsystem.Artwork
+import app.podcst.designsystem.ArtworkTint
 import app.podcst.designsystem.artworkTint
 import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.designsystem.ButtonKind
@@ -110,11 +114,24 @@ fun PodcastScreen(
     }
     val colors = Podcst.colors
     val list = rememberLazyListState()
+    val tint = rememberArtworkTint(state.podcast.cover)
+    var toolbarHeight by remember { mutableIntStateOf(0) }
+    var headerHeight by remember { mutableIntStateOf(0) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
     val collapsed by remember { derivedStateOf { list.firstVisibleItemIndex > 0 } }
     var tab by rememberSaveable { mutableStateOf(PodcastTab.Episodes) }
-    Column(Modifier.fillMaxSize().background(colors.paper).nestedScroll(scroll.nestedScrollConnection)) {
+    Column(
+        Modifier.fillMaxSize().background(colors.paper)
+            .artworkTint(
+                tint,
+                headerHeight = { headerHeight },
+                toolbarHeight = { toolbarHeight },
+                scrollOffset = { if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset else headerHeight },
+            )
+            .nestedScroll(scroll.nestedScrollConnection),
+    ) {
         TopAppBar(
+            modifier = Modifier.onSizeChanged { toolbarHeight = it.height },
             title = {
                 AnimatedVisibility(collapsed, enter = fadeIn(), exit = fadeOut()) {
                     Text(state.podcast.title, style = Podcst.type.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -131,8 +148,8 @@ fun PodcastScreen(
             },
             scrollBehavior = scroll,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = colors.paper,
-                scrolledContainerColor = colors.surface,
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent,
                 titleContentColor = colors.ink,
                 navigationIconContentColor = colors.ink,
                 actionIconContentColor = colors.ink,
@@ -144,7 +161,7 @@ fun PodcastScreen(
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
             LazyColumn(Modifier.fillMaxSize(), state = list) {
-                item(key = "hero") { Hero(state, viewModel, actions) }
+                item(key = "hero") { Hero(state, viewModel, actions, tint, Modifier.onSizeChanged { headerHeight = it.height }) }
                 stickyHeader(key = "tabs") { Tabs(tab) { tab = it } }
                 when (tab) {
                     PodcastTab.Episodes -> episodes(state, query, viewModel, actions)
@@ -170,14 +187,13 @@ private fun Overflow(state: PodcastScreenState, viewModel: PodcastViewModel) {
 }
 
 @Composable
-private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions) {
+private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, tint: ArtworkTint, modifier: Modifier) {
     val colors = Podcst.colors
     val podcast = state.podcast
-    val tint = rememberArtworkTint(podcast.cover)
     val toaster = LocalToaster.current
     val failure = stringResource(R.string.subscription_failed)
     var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().artworkTint(tint).padding(top = 12.dp, bottom = 16.dp)) {
+    Column(modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp)) {
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
             Artwork(podcast.cover, 132.dp, corner = 16.dp, tint = tint)
             Column(Modifier.padding(bottom = 4.dp)) {

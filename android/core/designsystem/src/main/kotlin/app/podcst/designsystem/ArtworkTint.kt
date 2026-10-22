@@ -1,7 +1,6 @@
 package app.podcst.designsystem
 
 import android.util.LruCache
-import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -9,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -70,13 +70,24 @@ fun rememberArtworkTint(source: String?): ArtworkTint {
 }
 
 @Composable
-fun Modifier.artworkTint(tint: ArtworkTint): Modifier {
-    val colors = Podcst.colors
-    return background(
-        Brush.verticalGradient(
-            0f to Color.Transparent,
-            0.2f to tint.headerColor(colors),
-            1f to Color.Transparent,
-        ),
-    )
+fun Modifier.artworkTint(
+    tint: ArtworkTint,
+    headerHeight: () -> Int,
+    toolbarHeight: () -> Int,
+    scrollOffset: () -> Int,
+): Modifier {
+    val color = tint.headerColor(Podcst.colors)
+    return drawBehind {
+        val header = headerHeight()
+        if (header <= 0) return@drawBehind
+        val offset = scrollOffset().coerceIn(0, header)
+        val visibility = 1f - offset.toFloat() / header
+        if (visibility <= 0f) return@drawBehind
+        drawRect(
+            Brush.verticalGradient(
+                colors = listOf(color.copy(alpha = color.alpha * visibility), Color.Transparent),
+                endY = toolbarHeight() + header.toFloat() - offset,
+            ),
+        )
+    }
 }
