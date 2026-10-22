@@ -19,7 +19,7 @@ import app.podcst.feature.podcast.PodcastViewModel
 fun EntryProviderScope<NavKey>.podcastEntries(graph: AppGraph, navigator: Navigator, actions: EpisodeActions, share: (ShareRequest) -> Unit) {
     entry<PodcastRoute> { route ->
         val viewModel = viewModel {
-            PodcastViewModel(route.podcast, graph.catalog, graph.library, graph.progress, graph.stars, graph.downloads, graph.playback)
+            PodcastViewModel(route.podcast, graph.catalog, graph.library, graph.progress, graph.stars, graph.downloads, graph.playback, graph.session)
         }
         val state by viewModel.state.collectAsStateWithLifecycle()
         val query by viewModel.query.collectAsStateWithLifecycle()

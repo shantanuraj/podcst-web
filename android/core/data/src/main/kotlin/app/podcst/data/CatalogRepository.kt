@@ -11,6 +11,8 @@ import app.podcst.model.PlaybackRules
 import app.podcst.model.Podcast
 import app.podcst.model.Region
 import app.podcst.network.PodcstApi
+import app.podcst.network.ApiException
+import java.io.IOException
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 class CatalogRepository(
     private val api: PodcstApi,
@@ -74,35 +78,67 @@ class CatalogRepository(
         scope.database.episodes().observe(identities).map { rows -> rows.map { it.domain() } }
     }
 
-    suspend fun load(podcast: Podcast, force: Boolean = false, recheck: Boolean = false): Podcast {
+    suspend fun load(podcast: Podcast, force: Boolean = false, recheck: Boolean = false, refreshIfStale: Boolean = false, onRead: (Podcast) -> Unit = {}): Podcast {
         val owner = scopes.current.value
         val epoch = scopes.epoch
-        podcast.id?.let { id -> return load(id, force, recheck) }
+        podcast.id?.let { id -> return load(id, force, recheck, refreshIfStale, onRead) }
         podcast.itunesId?.let { itunesId ->
             val id = api.resolve(itunesId, podcast.itunesLocale ?: Region.DEFAULT.code)
             if (scopes.current.value !== owner || scopes.epoch != epoch) throw CancellationException("Account changed")
-            return load(id, force, recheck)
+            return load(id, force, recheck, refreshIfStale, onRead)
         }
         val resolved = api.podcast(podcast.feed)
-        if (scopes.current.value !== owner) throw CancellationException("Account changed")
-        resolved.id?.let { id -> return load(id, force) }
+        if (scopes.current.value !== owner || scopes.epoch != epoch) throw CancellationException("Account changed")
+        resolved.id?.let { id -> return load(id, force, recheck, refreshIfStale, onRead) }
         store(listOf(resolved), complete = resolved.episodes.isNotEmpty(), owner = owner)
+        onRead(resolved)
         return resolved
     }
 
-    suspend fun load(id: Long, force: Boolean = false, recheck: Boolean = false): Podcast {
+    suspend fun load(id: Long, force: Boolean = false, recheck: Boolean = false, refreshIfStale: Boolean = false, onRead: (Podcast) -> Unit = {}): Podcast {
         val owner = scopes.current.value
         val epoch = scopes.epoch
+        suspend fun checkReader() {
+            currentCoroutineContext().ensureActive()
+            if (scopes.current.value !== owner || scopes.epoch != epoch || owner.accountId != null && !scopes.verified) throw CancellationException("Account changed")
+        }
         val existing = owner.database.podcasts().byId(id)
-        if (scopes.current.value !== owner || scopes.epoch != epoch || owner.accountId != null && !scopes.verified) throw CancellationException("Account changed")
-        if (!force && !recheck && existing != null && existing.complete && fresh(existing)) {
-            return existing.domain(scopes.database.episodes().catalog(existing.feed).map { it.domain() })
+        checkReader()
+        if (!force && !recheck && !refreshIfStale && existing != null && existing.complete && fresh(existing)) {
+            val cached = existing.domain(owner.database.episodes().catalog(existing.feed).map { it.domain() })
+            checkReader()
+            onRead(cached)
+            return cached
         }
         if (force) api.refresh(id)
-        val podcast = complete(id)
-        if (scopes.current.value !== owner || scopes.epoch != epoch) throw CancellationException("Account changed")
+        checkReader()
+        var podcast = complete(id)
+        checkReader()
+        // Publish playable episodes before waiting for refresh admission.
         store(listOf(podcast), complete = podcast.freshness?.content == FeedFreshness.Content.cached, owner = owner)
-        return podcast.copy(episodes = owner.database.episodes().catalog(podcast.feed).map { it.domain() })
+        val available = podcast.copy(episodes = owner.database.episodes().catalog(podcast.feed).map { it.domain() })
+        checkReader()
+        onRead(available)
+        if (refreshIfStale && !force && podcast.freshness?.state == FeedFreshness.State.stale) {
+            try {
+                val admitted = api.refresh(id).freshness
+                checkReader()
+                podcast = if (admitted.content == FeedFreshness.Content.cached && admitted.checkedAtMs != podcast.freshness?.checkedAtMs) {
+                    // A worker may have finished after our first catalogue read.
+                    complete(id)
+                } else podcast.copy(freshness = admitted)
+                checkReader()
+                store(listOf(podcast), complete = podcast.freshness?.content == FeedFreshness.Content.cached, owner = owner)
+            } catch (failure: ApiException) {
+                if (failure.status != 429 && failure.status < 500) throw failure
+            } catch (_: IOException) {
+                // Refresh outages do not invalidate successfully read episodes.
+            }
+        }
+        checkReader()
+        val result = podcast.copy(episodes = owner.database.episodes().catalog(podcast.feed).map { it.domain() })
+        checkReader()
+        return result
     }
 
     internal suspend fun store(podcasts: List<Podcast>, complete: Boolean? = null, owner: Scope = scopes.current.value) {

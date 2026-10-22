@@ -40,10 +40,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import app.podcst.model.FeedFreshness
 import androidx.compose.runtime.derivedStateOf
+import app.podcst.model.FeedFreshness
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -78,6 +79,7 @@ import app.podcst.designsystem.PodcstButton
 import app.podcst.designsystem.PodcstIcons
 import app.podcst.model.EpisodeSort
 import app.podcst.model.SortDirection
+import kotlinx.coroutines.delay
 import app.podcst.designsystem.R as DesignR
 
 private enum class PodcastTab(val label: Int) { Episodes(R.string.tab_episodes), About(R.string.tab_about) }
@@ -94,7 +96,13 @@ fun PodcastScreen(
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, viewModel) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) viewModel.suspendReads() }
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> viewModel.resumeReads()
+                Lifecycle.Event.ON_STOP -> viewModel.suspendReads()
+                else -> Unit
+            }
+        }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); viewModel.suspendReads() }
     }
@@ -257,26 +265,16 @@ private fun Tabs(selected: PodcastTab, onSelect: (PodcastTab) -> Unit) {
 
 private fun LazyListScope.episodes(state: PodcastScreenState, query: String, viewModel: PodcastViewModel, actions: EpisodeActions) {
     item(key = "episodes-header") { EpisodesHeader(state, viewModel) }
-    state.podcast.freshness?.takeIf { it.state != FeedFreshness.State.fresh }?.let { freshness ->
-        item(key = "freshness") { Message(freshness.message, action = stringResource(DesignR.string.retry), onAction = viewModel::retry) }
-    }
     if (state.podcast.episodes.size > FILTER_THRESHOLD) item(key = "filter") { FilterField(query, viewModel::filter) }
-    if (state.load == LoadState.Failed) {
-        item(key = "failure") {
-            if (state.podcast.episodes.isEmpty()) {
-                Message(stringResource(R.string.catalogue_failed), action = stringResource(DesignR.string.retry), onAction = viewModel::retry)
-            } else {
-                FailureRow(viewModel::retry)
-            }
-        }
-    }
     items(state.episodes, key = { it.identity.value }, contentType = { "episode" }) { episode ->
         DatedEpisodeRow(state.marks.row(episode), actions, Modifier.animateItem())
     }
     if (state.episodes.isEmpty()) {
         item(key = "empty") {
             when {
-                state.podcast.episodes.isEmpty() && state.load == LoadState.Loading ->
+                state.episodeNotice == EpisodeNotice.Preparing -> Message(stringResource(R.string.episodes_preparing))
+                state.episodeNotice == EpisodeNotice.Unavailable -> EpisodeUnavailable(state, viewModel::retry)
+                state.podcast.episodes.isEmpty() && state.load in listOf(LoadState.Loading, LoadState.Refreshing) ->
                     Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(24.dp), color = Podcst.colors.accent, strokeWidth = 2.dp)
                     }
@@ -361,15 +359,17 @@ private fun FilterField(query: String, onQuery: (String) -> Unit) {
 }
 
 @Composable
-private fun FailureRow(onRetry: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.catalogue_failed), style = Podcst.type.caption, color = Podcst.colors.secondary, modifier = Modifier.weight(1f))
-        PodcstButton(stringResource(DesignR.string.retry), onRetry, kind = ButtonKind.Outline, height = 36.dp, corner = 18.dp)
+private fun EpisodeUnavailable(state: PodcastScreenState, onRetry: () -> Unit) {
+    val retryAt = state.podcast.freshness?.retryAtMs ?: 0
+    val now by produceState(System.currentTimeMillis(), retryAt) {
+        delay((retryAt - System.currentTimeMillis()).coerceAtLeast(0))
+        value = System.currentTimeMillis()
     }
+    Message(
+        stringResource(R.string.episodes_unavailable),
+        action = stringResource(DesignR.string.retry).takeIf { state.canRetryEpisodes(now) },
+        onAction = onRetry,
+    )
 }
 
 @Composable

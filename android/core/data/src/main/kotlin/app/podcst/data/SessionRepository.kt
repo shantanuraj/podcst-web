@@ -55,8 +55,8 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             }
             state.update { it.copy(error = failure.message) }
         } finally {
-            state.update { it.copy(loading = false) }
             if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
+            state.update { it.copy(loading = false) }
         }
     }
 
@@ -85,8 +85,8 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             api.signOut()
             state.update { it.copy(error = null) }
         } finally {
-            state.update { it.copy(loading = false) }
             if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
+            state.update { it.copy(loading = false) }
         }
     }
 
@@ -108,8 +108,8 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             state.update { it.copy(error = failure.message) }
             false
         } finally {
-            state.update { it.copy(loading = false) }
             if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
+            state.update { it.copy(loading = false) }
         }
     }
 

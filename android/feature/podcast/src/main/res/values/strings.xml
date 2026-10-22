@@ -25,7 +25,8 @@
     <string name="clear_filter">Clear filter</string>
     <string name="no_matches">No episodes match “%1$s”</string>
     <string name="no_episodes">No episodes available</string>
-    <string name="catalogue_failed">Couldn\'t load the full catalogue</string>
+    <string name="episodes_preparing">Preparing episodes…</string>
+    <string name="episodes_unavailable">Episodes are temporarily unavailable</string>
     <string name="refresh">Refresh</string>
     <string name="open_website">Open website</string>
     <string name="website">Website</string>
