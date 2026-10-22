@@ -12,7 +12,7 @@ extension EnvironmentValues {
     }
 }
 
-struct ArtworkBackdrop: View {
+struct ArtworkBackdrop: ViewModifier {
     private struct Source: Hashable {
         let url: URL?
         let fallbackURL: URL?
@@ -27,8 +27,10 @@ struct ArtworkBackdrop: View {
     @Environment(SessionStore.self) private var session: SessionStore?
     let url: URL?
     let artworkSize: CGFloat
+    let headerHeight: CGFloat
     var fallbackURL: URL? = nil
     @State private var loaded: (Source, ArtworkTint?)?
+    @State private var scrollOffset: CGFloat = 0
 
     private var source: Source {
         let pixels = ArtworkStore.pixelSize(for: artworkSize, scale: displayScale)
@@ -39,19 +41,35 @@ struct ArtworkBackdrop: View {
 
     private var tint: ArtworkTint? { loaded?.0 == source ? loaded?.1 : nil }
 
-    var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: .clear, location: 0),
-                .init(color: tint?.headerColor(in: environment) ?? .clear, location: 0.2),
-                .init(color: .clear, location: 1),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: tint)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+    func body(content: Content) -> some View {
+        content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+            min(geometry.contentOffset.y + geometry.contentInsets.top, headerHeight + geometry.contentInsets.top)
+        } action: { _, offset in
+            scrollOffset = offset
+        }
+        .background {
+            GeometryReader { geometry in
+                let insets = geometry.safeAreaInsets
+                let color = tint?.headerColor(in: environment) ?? .clear
+                LinearGradient(
+                    stops: [
+                        .init(color: color, location: 0),
+                        .init(color: color, location: 0.2),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(width: geometry.size.width + insets.leading + insets.trailing,
+                       height: headerHeight + insets.top + max(0, -scrollOffset))
+                .offset(x: -insets.leading, y: -insets.top - max(0, scrollOffset))
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: tint)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .podcstPage()
+        .toolbarBackground(scrollOffset >= headerHeight ? .automatic : .hidden, for: .navigationBar)
         .task(id: source) {
             let requested = source
             let tint = await ArtworkStore.shared.tint(requested.url, fallbackURL: requested.fallbackURL, pixelSize: requested.pixels)

@@ -159,10 +159,6 @@ struct PodcastDetailView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
-            .background(alignment: .top) {
-                ArtworkBackdrop(url: content.artworkURL, artworkSize: artworkSize)
-                    .frame(height: 360)
-            }
         }
         .refreshable { await loadDetails(forceRefresh: true) }
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -170,7 +166,7 @@ struct PodcastDetailView: View {
         } action: { _, visible in
             withAnimation(.easeInOut(duration: 0.2)) { titleVisible = visible }
         }
-        .podcstPage()
+        .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: artworkSize, headerHeight: 360))
         .navigationTitle(titleVisible ? content.title : "")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt)") {
@@ -457,12 +453,8 @@ struct EpisodeDetailView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 28)
-            .background(alignment: .top) {
-                ArtworkBackdrop(url: episode.artworkURL, artworkSize: artworkSize, fallbackURL: URL(string: episode.cover))
-                    .frame(height: 280)
-            }
         }
-        .podcstPage()
+        .modifier(ArtworkBackdrop(url: episode.artworkURL, artworkSize: artworkSize, headerHeight: 280, fallbackURL: URL(string: episode.cover)))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if episode.publicLink != nil {
