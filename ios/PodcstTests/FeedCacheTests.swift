@@ -4,6 +4,164 @@ import XCTest
 
 @MainActor
 final class FeedCacheTests: XCTestCase {
+    func testOpeningStalePodcastAdmitsRefreshThenRechecksWithoutAnotherPost() async throws {
+        DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [1, 2, 3])
+        try Self.setEpisodeFreshness(state: "stale")
+        DetailURLProtocol.responses["/api/feed/refresh"] = Data(#"{"podcastId":"9001","freshness":{"content":"cached","state":"pending","checkedAtMs":1000,"retryAtMs":5000}}"#.utf8)
+        DetailURLProtocol.statuses["/api/feed/refresh"] = 202
+        defer { DetailURLProtocol.reset() }
+        let api = makeAPI()
+        let source = Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example")
+
+        let pending = try await api.detail(of: source, recheck: true, refreshIfStale: true)
+
+        XCTAssertEqual(pending.episodes.map(\.id), [1, 2, 3])
+        XCTAssertEqual(pending.freshness?.state, .pending)
+        XCTAssertNil(pending.episodeStatusMessage)
+        XCTAssertEqual(DetailURLProtocol.requests.last?.url?.path, "/api/feed/refresh")
+        XCTAssertEqual(DetailURLProtocol.requests.last?.httpMethod, "POST")
+        let body = try XCTUnwrap(DetailURLProtocol.requests.last?.httpBody)
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: body) as? [String: String], ["podcastId": "9001"])
+
+        // Even if a later read is stale again, polling must not create new demand.
+        _ = try await api.detail(of: pending, recheck: true)
+        XCTAssertEqual(DetailURLProtocol.requests.filter { $0.httpMethod == "POST" }.count, 1)
+
+        // A worker completes the admitted refresh; polling only reads its result.
+        DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [4, 1, 2, 3])
+        let updated = try await api.detail(of: pending, recheck: true)
+        XCTAssertEqual(updated.episodes.map(\.id), [4, 1, 2, 3])
+        XCTAssertEqual(updated.freshness?.state, .fresh)
+        XCTAssertEqual(DetailURLProtocol.requests.filter { $0.httpMethod == "POST" }.count, 1)
+    }
+
+    func testOpeningPodcastReadsUpdatesCompletedBetweenReadAndAdmission() async throws {
+        DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [1, 2, 3])
+        try Self.setEpisodeFreshness(state: "stale")
+        DetailURLProtocol.responseSequences["/api/feed/episodes"] = [try XCTUnwrap(DetailURLProtocol.responses["/api/feed/episodes"])]
+        DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [4, 1, 2, 3])
+        defer { DetailURLProtocol.reset() }
+
+        let detail = try await makeAPI().detail(of: Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example"), recheck: true, refreshIfStale: true)
+
+        XCTAssertEqual(detail.episodes.map(\.id), [4, 1, 2, 3])
+        XCTAssertEqual(detail.freshness?.state, .fresh)
+        XCTAssertEqual(DetailURLProtocol.requests.filter { $0.httpMethod == "POST" }.count, 1)
+        XCTAssertEqual(DetailURLProtocol.requests.filter { $0.url?.path == "/api/feed/episodes" }.count, 2)
+    }
+
+    func testOpeningPodcastDoesNotReadmitFreshPendingBackoffOrUnavailableFeeds() async throws {
+        for state in ["fresh", "pending", "backoff", "unavailable"] {
+            DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [1, 2, 3])
+            try Self.setEpisodeFreshness(state: state)
+            defer { DetailURLProtocol.reset() }
+            let detail = try await makeAPI().detail(of: Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example"), recheck: true, refreshIfStale: true)
+            XCTAssertEqual(detail.freshness?.state.rawValue, state)
+            XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
+            XCTAssertFalse(DetailURLProtocol.requests.contains { $0.httpMethod == "POST" })
+        }
+    }
+
+    func testAutomaticAdmissionFailureKeepsSuccessfullyReadEpisodes() async throws {
+        for status in [429, 503] {
+            DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [1, 2, 3])
+            try Self.setEpisodeFreshness(state: "stale")
+            DetailURLProtocol.responses["/api/feed/refresh"] = Data(#"{"message":"Refresh unavailable"}"#.utf8)
+            DetailURLProtocol.statuses["/api/feed/refresh"] = status
+            defer { DetailURLProtocol.reset() }
+
+            let detail = try await makeAPI().detail(of: Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example"), recheck: true, refreshIfStale: true)
+            XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
+            XCTAssertEqual(detail.freshness?.state, .stale)
+            XCTAssertNil(detail.episodeStatusMessage)
+            XCTAssertEqual(DetailURLProtocol.requests.filter { $0.httpMethod == "POST" }.count, 1)
+        }
+    }
+
+    func testAutomaticAdmissionDoesNotHideLostAccess() async throws {
+        for status in [401, 403, 404] {
+            DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [1, 2, 3])
+            try Self.setEpisodeFreshness(state: "stale")
+            DetailURLProtocol.responses["/api/feed/refresh"] = Data(#"{"message":"Unavailable"}"#.utf8)
+            DetailURLProtocol.statuses["/api/feed/refresh"] = status
+            defer { DetailURLProtocol.reset() }
+            do {
+                _ = try await makeAPI().detail(of: Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example"), recheck: true, refreshIfStale: true)
+                XCTFail("Access failures must still be surfaced")
+            } catch {
+                XCTAssertEqual((error as? APIError)?.statusCode, status)
+            }
+        }
+    }
+
+    func testDetailRetainsVisibleEpisodesWhileServerContentIsMissing() async throws {
+        DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [])
+        try Self.setEpisodeFreshness(state: "pending", content: "missing")
+        defer { DetailURLProtocol.reset() }
+        let source = Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example", episodeCount: 1, episodes: [episode(guid: "retained")])
+        let detail = try await makeAPI().detail(of: source, recheck: true, refreshIfStale: true)
+        XCTAssertEqual(detail.episodes.map(\.guid), ["retained"])
+        XCTAssertEqual(detail.episodeCount, 1)
+        XCTAssertNil(detail.episodeStatusMessage)
+    }
+
+    func testJoinedDetailReadRetainsEachCallersVisibleEpisodes() async throws {
+        DetailURLProtocol.responses = try Self.refreshed(episodeIDs: [])
+        try Self.setEpisodeFreshness(state: "pending", content: "missing")
+        let started = expectation(description: "First catalogue request started")
+        let joining = expectation(description: "Second caller joins the pending read")
+        let responseGate = DispatchSemaphore(value: 0)
+        DetailURLProtocol.beforeResponse = { request in
+            if request.url?.path == "/api/feed/episodes" {
+                started.fulfill()
+                _ = responseGate.wait(timeout: .now() + 5)
+            }
+        }
+        defer {
+            responseGate.signal()
+            DetailURLProtocol.reset()
+        }
+        let api = makeAPI()
+        let summary = Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example")
+        var visible = summary
+        visible.episodes = [episode(guid: "retained")]
+        visible.episodeCount = 1
+        let source = visible
+
+        let first = Task { try await api.detail(of: summary, recheck: true) }
+        await fulfillment(of: [started], timeout: 2)
+        let second = Task {
+            joining.fulfill()
+            return try await api.detail(of: source, recheck: true)
+        }
+        await fulfillment(of: [joining], timeout: 2)
+        responseGate.signal()
+
+        let firstResult = try await first.value
+        let secondResult = try await second.value
+        XCTAssertTrue(firstResult.episodes.isEmpty)
+        XCTAssertEqual(secondResult.episodes.map(\.guid), ["retained"])
+        XCTAssertEqual(secondResult.episodeCount, 1)
+        XCTAssertNil(secondResult.episodeStatusMessage)
+        XCTAssertEqual(DetailURLProtocol.requests.filter { $0.url?.path == "/api/feed/episodes" }.count, 1)
+    }
+
+    func testEpisodeStatusOnlyExplainsUnavailableEpisodes() throws {
+        for state in ["stale", "pending", "backoff", "unavailable"] {
+            for content in ["cached", "missing"] {
+                let freshness = try JSONDecoder().decode(FeedFreshness.self, from: JSONSerialization.data(withJSONObject: Self.freshness(state: state, content: content)))
+                var podcast = Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example", episodes: [episode(guid: "playable")], freshness: freshness)
+                XCTAssertNil(podcast.episodeStatusMessage)
+                podcast.episodes = []
+                if content == "missing" {
+                    XCTAssertNotNil(podcast.episodeStatusMessage)
+                } else {
+                    XCTAssertNil(podcast.episodeStatusMessage, "A successfully loaded empty feed needs no recovery warning")
+                }
+            }
+        }
+    }
+
     func testPodcastDetailLoadsEveryEpisodePage() async throws {
         let info = Self.podcastPayload(episodeCount: 202)
         let firstPage = [
@@ -380,6 +538,19 @@ final class FeedCacheTests: XCTestCase {
 
     private static var freshnessPayload: [String: Any] { ["content": "cached", "state": "fresh", "checkedAtMs": 1791499200000, "retryAtMs": NSNull()] }
 
+    private static func freshness(state: String, content: String = "cached") -> [String: Any] {
+        var value: [String: Any] = ["content": content, "state": state, "checkedAtMs": 1000, "retryAtMs": NSNull()]
+        if ["pending", "backoff"].contains(state) { value["retryAtMs"] = 5000 }
+        return value
+    }
+
+    private static func setEpisodeFreshness(state: String, content: String = "cached") throws {
+        let data = try XCTUnwrap(DetailURLProtocol.responses["/api/feed/episodes"])
+        var page = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        page["freshness"] = freshness(state: state, content: content)
+        DetailURLProtocol.responses["/api/feed/episodes"] = try JSONSerialization.data(withJSONObject: page)
+    }
+
     private static func refreshed(episodeIDs: [Int], title: String = "Example") throws -> [String: Data] {
         var info = podcastPayload(episodeCount: episodeIDs.count)
         info["title"] = title
@@ -450,8 +621,10 @@ private final class FeedTestCredentials: SessionCredentialStore {
 
 private final class DetailURLProtocol: URLProtocol {
     nonisolated(unsafe) static var responses: [String: Data] = [:]
+    nonisolated(unsafe) static var responseSequences: [String: [Data]] = [:]
     nonisolated(unsafe) static var statuses: [String: Int] = [:]
     nonisolated(unsafe) static var requests: [URLRequest] = []
+    nonisolated(unsafe) static var beforeResponse: ((URLRequest) -> Void)?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
 
@@ -476,8 +649,16 @@ private final class DetailURLProtocol: URLProtocol {
             recorded.httpBody = data
         }
         Self.requests.append(recorded)
+        Self.beforeResponse?(recorded)
         let key = url.path + (url.query?.contains("cursor=200") == true ? "?cursor=200" : "")
-        guard let data = Self.responses[key] else {
+        let data: Data?
+        if var sequence = Self.responseSequences[key], !sequence.isEmpty {
+            data = sequence.removeFirst()
+            Self.responseSequences[key] = sequence
+        } else {
+            data = Self.responses[key]
+        }
+        guard let data else {
             client?.urlProtocol(self, didFailWithError: APIError(statusCode: 404, message: "Missing fixture"))
             return
         }
@@ -491,7 +672,9 @@ private final class DetailURLProtocol: URLProtocol {
 
     static func reset() {
         responses = [:]
+        responseSequences = [:]
         statuses = [:]
         requests = []
+        beforeResponse = nil
     }
 }

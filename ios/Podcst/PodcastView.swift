@@ -16,6 +16,8 @@ struct PodcastDetailView: View {
     @State private var titleVisible = false
     @State private var readAttempt = UUID()
     @State private var readOwner = UUID()
+    @State private var recheckOwner = UUID()
+    @State private var isRechecking = false
 
     private var content: Podcast { detail ?? podcast }
 
@@ -121,16 +123,19 @@ struct PodcastDetailView: View {
                     }
                 }
                 .padding(.top, 20)
-                if let freshness = content.freshness, freshness.state != .fresh {
+                if !detailError || isRechecking, let message = content.episodeStatusMessage {
                     VStack(alignment: .leading) {
-                        Text(freshness.message).font(.footnote)
-                        Button("Retry updates") {
-                            if Double(freshness.retryAtMs ?? 0) <= Date().timeIntervalSince1970 * 1000 { readAttempt = UUID() }
+                        Text(message).font(.footnote)
+                        if !isRechecking && !isLoading {
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                Button("Retry") { readAttempt = UUID() }
+                                    .disabled(Double(content.freshness?.retryAtMs ?? 0) > context.date.timeIntervalSince1970 * 1000)
+                            }
                         }
                     }.padding(.vertical, 12)
                 }
-                if detailError {
-                    ErrorRow(message: "Couldn't load the full catalogue.") {
+                if detailError && content.episodes.isEmpty && !isRechecking {
+                    ErrorRow(message: "Couldn't load episodes.") {
                         await loadDetails(forceRefresh: true)
                     }
                 }
@@ -165,8 +170,12 @@ struct PodcastDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt)") {
             guard scenePhase == .active else { return }
+            let owner = UUID()
+            recheckOwner = owner
+            isRechecking = true
+            defer { if recheckOwner == owner { isRechecking = false } }
             let startedAt = Date()
-            await loadDetails(recheck: true)
+            await loadDetails(recheck: true, refreshIfStale: true)
             while !Task.isCancelled, scenePhase == .active, let delay = content.freshness?.recheckDelay(startedAt: startedAt) {
                 do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() }
                 catch { return }
@@ -176,7 +185,7 @@ struct PodcastDetailView: View {
         }
     }
 
-    private func loadDetails(forceRefresh: Bool = false, recheck: Bool = false) async {
+    private func loadDetails(forceRefresh: Bool = false, recheck: Bool = false, refreshIfStale: Bool = false) async {
         if forceRefresh, Double(content.freshness?.retryAtMs ?? 0) > Date().timeIntervalSince1970 * 1000 { return }
         let token = api.activityToken
         let owner = UUID()
@@ -187,7 +196,7 @@ struct PodcastDetailView: View {
         detailError = false
         defer { if readOwner == owner { isLoading = false } }
         do {
-            let result = try await api.detail(of: source, forceRefresh: forceRefresh, recheck: recheck)
+            let result = try await api.detail(of: source, forceRefresh: forceRefresh, recheck: recheck, refreshIfStale: refreshIfStale)
             guard !Task.isCancelled, api.activityToken == token, readOwner == owner else { return }
             detail = result
             if forceRefresh { readAttempt = UUID() }

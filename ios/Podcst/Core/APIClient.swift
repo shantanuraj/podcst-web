@@ -95,13 +95,13 @@ public final class APIClient {
         }
     }
 
-    public func detail(of podcast: Podcast, forceRefresh: Bool = false, recheck: Bool = false) async throws -> Podcast {
+    public func detail(of podcast: Podcast, forceRefresh: Bool = false, recheck: Bool = false, refreshIfStale: Bool = false) async throws -> Podcast {
         if let id = podcast.id {
             let revision = sessionRevision
             if forceRefresh { _ = try await refresh(podcastID: id) }
             guard revision == sessionRevision else { throw CancellationError() }
             let refresh = forceRefresh || recheck || podcast.freshness?.state != .fresh || podcast.episodes.count <= 2 || podcast.episodes.count < podcast.episodeCount
-            return try await feedCache.load(.id(id), refreshing: refresh) {
+            var result = try await feedCache.load(.id(id), refreshing: refresh) {
                 async let info = self.podcastInfo(id: id)
                 async let catalogue = self.allEpisodes(podcastID: id)
                 let (infoResult, catalogueResult) = try await (info, catalogue)
@@ -124,16 +124,39 @@ public final class APIClient {
                     freshness: catalogueResult.freshness
                 )
             }
+            try Task.checkCancellation()
+            guard revision == sessionRevision else { throw CancellationError() }
+            result = result.preservingContent(of: podcast)
+            // Reads serve cached episodes; only refresh admission asks the worker
+            // to check the publisher. Admit once on opening, then poll with reads.
+            if refreshIfStale, !forceRefresh, result.freshness?.state == .stale {
+                do {
+                    let admitted = try await self.refresh(podcastID: id).freshness
+                    if admitted.content == .cached, admitted.checkedAtMs != result.freshness?.checkedAtMs {
+                        // Another worker may have finished since the initial read.
+                        result = try await detail(of: result, recheck: true)
+                    } else {
+                        result.freshness = admitted
+                    }
+                } catch let error as APIError where error.statusCode == 429 || error.statusCode >= 500 {
+                    // A busy refresh service must not discard a successful read.
+                } catch let error as URLError where error.code != .cancelled {
+                    // Keep the catalogue if connectivity drops after reading it.
+                }
+            }
+            try Task.checkCancellation()
+            guard revision == sessionRevision else { throw CancellationError() }
+            return result
         }
         if let itunesId = podcast.itunesId {
             let identity: RawPodcastIdentity = try await post(path: "/api/feed/resolve", body: ResolvePodcastBody(itunes_id: String(itunesId), locale: podcast.itunesLocale ?? "us"))
             var resolved = podcast
             resolved.id = identity.id
-            return try await detail(of: resolved, forceRefresh: forceRefresh)
+            return try await detail(of: resolved, forceRefresh: forceRefresh, recheck: recheck, refreshIfStale: refreshIfStale)
         }
         let resolved = try await self.podcast(feed: podcast.feed, forceRefresh: forceRefresh)
         guard resolved.id != nil else { return resolved }
-        return try await detail(of: resolved, forceRefresh: forceRefresh)
+        return try await detail(of: resolved, forceRefresh: forceRefresh, recheck: recheck, refreshIfStale: refreshIfStale)
     }
 
     public func podcastInfo(id: Int) async throws -> Podcast {

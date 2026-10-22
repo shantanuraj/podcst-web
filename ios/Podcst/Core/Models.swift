@@ -100,6 +100,11 @@ public struct Podcast: Codable, Hashable, Sendable, Identifiable {
         self.episodes = episodes
     }
 
+    var episodeStatusMessage: String? {
+        guard episodes.isEmpty, let freshness, freshness.content == .missing else { return nil }
+        return freshness.state == .pending ? "Preparing episodes…" : "Episodes are temporarily unavailable."
+    }
+
     func preservingContent(of previous: Podcast?) -> Podcast {
         guard let previous, previous.identity == identity, let freshness,
               freshness.content == .missing || freshness.state == .pending || freshness.state == .backoff else { return self }
