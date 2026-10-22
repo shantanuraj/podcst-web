@@ -17,12 +17,13 @@ import androidx.palette.graphics.Palette
 import app.podcst.model.Artwork
 import coil3.Image
 import coil3.toBitmap
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Stable
 class ArtworkTint internal constructor(private val source: String?) {
-    private var palette by mutableStateOf(source?.let(palettes::get))
+    private var palette by mutableStateOf(source?.let(palettes::get)?.palette)
 
     fun color(dark: Boolean): Color? {
         val palette = palette ?: return null
@@ -46,18 +47,19 @@ class ArtworkTint internal constructor(private val source: String?) {
 
     internal suspend fun loaded(image: Image) {
         val source = source ?: return
-        if (palette != null) return
         palette = withContext(Dispatchers.Default) {
-            synchronized(palettes) {
-                palettes.get(source) ?: Palette.from(image.toBitmap()).resizeBitmapArea(96 * 96).generate().also {
-                    palettes.put(source, it)
-                }
+            val cached = palettes.get(source)
+            if (cached?.image?.get() === image) cached.palette
+            else Palette.from(image.toBitmap()).resizeBitmapArea(96 * 96).generate().also {
+                palettes.put(source, CachedPalette(WeakReference(image), it))
             }
         }
     }
 
+    private data class CachedPalette(val image: WeakReference<Image>, val palette: Palette)
+
     private companion object {
-        val palettes = LruCache<String, Palette>(64)
+        val palettes = LruCache<String, CachedPalette>(64)
     }
 }
 
@@ -72,7 +74,8 @@ fun Modifier.artworkTint(tint: ArtworkTint): Modifier {
     val colors = Podcst.colors
     return background(
         Brush.verticalGradient(
-            0f to tint.headerColor(colors),
+            0f to Color.Transparent,
+            0.2f to tint.headerColor(colors),
             1f to Color.Transparent,
         ),
     )

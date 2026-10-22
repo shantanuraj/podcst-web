@@ -16,6 +16,20 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ArtworkTintTest {
     @Test
+    fun refreshedArtworkUpdatesTheTintAtTheSameURL() = runBlocking {
+        val tint = ArtworkTint("refresh-artwork")
+        val original = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFFCB2424.toInt()) }
+        tint.loaded(original.asImage())
+        val previous = tint.color(false)
+        val refreshed = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFF245CCB.toInt()) }
+        tint.loaded(refreshed.asImage())
+        assertNotEquals(previous, tint.color(false))
+        assertEquals(tint.color(false), ArtworkTint("refresh-artwork").color(false))
+        original.recycle()
+        refreshed.recycle()
+    }
+
+    @Test
     fun coloredArtworkKeepsTextReadableInBothThemes() = runBlocking {
         val artwork = listOf(0xFF0000FF, 0xFFFFFF00, 0xFFFF0000, 0xFF00FF00, 0xFF181818, 0xFFE8E8E8)
         for (source in artwork) {
