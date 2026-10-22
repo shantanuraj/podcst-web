@@ -11,4 +11,5 @@ dependencies {
     api(project(":core:model"))
     api(libs.coil.compose)
     implementation(libs.core.ktx)
+    implementation(libs.palette)
 }

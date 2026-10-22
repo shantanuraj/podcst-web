@@ -5,7 +5,3 @@ plugins {
 android {
     namespace = "app.podcst.feature.player"
 }
-
-dependencies {
-    implementation(libs.palette)
-}

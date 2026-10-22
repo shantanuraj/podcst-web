@@ -66,6 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.podcst.designsystem.Artwork
+import app.podcst.designsystem.artworkTint
+import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.designsystem.ButtonKind
 import app.podcst.designsystem.DatedEpisodeRow
 import app.podcst.designsystem.EpisodeActions
@@ -171,12 +173,13 @@ private fun Overflow(state: PodcastScreenState, viewModel: PodcastViewModel) {
 private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions) {
     val colors = Podcst.colors
     val podcast = state.podcast
+    val tint = rememberArtworkTint(podcast.cover)
     val toaster = LocalToaster.current
     val failure = stringResource(R.string.subscription_failed)
     var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+    Column(Modifier.fillMaxWidth().artworkTint(tint).padding(top = 12.dp, bottom = 16.dp)) {
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
-            Artwork(podcast.cover, 132.dp, corner = 16.dp)
+            Artwork(podcast.cover, 132.dp, corner = 16.dp, tint = tint)
             Column(Modifier.padding(bottom = 4.dp)) {
                 Text(
                     podcast.title,

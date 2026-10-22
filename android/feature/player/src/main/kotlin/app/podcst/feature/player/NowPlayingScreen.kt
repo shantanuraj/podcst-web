@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.podcst.designsystem.Artwork
+import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.designsystem.EpisodeActions
 import app.podcst.designsystem.Eyebrow
 import app.podcst.designsystem.Format
@@ -87,7 +88,8 @@ fun NowPlayingScreen(
     val player = state.player
     val clip = player.clip
     val colors = Podcst.colors
-    val tint = rememberArtworkTint(episode.artwork) ?: colors.surface
+    val artworkTint = rememberArtworkTint(episode.artwork)
+    val tint = artworkTint.color(colors.dark) ?: colors.surface
     var sheet by remember { mutableStateOf<PlayerSheet?>(null) }
     val chapterIndex = player.chapterIndex
 
@@ -117,6 +119,7 @@ fun NowPlayingScreen(
                         bordered = false,
                         contentDescription = episode.title,
                         chapterArtwork = player.chapterArtwork,
+                        tint = artworkTint,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     Column(Modifier.fillMaxWidth().widthIn(max = 560.dp).padding(top = if (compact) 18.dp else 26.dp)) {

@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,8 @@ import app.podcst.model.Artwork as ArtworkSizing
 import app.podcst.model.ChapterArtwork
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.CachePolicy
+import coil3.request.allowHardware
+import kotlinx.coroutines.launch
 import coil3.request.ImageRequest
 import coil3.compose.AsyncImage
 import kotlin.time.Instant
@@ -69,10 +72,19 @@ fun Artwork(
     bordered: Boolean = true,
     contentDescription: String? = null,
     chapterArtwork: ChapterArtwork? = null,
+    tint: ArtworkTint? = null,
 ) {
     val colors = Podcst.colors
     val shape = RoundedCornerShape(corner)
     val pixels = with(androidx.compose.ui.platform.LocalDensity.current) { size.roundToPx() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val request = remember(url, pixels, tint, context) {
+        ImageRequest.Builder(context)
+            .data(url?.let { ArtworkSizing.url(it, pixels) })
+            .allowHardware(tint == null)
+            .build()
+    }
     Box(
         modifier
             .size(size)
@@ -82,10 +94,11 @@ fun Artwork(
     ) {
         if (!url.isNullOrBlank()) {
             AsyncImage(
-                model = ArtworkSizing.url(url, pixels),
+                model = request,
                 contentDescription = contentDescription,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
+                onSuccess = { result -> tint?.let { scope.launch { it.loaded(result.result.image) } } },
             )
         }
         if (chapterArtwork != null) key(chapterArtwork.id) {

@@ -50,6 +50,8 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.podcst.designsystem.Artwork
+import app.podcst.designsystem.artworkTint
+import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.designsystem.ButtonKind
 import app.podcst.designsystem.EpisodeActions
 import app.podcst.designsystem.Eyebrow
@@ -78,6 +80,7 @@ fun EpisodeScreen(
 ) {
     val colors = Podcst.colors
     val episode = state.episode
+    val tint = rememberArtworkTint(episode.artwork)
     val website = webpage(episode.link)
     val uri = LocalUriHandler.current
     Column(Modifier.fillMaxSize().background(colors.paper)) {
@@ -91,28 +94,32 @@ fun EpisodeScreen(
             actions = { Overflow(state, actions, onOpenPodcast) },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.paper, actionIconContentColor = colors.ink),
         )
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
-            Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
-                Artwork(episode.artwork, 96.dp, corner = 12.dp)
-                Eyebrow(dateline(episode))
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
+            Column(Modifier.fillMaxWidth().artworkTint(tint).padding(horizontal = 20.dp)) {
+                Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
+                    Artwork(episode.artwork, 96.dp, corner = 12.dp, tint = tint)
+                    Eyebrow(dateline(episode))
+                }
+                Text(episode.title, style = Podcst.type.title, color = colors.ink, modifier = Modifier.padding(top = 18.dp).semantics { heading() })
+                Byline(episode, onOpenPodcast, Modifier.padding(top = 6.dp))
+                Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PrimaryAction(state.button, onClick = { actions.play(episode) }, modifier = Modifier.weight(1f))
+                    StarButton(state.starred, onStar = { actions.star(episode, !state.starred) }, onAddToList = { actions.addToList(episode) })
+                    Square(PodcstIcons.Queue, stringResource(DesignR.string.add_to_queue), onClick = { actions.enqueue(episode) })
+                }
+                state.progress?.let { LastPlayed(it, Modifier.padding(top = 8.dp)) }
+                Hairline(Modifier.padding(top = 22.dp, bottom = 18.dp))
             }
-            Text(episode.title, style = Podcst.type.title, color = colors.ink, modifier = Modifier.padding(top = 18.dp).semantics { heading() })
-            Byline(episode, onOpenPodcast, Modifier.padding(top = 6.dp))
-            Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PrimaryAction(state.button, onClick = { actions.play(episode) }, modifier = Modifier.weight(1f))
-                StarButton(state.starred, onStar = { actions.star(episode, !state.starred) }, onAddToList = { actions.addToList(episode) })
-                Square(PodcstIcons.Queue, stringResource(DesignR.string.add_to_queue), onClick = { actions.enqueue(episode) })
-            }
-            state.progress?.let { LastPlayed(it, Modifier.padding(top = 8.dp)) }
-            Hairline(Modifier.padding(top = 22.dp, bottom = 18.dp))
-            if (episode.notes.isBlank()) {
-                Text(stringResource(R.string.no_notes), style = Podcst.type.notes, color = colors.secondary)
-            } else {
-                NotesText(episode.notes, onTimestamp = viewModel::seek)
-            }
-            if (website != null) {
-                Box(Modifier.padding(top = 12.dp).heightIn(min = 48.dp).clickable(role = Role.Button) { uri.openUri(website.url) }, contentAlignment = Alignment.CenterStart) {
-                    Text(stringResource(R.string.open_episode_website), style = Podcst.type.label, color = colors.accent)
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                if (episode.notes.isBlank()) {
+                    Text(stringResource(R.string.no_notes), style = Podcst.type.notes, color = colors.secondary)
+                } else {
+                    NotesText(episode.notes, onTimestamp = viewModel::seek)
+                }
+                if (website != null) {
+                    Box(Modifier.padding(top = 12.dp).heightIn(min = 48.dp).clickable(role = Role.Button) { uri.openUri(website.url) }, contentAlignment = Alignment.CenterStart) {
+                        Text(stringResource(R.string.open_episode_website), style = Podcst.type.label, color = colors.accent)
+                    }
                 }
             }
         }
