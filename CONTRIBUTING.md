@@ -140,9 +140,11 @@ Gradle properties. Keep keystores and passwords outside the repository.
 From the repository root, `yarn android:install <device-serial>` builds and
 installs a signed Release build on a connected device.
 
-For archive/AAB version overrides, privacy review, symbols and store-installed
-validation, see [native distribution](docs/native-distribution.md). Local device
-installation does not establish TestFlight or Play internal-testing acceptance.
+For a Google Play upload bundle, configure your upload certificate and run
+`yarn android:release <version-name> <version-code> <new-output-directory>`.
+See [native distribution](docs/native-distribution.md#android-aab) for one-time
+signing setup, symbols and remaining store checks. Local device installation does
+not establish TestFlight or Play internal-testing acceptance.
 
 Both native clients default to the hosted API. For backend work, configure their
 `APIClient` (iOS) or `PodcstApi` (Android) with your development server. Passkeys on

@@ -72,31 +72,92 @@ sideload does not establish this gate.
 
 ## Android AAB
 
-Use an approved upload key, not the debug key. Configure the existing
-`podcst.release.storeFile`, `storePassword`, `keyAlias` and `keyPassword` properties
-in an owner-protected user-level Gradle properties file; keep the keystore outside
-the checkout. Do not put passwords in commands, build logs or CI artifacts.
+### One-time signing setup
+
+Use the approved **upload key**, not the debug key or Play's app-signing key.
+For an existing Play app, reuse its registered upload key; do not generate a
+replacement unless following Play's upload-key reset process. For a new app with
+no upload key, create one outside Git (the command prompts for passwords):
 
 ```sh
-cd android
-./gradlew --console=plain :app:bundleRelease \
-  -Ppodcst.release.versionName="$VERSION" \
-  -Ppodcst.release.versionCode="$BUILD_NUMBER"
+umask 077
+mkdir -p "$HOME/.android/keys"
+keytool -genkeypair -keystore "$HOME/.android/keys/podcst-upload.p12" \
+  -storetype PKCS12 -alias upload -keyalg RSA -keysize 3072 -validity 10000
 ```
 
-The output is `app/build/outputs/bundle/release/app-release.aab`. Without signing
-properties Gradle may produce an **unsigned** bundle. Inspect the JAR signature
-and certificate using `jarsigner -verify -verbose -certs` and
-`keytool -printcert -jarfile`; require a valid signature and the approved upload
-certificate fingerprint, not merely exit zero. Validate the bundle and inspect
-its manifest with the pinned `bundletool` version. Hash the AAB with
-`shasum -a 256`, and copy it to the protected release directory before any rebuild.
+Back up the keystore and passwords through your private custody process. Configure
+these properties in `$GRADLE_USER_HOME/gradle.properties` (normally
+`~/.gradle/gradle.properties`), with mode `600`. Replace the placeholders privately;
+use an absolute keystore path, not `~`. Java properties escaping applies to
+passwords, including backslashes. Never commit this file or put real passwords in
+commands, build logs or CI artifacts.
 
-Retain `app/build/outputs/mapping/release/mapping.txt`, native symbol files and
-unstripped JNI libraries with the AAB and toolchain receipt. Release uses `FULL`
-native debug symbols; verify the AAB's `BUNDLE-METADATA` actually contains them for
-each shipped ABI. If producing APKs, inspect
-`app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip`.
+```properties
+podcst.release.storeFile=/absolute/private/path/podcst-upload.p12
+podcst.release.storePassword=REPLACE_PRIVATELY
+podcst.release.keyAlias=upload
+podcst.release.keyPassword=REPLACE_PRIVATELY
+```
+
+Export the public upload certificate once. Substitute your actual keystore and
+alias; this command prompts for the store password:
+
+```sh
+keytool -exportcert -rfc -keystore "$HOME/.android/keys/podcst-upload.p12" \
+  -alias upload -file "$HOME/.android/keys/podcst-upload.pem"
+export ANDROID_UPLOAD_CERTIFICATE="$HOME/.android/keys/podcst-upload.pem"
+keytool -printcert -file "$ANDROID_UPLOAD_CERTIFICATE"
+```
+
+Compare its SHA-256 fingerprint with the **upload certificate** in Play Console,
+not the app-signing certificate. For the first upload, this is the certificate
+you intend to register. Save `ANDROID_UPLOAD_CERTIFICATE` in your shell setup;
+the certificate is public and contains no private key.
+
+### Build the upload bundle
+
+From a clean commit, with the [Android toolchain](../CONTRIBUTING.md#android)
+installed and JDK `keytool`/`jarsigner`, `unzip` and `shasum` on `PATH`:
+
+```sh
+mkdir -p "$HOME/Releases/podcst"
+yarn android:release "$VERSION" "$BUILD_NUMBER" \
+  "$HOME/Releases/podcst/android-$BUILD_NUMBER"
+```
+
+Supply an explicit version name and an unused Play version code (1–2100000000).
+The script cannot check Play's allocation; reserve a code higher than previous
+uploads. The destination must not exist, its parent must exist outside Git, and
+no other build or source edit should run concurrently in this checkout.
+
+The script requires signing configuration, builds `:app:bundleRelease`, and uses
+strict JAR verification against a temporary truststore containing only your
+approved upload certificate. Unsigned/partly signed bundles, a different signer,
+and Android debug certificates fail. Private keys/passwords remain in Gradle;
+the release invocation disables configuration caching. Failure removes the newly
+created output directory, never an existing release.
+
+The protected output directory contains:
+
+- `app-release.aab` — the only file to upload to Google Play.
+- `mapping.txt` and `native-debug-symbols/` — diagnostics from this build; the
+  bundle also embeds the native symbols. Every shipped ABI must include Podcst
+  JNI and its FULL symbols.
+- `upload-certificate.pem`, `upload-certificate.txt`, `signature.txt`,
+  `release.txt` (commit/version) and `SHA256SUMS` — local verification records.
+
+Verify retained files with `shasum -a 256 -c SHA256SUMS` inside that directory.
+Nothing is uploaded, installed, or submitted by the script. Direct Gradle builds
+without the script can still produce unsigned bundles for development/CI.
+
+### Remaining artifact and store checks
+
+Validate the bundle and inspect its manifest with the pinned `bundletool` version.
+Verify package `app.podcst.android`, version, minimum/target SDK, permissions and
+non-debuggable status. Retain unstripped JNI libraries and the full toolchain
+receipt alongside the script's outputs before rebuilding. If producing APKs,
+inspect `app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip`.
 App packaging and the engine share the pinned NDK and ABI list: do not ship an
 ABI containing only a dependency's native code but no Podcst JNI library. Require
 matching Podcst symbols for every shipped ABI. Pre-stripped third-party libraries

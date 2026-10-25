@@ -30,6 +30,14 @@ android {
         }
     }
 
+    if (providers.gradleProperty("podcst.release.requireSigning").orNull == "true") {
+        require(release != null) {
+            "Configure podcst.release signing properties in your user-level Gradle properties."
+        }
+        require(release.storeFile?.isFile == true) { "Release keystore does not exist." }
+        require(release.keyAlias != "androiddebugkey") { "Use an upload key, not the Android debug key." }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
