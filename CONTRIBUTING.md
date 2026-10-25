@@ -103,6 +103,14 @@ xcodebuild -project ios/Podcst.xcodeproj -scheme PodcstTests \
 Use an available simulator name on your machine. Xcode builds the Rust library
 for the selected destination automatically.
 
+Xcode Cloud runs [`ios/ci_scripts/ci_post_clone.sh`](ios/ci_scripts/ci_post_clone.sh)
+to install Rust and all three iOS targets before building. Test actions also
+install FFmpeg for their generated audio fixtures. The hook uses stable Rust,
+matching GitHub Actions; set `RUSTUP_TOOLCHAIN` in the Cloud workflow to select a
+specific version. The existing native-audio build phase compiles and links the
+library from source; no prebuilt library needs to be committed. Keep the hook
+executable and beside `Podcst.xcodeproj` in `ios/ci_scripts` so Cloud discovers it.
+
 For a physical device, select your own signing team in Xcode. Associated Domains
 requires a team that supports the capability.
 
