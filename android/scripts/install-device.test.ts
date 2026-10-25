@@ -15,20 +15,9 @@ const directories: string[] = [];
 
 const mock = `#!/bin/bash
 set -euo pipefail
-name="$(basename "$0")"
-printf '%s\\0' "$name" "$@" >> "$MOCK_LOG"
+printf '%s\\0' android "$@" >> "$MOCK_LOG"
 printf '\\n' >> "$MOCK_LOG"
-if [[ $name == gradlew ]]; then
-    [[ $MOCK_FAIL != build ]] || exit 23
-elif [[ $1 == devices ]]; then
-    printf 'List of devices attached\\n%b' "$MOCK_DEVICES"
-elif [[ $1 == -s && $3 == install ]]; then
-    [[ $MOCK_FAIL != install ]] || exit 23
-elif [[ $1 == -s && $3 == shell ]]; then
-    [[ $MOCK_FAIL != launch ]] || exit 23
-else
-    exit 99
-fi
+exit "$MOCK_EXIT_CODE"
 `;
 
 afterEach(async () => {
@@ -50,10 +39,8 @@ async function fixture() {
   await mkdir(bin);
   await copyFile(join(import.meta.dir, 'install-device.sh'), script);
   await writeFile(log, '');
-  await writeFile(join(android, 'gradlew'), mock);
-  await chmod(join(android, 'gradlew'), 0o755);
-  await writeFile(join(bin, 'adb'), mock);
-  await chmod(join(bin, 'adb'), 0o755);
+  await writeFile(join(bin, 'android'), mock);
+  await chmod(join(bin, 'android'), 0o755);
   return {
     android,
     async run(args: string[] = [], env: Record<string, string> = {}) {
@@ -64,8 +51,7 @@ async function fixture() {
           PATH: `${bin}:${process.env.PATH}`,
           ANDROID_SERIAL: '',
           MOCK_LOG: log,
-          MOCK_FAIL: '',
-          MOCK_DEVICES: 'emulator-5554\\tdevice\\n',
+          MOCK_EXIT_CODE: '0',
           ...env,
         },
         stdout: 'pipe',
@@ -84,52 +70,38 @@ async function fixture() {
   };
 }
 
-const component = 'app.podcst.android/app.podcst.MainActivity';
-
 describe('Android Release installation', () => {
-  it('builds Release, installs, and relaunches on the first ready device', async () => {
+  it('delegates the Release build, install, launch, and device selection to Android CLI', async () => {
     const f = await fixture();
-    const result = await f.run([], {
-      MOCK_DEVICES:
-        'offline-1\\toffline\\nphone-2\\tunauthorized\\nemulator-5554\\tdevice\\npixel-9\\tdevice\\n',
-    });
-    const apk = join(
-      f.android,
-      'app/build/outputs/apk/release/app-release.apk',
-    );
+    const result = await f.run();
     expect(result.code, result.output).toBe(0);
     expect(result.commands).toEqual([
-      ['adb', 'devices'],
       [
-        'gradlew',
-        '-p',
-        f.android,
+        'android',
+        'run',
+        `${f.android}?:app@release`,
+        '--',
         '--console=plain',
         '-q',
-        ':app:assembleRelease',
-      ],
-      ['adb', '-s', 'emulator-5554', 'install', '-r', apk],
-      [
-        'adb',
-        '-s',
-        'emulator-5554',
-        'shell',
-        'am',
-        'start',
-        '-S',
-        '-n',
-        component,
       ],
     ]);
   });
 
-  it('uses the saved serial without listing devices', async () => {
+  it('passes the saved serial to Android CLI', async () => {
     const f = await fixture();
     const result = await f.run([], { ANDROID_SERIAL: 'saved-serial' });
     expect(result.code, result.output).toBe(0);
-    expect(result.commands[0][0]).toBe('gradlew');
-    expect(result.commands[1]).toContain('saved-serial');
-    expect(result.commands[2]).toContain('saved-serial');
+    expect(result.commands).toEqual([
+      [
+        'android',
+        'run',
+        `${f.android}?:app@release`,
+        '--device=saved-serial',
+        '--',
+        '--console=plain',
+        '-q',
+      ],
+    ]);
   });
 
   it('prefers the explicit serial over the saved serial', async () => {
@@ -138,40 +110,30 @@ describe('Android Release installation', () => {
       ANDROID_SERIAL: 'saved-serial',
     });
     expect(result.code, result.output).toBe(0);
-    expect(result.commands[1]).toContain('explicit-serial');
-    expect(result.commands.flat()).not.toContain('saved-serial');
-  });
-
-  it('fails without a ready device and builds nothing', async () => {
-    const f = await fixture();
-    const result = await f.run([], { MOCK_DEVICES: 'phone\\tunauthorized\\n' });
-    expect(result.code).toBe(1);
-    expect(result.output).toContain('No ready device');
-    expect(result.commands).toEqual([['adb', 'devices']]);
+    expect(result.commands[0]).toContain('--device=explicit-serial');
+    expect(result.commands.flat()).not.toContain('--device=saved-serial');
   });
 
   it('prints help and rejects unexpected arguments', async () => {
     const f = await fixture();
-    const help = await f.run(['--help']);
-    expect(help.code).toBe(0);
-    expect(help.output).toContain('yarn android:install');
-    for (const args of [['a', 'b'], ['--release']]) {
+    for (const flag of ['--help', '-h']) {
+      const help = await f.run([flag]);
+      expect(help.code).toBe(0);
+      expect(help.output).toContain('yarn android:install');
+      expect(help.commands).toEqual([]);
+    }
+    for (const args of [['a', 'b'], ['--release'], ['--help', 'serial']]) {
       const result = await f.run(args);
       expect(result.code).toBe(1);
       expect(result.commands).toEqual([]);
     }
   });
 
-  for (const [step, command] of [
-    ['build', ':app:assembleRelease'],
-    ['install', 'install'],
-    ['launch', 'am'],
-  ]) {
-    it(`stops when ${step} fails`, async () => {
-      const f = await fixture();
-      const result = await f.run([], { MOCK_FAIL: step });
-      expect(result.code).not.toBe(0);
-      expect(result.commands.at(-1) ?? []).toContain(command);
-    });
-  }
+  it('propagates Android CLI failures', async () => {
+    const f = await fixture();
+    const result = await f.run([], { MOCK_EXIT_CODE: '23' });
+    expect(result.code).toBe(23);
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0]).toContain('run');
+  });
 });
