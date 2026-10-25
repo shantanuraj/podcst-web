@@ -7,6 +7,12 @@ on:
   pull_request:
     branches: [main]
     paths: ['android/**', 'audio-engine/**', 'contracts/**', '.github/workflows/android.yml', '.github/actions/setup-android/**']
+  workflow_dispatch:
+    inputs:
+      upload_to_play:
+        description: Upload to Play internal testing (leave off for the first manual AAB upload)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -44,3 +50,122 @@ jobs:
           target: google_apis
           working-directory: android
           script: ./gradlew --console=plain :core:audio-engine:connectedDebugAndroidTest :core:playback:connectedDebugAndroidTest
+
+  release:
+    name: Play internal release
+    needs: [jvm, device]
+    if: >-
+      github.repository == 'shantanuraj/podcst-web' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && vars.PLAY_INTERNAL_ENABLED == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: play-internal
+    concurrency:
+      group: play-internal
+      queue: max
+      cancel-in-progress: false
+    env:
+      RUSTUP_TOOLCHAIN: stable
+      UPLOAD_TO_PLAY: ${{ github.event_name == 'push' || inputs.upload_to_play }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare signing and release version
+        id: prepare
+        env:
+          SIGNING_DIR: ${{ runner.temp }}/podcst-play-signing
+          VERSION_NAME: ${{ vars.ANDROID_VERSION_NAME || '1.0' }}
+          VERSION_CODE_OFFSET: ${{ vars.ANDROID_VERSION_CODE_OFFSET || '0' }}
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_CERTIFICATE_PEM: ${{ secrets.ANDROID_UPLOAD_CERTIFICATE_PEM }}
+          UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          required=(UPLOAD_KEYSTORE_BASE64 UPLOAD_CERTIFICATE_PEM UPLOAD_STORE_PASSWORD UPLOAD_KEY_ALIAS UPLOAD_KEY_PASSWORD)
+          if [[ "$UPLOAD_TO_PLAY" == true ]]; then
+            required+=(PLAY_SERVICE_ACCOUNT_JSON)
+          fi
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              printf 'Missing release credential: %s\n' "$name" >&2
+              exit 1
+            fi
+          done
+          [[ "$VERSION_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9.+_-]*$ ]] || { echo 'Invalid version name.' >&2; exit 1; }
+          [[ "$VERSION_CODE_OFFSET" =~ ^[0-9]{1,10}$ ]] || { echo 'Invalid version code offset.' >&2; exit 1; }
+          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]{0,9}$ ]] || { echo 'Invalid workflow run number.' >&2; exit 1; }
+          version_code=$((10#$VERSION_CODE_OFFSET + 10#$GITHUB_RUN_NUMBER))
+          (( version_code > 0 && version_code <= 2100000000 )) || { echo 'Version code is outside Play limits.' >&2; exit 1; }
+
+          umask 077
+          mkdir "$SIGNING_DIR"
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$SIGNING_DIR/upload.jks"
+          printf '%s' "$UPLOAD_CERTIFICATE_PEM" > "$SIGNING_DIR/upload-certificate.pem"
+          [[ -s "$SIGNING_DIR/upload.jks" && -s "$SIGNING_DIR/upload-certificate.pem" ]]
+          if [[ "$UPLOAD_TO_PLAY" == true ]]; then
+            printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$SIGNING_DIR/play-service-account.json"
+          fi
+          printf 'version_name=%s\nversion_code=%s\n' "$VERSION_NAME" "$version_code" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-android
+      - name: Build and verify the signed bundle
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/podcst-play-release
+          VERSION_NAME: ${{ steps.prepare.outputs.version_name }}
+          VERSION_CODE: ${{ steps.prepare.outputs.version_code }}
+          ANDROID_UPLOAD_CERTIFICATE: ${{ runner.temp }}/podcst-play-signing/upload-certificate.pem
+          ANDROID_UPLOAD_STORE_FILE: ${{ runner.temp }}/podcst-play-signing/upload.jks
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: bash android/scripts/build-release.sh "$VERSION_NAME" "$VERSION_CODE" "$RELEASE_DIR"
+      - name: Retain the verified bundle and symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ steps.prepare.outputs.version_code }}
+          path: ${{ runner.temp }}/podcst-play-release/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Check for newer Android changes before uploading
+        id: current
+        if: env.UPLOAD_TO_PLAY == 'true'
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          changed=$(git diff --name-only "$GITHUB_SHA" FETCH_HEAD -- \
+            android audio-engine contracts .github/workflows/android.yml .github/actions/setup-android)
+          if [[ -z "$changed" ]]; then
+            echo 'upload=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'upload=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::Newer Android changes exist on main. Bundle retained; their Android CI run will publish the newer candidate.'
+          fi
+      - name: Publish to Play internal testing
+        if: steps.current.outputs.upload == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJson: ${{ runner.temp }}/podcst-play-signing/play-service-account.json
+          packageName: app.podcst.android
+          releaseFiles: ${{ runner.temp }}/podcst-play-release/app-release.aab
+          tracks: internal
+          status: completed
+          releaseName: ${{ steps.prepare.outputs.version_name }} (${{ steps.prepare.outputs.version_code }})
+          mappingFile: ${{ runner.temp }}/podcst-play-release/mapping.txt
+      - name: Remove temporary signing material
+        id: cleanup
+        if: always()
+        env:
+          SIGNING_DIR: ${{ runner.temp }}/podcst-play-signing
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          directory = Path(os.environ['SIGNING_DIR'])
+          for name in ('upload.jks', 'upload-certificate.pem', 'play-service-account.json'):
+              (directory / name).unlink(missing_ok=True)
+          if directory.exists():
+              directory.rmdir()
+          PY

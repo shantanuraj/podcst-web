@@ -21,12 +21,16 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    val release = providers.gradleProperty("podcst.release.storeFile").orNull?.let { storeFile ->
+    val release = providers.gradleProperty("podcst.release.storeFile")
+        .orElse(providers.environmentVariable("ANDROID_UPLOAD_STORE_FILE")).orNull?.let { storeFile ->
         signingConfigs.create("release") {
             this.storeFile = file(storeFile)
-            storePassword = providers.gradleProperty("podcst.release.storePassword").get()
-            keyAlias = providers.gradleProperty("podcst.release.keyAlias").get()
-            keyPassword = providers.gradleProperty("podcst.release.keyPassword").get()
+            storePassword = providers.gradleProperty("podcst.release.storePassword")
+                .orElse(providers.environmentVariable("ANDROID_UPLOAD_STORE_PASSWORD")).get()
+            keyAlias = providers.gradleProperty("podcst.release.keyAlias")
+                .orElse(providers.environmentVariable("ANDROID_UPLOAD_KEY_ALIAS")).get()
+            keyPassword = providers.gradleProperty("podcst.release.keyPassword")
+                .orElse(providers.environmentVariable("ANDROID_UPLOAD_KEY_PASSWORD")).get()
         }
     }
 

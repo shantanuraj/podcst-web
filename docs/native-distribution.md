@@ -151,6 +151,49 @@ Verify retained files with `shasum -a 256 -c SHA256SUMS` inside that directory.
 Nothing is uploaded, installed, or submitted by the script. Direct Gradle builds
 without the script can still produce unsigned bundles for development/CI.
 
+### GitHub Actions internal releases
+
+The **Android** workflow can build a signed release after its JVM and device jobs
+pass. Use **Run workflow** on `main` with `upload_to_play` disabled to retain an
+`android-release-<version-code>` artifact for the first manual Play Console upload.
+The artifact contains the verified AAB, mapping, embedded native symbols and
+checksums. Download it within its 30-day retention period.
+
+Create a GitHub environment named `play-internal`, restricted to `main`, with these
+secrets. Reuse the existing upload keystore and its signing values:
+
+- `ANDROID_UPLOAD_KEYSTORE_BASE64`: base64-encoded keystore bytes.
+- `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`,
+  `ANDROID_UPLOAD_KEY_PASSWORD`: the values used by the local release build.
+- `ANDROID_UPLOAD_CERTIFICATE_PEM`: the exported public upload certificate.
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`: the Play publisher service-account key;
+  needed only when uploading, not for an artifact-only run.
+
+CI passes the keystore path as `ANDROID_UPLOAD_STORE_FILE` and the signing values
+as same-named environment variables. Existing `podcst.release.*` Gradle properties
+take precedence for local builds. CI credentials stay outside the checkout and
+release artifacts; the signing step does not write passwords to Gradle properties.
+
+Create the app and upload/roll out its first signed AAB in Play Console before
+enabling API publishing. Grant the service account app-scoped read access and
+**Release apps to testing tracks**, and enable the Google Play Android Developer
+API in its Cloud project. The workflow publishes only `app.podcst.android` to
+`internal`; it sends the mapping file and the bundle's embedded native symbols.
+
+Set repository variable `PLAY_INTERNAL_ENABLED=true` after that setup to publish
+automatically on successful `main` Android CI runs. Pull requests and forks never
+enter the signing job. Manual runs can explicitly enable `upload_to_play`.
+Publishing is serialized, and an older candidate is retained as an artifact but
+not uploaded if newer Android-related changes exist on `main` by upload time.
+Unrelated web/documentation commits do not suppress an Android release.
+
+Version name comes from `ANDROID_VERSION_NAME` (default `1.0`); version code is
+the Android workflow run number plus `ANDROID_VERSION_CODE_OFFSET` (default `0`).
+Set the offset so the next code exceeds every previous Play upload, including
+other tracks. A rerun uses the same code: if Play already received the bundle,
+start a new workflow run instead. First-time publication and ongoing tester-group
+membership remain configured in Play Console.
+
 ### Remaining artifact and store checks
 
 Validate the bundle and inspect its manifest with the pinned `bundletool` version.
