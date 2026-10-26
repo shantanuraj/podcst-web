@@ -11,6 +11,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgres from 'postgres';
+import { createEmailService } from '@/server/auth/email-service';
+import { reviewCodeDigest } from '@/server/auth/review-credential';
 import { createEpisodeListService } from '@/server/lists/service';
 import { createFollowStateService } from '@/server/state/follows';
 import { createProgressStateService } from '@/server/state/progress';
@@ -307,6 +309,12 @@ describe.skipIf(!process.env.PG_BIN)(
       });
       await sql`INSERT INTO passkeys (id,user_id,credential_id,public_key,counter) VALUES ('passkey','owner','credential',decode('1234','hex'),7)`;
       await sql`INSERT INTO sessions (id,user_id,expires_at) VALUES ('session','owner','2030-01-01')`;
+      const reviewSecret = 'synthetic-backup-secret'.repeat(3);
+      await sql`
+        INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+        VALUES ('apple', 'owner', ${reviewCodeDigest(reviewSecret, 'apple', 'owner@example.invalid', '012345')},
+          ${randomUUID()}, ${'a'.repeat(64)}, 'create', 'synthetic-backup')
+      `;
       await sql`INSERT INTO email_verifications (id,email,code_digest,expires_at) VALUES ('verification','owner@example.invalid',${'a'.repeat(64)},'2030-01-01')`;
       await sql`INSERT INTO transcripts (episode_id,content,segments,source) VALUES (101,'Synthetic','[{"start":0,"text":"Synthetic"}]','synthetic')`;
       const lists = createEpisodeListService(sql);
@@ -346,6 +354,12 @@ describe.skipIf(!process.env.PG_BIN)(
         expect(await restored`SELECT * FROM ${restored(table)}`).toHaveLength(
           0,
         );
+      expect(
+        await createEmailService(restored, reviewSecret, async () => {}).login(
+          'owner@example.invalid',
+          '012345',
+        ),
+      ).toBeNull();
       const restoredLists = createEpisodeListService(restored);
       const page = await restoredLists.episodes('owner', starred, {
         limit: 10,

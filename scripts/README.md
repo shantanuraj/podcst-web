@@ -19,6 +19,13 @@ environment-file permissions. Backup scripts require Linux/GNU coreutils,
 PostgreSQL client tools, age, AWS CLI and (for identity snapshots) zstd on `PATH`.
 Missing required configuration stops the script before a dump or upload.
 
+## Store reviewer preparation
+
+[`review-account.ts`](review-account.ts) provides protected credential generation,
+plan/apply/inspect and HTTP verification for the Apple and Google demonstration
+accounts. See the [interface and reset contract](../docs/review-accounts.md).
+It requires its own explicit database target and never runs on login or deployment.
+
 ## Egress-blocked feeds
 
 A publisher may refuse the server's egress address while serving the same feed

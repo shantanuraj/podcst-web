@@ -626,12 +626,17 @@ describe.skipIf(!process.env.PG_BIN)(
 
     test('CLI explains when an existing index needs operator recovery', async () => {
       const chain = loadMigrations();
-      await applyMigrations(sql, chain.slice(0, -1));
+      const index = chain.findIndex(
+        (migration) =>
+          migration.name === '0024-episodes-podcast-published-index.sql',
+      );
+      expect(index).toBeGreaterThan(0);
+      await applyMigrations(sql, chain.slice(0, index));
       await sql`CREATE INDEX idx_episodes_podcast_published ON public.episodes (id)`;
       const result = cli(['up'], cluster.url);
       expect(result.exitCode).toBe(1);
       expect(result.stderr.toString()).toContain('requires operator recovery');
-      expect((await inspectMigrations(sql)).migrations.at(-1)?.state).toBe(
+      expect((await inspectMigrations(sql)).migrations[index]?.state).toBe(
         'pending',
       );
     });

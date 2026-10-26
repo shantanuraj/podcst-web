@@ -279,6 +279,14 @@ Both email endpoints bound UTF-8 JSON bodies to 16 KiB and five seconds (413/408
 
 Body: `{ "email": string, "code": string }`. Consumes the code, creates the user if absent, and inserts a session in one database transaction; the cookie is set only after commit. Concurrent redemption produces at most one session. Returns `Verified` `{ "verified": true }`. Errors: 400 `{message: "Email and code required"}`, 400 `{message: "Invalid or expired code"}`, plus the shared limits/outages above. Email identity is compared exactly as sent: no trimming, case-folding or automatic account merges. Codes must be six-digit strings, including leading zeros. A lost success response requires a new code, not replay of the consumed code. Fixtures: `auth-email-login.verified.json`, `auth-email-login.invalid-code.json`.
 
+Explicitly enrolled store reviewer accounts additionally accept a reusable code
+for their normalized email through this same endpoint. It creates only ordinary
+sessions for the enrolled, existing user and never creates an account. It does
+not consume or depend on an emailed code. Emailed OTPs continue to work for the
+same registered user, including case variants of that registered address. General
+verification does not accept the reusable registration, and all ordinary request
+and rate protections still apply. See [reviewer accounts](../../docs/review-accounts.md).
+
 ### `POST /api/auth/login` — public
 
 Start body: `{ "discoverable": true }`. Returns `PasskeyLoginStart` `{ "flowId": string, "options": PublicKeyCredentialRequestOptionsJSON }`. Options contain `rpId`, a random challenge, `allowCredentials: []`, timeout 60000 and `userVerification: "required"`. There is no email/account/passkey discovery response; clients offer email-code login independently. A missing start discriminator returns 400 `{message: "Passkey flow required"}`. Fixtures: `auth-login.discoverable.json`, `auth-login.missing-flow.json`.

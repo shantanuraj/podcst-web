@@ -1,0 +1,13 @@
+{
+  "revision": "1",
+  "feeds": [
+    { "key": "public", "episodes": ["listening", "walking", "rain", "night"] },
+    { "key": "private", "episodes": ["notebook", "postcard"] }
+  ],
+  "progress": [
+    { "episode": "listening", "positionSeconds": 35, "completed": false },
+    { "episode": "walking", "completed": true }
+  ],
+  "starred": ["rain", "notebook"],
+  "playlist": { "name": "A little time to listen", "episodes": ["night", "notebook", "listening"] }
+}

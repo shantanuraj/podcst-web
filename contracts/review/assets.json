@@ -1,0 +1,36 @@
+{
+  "listening": {
+    "length": 705394,
+    "sha256": "2f88b4e526701f95b9befed36a91ce938c7bf6b3ef6d1b872bd2dd3cfdadf479",
+    "duration": 88
+  },
+  "walking": {
+    "length": 700577,
+    "sha256": "97b2656d8f46b71dafe07577c950a6bb523fb331b24755a38dc4e4f2b48bc790",
+    "duration": 87
+  },
+  "rain": {
+    "length": 719171,
+    "sha256": "48726260f0eba3c28cbd9337c577fa2d26721fd92990b66cffd14cdf057799fa",
+    "duration": 89
+  },
+  "night": {
+    "length": 747609,
+    "sha256": "a22d06d62158b290c4ba6ce7d3b32fd04a623f3b49e4da335509ef968dd41162",
+    "duration": 93
+  },
+  "notebook": {
+    "length": 747397,
+    "sha256": "e2dbad398f6722a45dfa740cc4d1a5a9f771eddc16e02888e2f259a7986bf8f0",
+    "duration": 93
+  },
+  "postcard": {
+    "length": 672592,
+    "sha256": "0cb732603286029866f940ab76f2cc0adac8f02dd98c3cc94f6c39b077151637",
+    "duration": 83
+  },
+  "cover": {
+    "length": 35173,
+    "sha256": "04e2ff503d056f28bc777246e23bc42bcc9d8bf5ed073011d04887f11e20d15b"
+  }
+}

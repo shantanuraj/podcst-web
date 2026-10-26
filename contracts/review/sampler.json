@@ -1,0 +1,66 @@
+{
+  "author": "Podcst",
+  "published": "2026-10-01T12:00:00.000Z",
+  "episodes": [
+    {
+      "key": "listening",
+      "title": "The small art of listening",
+      "description": "An original spoken introduction to noticing the sounds around us.",
+      "chapters": [
+        { "title": "An open window", "text": "Welcome to the Podcst sampler. These short, original stories are spoken by a synthetic voice. There is no quiz at the end, and no need to remember every detail. Find a comfortable volume and settle in. Imagine a room with an open window. Somewhere outside, a bicycle rolls over a loose paving stone. A door closes. A bird calls from a roof you cannot see. Each small sound tells you something about the world beyond the window." },
+        { "title": "Near and far", "text": "Try listening for the nearest sound, then for the farthest. The nearest might be the brush of a sleeve or the quiet turning of a page. The farthest might be a train, a bell, or the steady movement of traffic. Nothing needs to be beautiful to be interesting. A familiar room becomes a different place when you pay attention to its edges. Let the sounds arrive without trying to name all of them. A pause belongs to the story too." },
+        { "title": "A moment to return", "text": "Now bring your attention back to this voice. A recording lets us return to a moment that has already passed. We can pause it, move back a little, or carry it into the next room. That small freedom is part of the pleasure of listening. When this episode ends, leave yourself a few seconds before choosing the next one. Notice which sound takes the place of the voice. The window is still open, and the world has kept going." }
+      ]
+    },
+    {
+      "key": "walking",
+      "title": "A walk around the block",
+      "description": "A familiar route becomes a collection of small discoveries.",
+      "chapters": [
+        { "title": "The corner", "text": "Our walk starts at a corner we have passed a hundred times. Today we have nowhere urgent to be. The pavement has a pale line where a wall used to stand. A shop window holds a blue bowl, three books, and a plant leaning toward the light. There is nothing remarkable about any of it. That is the point of this walk. We are looking for ordinary things that usually slip past while we are thinking about somewhere else." },
+        { "title": "Across the street", "text": "Across the street, someone has painted a front door green. The brass handle has become bright where many hands have touched it. A narrow tree grows from a square of soil between the paving stones. Its leaves move before we feel the breeze ourselves. We wait at the crossing and hear a bicycle bell. Then the street is quiet again. A short walk has its own rhythm: a few steps, a pause, a glance upward, and a few steps more." },
+        { "title": "Home again", "text": "By the time we reach the starting corner, the light has shifted along the wall. We have travelled only a small distance, yet the route feels larger than it did before. Perhaps tomorrow we will notice a different window, a flower opening, or a missing tile. We do not need to collect these details or photograph every one. It is enough to have seen them. The door opens, the walk is finished, and the rest of the day is waiting." }
+      ]
+    },
+    {
+      "key": "rain",
+      "title": "When the rain arrives",
+      "description": "A quiet story about an afternoon shower and the sounds it changes.",
+      "chapters": [
+        { "title": "First drops", "text": "The first drops arrive slowly enough to count. One lands on the windowsill. Another darkens the stone outside the door. For a moment the street seems undecided about whether it is raining at all. Then the drops draw together into a steady pattern. People fold their newspapers and move under the awning. A dog pauses, looks upward, and keeps walking. Inside, a kettle begins to warm. We have a little time to watch the weather change." },
+        { "title": "Under shelter", "text": "Rain makes a different instrument of every surface. On leaves it whispers. On the roof of the shed it taps. In the gutter it gathers into a small, hurried stream. The room feels closer around us, though nothing in it has moved. We turn a chair toward the window and watch the reflections stretch along the road. A passing bus lifts a soft fan of water. Then the reflections settle, and the window becomes a picture again." },
+        { "title": "Afterwards", "text": "Eventually the pattern grows uneven. The shower moves on, leaving a few drops hanging from the edge of the awning. A patch of light appears on the opposite wall. Someone steps outside to check the sky, and soon the pavement belongs to the afternoon again. We open the window a little wider. The sound that remains is not quite silence: water still falls from the leaves, one drop at a time. There is no hurry to close the window." }
+      ]
+    },
+    {
+      "key": "night",
+      "title": "The last light in the library",
+      "description": "An imagined library closes for the evening, one room at a time.",
+      "chapters": [
+        { "title": "The announcement", "text": "The library will close in ten minutes. A quiet announcement travels through the rooms, and readers begin to mark their places. A pencil returns to a pocket. A map is folded carefully along its old creases. At the long table by the window, one person finishes a sentence before looking up. Outside, the evening has changed the glass into a mirror. Inside, the lamps make small islands of light among the shelves. For a few more minutes, every island is occupied." },
+        { "title": "Returning books", "text": "A librarian guides a trolley between the tables. Its wheels make a gentle, uneven sound over the floor. The books on it have travelled through many hands today. Some were opened for a single page. Others kept someone company for an entire afternoon. A book about gardens rests beside a collection of stories and an atlas of imaginary places. Tomorrow they will return to their shelves, ready for a reader who does not yet know which one to choose." },
+        { "title": "The doorway", "text": "At last the tables are empty. Chairs slide into place, and the lamps are switched off in pairs. The final reader pauses at the doorway to put on a coat. Behind them, the library holds its rows of unread beginnings and unfinished journeys. Ahead, the street is full of evening sounds. The door closes softly. We can carry a story home without taking anything away from the room where we found it. Tomorrow the light will be waiting again." }
+      ]
+    },
+    {
+      "key": "notebook",
+      "title": "Pages from a pocket notebook",
+      "description": "A private sampler story about a notebook full of harmless observations.",
+      "chapters": [
+        { "title": "The first page", "text": "This is the private Podcst sampler. It contains original demonstration stories, with no personal information. Our first story begins with a pocket notebook. The cover is plain, the corners are slightly bent, and the first page contains only three words: things to notice. There are no deadlines, appointments, or important addresses inside. Instead, someone has written down the shape of a cloud, the colour of a doorway, and a sentence they heard in a dream. It is a very undemanding book." },
+        { "title": "Small entries", "text": "On another page, a sketch of a cup sits beside a list of sounds from a railway station. The sketch is crooked, but the handle looks cheerful. Further on there is a description of a leaf that landed on a bench. Nothing here would make the news. Yet each small entry has kept a moment from disappearing completely. When the owner opens the notebook weeks later, a few words are enough to bring back the air and light of an ordinary day." },
+        { "title": "Room for more", "text": "There are still many empty pages. That is part of what makes the notebook welcoming. It does not ask to be finished quickly, or filled with especially clever thoughts. A single line will do. So will a drawing, a question, or a word worth saying aloud. We close the cover and put the notebook back into a pocket. Somewhere outside, another small thing is waiting to be noticed. Perhaps it will find its way onto the next page." }
+      ]
+    },
+    {
+      "key": "postcard",
+      "title": "A postcard from an imaginary coast",
+      "description": "An invented seaside scene, written as a friendly postcard.",
+      "chapters": [
+        { "title": "Dear friend", "text": "Dear friend, I am writing from a town that exists only for this story. The station is small, the sea is close, and the street names all seem to lead downhill. This morning I bought a postcard with a picture of a lighthouse on it. The real lighthouse is shorter than the picture suggests, but I like it better that way. A line of washing moves behind a cottage, and somewhere a gate keeps tapping against its post. Nothing here is in much of a hurry." },
+        { "title": "Along the shore", "text": "I walked along the shore until the town was hidden by the curve of the coast. The beach was a mixture of sand and smooth stones. I chose one stone, turned it over in my hand, and left it where I found it. There were little pools between the rocks, each reflecting a different piece of sky. I sat for a while and watched the water move. A boat crossed the far edge of the view so slowly that it seemed almost still." },
+        { "title": "Wish you were here", "text": "Now I am back at a table near the harbour, trying to fit the whole morning into the space on this card. There is room for only a few more lines. So I will tell you that the air was cool, the water was bright, and I was glad to have taken the longer path. I hope your day has a quiet corner in it too. Wish you were here, in this small imaginary place. I will leave the rest of the picture to you." }
+      ]
+    }
+  ]
+}

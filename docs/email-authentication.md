@@ -15,8 +15,10 @@ a client-controlled header or accept an arbitrary `X-Forwarded-For` chain.
 
 ## State and limits
 
-- Exact email strings remain account identities. Case-folding applies only to
-  abuse-limit subjects; it neither changes codes' identity binding nor merges users.
+- Exact email strings remain ordinary account identities. Case-folding applies
+  to abuse limits and identity locks. Explicitly enrolled [store reviewer
+  accounts](review-accounts.md) use a normalized address and reusable login code;
+  they do not merge or enroll existing ordinary users.
 - Six-digit cryptographic codes expire after ten minutes and five guesses.
 - Sends: 60-second cooldown, five/hour/email, 20/hour/trusted source.
 - Verification: five guesses times the send budget, or 25/hour/email and
@@ -33,6 +35,12 @@ a client-controlled header or accept an arbitrary `X-Forwarded-For` chain.
 account deletion must acquire it before locking the user, and remove matching
 verification rows in the deletion transaction. Deletion proof must be a separate,
 purpose-bound flow, not reuse login's account-creation semantics.
+
+Migration `0025-review-accounts.sql` adds read-only runtime registration lookup
+to email login. Grant the runtime SELECT on this table before activating the
+application. Reusable review credentials use a separate HMAC purpose bound to
+store and normalized email; general verification still accepts only ordinary
+one-time codes. Shared-secret rotation must reissue their digests too.
 
 ## Activation and recovery
 

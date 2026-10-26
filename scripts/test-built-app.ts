@@ -133,6 +133,8 @@ try {
     await cluster.sql.unsafe(
       readFileSync(join(root, 'scripts/fixtures', fixture), 'utf8'),
     );
+  for (const table of ['authors', 'podcasts', 'episodes'])
+    await cluster.sql`SELECT setval(pg_get_serial_sequence(${table}, 'id'), (SELECT max(id) FROM ${cluster.sql(table)}))`;
   const runtime = new URL(cluster.url);
   runtime.username = 'web_runtime';
   abort.signal.throwIfAborted();
@@ -162,6 +164,9 @@ try {
       DATABASE_URL: runtime.toString(),
       REDIS_URL: socket,
       AUTH_CODE_SECRET: 'a'.repeat(64),
+      REVIEW_SAMPLER_ORIGIN: base,
+      REVIEW_SAMPLER_APPLE_TOKEN: 'b'.repeat(64),
+      REVIEW_SAMPLER_GOOGLE_TOKEN: 'c'.repeat(64),
       WEBAUTHN_ORIGIN: base,
       WEBAUTHN_RP_ID: 'localhost',
       NEXT_TELEMETRY_DISABLED: '1',

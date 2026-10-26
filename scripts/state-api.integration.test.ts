@@ -4,7 +4,14 @@ import { lstatSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import postgres from 'postgres';
+import { adaptFeed } from '../src/app/api/feed/parser';
+import { reviewCodeDigest } from '../src/server/auth/review-credential';
 import { stateValidator } from '../src/shared/state-contract';
+import { applyReviewAccount, planReviewAccount } from './lib/review-account';
+import type { ResolvedReviewSeed } from './lib/review-seed';
+import { verifyReviewAccount } from './lib/review-verify';
+import { loadMigrations } from './migrations';
+import { captureSchema, inventoryArtifact } from './schema-catalog';
 
 const base = process.env.STATE_TEST_BASE_URL;
 const socket = process.env.STATE_TEST_SOCKET;
@@ -367,6 +374,131 @@ describe.skipIf(!configured)(
           )
         ).status,
       ).toBe(401);
+    }, 30_000);
+    test('reviewers use the normal HTTP login, seeded state and account retirement paths', async () => {
+      if (!base) throw new Error('Isolated application target required');
+      const reference = inventoryArtifact(
+        await captureSchema(sql),
+        loadMigrations().map(({ name, checksum }) => ({ name, checksum })),
+      );
+      const identity = {
+        store: 'apple' as const,
+        email: 'http-review@example.invalid',
+        target: 'development' as const,
+      };
+      const sourceDigest = 'a'.repeat(64);
+      const code = '012345';
+      const seed: ResolvedReviewSeed = { revision: '1', feeds: [] };
+      for (const key of ['public', 'private'] as const) {
+        const url = `${base}/api/sampler/${key === 'public' ? 'public' : 'b'.repeat(64)}`;
+        const response = await fetch(url);
+        expect(response.status).toBe(200);
+        const data = await adaptFeed(await response.text());
+        if (!data) throw new Error('Sampler feed unavailable');
+        seed.feeds.push({
+          key,
+          url,
+          fetched: {
+            status: 'updated',
+            data,
+            etag: null,
+            lastModified: null,
+            hash: 'synthetic',
+          },
+        });
+        for (const episode of data.episodes) {
+          const range = await fetch(episode.file.url, {
+            headers: { Range: 'bytes=0-1' },
+          });
+          expect(range.status).toBe(206);
+          expect(range.headers.get('content-type')).toContain('audio/mpeg');
+          expect(range.headers.get('content-range')).toBe(
+            `bytes 0-1/${episode.file.length}`,
+          );
+          expect((await range.arrayBuffer()).byteLength).toBe(2);
+        }
+      }
+      const credentialDigest = reviewCodeDigest(
+        'a'.repeat(64),
+        identity.store,
+        identity.email,
+        code,
+      );
+      const create = await planReviewAccount(
+        sql,
+        {
+          identity,
+          action: 'create',
+          submission: 'http-fixture',
+          sourceDigest,
+          credentialDigest,
+        },
+        reference,
+        seed,
+      );
+      await applyReviewAccount(sql, create, {
+        sourceDigest,
+        credentialDigest,
+        seed,
+        target: 'development',
+      });
+      const verified = await verifyReviewAccount(sql, create, base, code, {
+        sendCode: false,
+      });
+      expect(verified.sessionsChecked).toBe(2);
+      expect(verified.seedChecked).toBe(true);
+      const login = await fetch(`${base}/api/auth/email-login`, {
+        method: 'POST',
+        headers: {
+          'X-Podcst-Client': 'native',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: identity.email, code }),
+      });
+      expect(login.status).toBe(200);
+      const oldCookie = login.headers.get('set-cookie')?.split(';')[0] ?? '';
+      const [privatePodcast] =
+        await sql`SELECT id FROM podcasts WHERE owner_user_id = ${verified.userId}`;
+      const denied = await fetch(
+        `${base}/api/feed/info?id=${privatePodcast.id}`,
+        { headers: { Cookie: `session=${otherCookie}` } },
+      );
+      expect(denied.status).toBe(404);
+      const send = await fetch(`${base}/api/auth/verify`, {
+        method: 'POST',
+        headers: {
+          'X-Podcst-Client': 'native',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: identity.email }),
+      });
+      expect(send.status).toBe(503);
+      const reset = await planReviewAccount(
+        sql,
+        {
+          identity,
+          action: 'reset',
+          submission: 'http-fixture',
+          sourceDigest,
+          credentialDigest: null,
+        },
+        reference,
+        seed,
+      );
+      await applyReviewAccount(sql, reset, {
+        sourceDigest,
+        credentialDigest: null,
+        seed,
+        target: 'development',
+      });
+      const retired = await fetch(`${base}/api/account`, {
+        headers: { Cookie: oldCookie },
+      });
+      expect(retired.status).toBe(401);
+      const next = await verifyReviewAccount(sql, reset, base, code, {
+        sendCode: false,
+      });
+      expect(next.userId).not.toBe(verified.userId);
     }, 30_000);
   },
 );
