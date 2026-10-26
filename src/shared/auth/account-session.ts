@@ -24,6 +24,7 @@ export interface AccountToken {
 }
 
 interface Effects {
+  isBlocked?: (account: string) => boolean;
   resetPlayer: (scope: AccountScope | undefined, revision: number) => void;
   reload: () => void;
   publish: () => void;
@@ -38,10 +39,15 @@ export class AccountSession {
   private checking?: { controller: AbortController; promise: Promise<void> };
   private tokenState?: AccountSnapshot;
   private cachedToken?: AccountToken;
-  private lifecycle = new Set<{
-    suspend: () => Promise<void>;
-    erase: (account: string) => Promise<void>;
-  }>();
+  private deletionPaused = new Set<string>();
+  private blockedSnapshot?: { source: AccountSnapshot; value: AccountSnapshot };
+  private lifecycle = new Map<
+    string,
+    {
+      suspend: () => Promise<void>;
+      erase: (account: string) => Promise<void>;
+    }
+  >();
   private checkpoints = new Set<() => Promise<void>>();
 
   registerCheckpoint(checkpoint: () => Promise<void>) {
@@ -51,23 +57,36 @@ export class AccountSession {
     };
   }
 
-  registerLifecycle(hooks: {
-    suspend: () => Promise<void>;
-    erase: (account: string) => Promise<void>;
-  }) {
-    this.lifecycle.add(hooks);
+  registerLifecycle(
+    kind: string,
+    hooks: {
+      suspend: () => Promise<void>;
+      erase: (account: string) => Promise<void>;
+    },
+  ) {
+    if (this.lifecycle.has(kind))
+      throw new Error('Account lifecycle already registered');
+    this.lifecycle.set(kind, hooks);
     return () => {
-      this.lifecycle.delete(hooks);
+      if (this.lifecycle.get(kind) === hooks) this.lifecycle.delete(kind);
     };
   }
 
   async checkpointAndSuspend() {
     await Promise.all([...this.checkpoints].map((checkpoint) => checkpoint()));
-    await Promise.all([...this.lifecycle].map((hooks) => hooks.suspend()));
+    await Promise.all(
+      [...this.lifecycle.values()].map((hooks) => hooks.suspend()),
+    );
   }
 
   async eraseConfirmedAccount(account: string) {
-    await Promise.all([...this.lifecycle].map((hooks) => hooks.erase(account)));
+    for (const kind of ['queue', 'stars', 'state']) {
+      if (!this.lifecycle.has(kind))
+        throw new Error('Account cleanup is not initialized; retry required');
+    }
+    await Promise.all(
+      [...this.lifecycle.values()].map((hooks) => hooks.erase(account)),
+    );
   }
 
   constructor(
@@ -84,7 +103,50 @@ export class AccountSession {
     };
   }
 
-  getSnapshot = () => this.state;
+  getSnapshot = () => {
+    let blocked = false;
+    if (this.scope !== null) {
+      try {
+        blocked =
+          this.deletionPaused.has(this.scope) ||
+          (this.effects.isBlocked?.(this.scope) ?? false);
+      } catch {
+        blocked = true;
+      }
+    }
+    if (!blocked) return this.state;
+    if (this.blockedSnapshot?.source !== this.state)
+      this.blockedSnapshot = {
+        source: this.state,
+        value: { ...this.state, ready: false },
+      };
+    return this.blockedSnapshot.value;
+  };
+
+  get verifiedAccount() {
+    return this.state.ready ? this.scope : undefined;
+  }
+
+  suspendForDeletion(account: string) {
+    if (this.scope !== account) return;
+    this.deletionPaused.add(account);
+    this.retire(this.state.denied, true);
+  }
+
+  resumeAfterDeletionCancellation(account: string) {
+    this.deletionPaused.delete(account);
+    return this.refresh();
+  }
+
+  forgetDeletedAccount(account: string) {
+    this.purge(account);
+    if (this.scope !== account) return;
+    this.retire();
+    this.state = { ...this.state, user: null, ready: true };
+    this.synchronizePlayer();
+    this.emit();
+    this.effects.publish();
+  }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {
@@ -110,7 +172,7 @@ export class AccountSession {
 
   current(token: AccountToken, resource?: string | number) {
     return (
-      this.state.ready &&
+      this.getSnapshot().ready &&
       token.scope === this.scope &&
       token.revision === this.state.revision &&
       !token.signal.aborted &&
@@ -137,11 +199,14 @@ export class AccountSession {
       if (matches(mutation.options.mutationKey)) mutations.remove(mutation);
   }
 
-  private retire(denied: ReadonlySet<string | number> = new Set()) {
+  private retire(
+    denied: ReadonlySet<string | number> = new Set(),
+    preserveVerification = false,
+  ) {
     const previous = this.scope;
     this.state = {
       ...this.state,
-      ready: false,
+      ready: preserveVerification && this.state.ready,
       revision: this.state.revision + 1,
       denied,
     };
@@ -156,7 +221,7 @@ export class AccountSession {
 
   synchronizePlayer() {
     this.effects.resetPlayer(
-      this.state.ready ? this.scope : undefined,
+      this.getSnapshot().ready ? this.scope : undefined,
       this.state.revision,
     );
   }

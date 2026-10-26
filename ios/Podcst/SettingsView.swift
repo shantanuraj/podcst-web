@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Appearance.key) private var appearance = Appearance.system
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
+    @State private var showingDeletion = false
     @State private var showingLogin = false
     @State private var importing = false
     @State private var importError: String?
@@ -52,6 +53,9 @@ struct SettingsView: View {
                     } header: {
                         Text("Account").eyebrow()
                     }
+                }
+                Section {
+                    Button("Delete account", role: .destructive) { showingDeletion = true }
                 }
                 Section {
                     Picker("Appearance", selection: $appearance) {
@@ -100,6 +104,7 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(PodcstPalette.paper)
             .navigationTitle("Settings")
+            .sheet(isPresented: $showingDeletion) { AccountDeletionView() }
             .sheet(isPresented: $showingLogin) { LoginView() }
             .sheet(isPresented: $showingAudio) { AudioSettingsView() }
             .confirmationDialog("Remove passkey?", isPresented: Binding { removing != nil } set: { if !$0 { removing = nil } }, titleVisibility: .visible, presenting: removing) { passkey in
@@ -428,5 +433,68 @@ struct LoginView: View {
                 focus = .code
             }
         }
+    }
+}
+
+struct AccountDeletionView: View {
+    @Environment(AccountDeletionStore.self) private var deletion
+    @Environment(SessionStore.self) private var session
+    @Environment(\.dismiss) private var dismiss
+    @State private var code = ""
+    @State private var confirmed = false
+    @State private var showingLogin = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Permanently delete your Podcst account, credentials, follows, listening history, Starred episodes, preferences and private feeds. This cannot be undone.")
+                    Text("This device removes the account’s saved data after confirmation. Other devices and exported copies may retain data. Publisher subscriptions are unaffected.")
+                        .font(.footnote)
+                    Link("Data retention details", destination: URL(string: "https://www.podcst.app/privacy#deletion")!)
+                }
+                if let user = session.user, !deletion.blocked(user.id) {
+                    Button("Send deletion code") { Task { await deletion.prepare(account: user.id) } }
+                } else if session.user == nil {
+                    Button("Sign in to delete your account") { showingLogin = true }
+                }
+                ForEach(deletion.records) { record in
+                    Section {
+                        Text(status(record))
+                        if record.accountId == session.user?.id, record.preparation != nil, record.cleanup == nil, record.outcome == nil || record.outcome == .unknown {
+                            TextField("Deletion code", text: $code)
+                                .keyboardType(.numberPad)
+                                .textContentType(.oneTimeCode)
+                            Toggle("Permanently delete \(session.user?.email ?? "this account") and its data", isOn: $confirmed)
+                            Button("Delete account permanently", role: .destructive) { Task { await deletion.submit(account: record.accountId, code: code) } }
+                                .disabled(!confirmed || code.count != 6)
+                        }
+                        if record.outcome == nil {
+                            Button("Cancel") { Task { await deletion.cancel(account: record.accountId) } }
+                        } else if record.cleanup != .complete {
+                            Button(record.outcome == .completed ? "Retry cleanup" : "Check deletion status") { Task { await deletion.check(account: record.accountId) } }
+                        }
+                        if record.outcome == .unknown, record.accountId == session.user?.id {
+                            Button("Request a new deletion code") { Task { await deletion.prepare(account: record.accountId) } }
+                        }
+                    }
+                }
+                if let error = deletion.error { Text(error).foregroundStyle(.red) }
+            }
+            .disabled(deletion.busy)
+            .navigationTitle("Delete account")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .sheet(isPresented: $showingLogin) { LoginView() }
+            .onChange(of: session.user?.id) { code = ""; confirmed = false }
+            .onChange(of: deletion.records.first { $0.accountId == session.user?.id }?.preparation?.operationId) { code = ""; confirmed = false }
+        }
+    }
+
+    private func status(_ record: AccountDeletion) -> String {
+        if record.cleanup == .complete { return "Your account has been deleted and its saved data removed from this device." }
+        if record.outcome == .completed { return "Your account has been deleted. Cleanup on this device still needs to finish." }
+        if record.outcome == .pending { return "Your deletion request has been accepted. Check for completion." }
+        if record.outcome == .unknown { return "Deletion is not confirmed. Check its status. Your saved data is retained." }
+        return "Enter the deletion code sent to your account email. It expires after five minutes."
     }
 }

@@ -233,6 +233,7 @@ export const messages = {
   },
 
   account: {
+    delete: 'Delete account',
     title: 'Account',
     profile: 'Profile',
     playback: 'Playback',

@@ -234,6 +234,7 @@ export const messages: Messages = {
   },
 
   account: {
+    delete: '계정 삭제',
     title: '계정',
     profile: '프로필',
     playback: '재생',

@@ -205,7 +205,7 @@ describe.skipIf(!process.env.PG_BIN)(
     test('read-only registration access suffices and a backend failure never falls back', async () => {
       await sql`CREATE ROLE review_runtime LOGIN`;
       await sql`GRANT USAGE ON SCHEMA public TO review_runtime`;
-      await sql`GRANT SELECT ON review_accounts TO review_runtime`;
+      await sql`GRANT SELECT ON review_accounts, account_erasure_intents TO review_runtime`;
       await sql`GRANT SELECT, INSERT, UPDATE ON users, sessions TO review_runtime`;
       await sql`GRANT SELECT, INSERT, UPDATE, DELETE ON email_verifications TO review_runtime`;
       const runtime = postgres({

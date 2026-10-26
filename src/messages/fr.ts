@@ -240,6 +240,7 @@ export const messages: Messages = {
   },
 
   account: {
+    delete: 'Supprimer le compte',
     title: 'Compte',
     profile: 'Profil',
     playback: 'Lecture',

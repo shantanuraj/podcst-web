@@ -6,6 +6,7 @@ import { AuthError } from './error';
 
 const SENDS_PER_EMAIL = 5;
 const SENDS_PER_SOURCE = 20;
+export type AuthLimitKind = 'send' | 'verify' | 'challenge' | 'deletion-status';
 
 const consume = `
   local time = redis.call('TIME')
@@ -39,38 +40,39 @@ export function createAuthLimiter(redis: Pick<Redis, 'eval'>, secret: string) {
     throw new AuthError(503, 'Authentication unavailable');
   const key = (scope: string, value: string) =>
     `auth:limit:${scope}:${createHmac('sha256', secret).update(value).digest('hex')}`;
-  return async (
-    kind: 'send' | 'verify' | 'challenge',
-    email: string,
-    source: string,
-  ) => {
+  return async (kind: AuthLimitKind, email: string, source: string) => {
     const policies =
-      kind === 'challenge'
+      kind === 'deletion-status'
         ? ([
-            [key('challenge-source', source), 3_600_000, SENDS_PER_SOURCE],
+            [key('deletion-receipt', email), 60_000, 12],
+            [key('deletion-source', source), 60_000, 120],
           ] as const)
-        : kind === 'send'
+        : kind === 'challenge'
           ? ([
-              [key('cooldown', email.toLowerCase()), 60_000, 1],
-              [
-                key('send-email', email.toLowerCase()),
-                3_600_000,
-                SENDS_PER_EMAIL,
-              ],
-              [key('send-source', source), 3_600_000, SENDS_PER_SOURCE],
+              [key('challenge-source', source), 3_600_000, SENDS_PER_SOURCE],
             ] as const)
-          : ([
-              [
-                key('verify-email', email.toLowerCase()),
-                3_600_000,
-                SENDS_PER_EMAIL * CODE_ATTEMPTS,
-              ],
-              [
-                key('verify-source', source),
-                3_600_000,
-                SENDS_PER_SOURCE * CODE_ATTEMPTS,
-              ],
-            ] as const);
+          : kind === 'send'
+            ? ([
+                [key('cooldown', email.toLowerCase()), 60_000, 1],
+                [
+                  key('send-email', email.toLowerCase()),
+                  3_600_000,
+                  SENDS_PER_EMAIL,
+                ],
+                [key('send-source', source), 3_600_000, SENDS_PER_SOURCE],
+              ] as const)
+            : ([
+                [
+                  key('verify-email', email.toLowerCase()),
+                  3_600_000,
+                  SENDS_PER_EMAIL * CODE_ATTEMPTS,
+                ],
+                [
+                  key('verify-source', source),
+                  3_600_000,
+                  SENDS_PER_SOURCE * CODE_ATTEMPTS,
+                ],
+              ] as const);
     let retry: unknown;
     try {
       retry = await redis.eval(

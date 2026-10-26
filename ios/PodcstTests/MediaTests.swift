@@ -6,6 +6,26 @@ import XCTest
 
 @MainActor
 final class MediaTests: XCTestCase {
+    func testErasingArchivedMediaPreservesActiveAccountAndGuestDirectories() async throws {
+        let root = temporaryDirectory()
+        for kind in ["cache", "downloads"] {
+            for account: String? in ["a", "b", nil] {
+                let directory = root.appendingPathComponent(kind).appendingPathComponent(MediaKey.scope(account))
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try Data("retained".utf8).write(to: directory.appendingPathComponent("sentinel"))
+            }
+        }
+        let store = MediaStore(accountID: "b", rootURL: root, downloadConfiguration: .ephemeral)
+        try await store.erase(account: "a")
+        XCTAssertEqual(store.accountID, "b")
+        for kind in ["cache", "downloads"] {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(kind).appendingPathComponent(MediaKey.scope("a")).path))
+            for account: String? in ["b", nil] {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent(kind).appendingPathComponent(MediaKey.scope(account)).appendingPathComponent("sentinel").path))
+            }
+        }
+    }
+
     func testChapterArtworkReadsCompletedDownloadsOfflineAndReleasesItsLease() async throws {
         let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("contracts/fixtures/media/chapters-artwork-v23.mp3")

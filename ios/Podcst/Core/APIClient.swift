@@ -15,6 +15,7 @@ public final class APIClient {
     private var currentUserID: String?
     private var sessionRevision = UUID()
     var hasSession: Bool { sessionCookie?.isEmpty == false }
+    var deletionBlocked: ((String) -> Bool)?
     var accountID: String? { currentUserID }
     var activityToken: UUID { sessionRevision }
 
@@ -331,7 +332,7 @@ public final class APIClient {
         sessionRevision = UUID()
         sessionCookie = nil
         currentUserID = nil
-        keychain.delete()
+        try? keychain.delete()
         subscriptionRequest?.cancel()
         subscriptionRequest = nil
         feedCache.clear()
@@ -483,6 +484,27 @@ public final class APIClient {
         let _: RawSuccess = try await delete(path: "/api/account/passkeys/\(id)", query: [])
     }
 
+    func prepareDeletion(account: String) async throws -> DeletionPreparation {
+        try await post(path: "/api/account/deletion", body: ["accountId": account])
+    }
+
+    func submitDeletion(operation: String, code: String) async throws -> DeletionOutcome {
+        struct Body: Encodable { let operationId: String; let code: String; let confirmed = true }
+        return try await request(method: "DELETE", path: "/api/account/deletion", query: [], body: Body(operationId: operation, code: code))
+    }
+
+    func deletionStatus(receipt: String) async throws -> DeletionOutcome {
+        try await request(method: "POST", path: "/api/account/deletion/status", query: [], body: ["receipt": receipt], usesSession: false)
+    }
+
+    func eraseCredentials(account: String) throws {
+        subscriptionCache.remove(account)
+        guard currentUserID == account else { return }
+        try keychain.delete()
+        try feedCache.erase()
+        clearSession()
+    }
+
     private nonisolated static func isoDate(_ value: String) -> Date? {
         try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value)
     }
@@ -504,6 +526,8 @@ public final class APIClient {
     }
 
     private func request<T: Decodable, B: Encodable>(method: String, path: String, query: [URLQueryItem], body: B?, usesSession: Bool = true) async throws -> T {
+        if usesSession, let currentUserID, deletionBlocked?(currentUserID) == true,
+           !path.hasPrefix("/api/account/deletion"), !path.hasPrefix("/api/auth/") { throw DurableStateFailure.suspended }
         var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
         components?.queryItems = query.isEmpty ? nil : query
         guard let url = components?.url else { throw APIError(statusCode: 0, message: "Invalid API URL") }
@@ -626,6 +650,11 @@ final class FeedCache {
             return podcast
         }
         return entries[key(.feed(feed))]?.podcast
+    }
+
+    func erase() throws {
+        clear()
+        if let storageURL, FileManager.default.fileExists(atPath: storageURL.path) { try FileManager.default.removeItem(at: storageURL) }
     }
 
     func clear() {
@@ -842,7 +871,7 @@ final class PodcastSnapshotCache {
 public protocol SessionCredentialStore {
     func read() -> String?
     func write(_ value: String)
-    func delete()
+    func delete() throws
 }
 
 public struct KeychainStore: SessionCredentialStore, Sendable {
@@ -872,8 +901,9 @@ public struct KeychainStore: SessionCredentialStore, Sendable {
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    public func delete() {
-        SecItemDelete(baseQuery as CFDictionary)
+    public func delete() throws {
+        let status = SecItemDelete(baseQuery as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw APIError(statusCode: 0, message: "Unable to remove saved credentials. Retry cleanup.") }
     }
 
     private var baseQuery: [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account] }

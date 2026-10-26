@@ -1,7 +1,11 @@
 import { createRedis } from '../redis';
 import { createChallengeStore } from './challenges';
 import { AuthError } from './error';
-import { createAuthLimiter, trustedAuthSource } from './limits';
+import {
+  type AuthLimitKind,
+  createAuthLimiter,
+  trustedAuthSource,
+} from './limits';
 
 let redis: ReturnType<typeof createRedis> | undefined;
 
@@ -24,7 +28,7 @@ export const challengeStore = () => createChallengeStore(authRedis());
 
 export async function limitAuth(
   request: Request,
-  kind: 'send' | 'verify' | 'challenge',
+  kind: AuthLimitKind,
   subject: string,
 ) {
   const secret = authSecret();

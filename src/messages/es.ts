@@ -236,6 +236,7 @@ export const messages: Messages = {
   },
 
   account: {
+    delete: 'Eliminar cuenta',
     title: 'Cuenta',
     profile: 'Perfil',
     playback: 'Reproducción',

@@ -12,6 +12,8 @@ public final class SessionStore {
     @ObservationIgnored var prepareAccountChange: ((String?) async throws -> Void)?
     @ObservationIgnored var suspendAccountWork: (() -> Void)?
     @ObservationIgnored var resumeAccountWork: ((String?) -> Void)?
+    var deletionBlocked: ((String) -> Bool)?
+    var accountWorkAllowed: Bool { !isLoading && (user.map { deletionBlocked?($0.id) != true } ?? true) }
     private var changingSession = false
     private var restoration: (id: UUID, task: Task<Void, Never>)?
     private let storageURL: URL
@@ -55,7 +57,7 @@ public final class SessionStore {
             guard let self else { return }
             defer {
                 if self.restoration?.id == id { self.restoration = nil }
-                if !self.changingSession { self.isLoading = false; self.resumeAccountWork?(self.user?.id) }
+                if !self.changingSession { self.isLoading = false; self.resumeWork() }
             }
             do {
                 let value = try await self.api.sessionUser()
@@ -84,6 +86,31 @@ public final class SessionStore {
         self.restoration = nil
     }
 
+    private func resumeWork() {
+        if let account = user?.id, deletionBlocked?(account) == true { suspendAccountWork?(); return }
+        resumeAccountWork?(user?.id)
+    }
+
+    func serializeDeletion(_ operation: () async throws -> Void) async throws {
+        guard !changingSession else { throw CancellationError() }
+        changingSession = true
+        defer { changingSession = false }
+        await cancelRestoration()
+        try await operation()
+    }
+
+    func resumeAfterDeletionCancellation(account: String) {
+        if verifiedAccountID == account { resumeWork() }
+    }
+
+    func forgetDeletedAccount(_ account: String) async throws {
+        guard user?.id == account else { return }
+        try api.eraseCredentials(account: account)
+        if FileManager.default.fileExists(atPath: storageURL.path) { try FileManager.default.removeItem(at: storageURL) }
+        try await updateUser(nil)
+        resumeWork()
+    }
+
     public func sendCode(email: String) async {
         do {
             try await api.sendCode(email: email)
@@ -98,7 +125,7 @@ public final class SessionStore {
         suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false; resumeAccountWork?(user?.id) }
+        defer { changingSession = false; isLoading = false; resumeWork() }
         await cancelRestoration()
         do {
             try await updateUser(api.signIn(email: email, code: code))
@@ -113,7 +140,7 @@ public final class SessionStore {
         suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false; resumeAccountWork?(user?.id) }
+        defer { changingSession = false; isLoading = false; resumeWork() }
         await cancelRestoration()
         do {
             try await updateUser(api.signInWithPasskey(email: email))
@@ -138,7 +165,7 @@ public final class SessionStore {
         suspendAccountWork?()
         changingSession = true
         isLoading = true
-        defer { changingSession = false; isLoading = false; resumeAccountWork?(user?.id) }
+        defer { changingSession = false; isLoading = false; resumeWork() }
         await cancelRestoration()
         do {
             try await updateUser(nil)

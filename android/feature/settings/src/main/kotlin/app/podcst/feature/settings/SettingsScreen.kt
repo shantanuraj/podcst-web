@@ -91,12 +91,15 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    deletion: app.podcst.data.AccountDeletionRepository,
     version: String,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
     createPasskey: suspend (String) -> String,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showingDeletion by remember { mutableStateOf(false) }
+    if (showingDeletion) AccountDeletionDialog(deletion, state.user, onSignIn, onDismiss = { showingDeletion = false })
     val toaster = LocalToaster.current
     val context = LocalContext.current
     val resources = context.resources
@@ -151,6 +154,7 @@ fun SettingsScreen(
         onAddPasskey = { viewModel.addPasskey(createPasskey) },
         onRemovePasskey = viewModel::removePasskey,
         onSignOut = viewModel::signOut,
+        onDelete = { showingDeletion = true },
         onAppearance = viewModel::setAppearance,
         onRegion = viewModel::setRegion,
         onSpeed = viewModel::setSpeed,
@@ -173,6 +177,7 @@ private fun SettingsContent(
     onAddPasskey: () -> Unit,
     onRemovePasskey: (String) -> Unit,
     onSignOut: () -> Unit,
+    onDelete: () -> Unit,
     onAppearance: (Appearance) -> Unit,
     onRegion: (Region) -> Unit,
     onSpeed: (Double) -> Unit,
@@ -217,6 +222,9 @@ private fun SettingsContent(
                     SettingRow(stringResource(R.string.add_passkey), onClick = onAddPasskey, action = true)
                     SettingRow(stringResource(R.string.sign_out), onClick = onSignOut, action = true, divider = false)
                 }
+            }
+            Section("Account deletion") {
+                SettingRow("Delete account", onClick = onDelete, action = true, divider = false)
             }
             Section(stringResource(R.string.appearance)) {
                 Segments(state.appearance, onAppearance)
@@ -463,6 +471,7 @@ private fun SettingsPreview() {
             onAddPasskey = {},
             onRemovePasskey = {},
             onSignOut = {},
+            onDelete = {},
             onAppearance = {},
             onRegion = {},
             onSpeed = {},

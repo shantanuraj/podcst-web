@@ -68,6 +68,11 @@ beforeEach(async () => {
     reload() {},
     publish() {},
   });
+  for (const kind of ['stars', 'state'])
+    session.registerLifecycle(kind, {
+      suspend: async () => {},
+      erase: async () => {},
+    });
   disconnect = connectQueueSession(session);
   session.synchronizePlayer();
 });

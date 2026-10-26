@@ -237,6 +237,7 @@ export const messages: Messages = {
   },
 
   account: {
+    delete: 'Radera konto',
     title: 'Konto',
     profile: 'Profil',
     playback: 'Uppspelning',

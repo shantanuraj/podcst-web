@@ -212,4 +212,25 @@ describe.skipIf(!executable)('auth limits on disposable Redis', () => {
       1,
     );
   });
+
+  test('receipt polling has its own bounded budget and does not consume sign-in challenges', async () => {
+    const results = await Promise.allSettled(
+      Array.from({ length: 13 }, () =>
+        limit('deletion-status', 'synthetic-receipt', 'receipt-source'),
+      ),
+    );
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(
+      12,
+    );
+    expect(results.filter(({ status }) => status === 'rejected')).toHaveLength(
+      1,
+    );
+    await limit('deletion-status', 'another-receipt', 'receipt-source');
+    await limit('challenge', '', 'receipt-source');
+    expect(
+      (await redis.keys('auth:limit:deletion-*')).every(
+        (key) => !key.includes('synthetic-receipt'),
+      ),
+    ).toBe(true);
+  });
 });

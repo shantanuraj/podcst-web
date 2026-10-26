@@ -30,6 +30,8 @@ const tables = [...script.matchAll(/-t ([a-z_]+\.[a-z_]+)/g)].map(
 const excluded = {
   review_accounts:
     'Restore disables reusable review login until current credentials and account bindings are reconciled',
+  account_deletion_receipts:
+    'Short-lived receipt digests are not recovered; lost receipt status remains unknown',
   account_erasure_proofs:
     'Unaccepted short-lived proofs are invalidated on recovery; no receipt bearer is backed up',
   feed_poll_state:

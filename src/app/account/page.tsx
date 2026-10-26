@@ -28,6 +28,7 @@ import { type ThemePreference, themePreferences } from '@/shared/theme/theme';
 import { useTheme, useThemeStore } from '@/shared/theme/useTheme';
 import { useHydrated } from '@/shared/useHydrated';
 import styles from './Account.module.css';
+import { DeleteAccount } from './DeleteAccount';
 
 const sections = [
   ['profile', 'account.profile'],
@@ -36,6 +37,7 @@ const sections = [
   ['region', 'account.region'],
   ['library', 'account.library'],
   ['shortcuts', 'account.shortcuts'],
+  ['delete', 'account.delete'],
 ] as const satisfies readonly (readonly [string, TranslationKey])[];
 
 export default function AccountPage() {
@@ -76,6 +78,9 @@ export default function AccountPage() {
         </Section>
         <Section id="shortcuts" title={t('account.shortcuts')}>
           <Shortcuts />
+        </Section>
+        <Section id="delete" title={t('account.delete')}>
+          <DeleteAccount />
         </Section>
         <footer className={styles.footer}>
           Podcst {process.env.appVersion} ·{' '}

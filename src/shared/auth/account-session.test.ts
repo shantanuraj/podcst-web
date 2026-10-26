@@ -74,6 +74,53 @@ afterEach(() => {
 });
 
 describe('web account boundary', () => {
+  test('deletion suspends writes while retaining proof identity and clears only matching account caches', async () => {
+    const f = fixture(owner);
+    const token = f.session.token();
+    f.client.setQueryData(['account', owner.id, 'private'], 'owner');
+    f.client.setQueryData(['account', other.id, 'private'], 'other');
+    f.client.setQueryData(['account', null, 'library'], 'guest');
+    f.session.suspendForDeletion(owner.id);
+    expect(f.session.verifiedAccount).toBe(owner.id);
+    expect(f.session.getSnapshot().ready).toBe(false);
+    expect(f.session.current(token)).toBe(false);
+    f.session.forgetDeletedAccount(owner.id);
+    expect(f.session.scope).toBeNull();
+    expect(
+      f.client.getQueryData<string>(['account', owner.id, 'private']),
+    ).toBeUndefined();
+    expect(
+      f.client.getQueryData<string>(['account', other.id, 'private']),
+    ).toBe('other');
+    expect(f.client.getQueryData<string>(['account', null, 'library'])).toBe(
+      'guest',
+    );
+    expect(f.publish).toHaveBeenCalledTimes(1);
+  });
+
+  test('resuming old-account deletion preserves the current account and requires all cleanup stores', async () => {
+    const f = fixture(other);
+    const token = f.session.token();
+    f.session.forgetDeletedAccount(owner.id);
+    expect(f.session.scope).toBe(other.id);
+    expect(f.session.current(token)).toBe(true);
+    expect(f.publish).not.toHaveBeenCalled();
+    await expect(f.session.eraseConfirmedAccount(owner.id)).rejects.toThrow(
+      'not initialized',
+    );
+    const erased: string[] = [];
+    for (const kind of ['queue', 'stars', 'state'])
+      f.session.registerLifecycle(kind, {
+        suspend: async () => {},
+        erase: async (account) => {
+          erased.push(`${kind}:${account}`);
+        },
+      });
+    await f.session.eraseConfirmedAccount(owner.id);
+    expect(erased).toEqual(['queue:owner-a', 'stars:owner-a', 'state:owner-a']);
+    expect(f.session.current(token)).toBe(true);
+  });
+
   test('an unresolved account cannot start guest queries or activate guest playback', async () => {
     const f = fixture(undefined);
     const operation = mock(async () => 'guest data');

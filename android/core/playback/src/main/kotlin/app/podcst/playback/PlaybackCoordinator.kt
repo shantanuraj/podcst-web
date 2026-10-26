@@ -554,7 +554,7 @@ class PlaybackCoordinator internal constructor(
         stopTicker()
     }
 
-    private fun item(episode: Episode): MediaItem = MediaStore.item(episode)
+    private fun item(episode: Episode): MediaItem = MediaStore.item(episode).setCustomCacheKey(MediaStore.scopedKey(scopes.current.value.key, episode))
         .setMediaId(episode.identity.value)
         .setMediaMetadata(
             MediaMetadata.Builder()

@@ -55,8 +55,8 @@ BUILT_APP_DIRECTORY=/path/to/built-checkout PG_BIN=/path/to/postgresql/bin \
 
 The runner needs Node, Bun and `redis-server`. It starts disposable PostgreSQL and
 Redis, applies the active migration chain, seeds synthetic data, and serves the
-standalone build on loopback under a non-superuser role with no access to dormant
-erasure bookkeeping. It runs SSR, account/passkey/private-feed checks and authenticated
+standalone build on loopback under a non-superuser role with deletion bookkeeping
+grants and no recovery-admission infrastructure. It runs SSR, account/passkey/private-feed checks and authenticated
 progress/follow/list HTTP tests, including lost-ack replay, the numeric Starred
 bridge, checkpoint completion and rejected writers.
 The app and test processes receive an explicit environment, not inherited
@@ -106,6 +106,7 @@ Only these current application tables are excluded:
 | Table | Recovery consequence |
 | --- | --- |
 | `review_accounts` | Reusable review login is disabled on restore; reconcile current secret custody and account bindings before explicitly re-enrolling |
+| `account_deletion_receipts` | Short-lived receipt digests are not recovered; lost status remains unknown |
 | `account_erasure_proofs` | Unaccepted short-lived proofs are invalidated on recovery |
 | `feed_poll_state` | Rebuild validators/backoff/scheduling; cold polling adds I/O and must be rate-controlled |
 | `poll_metrics` | Historical operational telemetry is lost; do not use it as durable recovery evidence |

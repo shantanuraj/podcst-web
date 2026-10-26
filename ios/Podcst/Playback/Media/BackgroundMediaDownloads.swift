@@ -175,8 +175,7 @@ final class BackgroundMediaDownloads {
         defer { purging = false }
         generation = UUID()
         await reconciliation?.value
-        let existing = await connect().allTasks
-        for task in existing { task.cancel() }
+        try await cancelTasks(account: accountID)
         tasks = [:]
         recoveryRequests = []
         for id in Array(waiters.keys) { finish(id, result: .failure(MediaFailure.accountChanged)) }
@@ -187,6 +186,23 @@ final class BackgroundMediaDownloads {
         pauses = [:]
         do { try removeDirectory(accountDirectory) }
         catch { throw MediaFailure.storageUnavailable }
+    }
+
+    private func cancelTasks(account: String?) async throws {
+        let prefix = MediaKey.scope(account) + "/"
+        let matches: (URLSessionTask) -> Bool = { $0.taskDescription?.hasPrefix(prefix) == true }
+        for task in await connect().allTasks where matches(task) { task.cancel() }
+        for _ in 0..<50 {
+            if !(await connect().allTasks).contains(where: matches) { return }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        throw MediaFailure.storageUnavailable
+    }
+
+    func erase(account: String) async throws {
+        if accountID == account { try await purge(); return }
+        try await cancelTasks(account: account)
+        try removeDirectory(rootURL.appendingPathComponent(MediaKey.scope(account), isDirectory: true))
     }
 
     func switchAccount(to accountID: String?) {

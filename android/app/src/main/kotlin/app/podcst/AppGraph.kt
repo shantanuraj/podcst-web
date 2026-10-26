@@ -33,7 +33,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.io.File
 
@@ -43,11 +42,11 @@ class AppGraph(application: Application) {
     val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .cache(Cache(File(application.cacheDir, "http"), HTTP_CACHE))
         .build()
     val api = PodcstApi(client, SecureStore(application, "session"))
     val preferences = Preferences(application)
     val session = SessionRepository(application, api)
+    val deletion = app.podcst.data.AccountDeletionRepository(application, api, session)
     val account = AccountRepository(api, session, preferences)
     val scopes = Scopes(application, null)
     val scheduler = WorkManagerScheduler(application)
@@ -72,6 +71,34 @@ class AppGraph(application: Application) {
     val preview = ClipPreview(application, media, scope)
 
     init {
+        session.deletionBlocked = deletion::blocked
+        api.deletionBlocked = { session.user?.id?.let(deletion::blocked) == true }
+        media.blocked = deletion::blocked
+        deletion.suspend = { accountId ->
+            if (session.user?.id == accountId) {
+                playback.checkpointAndSuspend()
+                preview.stop()
+                scopes.checkpoint()
+                stars.checkpoint()
+                scopes.suspendSync()
+                stars.suspendSync()
+                api.beginAuthentication()
+            }
+        }
+        deletion.clean = { accountId, step ->
+            when (step) {
+                app.podcst.model.AccountDeletion.Cleanup.Retire -> {
+                    deletion.suspend?.invoke(accountId)
+                }
+                app.podcst.model.AccountDeletion.Cleanup.Media -> {
+                    downloads.erase(accountId)
+                    artwork.erase(Scope.key(accountId))
+                }
+                app.podcst.model.AccountDeletion.Cleanup.Data -> eraseAcknowledgedAccount(accountId)
+                app.podcst.model.AccountDeletion.Cleanup.Credentials -> session.forgetDeletedAccount(accountId)
+                app.podcst.model.AccountDeletion.Cleanup.Complete -> Unit
+            }
+        }
         scopes.retainedMediaIdentities = { downloads.states.value.values.mapTo(mutableSetOf()) { it.identity } }
         account.start(scope)
         session.checkpointAccountWork = {
@@ -79,7 +106,7 @@ class AppGraph(application: Application) {
             scopes.checkpoint()
             stars.checkpoint()
         }
-        session.suspendAccountWork = { stars.suspendSync(); scopes.suspendSync() }
+        session.suspendAccountWork = { stars.suspendSync(); scopes.suspendSync(); playback.beginAccountChange(); preview.stop() }
         session.resumeAccountWork = { account ->
             scopes.resumeSync(account)
             stars.resumeSync(account)
@@ -87,16 +114,19 @@ class AppGraph(application: Application) {
             scope.launch { progress.sync(); runCatching { library.refresh() } }
         }
         application.getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { scope.launch { stars.refresh(); progress.sync(); runCatching { library.refresh() } } }
+            override fun onAvailable(network: Network) { scope.launch { deletion.resume(); stars.refresh(); progress.sync(); runCatching { library.refresh() } } }
         })
         session.accountChange = AccountChange { accountId ->
             stars.suspendSync()
             playback.checkpointAndSuspend()
             stars.switchAccount(accountId, activate = false)
             scopes.switch(accountId)
+            media.accountId = accountId
+            downloads.scopeChanged()
             artwork.switch(Scope.key(accountId))
             playback.switchAccount()
         }
+        scope.launch { deletion.resume() }
         scope.launch {
             combine(library.podcasts, library.newReleases, playback.state.map { it.queue.episodes }.distinctUntilChanged()) { podcasts, releases, queue ->
                 podcasts.map { it.cover }.toSet() + (queue + releases.take(RETAINED_RELEASES)).flatMap { listOf(it.artwork, it.cover) }
@@ -111,7 +141,6 @@ class AppGraph(application: Application) {
     }
 
     private companion object {
-        const val HTTP_CACHE = 16L * 1024 * 1024
         const val RETAINED_RELEASES = 3
     }
 }

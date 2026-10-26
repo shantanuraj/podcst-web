@@ -10,6 +10,11 @@ import org.junit.Test
 class MediaIdentityTest {
     private val episode = Episode(id = 9007199254740993, guid = "same", feed = "https://one.test/rss", title = "Episode", file = EpisodeFile("https://one.test/audio"))
     private fun hash(seed: String) = MessageDigest.getInstance("SHA-256").digest(seed.toByteArray()).joinToString("") { "%02x".format(it) }
+    @Test fun accountMediaKeysCannotCollideWithOtherAccountsOrGuest() {
+        val keys = listOf(null, "a", "b").map { MediaStore.scopedKey(app.podcst.data.Scope.key(it), episode) }
+        assertEquals(3, keys.distinct().size)
+        assertTrue(keys.all { it.endsWith(":" + MediaStore.key(episode)) })
+    }
     @Test fun existingCanonicalMediaBytesSurviveFeedAndEnclosureMoves() {
         assertEquals(hash("episode:9007199254740993"), MediaStore.key(episode))
         assertEquals(MediaStore.key(episode), MediaStore.key(episode.copy(feed = "moved", file = EpisodeFile("https://moved.test/audio"))))

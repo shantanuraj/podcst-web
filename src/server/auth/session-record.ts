@@ -1,9 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import type postgres from 'postgres';
+import { requireActiveAccount } from './account-guard';
 
 export const generateId = () => randomBytes(20).toString('hex');
 
 export async function insertSession(sql: postgres.ISql, userId: string) {
+  await requireActiveAccount(sql, userId);
   const id = generateId();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await sql`

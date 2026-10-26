@@ -5,8 +5,9 @@ Only [`migrations/active/`](../migrations/active/) is run by the migration tool.
 Historical migrations and tier-swap scripts have been retired. Do not retrieve
 and replay them from older checkouts; they are not an upgrade sequence.
 
-The current chain ends at `0024-episodes-podcast-published-index.sql`. The
-`0013-account-erasure.sql` bookkeeping schema does not enable account deletion.
+The current chain includes `0025-review-accounts.sql` and ends at
+`0026-account-deletion-receipts.sql`. Account deletion uses the unchanged `0013`
+bookkeeping plus `0026` receipts. See [Account deletion](account-deletion.md).
 `0014` is reserved for parked recovery work and is not
 part of this release chain; do not reuse its number. Application builds, container
 startup and deployment do not run migrations automatically.

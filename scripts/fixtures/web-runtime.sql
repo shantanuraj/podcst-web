@@ -8,7 +8,7 @@ DECLARE
 BEGIN
   FOR target IN
     SELECT tablename FROM pg_tables WHERE schemaname = 'public'
-      AND tablename NOT IN ('account_erasure_proofs', 'account_erasure_intents', 'review_accounts')
+      AND tablename <> 'review_accounts'
   LOOP
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO web_runtime', target.tablename);
   END LOOP;

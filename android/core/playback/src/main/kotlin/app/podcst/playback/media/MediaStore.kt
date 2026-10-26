@@ -18,6 +18,21 @@ import java.util.concurrent.Executors
 import okhttp3.OkHttpClient
 
 class MediaStore(context: Context, client: OkHttpClient) {
+    var accountId: String? = null
+    var blocked: (String) -> Boolean = { false }
+    val scopeKey: String get() = app.podcst.data.Scope.key(accountId)
+    fun cacheKey(episode: Episode): String {
+        check(accountId?.let(blocked) != true) { "Account deletion is pending" }
+        return scopedKey(scopeKey, episode)
+    }
+    fun scopedItem(episode: Episode): MediaItem.Builder = item(episode).setCustomCacheKey(cacheKey(episode))
+
+    fun eraseStreaming(account: String) {
+        val prefix = app.podcst.data.Scope.key(account) + ":"
+        streaming.keys.filter { it.startsWith(prefix) }.forEach(streaming::removeResource)
+        check(streaming.keys.none { it.startsWith(prefix) }) { "Unable to remove cached audio" }
+    }
+
     private val root = File(context.noBackupFilesDir, "media")
     private val database = StandaloneDatabaseProvider(context)
     private val network = OkHttpDataSource.Factory(client)
@@ -55,6 +70,8 @@ class MediaStore(context: Context, client: OkHttpClient) {
             .setUri(episode.file.url)
             .setCustomCacheKey(key(episode))
             .setMimeType(episode.file.type.takeIf { it.startsWith("audio/") && it != "audio/mpeg3" })
+
+        fun scopedKey(scope: String, episode: Episode) = "$scope:${key(episode)}"
 
         fun key(episode: Episode): String {
             val identity = episode.mediaIdentity ?: episode.id?.let { "episode:$it" }

@@ -31,14 +31,14 @@ class SecureStore(context: Context, name: String) : SessionCookieStore {
         if (loaded && cached == value) return
         val temporary = File(file.parentFile, "${file.name}.tmp")
         temporary.writeBytes(encrypt(value))
-        temporary.renameTo(file)
+        check(temporary.renameTo(file)) { "Unable to save credentials" }
         cached = value
         loaded = true
     }
 
     @Synchronized
     override fun clear() {
-        file.delete()
+        check(!file.exists() || file.delete()) { "Unable to remove credentials. Retry cleanup." }
         cached = null
         loaded = true
     }

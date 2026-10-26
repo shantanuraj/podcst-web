@@ -17,23 +17,29 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.FileSystem
+import okio.Path.Companion.toOkioPath
 
 class ArtworkStore(context: Context, private val client: OkHttpClient, scope: String) {
     private val root = File(context.noBackupFilesDir, "artwork")
+    private val unscoped = listOf("artwork", "http").map { File(context.cacheDir, it) }
+    private val browsing = AccountArtworkCache(File(context.cacheDir, "account-artwork"), BROWSING)
     @Volatile private var directory = File(root, scope)
     private val transfers = Semaphore(TRANSFERS)
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var retention: Job? = null
+    private val requests = mutableMapOf<Job, String>()
 
     val loader: ImageLoader = ImageLoader.Builder(context)
         .memoryCache { MemoryCache.Builder().maxSizeBytes(MEMORY).build() }
-        .diskCache { DiskCache.Builder().directory(File(context.cacheDir, "artwork")).maxSizeBytes(BROWSING).build() }
+        .diskCache(browsing)
         .components {
             add(RetainedInterceptor())
             add(OkHttpNetworkFetcherFactory(callFactory = { client }))
@@ -65,6 +71,17 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         loader.memoryCache?.clear()
     }
 
+    suspend fun erase(scope: String) = withContext(Dispatchers.IO) {
+        if (directory.name == scope) retention?.cancelAndJoin()
+        browsing.erase(scope)
+        val pending = synchronized(requests) { requests.filterValues { it == scope }.keys.toList() }
+        pending.forEach { it.cancelAndJoin() }
+        val target = File(root, scope)
+        check(!target.exists() || target.deleteRecursively()) { "Unable to remove account artwork" }
+        loader.memoryCache?.let { cache -> cache.keys.filter { it.key.startsWith("$scope:") }.forEach { cache.remove(it) } }
+        check(unscoped.all { it.listFiles().isNullOrEmpty() }) { "Older caches have no account owner. Cleanup remains incomplete. Clear the app's storage in Android system settings to remove all local copies, including other accounts and guest data." }
+    }
+
     private fun download(url: String, file: File) {
         val partial = File(file.parentFile, file.name + ".part")
         runCatching {
@@ -77,13 +94,23 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         partial.delete()
     }
 
-    private fun retained(source: String): File? = File(directory, name(Artwork.canonical(source))).takeIf(File::exists)
-
     private inner class RetainedInterceptor : Interceptor {
         override suspend fun intercept(chain: Interceptor.Chain): ImageResult {
             val data = chain.request.data as? String ?: return chain.proceed()
-            val file = retained(data) ?: return chain.proceed()
-            return chain.withRequest(chain.request.newBuilder().data(file).build()).proceed()
+            val target = directory
+            val scope = target.name
+            val job = currentCoroutineContext()[Job]
+            if (job != null) synchronized(requests) { requests[job] = scope }
+            try {
+                val request = chain.request.newBuilder()
+                    .data(File(target, name(Artwork.canonical(data))).takeIf(File::exists) ?: data)
+                    .memoryCacheKey("$scope:${name(data)}")
+                    .diskCacheKey("$scope:${name(data)}")
+                    .build()
+                return chain.withRequest(request).proceed()
+            } finally {
+                if (job != null) synchronized(requests) { requests.remove(job) }
+            }
         }
     }
 
@@ -96,5 +123,33 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
 
         private fun name(canonical: String) =
             MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray()).joinToString("") { "%02x".format(it) }
+    }
+}
+
+internal class AccountArtworkCache(private val root: File, override val maxSize: Long) : DiskCache {
+    private val caches = mutableMapOf<String, DiskCache>()
+    private val erased = mutableSetOf<String>()
+    override val directory = root.toOkioPath()
+    override val fileSystem = FileSystem.SYSTEM
+    override val size: Long get() = synchronized(this) { caches.values.sumOf { it.size } }
+
+    @Synchronized private fun cache(key: String): DiskCache? {
+        val scope = key.substringBefore(':')
+        require(scope == ArtworkStore.GUEST || scope.matches(Regex("[a-f0-9]{64}")))
+        if (scope in erased) return null
+        return caches.getOrPut(scope) { DiskCache.Builder().directory(File(root, scope)).maxSizeBytes(maxSize).build() }
+    }
+
+    override fun openSnapshot(key: String) = cache(key)?.openSnapshot(key)
+    override fun openEditor(key: String) = cache(key)?.openEditor(key)
+    override fun remove(key: String) = cache(key)?.remove(key) ?: false
+    @Synchronized override fun clear() { caches.values.forEach { it.clear() } }
+    @Synchronized override fun shutdown() { caches.values.forEach { it.shutdown() }; caches.clear() }
+
+    @Synchronized fun erase(scope: String) {
+        erased += scope
+        caches.remove(scope)?.shutdown()
+        val target = File(root, scope)
+        check(!target.exists() || target.deleteRecursively()) { "Unable to remove account artwork cache" }
     }
 }

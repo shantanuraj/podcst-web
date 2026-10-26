@@ -31,7 +31,7 @@ class ClipPreview(private val context: Context, private val media: MediaStore, p
             .setMediaSourceFactory(DefaultMediaSourceFactory(media.dataSource))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
             .build()
-        preview.setMediaItem(MediaStore.item(episode).build(), start.inWholeMilliseconds)
+        preview.setMediaItem(media.scopedItem(episode).build(), start.inWholeMilliseconds)
         preview.prepare()
         preview.play()
         player = preview

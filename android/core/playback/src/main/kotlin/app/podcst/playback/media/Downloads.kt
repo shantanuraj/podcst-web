@@ -43,7 +43,7 @@ class Downloads(
     fun state(episode: Episode): DownloadState = entries.value[MediaStore.key(episode)]?.state ?: DownloadState.None
 
     fun download(episode: Episode) {
-        val key = MediaStore.key(episode)
+        val key = media.cacheKey(episode)
         val request = DownloadRequest.Builder(key, Uri.parse(episode.file.url))
             .setCustomCacheKey(key)
             .setMimeType(episode.file.type.takeIf { it.startsWith("audio/") })
@@ -53,23 +53,44 @@ class Downloads(
     }
 
     fun pause(episode: Episode) =
-        DownloadService.sendSetStopReason(context, service, MediaStore.key(episode), STOPPED_BY_USER, false)
+        DownloadService.sendSetStopReason(context, service, media.cacheKey(episode), STOPPED_BY_USER, false)
 
     fun resume(episode: Episode) =
-        DownloadService.sendSetStopReason(context, service, MediaStore.key(episode), Download.STOP_REASON_NONE, false)
+        DownloadService.sendSetStopReason(context, service, media.cacheKey(episode), Download.STOP_REASON_NONE, false)
 
-    fun remove(episode: Episode) = DownloadService.sendRemoveDownload(context, service, MediaStore.key(episode), false)
+    fun remove(episode: Episode) = DownloadService.sendRemoveDownload(context, service, media.cacheKey(episode), false)
 
     fun purge() {
         DownloadService.sendRemoveAllDownloads(context, service, false)
         media.purgeStreaming()
     }
 
+    fun scopeChanged() = publish()
+
+    suspend fun erase(account: String) {
+        val prefix = app.podcst.data.Scope.key(account) + ":"
+        fun matching(): List<String> = buildList {
+            manager.downloadIndex.getDownloads().use { cursor -> while (cursor.moveToNext()) {
+                if (cursor.download.request.id.startsWith(prefix)) add(cursor.download.request.id)
+            } }
+        }
+        kotlinx.coroutines.withTimeout(15_000) {
+            while (!manager.isInitialized) delay(50)
+            matching().forEach { DownloadService.sendRemoveDownload(context, service, it, false) }
+            while (matching().isNotEmpty() || manager.currentDownloads.any { it.request.id.startsWith(prefix) }) delay(100)
+        }
+        media.downloads.keys.filter { it.startsWith(prefix) }.forEach(media.downloads::removeResource)
+        check(media.downloads.keys.none { it.startsWith(prefix) }) { "Unable to remove downloaded audio" }
+        media.eraseStreaming(account)
+        check(media.downloads.keys.none { ':' !in it }) { "Older downloads have no account owner and were retained. Android system settings can clear all app storage, including these files and any other local account or guest data." }
+        publish()
+    }
+
     private fun publish() {
         val cursor = manager.downloadIndex.getDownloads()
         val next = buildMap {
-            cursor.use { while (it.moveToNext()) entry(it.download)?.let { entry -> put(it.download.request.id, entry) } }
-            manager.currentDownloads.forEach { download -> entry(download)?.let { put(download.request.id, it) } }
+            cursor.use { while (it.moveToNext()) entry(it.download)?.let { entry -> put(it.download.request.id.substringAfter(':'), entry) } }
+            manager.currentDownloads.forEach { download -> entry(download)?.let { put(download.request.id.substringAfter(':'), it) } }
         }
         entries.value = next
         val active = next.values.any { it.state is DownloadState.Downloading || it.state is DownloadState.Queued }
@@ -87,6 +108,7 @@ class Downloads(
     }
 
     private fun entry(download: Download): DownloadEntry? {
+        if (!download.request.id.startsWith(media.scopeKey + ":")) return null
         val identity = download.request.data.takeIf { it.isNotEmpty() }?.let(::String) ?: return null
         val total = download.contentLength.takeIf { it > 0 }
         val state = when (download.state) {

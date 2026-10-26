@@ -58,6 +58,8 @@ class PodcstApi(
 
     val hasSession: Boolean get() = !cookies.read().isNullOrEmpty()
 
+    var deletionBlocked: () -> Boolean = { false }
+
     suspend fun top(locale: String, limit: Int): List<Podcast> =
         get<List<WirePodcast>>("api/top", "limit" to "$limit", "locale" to locale, session = false).map { it.domain() }
 
@@ -225,6 +227,15 @@ class PodcstApi(
         send<WireSuccess>("DELETE", baseUrl.resolve("api/account/passkeys")!!.newBuilder().addPathSegment(id).build(), null)
     }
 
+    suspend fun prepareDeletion(account: String): app.podcst.model.DeletionPreparation =
+        post("api/account/deletion", body { put("accountId", account) })
+
+    suspend fun submitDeletion(operation: String, code: String): app.podcst.model.DeletionOutcome =
+        send("DELETE", url("api/account/deletion"), body { put("operationId", operation); put("code", code); put("confirmed", true) })
+
+    suspend fun deletionStatus(receipt: String): app.podcst.model.DeletionOutcome =
+        send("POST", url("api/account/deletion/status"), body { put("receipt", receipt) }, session = false)
+
     private suspend inline fun <reified T> get(path: String, vararg query: Pair<String, String?>, session: Boolean = true): T =
         send("GET", url(path, *query), null, session)
 
@@ -240,6 +251,7 @@ class PodcstApi(
         session: Boolean,
         strategy: DeserializationStrategy<T>,
     ): T {
+        check(!session || !deletionBlocked() || url.encodedPath.startsWith("/api/account/deletion") || url.encodedPath.startsWith("/api/auth/")) { "Account deletion is pending" }
         val token = revision.get()
         val request = Request.Builder().url(url)
             .header("Accept", "application/json")

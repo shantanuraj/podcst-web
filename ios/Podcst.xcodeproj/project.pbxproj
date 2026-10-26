@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D31100000000000000000003 = {isa = PBXBuildFile; fileRef = D31100000000000000000004; };
+		D31100000000000000000001 = {isa = PBXBuildFile; fileRef = D31100000000000000000002; };
         D04000000000000000000001 = {isa = PBXBuildFile; fileRef = D01000000000000000000001; };
         D04000000000000000000002 = {isa = PBXBuildFile; fileRef = D02000000000000000000001; };
 		AC3200000000000000000011 = {isa = PBXBuildFile; fileRef = AC3200000000000000000001; };
@@ -190,6 +192,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D31100000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
+		D31100000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/AccountDeletionStore.swift; sourceTree = "<group>"; };
 		AC3200000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ChapterMetadata.swift; sourceTree = "<group>"; };
 		AC3200000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/ID3Chapters.swift; sourceTree = "<group>"; };
 		AC3200000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChapterArtworkTests.swift; sourceTree = "<group>"; };
@@ -376,6 +380,7 @@
 				D02000000000000000000001,
 				E2A357A35D6089D818A2411D /* Core/Models.swift */,
 				77C4331C2AF45370D4B5CB18 /* Core/SessionStore.swift */,
+				D31100000000000000000002,
 				B941FFDDBFA04FFC50847F9C /* DiscoverView.swift */,
 				B56A8841AF99B2422E9F26A5 /* LibraryView.swift */,
 				A01000000000000000000001 /* Playback/PlaybackTransport.swift */,
@@ -432,6 +437,7 @@
 				AC2800000000000000000003,
 				AC3100000000000000000003,
 				AC4100000000000000000003,
+				D31100000000000000000004,
 				AC3000000000000000000002,
 				CCF1F07C6DEA6CCD122B6BC1,
 				D76F7DCE83148E0977D42F4F,
@@ -673,6 +679,7 @@
 				AC2800000000000000000014,
 				AC3100000000000000000013,
 				AC4100000000000000000013,
+				D31100000000000000000003,
 				AC3000000000000000000013,
 				F1EBB576915CDFAD37BDEC80,
 				D0CF9999271A713BB3876BB4,
@@ -742,6 +749,7 @@
 				D02000000000000000000002,
 				8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */,
 				6A9AFF4B84ECC8BBB1F90668 /* Core/SessionStore.swift in Sources */,
+				D31100000000000000000001,
 				D85A7146F885996C903E05C6 /* DiscoverView.swift in Sources */,
 				0CFBEBF3E82F8CAFDD299718 /* LibraryView.swift in Sources */,
 				A01000000000000000000002 /* Playback/PlaybackTransport.swift in Sources */,

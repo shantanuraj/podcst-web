@@ -53,7 +53,7 @@ public final class LibraryStore {
     }
 
     private func activateState() async throws {
-        guard !session.isLoading else { throw DurableStateFailure.suspended }
+        guard session.accountWorkAllowed else { throw DurableStateFailure.suspended }
         try await durable.activate(accountID: session.user?.id, verifiedAccountID: session.verifiedAccountID)
         if let accountID = session.user?.id {
             let key = SHA256.hash(data: Data(accountID.utf8)).map { String(format: "%02x", $0) }.joined()

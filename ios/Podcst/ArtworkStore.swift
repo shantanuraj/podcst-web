@@ -59,6 +59,16 @@ final class ArtworkStore {
         await previous.invalidate()
     }
 
+    func erase(account: String) async throws {
+        if accountID == account {
+            let previous = storage
+            configure(accountID: nil)
+            await previous.invalidate()
+        }
+        let directory = rootURL.appendingPathComponent(SHA256.hash(data: Data(account.utf8)).map { String(format: "%02x", $0) }.joined(), isDirectory: true)
+        if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
+    }
+
     func retain(_ urls: Set<URL>, accountID: String?) async {
         guard self.accountID == accountID else { return }
         await storage.retain(urls)

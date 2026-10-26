@@ -234,6 +234,7 @@ export const messages: Messages = {
   },
 
   account: {
+    delete: 'खाता मिटाएँ',
     title: 'खाता',
     profile: 'प्रोफ़ाइल',
     playback: 'प्लेबैक',

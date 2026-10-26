@@ -31,6 +31,8 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     val session: StateFlow<SessionState> = state.asStateFlow()
     val user: User? get() = state.value.user
     private var verified = false
+    val verifiedAccount: String? get() = state.value.user?.id.takeIf { verified }
+    var deletionBlocked: ((String) -> Boolean)? = null
     private var prepared = false
     var checkpointAccountWork: (suspend () -> Unit)? = null
     var accountChange: AccountChange? = null
@@ -55,7 +57,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             }
             state.update { it.copy(error = failure.message) }
         } finally {
-            if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
+            if (verified) resumeWork() else suspendAccountWork?.invoke()
             state.update { it.copy(loading = false) }
         }
     }
@@ -85,9 +87,30 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             api.signOut()
             state.update { it.copy(error = null) }
         } finally {
-            if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
+            if (verified) resumeWork() else suspendAccountWork?.invoke()
             state.update { it.copy(loading = false) }
         }
+    }
+
+    private fun resumeWork() {
+        val account = state.value.user?.id
+        if (account != null && deletionBlocked?.invoke(account) == true) suspendAccountWork?.invoke()
+        else resumeAccountWork?.invoke(account)
+    }
+
+    suspend fun serializeDeletion(work: suspend () -> Unit) = mutex.withLock { work() }
+
+    fun resumeAfterDeletionCancellation(account: String) {
+        if (verifiedAccount == account) resumeWork()
+    }
+
+    suspend fun forgetDeletedAccount(account: String) {
+        if (state.value.user?.id != account) return
+        api.clearSession()
+        check(!file.exists() || file.delete()) { "Unable to remove saved account. Retry cleanup." }
+        update(null)
+        verified = true
+        resumeWork()
     }
 
     fun dismissError() = state.update { it.copy(error = null) }
@@ -108,7 +131,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             state.update { it.copy(error = failure.message) }
             false
         } finally {
-            if (verified) resumeAccountWork?.invoke(state.value.user?.id) else suspendAccountWork?.invoke()
+            if (verified) resumeWork() else suspendAccountWork?.invoke()
             state.update { it.copy(loading = false) }
         }
     }

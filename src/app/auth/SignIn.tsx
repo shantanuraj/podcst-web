@@ -16,7 +16,11 @@ import { Icon } from '@/ui/icons/svg/Icon';
 
 import styles from './Auth.module.css';
 
-const landing = '/library';
+const landing = () =>
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('next') === 'delete'
+    ? '/account#delete'
+    : '/library';
 
 const failure = (error: unknown) =>
   error instanceof Error && error.name !== 'NotAllowedError'
@@ -176,7 +180,7 @@ function PasskeySetup({ user }: { user: AccountUser }) {
   const { error, attempt } = useAttempt();
 
   useEffect(() => {
-    if (user.hasPasskey) router.replace(landing);
+    if (user.hasPasskey) router.replace(landing());
   }, [user.hasPasskey, router]);
 
   if (user.hasPasskey) return null;
@@ -199,7 +203,7 @@ function PasskeySetup({ user }: { user: AccountUser }) {
         type="button"
         className={styles.link}
         disabled={register.isPending}
-        onClick={() => router.push(landing)}
+        onClick={() => router.push(landing())}
       >
         {t('auth.skipForNow')}
       </button>

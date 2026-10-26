@@ -14,6 +14,11 @@ export function createCodeDelivery(
   ) => Promise<{ error: unknown; data: { id: string } | null }>,
   from: string,
   timeoutMs = 10_000,
+  content = {
+    subject: 'Your Podcst verification code',
+    text: (code: string) =>
+      `Your verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.`,
+  },
 ) {
   return async (email: string, code: string) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -22,8 +27,8 @@ export function createCodeDelivery(
         send({
           from,
           to: email,
-          subject: 'Your Podcst verification code',
-          text: `Your verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.`,
+          subject: content.subject,
+          text: content.text(code),
         }),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error()), timeoutMs);

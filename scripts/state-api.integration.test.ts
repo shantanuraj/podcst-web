@@ -95,7 +95,7 @@ describe.skipIf(!configured)(
       return { status: response.status, body: await response.json() };
     }
 
-    test('serves accounts without access to dormant erasure or migration bookkeeping', async () => {
+    test('serves accounts with scoped deletion bookkeeping and no recovery admission', async () => {
       expect(
         Array.from(
           await sql`SELECT checksum FROM podcst_migrations.history WHERE name = '0013-account-erasure.sql'`,
@@ -115,12 +115,16 @@ describe.skipIf(!configured)(
           await sql`SELECT rolsuper, rolinherit FROM pg_roles WHERE rolname = 'web_runtime'`,
         ),
       ).toEqual([{ rolsuper: false, rolinherit: false }]);
-      for (const table of ['account_erasure_intents', 'account_erasure_proofs'])
+      for (const table of [
+        'account_erasure_intents',
+        'account_erasure_proofs',
+        'account_deletion_receipts',
+      ])
         expect(
           (
             await sql`SELECT has_table_privilege('web_runtime', ${`public.${table}`}, 'SELECT,INSERT,UPDATE,DELETE') AS permitted`
           )[0].permitted,
-        ).toBe(false);
+        ).toBe(true);
       expect(
         (
           await sql`SELECT has_schema_privilege('web_runtime', 'podcst_migrations', 'USAGE') AS permitted`
@@ -173,21 +177,14 @@ describe.skipIf(!configured)(
       await request(path, 'GET', undefined, 'missing-session', 404);
     });
 
-    test('does not expose account deletion routes', async () => {
-      for (const [path, method] of [
-        ['/api/account', 'DELETE'],
-        ['/api/account/deletion', 'POST'],
-        ['/api/account/deletion/status', 'POST'],
-      ]) {
-        const response = await fetch(`${base}${path}`, {
-          method,
-          headers: { 'X-Podcst-Client': 'native', Cookie: `session=${cookie}` },
-          signal: AbortSignal.timeout(15_000),
-          redirect: 'error',
-        });
-        expect([404, 405]).toContain(response.status);
-        await response.body?.cancel();
-      }
+    test('refuses deletion without its independently durable journal configuration', async () => {
+      await request(
+        '/api/account/deletion',
+        'POST',
+        { accountId },
+        cookie,
+        503,
+      );
       expect((await request('/api/auth/session')).body.user.id).toBe(accountId);
     });
 

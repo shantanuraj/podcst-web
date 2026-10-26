@@ -146,6 +146,12 @@ final class MediaStore {
         if cleanupFailed { throw MediaFailure.storageUnavailable }
     }
 
+    func erase(account: String) async throws {
+        if accountID == account { try await purge() }
+        else { try await downloads.erase(account: account) }
+        try Self.removeDirectory(rootURL.appendingPathComponent("cache", isDirectory: true).appendingPathComponent(MediaKey.scope(account), isDirectory: true))
+    }
+
     func reconcileDownloads() async {
         guard !purging else { return }
         await downloads.reconcile()
