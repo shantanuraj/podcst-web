@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import assets from '../../contracts/review/assets.json';
 import sampler from '../../contracts/review/sampler.json';
 import seed from '../../contracts/review/seed.json';
+import { reviewEpisodeGuid } from '../shared/review-sampler';
 
 const xml = (value: string | number) =>
   String(value).replace(
@@ -31,7 +32,7 @@ ${episodes
     const asset = assets[key as keyof typeof assets];
     if (!episode || !('duration' in asset))
       throw new Error('Sampler asset missing');
-    return `<item><guid isPermaLink="false">podcst-sampler-v1:${xml(key)}</guid>
+    return `<item><guid isPermaLink="false">${xml(reviewEpisodeGuid(key))}</guid>
 <title>${xml(episode.title)}</title><description>${xml(episode.description)}</description>
 <pubDate>${xml(new Date(Date.parse(sampler.published) - sampler.episodes.indexOf(episode) * 86_400_000).toUTCString())}</pubDate>
 <itunes:duration>${asset.duration}</itunes:duration>

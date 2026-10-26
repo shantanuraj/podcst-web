@@ -4,10 +4,10 @@ import { createEpisodeListService } from '../../src/server/lists/service';
 import { createFollowStateService } from '../../src/server/state/follows';
 import { createProgressStateService } from '../../src/server/state/progress';
 import { defaultPreferences } from '../../src/shared/preferences';
+import { reviewEpisodeGuid } from '../../src/shared/review-sampler';
 import { digest } from './artifacts';
 import { inspectReviewOperation, type ReviewPlan } from './review-account';
 import { ReviewAccountError } from './review-account-state';
-import { reviewEpisodeGuid } from './review-seed';
 
 export async function reviewSeedReads(sql: postgres.Sql, userId: string) {
   const episodes = await sql`

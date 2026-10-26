@@ -21,6 +21,7 @@ import { changeFollowState } from '../../src/server/state/follows';
 import { readGeneration } from '../../src/server/state/generation';
 import { changeProgressState } from '../../src/server/state/progress';
 import { defaultPreferences } from '../../src/shared/preferences';
+import { reviewEpisodeGuid } from '../../src/shared/review-sampler';
 import { digest } from './artifacts';
 import { ReviewAccountError } from './review-account-state';
 
@@ -35,8 +36,6 @@ export interface ResolvedReviewSeed {
     >;
   }[];
 }
-
-export const reviewEpisodeGuid = (key: string) => `podcst-sampler-v1:${key}`;
 
 export function validateReviewSeed(seed: ResolvedReviewSeed) {
   if (

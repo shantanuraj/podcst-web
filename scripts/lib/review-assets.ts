@@ -8,12 +8,9 @@ import {
 } from '../../src/server/http/public-destination';
 import { fetchFeed } from '../../src/server/ingest/feed-refresh';
 import { directArtwork } from '../../src/shared/artwork';
+import { reviewEpisodeGuid } from '../../src/shared/review-sampler';
 import { ReviewAccountError } from './review-account-state';
-import {
-  type ResolvedReviewSeed,
-  reviewEpisodeGuid,
-  validateReviewSeed,
-} from './review-seed';
+import { type ResolvedReviewSeed, validateReviewSeed } from './review-seed';
 
 export function reviewHttpsUrl(value: string) {
   const url = new URL(value);
