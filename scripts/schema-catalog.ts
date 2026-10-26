@@ -416,6 +416,23 @@ export function compareSchemas(
   };
   const expectedEnvironment = environment(expected.inventory.snapshot);
   const actualEnvironment = environment(actual.inventory.snapshot);
+  const onlyTableColumnPositions = changed.every((change) => {
+    const object = reference.get(change.key);
+    if (object?.kind !== 'column' || object.schema !== 'public') return false;
+    const relation = stable(['relation', object.schema, '', object.parent]);
+    if (
+      reference.get(relation)?.definition.kind !== 'r' ||
+      target.get(relation)?.definition.kind !== 'r'
+    )
+      return false;
+    const { position: beforePosition, ...before } = change.expected;
+    const { position: afterPosition, ...after } = change.actual;
+    return (
+      Number.isInteger(beforePosition) &&
+      Number.isInteger(afterPosition) &&
+      stable(before) === stable(after)
+    );
+  });
   return {
     format: 'podcst-schema-comparison/1',
     expectedDigest: expected.digest,
@@ -429,6 +446,8 @@ export function compareSchemas(
       ordered([...target.values()]).map(({ access: _, ...object }) => object),
     ),
     schemaMatches: !missing.length && !extra.length && !changed.length,
+    schemaMatchesByColumnName:
+      !missing.length && !extra.length && onlyTableColumnPositions,
     missing,
     extra,
     changed,

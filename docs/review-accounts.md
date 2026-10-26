@@ -53,6 +53,12 @@ catalogue reads, execution of `pg_control_system()` to identify the cluster, and
 the account/catalogue privileges needed by the selected action. The tool never
 grants itself permissions.
 
+Reference comparison uses column names for ordinary public tables, allowing
+historical physical positions while preserving all other captured definitions.
+The plan pins the exact target layout and grants; any later layout change still
+requires a new plan. Planning and applying refuse a recorded database collation
+version that differs from the installed provider.
+
 `create` refuses an existing email, including another spelling of the same
 normalized address. `reset` deletes the enrolled user and creates a new ID with
 the same email and seeded state. Supplying a credential rotates the code in that

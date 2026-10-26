@@ -60,6 +60,12 @@ Comparison is exact for captured fields, not a semantic SQL equivalence check.
 Physical column positions and object names matter. Estimates come from catalogue
 statistics and are not accurate storage or migration-cost measurements.
 
+`schemaMatchesByColumnName` additionally allows physical column-position differences
+on ordinary public tables. It retains every other definition check and still rejects
+changed view projection order. Raw differences and schema digests remain exact.
+Consumers that address table columns by name can use this result while retaining
+the target's full catalog fingerprint between planning and execution.
+
 A match does not prove historical data preservation, sequence safety, correct
 ownership, or backup recovery. Routine bodies, global role memberships and other
 uncaptured settings still need separate review. Never execute expressions from

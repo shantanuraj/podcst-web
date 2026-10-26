@@ -395,6 +395,7 @@ describe.skipIf(!process.env.PG_BIN)(
         inventoryArtifact(await captureSchema(sql)),
       );
       expect(result.schemaMatches).toBe(false);
+      expect(result.schemaMatchesByColumnName).toBe(false);
       if (change.category === 'changed')
         expect(
           result.changed.some((row) => JSON.parse(row.key)[0] === change.kind),
@@ -406,6 +407,30 @@ describe.skipIf(!process.env.PG_BIN)(
           true,
         );
       expect(result.adoptionApproved).toBe(false);
+    });
+
+    test('distinguishes table column positions from view projection order', async () => {
+      await sql`ALTER TABLE podcasts DROP COLUMN website_url`;
+      await sql`ALTER TABLE podcasts ADD COLUMN discarded text`;
+      await sql`ALTER TABLE podcasts DROP COLUMN discarded`;
+      await sql`ALTER TABLE podcasts ADD COLUMN website_url text`;
+      const result = compareSchemas(
+        inventoryArtifact(baseline, manifest),
+        inventoryArtifact(await captureSchema(sql)),
+      );
+      expect(result.schemaMatches).toBe(false);
+      expect(result.schemaMatchesByColumnName).toBe(true);
+      expect(result.expectedSchemaDigest).not.toBe(result.actualSchemaDigest);
+      expect(result.changed).toHaveLength(1);
+
+      await sql`CREATE VIEW fixture AS SELECT id, email FROM users`;
+      const withView = inventoryArtifact(await captureSchema(sql), manifest);
+      await sql`DROP VIEW fixture`;
+      await sql`CREATE VIEW fixture AS SELECT email, id FROM users`;
+      expect(
+        compareSchemas(withView, inventoryArtifact(await captureSchema(sql)))
+          .schemaMatchesByColumnName,
+      ).toBe(false);
     });
 
     test('reports invalid indexes left by failed concurrent index creation', async () => {

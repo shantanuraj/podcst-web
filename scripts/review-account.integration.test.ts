@@ -174,6 +174,47 @@ describe.skipIf(!process.env.PG_BIN)(
       );
     });
 
+    test('seeds by column name across historical positions and still pins the planned layout', async () => {
+      await sql`ALTER TABLE podcasts DROP COLUMN website_url`;
+      await sql`ALTER TABLE podcasts ADD COLUMN discarded text`;
+      await sql`ALTER TABLE podcasts DROP COLUMN discarded`;
+      await sql`ALTER TABLE podcasts ADD COLUMN website_url text`;
+      const registered = await enroll();
+      await reviewSeedReads(sql, registered.user_id);
+      expect(Array.from(await sql`SELECT website_url FROM podcasts`)).toEqual(
+        seed.feeds.map(({ fetched }) => ({ website_url: fetched.data.link })),
+      );
+      const plan = await makePlan('reset');
+      await sql`ALTER TABLE podcasts DROP COLUMN thumbnail`;
+      await sql`ALTER TABLE podcasts ADD COLUMN thumbnail text`;
+      await expect(apply(plan)).rejects.toThrow('schema changed');
+      expect((await readReviewRegistration(sql, identity.store))?.user_id).toBe(
+        registered.user_id,
+      );
+    });
+
+    test('refuses planning and applying while the database collation version differs', async () => {
+      const plan = await makePlan('create', seed, code);
+      const [database] = await sql`
+        SELECT datcollversion FROM pg_database WHERE datname = current_database()
+      `;
+      try {
+        await sql`UPDATE pg_database SET datcollversion = 'synthetic-outdated' WHERE datname = current_database()`;
+        await expect(makePlan('create', seed, code)).rejects.toThrow(
+          'collation version',
+        );
+        await expect(apply(plan)).rejects.toThrow('collation version');
+        expect(
+          await readReviewRegistration(sql, identity.store),
+        ).toBeUndefined();
+        expect(await sql`SELECT id FROM users`).toHaveLength(0);
+      } finally {
+        await sql`UPDATE pg_database SET datcollversion = ${database.datcollversion} WHERE datname = current_database()`;
+      }
+      await apply(plan);
+      expect(await readReviewRegistration(sql, identity.store)).toBeDefined();
+    });
+
     test('reset restores the baseline under a fresh identity without changing the other store or public catalogue', async () => {
       const first = await enroll();
       const other = await enroll(google, googleSeed, '654321');

@@ -93,6 +93,14 @@ async function databaseDigest(tx: postgres.ISql) {
 
 async function schemaState(tx: postgres.TransactionSql) {
   const snapshot = await captureSchemaInTransaction(tx);
+  const [collation] = await tx`
+    SELECT datcollversion IS NOT DISTINCT FROM pg_database_collation_actual_version(oid) AS current
+    FROM pg_database WHERE datname = current_database()
+  `;
+  if (!collation.current)
+    throw new ReviewAccountError(
+      'Database collation version differs from the installed provider',
+    );
   await tx`SET LOCAL search_path = public`;
   await tx`SET LOCAL lock_timeout = '3s'`;
   await tx`SET LOCAL idle_in_transaction_session_timeout = '30s'`;
@@ -185,7 +193,7 @@ export async function planReviewAccount(
     const schema = await schemaState(tx);
     if (
       !compareSchemas(reference, inventoryArtifact(schema.snapshot))
-        .schemaMatches
+        .schemaMatchesByColumnName
     )
       throw new ReviewAccountError(
         'Database schema differs from the active reference',
