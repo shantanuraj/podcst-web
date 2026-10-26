@@ -268,7 +268,7 @@ Always 200. Returns `Session`: `{ "user": null }` without a valid session, other
 
 Body: `{ "email": string, "code"?: string }`.
 
-- Without `code`: replaces earlier codes for that exact email with a cryptographically generated six-digit code valid for 10 minutes. Only a keyed digest is stored; redemption is enabled only after provider acknowledgement. Returns `CodeSent` `{ "sent": true }`, or 503 `{message: "Authentication unavailable"}`. It does not reveal whether an account exists.
+- Without `code`: addresses at the exact `podcst.app` domain (case-insensitive) return `CodeSent` `{ "sent": true }` without creating an OTP or contacting the email provider. For other domains, replaces earlier codes for that exact email with a cryptographically generated six-digit code valid for 10 minutes. Only a keyed digest is stored; redemption is enabled only after provider acknowledgement. Returns `{ "sent": true }`, or 503 `{message: "Authentication unavailable"}`. Neither path reveals whether an account exists or authenticates the request.
 - With `code`: returns `Verified` `{ "verified": true }` or 400 `{message: "Invalid or expired code"}`. **A successful check consumes the code** and creates no session. A client that verifies a code here cannot then use it with `/api/auth/email-login`; native clients send the code only to `email-login`.
 
 Missing/invalid email: 400 `{message: "Email required"}`. An explicitly supplied empty/non-string code is invalid, not a send request. Fixtures: `auth-verify.sent.json`, `auth-verify.verified.json`, `auth-verify.invalid-code.json`, `auth-verify.send-failed.json`.

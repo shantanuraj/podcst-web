@@ -133,7 +133,7 @@ export async function verifyReviewAccount(
         await call('/api/auth/verify', { email: plan.identity.email })
       ).json();
       if (sent.sent !== true)
-        throw new ReviewAccountError('Email delivery was not acknowledged');
+        throw new ReviewAccountError('Code request was not acknowledged');
     }
     for (let device = 0; device < 2; device++) {
       const loggedIn = await call('/api/auth/email-login', {
@@ -197,7 +197,7 @@ export async function verifyReviewAccount(
     return {
       ...receipt,
       verifiedAt: new Date().toISOString(),
-      emailDeliveryChecked: sendCode,
+      codeRequestChecked: sendCode,
       sessionsChecked: cookies.length,
       seedChecked: seed !== null,
     };

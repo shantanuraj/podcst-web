@@ -58,6 +58,8 @@ describe('email authentication handlers', () => {
       [],
       { email: {} },
       { email: email.repeat(30) },
+      { email: 'test@example.invalid@podcst.app' },
+      { email: 'test@podcst.app ' },
       { email, code: '' },
       { email, code: 123456 },
       { email: `${email}\n`, code: '123456' },

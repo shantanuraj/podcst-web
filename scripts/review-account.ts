@@ -279,7 +279,7 @@ async function main(args: string[]) {
         JSON.stringify({
           status: 'verified',
           operationId: plan.operationId,
-          emailDeliveryChecked: result.emailDeliveryChecked,
+          codeRequestChecked: result.codeRequestChecked,
           seedChecked: result.seedChecked,
         }),
       );

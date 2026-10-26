@@ -6,6 +6,13 @@ shared by all application instances and stored outside Git. It protects code
 and limiter digests. Rotating it invalidates outstanding codes and resets limiter
 namespaces. Email delivery also requires `RESEND_API_KEY`; `EMAIL_FROM` is optional.
 
+Code requests for the exact `podcst.app` domain, matched without case sensitivity,
+succeed without creating an OTP or contacting the email provider. This applies to
+every address at that domain. It does not authenticate or create an account:
+reviewer login still requires a registered reusable code. Subdomains and other
+domains use ordinary email delivery. Request validation and Redis limits apply
+before the domain check.
+
 The server does not infer proxy trust from forwarded headers. By default all
 requests share the conservative `unattributed` source budget. Set
 `AUTH_TRUSTED_IP_HEADER` only when the ingress overwrites that header with one

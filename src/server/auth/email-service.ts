@@ -53,6 +53,7 @@ export function createEmailService(
 
   return {
     async send(email: string) {
+      if (normalizeEmailIdentity(email).endsWith('@podcst.app')) return;
       const id = generateId();
       const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
       const codeDigest = digest(id, email, code);

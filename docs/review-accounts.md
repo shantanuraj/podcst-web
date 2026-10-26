@@ -6,9 +6,12 @@ purpose-separated HMAC of its reusable six-digit login code. The user row owns
 the email. Runtime access to this table requires **SELECT only**; enrollment,
 preparation and rotation belong to the separate operator connection.
 
-The existing email/code screens and response shapes are unchanged. Sending still
-delivers a real short-lived email code. Only `/api/auth/email-login` accepts the
-reusable credential, without consuming or requiring an ordinary verification row.
+The email/code screens advance after a successful code request. Requests for the
+exact `podcst.app` domain, matched without case sensitivity, succeed without
+generating an OTP or attempting email delivery. Other domains receive an ordinary
+short-lived code. Domain membership alone never authenticates or enrolls a user.
+Only `/api/auth/email-login` accepts the reusable credential, without consuming
+or requiring an ordinary verification row.
 `/api/auth/verify` never checks the registration. Both paths retain the existing
 request checks, Redis limits, session creation and cookie rotation. Registered
 addresses are normalized to lowercase, including when an emailed OTP logs into
@@ -64,8 +67,9 @@ normalized address. `reset` deletes the enrolled user and creates a new ID with
 the same email and seeded state. Supplying a credential rotates the code in that
 transaction; omitting it preserves the digest. `rotate` requires a different code
 and revokes sessions, passkeys and pending email codes without replacing library
-state. `remove` revokes those credentials and deletes the registration, leaving
-the account available through ordinary email login. It does not erase the user.
+state. `remove` revokes those credentials and deletes the registration without
+erasing the user. Addresses at `podcst.app` cannot request an ordinary email code
+after removal either.
 
 The lock order is normalized email identity, store, registration, user, account
 dependencies, then sampler identities and state/list resources. Foreign keys
@@ -84,13 +88,13 @@ a superseded operation is refused. Removal has no surviving registration receipt
 inspect the protected result and current registration before attempting further
 work. Never restore an old account or credential to undo preparation.
 
-`verify` checks the committed receipt, revalidates media, sends one ordinary email
-code, signs in twice with the reusable code, and checks both normal sessions,
+`verify` checks the committed receipt, revalidates media, exercises the code-request
+endpoint, signs in twice with the reusable code, and checks both normal sessions,
 account preferences, follows, progress, ordered lists and private-feed reads.
 Temporary verification sessions are logged out. `--skip-send` permits a repeat
-check without consuming another send; its receipt explicitly records that email
-delivery was not checked. Limits remain enforced. The seeded playlist exists in
-the list API; client playlist presentation remains the client's existing feature
+check without consuming another send; `codeRequestChecked` records whether that
+request ran, not whether an email was delivered. Limits remain enforced. The
+seeded playlist exists in the list API; client playlist presentation remains the client's existing feature
 set. HTTP verification does not establish signed native or retained-install
 behavior.
 
@@ -143,5 +147,5 @@ TZ=UTC PG_BIN=/path/to/postgresql/bin bun --no-env-file test \
 
 The built application runner also exercises normal reviewer HTTP login, sampler
 range serving, private access and account retirement under a runtime role with
-read-only registration access. Production grants, hosting, mailbox delivery,
+read-only registration access. Production grants, hosting, client sign-in,
 secret custody and signed Apple/Google client checks require a separate rollout.

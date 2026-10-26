@@ -34,6 +34,39 @@ describe.skipIf(!process.env.PG_BIN)(
       await cluster?.stop();
     });
 
+    test.each([
+      'test.ios@podcst.app',
+      'TEST.ANDROID@PODCST.APP',
+      'test.ios+review@podcst.app',
+    ])('skips delivery and OTP creation for %s without enabling login', async (email) => {
+      let deliveries = 0;
+      const unavailable = createEmailService(sql, secret, async () => {
+        deliveries++;
+        throw new Error('Delivery unavailable');
+      });
+      await unavailable.send(email);
+      expect(deliveries).toBe(0);
+      expect(
+        await sql`SELECT id FROM email_verifications WHERE email = ${email}`,
+      ).toHaveLength(0);
+      expect(await unavailable.verify(email, '012345')).toBe(false);
+      expect(await unavailable.login(email, '012345')).toBeNull();
+      expect(
+        await sql`SELECT id FROM users WHERE email = ${email}`,
+      ).toHaveLength(0);
+    });
+
+    test.each([
+      'review@podcst.app.example.invalid',
+      'review@mail.podcst.app',
+      'review@notpodcst.app',
+      'podcst.app@example.invalid',
+    ])('delivers and redeems an ordinary OTP for %s', async (email) => {
+      await service.send(email);
+      expect(await service.login(email, codeFor(email))).not.toBeNull();
+      expect(await service.login(email, codeFor(email))).toBeNull();
+    });
+
     test('populated upgrades invalidate old codes without revoking sessions and roll back atomically', async () => {
       const upgrade = startPostgres();
       try {

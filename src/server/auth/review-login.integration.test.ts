@@ -83,6 +83,93 @@ describe.skipIf(!process.env.PG_BIN)(
       expect(await sql`SELECT * FROM users`).toHaveLength(2);
     });
 
+    test('the reviewer code-entry flow works without email delivery and still requires its registered code', async () => {
+      const address = 'test.android@podcst.app';
+      await sql`INSERT INTO users (id, email) VALUES ('domain-reviewer', ${address})`;
+      try {
+        await sql`
+          INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+          VALUES ('google', 'domain-reviewer', ${reviewCodeDigest(secret, 'google', address, code)}, ${randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')
+        `;
+        let deliveries = 0;
+        const unavailable = createEmailService(sql, secret, async () => {
+          deliveries++;
+          throw new Error('Delivery unavailable');
+        });
+        const limits: string[] = [];
+        const sessions: string[] = [];
+        const handlers = createEmailHandlers(
+          () => unavailable,
+          async (_, kind) => {
+            limits.push(kind);
+          },
+          async (session) => {
+            sessions.push(session.id);
+          },
+        );
+        const request = (body: Record<string, string>) =>
+          new Request('https://example.invalid', {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+        for (const email of [address, address.toUpperCase()]) {
+          const sent = await handlers.verify(request({ email }));
+          expect(sent.status).toBe(200);
+          expect(await sent.json()).toEqual({ sent: true });
+          expect(
+            (await handlers.login(request({ email, code: '000000' }))).status,
+          ).toBe(400);
+          expect((await handlers.verify(request({ email, code }))).status).toBe(
+            400,
+          );
+          expect((await handlers.login(request({ email, code }))).status).toBe(
+            200,
+          );
+        }
+        expect(deliveries).toBe(0);
+        expect(sessions).toHaveLength(2);
+        expect(limits).toEqual([
+          'send',
+          'verify',
+          'verify',
+          'verify',
+          'send',
+          'verify',
+          'verify',
+          'verify',
+        ]);
+        expect(
+          await sql`SELECT id FROM email_verifications WHERE lower(email) = ${address}`,
+        ).toHaveLength(0);
+        for (const error of [
+          new AuthError(429, 'Limited', 60),
+          new Error('Redis unavailable'),
+        ]) {
+          const limited = createEmailHandlers(
+            () => unavailable,
+            async () => {
+              throw error;
+            },
+            async () => {
+              throw new Error('Must not create a session');
+            },
+          );
+          expect(
+            (await limited.verify(request({ email: address }))).status,
+          ).toBe(error instanceof AuthError ? 429 : 503);
+          expect(
+            (await limited.login(request({ email: address, code }))).status,
+          ).toBe(error instanceof AuthError ? 429 : 503);
+        }
+        await sql`DELETE FROM review_accounts WHERE store = 'google'`;
+        expect(
+          (await handlers.login(request({ email: address, code }))).status,
+        ).toBe(400);
+      } finally {
+        await sql`DELETE FROM users WHERE id = 'domain-reviewer'`;
+      }
+    });
+
     test('shared limits and delivery failures remain fail closed', async () => {
       const request = () =>
         new Request('https://example.invalid', {
