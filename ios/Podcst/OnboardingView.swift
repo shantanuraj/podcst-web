@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @Environment(APIClient.self) private var api
-    @Environment(SessionStore.self) private var session
+    let api: APIClient
+    let session: SessionStore
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
     @State private var covers: [Podcast] = []
     @State private var isWorking = false

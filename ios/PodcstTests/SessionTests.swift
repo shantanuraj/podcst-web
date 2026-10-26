@@ -1,5 +1,7 @@
 import AuthenticationServices
 import Foundation
+import SwiftUI
+import UIKit
 import XCTest
 @testable import Podcst
 
@@ -95,6 +97,40 @@ final class SessionTests: XCTestCase {
         let result = try await charts.value
         XCTAssertEqual(result, [podcast])
         XCTAssertEqual(fixture.api.cachedTop(locale: locale), [podcast])
+    }
+
+    func testOnboardingPresentationLoadsChartsWithoutEnvironmentObjects() async throws {
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        let locale = "onboarding-\(UUID().uuidString.lowercased())"
+        fixture.defaults.set(locale, forKey: DiscoveryRegion.key)
+        defer { PodcastSnapshotCache(namespace: "top", lifetime: 3600).remove("\(locale)-30") }
+        let loaded = expectation(description: "Presented onboarding loads charts")
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/top")
+            let query = URLComponents(url: request.request.url!, resolvingAgainstBaseURL: false)?.queryItems
+            XCTAssertEqual(query?.first { $0.name == "locale" }?.value, locale)
+            try request.respond([Podcast]())
+            loaded.fulfill()
+        }
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previous = scene.keyWindow
+        let window = UIWindow(windowScene: scene)
+        let host = UIHostingController(rootView: Color.clear
+            .fullScreenCover(isPresented: .constant(true)) {
+                OnboardingView(api: fixture.api, session: fixture.session) {}
+            }
+            .defaultAppStorage(fixture.defaults))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer {
+            host.dismiss(animated: false)
+            window.isHidden = true
+            window.rootViewController = nil
+            previous?.makeKey()
+        }
+        await fulfillment(of: [loaded], timeout: 5)
+        XCTAssertNotNil(host.presentedViewController)
     }
 
     func testPublicChartsDoNotSendOrAcceptSessionCredentials() async throws {

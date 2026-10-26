@@ -119,7 +119,7 @@ struct RootView: View {
         }
         .shareSheet(Binding { router.showingPlayer ? nil : router.sharing } set: { router.sharing = $0 })
         .fullScreenCover(isPresented: onboarding) {
-            OnboardingView { onboarded = true }
+            OnboardingView(api: api, session: session) { onboarded = true }
         }
         .preferredColorScheme(appearance.colorScheme)
         .task { configureInitialTab() }
