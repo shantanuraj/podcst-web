@@ -26,6 +26,8 @@ const tables = [...script.matchAll(/-t ([a-z_]+\.[a-z_]+)/g)].map(
   (match) => match[1],
 );
 const excluded = {
+  review_accounts:
+    'Restore disables reusable review login until current credentials and account bindings are reconciled',
   account_erasure_proofs:
     'Unaccepted short-lived proofs are invalidated on recovery; no receipt bearer is backed up',
   feed_poll_state:

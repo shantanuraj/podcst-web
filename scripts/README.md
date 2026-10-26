@@ -98,6 +98,7 @@ Only these current application tables are excluded:
 
 | Table | Recovery consequence |
 | --- | --- |
+| `review_accounts` | Reusable review login is disabled on restore; reconcile current secret custody and account bindings before explicitly re-enrolling |
 | `account_erasure_proofs` | Unaccepted short-lived proofs are invalidated on recovery |
 | `feed_poll_state` | Rebuild validators/backoff/scheduling; cold polling adds I/O and must be rate-controlled |
 | `poll_metrics` | Historical operational telemetry is lost; do not use it as durable recovery evidence |

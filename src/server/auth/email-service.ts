@@ -1,13 +1,19 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import type postgres from 'postgres';
 import { AuthError } from './error';
+import { isCode, isEmail } from './http';
+import {
+  matchesReviewCode,
+  normalizeEmailIdentity,
+  reviewCodeDigest,
+} from './review-credential';
 import { generateId, insertSession } from './session-record';
 
 export const CODE_ATTEMPTS = 5;
 export const CODE_EXPIRY_MINUTES = 10;
 
 export async function lockEmailIdentity(sql: postgres.ISql, email: string) {
-  await sql`SELECT pg_advisory_xact_lock(hashtextextended(${email}, 734109))`;
+  await sql`SELECT pg_advisory_xact_lock(hashtextextended(${normalizeEmailIdentity(email)}, 734109))`;
 }
 
 export function createEmailService(
@@ -22,30 +28,27 @@ export function createEmailService(
       .update(JSON.stringify([id, email, code]))
       .digest('hex');
 
-  const redeem = async <T>(
+  const redeem = async (
+    tx: postgres.TransactionSql,
     email: string,
     code: string,
-    complete: (tx: postgres.TransactionSql) => Promise<T>,
-  ): Promise<T | null> => {
-    return sql.begin(async (tx) => {
-      await lockEmailIdentity(tx, email);
-      const [row] = await tx`
+  ): Promise<boolean> => {
+    const [row] = await tx`
         UPDATE email_verifications SET attempts = attempts + 1
         WHERE email = ${email} AND ready AND NOT used
           AND expires_at > clock_timestamp() AND attempts < ${CODE_ATTEMPTS}
         RETURNING id, code_digest
       `;
-      if (!row) return null;
-      const expected = Buffer.from(row.code_digest, 'hex');
-      const supplied = Buffer.from(digest(row.id, email, code), 'hex');
-      if (
-        expected.length !== supplied.length ||
-        !timingSafeEqual(expected, supplied)
-      )
-        return null;
-      await tx`UPDATE email_verifications SET used = true WHERE id = ${row.id}`;
-      return complete(tx);
-    }) as Promise<T | null>;
+    if (!row) return false;
+    const expected = Buffer.from(row.code_digest, 'hex');
+    const supplied = Buffer.from(digest(row.id, email, code), 'hex');
+    if (
+      expected.length !== supplied.length ||
+      !timingSafeEqual(expected, supplied)
+    )
+      return false;
+    await tx`UPDATE email_verifications SET used = true WHERE id = ${row.id}`;
+    return true;
   };
 
   return {
@@ -78,10 +81,34 @@ export function createEmailService(
       }
     },
     async verify(email: string, code: string) {
-      return (await redeem(email, code, async () => true)) ?? false;
+      return sql.begin(async (tx) => {
+        await lockEmailIdentity(tx, email);
+        return redeem(tx, email, code);
+      });
     },
-    login: (email: string, code: string) =>
-      redeem(email, code, async (tx) => {
+    async login(email: string, code: string) {
+      if (!isEmail(email) || !isCode(code)) return null;
+      return sql.begin(async (tx) => {
+        await lockEmailIdentity(tx, email);
+        const [review] = await tx`
+          SELECT r.store, r.user_id, r.code_digest, u.email
+          FROM review_accounts r JOIN users u ON u.id = r.user_id
+          WHERE lower(u.email) = ${normalizeEmailIdentity(email)}
+        `;
+        if (
+          review &&
+          matchesReviewCode(
+            review.code_digest,
+            reviewCodeDigest(secret, review.store, review.email, code),
+          )
+        ) {
+          const [user] = await tx`
+            SELECT id FROM users WHERE id = ${review.user_id} AND email = ${review.email} FOR UPDATE
+          `;
+          return user ? insertSession(tx, user.id) : null;
+        }
+        if (!(await redeem(tx, email, code))) return null;
+        if (review) return insertSession(tx, review.user_id);
         await tx`
           INSERT INTO users (id, email) VALUES (${generateId()}, ${email})
           ON CONFLICT (email) DO NOTHING
@@ -89,6 +116,7 @@ export function createEmailService(
         const [user] =
           await tx`SELECT id FROM users WHERE email = ${email} FOR UPDATE`;
         return insertSession(tx, user.id);
-      }),
+      });
+    },
   };
 }
