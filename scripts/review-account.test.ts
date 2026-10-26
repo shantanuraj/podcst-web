@@ -20,6 +20,7 @@ test('credential generation persists private files without exposing secrets or o
       config,
       JSON.stringify({
         store: 'apple',
+        purpose: 'review',
         email: 'synthetic@example.invalid',
         target: 'development',
         apiOrigin: 'https://example.invalid',
@@ -53,6 +54,7 @@ test('credential generation persists private files without exposing secrets or o
     ]);
     expect(generated.exitCode).toBe(0);
     const stored = JSON.parse(readFileSync(output, 'utf8'));
+    expect(stored.purpose).toBe('review');
     expect(stored.code).toMatch(/^\d{6}$/);
     expect(statSync(output).mode & 0o777).toBe(0o600);
     expect(

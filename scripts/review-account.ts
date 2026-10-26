@@ -3,11 +3,8 @@ import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authSecret } from '../src/server/auth/backend';
-import { isCode, isEmail } from '../src/server/auth/http';
-import {
-  normalizeEmailIdentity,
-  reviewCodeDigest,
-} from '../src/server/auth/review-credential';
+import { isCode } from '../src/server/auth/http';
+import { reviewCodeDigest } from '../src/server/auth/review-credential';
 import {
   ArtifactError,
   digest,
@@ -18,6 +15,7 @@ import {
 import { DatabaseTargetError, openDatabase } from './lib/database';
 import {
   applyReviewAccount,
+  assertReviewIdentity,
   inspectReviewOperation,
   planReviewAccount,
   ReviewAccountError,
@@ -91,13 +89,8 @@ function protectedFile(path: string) {
 
 function configuration(path: string): Configuration {
   const config = readProtected(protectedFile(path), 16_384) as Configuration;
-  if (
-    !['apple', 'google'].includes(config.store) ||
-    !['production', 'development'].includes(config.target) ||
-    !isEmail(config.email) ||
-    normalizeEmailIdentity(config.email) !== config.email ||
-    !config.feeds
-  )
+  assertReviewIdentity(config);
+  if (!config.feeds)
     throw new ReviewAccountError('Invalid review account configuration');
   const origin = reviewHttpsUrl(`${config.apiOrigin}/`);
   if (origin.origin !== config.apiOrigin)
@@ -139,11 +132,12 @@ function credential(path: string, identity: ReviewIdentity) {
   const value = readProtected(protectedFile(path), 16_384);
   if (
     value.store !== identity.store ||
+    value.purpose !== identity.purpose ||
     value.email !== identity.email ||
     !isCode(value.code)
   )
     throw new ReviewAccountError(
-      'Credential does not match the enrolled store and email',
+      'Credential does not match the enrolled store, purpose and email',
     );
   return value.code as string;
 }
@@ -162,6 +156,7 @@ async function main(args: string[]) {
   if (command === 'credential' && config) {
     writeProtected(output ?? '', {
       store: config.store,
+      purpose: config.purpose,
       email: config.email,
       code: randomInt(0, 1_000_000).toString().padStart(6, '0'),
     });
@@ -188,6 +183,7 @@ async function main(args: string[]) {
     if (!config) throw new ReviewAccountError('Configuration required');
     const identity = {
       store: config.store,
+      purpose: config.purpose,
       email: config.email,
       target: config.target,
     };
@@ -225,6 +221,7 @@ async function main(args: string[]) {
         JSON.stringify({
           action,
           store: config.store,
+          purpose: config.purpose,
           operationId: result.operationId,
           affectedRows: result.account.rows,
           rotatesCode: credentialDigest !== null,
@@ -253,6 +250,7 @@ async function main(args: string[]) {
         JSON.stringify({
           status: 'committed',
           store: config.store,
+          purpose: config.purpose,
           operationId: plan.operationId,
           action: plan.action,
         }),

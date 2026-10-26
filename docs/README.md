@@ -6,7 +6,7 @@ For setup and tests, start with [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 - [API contract and fixtures](../contracts/api/README.md)
 - [Email authentication](email-authentication.md)
-- [Store reviewer accounts and sampler](review-accounts.md)
+- [Store reviewer and E2E accounts and sampler](review-accounts.md)
 - [Passkey authentication](passkey-authentication.md)
 - [Account deletion](account-deletion.md)
 - [Episode lists and starred-episode sync proposal](episode-lists.md)

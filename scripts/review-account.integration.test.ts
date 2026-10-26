@@ -43,11 +43,13 @@ const secret = 'synthetic-review-secret'.repeat(3);
 const sourceDigest = '1'.repeat(64);
 const identity: ReviewIdentity = {
   store: 'apple',
+  purpose: 'review',
   email: 'apple@example.invalid',
   target: 'development',
 };
 const google: ReviewIdentity = {
   store: 'google',
+  purpose: 'review',
   email: 'google@example.invalid',
   target: 'development',
 };
@@ -121,7 +123,7 @@ describe.skipIf(!process.env.PG_BIN)(
     ) => {
       const plan = await makePlan('create', seedValue, accountCode, account);
       await apply(plan, seedValue);
-      const registration = await readReviewRegistration(sql, account.store);
+      const registration = await readReviewRegistration(sql, account);
       if (!registration) throw new Error('Enrollment missing');
       return registration;
     };
@@ -174,6 +176,78 @@ describe.skipIf(!process.env.PG_BIN)(
       );
     });
 
+    test('E2E reset, rotation and removal preserve both reviewers and the other E2E account', async () => {
+      const reviewer = await enroll();
+      const otherReviewer = await enroll(google, googleSeed, '654321');
+      const ios: ReviewIdentity = {
+        ...identity,
+        purpose: 'e2e',
+        email: 'e2e.ios@example.invalid',
+      };
+      const android: ReviewIdentity = {
+        ...google,
+        purpose: 'e2e',
+        email: 'e2e.android@example.invalid',
+      };
+      const iosSeed = await seedFor('e2e-ios');
+      const androidSeed = await seedFor('e2e-android');
+      const first = await enroll(ios, iosSeed, '111111');
+      const other = await enroll(android, androidSeed, '222222');
+      expect(
+        await sql`SELECT store, purpose FROM review_accounts`,
+      ).toHaveLength(4);
+      for (const [account, credential] of [
+        [identity, code],
+        [google, '654321'],
+        [android, '222222'],
+      ] as const)
+        expect(await auth.login(account.email, credential)).not.toBeNull();
+      const preserved = [reviewer, otherReviewer, other];
+      const tables = [
+        'review_accounts',
+        'sessions',
+        'subscriptions',
+        'playback_progress',
+        'episode_lists',
+      ];
+      const before = await Promise.all(
+        preserved.map((row) => capture(tables, row.user_id)),
+      );
+      await expect(
+        makePlan('create', iosSeed, '333333', {
+          ...ios,
+          email: 'duplicate@example.invalid',
+        }),
+      ).rejects.toThrow('already enrolled');
+      const session = await auth.login(ios.email, '111111');
+      const reset = await makePlan('reset', iosSeed, null, ios);
+      await apply(reset, iosSeed);
+      const next = await readReviewRegistration(sql, ios);
+      expect(next?.user_id).not.toBe(first.user_id);
+      expect(next?.code_digest).toBe(first.code_digest);
+      await reviewSeedReads(sql, next?.user_id ?? '');
+      expect(
+        await sql`SELECT id FROM sessions WHERE id = ${session?.id ?? ''}`,
+      ).toHaveLength(0);
+      expect(await auth.login(ios.email, '111111')).not.toBeNull();
+      expect(await auth.login(identity.email, '111111')).toBeNull();
+      expect(await auth.login(ios.email, code)).toBeNull();
+      expect(await auth.verify(ios.email, '111111')).toBe(false);
+      await expect(
+        apply({ ...reset, identity: { ...ios, purpose: 'review' } }, iosSeed),
+      ).rejects.toThrow('do not match');
+      const rotate = await makePlan('rotate', null, '333333', ios);
+      await apply(rotate, null);
+      expect(await auth.login(ios.email, '111111')).toBeNull();
+      expect(await auth.login(ios.email, '333333')).not.toBeNull();
+      await apply(await makePlan('remove', null, null, ios), null);
+      expect(await readReviewRegistration(sql, ios)).toBeUndefined();
+      expect(await auth.login(ios.email, '333333')).toBeNull();
+      expect(
+        await Promise.all(preserved.map((row) => capture(tables, row.user_id))),
+      ).toEqual(before);
+    });
+
     test('seeds by column name across historical positions and still pins the planned layout', async () => {
       await sql`ALTER TABLE podcasts DROP COLUMN website_url`;
       await sql`ALTER TABLE podcasts ADD COLUMN discarded text`;
@@ -188,7 +262,7 @@ describe.skipIf(!process.env.PG_BIN)(
       await sql`ALTER TABLE podcasts DROP COLUMN thumbnail`;
       await sql`ALTER TABLE podcasts ADD COLUMN thumbnail text`;
       await expect(apply(plan)).rejects.toThrow('schema changed');
-      expect((await readReviewRegistration(sql, identity.store))?.user_id).toBe(
+      expect((await readReviewRegistration(sql, identity))?.user_id).toBe(
         registered.user_id,
       );
     });
@@ -204,15 +278,13 @@ describe.skipIf(!process.env.PG_BIN)(
           'collation version',
         );
         await expect(apply(plan)).rejects.toThrow('collation version');
-        expect(
-          await readReviewRegistration(sql, identity.store),
-        ).toBeUndefined();
+        expect(await readReviewRegistration(sql, identity)).toBeUndefined();
         expect(await sql`SELECT id FROM users`).toHaveLength(0);
       } finally {
         await sql`UPDATE pg_database SET datcollversion = ${database.datcollversion} WHERE datname = current_database()`;
       }
       await apply(plan);
-      expect(await readReviewRegistration(sql, identity.store)).toBeDefined();
+      expect(await readReviewRegistration(sql, identity)).toBeDefined();
     });
 
     test('reset restores the baseline under a fresh identity without changing the other store or public catalogue', async () => {
@@ -249,7 +321,7 @@ describe.skipIf(!process.env.PG_BIN)(
       );
       const generationBefore = await sql`SELECT * FROM state_generation`;
       await apply(plan);
-      const next = await readReviewRegistration(sql, identity.store);
+      const next = await readReviewRegistration(sql, identity);
       expect(next?.user_id).not.toBe(first.user_id);
       expect(next?.code_digest).toBe(first.code_digest);
       await reviewSeedReads(sql, next?.user_id ?? '');
@@ -360,7 +432,7 @@ describe.skipIf(!process.env.PG_BIN)(
       ).rejects.toThrow('target');
       await sql`UPDATE account_preferences SET speed = 1.5 WHERE user_id = ${first.user_id}`;
       await expect(apply(plan)).rejects.toThrow('Account state changed');
-      expect((await readReviewRegistration(sql, identity.store))?.user_id).toBe(
+      expect((await readReviewRegistration(sql, identity))?.user_id).toBe(
         first.user_id,
       );
     });
@@ -378,7 +450,7 @@ describe.skipIf(!process.env.PG_BIN)(
       const changed = structuredClone(seed);
       changed.feeds[0].fetched.data.episodes[0].duration = 1;
       await expect(apply(replacement, changed)).rejects.toThrow('seed');
-      expect((await readReviewRegistration(sql, identity.store))?.user_id).toBe(
+      expect((await readReviewRegistration(sql, identity))?.user_id).toBe(
         first.user_id,
       );
     });
@@ -409,7 +481,7 @@ describe.skipIf(!process.env.PG_BIN)(
           'episode_list_items',
         ]),
       ).toBe(before);
-      expect((await readReviewRegistration(sql, identity.store))?.user_id).toBe(
+      expect((await readReviewRegistration(sql, identity))?.user_id).toBe(
         first.user_id,
       );
     });
@@ -433,7 +505,7 @@ describe.skipIf(!process.env.PG_BIN)(
       );
       const plan = await makePlan('rotate', null, '123456');
       await apply(plan, null);
-      expect((await readReviewRegistration(sql, identity.store))?.user_id).toBe(
+      expect((await readReviewRegistration(sql, identity))?.user_id).toBe(
         first.user_id,
       );
       expect(
@@ -476,7 +548,7 @@ describe.skipIf(!process.env.PG_BIN)(
         await sql`SELECT user_id FROM sessions WHERE id = ${session?.id ?? ''}`;
       expect(stored.user_id).not.toBe(first.user_id);
       expect(stored.user_id).toBe(
-        (await readReviewRegistration(sql, identity.store))?.user_id,
+        (await readReviewRegistration(sql, identity))?.user_id,
       );
     });
 
@@ -521,7 +593,7 @@ describe.skipIf(!process.env.PG_BIN)(
       const first = await enroll();
       const plan = await makePlan('remove', null);
       await apply(plan, null);
-      expect(await readReviewRegistration(sql, identity.store)).toBeUndefined();
+      expect(await readReviewRegistration(sql, identity)).toBeUndefined();
       expect(await auth.login(identity.email, code)).toBeNull();
       expect(
         await sql`SELECT * FROM users WHERE id = ${first.user_id}`,

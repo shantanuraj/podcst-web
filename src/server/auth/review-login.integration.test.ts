@@ -26,8 +26,8 @@ describe.skipIf(!process.env.PG_BIN)(
       await createSchemaFixture(sql);
       await sql`INSERT INTO users (id, email) VALUES ('review-user', ${email}), ('ordinary', 'ordinary@example.invalid')`;
       await sql`
-      INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
-      VALUES ('apple', 'review-user', ${reviewCodeDigest(secret, 'apple', email, code)}, ${randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')
+      INSERT INTO review_accounts (store, purpose, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+      VALUES ('apple', 'review', 'review-user', ${reviewCodeDigest(secret, 'apple', email, code)}, ${randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')
     `;
       service = createEmailService(sql, secret, async (address, sent) => {
         delivered.set(address, sent);
@@ -88,8 +88,8 @@ describe.skipIf(!process.env.PG_BIN)(
       await sql`INSERT INTO users (id, email) VALUES ('domain-reviewer', ${address})`;
       try {
         await sql`
-          INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
-          VALUES ('google', 'domain-reviewer', ${reviewCodeDigest(secret, 'google', address, code)}, ${randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')
+          INSERT INTO review_accounts (store, purpose, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+          VALUES ('google', 'review', 'domain-reviewer', ${reviewCodeDigest(secret, 'google', address, code)}, ${randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')
         `;
         let deliveries = 0;
         const unavailable = createEmailService(sql, secret, async () => {

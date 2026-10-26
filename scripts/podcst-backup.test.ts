@@ -313,8 +313,8 @@ describe.skipIf(!process.env.PG_BIN)(
       await sql`INSERT INTO sessions (id,user_id,expires_at) VALUES ('session','owner','2030-01-01')`;
       const reviewSecret = 'synthetic-backup-secret'.repeat(3);
       await sql`
-        INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
-        VALUES ('apple', 'owner', ${reviewCodeDigest(reviewSecret, 'apple', 'owner@example.invalid', '012345')},
+        INSERT INTO review_accounts (store, purpose, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+        VALUES ('apple', 'review', 'owner', ${reviewCodeDigest(reviewSecret, 'apple', 'owner@example.invalid', '012345')},
           ${randomUUID()}, ${'a'.repeat(64)}, 'create', 'synthetic-backup')
       `;
       await sql`INSERT INTO email_verifications (id,email,code_digest,expires_at) VALUES ('verification','owner@example.invalid',${'a'.repeat(64)},'2030-01-01')`;

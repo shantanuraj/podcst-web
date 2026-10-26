@@ -265,8 +265,8 @@ describe.skipIf(!process.env.PG_BIN)(
         ['apple', owner],
         ['google', other],
       ] as const) {
-        await sql`INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
-          VALUES (${store}, ${account.userId}, ${reviewCodeDigest(secret, store, account.email, reviewCode)}, ${crypto.randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic deletion integration')`;
+        await sql`INSERT INTO review_accounts (store, purpose, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+          VALUES (${store}, 'review', ${account.userId}, ${reviewCodeDigest(secret, store, account.email, reviewCode)}, ${crypto.randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic deletion integration')`;
       }
       const login = createEmailService(sql, secret, async () => {
         throw new Error('Unexpected delivery');

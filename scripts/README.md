@@ -105,7 +105,7 @@ Only these current application tables are excluded:
 
 | Table | Recovery consequence |
 | --- | --- |
-| `review_accounts` | Reusable review login is disabled on restore; reconcile current secret custody and account bindings before explicitly re-enrolling |
+| `review_accounts` | Reusable reviewer and E2E login is disabled on restore; reconcile current secret custody and account bindings before explicitly re-enrolling |
 | `account_deletion_receipts` | Short-lived receipt digests are not recovered; lost status remains unknown |
 | `account_erasure_proofs` | Unaccepted short-lived proofs are invalidated on recovery |
 | `feed_poll_state` | Rebuild validators/backoff/scheduling; cold polling adds I/O and must be rate-controlled |

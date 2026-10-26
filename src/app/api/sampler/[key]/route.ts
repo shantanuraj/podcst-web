@@ -11,6 +11,8 @@ export async function GET(
     [
       process.env.REVIEW_SAMPLER_APPLE_TOKEN,
       process.env.REVIEW_SAMPLER_GOOGLE_TOKEN,
+      process.env.E2E_SAMPLER_IOS_TOKEN,
+      process.env.E2E_SAMPLER_ANDROID_TOKEN,
     ],
   );
 }

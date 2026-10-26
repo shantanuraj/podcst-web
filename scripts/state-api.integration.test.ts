@@ -380,6 +380,7 @@ describe.skipIf(!configured)(
       );
       const identity = {
         store: 'apple' as const,
+        purpose: 'review' as const,
         email: 'http-review@example.invalid',
         target: 'development' as const,
       };

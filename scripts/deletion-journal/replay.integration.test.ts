@@ -18,8 +18,8 @@ test.skipIf(!process.env.PG_BIN)(
       await sql`INSERT INTO users (id, email) VALUES ('a', 'a@example.invalid'), ('b', 'b@example.invalid')`;
       await sql`INSERT INTO sessions (id, user_id, expires_at) VALUES ('session-b', 'b', now() + interval '1 day')`;
       await sql`INSERT INTO passkeys (id, user_id, credential_id, public_key) VALUES ('key-b', 'b', 'credential-b', decode('01', 'hex'))`;
-      await sql`INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
-      VALUES ('apple', 'b', ${'0'.repeat(64)}, ${crypto.randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')`;
+      await sql`INSERT INTO review_accounts (store, purpose, user_id, code_digest, operation_id, operation_digest, operation_kind, submission)
+      VALUES ('apple', 'review', 'b', ${'0'.repeat(64)}, ${crypto.randomUUID()}, ${'0'.repeat(64)}, 'create', 'synthetic')`;
       await sql`INSERT INTO account_preferences (user_id, speed, volume_boost, trim_silence) VALUES ('b', 1.5, true, false)`;
       const [before] = await sql`SELECT * FROM state_generation`;
       await deletionLog(directory, secret).append({

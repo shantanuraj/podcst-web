@@ -24,12 +24,13 @@ export type ReviewAction = 'create' | 'reset' | 'rotate' | 'remove';
 
 export interface ReviewIdentity {
   store: ReviewStore;
+  purpose: 'review' | 'e2e';
   email: string;
   target: 'production' | 'development';
 }
 
 export interface ReviewPlan {
-  format: 'podcst-review-plan/1';
+  format: 'podcst-review-plan/2';
   identity: ReviewIdentity;
   action: ReviewAction;
   operationId: string;
@@ -45,6 +46,7 @@ export interface ReviewPlan {
 
 interface Registration {
   store: ReviewStore;
+  purpose: ReviewIdentity['purpose'];
   user_id: string;
   email: string;
   code_digest: string;
@@ -59,14 +61,15 @@ interface Registration {
 
 export async function readReviewRegistration(
   tx: postgres.ISql,
-  store: ReviewStore,
+  identity: Pick<ReviewIdentity, 'store' | 'purpose'>,
   lock = false,
 ) {
   const [row] = await tx<Registration[]>`
-    SELECT r.store, r.user_id, r.code_digest, r.operation_id, r.operation_digest,
+    SELECT r.store, r.purpose, r.user_id, r.code_digest, r.operation_id, r.operation_digest,
       r.operation_kind, r.seed_revision, r.seed_digest, r.submission, r.completed_at, u.email
     FROM review_accounts r JOIN users u ON u.id = r.user_id
-    WHERE r.store = ${store} ${lock ? tx`FOR UPDATE OF r` : tx``}
+    WHERE r.store = ${identity.store} AND r.purpose = ${identity.purpose}
+      ${lock ? tx`FOR UPDATE OF r` : tx``}
   `;
   return row;
 }
@@ -74,6 +77,7 @@ export async function readReviewRegistration(
 export function reviewReceipt(row: Registration) {
   return {
     store: row.store,
+    purpose: row.purpose,
     operationId: row.operation_id,
     action: row.operation_kind,
     userId: row.user_id,
@@ -120,9 +124,10 @@ async function schemaState(tx: postgres.TransactionSql) {
   };
 }
 
-function assertIdentity(identity: ReviewIdentity) {
+export function assertReviewIdentity(identity: ReviewIdentity) {
   if (
     !['apple', 'google'].includes(identity.store) ||
+    !['review', 'e2e'].includes(identity.purpose) ||
     !['production', 'development'].includes(identity.target) ||
     !isEmail(identity.email) ||
     identity.email !== normalizeEmailIdentity(identity.email)
@@ -131,9 +136,9 @@ function assertIdentity(identity: ReviewIdentity) {
 }
 
 function validatePlan(plan: ReviewPlan) {
-  if (plan?.format !== 'podcst-review-plan/1' || !plan.identity)
+  if (plan?.format !== 'podcst-review-plan/2' || !plan.identity)
     throw new ReviewAccountError('Invalid review plan');
-  assertIdentity(plan.identity);
+  assertReviewIdentity(plan.identity);
   if (
     !['create', 'reset', 'rotate', 'remove'].includes(plan.action) ||
     !/^[a-f0-9-]{36}$/.test(plan.operationId) ||
@@ -166,13 +171,16 @@ async function expectedAccount(
   registration?: Registration,
 ) {
   if (action === 'create') {
-    if (registration) throw new ReviewAccountError('Store is already enrolled');
+    if (registration)
+      throw new ReviewAccountError('Store and purpose are already enrolled');
     const existing =
       await tx`SELECT id FROM users WHERE lower(email) = ${identity.email}`;
     if (existing.length)
       throw new ReviewAccountError('Refusing to adopt an existing account');
   } else if (!registration || registration.email !== identity.email) {
-    throw new ReviewAccountError('Enrolled store and email do not match');
+    throw new ReviewAccountError(
+      'Enrolled store, purpose and email do not match',
+    );
   }
 }
 
@@ -188,7 +196,7 @@ export async function planReviewAccount(
   reference: InventoryArtifact,
   seed: ResolvedReviewSeed | null,
 ): Promise<ReviewPlan> {
-  assertIdentity(input.identity);
+  assertReviewIdentity(input.identity);
   return sql.begin('isolation level repeatable read read only', async (tx) => {
     const schema = await schemaState(tx);
     if (
@@ -198,7 +206,7 @@ export async function planReviewAccount(
       throw new ReviewAccountError(
         'Database schema differs from the active reference',
       );
-    const registration = await readReviewRegistration(tx, input.identity.store);
+    const registration = await readReviewRegistration(tx, input.identity);
     await expectedAccount(tx, input.identity, input.action, registration);
     if (
       input.credentialDigest !== null &&
@@ -207,7 +215,7 @@ export async function planReviewAccount(
       throw new ReviewAccountError('Rotation requires a different code');
     const expectedUserId = registration?.user_id ?? null;
     const plan: ReviewPlan = {
-      format: 'podcst-review-plan/1',
+      format: 'podcst-review-plan/2',
       ...input,
       operationId: randomUUID(),
       expectedUserId,
@@ -228,7 +236,7 @@ export async function inspectReviewOperation(
   validatePlan(plan);
   if ((await databaseDigest(sql)) !== plan.databaseDigest)
     throw new ReviewAccountError('Database does not match the planned target');
-  const registration = await readReviewRegistration(sql, plan.identity.store);
+  const registration = await readReviewRegistration(sql, plan.identity);
   if (registration?.operation_id === plan.operationId) {
     if (
       registration.operation_digest !== digest(plan) ||
@@ -263,12 +271,8 @@ export async function applyReviewAccount(
       throw new ReviewAccountError(
         'Database does not match the planned target',
       );
-    await tx`SELECT pg_advisory_xact_lock(hashtext('review-account'), hashtext(${plan.identity.store}))`;
-    const registration = await readReviewRegistration(
-      tx,
-      plan.identity.store,
-      true,
-    );
+    await tx`SELECT pg_advisory_xact_lock(hashtext('review-account'), hashtext(${JSON.stringify([plan.identity.store, plan.identity.purpose])}))`;
+    const registration = await readReviewRegistration(tx, plan.identity, true);
     if (registration?.operation_id === plan.operationId) {
       if (registration.operation_digest !== digest(plan))
         throw new ReviewAccountError(
@@ -310,9 +314,10 @@ export async function applyReviewAccount(
     if (plan.action === 'remove') {
       await tx`DELETE FROM sessions WHERE user_id = ${plan.expectedUserId}`;
       await tx`DELETE FROM passkeys WHERE user_id = ${plan.expectedUserId}`;
-      await tx`DELETE FROM review_accounts WHERE store = ${plan.identity.store}`;
+      await tx`DELETE FROM review_accounts WHERE store = ${plan.identity.store} AND purpose = ${plan.identity.purpose}`;
       return {
         store: plan.identity.store,
+        purpose: plan.identity.purpose,
         operationId: plan.operationId,
         action: 'remove' as const,
       };
@@ -333,18 +338,18 @@ export async function applyReviewAccount(
     if (!userId || !codeDigest)
       throw new ReviewAccountError('Missing enrolled account credential');
     await tx`
-      INSERT INTO review_accounts (store, user_id, code_digest, operation_id, operation_digest,
+      INSERT INTO review_accounts (store, purpose, user_id, code_digest, operation_id, operation_digest,
         operation_kind, seed_revision, seed_digest, submission)
-      VALUES (${plan.identity.store}, ${userId}, ${codeDigest}, ${plan.operationId}, ${digest(plan)},
+      VALUES (${plan.identity.store}, ${plan.identity.purpose}, ${userId}, ${codeDigest}, ${plan.operationId}, ${digest(plan)},
         ${plan.action}, ${plan.seed?.revision ?? registration?.seed_revision ?? null},
         ${plan.seed?.digest ?? registration?.seed_digest ?? null}, ${plan.submission})
-      ON CONFLICT (store) DO UPDATE SET user_id = EXCLUDED.user_id, code_digest = EXCLUDED.code_digest,
+      ON CONFLICT (store, purpose) DO UPDATE SET user_id = EXCLUDED.user_id, code_digest = EXCLUDED.code_digest,
         operation_id = EXCLUDED.operation_id, operation_digest = EXCLUDED.operation_digest,
         operation_kind = EXCLUDED.operation_kind, seed_revision = EXCLUDED.seed_revision,
         seed_digest = EXCLUDED.seed_digest, submission = EXCLUDED.submission, completed_at = clock_timestamp()
     `;
     await tx`SET CONSTRAINTS ALL IMMEDIATE`;
-    const result = await readReviewRegistration(tx, plan.identity.store);
+    const result = await readReviewRegistration(tx, plan.identity);
     if (!result) throw new ReviewAccountError('Preparation receipt missing');
     return reviewReceipt(result);
   });

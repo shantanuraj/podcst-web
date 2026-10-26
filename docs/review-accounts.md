@@ -1,7 +1,8 @@
-# Store reviewer accounts
+# Store reviewer and E2E accounts
 
-Migration `0025-review-accounts.sql` registers at most one Apple account and one
-Google account. Each registration references an ordinary user and holds a
+Migration `0027-review-account-purposes.sql` permits one account per store and
+purpose: `apple` or `google`, and `review` or `e2e`. Existing registrations retain
+their credentials and gain the `review` purpose. Each registration references an ordinary user and holds a
 purpose-separated HMAC of its reusable six-digit login code. The user row owns
 the email. Runtime access to this table requires **SELECT only**; enrollment,
 preparation and rotation belong to the separate operator connection.
@@ -40,12 +41,19 @@ emails or private feed URLs.
 
 Run commands with `bun --no-env-file scripts/review-account.ts`. Supply connection
 settings and `AUTH_CODE_SECRET` through protected environment configuration.
-The configuration object contains `store` (`apple` or `google`), normalized
+The configuration object contains `store` (`apple` or `google`), required
+`purpose` (`review` or `e2e`), normalized
 `email`, `target`, HTTPS `apiOrigin` without a trailing slash, and `feeds` with
 canonical HTTPS `public` and `private` URLs. Credential files contain `store`,
-`email` and string `code`. `credential` generates and persists a cryptographically
+`purpose`, `email` and string `code`. `credential` generates and persists a cryptographically
 random code; `sampler-token` writes a separate random 256-bit `token`. Preserve
 the prior credential separately until a deliberate rotation commits.
+
+Plans use `podcst-review-plan/2` and pin the purpose. Configurations and credential
+files must name it explicitly; plans from earlier source must be prepared again.
+Reset, rotation and removal select the exact store/purpose registration. E2E
+preparation does not reset reviewer state or the other platform's E2E account.
+Keep future test runs serialized per account when they change shared account state.
 
 `--reference` is an active-chain reference from the [schema inventory
 tool](schema-inventory.md). Planning checks the complete migration ledger and
@@ -71,7 +79,7 @@ state. `remove` revokes those credentials and deletes the registration without
 erasing the user. Addresses at `podcst.app` cannot request an ordinary email code
 after removal either.
 
-The lock order is normalized email identity, store, registration, user, account
+The lock order is normalized email identity, store/purpose, registration, user, account
 dependencies, then sampler identities and state/list resources. Foreign keys
 derive the account dependency inventory. Preparation refuses cross-account
 private references and erasure bookkeeping. Network and secret-custody work
@@ -113,8 +121,9 @@ and version any regeneration. Runtime serving needs neither speech software nor
 FFmpeg. The public media assets live at `/samples/review/v1/`.
 
 `/api/sampler/public` serves the four-episode public feed. A separate 64-character
-hexadecimal token for each store enables `/api/sampler/TOKEN`, backed by
-`REVIEW_SAMPLER_APPLE_TOKEN` and `REVIEW_SAMPLER_GOOGLE_TOKEN`. Configure different
+hexadecimal token for each account enables `/api/sampler/TOKEN`, backed by
+`REVIEW_SAMPLER_APPLE_TOKEN`, `REVIEW_SAMPLER_GOOGLE_TOKEN`,
+`E2E_SAMPLER_IOS_TOKEN` and `E2E_SAMPLER_ANDROID_TOKEN`. Configure different
 tokens in protected runtime settings. Private feed URLs are bearer locators for
 demonstration content; imported database records use normal account ownership.
 Their audio files are public demonstration assets. Unknown or unconfigured tokens
@@ -133,7 +142,7 @@ application.
 ## Recovery and validation
 
 The selected backup intentionally excludes `review_accounts`. A fresh restore
-therefore disables reusable review login. Restoring a full database requires
+therefore disables reusable reviewer and E2E login. Restoring a full database requires
 explicitly clearing stale registrations before admission. Reconcile current
 credential custody, account bindings and revocations before restoring review
 access; initial enrollment never adopts a restored ordinary user automatically.
