@@ -143,137 +143,146 @@ function acknowledgement(
   };
 }
 
-export function createEpisodeListService(
-  sql: postgres.Sql,
+export async function changeEpisodeList(
+  tx: postgres.TransactionSql,
+  userId: string,
+  listId: string,
+  scope: StateScope,
+  batch: ListBatch | LegacyListBatch,
+  legacy: boolean,
   registerClient?: (userId: string) => Promise<void>,
-) {
-  async function change(
-    userId: string,
-    listId: string,
-    scope: StateScope,
-    batch: ListBatch | LegacyListBatch,
-    legacy: boolean,
-  ): Promise<ListAcknowledgement> {
-    const hash = legacy
-      ? legacyListHash(listId, batch as LegacyListBatch)
-      : createHash('sha256')
-          .update(
-            JSON.stringify({
-              protocol: scope.protocol,
-              accountId: scope.accountId,
-              generation: scope.generation,
-              listId,
-              clientId: batch.clientId,
-              sequence: batch.sequence,
-              changes: batch.changes.map(({ op, episodeId }) => ({
-                op,
-                episodeId,
-              })),
-            }),
-          )
-          .digest('hex');
-    return sql.begin(async (tx) => {
-      await tx`SET LOCAL lock_timeout = '3s'`;
-      const current = await readGeneration(tx, userId, true);
-      assertStateScope(userId, current.scope.generation, scope);
-      if (legacy && current.scope.generation !== current.legacyGeneration)
-        throw new StateError(
-          'recovery_required',
-          'Legacy work requires reconciliation',
-        );
-      await ownedList(tx, userId, listId);
-      const registered = await tx`
+): Promise<ListAcknowledgement> {
+  const hash = legacy
+    ? legacyListHash(listId, batch as LegacyListBatch)
+    : createHash('sha256')
+        .update(
+          JSON.stringify({
+            protocol: scope.protocol,
+            accountId: scope.accountId,
+            generation: scope.generation,
+            listId,
+            clientId: batch.clientId,
+            sequence: batch.sequence,
+            changes: batch.changes.map(({ op, episodeId }) => ({
+              op,
+              episodeId,
+            })),
+          }),
+        )
+        .digest('hex');
+  await tx`SET LOCAL lock_timeout = '3s'`;
+  const current = await readGeneration(tx, userId, true);
+  assertStateScope(userId, current.scope.generation, scope);
+  if (legacy && current.scope.generation !== current.legacyGeneration)
+    throw new StateError(
+      'recovery_required',
+      'Legacy work requires reconciliation',
+    );
+  await ownedList(tx, userId, listId);
+  const registered = await tx`
         INSERT INTO episode_list_clients (user_id, client_id)
         VALUES (${userId}, ${batch.clientId}) ON CONFLICT DO NOTHING RETURNING client_id
       `;
-      if (registered.length) await registerClient?.(userId);
-      const [client] = await tx`
+  if (registered.length) await registerClient?.(userId);
+  const [client] = await tx`
         SELECT last_sequence::text, last_request_hash, last_result
         FROM episode_list_clients
         WHERE user_id = ${userId} AND client_id = ${batch.clientId} FOR UPDATE
       `;
-      if (
-        stateReplay(batch.sequence, hash, {
-          sequence: client.last_sequence,
-          hash: client.last_request_hash,
-        })
-      )
-        return acknowledgement(
-          current.scope,
-          client.last_result as StoredAcknowledgement,
-        );
-      const ids = [
-        ...new Set(batch.changes.map(({ episodeId }) => String(episodeId))),
-      ];
-      const references = () => tx`
+  if (
+    stateReplay(batch.sequence, hash, {
+      sequence: client.last_sequence,
+      hash: client.last_request_hash,
+    })
+  )
+    return acknowledgement(
+      current.scope,
+      client.last_result as StoredAcknowledgement,
+    );
+  const ids = [
+    ...new Set(batch.changes.map(({ episodeId }) => String(episodeId))),
+  ];
+  const references = () => tx`
         SELECT id::text, podcast_id::text FROM episodes
         WHERE id = ANY(${ids}::bigint[]) ORDER BY id
       `;
-      const before = await references();
-      const podcastIds = [
-        ...new Set(before.map((row) => String(row.podcast_id))),
-      ].sort(compareCanonicalIds);
-      for (const id of podcastIds)
-        await tx`SELECT pg_advisory_xact_lock(${id}::bigint)`;
-      if (JSON.stringify(before) !== JSON.stringify(await references()))
-        throw new ListError(503, 'Episode identities changed; retry');
-      const list = await ownedList(tx, userId, listId, true);
-      const results: StoredAcknowledgement['results'] = [];
-      for (const item of batch.changes) {
-        if (item.op === 'remove') {
-          const removed = await tx`
+  const before = await references();
+  const podcastIds = [
+    ...new Set(before.map((row) => String(row.podcast_id))),
+  ].sort(compareCanonicalIds);
+  for (const id of podcastIds)
+    await tx`SELECT pg_advisory_xact_lock(${id}::bigint)`;
+  if (JSON.stringify(before) !== JSON.stringify(await references()))
+    throw new ListError(503, 'Episode identities changed; retry');
+  const list = await ownedList(tx, userId, listId, true);
+  const results: StoredAcknowledgement['results'] = [];
+  for (const item of batch.changes) {
+    if (item.op === 'remove') {
+      const removed = await tx`
             DELETE FROM episode_list_items WHERE list_id = ${listId} AND episode_id = ${item.episodeId}
             RETURNING episode_id
           `;
-          results.push({
-            episodeId: item.episodeId,
-            status: removed.length ? 'applied' : 'unchanged',
-          });
-        } else {
-          const [episode] = await tx`
+      results.push({
+        episodeId: item.episodeId,
+        status: removed.length ? 'applied' : 'unchanged',
+      });
+    } else {
+      const [episode] = await tx`
             SELECT e.id FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
             WHERE e.id = ${item.episodeId} AND ${podcastAccess(tx, userId)}
           `;
-          const added = episode
-            ? await tx`
+      const added = episode
+        ? await tx`
             INSERT INTO episode_list_items (list_id, episode_id) VALUES (${listId}, ${item.episodeId})
             ON CONFLICT DO NOTHING RETURNING episode_id
           `
-            : [];
-          results.push({
-            episodeId: item.episodeId,
-            status: !episode
-              ? 'not_found'
-              : added.length
-                ? 'applied'
-                : 'unchanged',
-          });
-        }
-      }
-      if (results.some(({ status }) => status === 'applied')) {
-        list.revision = nextStateRevision(list.revision);
-        await tx`
+        : [];
+      results.push({
+        episodeId: item.episodeId,
+        status: !episode ? 'not_found' : added.length ? 'applied' : 'unchanged',
+      });
+    }
+  }
+  if (results.some(({ status }) => status === 'applied')) {
+    list.revision = nextStateRevision(list.revision);
+    await tx`
           UPDATE episode_lists SET revision = ${list.revision}::bigint, updated_at = clock_timestamp()
           WHERE id = ${listId}
         `;
-      }
-      const stored: StoredAcknowledgement = {
-        clientId: batch.clientId,
-        sequence: batch.sequence,
-        listId: list.id,
-        revision: list.revision,
-        results,
-      };
-      const result = acknowledgement(current.scope, stored);
-      await tx`
+  }
+  const stored: StoredAcknowledgement = {
+    clientId: batch.clientId,
+    sequence: batch.sequence,
+    listId: list.id,
+    revision: list.revision,
+    results,
+  };
+  const result = acknowledgement(current.scope, stored);
+  await tx`
         UPDATE episode_list_clients SET last_sequence = ${batch.sequence}::bigint,
           last_request_hash = ${hash}, last_result = ${tx.json((legacy ? stored : result) as unknown as postgres.JSONValue)}
         WHERE user_id = ${userId} AND client_id = ${batch.clientId}
       `;
-      return result;
-    });
-  }
+  return result;
+}
 
+export async function insertEpisodeList(
+  tx: postgres.ISql,
+  userId: string,
+  kind: EpisodeList['kind'],
+  name: string | null = null,
+) {
+  const [list] = await tx`
+    INSERT INTO episode_lists (id, user_id, kind, name) VALUES (${randomUUID()}, ${userId}, ${kind}, ${name})
+    ON CONFLICT (user_id) WHERE kind = 'starred' DO NOTHING RETURNING id
+  `;
+  return list?.id as string | undefined;
+}
+
+export function createEpisodeListService(
+  sql: postgres.Sql,
+  registerClient?: (userId: string) => Promise<void>,
+) {
   return {
     async lists(
       userId: string,
@@ -319,10 +328,7 @@ export function createEpisodeListService(
       // second statement sees the winner of a concurrent starred-list insert.
       return sql.begin(async (tx) => {
         const { scope } = await readGeneration(tx, userId, true);
-        await tx`
-          INSERT INTO episode_lists (id, user_id, kind) VALUES (${randomUUID()}, ${userId}, 'starred')
-          ON CONFLICT (user_id) WHERE kind = 'starred' DO NOTHING
-        `;
+        await insertEpisodeList(tx, userId, 'starred');
         const lists = await tx<EpisodeList[]>`
           SELECT l.id, l.kind, l.name, l.revision::text,
             (SELECT count(*)::int FROM episode_list_items i WHERE i.list_id = l.id) AS "itemCount"
@@ -423,7 +429,17 @@ export function createEpisodeListService(
       const batch = parseListBatch(input);
       if (!batch)
         throw new StateError('invalid_request', 'Invalid list changes');
-      return change(userId, listId, batch, batch, false);
+      return sql.begin((tx) =>
+        changeEpisodeList(
+          tx,
+          userId,
+          listId,
+          batch,
+          batch,
+          false,
+          registerClient,
+        ),
+      );
     },
 
     async migrate(
@@ -435,7 +451,17 @@ export function createEpisodeListService(
       const batch = parseLegacyListBatch(input);
       if (!batch)
         throw new StateError('invalid_request', 'Invalid legacy list changes');
-      return change(userId, listId, scope, batch, true);
+      return sql.begin((tx) =>
+        changeEpisodeList(
+          tx,
+          userId,
+          listId,
+          scope,
+          batch,
+          true,
+          registerClient,
+        ),
+      );
     },
   };
 }

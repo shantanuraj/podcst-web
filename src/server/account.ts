@@ -77,6 +77,14 @@ export async function savePreferences(
   userId: string,
   preferences: Preferences,
 ) {
+  return writePreferences(sql, userId, preferences);
+}
+
+export async function writePreferences(
+  sql: postgres.ISql,
+  userId: string,
+  preferences: Preferences,
+) {
   await sql`
     INSERT INTO account_preferences (user_id, speed, volume_boost, trim_silence)
     VALUES (

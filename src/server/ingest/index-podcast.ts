@@ -1,5 +1,6 @@
 import type postgres from 'postgres';
 import { FEED_LIMITS } from '@/shared/feed-contract';
+import type { IEpisodeListing } from '@/types';
 import { readGeneration } from '../state/generation';
 import {
   claimAppleIdentity,
@@ -59,6 +60,34 @@ function authorizePrivate(podcast: PodcastIdentity, userId: string) {
     throw new PodcastAccessDenied('Feed unavailable');
   }
   return String(podcast.id);
+}
+
+export async function insertPodcast(
+  tx: postgres.ISql,
+  feedUrl: string,
+  ownerUserId: string | null,
+  data: IEpisodeListing,
+  itunesId?: string,
+) {
+  const authorName = data.author || 'Unknown';
+  let [author] =
+    await tx`SELECT id FROM authors WHERE name = ${authorName} LIMIT 1`;
+  if (!author)
+    [author] =
+      await tx`INSERT INTO authors (name) VALUES (${authorName}) RETURNING id`;
+  const [podcast] = await tx<PodcastIdentity[]>`
+      INSERT INTO podcasts (
+        itunes_id, owner_user_id, feed_url, title, author_id, description, cover,
+        website_url, explicit, episode_count, last_published
+      ) VALUES (
+        ${itunesId ?? null}, ${ownerUserId}, ${feedUrl}, ${data.title}, ${author.id},
+        ${data.description}, ${data.cover}, ${data.link}, ${data.explicit},
+        ${data.episodes.length}, ${data.published ? new Date(data.published) : null}
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
+    `;
+  return podcast;
 }
 
 async function index(
@@ -184,24 +213,13 @@ async function index(
     if (fetched?.status !== 'updated')
       throw new Error('Feed changed during import; retry');
     const { data } = fetched;
-    const authorName = data.author || 'Unknown';
-    let [author] =
-      await tx`SELECT id FROM authors WHERE name = ${authorName} LIMIT 1`;
-    if (!author)
-      [author] =
-        await tx`INSERT INTO authors (name) VALUES (${authorName}) RETURNING id`;
-    const [podcast] = await tx<PodcastIdentity[]>`
-      INSERT INTO podcasts (
-        itunes_id, owner_user_id, feed_url, title, author_id, description, cover,
-        website_url, explicit, episode_count, last_published
-      ) VALUES (
-        ${applePlan ? null : (itunesId ?? null)}, ${ownerUserId}, ${move?.canonicalFeedUrl ?? feedUrl}, ${data.title}, ${author.id},
-        ${data.description}, ${data.cover}, ${data.link}, ${data.explicit},
-        ${data.episodes.length}, ${data.published ? new Date(data.published) : null}
-      )
-      ON CONFLICT DO NOTHING
-      RETURNING id, itunes_id, podcast_index_id, feed_url, owner_user_id
-    `;
+    const podcast = await insertPodcast(
+      tx,
+      move?.canonicalFeedUrl ?? feedUrl,
+      ownerUserId,
+      data,
+      applePlan ? undefined : itunesId,
+    );
     if (!podcast) {
       const winner = await findPodcastIdentity(
         tx,

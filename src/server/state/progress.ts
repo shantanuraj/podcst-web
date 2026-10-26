@@ -88,6 +88,66 @@ async function readSnapshot(
   };
 }
 
+export async function changeProgressState(
+  tx: postgres.TransactionSql,
+  accountId: string,
+  batch: ProgressBatch,
+  registerClient?: (accountId: string) => Promise<void>,
+): Promise<ProgressAcknowledgement> {
+  const state = await lockStateChange(
+    tx,
+    accountId,
+    'progress',
+    batch,
+    registerClient,
+  );
+  if (state.replay) return state.replay as ProgressAcknowledgement;
+  const ids = [...new Set(batch.changes.map(({ episodeId }) => episodeId))];
+  const visible = await tx<{ id: string }[]>`
+    SELECT e.id::text FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
+    WHERE e.id = ANY(${ids}::bigint[]) AND ${podcastAccess(tx, accountId)}
+    ORDER BY e.id FOR SHARE OF e, p
+  `;
+  const available = new Set(visible.map(({ id }) => id));
+  const results: ProgressAcknowledgement['results'] = [];
+  let revision = state.revision;
+  for (const change of batch.changes) {
+    if (!available.has(change.episodeId)) {
+      results.push({ episodeId: change.episodeId, status: 'not_found' });
+      continue;
+    }
+    const [previous] = await tx`
+      SELECT position, completed FROM playback_progress
+      WHERE user_id = ${accountId} AND episode_id = ${change.episodeId}
+    `;
+    const completed = change.completed ?? previous?.completed ?? false;
+    revision = nextStateRevision(revision);
+    await tx`
+      INSERT INTO playback_progress (user_id, episode_id, position, completed, revision, updated_at)
+      VALUES (${accountId}, ${change.episodeId}, ${change.positionSeconds}, ${completed}, ${revision}::bigint, clock_timestamp())
+      ON CONFLICT (user_id, episode_id) DO UPDATE SET
+        position = EXCLUDED.position, completed = EXCLUDED.completed,
+        revision = EXCLUDED.revision, updated_at = EXCLUDED.updated_at
+    `;
+    results.push({
+      episodeId: change.episodeId,
+      status:
+        previous?.position === change.positionSeconds &&
+        previous.completed === completed
+          ? 'unchanged'
+          : 'applied',
+    });
+  }
+  const { changes: _, ...stream } = batch;
+  const result: ProgressAcknowledgement = {
+    ...stream,
+    revision,
+    results,
+  };
+  await saveStateAcknowledgement(tx, 'progress', state.hash, result);
+  return result;
+}
+
 export function createProgressStateService(
   sql: postgres.Sql,
   registerClient?: (accountId: string) => Promise<void>,
@@ -97,62 +157,9 @@ export function createProgressStateService(
       accountId: string,
       batch: ProgressBatch,
     ): Promise<ProgressAcknowledgement> {
-      return sql.begin(async (tx) => {
-        const state = await lockStateChange(
-          tx,
-          accountId,
-          'progress',
-          batch,
-          registerClient,
-        );
-        if (state.replay) return state.replay as ProgressAcknowledgement;
-        const ids = [
-          ...new Set(batch.changes.map(({ episodeId }) => episodeId)),
-        ];
-        const visible = await tx<{ id: string }[]>`
-          SELECT e.id::text FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
-          WHERE e.id = ANY(${ids}::bigint[]) AND ${podcastAccess(tx, accountId)}
-          ORDER BY e.id FOR SHARE OF e, p
-        `;
-        const available = new Set(visible.map(({ id }) => id));
-        const results: ProgressAcknowledgement['results'] = [];
-        let revision = state.revision;
-        for (const change of batch.changes) {
-          if (!available.has(change.episodeId)) {
-            results.push({ episodeId: change.episodeId, status: 'not_found' });
-            continue;
-          }
-          const [previous] = await tx`
-            SELECT position, completed FROM playback_progress
-            WHERE user_id = ${accountId} AND episode_id = ${change.episodeId}
-          `;
-          const completed = change.completed ?? previous?.completed ?? false;
-          revision = nextStateRevision(revision);
-          await tx`
-            INSERT INTO playback_progress (user_id, episode_id, position, completed, revision, updated_at)
-            VALUES (${accountId}, ${change.episodeId}, ${change.positionSeconds}, ${completed}, ${revision}::bigint, clock_timestamp())
-            ON CONFLICT (user_id, episode_id) DO UPDATE SET
-              position = EXCLUDED.position, completed = EXCLUDED.completed,
-              revision = EXCLUDED.revision, updated_at = EXCLUDED.updated_at
-          `;
-          results.push({
-            episodeId: change.episodeId,
-            status:
-              previous?.position === change.positionSeconds &&
-              previous.completed === completed
-                ? 'unchanged'
-                : 'applied',
-          });
-        }
-        const { changes: _, ...stream } = batch;
-        const result: ProgressAcknowledgement = {
-          ...stream,
-          revision,
-          results,
-        };
-        await saveStateAcknowledgement(tx, 'progress', state.hash, result);
-        return result;
-      });
+      return sql.begin((tx) =>
+        changeProgressState(tx, accountId, batch, registerClient),
+      );
     },
 
     async read(accountId: string, ids: string[]): Promise<ProgressSnapshot> {
