@@ -308,10 +308,11 @@ export default function PrivacyPage() {
             the backup taken on the first of each month for 12 months. Weekly
             encrypted snapshots of podcast and episode identifiers, which
             include private feed addresses and their owning account, are kept
-            for 90 days. A deleted account can remain inside backups taken
-            before the deletion until those backups expire. Before any backup is
-            restored, we reapply every recorded account deletion, so a deleted
-            account cannot return.
+            for 90 days. Encrypted copies made before maintenance work are
+            deleted within 35 days. A deleted account can remain inside backups
+            taken before the deletion until those backups expire. Before any
+            backup is restored, we reapply every recorded account deletion, so a
+            deleted account cannot return.
           </p>
         </PolicySection>
 
