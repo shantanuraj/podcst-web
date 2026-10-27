@@ -38,7 +38,7 @@ if (command === 'age') record.mode = fs.statSync(args.at(-1)).mode & 0o777;
 fs.appendFileSync(path.join(process.env.TEST_ROOT, 'calls'), JSON.stringify(record) + '\\n');
 if (process.env.FAIL_COMMAND === command) process.exit(1);
 switch (command) {
-  case 'date': console.log(args.includes('+%d') ? '02' : '2030-01-02T000000Z'); break;
+  case 'date': console.log(args.includes('+%d') ? process.env.DAY ?? '02' : '2030-01-02T000000Z'); break;
   case 'mktemp': console.log(fs.mkdtempSync(path.join(process.env.TEST_ROOT, 'dump-'))); break;
   case 'stat': console.log(fs.statSync(args.at(-1)).size); break;
   case 'pg_dump': process.stdout.write('synthetic dump'); break;
@@ -141,6 +141,21 @@ for (const script of scripts) {
     expect(calls.some((call) => call.command === 'aws')).toBe(false);
   });
 }
+
+test.each([
+  ['02', 35, 'daily'],
+  ['01', 365, 'monthly'],
+])('user-data backup on day %s locks %i days and tags %s', (day, days, retention) => {
+  const { result, calls } = run('podcst-backup.sh', { DAY: day });
+  expect(result.exitCode).toBe(0);
+  expect(
+    calls.find((call) => call.command === 'date' && call.args.includes('-d'))
+      ?.args,
+  ).toContain(`+${days} days`);
+  expect(calls.find((call) => call.command === 'aws')?.args).toEqual(
+    expect.arrayContaining(['--tagging', `retention=${retention}`]),
+  );
+});
 
 for (const variable of ['BACKUP_MIN_PODCASTS', 'BACKUP_MIN_EPISODES']) {
   test.each([

@@ -7,7 +7,11 @@ TS=$(date -u +%Y-%m-%dT%H%M%SZ)
 KEY="podcst-userdata-${TS}.dump.age"
 
 RETAIN_DAYS=35
-[ "$(date -u +%d)" = "01" ] && RETAIN_DAYS=365
+RETENTION=daily
+if [ "$(date -u +%d)" = "01" ]; then
+  RETAIN_DAYS=365
+  RETENTION=monthly
+fi
 RETAIN_UNTIL=$(date -u -d "+${RETAIN_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
 
 TMP=$(mktemp -d)
@@ -36,6 +40,7 @@ age -r "$BACKUP_RECIPIENT" -o "$DUMP.age" "$DUMP"
 
 aws s3api put-object \
   --bucket "$BACKUP_BUCKET" --key "$KEY" --body "$DUMP.age" \
-  --object-lock-mode GOVERNANCE --object-lock-retain-until-date "$RETAIN_UNTIL" >/dev/null
+  --object-lock-mode GOVERNANCE --object-lock-retain-until-date "$RETAIN_UNTIL" \
+  --tagging "retention=${RETENTION}" >/dev/null
 
 echo "OK uploaded s3://${BACKUP_BUCKET}/${KEY} plaintext=$(stat -c%s "$DUMP")B encrypted=$(stat -c%s "$DUMP.age")B retain_until=${RETAIN_UNTIL} (${RETAIN_DAYS}d)"
