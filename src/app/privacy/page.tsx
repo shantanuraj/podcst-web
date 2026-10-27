@@ -146,9 +146,7 @@ export default function PrivacyPage() {
             information and timestamps to deliver the service and keep it
             secure. Hosting providers record this in short-lived request and
             error logs. To limit abuse of sign in and account deletion, we keep
-            rate-limit counters keyed by a secret-keyed hash of the email
-            address and of the requesting IP address; they expire within an
-            hour.
+            short-lived, hashed records of email and IP addresses.
           </p>
           <p>
             <strong>Support.</strong> If you contact us, we receive your email
@@ -183,13 +181,10 @@ export default function PrivacyPage() {
 
         <PolicySection id="services">
           <p>
-            <strong>Hosting and infrastructure.</strong> The website and API at
-            podcst.app are served by Vercel, with application servers in the
-            United States. Fly.io runs a second instance of the same service in
-            Amsterdam. Our database, cache, feed-refresh workers and image proxy
-            (assets.podcst.app) run on dedicated servers we operate at Hetzner
-            in Germany. Encrypted backups are stored with Amazon Web Services in
-            Frankfurt, Germany. These providers process information on our
+            <strong>Hosting and infrastructure.</strong> Vercel and Fly.io serve
+            the website and API. Our database and other servers run at Hetzner
+            in Germany, and encrypted backups are stored with Amazon Web
+            Services in Germany. These providers process information on our
             behalf to run Podcst.
           </p>
           <p>
@@ -266,16 +261,13 @@ export default function PrivacyPage() {
             advertising or tracking cookies.
           </p>
           <p>
-            All connections to Podcst use HTTPS. Our servers connect to the
-            database and cache over mutually authenticated TLS with restricted,
-            dedicated credentials. Backups are encrypted before they leave our
-            servers, using keys held only by the operator, and are stored in
-            locked, non-public storage. Production access is limited to the
-            operator. Account sync and private feeds are not end-to-end
+            All connections to Podcst use HTTPS, and connections between our own
+            systems are encrypted and authenticated. Backups are encrypted with
+            keys only we hold, and access to production systems is limited to
+            the operator. Account sync and private feeds are not end-to-end
             encrypted, because our servers need to read them to synchronize your
-            library and refresh your feeds. Podcasts are hosted by their
-            publishers, and some publishers still use unencrypted HTTP links
-            that we cannot secure.
+            library and refresh your feeds. Some publishers use unencrypted HTTP
+            links that we cannot secure.
           </p>
           <p>
             Vercel, Fly.io and Resend may process information in the United
@@ -292,10 +284,8 @@ export default function PrivacyPage() {
           <p>
             Account and synchronized data are kept for as long as your account
             exists. We do not delete inactive accounts automatically. Sign-in
-            sessions expire after 30 days. Sign-in codes expire after 10 minutes
-            and deletion codes after 5 minutes. Abuse-prevention counters expire
-            within an hour. Signing out keeps pending account data on that
-            device, and neither signing out nor uninstalling deletes your server
+            sessions expire after 30 days, and sign-in and deletion codes expire
+            within minutes. Neither signing out nor uninstalling deletes your
             account.
           </p>
           <p>
@@ -304,15 +294,11 @@ export default function PrivacyPage() {
             long as needed to resolve your request.
           </p>
           <p>
-            Daily encrypted backups of account data are kept for 35 days, and
-            the backup taken on the first of each month for 12 months. Weekly
-            encrypted snapshots of podcast and episode identifiers, which
-            include private feed addresses and their owning account, are kept
-            for 90 days. Encrypted copies made before maintenance work are
-            deleted within 35 days. A deleted account can remain inside backups
-            taken before the deletion until those backups expire. Before any
-            backup is restored, we reapply every recorded account deletion, so a
-            deleted account cannot return.
+            Encrypted backups may contain account information and private feed
+            addresses, and are kept for up to 12 months. Information deleted
+            from the active service may remain in existing backups until they
+            expire. We reapply recorded account deletions before any restored
+            data is put back into use.
           </p>
         </PolicySection>
 
@@ -322,11 +308,10 @@ export default function PrivacyPage() {
             <Link href="/account#delete">
               delete your account in account settings
             </Link>
-            , or open Settings → Delete account in the iOS or Android app. Sign
-            in, request a deletion code by email, enter it within five minutes
-            and confirm permanent deletion. You can cancel at any point before
-            you confirm. Once confirmed, the request cannot be cancelled and you
-            are signed out on every device.
+            , or open Settings → Delete account in the iOS or Android app. You
+            confirm with a code we email you, and you can cancel at any point
+            before you confirm. Once confirmed, deletion cannot be undone and
+            you are signed out on every device.
           </p>
           <p>
             Deletion removes your account, email address, passkeys, sessions,
@@ -337,37 +322,27 @@ export default function PrivacyPage() {
             that, contact the publisher.
           </p>
           <p>
-            Most deletions complete immediately. If completion cannot be
-            confirmed at once, your request stays pending, and we retry it
-            automatically every minute until it completes. Use Check deletion
-            status in the app or on the website to see the result. Your device
-            keeps a status receipt that is valid for seven days. If the receipt
-            is missing or has expired, the outcome is unknown, not confirmed, so
-            the app keeps your saved data instead of assuming deletion.
+            Deletion usually completes immediately. If it cannot be confirmed
+            straight away, the request stays pending and completes
+            automatically, and you can check its status in the app or on the
+            website. Until deletion is confirmed, the app keeps your saved data.
           </p>
           <p>
-            After the server confirms deletion, the browser or device you used
-            removes saved data belonging to that account, including its
-            downloads. Guest data and other accounts’ data stay. If local
-            cleanup fails, use Retry cleanup. Other signed-in devices are signed
-            out, but their saved copies remain until you remove them or the app.
-            Deletion cannot instantly remove data from disconnected devices,
-            system caches, publisher services or copies you exported.
+            After deletion is confirmed, the browser or device you used removes
+            that account’s saved data, including downloads. Guest data and other
+            accounts stay. Other devices are signed out but keep their saved
+            copies until you remove them. Deletion cannot reach disconnected
+            devices, system caches, publisher services or copies you exported.
           </p>
           <p>
-            Some information derived from private feeds can remain after
-            deletion. Cached chapter titles and times are only served after an
-            ownership check, so they are no longer available once your account
-            is deleted, and they expire within 180 days. Our image proxy caches
-            resized artwork under hashed names, without recording where it came
-            from, and replaces old entries as space is needed.
+            Some cached information derived from private feeds, such as chapter
+            titles and artwork, is no longer available to your account after
+            deletion and expires over time, chapter data within 180 days.
           </p>
           <p>
-            We keep a separate deletion record containing only the deleted
-            account’s random identifier, a request identifier and the time of
-            the request. It contains no email address, feeds or listening data.
-            We keep it as long as any backup could restore the account, so that
-            the deletion is reapplied after a restore.
+            We keep a minimal record of each deletion, an identifier and a
+            timestamp with no email address, feeds or listening data, so that
+            the deletion is reapplied if a backup is ever restored.
           </p>
           <p>For help with account deletion, contact {privacyEmail}.</p>
         </PolicySection>
