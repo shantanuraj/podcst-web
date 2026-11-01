@@ -206,6 +206,39 @@ final class SessionTests: XCTestCase {
         XCTAssertNil(SessionStore(api: fixture.api, storageURL: fixture.url).user)
     }
 
+    func testRepeatedAccountRestorationKeepsWorkRunningOnlineAndOffline() async throws {
+        for status: Int? in [200, nil] {
+            let fixture = try fixture(status: status)
+            defer { fixture.cleanUp() }
+            let session = SessionStore(api: fixture.api, storageURL: fixture.url)
+            session.suspendAccountWork = { XCTFail("Revalidating an unchanged account must not suspend its work") }
+            session.prepareAccountChange = { _ in XCTFail("Revalidating an unchanged account must not retire its resources") }
+            session.resumeAccountWork = { XCTAssertEqual($0, "listener") }
+
+            await session.restore()
+            await session.restore()
+
+            XCTAssertEqual(session.user?.id, "listener")
+            XCTAssertFalse(session.isLoading)
+            XCTAssertEqual(session.error == nil, status == 200)
+        }
+    }
+
+    func testRepeatedGuestRestorationKeepsWorkRunning() async throws {
+        let fixture = try await guestFixture(podcasts: [])
+        defer { fixture.cleanUp() }
+        fixture.session.suspendAccountWork = { XCTFail("Revalidating a guest must not suspend its work") }
+        fixture.session.prepareAccountChange = { _ in XCTFail("Revalidating a guest must not retire its resources") }
+        fixture.session.resumeAccountWork = { XCTAssertNil($0) }
+
+        await fixture.session.restore()
+        await fixture.session.restore()
+
+        XCTAssertNil(fixture.session.user)
+        XCTAssertFalse(fixture.session.isLoading)
+        XCTAssertNil(fixture.session.error)
+    }
+
     func testAuthoritativeSessionExpiryClearsCachedAccountAfterResourceRetirement() async throws {
         let fixture = try fixture(status: 401)
         defer { fixture.cleanUp() }
