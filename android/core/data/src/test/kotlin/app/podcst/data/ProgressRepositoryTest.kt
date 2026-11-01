@@ -90,6 +90,26 @@ class ProgressRepositoryTest {
         assertNull(scopes.durable.account("owner").progressQueued.single().completed)
     }
 
+    @Test fun verificationSuspensionRetainsCheckpointsUntilTheSameAccountResumes() = runTest {
+        val server = server()
+        val repository = repository(server)
+        scopes.suspendSync()
+        repository.record(phone, 42.seconds, false)
+        val checkpoint = StateProgressChange(StateID("1"), 42, null)
+        assertEquals(42000L, scopes.database.progress().get(phone.identity.value)?.positionMs)
+        assertEquals(listOf(checkpoint), scopes.durable.account("owner").progressQueued)
+        assertEquals(SyncOutcome.Done, repository.sync())
+        assertTrue(server.calls.isEmpty())
+        assertEquals(listOf(checkpoint), scopes.durable.account("owner").progressQueued)
+        scopes.resumeSync("owner")
+        assertEquals(SyncOutcome.Done, repository.sync())
+        val uploaded = Json.decodeFromString<StateBatch<StateProgressChange>>(server.calls.single { it.body.isNotEmpty() }.body)
+        assertEquals("owner", uploaded.accountId)
+        assertEquals(listOf(checkpoint), uploaded.changes)
+        assertFalse(scopes.durable.account("owner").pending)
+        assertEquals(42000L, scopes.database.progress().get(phone.identity.value)?.positionMs)
+    }
+
     @Test fun currentPlaybackReconcilesBackwardWithoutCreatingIntent() = runTest {
         val server = server()
         val repository = repository(server)

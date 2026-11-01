@@ -106,7 +106,8 @@ class AppGraph(application: Application) {
             scopes.checkpoint()
             stars.checkpoint()
         }
-        session.suspendAccountWork = { stars.suspendSync(); scopes.suspendSync(); playback.beginAccountChange(); preview.stop() }
+        session.suspendAccountSync = { stars.suspendSync(); scopes.suspendSync() }
+        session.suspendAccountWork = { session.suspendAccountSync?.invoke(); playback.beginAccountChange(); preview.stop() }
         session.resumeAccountWork = { account ->
             scopes.resumeSync(account)
             stars.resumeSync(account)
@@ -118,6 +119,7 @@ class AppGraph(application: Application) {
         })
         session.accountChange = AccountChange { accountId ->
             stars.suspendSync()
+            preview.stop()
             playback.checkpointAndSuspend()
             stars.switchAccount(accountId, activate = false)
             scopes.switch(accountId)

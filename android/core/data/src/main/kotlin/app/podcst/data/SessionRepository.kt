@@ -36,12 +36,13 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
     private var prepared = false
     var checkpointAccountWork: (suspend () -> Unit)? = null
     var accountChange: AccountChange? = null
+    var suspendAccountSync: (() -> Unit)? = null
     var suspendAccountWork: (() -> Unit)? = null
     var resumeAccountWork: ((String?) -> Unit)? = null
 
     suspend fun restore() = mutex.withLock {
         verified = false
-        suspendAccountWork?.invoke()
+        suspendForVerification()
         state.update { it.copy(loading = true) }
         try {
             update(api.sessionUser())
@@ -57,7 +58,7 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
             }
             state.update { it.copy(error = failure.message) }
         } finally {
-            if (verified) resumeWork() else suspendAccountWork?.invoke()
+            if (verified) resumeWork() else suspendForVerification()
             state.update { it.copy(loading = false) }
         }
     }
@@ -96,6 +97,12 @@ class SessionRepository(context: Context, private val api: PodcstApi) {
         val account = state.value.user?.id
         if (account != null && deletionBlocked?.invoke(account) == true) suspendAccountWork?.invoke()
         else resumeAccountWork?.invoke(account)
+    }
+
+    private fun suspendForVerification() {
+        val account = state.value.user?.id
+        if (account != null && deletionBlocked?.invoke(account) == true) suspendAccountWork?.invoke()
+        else suspendAccountSync?.invoke()
     }
 
     suspend fun serializeDeletion(work: suspend () -> Unit) = mutex.withLock { work() }
