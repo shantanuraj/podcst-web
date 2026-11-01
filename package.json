@@ -43,7 +43,7 @@
     "ioredis": "5.11.1",
     "match-sorter": "8.3.0",
     "music-metadata": "12.0.0",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "postgres": "^3.4.9",
     "react": "19.2.7",
     "react-dom": "19.2.7",
