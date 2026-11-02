@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.podcst.model.Artwork as ArtworkSizing
 import app.podcst.model.ChapterArtwork
+import app.podcst.artwork.ArtworkMetadata
 import androidx.compose.ui.platform.LocalContext
 import coil3.request.CachePolicy
 import coil3.request.allowHardware
@@ -98,7 +99,7 @@ fun Artwork(
                 contentDescription = contentDescription,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
-                onSuccess = { result -> tint?.let { scope.launch { it.loaded(result.result.image) } } },
+                onSuccess = { result -> tint?.let { scope.launch { it.loaded(result.result.image, result.result.request.extras[ArtworkMetadata.Key]?.colors) } } },
             )
         }
         if (chapterArtwork != null) key(chapterArtwork.id) {

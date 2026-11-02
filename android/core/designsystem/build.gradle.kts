@@ -9,6 +9,7 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    implementation(project(":core:artwork"))
     api(libs.coil.compose)
     implementation(libs.core.ktx)
     implementation(libs.palette)

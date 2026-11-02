@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.podcst.artwork.ArtworkColors
 import coil3.asImage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -15,6 +16,24 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ArtworkTintTest {
+    @Test
+    fun serverPalettePreservesTheWebArtworkHue() = runBlocking {
+        val tint = ArtworkTint("server-artwork")
+        val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFF00FF00.toInt()) }
+        tint.loaded(bitmap.asImage(), ArtworkColors(0xFFB8A8B0.toInt(), 0xFF706878.toInt()))
+        assertEquals(Color(0xFFB8A8B0), tint.color(false))
+        assertEquals(Color(0xFF706878), tint.color(true))
+        for (colors in listOf(PodcstColors.Light, PodcstColors.Dark)) {
+            val background = tint.headerColor(colors)
+            assertEquals(1f, background.alpha)
+            assertTrue(background.red > background.green)
+            val high = maxOf(background.luminance(), colors.secondary.luminance())
+            val low = minOf(background.luminance(), colors.secondary.luminance())
+            assertTrue((high + .05f) / (low + .05f) >= 4.5f)
+        }
+        bitmap.recycle()
+    }
+
     @Test
     fun refreshedArtworkUpdatesTheTintAtTheSameURL() = runBlocking {
         val tint = ArtworkTint("refresh-artwork")

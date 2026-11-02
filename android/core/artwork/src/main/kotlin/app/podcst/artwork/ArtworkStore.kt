@@ -1,6 +1,7 @@
 package app.podcst.artwork
 
 import android.content.Context
+import android.util.LruCache
 import app.podcst.model.Artwork
 import coil3.ImageLoader
 import coil3.disk.DiskCache
@@ -8,7 +9,12 @@ import coil3.disk.directory
 import coil3.intercept.Interceptor
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.annotation.ExperimentalCoilApi
+import coil3.network.CacheStrategy
+import coil3.network.NetworkRequest
+import coil3.network.NetworkResponse
 import coil3.request.ImageResult
+import coil3.request.Options
 import coil3.request.crossfade
 import java.io.File
 import java.security.MessageDigest
@@ -27,6 +33,7 @@ import okhttp3.Request
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 
+@OptIn(ExperimentalCoilApi::class)
 class ArtworkStore(context: Context, private val client: OkHttpClient, scope: String) {
     private val root = File(context.noBackupFilesDir, "artwork")
     private val unscoped = listOf("artwork", "http").map { File(context.cacheDir, it) }
@@ -36,13 +43,14 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var retention: Job? = null
     private val requests = mutableMapOf<Job, String>()
+    private val metadata = LruCache<String, ArtworkMetadata>(64)
 
     val loader: ImageLoader = ImageLoader.Builder(context)
         .memoryCache { MemoryCache.Builder().maxSizeBytes(MEMORY).build() }
         .diskCache(browsing)
         .components {
             add(RetainedInterceptor())
-            add(OkHttpNetworkFetcherFactory(callFactory = { client }))
+            add(OkHttpNetworkFetcherFactory(callFactory = { client }, cacheStrategy = { TintCacheStrategy() }))
         }
         .fetcherCoroutineContext(Dispatchers.IO.limitedParallelism(TRANSFERS))
         .crossfade(true)
@@ -55,7 +63,7 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         retention = work.launch {
             previous?.cancelAndJoin()
             target.mkdirs()
-            target.listFiles().orEmpty().filter { it.name !in wanted.keys && !it.name.endsWith(".part") }.forEach(File::delete)
+            target.listFiles().orEmpty().filter { it.name.removeSuffix(".tint") !in wanted.keys && !it.name.endsWith(".part") }.forEach(File::delete)
             wanted.forEach { (name, source) ->
                 val file = File(target, name)
                 if (!file.exists()) transfers.withPermit { download(Artwork.url(source, RETAINED_WIDTH), file) }
@@ -69,6 +77,7 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         directory = File(root, scope)
         if (previous != directory && previous.name != GUEST) previous.deleteRecursively()
         loader.memoryCache?.clear()
+        metadata.evictAll()
     }
 
     suspend fun erase(scope: String) = withContext(Dispatchers.IO) {
@@ -79,6 +88,7 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         val target = File(root, scope)
         check(!target.exists() || target.deleteRecursively()) { "Unable to remove account artwork" }
         loader.memoryCache?.let { cache -> cache.keys.filter { it.key.startsWith("$scope:") }.forEach { cache.remove(it) } }
+        metadata.snapshot().keys.filter { it.startsWith("$scope:") }.forEach(metadata::remove)
         check(unscoped.all { it.listFiles().isNullOrEmpty() }) { "Older caches have no account owner. Cleanup remains incomplete. Clear the app's storage in Android system settings to remove all local copies, including other accounts and guest data." }
     }
 
@@ -88,7 +98,10 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
             client.newCall(Request.Builder().url(url).build()).execute().use { response ->
                 if (!response.isSuccessful) return
                 partial.outputStream().use { response.body.byteStream().copyTo(it) }
-                partial.renameTo(file)
+                if (partial.renameTo(file)) {
+                    val colors = ArtworkColors.fromHeaders(response.header("X-Artwork-Tint-Light"), response.header("X-Artwork-Tint-Dark"))
+                    if (colors != null) File(file.path + ".tint").writeText(colors.encoded())
+                }
             }
         }
         partial.delete()
@@ -102,15 +115,39 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
             val job = currentCoroutineContext()[Job]
             if (job != null) synchronized(requests) { requests[job] = scope }
             try {
+                val retained = File(target, name(Artwork.canonical(data))).takeIf(File::exists)
+                val key = "$scope:${name(data)}"
+                val tint = metadata.get(key) ?: withContext(Dispatchers.IO) {
+                    ArtworkMetadata(retained?.let { file ->
+                        runCatching { ArtworkColors.decode(File(file.path + ".tint").readText()) }.getOrNull()
+                    }).also { metadata.put(key, it) }
+                }
                 val request = chain.request.newBuilder()
-                    .data(File(target, name(Artwork.canonical(data))).takeIf(File::exists) ?: data)
-                    .memoryCacheKey("$scope:${name(data)}")
-                    .diskCacheKey("$scope:${name(data)}")
+                    .data(retained ?: data)
+                    .memoryCacheKey(key)
+                    .diskCacheKey(key)
+                    .apply { extras[ArtworkMetadata.Key] = tint }
                     .build()
                 return chain.withRequest(request).proceed()
             } finally {
                 if (job != null) synchronized(requests) { requests.remove(job) }
             }
+        }
+    }
+
+    private class TintCacheStrategy : CacheStrategy {
+        override suspend fun read(cacheResponse: NetworkResponse, networkRequest: NetworkRequest, options: Options): CacheStrategy.ReadResult {
+            record(cacheResponse, options)
+            return CacheStrategy.DEFAULT.read(cacheResponse, networkRequest, options)
+        }
+
+        override suspend fun write(cacheResponse: NetworkResponse?, networkRequest: NetworkRequest, networkResponse: NetworkResponse, options: Options): CacheStrategy.WriteResult {
+            record(networkResponse, options)
+            return CacheStrategy.DEFAULT.write(cacheResponse, networkRequest, networkResponse, options)
+        }
+
+        private fun record(response: NetworkResponse, options: Options) {
+            options.extras[ArtworkMetadata.Key]?.colors = ArtworkColors.fromHeaders(response.headers["X-Artwork-Tint-Light"], response.headers["X-Artwork-Tint-Dark"])
         }
     }
 

@@ -11,9 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.luminance
 import androidx.palette.graphics.Palette
+import app.podcst.artwork.ArtworkColors
 import app.podcst.model.Artwork
 import coil3.Image
 import coil3.toBitmap
@@ -23,10 +24,12 @@ import kotlinx.coroutines.withContext
 
 @Stable
 class ArtworkTint internal constructor(private val source: String?) {
-    private var palette by mutableStateOf(source?.let(palettes::get)?.palette)
+    private var loaded by mutableStateOf(source?.let(palettes::get))
 
     fun color(dark: Boolean): Color? {
-        val palette = palette ?: return null
+        val loaded = loaded ?: return null
+        loaded.colors?.let { return Color(if (dark) it.dark else it.light) }
+        val palette = loaded.palette
         val swatch = if (dark) palette.darkMutedSwatch ?: palette.darkVibrantSwatch ?: palette.dominantSwatch
         else palette.lightMutedSwatch ?: palette.lightVibrantSwatch ?: palette.dominantSwatch
         return swatch?.rgb?.let { Color(it) }
@@ -35,28 +38,29 @@ class ArtworkTint internal constructor(private val source: String?) {
     internal fun headerColor(colors: PodcstColors): Color {
         val color = color(colors.dark) ?: return Color.Transparent
         val foreground = colors.secondary.luminance()
-        var strength = if (colors.dark) 0.32f else 0.24f
-        repeat(8) {
-            val tint = color.copy(alpha = strength)
-            val background = tint.compositeOver(colors.paper).luminance()
-            if ((maxOf(foreground, background) + 0.05f) / (minOf(foreground, background) + 0.05f) >= 4.5f) return tint
-            strength *= 0.75f
+        val lab = color.convert(ColorSpaces.Oklab)
+        var lightness = if (colors.dark) minOf(lab.red, 0.35f) else maxOf(lab.red, 0.88f)
+        repeat(101) {
+            val tint = Color(lightness, lab.green, lab.blue, colorSpace = ColorSpaces.Oklab).convert(ColorSpaces.Srgb)
+            val background = tint.luminance()
+            if ((maxOf(foreground, background) + 0.05f) / (minOf(foreground, background) + 0.05f) >= 4.6f) return tint
+            lightness = (lightness + if (colors.dark) -0.01f else 0.01f).coerceIn(0f, 1f)
         }
-        return Color.Transparent
+        return colors.paper
     }
 
-    internal suspend fun loaded(image: Image) {
+    internal suspend fun loaded(image: Image, colors: ArtworkColors? = null) {
         val source = source ?: return
-        palette = withContext(Dispatchers.Default) {
+        loaded = withContext(Dispatchers.Default) {
             val cached = palettes.get(source)
-            if (cached?.image?.get() === image) cached.palette
-            else Palette.from(image.toBitmap()).resizeBitmapArea(96 * 96).generate().also {
-                palettes.put(source, CachedPalette(WeakReference(image), it))
+            if (cached?.image?.get() === image && cached.colors == colors) cached
+            else CachedPalette(WeakReference(image), Palette.from(image.toBitmap()).resizeBitmapArea(96 * 96).generate(), colors).also {
+                palettes.put(source, it)
             }
         }
     }
 
-    private data class CachedPalette(val image: WeakReference<Image>, val palette: Palette)
+    private data class CachedPalette(val image: WeakReference<Image>, val palette: Palette, val colors: ArtworkColors?)
 
     private companion object {
         val palettes = LruCache<String, CachedPalette>(64)
