@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.podcst.data.CatalogRepository
 import app.podcst.data.LibraryRepository
 import app.podcst.data.ProgressRepository
+import app.podcst.data.Preferences
 import app.podcst.data.SessionRepository
 import app.podcst.data.StarRepository
 import app.podcst.designsystem.EpisodeRowState
@@ -28,7 +29,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -68,6 +71,7 @@ data class PodcastScreenState(
     val subscribing: Boolean = false,
     val load: LoadState = LoadState.Loading,
     val marks: EpisodeMarks = EpisodeMarks(),
+    val related: List<Podcast> = emptyList(),
 ) {
     val latest: Episode? by lazy { podcast.episodes.maxByOrNull { it.published ?: Instant.DISTANT_PAST } }
     val updated: Instant? get() = listOfNotNull(podcast.published, latest?.published).maxOrNull()
@@ -97,6 +101,7 @@ class PodcastViewModel(
     downloads: Downloads,
     playback: PlaybackCoordinator,
     session: SessionRepository,
+    preferences: Preferences,
 ) : ViewModel() {
     private val reader = PodcastReader(route, viewModelScope, session.session, catalog::readerActive,
         read = { podcast, force, publish -> catalog.load(podcast, force, recheck = true, refreshIfStale = !force, onRead = publish) },
@@ -123,6 +128,28 @@ class PodcastViewModel(
 
     private val subscription = combine(library.subscribed, subscribing, load, ::Triple)
 
+    private val related = combine(
+        podcast.distinctUntilChangedBy { it.id to it.isPrivate },
+        preferences.region,
+        session.session.map { it.loading to it.user?.id }.distinctUntilChanged(),
+        inaccessible,
+    ) { podcast, region, session, denied -> Triple(podcast, region, session.first || denied) }
+        .flatMapLatest { (podcast, region, loading) ->
+            flow {
+                emit(emptyList<Podcast>())
+                if (!loading) {
+                    try {
+                        emit(catalog.related(podcast, region))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        emit(emptyList())
+                    }
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     private val marks: Flow<EpisodeMarks> = combine(
         progress.progress,
         stars.episodeIds,
@@ -132,7 +159,8 @@ class PodcastViewModel(
 
     val state: StateFlow<PodcastScreenState> = combine(podcast, episodes, order, subscription, marks) { podcast, episodes, order, (subscribed, subscribing, load), marks ->
         PodcastScreenState(podcast, episodes, order, podcast.identity in subscribed, subscribing, load, marks)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PodcastScreenState(route))
+    }.combine(related) { state, related -> state.copy(related = related) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PodcastScreenState(route))
 
     fun refresh() = reader.refresh()
 

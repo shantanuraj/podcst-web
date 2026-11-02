@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -88,6 +87,7 @@ import app.podcst.designsystem.Podcst
 import app.podcst.designsystem.PodcstButton
 import app.podcst.designsystem.PodcstIcons
 import app.podcst.model.EpisodeSort
+import app.podcst.model.Podcast
 import app.podcst.model.SortDirection
 import kotlinx.coroutines.delay
 import app.podcst.designsystem.R as DesignR
@@ -103,6 +103,7 @@ fun PodcastScreen(
     actions: EpisodeActions,
     onBack: () -> Unit,
     onShare: () -> Unit,
+    onOpenPodcast: (Podcast) -> Unit,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, viewModel) {
@@ -164,12 +165,15 @@ fun PodcastScreen(
             onRefresh = viewModel::refresh,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
-            LazyColumn(Modifier.widthIn(max = 1120.dp).fillMaxSize().align(Alignment.TopCenter), state = list) {
-                item(key = "hero") { Hero(state, viewModel, actions, tint, Modifier.onSizeChanged { headerHeight = it.height }) }
-                stickyHeader(key = "tabs") { Tabs(tab) { tab = it } }
-                when (tab) {
-                    PodcastTab.Episodes -> episodes(state, query, viewModel, actions)
-                    PodcastTab.About -> item(key = "about") { About(state) }
+            BoxWithConstraints(Modifier.widthIn(max = 1120.dp).fillMaxSize().align(Alignment.TopCenter)) {
+                val sidebar = maxWidth >= 960.dp && LocalDensity.current.fontScale <= 1.3f && state.related.isNotEmpty()
+                LazyColumn(Modifier.fillMaxSize(), state = list) {
+                    item(key = "hero") { Hero(state, viewModel, actions, tint, Modifier.onSizeChanged { headerHeight = it.height }) }
+                    stickyHeader(key = "tabs") { Tabs(tab) { tab = it } }
+                    when (tab) {
+                        PodcastTab.Episodes -> episodes(state, query, viewModel, actions, sidebar, onOpenPodcast)
+                        PodcastTab.About -> item(key = "about") { About(state) }
+                    }
                 }
             }
         }
@@ -315,24 +319,74 @@ private fun Tabs(selected: PodcastTab, onSelect: (PodcastTab) -> Unit) {
     }
 }
 
-private fun LazyListScope.episodes(state: PodcastScreenState, query: String, viewModel: PodcastViewModel, actions: EpisodeActions) {
-    item(key = "episodes-header") { EpisodesHeader(state, query, viewModel) }
-    items(state.episodes, key = { it.identity.value }, contentType = { "episode" }) { episode ->
-        DatedEpisodeRow(state.marks.row(episode), actions, Modifier.animateItem())
-    }
-    if (state.episodes.isEmpty()) {
-        item(key = "empty") {
-            when {
-                state.episodeNotice == EpisodeNotice.Preparing -> Message(stringResource(R.string.episodes_preparing))
-                state.episodeNotice == EpisodeNotice.Unavailable -> EpisodeUnavailable(state, viewModel::retry)
-                state.podcast.episodes.isEmpty() && state.load in listOf(LoadState.Loading, LoadState.Refreshing) ->
-                    Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(24.dp), color = Podcst.colors.accent, strokeWidth = 2.dp)
-                    }
-                query.isNotBlank() -> Message(stringResource(R.string.no_matches, query.trim()))
-                state.podcast.episodes.isEmpty() && state.load == LoadState.Loaded && state.podcast.freshness?.content != FeedFreshness.Content.missing -> Message(stringResource(R.string.no_episodes))
+private fun LazyListScope.episodes(
+    state: PodcastScreenState,
+    query: String,
+    viewModel: PodcastViewModel,
+    actions: EpisodeActions,
+    sidebar: Boolean,
+    onOpenPodcast: (Podcast) -> Unit,
+) {
+    val related = state.related.takeIf { sidebar }.orEmpty()
+    item(key = "episodes-header") {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Box(Modifier.weight(1f)) { EpisodesHeader(state, query, viewModel) }
+            if (sidebar) {
+                Text(
+                    stringResource(R.string.listeners_also_follow),
+                    style = Podcst.type.rowTitle,
+                    color = Podcst.colors.ink,
+                    modifier = Modifier.width(SIDEBAR_WIDTH).padding(horizontal = 20.dp).padding(bottom = 18.dp).semantics { heading() },
+                )
             }
         }
+    }
+    items(
+        count = maxOf(state.episodes.size, related.size, 1),
+        key = { index -> state.episodes.getOrNull(index)?.identity?.value ?: if (index == 0) "empty" else "related-$index" },
+        contentType = { "episode" },
+    ) { index ->
+        Row(Modifier.fillMaxWidth().animateItem(), verticalAlignment = Alignment.Top) {
+            Box(Modifier.weight(1f)) {
+                val episode = state.episodes.getOrNull(index)
+                if (episode != null) DatedEpisodeRow(state.marks.row(episode), actions)
+                else if (index == 0) EmptyEpisodes(state, query, viewModel::retry)
+            }
+            if (sidebar) {
+                Box(Modifier.width(SIDEBAR_WIDTH)) {
+                    related.getOrNull(index)?.let { RelatedPodcast(it, onOpenPodcast) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RelatedPodcast(podcast: Podcast, onOpen: (Podcast) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(podcast) }.padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Artwork(podcast.cover, 52.dp, corner = 8.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(podcast.title, style = Podcst.type.compactTitle, color = Podcst.colors.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (podcast.author.isNotBlank()) Text(podcast.author, style = Podcst.type.meta, color = Podcst.colors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun EmptyEpisodes(state: PodcastScreenState, query: String, onRetry: () -> Unit) {
+    when {
+        state.episodeNotice == EpisodeNotice.Preparing -> Message(stringResource(R.string.episodes_preparing))
+        state.episodeNotice == EpisodeNotice.Unavailable -> EpisodeUnavailable(state, onRetry)
+        state.podcast.episodes.isEmpty() && state.load in listOf(LoadState.Loading, LoadState.Refreshing) ->
+            Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(24.dp), color = Podcst.colors.accent, strokeWidth = 2.dp)
+            }
+        query.isNotBlank() -> Message(stringResource(R.string.no_matches, query.trim()))
+        state.podcast.episodes.isEmpty() && state.load == LoadState.Loaded && state.podcast.freshness?.content != FeedFreshness.Content.missing -> Message(stringResource(R.string.no_episodes))
     }
 }
 
@@ -482,3 +536,4 @@ private val EpisodeOrder.label: Int
     }
 
 private const val FILTER_THRESHOLD = 10
+private val SIDEBAR_WIDTH = 300.dp

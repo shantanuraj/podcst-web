@@ -76,6 +76,12 @@ class PodcstApi(
 
     suspend fun podcastInfo(id: Long): Podcast = get<WirePodcast>("api/feed/info", "id" to "$id").domain()
 
+    suspend fun related(podcast: Podcast, locale: String): List<Podcast> {
+        val id = podcast.id?.takeIf { it > 0 && !podcast.isPrivate } ?: return emptyList()
+        return get<List<WirePodcast>>("api/feed/related", "id" to "$id", "locale" to locale, session = false)
+            .map { it.domain() }
+    }
+
     suspend fun episodes(
         podcastId: Long,
         cursor: Int? = null,

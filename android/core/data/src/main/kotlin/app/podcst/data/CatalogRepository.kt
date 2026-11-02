@@ -84,6 +84,16 @@ class CatalogRepository(
         return result
     }
 
+    suspend fun related(podcast: Podcast, region: Region): List<Podcast> {
+        if (podcast.isPrivate || (podcast.id ?: 0) <= 0) return emptyList()
+        val active = readerActive()
+        if (!active()) throw CancellationException("Account changed")
+        val result = api.related(podcast, region.code)
+        currentCoroutineContext().ensureActive()
+        if (!active()) throw CancellationException("Account changed")
+        return result
+    }
+
     fun episodes(identities: List<String>): Flow<List<Episode>> = scopes.current.flatMapLatest { scope ->
         scope.database.episodes().observe(identities).map { rows -> rows.map { it.domain() } }
     }
