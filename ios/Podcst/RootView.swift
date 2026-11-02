@@ -112,6 +112,7 @@ struct RootView: View {
         .sheet(isPresented: $router.showingPlayer) {
             NowPlayingView()
                 .environment(router)
+                .presentationSizing(.page)
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $router.listing) { episode in

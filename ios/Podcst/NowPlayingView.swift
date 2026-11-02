@@ -90,24 +90,70 @@ private struct PlayerLayout<Artwork: View, Controls: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let wide = geometry.size.width >= 640 && geometry.size.width > geometry.size.height && !dynamicTypeSize.isAccessibilitySize
-            let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 26))
             ScrollView {
-                layout {
+                PlayerArrangement(viewportHeight: max(0, geometry.size.height - 12), allowsColumns: !dynamicTypeSize.isAccessibilitySize) {
                     artwork
-                        .frame(maxWidth: 300)
-                        .frame(maxWidth: .infinity)
                     controls
-                        .frame(maxWidth: 480)
-                        .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 900, minHeight: max(0, geometry.size.height - 12))
+                .frame(maxWidth: 900)
                 .padding(.horizontal, 28)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
+    }
+}
+
+private struct PlayerArrangement: Layout {
+    let viewportHeight: CGFloat
+    let allowsColumns: Bool
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = min(900, proposal.width ?? 480)
+        let frames = frames(width: width, subviews: subviews)
+        return CGSize(width: width, height: max(viewportHeight, frames.artwork.maxY, frames.controls.maxY))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let frames = frames(width: bounds.width, subviews: subviews)
+        for (view, frame) in zip(subviews, [frames.artwork, frames.controls]) {
+            view.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                       proposal: ProposedViewSize(frame.size))
+        }
+    }
+
+    private func frames(width: CGFloat, subviews: Subviews) -> (artwork: CGRect, controls: CGRect) {
+        let controls = subviews[1].sizeThatFits(ProposedViewSize(width: min(480, width), height: nil))
+        let artwork = subviews[0].sizeThatFits(ProposedViewSize(width: min(300, width), height: nil))
+        let stackedHeight = artwork.height + 26 + controls.height
+        let fittedArtwork = subviews[0].sizeThatFits(ProposedViewSize(
+            width: min(300, width), height: max(100, viewportHeight - controls.height - 26)
+        ))
+        let fittedStackedHeight = fittedArtwork.height + 26 + controls.height
+        if allowsColumns, width >= 448, width > viewportHeight || stackedHeight > viewportHeight {
+            let columnWidth = min(480, max(300, (width - 28) * 0.6))
+            let columnControls = subviews[1].sizeThatFits(ProposedViewSize(width: columnWidth, height: nil))
+            let columnArtwork = subviews[0].sizeThatFits(ProposedViewSize(
+                width: min(300, max(0, width - 28 - columnControls.width)), height: max(100, viewportHeight)
+            ))
+            let height = max(columnControls.height, columnArtwork.height)
+            if columnArtwork.width >= 120, columnArtwork.width + 28 + columnControls.width <= width,
+               height <= viewportHeight || height < fittedStackedHeight {
+                let top = max(0, (viewportHeight - height) / 2)
+                let leading = (width - columnArtwork.width - 28 - columnControls.width) / 2
+                return (
+                    CGRect(x: leading, y: top + (height - columnArtwork.height) / 2, width: columnArtwork.width, height: columnArtwork.height),
+                    CGRect(x: leading + columnArtwork.width + 28, y: top + (height - columnControls.height) / 2,
+                           width: columnControls.width, height: columnControls.height)
+                )
+            }
+        }
+        let top = max(0, (viewportHeight - fittedStackedHeight) / 2)
+        return (
+            CGRect(x: (width - fittedArtwork.width) / 2, y: top, width: fittedArtwork.width, height: fittedArtwork.height),
+            CGRect(x: (width - controls.width) / 2, y: top + fittedArtwork.height + 26, width: controls.width, height: controls.height)
+        )
     }
 }
 
