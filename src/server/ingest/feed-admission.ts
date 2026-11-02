@@ -59,7 +59,7 @@ export function createFeedAdmission(
       .update(`${principal.kind}:${principal.id}`)
       .digest('hex');
   const key = (kind: string, scope: string) =>
-    `feeds:{admission}:${kind}:${scope}`;
+    `feed-{admission}:${kind}:${scope}`;
   const evaluate = async (
     script: string,
     keys: string[],

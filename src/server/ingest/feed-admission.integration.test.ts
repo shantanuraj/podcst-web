@@ -19,6 +19,7 @@ describe.skipIf(!executable)(
     let server: ReturnType<typeof Bun.spawn>;
     let redis: Redis;
     let admission: ReturnType<typeof createFeedAdmission>;
+    let port = 0;
     const owner = { kind: 'account' as const, id: 'private-account' };
     const secret = 'synthetic-secret-for-feed-admission-tests';
 
@@ -29,7 +30,7 @@ describe.skipIf(!executable)(
         port: 0,
         socket: { data() {} },
       });
-      const port = listener.port;
+      port = listener.port;
       listener.stop(true);
       server = Bun.spawn(
         [
@@ -86,7 +87,7 @@ describe.skipIf(!executable)(
       expect(
         batches.filter(({ status }) => status === 'fulfilled'),
       ).toHaveLength(6);
-      for (const key of await redis.keys('feeds:*')) {
+      for (const key of await redis.keys('feed-*')) {
         expect(key).not.toContain(owner.id);
         expect(await redis.pttl(key)).toBeGreaterThan(0);
       }
@@ -129,7 +130,7 @@ describe.skipIf(!executable)(
 
     test('expiry fences stale holders and late release cannot remove replacements', async () => {
       const old = await admission.importLease(owner);
-      const keys = await redis.keys('feeds:*:import-active:*');
+      const keys = await redis.keys('feed-*:import-active:*');
       for (const key of keys) {
         for (const token of await redis.zrange(key, 0, -1))
           await redis.zadd(key, 0, token);
@@ -155,7 +156,7 @@ describe.skipIf(!executable)(
       await expect(
         admission.importLease(owner, controller.signal),
       ).rejects.toThrow();
-      for (const key of await redis.keys('feeds:*:import-active:*'))
+      for (const key of await redis.keys('feed-*:import-active:*'))
         expect(await redis.zcard(key)).toBe(0);
     });
 
@@ -170,6 +171,55 @@ describe.skipIf(!executable)(
       await expect(admission.importLease(owner)).rejects.toMatchObject({
         code: 'rate_limited',
       });
+    });
+
+    test('refresh admission runs under the production application ACL', async () => {
+      await redis.acl(
+        'SETUSER',
+        'podcst_app',
+        'reset',
+        'on',
+        '>synthetic-application-password',
+        '~auth:*',
+        '~lists:*',
+        '~chapters:*',
+        '~top@2/*',
+        '~feed-*',
+        '~short-*',
+        '+ping',
+        '+quit',
+        '+info',
+        '+client|setname',
+        '+get',
+        '+getrange',
+        '+getdel',
+        '+set',
+        '+del',
+        '+incr',
+        '+expire',
+        '+pexpire',
+        '+zremrangebyscore',
+        '+zcard',
+        '+zrange',
+        '+zadd',
+        '+time',
+        '+eval',
+      );
+      const restricted = new Redis({
+        host: '127.0.0.1',
+        port,
+        username: 'podcst_app',
+        password: 'synthetic-application-password',
+        maxRetriesPerRequest: 0,
+      });
+      try {
+        const limited = createFeedAdmission(restricted, secret);
+        await expect(limited.refresh(owner)).resolves.toBeUndefined();
+        await expect(limited.importRequest(owner)).resolves.toBeUndefined();
+      } finally {
+        restricted.disconnect();
+        await redis.acl('DELUSER', 'podcst_app');
+      }
     });
   },
 );
