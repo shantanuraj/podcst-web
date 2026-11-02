@@ -170,6 +170,7 @@ extension View {
         scrollContentBackground(.hidden)
             .background(PodcstPalette.paper)
             .foregroundStyle(PodcstPalette.ink)
+            .containerBackground(PodcstPalette.paper, for: .navigation)
     }
 
     func eyebrow(_ color: Color = PodcstPalette.tertiary) -> some View {
@@ -209,18 +210,8 @@ private struct Callout<S: InsettableShape>: ViewModifier {
 enum PodcstAppearance {
     static func configure() {
         let bar = UINavigationBar.appearance()
-        let standard = UINavigationBarAppearance()
-        let scrollEdge = UINavigationBarAppearance()
-        scrollEdge.configureWithTransparentBackground()
-        for appearance in [standard, scrollEdge] {
-            appearance.backgroundColor = UIColor(PodcstPalette.paper)
-            appearance.largeTitleTextAttributes = [.font: UIFont.podcst(.serif, .largeTitle), .kern: -0.6]
-            appearance.titleTextAttributes = [.font: UIFont.podcst(.serif, .headline)]
-        }
-        bar.standardAppearance = standard
-        bar.compactAppearance = standard
-        bar.scrollEdgeAppearance = scrollEdge
-        bar.compactScrollEdgeAppearance = scrollEdge
+        bar.largeTitleTextAttributes = [.font: UIFont.podcst(.serif, .largeTitle), .kern: -0.6]
+        bar.titleTextAttributes = [.font: UIFont.podcst(.serif, .headline)]
         UIBarButtonItem.appearance().setTitleTextAttributes([.font: UIFont.podcst(.sans, .body)], for: .normal)
     }
 }
