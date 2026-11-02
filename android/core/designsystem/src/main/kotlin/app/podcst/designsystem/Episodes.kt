@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import app.podcst.model.DownloadState
 import app.podcst.model.Episode
 import app.podcst.model.EpisodeProgress
+import app.podcst.model.ShowNotes
 import kotlin.time.Duration
 
 @Immutable
@@ -100,6 +101,7 @@ fun DatedEpisodeRow(
     state: EpisodeRowState,
     actions: EpisodeActions,
     modifier: Modifier = Modifier,
+    showDescription: Boolean = false,
 ) {
     EpisodeGestures(state, actions, modifier) {
         Row(
@@ -110,6 +112,10 @@ fun DatedEpisodeRow(
             Box(Modifier.alpha(if (state.played) 0.5f else 1f)) { DateBlock(state.episode.published) }
             Column(Modifier.weight(1f).alpha(if (state.played) 0.5f else 1f)) {
                 Text(state.episode.title, style = Podcst.type.episodeTitle, color = Podcst.colors.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (showDescription) {
+                    val description = remember(state.episode.summary) { ShowNotes.plainText(state.episode.summary.orEmpty()).trim() }
+                    if (description.isNotEmpty()) Text(description, style = Podcst.type.caption, color = Podcst.colors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                }
                 MetaLine(state, Modifier.padding(top = 3.dp))
             }
             PlayCircle(state, actions)

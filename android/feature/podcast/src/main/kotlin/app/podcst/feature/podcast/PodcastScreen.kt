@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.podcst.designsystem.Artwork
@@ -76,6 +77,7 @@ import app.podcst.designsystem.ArtworkTint
 import app.podcst.designsystem.artworkTint
 import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.designsystem.ButtonKind
+import app.podcst.designsystem.ContentLayout
 import app.podcst.designsystem.DatedEpisodeRow
 import app.podcst.designsystem.EpisodeActions
 import app.podcst.designsystem.Eyebrow
@@ -166,12 +168,13 @@ fun PodcastScreen(
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
             BoxWithConstraints(Modifier.widthIn(max = 1120.dp).fillMaxSize().align(Alignment.TopCenter)) {
-                val sidebar = maxWidth >= 960.dp && LocalDensity.current.fontScale <= 1.3f && state.related.isNotEmpty()
+                val layout = ContentLayout(maxWidth - 40.dp, LocalDensity.current.fontScale)
+                val sidebarWidth = (layout.supportingWidth + 20.dp).takeIf { layout.twoColumns && state.related.isNotEmpty() }
                 LazyColumn(Modifier.fillMaxSize(), state = list) {
-                    item(key = "hero") { Hero(state, viewModel, actions, tint, Modifier.onSizeChanged { headerHeight = it.height }) }
+                    item(key = "hero") { Hero(state, viewModel, actions, tint, layout, Modifier.onSizeChanged { headerHeight = it.height }) }
                     stickyHeader(key = "tabs") { Tabs(tab) { tab = it } }
                     when (tab) {
-                        PodcastTab.Episodes -> episodes(state, query, viewModel, actions, sidebar, onOpenPodcast)
+                        PodcastTab.Episodes -> episodes(state, query, viewModel, actions, layout.twoColumns, sidebarWidth, onOpenPodcast)
                         PodcastTab.About -> item(key = "about") { About(state) }
                     }
                 }
@@ -195,19 +198,17 @@ private fun Overflow(state: PodcastScreenState, viewModel: PodcastViewModel) {
 }
 
 @Composable
-private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, tint: ArtworkTint, modifier: Modifier) {
+private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, tint: ArtworkTint, layout: ContentLayout, modifier: Modifier) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 24.dp)) {
-        val wide = maxWidth >= 800.dp && LocalDensity.current.fontScale <= 1.3f
-        if (wide) {
-            Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
-                Artwork(state.podcast.cover, 176.dp, corner = 16.dp, tint = tint)
-                Column(Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    PodcastIdentity(state, wide = true)
-                    PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp))
-                }
+    Column(modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 24.dp)) {
+        if (layout.twoColumns) {
+            Row(horizontalArrangement = Arrangement.spacedBy(layout.gutter), verticalAlignment = Alignment.Top) {
+                PodcastSummary(state, viewModel, actions, tint, Modifier.weight(1f))
                 if (state.description.isNotEmpty()) {
-                    PodcastDescription(state.description, expanded, { expanded = !expanded }, 7, Modifier.weight(1f).padding(top = 6.dp))
+                    Column(Modifier.width(layout.supportingWidth), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        PodcastDescription(state.description, expanded, { expanded = !expanded }, 7)
+                        PodcastWebsite(state.podcast)
+                    }
                 }
             }
         } else {
@@ -223,6 +224,35 @@ private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions
             }
         }
     }
+}
+
+@Composable
+private fun PodcastSummary(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, tint: ArtworkTint, modifier: Modifier) {
+    BoxWithConstraints(modifier) {
+        val horizontal = maxWidth >= 520.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
+                Artwork(state.podcast.cover, if (horizontal) 176.dp else 136.dp, corner = 16.dp, tint = tint)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    PodcastIdentity(state, wide = true)
+                    if (horizontal) PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp))
+                }
+            }
+            if (!horizontal) PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp))
+        }
+    }
+}
+
+@Composable
+private fun PodcastWebsite(podcast: Podcast) {
+    val website = webpage(podcast.link) ?: return
+    val uri = LocalUriHandler.current
+    Text(
+        website.host,
+        style = Podcst.type.label,
+        color = Podcst.colors.accent,
+        modifier = Modifier.clickable(role = Role.Button) { uri.openUri(website.url) }.padding(vertical = 8.dp),
+    )
 }
 
 @Composable
@@ -324,19 +354,20 @@ private fun LazyListScope.episodes(
     query: String,
     viewModel: PodcastViewModel,
     actions: EpisodeActions,
-    sidebar: Boolean,
+    wide: Boolean,
+    sidebarWidth: Dp?,
     onOpenPodcast: (Podcast) -> Unit,
 ) {
-    val related = state.related.takeIf { sidebar }.orEmpty()
+    val related = state.related.takeIf { sidebarWidth != null }.orEmpty()
     item(key = "episodes-header") {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Box(Modifier.weight(1f)) { EpisodesHeader(state, query, viewModel) }
-            if (sidebar) {
+            if (sidebarWidth != null) {
                 Text(
                     stringResource(R.string.listeners_also_follow),
                     style = Podcst.type.rowTitle,
                     color = Podcst.colors.ink,
-                    modifier = Modifier.width(SIDEBAR_WIDTH).padding(horizontal = 20.dp).padding(bottom = 18.dp).semantics { heading() },
+                    modifier = Modifier.width(sidebarWidth).padding(end = 20.dp).padding(bottom = 18.dp).semantics { heading() },
                 )
             }
         }
@@ -349,11 +380,11 @@ private fun LazyListScope.episodes(
         Row(Modifier.fillMaxWidth().animateItem(), verticalAlignment = Alignment.Top) {
             Box(Modifier.weight(1f)) {
                 val episode = state.episodes.getOrNull(index)
-                if (episode != null) DatedEpisodeRow(state.marks.row(episode), actions)
+                if (episode != null) DatedEpisodeRow(state.marks.row(episode), actions, showDescription = wide)
                 else if (index == 0) EmptyEpisodes(state, query, viewModel::retry)
             }
-            if (sidebar) {
-                Box(Modifier.width(SIDEBAR_WIDTH)) {
+            if (sidebarWidth != null) {
+                Box(Modifier.width(sidebarWidth)) {
                     related.getOrNull(index)?.let { RelatedPodcast(it, onOpenPodcast) }
                 }
             }
@@ -364,7 +395,7 @@ private fun LazyListScope.episodes(
 @Composable
 private fun RelatedPodcast(podcast: Podcast, onOpen: (Podcast) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(podcast) }.padding(horizontal = 20.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(podcast) }.padding(end = 20.dp).padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -536,4 +567,3 @@ private val EpisodeOrder.label: Int
     }
 
 private const val FILTER_THRESHOLD = 10
-private val SIDEBAR_WIDTH = 300.dp
