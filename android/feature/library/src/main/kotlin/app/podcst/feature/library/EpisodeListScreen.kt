@@ -29,6 +29,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.podcst.designsystem.ArtworkEpisodeRow
 import app.podcst.designsystem.ButtonKind
+import app.podcst.designsystem.Card
 import app.podcst.designsystem.EpisodeActions
 import app.podcst.designsystem.SwipeAction
 import app.podcst.designsystem.EpisodeRowState
@@ -81,8 +83,15 @@ fun EpisodeListScreen(state: EpisodeListState, model: EpisodeListViewModel, acti
     val content = @Composable {
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(state, onBack) }
-            if (state.starError != null || state.starPending) item {
-                Text(state.starError ?: "Saved on this device. Waiting to sync…", Modifier.padding(20.dp), style = Podcst.type.caption, color = Podcst.colors.tertiary)
+            if (state.starError != null) item {
+                Card(Modifier.padding(horizontal = 20.dp, vertical = 12.dp).fillMaxWidth()) {
+                    Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(state.starError, Modifier.weight(1f).padding(vertical = 14.dp), style = Podcst.type.caption, color = Podcst.colors.secondary)
+                        TextButton(onClick = model::retry) { Text(stringResource(R.string.retry), color = Podcst.colors.accent) }
+                    }
+                }
+            } else if (state.starPending) item {
+                Text(stringResource(R.string.star_pending), Modifier.padding(20.dp), style = Podcst.type.caption, color = Podcst.colors.tertiary)
             }
             items(state.missing, key = { "missing:${it.id}" }) { star ->
                 Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {

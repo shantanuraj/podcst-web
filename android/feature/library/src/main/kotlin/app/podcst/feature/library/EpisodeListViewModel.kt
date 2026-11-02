@@ -109,13 +109,15 @@ class EpisodeListViewModel(
     suspend fun recheckContent() { if (list == EpisodeList.Starred) stars.refresh() else library.refresh() }
 
     fun refresh() = viewModelScope.refresh(refresh) {
-        if (list == EpisodeList.Starred) stars.refresh() else library.refresh(force = true)
+        if (list == EpisodeList.Starred) stars.retry() else library.refresh(force = true)
         progress.refresh(source.first())
     }
 
     fun refreshProgress() = viewModelScope.refresh(refresh) {
         progress.refresh(source.first())
     }
+
+    fun retry() = viewModelScope.launch { stars.retry() }
 
     fun removeStar(id: Long) = viewModelScope.launch { stars.remove(id) }
 

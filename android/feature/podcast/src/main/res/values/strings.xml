@@ -26,7 +26,7 @@
     <string name="no_matches">No episodes match “%1$s”</string>
     <string name="no_episodes">No episodes available</string>
     <string name="episodes_preparing">Preparing episodes…</string>
-    <string name="episodes_unavailable">Episodes are temporarily unavailable</string>
+    <string name="episodes_unavailable">Episodes couldn’t be loaded right now</string>
     <string name="refresh">Refresh</string>
     <string name="open_website">Open website</string>
     <string name="website">Website</string>

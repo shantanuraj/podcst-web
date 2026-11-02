@@ -123,6 +123,13 @@ internal data class StarScope(
     }
 }
 
+internal fun adoptGeneration(root: MutableMap<String, StarScope>, accountId: String, generation: String) {
+    val key = Scope.key(accountId)
+    val saved = root[key] ?: return
+    if (saved.generation == null || saved.generation == generation || saved.flight != null || saved.queued.isNotEmpty()) return
+    root[key] = StarScope(identityVersion = 2)
+}
+
 internal fun mergeGuest(root: MutableMap<String, StarScope>, accountId: String) {
     val guest = root[Scope.key(null)] ?: return
     val key = Scope.key(accountId)

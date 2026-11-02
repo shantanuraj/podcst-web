@@ -77,7 +77,7 @@ class StarRepository(
     private var root: Map<String, StarScope> = try {
         if (file.exists() || File(file.path + ".bak").exists()) decode(this.file.readFully()) else emptyMap()
     } catch (_: Exception) { readable = false; emptyMap() }
-    private val state = MutableStateFlow(StarsState(accountId, ready = readable && accountId == null, error = if (readable) null else "Saved episodes could not be opened. Pending work has not been reset."))
+    private val state = MutableStateFlow(StarsState(accountId, ready = readable && accountId == null, error = if (readable) null else "Starred episodes on this device couldn’t be opened. Nothing has been removed."))
     val status = state.asStateFlow()
     val starred = status.map { state -> state.items.mapNotNull { it.episode } }.distinctUntilChanged()
     val episodeIds = status.map { state -> state.items.map { it.id }.toSet() }.distinctUntilChanged()
@@ -96,7 +96,7 @@ class StarRepository(
         val token = generation.get()
         val account = state.value.accountId
         if (!state.value.ready || !validStarId(id)) {
-            view(token) { it.copy(error = "A canonical episode ID and an active account scope are required.") }
+            view(token) { it.copy(error = "This episode can’t be starred right now.") }
             return false
         }
         return try {
@@ -163,6 +163,11 @@ class StarRepository(
 
     suspend fun poll() { if (state.value.pending || clock() - lastSync >= 60_000) refresh() }
 
+    suspend fun retry() {
+        nextAttempt = 0
+        refresh()
+    }
+
     suspend fun refresh() {
         if (authenticationPaused || !readable || clock() < nextAttempt || !sender.tryLock()) return
         val token = generation.get()
@@ -181,18 +186,13 @@ class StarRepository(
                 throw IOException("Session changed")
             }
             view(token) { it.copy(ready = true, error = null) }
-            withContext(io) {
-                mutex.withLock {
-                    checkCurrent(token)
-                    val next = root.toMutableMap()
-                    mergeGuest(next, account)
-                    commit(next)
-                }
-            }
-            var current = change(token, account) {}
-            if (current.blocked != null) return
+            rewrite(token) { mergeGuest(it, account) }
             val envelope = remote.lists()
             checkCurrent(token)
+            validateStateScope(envelope.protocol, envelope.accountId, envelope.generation, account)
+            rewrite(token) { adoptGeneration(it, account, envelope.generation) }
+            var current = change(token, account) {}
+            if (current.blocked != null) return
             validateStateScope(envelope.protocol, envelope.accountId, envelope.generation, account, current.generation)
             current = change(token, account) {
                 it.accountId = account
@@ -246,9 +246,18 @@ class StarRepository(
                     runCatching { change(token, account) { it.episodes = emptyMap(); it.snapshot = null } }
                 }
                 nextAttempt = clock() + ((failure as? ApiException)?.retryAfterSeconds?.coerceIn(1, 86400)?.times(1000) ?: minOf(60_000L, 1000L shl minOf(attempts++, 6)))
-                view(token) { it.copy(error = it.error ?: "Star sync paused. Changes remain saved on this device.") }
+                view(token) { it.copy(error = it.error ?: "Couldn’t sync starred episodes. Your changes are saved on this device.".takeIf { _ -> it.pending }) }
             }
         } finally { sender.unlock() }
+    }
+
+    private suspend fun rewrite(token: Long, change: (MutableMap<String, StarScope>) -> Unit) = withContext(io) {
+        mutex.withLock {
+            checkCurrent(token)
+            val next = root.toMutableMap()
+            change(next)
+            commit(next)
+        }
     }
 
     private suspend fun change(token: Long, account: String?, change: (StarScope) -> Unit): StarScope = withContext(io) {
@@ -327,8 +336,9 @@ class StarRepository(
             pending = account != null && (current.flight != null || current.queued.isNotEmpty()),
             error = when {
                 !readable -> previous.error
-                current.blocked != null -> "Star sync needs attention. Pending edits have been kept."
-                current.failures.isNotEmpty() -> "${current.failures.size} episode(s) could not be added."
+                current.blocked != null -> "Some starred changes couldn’t sync. They’re saved on this device."
+                current.failures.size == 1 -> "1 episode couldn’t be starred because it’s no longer available."
+                current.failures.isNotEmpty() -> "${current.failures.size} episodes couldn’t be starred because they’re no longer available."
                 else -> null
             },
         ) }

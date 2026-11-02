@@ -58,4 +58,6 @@
     <string name="add_to_list_title">Add to list</string>
     <string name="done">Done</string>
     <string name="list_footer">Removing an episode from a list doesn’t delete its download or progress.</string>
+    <string name="retry">Retry</string>
+    <string name="star_pending">Saved on this device. Waiting to sync…</string>
 </resources>

@@ -178,8 +178,40 @@ class StarRepositoryTest {
         assertTrue(state.project().any { it.id == Long.MAX_VALUE })
     }
 
+    @Test fun idleBlockedStreamAdoptsRotatedGenerationWithoutUploading() = runTest {
+        val stale = StarScope(identityVersion = 2, sequence = 2, accountId = "owner", generation = "ca1593df-24f8-45fb-8b46-e9563a1ec1b2", listId = LIST, blocked = 409)
+        file.writeText(Json { encodeDefaults = true }.encodeToString(mapOf(Scope.key("owner") to stale)))
+        val remote = Remote().apply { members = snapshot(listOf(19302, 19311), "2") }
+        val stars = repository(remote)
+        assertNotNull(stars.status.value.error)
+        stars.refresh()
+        assertNull(stars.status.value.error)
+        assertEquals(listOf(19311L, 19302L), stars.status.value.items.map { it.id })
+        assertTrue(remote.sent.isEmpty())
+        stars.unstar(episode(19311))
+        testScheduler.runCurrent()
+        assertEquals(listOf("1"), remote.sent.map { it.sequence })
+        assertNotEquals(stale.clientId, remote.sent.single().clientId)
+        val restarted = repository(remote)
+        restarted.refresh()
+        assertEquals(listOf(19302L), restarted.status.value.items.map { it.id })
+        assertEquals(1, remote.sent.size)
+    }
+
+    @Test fun pendingWorkIsNotCarriedIntoARotatedGeneration() = runTest {
+        seed()
+        val remote = Remote().apply { generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211" }
+        val stars = repository(remote)
+        stars.retry()
+        assertTrue(remote.sent.isEmpty())
+        assertTrue(stars.status.value.pending)
+        assertNotNull(stars.status.value.error)
+        assertEquals(listOf(1L), stars.status.value.items.map { it.id })
+    }
+
     private class Remote : StarRemote {
         var members = snapshot(emptyList(), "0")
+        var generation = GENERATION
         var loseReply = false
         var failSnapshot = false
         var reject: Int? = null
@@ -188,9 +220,9 @@ class StarRepositoryTest {
         val legacy = mutableListOf<Boolean>()
         val ledger = mutableMapOf<Pair<String, String>, ListAcknowledgement>()
         override suspend fun accountId() = "owner"
-        override suspend fun lists() = AccountLists(1, "owner", GENERATION, listOf(AccountEpisodeList(LIST, "starred", null, members.revision, members.items.size)))
-        override suspend fun membership(id: String): ListSnapshot { if (failSnapshot) throw IOException("offline"); return members }
-        override suspend fun episodes(id: String, cursor: String?) = ListEpisodePage(LIST, members.revision, members.items.map { ListEpisodeItem(it, episode(it.episodeId)) }, null, 1, "owner", GENERATION)
+        override suspend fun lists() = AccountLists(1, "owner", generation, listOf(AccountEpisodeList(LIST, "starred", null, members.revision, members.items.size)))
+        override suspend fun membership(id: String): ListSnapshot { if (failSnapshot) throw IOException("offline"); return members.copy(generation = generation) }
+        override suspend fun episodes(id: String, cursor: String?) = ListEpisodePage(LIST, members.revision, members.items.map { ListEpisodeItem(it, episode(it.episodeId)) }, null, 1, "owner", generation)
         override suspend fun change(id: String, batch: ListBatch, accountId: String, generation: String, legacy: Boolean): ListAcknowledgement {
             sent += batch; this.legacy += legacy
             beforeChange?.invoke()
