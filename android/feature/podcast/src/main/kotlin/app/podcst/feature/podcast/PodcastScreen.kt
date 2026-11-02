@@ -282,12 +282,12 @@ private fun PodcastActions(state: PodcastScreenState, viewModel: PodcastViewMode
     val failure = stringResource(R.string.subscription_failed)
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
-        val buttonWidth = if (maxWidth >= 280.dp * scale + 10.dp) (maxWidth - 10.dp) / 2 else maxWidth
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val columns = if (maxWidth >= 280.dp * scale + 10.dp) 2 else 1
+        FlowRow(maxItemsInEachRow = columns, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             PodcstButton(
                 stringResource(if (state.subscribed) R.string.subscribed else R.string.subscribe),
                 onClick = { viewModel.toggleSubscription { toaster.show(failure, it.message) } },
-                modifier = Modifier.width(buttonWidth),
+                modifier = Modifier.weight(1f),
                 kind = if (state.subscribed) ButtonKind.Outline else ButtonKind.Accent,
                 icon = PodcstIcons.Check.takeIf { state.subscribed },
                 iconTint = Podcst.colors.accent,
@@ -298,7 +298,7 @@ private fun PodcastActions(state: PodcastScreenState, viewModel: PodcastViewMode
             PodcstButton(
                 stringResource(R.string.play_latest),
                 onClick = { state.latest?.let(actions::play) },
-                modifier = Modifier.width(buttonWidth),
+                modifier = Modifier.weight(1f),
                 kind = ButtonKind.Outline,
                 icon = PodcstIcons.Play,
                 height = 44.dp,
