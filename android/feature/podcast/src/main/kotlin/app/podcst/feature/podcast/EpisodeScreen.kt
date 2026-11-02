@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +59,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import app.podcst.designsystem.Artwork
+import app.podcst.designsystem.ContentLayout
 import app.podcst.designsystem.artworkTint
 import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.designsystem.EpisodeActions
@@ -115,17 +119,18 @@ fun EpisodeScreen(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, actionIconContentColor = colors.ink),
         )
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val wide = maxWidth >= 840.dp && LocalDensity.current.fontScale <= 1.3f
+            val contentWidth = maxWidth.coerceAtMost(1120.dp) - 40.dp
+            val layout = ContentLayout(contentWidth, LocalDensity.current.fontScale)
             Column(
                 Modifier.fillMaxWidth().verticalScroll(scroll).padding(bottom = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Column(Modifier.widthIn(max = 1120.dp).fillMaxWidth().padding(horizontal = 20.dp)) {
-                    EpisodeHeader(state, actions, tint, wide, onOpenPodcast, Modifier.onSizeChanged { headerHeight = it.height })
-                    if (wide && chapters.chapters.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.Top) {
-                            EpisodeNotes(episode, viewModel::seek, Modifier.weight(1.6f))
-                            ChapterCard(chapters, state.playhead?.position, true, false, {}, viewModel::seek, Modifier.weight(1f))
+                    EpisodeHeader(state, actions, tint, layout.twoColumns, contentWidth, onOpenPodcast, Modifier.onSizeChanged { headerHeight = it.height })
+                    if (layout.twoColumns && chapters.chapters.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(layout.gutter), verticalAlignment = Alignment.Top) {
+                            EpisodeNotes(episode, viewModel::seek, Modifier.weight(1f))
+                            ChapterCard(chapters, state.playhead?.position, true, false, {}, viewModel::seek, Modifier.width(layout.supportingWidth))
                         }
                     } else {
                         Column(Modifier.widthIn(max = 680.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -147,14 +152,15 @@ private fun EpisodeHeader(
     actions: EpisodeActions,
     tint: app.podcst.designsystem.ArtworkTint,
     wide: Boolean,
+    contentWidth: Dp,
     onOpenPodcast: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val episode = state.episode
     Column(modifier.fillMaxWidth().padding(top = 14.dp)) {
         if (wide) {
-            Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Bottom) {
-                Artwork(episode.artwork, 160.dp, corner = 14.dp, tint = tint)
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Bottom) {
+                Artwork(episode.artwork, if (contentWidth >= 800.dp) 160.dp else 144.dp, corner = 14.dp, tint = tint)
                 EpisodeSummary(state, actions, true, onOpenPodcast, Modifier.weight(1f))
             }
         } else {
@@ -178,14 +184,24 @@ private fun EpisodeSummary(
     modifier: Modifier = Modifier,
 ) {
     val episode = state.episode
-    Column(modifier) {
-        if (wide) Eyebrow(dateline(episode), Modifier.padding(bottom = 10.dp))
-        Text(episode.title, style = if (wide) Podcst.type.largeTitle else Podcst.type.title, color = Podcst.colors.ink, modifier = Modifier.semantics { heading() })
-        Byline(episode, onOpenPodcast, Modifier.padding(top = 8.dp))
-        Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PrimaryAction(state.button, onClick = { actions.play(episode) }, modifier = Modifier.weight(1f))
-            StarButton(state.starred, onStar = { actions.star(episode, !state.starred) }, onAddToList = { actions.addToList(episode) })
-            Square(PodcstIcons.Queue, stringResource(DesignR.string.add_to_queue), onClick = { actions.enqueue(episode) })
+    BoxWithConstraints(modifier) {
+        val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+        val actionsWidth = maxWidth.coerceAtMost(440.dp * scale)
+        val primaryWidth = if (actionsWidth >= 220.dp * scale + 116.dp) actionsWidth - 116.dp else actionsWidth
+        val titleStyle = if (wide && maxWidth >= 560.dp) Podcst.type.largeTitle else Podcst.type.title
+        Column {
+            if (wide) Eyebrow(dateline(episode), Modifier.padding(bottom = 10.dp))
+            Text(episode.title, style = titleStyle, color = Podcst.colors.ink, modifier = Modifier.semantics { heading() })
+            Byline(episode, onOpenPodcast, Modifier.padding(top = 8.dp))
+            FlowRow(
+                Modifier.width(actionsWidth).padding(top = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                PrimaryAction(state.button, onClick = { actions.play(episode) }, modifier = Modifier.width(primaryWidth))
+                StarButton(state.starred, onStar = { actions.star(episode, !state.starred) }, onAddToList = { actions.addToList(episode) })
+                Square(PodcstIcons.Queue, stringResource(DesignR.string.add_to_queue), onClick = { actions.enqueue(episode) })
+            }
         }
     }
 }
