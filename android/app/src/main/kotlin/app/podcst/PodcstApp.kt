@@ -20,10 +20,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -132,57 +136,67 @@ private fun Shell(graph: AppGraph) {
     CompositionLocalProvider(LocalToaster provides toaster) {
         Box(Modifier.fillMaxSize().background(Podcst.colors.paper)) {
             val typing = WindowInsets.isImeVisible
-            Column(Modifier.fillMaxSize()) {
-                if (unresolved > 0) {
-                    androidx.compose.material3.TextButton(onClick = { graph.scope.launch { runCatching { graph.retained.resolve() } } }) {
-                        Text("$unresolved local items need identity verification — Resolve")
-                    }
-                }
-                if (durableStatus.pending || durableStatus.error != null) {
-                    androidx.compose.material3.TextButton(onClick = {
-                        graph.scope.launch {
-                            if (durableStatus.blocked) {
-                                runCatching { graph.playback.prepareSyncedVersion(graph.recovery) }
-                                    .onSuccess { recoveryChoice = it }
-                                    .onFailure { toaster.show(it.message ?: "Unable to check the synced version") }
-                            } else {
-                                graph.progress.sync()
-                                runCatching { graph.library.retryImports(); graph.library.refresh() }
+            val nowPlaying = navigator.nowPlaying && playerState.episode != null
+            Navigation(navigator, typing) {
+                Box(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    Column(Modifier.fillMaxSize()) {
+                        if (unresolved > 0) {
+                            androidx.compose.material3.TextButton(onClick = { graph.scope.launch { runCatching { graph.retained.resolve() } } }) {
+                                Text("$unresolved local items need identity verification — Resolve")
                             }
                         }
-                    }) { Text(durableStatus.error ?: "Changes saved on this device — sync pending") }
+                        if (durableStatus.pending || durableStatus.error != null) {
+                            androidx.compose.material3.TextButton(onClick = {
+                                graph.scope.launch {
+                                    if (durableStatus.blocked) {
+                                        runCatching { graph.playback.prepareSyncedVersion(graph.recovery) }
+                                            .onSuccess { recoveryChoice = it }
+                                            .onFailure { toaster.show(it.message ?: "Unable to check the synced version") }
+                                    } else {
+                                        graph.progress.sync()
+                                        runCatching { graph.library.retryImports(); graph.library.refresh() }
+                                    }
+                                }
+                            }) { Text(durableStatus.error ?: "Changes saved on this device — sync pending") }
+                        }
+                        Box(Modifier.weight(1f).fillMaxWidth().imePadding()) {
+                            NavDisplay(
+                                backStack = navigator.stack,
+                                onBack = { navigator.back() },
+                                entryDecorators = listOf(
+                                    rememberSaveableStateHolderNavEntryDecorator(),
+                                    rememberViewModelStoreNavEntryDecorator(),
+                                ),
+                                entryProvider = entryProvider<NavKey> {
+                                    discoverEntries(graph, navigator)
+                                    podcastEntries(graph, navigator, actions, share)
+                                    libraryEntries(graph, navigator, actions)
+                                    playerEntries(graph, navigator, actions, player)
+                                    settingsEntries(graph, navigator)
+                                },
+                            )
+                        }
+                        AnimatedVisibility(playerState.player.active && !typing) {
+                            MiniPlayer(
+                                playerState,
+                                actions,
+                                onOpen = { navigator.nowPlaying = true },
+                                onToggle = player::toggle,
+                                onNext = player::next,
+                                onPrevious = player::previous,
+                                onStop = stop,
+                            )
+                        }
+                    }
+                    if (!nowPlaying) {
+                        ToastHost(
+                            toaster,
+                            Modifier.align(Alignment.BottomCenter).imePadding()
+                                .padding(bottom = if (playerState.player.active && !typing) 80.dp else 16.dp),
+                        )
+                    }
                 }
-                Box(Modifier.weight(1f).fillMaxWidth().imePadding()) {
-                    NavDisplay(
-                        backStack = navigator.stack,
-                        onBack = { navigator.back() },
-                        entryDecorators = listOf(
-                            rememberSaveableStateHolderNavEntryDecorator(),
-                            rememberViewModelStoreNavEntryDecorator(),
-                        ),
-                        entryProvider = entryProvider<NavKey> {
-                            discoverEntries(graph, navigator)
-                            podcastEntries(graph, navigator, actions, share)
-                            libraryEntries(graph, navigator, actions)
-                            playerEntries(graph, navigator, actions, player)
-                            settingsEntries(graph, navigator)
-                        },
-                    )
-                }
-                AnimatedVisibility(playerState.player.active && !typing) {
-                    MiniPlayer(
-                        playerState,
-                        actions,
-                        onOpen = { navigator.nowPlaying = true },
-                        onToggle = player::toggle,
-                        onNext = player::next,
-                        onPrevious = player::previous,
-                        onStop = stop,
-                    )
-                }
-                AnimatedVisibility(!typing) { Bar(navigator) }
             }
-            val nowPlaying = navigator.nowPlaying && playerState.episode != null
             AnimatedVisibility(
                 nowPlaying,
                 enter = slideInVertically(tween(320)) { it } + fadeIn(),
@@ -190,13 +204,9 @@ private fun Shell(graph: AppGraph) {
             ) {
                 NowPlayingScreen(playerState, player, actions, onDismiss = { navigator.nowPlaying = false }, onStop = stop, onOpenPodcast = openPodcast, onShare = share)
             }
-            ToastHost(
-                toaster,
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .then(if (nowPlaying) Modifier.navigationBarsPadding() else Modifier)
-                    .padding(bottom = if (nowPlaying) 72.dp else if (playerState.player.active) 160.dp else 96.dp),
-            )
+            if (nowPlaying) {
+                ToastHost(toaster, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp))
+            }
             recoveryChoice?.let { choice ->
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { if (!recovering) recoveryChoice = null },
@@ -234,26 +244,49 @@ private fun Shell(graph: AppGraph) {
 }
 
 @Composable
-private fun Bar(navigator: Navigator) {
+private fun Navigation(navigator: Navigator, typing: Boolean, content: @Composable () -> Unit) {
     val colors = Podcst.colors
-    NavigationBar(containerColor = colors.navigation, contentColor = colors.secondary) {
-        Tab.entries.forEach { tab ->
-            val selected = navigator.tab == tab
-            NavigationBarItem(
-                selected = selected,
-                onClick = { navigator.select(tab) },
-                icon = { Icon(tab.icon, null, Modifier.size(22.dp)) },
-                label = { Text(stringResource(tab.label), style = if (selected) Podcst.type.navigation.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) else Podcst.type.navigation) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = colors.accent,
-                    selectedTextColor = colors.ink,
-                    indicatorColor = colors.accentSubtle,
-                    unselectedIconColor = colors.secondary,
-                    unselectedTextColor = colors.secondary,
-                ),
-            )
-        }
-    }
+    val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+    val itemColors = NavigationSuiteDefaults.itemColors(
+        navigationBarItemColors = NavigationBarItemDefaults.colors(
+            selectedIconColor = colors.accent,
+            selectedTextColor = colors.ink,
+            indicatorColor = colors.accentSubtle,
+            unselectedIconColor = colors.secondary,
+            unselectedTextColor = colors.secondary,
+        ),
+        navigationRailItemColors = NavigationRailItemDefaults.colors(
+            selectedIconColor = colors.accent,
+            selectedTextColor = colors.ink,
+            indicatorColor = colors.accentSubtle,
+            unselectedIconColor = colors.secondary,
+            unselectedTextColor = colors.secondary,
+        ),
+    )
+    NavigationSuiteScaffold(
+        layoutType = if (typing && adaptiveType == NavigationSuiteType.NavigationBar) NavigationSuiteType.None else adaptiveType,
+        containerColor = colors.paper,
+        contentColor = colors.ink,
+        navigationSuiteColors = NavigationSuiteDefaults.colors(
+            navigationBarContainerColor = colors.navigation,
+            navigationBarContentColor = colors.secondary,
+            navigationRailContainerColor = colors.navigation,
+            navigationRailContentColor = colors.secondary,
+        ),
+        navigationSuiteItems = {
+            Tab.entries.forEach { tab ->
+                val selected = navigator.tab == tab
+                item(
+                    selected = selected,
+                    onClick = { navigator.select(tab) },
+                    icon = { Icon(tab.icon, null, Modifier.size(22.dp)) },
+                    label = { Text(stringResource(tab.label), style = if (selected) Podcst.type.navigation.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) else Podcst.type.navigation) },
+                    colors = itemColors,
+                )
+            }
+        },
+        content = content,
+    )
 }
 
 private val Tab.icon

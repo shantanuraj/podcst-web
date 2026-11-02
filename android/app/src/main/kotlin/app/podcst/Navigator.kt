@@ -1,6 +1,7 @@
 package app.podcst
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,11 +18,12 @@ enum class Tab(val root: Route) { Discover(DiscoverRoute), Library(LibraryRoute)
 @Stable
 class Navigator(
     private val stacks: Map<Tab, NavBackStack<NavKey>>,
-    initial: Tab,
+    selectedTab: MutableState<Tab>,
+    playerVisible: MutableState<Boolean>,
 ) {
-    var tab by mutableStateOf(initial)
+    var tab by selectedTab
         private set
-    var nowPlaying by mutableStateOf(false)
+    var nowPlaying by playerVisible
     var signIn by mutableStateOf(false)
 
     val stack: NavBackStack<NavKey> get() = stacks.getValue(tab)
@@ -57,8 +59,9 @@ fun rememberNavigator(): Navigator {
     val discover = rememberNavBackStack(DiscoverRoute)
     val library = rememberNavBackStack(LibraryRoute)
     val queue = rememberNavBackStack(QueueRoute)
-    val tab by rememberSaveable { mutableStateOf(Tab.Discover) }
-    return androidx.compose.runtime.remember(discover, library, queue) {
-        Navigator(mapOf(Tab.Discover to discover, Tab.Library to library, Tab.Queue to queue), tab)
+    val tab = rememberSaveable { mutableStateOf(Tab.Discover) }
+    val playerVisible = rememberSaveable { mutableStateOf(false) }
+    return androidx.compose.runtime.remember(discover, library, queue, tab, playerVisible) {
+        Navigator(mapOf(Tab.Discover to discover, Tab.Library to library, Tab.Queue to queue), tab, playerVisible)
     }
 }

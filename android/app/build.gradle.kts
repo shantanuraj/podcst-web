@@ -80,6 +80,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:auth"))
     implementation(libs.activity.compose)
+    implementation(libs.compose.material3.adaptive.navigation.suite)
     implementation(libs.core.ktx)
     implementation(libs.core.splashscreen)
     implementation(libs.lifecycle.runtime.compose)
@@ -96,4 +97,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.profileinstaller)
     testImplementation(libs.junit)
+    androidTestImplementation(libs.espresso.core)
 }
