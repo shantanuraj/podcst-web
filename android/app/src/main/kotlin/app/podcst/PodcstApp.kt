@@ -168,7 +168,7 @@ private fun Shell(graph: AppGraph) {
                                     rememberViewModelStoreNavEntryDecorator(),
                                 ),
                                 entryProvider = entryProvider<NavKey> {
-                                    discoverEntries(graph, navigator)
+                                    discoverEntries(graph, navigator, actions)
                                     podcastEntries(graph, navigator, actions, share)
                                     libraryEntries(graph, navigator, actions)
                                     playerEntries(graph, navigator, actions, player)

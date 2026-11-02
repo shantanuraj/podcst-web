@@ -75,6 +75,30 @@ class CatalogRepository(
         scope.database.episodes().observe(identity).map { it?.domain() }
     }
 
+    suspend fun info(podcast: Podcast): Podcast {
+        val id = podcast.id?.takeIf { it > 0 } ?: return podcast
+        val active = readerActive()
+        if (!active() || podcast.isPrivate && scopes.current.value.accountId == null) throw CancellationException("Account changed")
+        val result = api.podcastInfo(id)
+        currentCoroutineContext().ensureActive()
+        if (!active() || result.isPrivate && scopes.current.value.accountId == null) throw CancellationException("Account changed")
+        return result
+    }
+
+    suspend fun latest(podcast: Podcast): Episode? {
+        val id = podcast.id?.takeIf { it > 0 } ?: return null
+        val active = readerActive()
+        if (!active() || podcast.isPrivate && scopes.current.value.accountId == null) throw CancellationException("Account changed")
+        val result = api.episodes(id, limit = 1).episodes.firstOrNull()
+        currentCoroutineContext().ensureActive()
+        if (!active() || result?.isPrivate == true && scopes.current.value.accountId == null) throw CancellationException("Account changed")
+        return result?.copy(
+            feed = result.feed.ifEmpty { podcast.feed },
+            podcastTitle = result.podcastTitle ?: podcast.title,
+            cover = result.cover.ifEmpty { podcast.cover },
+        )
+    }
+
     suspend fun chapters(episode: Episode): EpisodeChapters {
         val active = readerActive()
         if (!active() || episode.isPrivate && scopes.current.value.accountId == null) throw CancellationException("Account changed")

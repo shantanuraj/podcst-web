@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="discover">Discover</string>
+    <string name="top_podcasts">Top podcasts</string>
+    <string name="the_chart">The chart</string>
     <string name="search_placeholder">Search podcasts or paste a feed</string>
     <string name="account">Account and settings</string>
     <string name="number_one">No. 1 in %1$s</string>
     <string name="subscribe">Subscribe</string>
     <string name="subscribed">Subscribed</string>
+    <string name="play_latest">Play latest</string>
+    <string name="playback_failed">Couldn\'t play the latest episode</string>
+    <string name="no_episodes">No episodes are available yet.</string>
     <string name="subscribe_to">Subscribe to %1$s</string>
     <string name="unsubscribe_from">Unsubscribe from %1$s</string>
     <string name="ranked_description">Number %1$d, %2$s, %3$s</string>

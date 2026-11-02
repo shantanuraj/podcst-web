@@ -4,31 +4,45 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -42,7 +56,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.podcst.designsystem.Artwork
 import app.podcst.designsystem.ButtonKind
 import app.podcst.designsystem.Card
+import app.podcst.designsystem.ContentLayout
 import app.podcst.designsystem.Eyebrow
+import app.podcst.designsystem.Hairline
 import app.podcst.designsystem.LocalToaster
 import app.podcst.designsystem.Message
 import app.podcst.designsystem.Podcst
@@ -50,8 +66,14 @@ import app.podcst.designsystem.PodcstButton
 import app.podcst.designsystem.PodcstIcons
 import app.podcst.designsystem.PodcstTheme
 import app.podcst.designsystem.RoundIcon
+import app.podcst.designsystem.SectionHeader
+import app.podcst.designsystem.artworkTint
+import app.podcst.designsystem.rememberArtworkTint
 import app.podcst.model.Podcast
+import app.podcst.model.ShowNotes
 import app.podcst.model.User
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 fun Discover(
@@ -59,12 +81,29 @@ fun Discover(
     onSearch: () -> Unit,
     onAccount: () -> Unit,
     onPodcast: (Podcast) -> Unit,
+    onPlay: suspend (Podcast) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toaster = LocalToaster.current
     val title = stringResource(R.string.subscription_failed)
+    val playbackFailure = stringResource(R.string.playback_failed)
+    val scope = rememberCoroutineScope()
+    var starting by remember { mutableStateOf(false) }
     LaunchedEffect(viewModel) { viewModel.subscriptionFailures.collect { toaster.show(title, it) } }
-    DiscoverScreen(state, onSearch, onAccount, onPodcast, viewModel::toggle, viewModel::refresh)
+    DiscoverScreen(state, onSearch, onAccount, onPodcast, viewModel::toggle, viewModel::refresh, starting) { podcast ->
+        if (!starting) scope.launch {
+            starting = true
+            try {
+                onPlay(podcast)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                toaster.show(playbackFailure, failure.message)
+            } finally {
+                starting = false
+            }
+        }
+    }
 }
 
 @Composable
@@ -75,42 +114,77 @@ fun DiscoverScreen(
     onPodcast: (Podcast) -> Unit,
     onToggle: (Podcast) -> Unit,
     onRefresh: () -> Unit,
+    starting: Boolean = false,
+    onPlay: (Podcast) -> Unit = {},
 ) {
+    val chartState = rememberLazyListState()
+    val featureScroll = rememberScrollState()
+    val fontScale = LocalDensity.current.fontScale
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         SearchBar(state.initial, onSearch, onAccount, Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp))
         PullToRefreshBox(state.refreshing, onRefresh, Modifier.fillMaxSize()) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-                item {
-                    Text(
-                        stringResource(R.string.discover),
-                        style = Podcst.type.largeTitle,
-                        color = Podcst.colors.ink,
-                        modifier = Modifier.padding(start = 4.dp, top = 22.dp, bottom = 18.dp).semantics { heading() },
-                    )
-                }
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val layout = ContentLayout(minOf(maxWidth, 1100.dp) - 32.dp, fontScale)
                 val featured = state.featured
-                when {
-                    featured != null -> {
-                        if (state.load == ChartLoad.Failed) item { ChartFailure(onRefresh) }
-                        item { FeaturedCard(featured, state, onPodcast, onToggle) }
-                        items(state.ranked, key = { it.podcast.identity }) { ranked ->
-                            RankedRow(ranked, state.subscribed(ranked.podcast), onPodcast, onToggle)
+                val wide = layout.twoColumns && featured != null
+                Column(Modifier.widthIn(max = 1100.dp).fillMaxSize().align(Alignment.TopCenter).padding(horizontal = 16.dp)) {
+                    if (wide) DiscoverTitle()
+                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(layout.gutter)) {
+                        if (wide && featured != null) {
+                            Column(Modifier.weight(1f).verticalScroll(featureScroll).padding(bottom = 24.dp)) {
+                                SectionHeader(stringResource(R.string.top_podcasts), Modifier.padding(bottom = 14.dp))
+                                FeaturedHero(featured, state, starting, onPodcast, onToggle, onPlay)
+                            }
+                        }
+                        LazyColumn(
+                            Modifier.weight(1f).fillMaxHeight(),
+                            state = chartState,
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                        ) {
+                            item(key = "heading") {
+                                if (wide) {
+                                    SectionHeader(stringResource(R.string.the_chart), Modifier.padding(bottom = 24.dp))
+                                } else {
+                                    DiscoverTitle()
+                                }
+                            }
+                            item(key = "chart-failure") {
+                                if (featured != null && state.load == ChartLoad.Failed) ChartFailure(onRefresh)
+                            }
+                            item(key = "featured") {
+                                if (featured != null && !wide) FeaturedCard(featured, state, onPodcast, onToggle)
+                            }
+                            when {
+                                featured != null -> items(state.ranked, key = { it.podcast.identity }) { ranked ->
+                                    RankedRow(ranked, state.subscribed(ranked.podcast), onPodcast, onToggle, wide)
+                                }
+                                state.load == ChartLoad.Loading -> item { ChartSkeleton() }
+                                state.load == ChartLoad.Failed -> item {
+                                    Message(
+                                        stringResource(R.string.chart_unavailable),
+                                        detail = stringResource(R.string.chart_unavailable_detail),
+                                        action = stringResource(R.string.retry),
+                                        onAction = onRefresh,
+                                    )
+                                }
+                                else -> item { Message(stringResource(R.string.chart_empty)) }
+                            }
                         }
                     }
-                    state.load == ChartLoad.Loading -> item { ChartSkeleton() }
-                    state.load == ChartLoad.Failed -> item {
-                        Message(
-                            stringResource(R.string.chart_unavailable),
-                            detail = stringResource(R.string.chart_unavailable_detail),
-                            action = stringResource(R.string.retry),
-                            onAction = onRefresh,
-                        )
-                    }
-                    else -> item { Message(stringResource(R.string.chart_empty)) }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DiscoverTitle() {
+    Text(
+        stringResource(R.string.discover),
+        style = Podcst.type.largeTitle,
+        color = Podcst.colors.ink,
+        modifier = Modifier.padding(start = 4.dp, top = 22.dp, bottom = 18.dp).semantics { heading() },
+    )
 }
 
 @Composable
@@ -191,39 +265,112 @@ private fun FeaturedCard(podcast: Podcast, state: DiscoverState, onPodcast: (Pod
 }
 
 @Composable
-private fun RankedRow(ranked: RankedPodcast, subscribed: Boolean, onPodcast: (Podcast) -> Unit, onToggle: (Podcast) -> Unit) {
+private fun FeaturedHero(
+    podcast: Podcast,
+    state: DiscoverState,
+    starting: Boolean,
+    onPodcast: (Podcast) -> Unit,
+    onToggle: (Podcast) -> Unit,
+    onPlay: (Podcast) -> Unit,
+) {
+    val colors = Podcst.colors
+    val tint = rememberArtworkTint(podcast.cover)
+    val description = remember(podcast.description) { ShowNotes.plainText(podcast.description).replace(Regex("\\s+"), " ").trim() }
+    val subscribed = state.subscribed(podcast)
+    var height by remember { mutableIntStateOf(0) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .artworkTint(tint, { height }, { 0 }, { 0 })
+            .onSizeChanged { height = it.height }
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Artwork(
+            podcast.cover,
+            200.dp,
+            Modifier.clickable(role = Role.Button) { onPodcast(podcast) },
+            corner = 16.dp,
+            bordered = false,
+            contentDescription = stringResource(R.string.podcast_description, podcast.title, podcast.author),
+            tint = tint,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Eyebrow(stringResource(R.string.number_one, state.region.code), color = colors.accent)
+            Text(
+                podcast.title,
+                style = Podcst.type.title,
+                color = colors.ink,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable(role = Role.Button) { onPodcast(podcast) },
+            )
+            Text(podcast.author, style = Podcst.type.caption, color = colors.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (description.isNotEmpty()) {
+            Text(description, style = Podcst.type.body, color = colors.secondary, maxLines = 5, overflow = TextOverflow.Ellipsis)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PodcstButton(
+                stringResource(if (subscribed) R.string.subscribed else R.string.subscribe),
+                onClick = { onToggle(podcast) },
+                kind = if (subscribed) ButtonKind.Outline else ButtonKind.Accent,
+                icon = if (subscribed) PodcstIcons.Check else null,
+                height = 44.dp,
+                corner = 22.dp,
+            )
+            PodcstButton(
+                stringResource(R.string.play_latest),
+                onClick = { onPlay(podcast) },
+                kind = ButtonKind.Outline,
+                icon = PodcstIcons.Play,
+                height = 44.dp,
+                corner = 22.dp,
+                loading = starting,
+                enabled = (podcast.id ?: 0) > 0,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RankedRow(ranked: RankedPodcast, subscribed: Boolean, onPodcast: (Podcast) -> Unit, onToggle: (Podcast) -> Unit, wide: Boolean) {
     val colors = Podcst.colors
     val podcast = ranked.podcast
     val description = stringResource(R.string.ranked_description, ranked.rank, podcast.title, podcast.author)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onPodcast(podcast) }
-            .padding(horizontal = 4.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    Column {
         Row(
-            Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = description },
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onPodcast(podcast) }
+                .padding(horizontal = 4.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("${ranked.rank}", style = Podcst.type.rank, color = colors.muted, modifier = Modifier.width(24.dp), maxLines = 1, textAlign = TextAlign.Center)
-            Artwork(podcast.cover, 52.dp, corner = 12.dp, bordered = false)
-            Column(Modifier.weight(1f)) {
-                Text(podcast.title, style = Podcst.type.rowTitle, color = colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(podcast.author, style = Podcst.type.meta, color = colors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(
+                Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = description },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("${ranked.rank}", style = Podcst.type.rank, color = colors.muted, modifier = Modifier.width(24.dp), maxLines = 1, textAlign = TextAlign.Center)
+                Artwork(podcast.cover, 52.dp, corner = 12.dp, bordered = false)
+                Column(Modifier.weight(1f)) {
+                    Text(podcast.title, style = Podcst.type.rowTitle, color = colors.ink, maxLines = if (wide) 2 else 1, overflow = TextOverflow.Ellipsis)
+                    Text(podcast.author, style = Podcst.type.meta, color = colors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
+            RoundIcon(
+                if (subscribed) PodcstIcons.Check else PodcstIcons.Plus,
+                stringResource(if (subscribed) R.string.unsubscribe_from else R.string.subscribe_to, podcast.title),
+                onClick = { onToggle(podcast) },
+                size = 40.dp,
+                background = Color.Transparent,
+                tint = if (subscribed) colors.accent else colors.secondary,
+            )
         }
-        RoundIcon(
-            if (subscribed) PodcstIcons.Check else PodcstIcons.Plus,
-            stringResource(if (subscribed) R.string.unsubscribe_from else R.string.subscribe_to, podcast.title),
-            onClick = { onToggle(podcast) },
-            size = 40.dp,
-            background = Color.Transparent,
-            tint = if (subscribed) colors.accent else colors.secondary,
-        )
+        if (wide) Hairline()
     }
 }
 

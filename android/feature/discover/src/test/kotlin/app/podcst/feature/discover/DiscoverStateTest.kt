@@ -34,6 +34,16 @@ class DiscoverStateTest {
     }
 
     @Test
+    fun enrichesOnlyTheCurrentFeaturedPodcast() {
+        val info = chart.first().copy(description = "A description from the metadata endpoint.")
+        val enriched = DiscoverState(chart = chart, featuredInfo = info)
+        assertEquals(info, enriched.featured)
+        assertEquals(chart.drop(1), enriched.ranked.map { it.podcast })
+        assertEquals(chart[1], DiscoverState(chart = chart.drop(1), featuredInfo = info).featured)
+        assertNull(DiscoverState(featuredInfo = info).featured)
+    }
+
+    @Test
     fun refreshesVisiblyOnlyOverAnExistingChart() {
         assertFalse(DiscoverState(load = ChartLoad.Loading).refreshing)
         assertTrue(DiscoverState(chart = chart, load = ChartLoad.Loading).refreshing)
