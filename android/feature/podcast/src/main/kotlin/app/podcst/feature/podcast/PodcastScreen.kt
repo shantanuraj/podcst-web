@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -235,10 +236,10 @@ private fun PodcastSummary(state: PodcastScreenState, viewModel: PodcastViewMode
                 Artwork(state.podcast.cover, if (horizontal) 176.dp else 136.dp, corner = 16.dp, tint = tint)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     PodcastIdentity(state, wide = true)
-                    if (horizontal) PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp))
+                    if (horizontal) PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)))
                 }
             }
-            if (!horizontal) PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp))
+            if (!horizontal) PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)))
         }
     }
 }
@@ -279,28 +280,32 @@ private fun PodcastIdentity(state: PodcastScreenState, wide: Boolean, modifier: 
 private fun PodcastActions(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, modifier: Modifier = Modifier) {
     val toaster = LocalToaster.current
     val failure = stringResource(R.string.subscription_failed)
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        PodcstButton(
-            stringResource(if (state.subscribed) R.string.subscribed else R.string.subscribe),
-            onClick = { viewModel.toggleSubscription { toaster.show(failure, it.message) } },
-            modifier = Modifier.weight(1f),
-            kind = if (state.subscribed) ButtonKind.Outline else ButtonKind.Accent,
-            icon = PodcstIcons.Check.takeIf { state.subscribed },
-            iconTint = Podcst.colors.accent,
-            height = 44.dp,
-            corner = 22.dp,
-            loading = state.subscribing,
-        )
-        PodcstButton(
-            stringResource(R.string.play_latest),
-            onClick = { state.latest?.let(actions::play) },
-            modifier = Modifier.weight(1f),
-            kind = ButtonKind.Outline,
-            icon = PodcstIcons.Play,
-            height = 44.dp,
-            corner = 22.dp,
-            enabled = state.latest != null,
-        )
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+        val buttonWidth = if (maxWidth >= 280.dp * scale + 10.dp) (maxWidth - 10.dp) / 2 else maxWidth
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PodcstButton(
+                stringResource(if (state.subscribed) R.string.subscribed else R.string.subscribe),
+                onClick = { viewModel.toggleSubscription { toaster.show(failure, it.message) } },
+                modifier = Modifier.width(buttonWidth),
+                kind = if (state.subscribed) ButtonKind.Outline else ButtonKind.Accent,
+                icon = PodcstIcons.Check.takeIf { state.subscribed },
+                iconTint = Podcst.colors.accent,
+                height = 44.dp,
+                corner = 22.dp,
+                loading = state.subscribing,
+            )
+            PodcstButton(
+                stringResource(R.string.play_latest),
+                onClick = { state.latest?.let(actions::play) },
+                modifier = Modifier.width(buttonWidth),
+                kind = ButtonKind.Outline,
+                icon = PodcstIcons.Play,
+                height = 44.dp,
+                corner = 22.dp,
+                enabled = state.latest != null,
+            )
+        }
     }
 }
 
@@ -483,7 +488,7 @@ private fun FilterField(query: String, onQuery: (String) -> Unit, modifier: Modi
             .semantics { contentDescription = placeholder },
         decorationBox = { field ->
             Row(
-                Modifier.height(44.dp).background(colors.surface, shape).border(1.dp, colors.rule, shape).padding(start = 12.dp),
+                Modifier.heightIn(min = 44.dp).background(colors.surface, shape).border(1.dp, colors.rule, shape).padding(start = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
