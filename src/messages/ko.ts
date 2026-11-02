@@ -2,6 +2,7 @@ import type { Messages } from './en';
 
 export const messages: Messages = {
   common: {
+    retry: '다시 시도',
     appName: 'Podcst',
     version: '버전',
     madeBy: '제작:',

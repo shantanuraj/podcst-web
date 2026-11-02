@@ -1,5 +1,6 @@
 export const messages = {
   common: {
+    retry: 'Retry',
     appName: 'Podcst',
     version: 'Version',
     madeBy: 'Made by',

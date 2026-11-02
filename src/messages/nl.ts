@@ -2,6 +2,7 @@ import type { Messages } from './en';
 
 export const messages: Messages = {
   common: {
+    retry: 'Opnieuw proberen',
     appName: 'Podcst',
     version: 'Versie',
     madeBy: 'Gemaakt door',
