@@ -1,0 +1,47 @@
+name: Create iOS release tag
+
+run-name: Release ${{ inputs.tag }} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full commit SHA on main with passing CI
+        required: true
+        type: string
+      tag:
+        description: Release tag matching the app version (ios-1.0 or ios-1.0-rc.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release-tags
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Validate candidate and create tag
+    if: github.repository == 'shantanuraj/podcst-web' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create immutable release tag
+        uses: actions/github-script@v8
+        env:
+          RELEASE_COMMIT: ${{ inputs.commit }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { createIOSReleaseTag } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/create-ios-release-tag.mjs`).href);
+            await createIOSReleaseTag({ github, context, core });
