@@ -27,10 +27,13 @@ export const PlayButton = memo(
     { episode, icon, label, ...props },
     ref,
   ) {
+    const { t } = useTranslation();
     const withAccount = useAccountPlayback();
     const state = usePlayer(getPlaybackState);
     const isCurrentEpisode = usePlayer(
-      useCallback(selectIsCurrentEpisode(episode), []),
+      (playerState) =>
+        sameEpisode(getCurrentEpisode(playerState), episode) &&
+        playerState.state !== 'idle',
     );
     const isPlaying =
       isCurrentEpisode && (state === 'playing' || state === 'buffering');
@@ -39,7 +42,6 @@ export const PlayButton = memo(
     const resume = usePlayer(selectResume);
     const pause = usePlayer(selectPause);
 
-    const children = icon ? PlayButtonIconContent : PlayButtonContent;
     const className =
       `${props.className || ''} ${icon ? styles.withIcon : ''}`.trim();
 
@@ -64,16 +66,11 @@ export const PlayButton = memo(
         data-is-current={isCurrentEpisode}
         data-variant="primary"
       >
-        {icon ? (
-          children({ isCurrentEpisode, isPlaying })
-        ) : (
-          <>
-            <Icon icon={isPlaying ? 'pause' : 'play'} size={16} />
-            {isCurrentEpisode || !label
-              ? children({ isCurrentEpisode, isPlaying })
-              : label}
-          </>
-        )}
+        <Icon icon={isPlaying ? 'pause' : 'play'} size={icon ? 30 : 16} />
+        {!icon &&
+          (isCurrentEpisode
+            ? t(isPlaying ? 'player.pause' : 'player.resume')
+            : label || t('player.play'))}
       </Button>
     );
   }),
@@ -81,35 +78,6 @@ export const PlayButton = memo(
 
 PlayButton.displayName = 'PlayButton';
 
-const PlayButtonContent = (props: {
-  isCurrentEpisode: boolean;
-  isPlaying: boolean;
-}) => {
-  const { t } = useTranslation();
-  const { isCurrentEpisode, isPlaying } = props;
-  return isCurrentEpisode
-    ? isPlaying
-      ? t('player.pause')
-      : t('player.resume')
-    : t('player.play');
-};
-
-const PlayButtonIconContent = ({
-  isCurrentEpisode,
-  isPlaying,
-}: {
-  isCurrentEpisode: boolean;
-  isPlaying: boolean;
-}) => {
-  return (
-    <Icon icon={isCurrentEpisode && isPlaying ? 'pause' : 'play'} size={30} />
-  );
-};
-
-const selectIsCurrentEpisode =
-  (episode: IEpisodeInfo) => (playerState: IPlayerState) =>
-    sameEpisode(getCurrentEpisode(playerState), episode) &&
-    playerState.state !== 'idle';
 const selectPlay = (playerState: IPlayerState) => playerState.playEpisode;
 const selectResume = (playerState: IPlayerState) => playerState.resumeEpisode;
 const selectPause = (playerState: IPlayerState) => playerState.pause;

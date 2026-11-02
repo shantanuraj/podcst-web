@@ -11,11 +11,13 @@ interface BrowserResult {
 export async function runBrowserFixture({
   chrome,
   entrypoint,
+  development = false,
   headers,
   fetch,
 }: {
   chrome: string;
   entrypoint: URL;
+  development?: boolean;
   headers?: Record<string, string>;
   fetch: (
     request: Request,
@@ -24,7 +26,12 @@ export async function runBrowserFixture({
   const build = await Bun.build({
     entrypoints: [entrypoint.pathname],
     target: 'browser',
-    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+    define: {
+      'process.env': '{}',
+      'process.env.NODE_ENV': JSON.stringify(
+        development ? 'development' : 'production',
+      ),
+    },
   });
   if (!build.success) throw new Error(build.logs.join('\n'));
   const javascript = await build.outputs[0].text();
