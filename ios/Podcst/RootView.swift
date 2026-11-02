@@ -381,14 +381,9 @@ struct AccountButton: View {
         Button {
             showingSettings = true
         } label: {
-            Image(systemName: "person")
-                .font(.sans(.subheadline).weight(.semibold))
-                .foregroundStyle(PodcstPalette.secondary)
-                .frame(width: 36, height: 36)
-                .background(PodcstPalette.surface, in: Circle())
+            Label("Account and settings", systemImage: "person")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Account and settings")
+        .labelStyle(.iconOnly)
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }

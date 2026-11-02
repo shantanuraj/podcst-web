@@ -83,7 +83,51 @@ struct NowPlayingView: View {
     }
 }
 
+private struct PlayerLayout<Artwork: View, Controls: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ViewBuilder let artwork: Artwork
+    @ViewBuilder let controls: Controls
+
+    var body: some View {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 640 && geometry.size.width > geometry.size.height && !dynamicTypeSize.isAccessibilitySize
+            let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 26))
+            ScrollView {
+                layout {
+                    artwork
+                        .frame(maxWidth: 300)
+                        .frame(maxWidth: .infinity)
+                    controls
+                        .frame(maxWidth: 480)
+                        .frame(maxWidth: .infinity)
+                }
+                .frame(maxWidth: 900, minHeight: max(0, geometry.size.height - 12))
+                .padding(.horizontal, 28)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+}
+
 private struct FullPlayer: View {
+    @Environment(PlaybackController.self) private var playback
+    let episode: Episode
+    let panels: [PlayerPanel]
+    let open: (PlayerPanel) -> Void
+
+    var body: some View {
+        PlayerLayout {
+            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), chapterArtwork: playback.currentChapterArtwork)
+                .shadow(color: .black.opacity(0.4), radius: 30, y: 22)
+        } controls: {
+            FullPlayerControls(episode: episode, panels: panels, open: open)
+        }
+    }
+}
+
+private struct FullPlayerControls: View {
     @Environment(PlaybackController.self) private var playback
     @GestureState private var holdingTitle = false
     let episode: Episode
@@ -93,11 +137,6 @@ private struct FullPlayer: View {
     var body: some View {
         let chapters = playback.chapters
         VStack(spacing: 0) {
-            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), chapterArtwork: playback.currentChapterArtwork)
-                .frame(maxWidth: 300)
-                .shadow(color: .black.opacity(0.4), radius: 30, y: 22)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 140)
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     if let index = playback.currentChapterIndex {
@@ -129,7 +168,6 @@ private struct FullPlayer: View {
                 }
                 .padding(.top, playback.currentChapterIndex == nil ? 2 : 14)
             }
-            .padding(.top, 26)
             SeekBar()
                 .padding(.top, 20)
             Transport()
@@ -145,9 +183,7 @@ private struct FullPlayer: View {
                     if value.translation.height < -30, let first = panels.first { open(first) }
                 }
             )
-            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 28)
         .onChange(of: holdingTitle) { _, holding in
             playback.holdDoubleSpeed(holding)
         }
@@ -156,23 +192,35 @@ private struct FullPlayer: View {
 
 private struct ClipPlayer: View {
     @Environment(PlaybackController.self) private var playback
+    let episode: Episode
+    let clip: Clip
+
+    var body: some View {
+        PlayerLayout {
+            VStack(spacing: 18) {
+                Text(clip.chapter == nil ? "Shared clip" : "Shared chapter")
+                    .eyebrow(PodcstPalette.accent)
+                    .padding(.horizontal, 10)
+                    .frame(height: 26)
+                    .background(PodcstPalette.accent.opacity(0.18), in: Capsule())
+                ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), chapterArtwork: playback.currentChapterArtwork)
+                    .frame(maxWidth: 270)
+                    .shadow(color: .black.opacity(0.4), radius: 30, y: 22)
+            }
+        } controls: {
+            ClipPlayerControls(episode: episode, clip: clip)
+        }
+    }
+}
+
+private struct ClipPlayerControls: View {
+    @Environment(PlaybackController.self) private var playback
     @Environment(LibraryStore.self) private var library
     let episode: Episode
     let clip: Clip
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(clip.chapter == nil ? "Shared clip" : "Shared chapter")
-                .eyebrow(PodcstPalette.accent)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
-                .background(PodcstPalette.accent.opacity(0.18), in: Capsule())
-            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), chapterArtwork: playback.currentChapterArtwork)
-                .frame(maxWidth: 270)
-                .shadow(color: .black.opacity(0.4), radius: 30, y: 22)
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-                .frame(minHeight: 140)
             VStack(alignment: .leading, spacing: 4) {
                 Text(episode.title)
                     .font(.serif(.title2))
@@ -184,7 +232,6 @@ private struct ClipPlayer: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 26)
             if let number = clip.chapter {
                 Text("Chapter \(number) · \(playback.chapterTitle(number))")
                     .eyebrow(PodcstPalette.accent)
@@ -220,9 +267,7 @@ private struct ClipPlayer: View {
                         .buttonStyle(PodcstButtonStyle(kind: .surface))
                 }
             }
-            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 28)
     }
 }
 

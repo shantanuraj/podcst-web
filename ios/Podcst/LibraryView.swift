@@ -18,101 +18,103 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                LibraryLists()
-                if library.podcasts.contains(where: { $0.freshness?.state == .pending || $0.freshness?.content == .missing }) {
-                    Text("Preparing some episodes. Cached content and follows are retained.").font(.footnote)
-                    Button("Recheck episodes") { Task { feedWindow = Date(); await library.load() } }.font(.footnote)
-                }
-                if let error = library.syncError { Text(error).font(.footnote).foregroundStyle(.red).padding(.vertical, 8) }
-                else if library.syncBlocked { Text("Syncing is paused. Your saved changes are preserved.").font(.footnote) }
-                else if library.syncPending { Text("Changes pending sync").font(.footnote) }
-                if library.canUseSyncedState {
-                    Button("Use synced version") { showingSyncRecovery = true }.font(.footnote).disabled(playback.isPlaying || playback.isPlaybackRequested || playback.clip != nil)
-                }
-                if library.unresolvedCount > 0 { Text("\(library.unresolvedCount) legacy identities remain unresolved; original data is preserved.").font(.footnote) }
-                ForEach(library.durable.guestPositions, id: \.episodeId) { change in
-                    Button("Use guest position for episode \(change.episodeId.value)") {
-                        library.reapplyGuest(change)
-                    }.font(.footnote)
-                }
-                ForEach(Array(library.legacyProgress.enumerated()), id: \.offset) { _, update in
-                    Button("Reapply legacy position for episode \(update.episodeID) (\(update.position.formatted()))") { library.reapplyLegacy(update) }
-                        .font(.footnote)
-                }
-                if !library.durable.pendingImportFeeds.isEmpty {
-                    Button("Retry unresolved feed imports") { let activity = api.activityToken; let feeds = library.durable.pendingImportFeeds; Task { await library.importFeeds(feeds, expectedActivity: activity) } }.font(.footnote)
-                }
-                ForEach(library.durable.unresolvedGuest, id: \.identity) { podcast in
-                    Button("Resolve legacy follow: \(podcast.title)") { let activity = api.activityToken; Task { await library.importFeeds([podcast.feed], expectedActivity: activity) } }.font(.footnote)
-                }
-                ForEach(library.durable.failures, id: \.self) { Text($0).font(.footnote).foregroundStyle(.red) }
-                ForEach(Array(library.durable.unavailableIDs).sorted(), id: \.self) { id in
-                    Button("Unfollow unavailable podcast \(id)") {
-                        Task { await library.toggleSubscription(Podcast(id: id, feed: "", title: "Unavailable podcast")) }
-                    }.font(.footnote)
-                }
-                if library.podcasts.isEmpty {
-                    Group {
-                        if library.isLoading {
-                            ProgressView().tint(PodcstPalette.accent)
-                        } else {
-                            EmptyLibraryView(signedIn: session.user != nil) { showingLogin = true }
-                        }
+        GeometryReader { geometry in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    LibraryLists()
+                    if library.podcasts.contains(where: { $0.freshness?.state == .pending || $0.freshness?.content == .missing }) {
+                        Text("Preparing some episodes. Cached content and follows are retained.").font(.footnote)
+                        Button("Recheck episodes") { Task { feedWindow = Date(); await library.load() } }.font(.footnote)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
-                } else {
-                    if !continueAndNew.isEmpty {
-                        SectionHeader("Continue & new") {
-                            NavigationLink("See all", value: Route.releases)
-                                .font(.sans(.footnote).weight(.medium))
-                                .foregroundStyle(PodcstPalette.accent)
+                    if let error = library.syncError { Text(error).font(.footnote).foregroundStyle(.red).padding(.vertical, 8) }
+                    else if library.syncBlocked { Text("Syncing is paused. Your saved changes are preserved.").font(.footnote) }
+                    else if library.syncPending { Text("Changes pending sync").font(.footnote) }
+                    if library.canUseSyncedState {
+                        Button("Use synced version") { showingSyncRecovery = true }.font(.footnote).disabled(playback.isPlaying || playback.isPlaybackRequested || playback.clip != nil)
+                    }
+                    if library.unresolvedCount > 0 { Text("\(library.unresolvedCount) legacy identities remain unresolved; original data is preserved.").font(.footnote) }
+                    ForEach(library.durable.guestPositions, id: \.episodeId) { change in
+                        Button("Use guest position for episode \(change.episodeId.value)") {
+                            library.reapplyGuest(change)
+                        }.font(.footnote)
+                    }
+                    ForEach(Array(library.legacyProgress.enumerated()), id: \.offset) { _, update in
+                        Button("Reapply legacy position for episode \(update.episodeID) (\(update.position.formatted()))") { library.reapplyLegacy(update) }
+                            .font(.footnote)
+                    }
+                    if !library.durable.pendingImportFeeds.isEmpty {
+                        Button("Retry unresolved feed imports") { let activity = api.activityToken; let feeds = library.durable.pendingImportFeeds; Task { await library.importFeeds(feeds, expectedActivity: activity) } }.font(.footnote)
+                    }
+                    ForEach(library.durable.unresolvedGuest, id: \.identity) { podcast in
+                        Button("Resolve legacy follow: \(podcast.title)") { let activity = api.activityToken; Task { await library.importFeeds([podcast.feed], expectedActivity: activity) } }.font(.footnote)
+                    }
+                    ForEach(library.durable.failures, id: \.self) { Text($0).font(.footnote).foregroundStyle(.red) }
+                    ForEach(Array(library.durable.unavailableIDs).sorted(), id: \.self) { id in
+                        Button("Unfollow unavailable podcast \(id)") {
+                            Task { await library.toggleSubscription(Podcast(id: id, feed: "", title: "Unavailable podcast")) }
+                        }.font(.footnote)
+                    }
+                    if library.podcasts.isEmpty {
+                        Group {
+                            if library.isLoading {
+                                ProgressView().tint(PodcstPalette.accent)
+                            } else {
+                                EmptyLibraryView(signedIn: session.user != nil) { showingLogin = true }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                    } else {
+                        if !continueAndNew.isEmpty {
+                            SectionHeader("Continue & new") {
+                                NavigationLink("See all", value: Route.releases)
+                                    .font(.sans(.footnote).weight(.medium))
+                                    .foregroundStyle(PodcstPalette.accent)
+                            }
+                            .padding(.top, 22)
+                            ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
+                                EpisodeRow(episode: episode, context: .library)
+                            }
+                        }
+                        SectionHeader("Subscriptions") {
+                            Text(library.podcasts.count == 1 ? "1 show" : "\(library.podcasts.count) shows")
+                                .font(.sans(.footnote))
+                                .foregroundStyle(PodcstPalette.tertiary)
                         }
                         .padding(.top, 22)
-                        ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
-                            EpisodeRow(episode: episode, context: .library)
-                        }
-                    }
-                    SectionHeader("Subscriptions") {
-                        Text(library.podcasts.count == 1 ? "1 show" : "\(library.podcasts.count) shows")
-                            .font(.sans(.footnote))
-                            .foregroundStyle(PodcstPalette.tertiary)
-                    }
-                    .padding(.top, 22)
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
-                        ForEach(library.podcasts, id: \.identity) { podcast in
-                            NavigationLink(value: Route.podcast(podcast)) {
-                                ArtworkView(url: podcast.artworkURL)
+                        LazyVGrid(columns: columns(for: geometry.size.width - 40), spacing: 14) {
+                            ForEach(library.podcasts, id: \.identity) { podcast in
+                                NavigationLink(value: Route.podcast(podcast)) {
+                                    ArtworkView(url: podcast.artworkURL)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("\(podcast.title), \(podcast.author)")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("\(podcast.title), \(podcast.author)")
                         }
+                        .padding(.top, 14)
                     }
-                    .padding(.top, 14)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
-        }
-        .refreshable {
-            feedWindow = Date()
-            await library.load(forceRefresh: true)
-            await library.loadProgress(for: library.newReleases)
-        }
-        .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
-            if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
-        }
-        .task(id: "\(api.activityToken):\(scenePhase):\(library.podcasts.compactMap { $0.freshness?.retryAtMs }.min() ?? 0)") {
-            guard scenePhase == .active, let delay = library.podcasts.compactMap({ $0.freshness?.recheckDelay(startedAt: feedWindow) }).min() else { return }
-            do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() } catch { return }
-            await library.load()
+            .refreshable {
+                feedWindow = Date()
+                await library.load(forceRefresh: true)
+                await library.loadProgress(for: library.newReleases)
+            }
+            .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
+                if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
+            }
+            .task(id: "\(api.activityToken):\(scenePhase):\(library.podcasts.compactMap { $0.freshness?.retryAtMs }.min() ?? 0)") {
+                guard scenePhase == .active, let delay = library.podcasts.compactMap({ $0.freshness?.recheckDelay(startedAt: feedWindow) }).min() else { return }
+                do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() } catch { return }
+                await library.load()
+            }
         }
         .podcstPage()
         .screenHeader("Library") {
-            HStack(spacing: 14) {
+            Group {
                 if session.user == nil {
                     Button("Sign in") { showingLogin = true }
                         .font(.sans(.body).weight(.medium))
@@ -129,6 +131,13 @@ struct LibraryView: View {
         } message: {
             Text("Replace unsynced listening positions and subscription changes on this device with the versions saved to your account?")
         }
+    }
+
+    private func columns(for width: CGFloat) -> [GridItem] {
+        let count = width < 480
+            ? max(2, Int((width + 12) / 112))
+            : max(4, Int((width + 12) / 172) / 2 * 2)
+        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
     }
 }
 

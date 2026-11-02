@@ -344,20 +344,12 @@ private struct ScreenHeader<Trailing: View>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .navigationTitle(title)
-            .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                HStack {
-                    Text(title)
-                        .font(.serif(.largeTitle))
-                        .tracking(-0.8)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
                     trailing
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-                .background(PodcstPalette.paper)
             }
     }
 }

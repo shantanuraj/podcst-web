@@ -13,74 +13,81 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            CoverMosaic(podcasts: covers)
-            LinearGradient(
-                stops: [
-                    .init(color: PodcstPalette.paper.opacity(0), location: 0),
-                    .init(color: PodcstPalette.paper.opacity(0.55), location: 0.32),
-                    .init(color: PodcstPalette.paper, location: 0.52),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Podcst")
-                    .font(.custom(Typeface.serifItalic.name, fixedSize: 72))
-                    .tracking(-1.4)
-                Text("A beautiful way to discover and listen to podcasts")
-                    .font(.serif(.title3))
-                    .foregroundStyle(PodcstPalette.secondary)
-                    .frame(maxWidth: 280, alignment: .leading)
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Top charts from").eyebrow()
-                    Menu {
-                        Picker("Region", selection: $region) {
-                            ForEach(DiscoveryRegion.allCases) { option in
-                                Text(option.name).tag(option.rawValue)
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                CoverMosaic(podcasts: covers)
+                LinearGradient(
+                    stops: [
+                        .init(color: PodcstPalette.paper.opacity(0), location: 0),
+                        .init(color: PodcstPalette.paper.opacity(0.55), location: 0.32),
+                        .init(color: PodcstPalette.paper, location: 0.52),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("Podcst")
+                            .font(.custom(Typeface.serifItalic.name, fixedSize: 72))
+                            .tracking(-1.4)
+                        Text("A beautiful way to discover and listen to podcasts")
+                            .font(.serif(.title3))
+                            .foregroundStyle(PodcstPalette.secondary)
+                            .frame(maxWidth: 280, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Top charts from").eyebrow()
+                            Menu {
+                                Picker("Region", selection: $region) {
+                                    ForEach(DiscoveryRegion.allCases) { option in
+                                        Text(option.name).tag(option.rawValue)
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text(regionName)
+                                    Image(systemName: "chevron.down")
+                                        .font(.sans(.caption).weight(.bold))
+                                        .foregroundStyle(PodcstPalette.tertiary)
+                                }
+                                .font(.sans(.subheadline).weight(.medium))
+                                .foregroundStyle(PodcstPalette.ink)
+                                .padding(.leading, 14)
+                                .padding(.trailing, 12)
+                                .padding(.vertical, 8)
+                                .overlay { Capsule().strokeBorder(PodcstPalette.rule) }
                             }
+                            .accessibilityLabel("Chart region, \(regionName)")
                         }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(regionName)
-                            Image(systemName: "chevron.down")
-                                .font(.sans(.caption).weight(.bold))
-                                .foregroundStyle(PodcstPalette.tertiary)
+                        .padding(.top, 6)
+                        VStack(spacing: 10) {
+                            Button("Sign in with a passkey") {
+                                Task {
+                                    isWorking = true
+                                    await session.signInWithPasskey()
+                                    isWorking = false
+                                    if session.user != nil { finish() }
+                                }
+                            }
+                            .buttonStyle(PodcstButtonStyle(kind: .accent, height: 54))
+                            .disabled(isWorking)
+                            Button("Start listening", action: finish)
+                                .buttonStyle(PodcstButtonStyle(kind: .outline, height: 54))
                         }
-                        .font(.sans(.subheadline).weight(.medium))
-                        .foregroundStyle(PodcstPalette.ink)
-                        .padding(.leading, 14)
-                        .padding(.trailing, 12)
-                        .padding(.vertical, 8)
-                        .overlay { Capsule().strokeBorder(PodcstPalette.rule) }
+                        .padding(.top, 8)
+                        Text(session.error ?? "Subscriptions and playback progress follow you across devices.")
+                            .font(.sans(.caption))
+                            .foregroundStyle(session.error == nil ? PodcstPalette.tertiary : PodcstPalette.accent)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
                     }
-                    .accessibilityLabel("Chart region, \(regionName)")
+                    .frame(maxWidth: 480)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .bottomLeading)
                 }
-                .padding(.top, 6)
-                VStack(spacing: 10) {
-                    Button("Sign in with a passkey") {
-                        Task {
-                            isWorking = true
-                            await session.signInWithPasskey()
-                            isWorking = false
-                            if session.user != nil { finish() }
-                        }
-                    }
-                    .buttonStyle(PodcstButtonStyle(kind: .accent, height: 54))
-                    .disabled(isWorking)
-                    Button("Start listening", action: finish)
-                        .buttonStyle(PodcstButtonStyle(kind: .outline, height: 54))
-                }
-                .padding(.top, 8)
-                Text(session.error ?? "Subscriptions and playback progress follow you across devices.")
-                    .font(.sans(.caption))
-                    .foregroundStyle(session.error == nil ? PodcstPalette.tertiary : PodcstPalette.accent)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(.horizontal, 28)
-            .padding(.bottom, 20)
         }
         .background(PodcstPalette.paper)
         .foregroundStyle(PodcstPalette.ink)
