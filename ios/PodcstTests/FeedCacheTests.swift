@@ -17,7 +17,7 @@ final class FeedCacheTests: XCTestCase {
 
         XCTAssertEqual(pending.episodes.map(\.id), [1, 2, 3])
         XCTAssertEqual(pending.freshness?.state, .pending)
-        XCTAssertNil(pending.episodeStatusMessage)
+        XCTAssertFalse(pending.awaitsEpisodes)
         XCTAssertEqual(DetailURLProtocol.requests.last?.url?.path, "/api/feed/refresh")
         XCTAssertEqual(DetailURLProtocol.requests.last?.httpMethod, "POST")
         let body = try XCTUnwrap(DetailURLProtocol.requests.last?.httpBody)
@@ -73,7 +73,7 @@ final class FeedCacheTests: XCTestCase {
             let detail = try await makeAPI().detail(of: Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example"), recheck: true, refreshIfStale: true)
             XCTAssertEqual(detail.episodes.map(\.id), [1, 2, 3])
             XCTAssertEqual(detail.freshness?.state, .stale)
-            XCTAssertNil(detail.episodeStatusMessage)
+            XCTAssertFalse(detail.awaitsEpisodes)
             XCTAssertEqual(DetailURLProtocol.requests.filter { $0.httpMethod == "POST" }.count, 1)
         }
     }
@@ -102,7 +102,7 @@ final class FeedCacheTests: XCTestCase {
         let detail = try await makeAPI().detail(of: source, recheck: true, refreshIfStale: true)
         XCTAssertEqual(detail.episodes.map(\.guid), ["retained"])
         XCTAssertEqual(detail.episodeCount, 1)
-        XCTAssertNil(detail.episodeStatusMessage)
+        XCTAssertFalse(detail.awaitsEpisodes)
     }
 
     func testJoinedDetailReadRetainsEachCallersVisibleEpisodes() async throws {
@@ -142,7 +142,7 @@ final class FeedCacheTests: XCTestCase {
         XCTAssertTrue(firstResult.episodes.isEmpty)
         XCTAssertEqual(secondResult.episodes.map(\.guid), ["retained"])
         XCTAssertEqual(secondResult.episodeCount, 1)
-        XCTAssertNil(secondResult.episodeStatusMessage)
+        XCTAssertFalse(secondResult.awaitsEpisodes)
         XCTAssertEqual(DetailURLProtocol.requests.filter { $0.url?.path == "/api/feed/episodes" }.count, 1)
     }
 
@@ -151,12 +151,12 @@ final class FeedCacheTests: XCTestCase {
             for content in ["cached", "missing"] {
                 let freshness = try JSONDecoder().decode(FeedFreshness.self, from: JSONSerialization.data(withJSONObject: Self.freshness(state: state, content: content)))
                 var podcast = Podcast(id: 9001, feed: "https://example.com/feed.xml", title: "Example", episodes: [episode(guid: "playable")], freshness: freshness)
-                XCTAssertNil(podcast.episodeStatusMessage)
+                XCTAssertFalse(podcast.awaitsEpisodes)
                 podcast.episodes = []
                 if content == "missing" {
-                    XCTAssertNotNil(podcast.episodeStatusMessage)
+                    XCTAssertTrue(podcast.awaitsEpisodes)
                 } else {
-                    XCTAssertNil(podcast.episodeStatusMessage, "A successfully loaded empty feed needs no recovery warning")
+                    XCTAssertFalse(podcast.awaitsEpisodes, "A successfully loaded empty feed needs no recovery warning")
                 }
             }
         }

@@ -96,6 +96,17 @@ private struct StarScope: Codable {
         }
     }
 
+    mutating func adopt(_ next: StateScope, list: String) throws {
+        if let scope, scope != next {
+            guard scope.accountId == next.accountId, flight == nil, queued.isEmpty, (unresolved ?? []).isEmpty else { throw StarFailure.protocolViolation }
+            self = StarScope()
+        }
+        guard blocked == nil else { return }
+        guard listId == nil || listId == list else { throw StarFailure.protocolViolation }
+        scope = next
+        listId = list
+    }
+
     mutating func install(_ value: ListSnapshot) throws {
         guard value.scope == scope, value.scope != nil, value.listId == listId, let revision = try? StateRevision(value.revision).number,
               Set(value.items.map(\.episodeId)).count == value.items.count,
@@ -184,7 +195,7 @@ final class StarStore {
                 }
                 root = converted
             }
-        } catch { readable = false; ready = false; self.error = "Saved episodes could not be opened. Pending work has not been reset." }
+        } catch { readable = false; ready = false; self.error = "Starred episodes on this device couldn’t be opened. Nothing has been removed." }
         publish()
     }
 
@@ -200,7 +211,7 @@ final class StarStore {
     @discardableResult func toggle(_ episode: Episode) -> Bool { contains(episode) ? unstar(episode) : star(episode) }
 
     private func edit(_ id: Int?, _ op: ListChange.Operation, episode: Episode? = nil) -> Bool {
-        guard ready, let id, Self.validID(id), !(state.unresolved ?? []).contains(where: { $0.change.episodeId == id }) else { error = "A canonical episode ID and an active account scope are required."; return false }
+        guard ready, let id, Self.validID(id), !(state.unresolved ?? []).contains(where: { $0.change.episodeId == id }) else { error = "This episode can’t be starred right now."; return false }
         do {
             error = nil
             try update { state in
@@ -272,12 +283,17 @@ final class StarStore {
     private func publish() {
         stars = ready ? state.stars : []
         pending = accountID != nil && (state.flight != nil || !state.queued.isEmpty)
-        if state.blocked != nil { error = "Star sync needs attention. Pending edits have been kept." }
-        else if !(state.unresolved ?? []).isEmpty { error = "Legacy Starred identities are unresolved. Original data has been preserved." }
-        else if !state.failures.isEmpty { error = "\(state.failures.count) episode(s) could not be added." }
+        if state.blocked != nil { error = "Some starred changes couldn’t sync. They’re saved on this device." }
+        else if !(state.unresolved ?? []).isEmpty { error = "Some older starred episodes couldn’t be matched. They’re kept on this device." }
+        else if !state.failures.isEmpty { error = state.failures.count == 1 ? "1 episode couldn’t be starred because it’s no longer available." : "\(state.failures.count) episodes couldn’t be starred because they’re no longer available." }
     }
 
     func poll() async { if pending || now().timeIntervalSince(lastSync) >= 60 { await refresh() } }
+
+    func retry() async {
+        nextAttempt = .distantPast
+        await refresh()
+    }
 
     func refresh() async {
         guard let api, readable, !authenticationPaused, now() >= nextAttempt else { return }
@@ -301,15 +317,12 @@ final class StarStore {
                 try commit(next)
                 error = nil
                 publish()
-                guard state.blocked == nil else { return }
                 let catalogue = try await api.lists()
                 try check(token)
                 try catalogue.scope.validate(account: accountID)
-                guard state.scope == nil || state.scope == catalogue.scope,
-                      let list = catalogue.lists.first(where: { $0.kind == "starred" }),
-                      state.listId == nil || state.listId == list.id else { throw StarFailure.protocolViolation }
-                try update { $0.scope = catalogue.scope; $0.listId = list.id }
-                guard let id = state.listId else { throw StarFailure.protocolViolation }
+                guard let id = catalogue.lists.first(where: { $0.kind == "starred" })?.id else { throw StarFailure.protocolViolation }
+                try update { try $0.adopt(catalogue.scope, list: id) }
+                guard state.blocked == nil else { return }
                 repeat {
                     try check(token)
                     try update { try $0.freeze() }
@@ -346,6 +359,8 @@ final class StarStore {
                 attempts = 0
                 nextAttempt = .distantPast
                 lastSync = now()
+                error = nil
+                publish()
             } catch {
                 guard token == generation, !Task.isCancelled else { return }
                 if case StarFailure.protocolViolation = error { try? update { $0.blocked = 409 } }
@@ -358,7 +373,7 @@ final class StarStore {
                 }
                 attempts += 1
                 nextAttempt = now().addingTimeInterval(max((error as? APIError)?.retryAfter ?? 0, min(60, pow(2, Double(min(attempts, 6))))))
-                self.error = "Star sync paused. Changes remain saved on this device."
+                self.error = state.flight != nil || !state.queued.isEmpty ? "Couldn’t sync starred episodes. Your changes are saved on this device." : nil
                 publish()
             }
         }

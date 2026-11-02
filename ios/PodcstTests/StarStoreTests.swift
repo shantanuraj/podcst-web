@@ -369,6 +369,48 @@ final class StarStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: source), bytes)
     }
 
+    func testIdleBlockedStreamAdoptsRotatedGenerationWithoutUploading() async throws {
+        let api = StarServer()
+        let client = "2154eb51-18b8-4c52-9813-bd4f94b36065"
+        let archive: [String: Any] = [MediaKey.scope("owner"): [
+            "scope": ["protocol": 1, "accountId": "owner", "generation": "ca1593df-24f8-45fb-8b46-e9563a1ec1b2"],
+            "unresolved": [], "clientId": client, "sequence": 2, "listId": api.id,
+            "episodes": [:], "queued": [], "failures": [], "blocked": 409,
+        ]]
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: archive).write(to: directory.appendingPathComponent("lists-v1.json"))
+        api.members = ListSnapshot(listId: api.id, revision: "2", items: [
+            ListMembership(episodeId: 19302, addedAt: 2, availability: .available),
+            ListMembership(episodeId: 19311, addedAt: 1, availability: .available),
+        ])
+        let stars = StarStore(accountID: "owner", directory: directory, api: api)
+        XCTAssertNotNil(stars.error)
+        await stars.refresh()
+        XCTAssertNil(stars.error)
+        XCTAssertEqual(stars.stars.map(\.id), [19302, 19311])
+        XCTAssertEqual(stars.episodes.map(\.id), [19302, 19311])
+        XCTAssertTrue(api.sent.isEmpty)
+        XCTAssertTrue(stars.unstar(starEpisode(19311)))
+        await stars.refresh()
+        XCTAssertEqual(api.sent.map(\.sequence), ["1"])
+        XCTAssertNotEqual(api.sent.first?.clientId, client)
+        XCTAssertEqual(api.sent.first?.scope, api.scope)
+        XCTAssertEqual(StarStore(accountID: "owner", directory: directory).stars.map(\.id), [19302])
+    }
+
+    func testPendingWorkIsNotCarriedIntoARotatedGeneration() async {
+        let api = StarServer()
+        let stars = StarStore(accountID: "owner", directory: directory, api: api)
+        await stars.refresh()
+        api.generation = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        stars.star(starEpisode(1))
+        await stars.retry()
+        XCTAssertTrue(api.sent.isEmpty)
+        XCTAssertTrue(stars.pending)
+        XCTAssertNotNil(stars.error)
+        XCTAssertEqual(stars.stars.map(\.id), [1])
+    }
+
     func testCorruptOutboxIsNotSilentlyReset() throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("lists-v1.json")

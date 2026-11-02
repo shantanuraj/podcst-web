@@ -89,7 +89,7 @@ struct PodcastDetailView: View {
                             episodeFilter
                                 .frame(maxWidth: 240)
                         }
-                        if isLoading { ProgressView().controlSize(.small) }
+                        if isLoading, !content.episodes.isEmpty { ProgressView().controlSize(.small) }
                         Menu {
                             Picker("Order", selection: $newestFirst) {
                                 Text("Newest first").tag(true)
@@ -103,16 +103,20 @@ struct PodcastDetailView: View {
                     }
                 }
                 .id(showsHeader ? "podcast-episodes" : "podcast-top")
-                if !detailError || isRechecking, let message = content.episodeStatusMessage {
-                    VStack(alignment: .leading) {
-                        Text(message).font(.footnote)
-                        if !isRechecking && !isLoading {
-                            TimelineView(.periodic(from: .now, by: 1)) { context in
-                                Button("Retry") { readAttempt = UUID() }
-                                    .disabled(Double(content.freshness?.retryAtMs ?? 0) > context.date.timeIntervalSince1970 * 1000)
-                            }
+                if !detailError || isRechecking, content.awaitsEpisodes {
+                    if content.freshness?.state == .pending || isRechecking || isLoading {
+                        HStack(spacing: 10) {
+                            ProgressView().controlSize(.small)
+                            Text("Preparing episodes…")
                         }
-                    }.padding(.vertical, 12)
+                        .font(.sans(.subheadline))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
+                    } else {
+                        ErrorRow(message: "Episodes couldn’t be loaded right now.") { readAttempt = UUID() }
+                            .padding(.vertical, 12)
+                    }
                 }
                 if detailError && content.episodes.isEmpty && !isRechecking {
                     ErrorRow(message: "Couldn't load episodes.") {
@@ -127,7 +131,7 @@ struct PodcastDetailView: View {
                         EpisodeRow(episode: episode, showsSummary: wide)
                             .id(episode.identity)
                     }
-                } else if isLoading {
+                } else if isLoading, !content.awaitsEpisodes {
                     ProgressView().frame(maxWidth: .infinity).padding(30)
                 } else if !detailError && content.freshness?.content != .missing {
                     Text("No episodes available.")

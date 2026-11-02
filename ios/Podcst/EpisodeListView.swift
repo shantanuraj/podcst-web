@@ -65,10 +65,18 @@ struct EpisodeListView: View {
                 }
                 .padding(.top, 6)
                 if list == .starred {
-                    if let error = stars.error { Text(error).font(.sans(.footnote)).accessibilityAddTraits(.updatesFrequently) }
-                    else if stars.pending { Text("Saved on this device. Waiting to sync…").font(.sans(.footnote)) }
+                    if let error = stars.error {
+                        ErrorRow(message: error) { feedWindow = Date(); await stars.retry() }
+                            .padding(.top, 16)
+                            .accessibilityAddTraits(.updatesFrequently)
+                    } else if stars.pending {
+                        Text("Saved on this device. Waiting to sync…")
+                            .font(.sans(.footnote))
+                            .foregroundStyle(PodcstPalette.tertiary)
+                            .padding(.top, 12)
+                    }
                     if stars.stars.contains(where: { $0.freshness?.content == .missing }) {
-                        Button("Retry episode content") { Task { feedWindow = Date(); await stars.refresh() } }.font(.footnote)
+                        Button("Retry episode content") { Task { feedWindow = Date(); await stars.retry() } }.font(.footnote)
                     }
                     ForEach(stars.stars.filter { $0.episode == nil }) { star in
                         HStack {
@@ -105,7 +113,7 @@ struct EpisodeListView: View {
         } action: { _, visible in
             withAnimation(.easeInOut(duration: 0.2)) { titleVisible = visible }
         }
-        .refreshable { if list == .starred { feedWindow = Date(); await stars.refresh() } }
+        .refreshable { if list == .starred { feedWindow = Date(); await stars.retry() } }
         .task { if list == .starred { await stars.refresh() } }
         .task(id: "\(api.activityToken):\(scenePhase):\(stars.stars.compactMap { $0.freshness?.retryAtMs }.min() ?? 0)") {
             guard list == .starred, scenePhase == .active, let delay = stars.stars.compactMap({ $0.freshness?.recheckDelay(startedAt: feedWindow) }).min() else { return }
