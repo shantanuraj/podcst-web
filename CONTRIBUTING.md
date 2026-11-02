@@ -26,6 +26,20 @@ WEBAUTHN_RP_ID=localhost
 WEBAUTHN_RP_ORIGIN=http://localhost:3000
 ```
 
+Generate a local-only secret once, appending it to `.env.local`:
+
+```sh
+printf 'AUTH_CODE_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env.local
+```
+
+Redis and `AUTH_CODE_SECRET` are required for new podcast imports and refresh
+admission, including anonymous Apple podcast links, not just authentication.
+Check that your local Redis responds with `PONG` before starting the app:
+
+```sh
+redis-cli -h localhost -p 6379 ping
+```
+
 Set `RESEND_API_KEY` if you want to test email verification. Never use production
 credentials or data for local development.
 
