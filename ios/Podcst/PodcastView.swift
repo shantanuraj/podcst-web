@@ -223,6 +223,7 @@ private struct RelatedPodcastsView: View {
             Text("Listeners also follow")
                 .eyebrow()
                 .accessibilityAddTraits(.isHeader)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 12)
                 .hairline()
             ForEach(podcasts, id: \.identity) { podcast in
