@@ -3,6 +3,7 @@ package app.podcst.artwork
 import android.content.Context
 import android.util.LruCache
 import app.podcst.model.Artwork
+import app.podcst.model.PlaybackRules
 import coil3.ImageLoader
 import coil3.disk.DiskCache
 import coil3.disk.directory
@@ -17,15 +18,21 @@ import coil3.request.ImageResult
 import coil3.request.Options
 import coil3.request.crossfade
 import java.io.File
+import java.net.URI
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -44,6 +51,9 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
     private var retention: Job? = null
     private val requests = mutableMapOf<Job, String>()
     private val metadata = LruCache<String, ArtworkMetadata>(64)
+    private val metadataProbes = LruCache<String, Boolean>(64)
+    private val metadataLocks = LruCache<String, Mutex>(64)
+    private val metadataClient = client.newBuilder().callTimeout(2, TimeUnit.SECONDS).build()
 
     val loader: ImageLoader = ImageLoader.Builder(context)
         .memoryCache { MemoryCache.Builder().maxSizeBytes(MEMORY).build() }
@@ -78,6 +88,7 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         if (previous != directory && previous.name != GUEST) previous.deleteRecursively()
         loader.memoryCache?.clear()
         metadata.evictAll()
+        metadataProbes.evictAll()
     }
 
     suspend fun erase(scope: String) = withContext(Dispatchers.IO) {
@@ -89,6 +100,7 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
         check(!target.exists() || target.deleteRecursively()) { "Unable to remove account artwork" }
         loader.memoryCache?.let { cache -> cache.keys.filter { it.key.startsWith("$scope:") }.forEach { cache.remove(it) } }
         metadata.snapshot().keys.filter { it.startsWith("$scope:") }.forEach(metadata::remove)
+        metadataProbes.snapshot().keys.filter { it.startsWith(target.path + "/") }.forEach(metadataProbes::remove)
         check(unscoped.all { it.listFiles().isNullOrEmpty() }) { "Older caches have no account owner. Cleanup remains incomplete. Clear the app's storage in Android system settings to remove all local copies, including other accounts and guest data." }
     }
 
@@ -100,11 +112,43 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
                 partial.outputStream().use { response.body.byteStream().copyTo(it) }
                 if (partial.renameTo(file)) {
                     val colors = ArtworkColors.fromHeaders(response.header("X-Artwork-Tint-Light"), response.header("X-Artwork-Tint-Dark"))
-                    if (colors != null) File(file.path + ".tint").writeText(colors.encoded())
+                    File(file.path + ".tint").writeText(colors?.encoded() ?: "none")
                 }
             }
         }
         partial.delete()
+    }
+
+    private suspend fun retainedColors(source: String, file: File): ArtworkColors? {
+        val lock = synchronized(metadataLocks) { metadataLocks.get(file.path) ?: Mutex().also { metadataLocks.put(file.path, it) } }
+        return lock.withLock { probeRetainedColors(source, file) }
+    }
+
+    private suspend fun probeRetainedColors(source: String, file: File): ArtworkColors? {
+        val sidecar = File(file.path + ".tint")
+        if (sidecar.exists()) return runCatching { ArtworkColors.decode(sidecar.readText()) }.getOrNull()
+        if (runCatching { URI(source).host }.getOrNull() != PlaybackRules.ARTWORK_HOST) return null
+        val probe = synchronized(metadataProbes) {
+            if (metadataProbes.get(file.path) == true) false else true.also { metadataProbes.put(file.path, true) }
+        }
+        if (!probe) return null
+        return transfers.withPermit {
+            val context = currentCoroutineContext()
+            try {
+                runCatching {
+                    metadataClient.newCall(Request.Builder().url(Artwork.url(source, 160)).head().build()).execute().use { response ->
+                        context.ensureActive()
+                        if (!response.isSuccessful) return@use null
+                        val colors = ArtworkColors.fromHeaders(response.header("X-Artwork-Tint-Light"), response.header("X-Artwork-Tint-Dark"))
+                        if (file.exists()) sidecar.writeText(colors?.encoded() ?: "none")
+                        colors
+                    }
+                }.getOrNull().also { context.ensureActive() }
+            } catch (cancelled: CancellationException) {
+                metadataProbes.remove(file.path)
+                throw cancelled
+            }
+        }
     }
 
     private inner class RetainedInterceptor : Interceptor {
@@ -118,9 +162,7 @@ class ArtworkStore(context: Context, private val client: OkHttpClient, scope: St
                 val retained = File(target, name(Artwork.canonical(data))).takeIf(File::exists)
                 val key = "$scope:${name(data)}"
                 val tint = metadata.get(key) ?: withContext(Dispatchers.IO) {
-                    ArtworkMetadata(retained?.let { file ->
-                        runCatching { ArtworkColors.decode(File(file.path + ".tint").readText()) }.getOrNull()
-                    }).also { metadata.put(key, it) }
+                    ArtworkMetadata(retained?.let { retainedColors(data, it) }).also { metadata.put(key, it) }
                 }
                 val request = chain.request.newBuilder()
                     .data(retained ?: data)
