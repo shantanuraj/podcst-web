@@ -90,6 +90,31 @@ foreground automatic rechecks stop after the bounded window, on navigation or
 scope/intent changes. Offer Retry without discarding data. Delayed link results
 cannot autoplay after a newer intent or change progress/completion implicitly.
 
+### Incremental podcast detail
+
+Opening a podcast must not wait for its entire episode archive. Metadata and a
+bounded first episode page are independent reads. Native detail screens can show
+either result as it arrives; web rendering retains the first page in server-rendered
+HTML. Older pages load on demand. Latest always refers to the newest playable
+episode, independently of the episode list's search and sort order.
+
+Search and sorting apply to the full accessible server catalogue through
+`GET /api/feed/episodes`, not just the rows already downloaded. A cursor belongs
+to its podcast, account scope, search and sort selection. Changing any of these
+retires older requests; a late response cannot replace or append to the new list.
+Deduplicate episode identities across offset pages and prevent concurrent requests
+for the same next page. A failed next page retains existing rows and offers an
+explicit retry instead of repeatedly loading through a visibility observer.
+
+Partial detail pages are not complete catalogue snapshots. They cannot remove
+older cached episodes or satisfy callers that explicitly need the whole archive.
+Persisted first-page caches retain their query and completeness provenance so
+offline reopening can show saved episodes without mistaking arbitrary search
+results for Latest. Caches remain account-scoped, and unavailable private data is
+removed from detail caches when access is revoked. Refresh admission and
+subsequent polling run after available content is presented; a refresh failure
+does not discard authorized cached content.
+
 This contract does not change server chapter caching, media persistence, deletion
 policy or durable-state recovery generations. HTTP/client activation must be
 coordinated; foundation fixtures alone are not an activated endpoint contract.
