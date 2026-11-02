@@ -210,8 +210,18 @@ private struct Callout<S: InsettableShape>: ViewModifier {
 enum PodcstAppearance {
     static func configure() {
         let bar = UINavigationBar.appearance()
-        bar.largeTitleTextAttributes = [.font: UIFont.podcst(.serif, .largeTitle), .kern: -0.6]
-        bar.titleTextAttributes = [.font: UIFont.podcst(.serif, .headline)]
+        let standard = UINavigationBarAppearance()
+        standard.backgroundColor = UIColor(PodcstPalette.paper)
+        let scrollEdge = UINavigationBarAppearance()
+        scrollEdge.configureWithTransparentBackground()
+        for appearance in [standard, scrollEdge] {
+            appearance.largeTitleTextAttributes = [.font: UIFont.podcst(.serif, .largeTitle), .kern: -0.6]
+            appearance.titleTextAttributes = [.font: UIFont.podcst(.serif, .headline)]
+        }
+        bar.standardAppearance = standard
+        bar.compactAppearance = standard
+        bar.scrollEdgeAppearance = scrollEdge
+        bar.compactScrollEdgeAppearance = scrollEdge
         UIBarButtonItem.appearance().setTitleTextAttributes([.font: UIFont.podcst(.sans, .body)], for: .normal)
     }
 }
