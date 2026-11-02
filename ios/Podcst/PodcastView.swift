@@ -21,8 +21,16 @@ struct PodcastDetailView: View {
     @State private var recheckOwner = UUID()
     @State private var isRechecking = false
     @State private var episodePosition: String? = "podcast-top"
+    @State private var recommendations: (key: String, podcasts: [Podcast])?
+    @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
 
     private var content: Podcast { detail ?? podcast }
+
+    private var relatedKey: String { "\(content.identity):\(content.isPrivate == true):\(region):\(api.activityToken)" }
+
+    private var relatedPodcasts: [Podcast] {
+        recommendations?.key == relatedKey ? recommendations?.podcasts ?? [] : []
+    }
 
     private var episodes: [Episode] {
         let sorted = content.episodes.sorted {
@@ -36,6 +44,7 @@ struct PodcastDetailView: View {
     var body: some View {
         GeometryReader { geometry in
             let wide = sizeClass == .regular && geometry.size.width >= 700 && !typeSize.isAccessibilitySize
+            let columnWidth = wide && geometry.size.width >= 820 ? min(300, (geometry.size.width - 72) * 0.3) : nil
             Group {
                 if #available(iOS 27.1, *), geometry.hasInteriorFold {
                     ArrangementView {
@@ -45,12 +54,12 @@ struct PodcastDetailView: View {
                         }
                         .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: 180, headerHeight: 360))
                     } secondary: {
-                        episodeScroll(wide: false, showsHeader: false, aboutWidth: nil)
+                        episodeScroll(wide: false, showsHeader: false, aboutWidth: nil, relatedWidth: nil)
                             .podcstPage()
                     }
                     .arrangementViewStyle(.split)
                 } else {
-                    episodeScroll(wide: wide, showsHeader: true, aboutWidth: wide && geometry.size.width >= 820 ? min(300, (geometry.size.width - 72) * 0.3) : nil)
+                    episodeScroll(wide: wide, showsHeader: true, aboutWidth: columnWidth, relatedWidth: relatedPodcasts.isEmpty ? nil : columnWidth)
                         .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: 180, headerHeight: wide ? 300 : 360))
                 }
             }
@@ -58,6 +67,15 @@ struct PodcastDetailView: View {
         }
         .navigationTitle(titleVisible ? content.title : "")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: relatedKey) {
+            let key = relatedKey
+            guard recommendations?.key != key else { return }
+            recommendations = nil
+            guard let id = content.id, id > 0, content.isPrivate != true else { return }
+            guard let podcasts = try? await api.related(podcastID: id, locale: region) else { return }
+            guard !Task.isCancelled, relatedKey == key else { return }
+            recommendations = (key, podcasts)
+        }
         .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt)") {
             guard scenePhase == .active else { return }
             let owner = UUID()
@@ -75,71 +93,83 @@ struct PodcastDetailView: View {
         }
     }
 
-    private func episodeScroll(wide: Bool, showsHeader: Bool, aboutWidth: CGFloat?) -> some View {
+    private func episodeScroll(wide: Bool, showsHeader: Bool, aboutWidth: CGFloat?, relatedWidth: CGFloat?) -> some View {
         AnchoredScroll(position: $episodePosition) {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 if showsHeader {
-                    PodcastHeader(podcast: content, latest: episodes.first, wide: wide, aboutWidth: aboutWidth, expanded: $expanded)
-                        .padding(.bottom, 28)
-                        .id("podcast-top")
+                    VStack {
+                        PodcastHeader(podcast: content, latest: episodes.first, wide: wide, aboutWidth: aboutWidth, expanded: $expanded)
+                            .padding(.bottom, 28)
+                            .id("podcast-top")
+                    }
+                    .scrollTargetLayout()
                 }
-                SectionHeader("Episodes") {
-                    HStack(spacing: 14) {
-                        if wide, content.episodes.count > 10 {
-                            episodeFilter
-                                .frame(maxWidth: 240)
-                        }
-                        if isLoading, !content.episodes.isEmpty { ProgressView().controlSize(.small) }
-                        Menu {
-                            Picker("Order", selection: $newestFirst) {
-                                Text("Newest first").tag(true)
-                                Text("Oldest first").tag(false)
+                HStack(alignment: .top, spacing: 32) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        SectionHeader("Episodes") {
+                            HStack(spacing: 14) {
+                                if wide, relatedWidth == nil, content.episodes.count > 10 {
+                                    episodeFilter
+                                        .frame(maxWidth: 240)
+                                }
+                                if isLoading, !content.episodes.isEmpty { ProgressView().controlSize(.small) }
+                                Menu {
+                                    Picker("Order", selection: $newestFirst) {
+                                        Text("Newest first").tag(true)
+                                        Text("Oldest first").tag(false)
+                                    }
+                                } label: {
+                                    Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
+                                        .font(.sans(.footnote))
+                                        .foregroundStyle(PodcstPalette.tertiary)
+                                }
                             }
-                        } label: {
-                            Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
-                                .font(.sans(.footnote))
-                                .foregroundStyle(PodcstPalette.tertiary)
+                        }
+                        .id(showsHeader ? "podcast-episodes" : "podcast-top")
+                        if !detailError || isRechecking, content.awaitsEpisodes {
+                            if content.freshness?.state == .pending || isRechecking || isLoading {
+                                HStack(spacing: 10) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Preparing episodes…")
+                                }
+                                .font(.sans(.subheadline))
+                                .foregroundStyle(PodcstPalette.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 30)
+                            } else {
+                                ErrorRow(message: "Episodes couldn’t be loaded right now.") { readAttempt = UUID() }
+                                    .padding(.vertical, 12)
+                            }
+                        }
+                        if detailError && content.episodes.isEmpty && !isRechecking {
+                            ErrorRow(message: "Couldn't load episodes.") {
+                                await loadDetails(forceRefresh: true)
+                            }
+                        }
+                        if !wide || relatedWidth != nil, content.episodes.count > 10 {
+                            episodeFilter.padding(.vertical, 12)
+                        }
+                        if !content.episodes.isEmpty {
+                            ForEach(episodes, id: \.identity) { episode in
+                                EpisodeRow(episode: episode, showsSummary: wide)
+                                    .id(episode.identity)
+                            }
+                        } else if isLoading, !content.awaitsEpisodes {
+                            ProgressView().frame(maxWidth: .infinity).padding(30)
+                        } else if !detailError && content.freshness?.content != .missing {
+                            Text("No episodes available.")
+                                .foregroundStyle(PodcstPalette.secondary)
+                                .padding(.vertical, 20)
                         }
                     }
-                }
-                .id(showsHeader ? "podcast-episodes" : "podcast-top")
-                if !detailError || isRechecking, content.awaitsEpisodes {
-                    if content.freshness?.state == .pending || isRechecking || isLoading {
-                        HStack(spacing: 10) {
-                            ProgressView().controlSize(.small)
-                            Text("Preparing episodes…")
-                        }
-                        .font(.sans(.subheadline))
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 30)
-                    } else {
-                        ErrorRow(message: "Episodes couldn’t be loaded right now.") { readAttempt = UUID() }
-                            .padding(.vertical, 12)
+                    .scrollTargetLayout()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if let relatedWidth {
+                        RelatedPodcastsView(podcasts: relatedPodcasts)
+                            .frame(width: relatedWidth)
                     }
-                }
-                if detailError && content.episodes.isEmpty && !isRechecking {
-                    ErrorRow(message: "Couldn't load episodes.") {
-                        await loadDetails(forceRefresh: true)
-                    }
-                }
-                if !wide, content.episodes.count > 10 {
-                    episodeFilter.padding(.vertical, 12)
-                }
-                if !content.episodes.isEmpty {
-                    ForEach(episodes, id: \.identity) { episode in
-                        EpisodeRow(episode: episode, showsSummary: wide)
-                            .id(episode.identity)
-                    }
-                } else if isLoading, !content.awaitsEpisodes {
-                    ProgressView().frame(maxWidth: .infinity).padding(30)
-                } else if !detailError && content.freshness?.content != .missing {
-                    Text("No episodes available.")
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .padding(.vertical, 20)
                 }
             }
-            .scrollTargetLayout()
             .frame(maxWidth: 1100)
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -181,6 +211,23 @@ struct PodcastDetailView: View {
                 detail = Podcast(id: source.id, feed: "", title: "Podcast unavailable", isPrivate: source.isPrivate ?? false)
             }
             detailError = true
+        }
+    }
+}
+
+private struct RelatedPodcastsView: View {
+    let podcasts: [Podcast]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Listeners also follow")
+                .eyebrow()
+                .accessibilityAddTraits(.isHeader)
+                .padding(.bottom, 12)
+                .hairline()
+            ForEach(podcasts, id: \.identity) { podcast in
+                PodcastRow(podcast: podcast)
+            }
         }
     }
 }

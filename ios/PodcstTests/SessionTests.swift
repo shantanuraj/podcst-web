@@ -6,6 +6,91 @@ import XCTest
 @testable import Podcst
 
 @MainActor
+final class RelatedPodcastsAPITests: XCTestCase {
+    func testReadsPublicRecommendationsWithExactCanonicalIdentitiesAndArtwork() async throws {
+        for signedIn in [false, true] {
+            let (api, credentials) = fixture(signedIn: signedIn)
+            defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+            GuestLibraryURLProtocol.handler = { pending in
+                XCTAssertEqual(pending.request.url?.path, "/api/feed/related")
+                XCTAssertEqual(pending.request.httpMethod, "GET")
+                let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(pending.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+                XCTAssertEqual(query, [URLQueryItem(name: "id", value: "9223372036854775807"), URLQueryItem(name: "locale", value: "nl")])
+                XCTAssertNil(pending.request.value(forHTTPHeaderField: "Cookie"))
+                XCTAssertFalse(pending.request.httpShouldHandleCookies)
+                let body = #"[{"id":"9007199254740993","itunes_id":"123","feed":"https://example.test/first.xml","title":"First show","author":"First author","cover":"https://example.test/first.jpg","thumbnail":"https://example.test/first-small.jpg","categories":[],"explicit":"explicit","count":27,"genre":{"id":1526,"name":"Daily News"},"category":{"id":1489,"name":"News"}},{"id":"9007199254740994","feed":"https://example.test/second.xml","title":"Second show","author":"Second author","cover":"https://example.test/second.jpg","thumbnail":null,"categories":[],"explicit":"notExplicit","count":8}]"#
+                pending.complete(.success((Data(body.utf8), ["Set-Cookie": "session=unexpected-session; Path=/; HttpOnly"])))
+            }
+
+            let podcasts = try await api.related(podcastID: Int.max, locale: "nl")
+
+            XCTAssertEqual(podcasts.compactMap(\.id), [9_007_199_254_740_993, 9_007_199_254_740_994])
+            XCTAssertEqual(podcasts.map(\.title), ["First show", "Second show"])
+            XCTAssertEqual(podcasts.map(\.author), ["First author", "Second author"])
+            XCTAssertEqual(podcasts.map(\.feed), ["https://example.test/first.xml", "https://example.test/second.xml"])
+            XCTAssertEqual(podcasts.map(\.thumbnail), ["https://example.test/first-small.jpg", "https://example.test/second.jpg"])
+            XCTAssertEqual(podcasts.map(\.episodeCount), [27, 8])
+            XCTAssertEqual(podcasts.map(\.explicit), [true, false])
+            XCTAssertTrue(podcasts.allSatisfy { $0.episodes.isEmpty && $0.freshness == nil && $0.isPrivate != true })
+            XCTAssertEqual(credentials.read(), signedIn ? "listener-session" : nil)
+        }
+    }
+
+    func testEmptyRecommendationsAndTransportErrorsRemainDistinct() async throws {
+        let (api, _) = fixture()
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { pending in
+            pending.complete(.success((Data("[]".utf8), [:])))
+        }
+        let empty = try await api.related(podcastID: 42)
+        XCTAssertTrue(empty.isEmpty)
+
+        GuestLibraryURLProtocol.handler = { pending in pending.fail(URLError(.notConnectedToInternet)) }
+        do {
+            _ = try await api.related(podcastID: 42)
+            XCTFail("Transport failures must remain available to the caller")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .notConnectedToInternet)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SessionURLProtocol.self]
+        let failing = APIClient(baseURL: URL(string: "https://status-401.example.test")!, session: URLSession(configuration: configuration), keychain: MemorySessionCredentials())
+        do {
+            _ = try await failing.related(podcastID: 42)
+            XCTFail("HTTP failures must retain their status and message")
+        } catch {
+            XCTAssertEqual((error as? APIError)?.statusCode, 401)
+            XCTAssertEqual((error as? APIError)?.message, "Expired")
+        }
+    }
+
+    func testInvalidSourceIdentityDoesNotMakeARequest() async throws {
+        let (api, _) = fixture()
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Invalid podcast identities must not be requested") }
+        for id in [0, -1] {
+            do {
+                _ = try await api.related(podcastID: id)
+                XCTFail("Invalid podcast identity must be rejected")
+            } catch {
+                XCTAssertEqual((error as? APIError)?.statusCode, 400)
+            }
+        }
+    }
+
+    private func fixture(signedIn: Bool = false) -> (APIClient, MemorySessionCredentials) {
+        let credentials = MemorySessionCredentials()
+        if signedIn { credentials.write("listener-session") }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GuestLibraryURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://related.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        api.restoreAccount(signedIn ? "listener" : nil)
+        return (api, credentials)
+    }
+}
+
+@MainActor
 final class EpisodeChaptersAPITests: XCTestCase {
     func testReadsChaptersByDatabaseIdentityWithCurrentAccountCredentials() async throws {
         for accountID: String? in [nil, "listener"] {

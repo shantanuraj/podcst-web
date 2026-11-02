@@ -76,6 +76,14 @@ public final class APIClient {
         return rows.map { Podcast(id: $0.id, itunesId: $0.itunesId, itunesLocale: locale, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail, isPrivate: $0.isPrivate ?? false) }
     }
 
+    public func related(podcastID: Int, locale: String = "us") async throws -> [Podcast] {
+        try Task.checkCancellation()
+        guard podcastID > 0 else { throw APIError(statusCode: 400, message: "Invalid podcast identity") }
+        let rows: [RawPodcast] = try await get(path: "/api/feed/related", query: [URLQueryItem(name: "id", value: String(podcastID)), URLQueryItem(name: "locale", value: locale)], usesSession: false)
+        try Task.checkCancellation()
+        return rows.map { mapPodcast($0) }
+    }
+
     public func cachedPodcast(id: Int? = nil, feed: String) -> Podcast? {
         feedCache.cached(id: id, feed: feed)
     }
