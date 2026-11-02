@@ -21,9 +21,10 @@ jobs:
       - run: cargo +stable clippy --locked --manifest-path audio-engine/Cargo.toml --all-targets -- -D warnings
 
   apple:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@v4
