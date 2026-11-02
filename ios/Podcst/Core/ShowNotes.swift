@@ -56,6 +56,14 @@ enum ShowNotesParser {
         return AttributedString(mutable)
     }
 
+    static func paragraphs(_ html: String) -> [AttributedString] {
+        let text = attributedString(html)
+        return text.characters.split(separator: "\n").compactMap { paragraph in
+            guard paragraph.contains(where: { !$0.isWhitespace }) else { return nil }
+            return AttributedString(text[paragraph.startIndex..<paragraph.endIndex])
+        }
+    }
+
     static func chapters(_ html: String) -> [Chapter] {
         let text = html
             .replacingOccurrences(of: #"<(br|/p|/li|/div|/h[1-6])[^>]*>"#, with: "\n", options: [.regularExpression, .caseInsensitive])

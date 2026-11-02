@@ -390,71 +390,88 @@ struct EpisodeMenuActions: View {
 }
 
 struct EpisodeDetailView: View {
+    @Environment(APIClient.self) private var api
     @Environment(PlaybackController.self) private var playback
-    @Environment(StarStore.self) private var stars
     @Environment(Router.self) private var router
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var loaded: (key: String, value: EpisodeChapters)?
+    @State private var rendered: (notes: String, paragraphs: [AttributedString])?
+    @State private var readingPosition: String? = "episode-header"
     let episode: Episode
 
-    var body: some View {
-        let artworkSize: CGFloat = 96
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .bottom, spacing: 16) {
-                    ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: artworkSize)
-                    Text(episode.dateline)
-                        .eyebrow()
-                }
-                .padding(.top, 8)
-                Text(episode.title)
-                    .font(.serif(.title))
-                    .tracking(-0.4)
-                    .padding(.top, 18)
-                NavigationLink(value: Route.podcast(episode.podcast)) {
-                    Text(episode.byline)
-                        .font(.sans(.subheadline))
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .multilineTextAlignment(.leading)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
-                HStack(spacing: 10) {
-                    EpisodePlayButton(episode: episode)
-                    let starred = stars.contains(episode)
-                    Menu {
-                        Button("Add to list…", systemImage: "text.badge.plus") { router.listing = episode }
-                    } label: {
-                        Image(systemName: starred ? "star.fill" : "star")
-                            .foregroundStyle(starred ? PodcstPalette.accent : PodcstPalette.ink)
-                    } primaryAction: {
-                        router.star(episode, !starred, in: stars)
-                    }
-                    .menuStyle(.button)
-                    .buttonStyle(PodcstButtonStyle(kind: .surface))
-                    .frame(width: 48)
-                    .accessibilityLabel(starred ? "Unstar" : "Star")
-                    DownloadButton(episode: episode, compact: true)
-                    let queued = playback.queue.contains { $0.identity == episode.identity }
-                    Button {
-                        playback.enqueue(episode, next: true)
-                    } label: {
-                        Image(systemName: queued ? "checkmark" : "text.line.first.and.arrowtriangle.forward")
-                            .foregroundStyle(queued ? PodcstPalette.accent : PodcstPalette.ink)
-                    }
-                    .buttonStyle(PodcstButtonStyle(kind: .surface))
-                    .frame(width: 48)
-                    .disabled(queued)
-                    .accessibilityLabel(queued ? "In queue" : "Play next")
-                }
-                .padding(.top, 20)
-                PodcstPalette.rule
-                    .frame(height: 1)
-                    .padding(.vertical, 20)
-                ShowNotesContent(episode: episode)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 28)
+    private var chapterKey: String { "\(episode.identity):\(api.activityToken)" }
+
+    private var chapters: EpisodeChapters {
+        let result = loaded?.key == chapterKey ? loaded?.value : nil
+        if playback.currentEpisode?.identity == episode.identity, playback.chapters.count >= 2 {
+            return EpisodeChapters(chapters: playback.chapters, source: result?.chapters == playback.chapters ? result?.source ?? .none : .none)
         }
-        .modifier(ArtworkBackdrop(url: episode.artworkURL, artworkSize: artworkSize, headerHeight: 280, fallbackURL: URL(string: episode.cover)))
+        return result ?? EpisodeChapters(chapters: [], source: .none)
+    }
+
+    var body: some View {
+        let chapters = chapters
+        let notes = ShowNotesParser.notes(of: episode)
+        let paragraphs = rendered?.notes == notes ? rendered?.paragraphs : nil
+        GeometryReader { geometry in
+            let wide = sizeClass == .regular && geometry.size.width >= 700 && !typeSize.isAccessibilitySize
+            Group {
+                if #available(iOS 27.1, *), hasFold(in: geometry), !chapters.chapters.isEmpty {
+                    ArrangementView {
+                        AnchoredScroll(position: $readingPosition) {
+                            VStack(alignment: .leading, spacing: 32) {
+                                VStack {
+                                    EpisodeHeader(episode: episode, wide: false)
+                                        .id("episode-header")
+                                }
+                                .scrollTargetLayout()
+                                EpisodeNotesSection(episode: episode, paragraphs: paragraphs)
+                            }
+                            .padding(20)
+                        }
+                    } secondary: {
+                        ScrollView {
+                            EpisodeChapterCard(episode: episode, content: chapters)
+                                .padding(20)
+                        }
+                    }
+                    .arrangementViewStyle(.split)
+                } else {
+                    AnchoredScroll(position: $readingPosition) {
+                        VStack(alignment: .leading, spacing: 32) {
+                            VStack {
+                                EpisodeHeader(episode: episode, wide: wide)
+                                    .id("episode-header")
+                            }
+                            .scrollTargetLayout()
+                            if wide {
+                                HStack(alignment: .top, spacing: 32) {
+                                    EpisodeNotesSection(episode: episode, paragraphs: paragraphs)
+                                        .frame(maxWidth: 640, alignment: .leading)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    if !chapters.chapters.isEmpty {
+                                        EpisodeChapterCard(episode: episode, content: chapters)
+                                            .frame(width: min(340, (geometry.size.width - 72) * 0.38))
+                                    }
+                                }
+                            } else {
+                                if !chapters.chapters.isEmpty {
+                                    EpisodeChapterCard(episode: episode, content: chapters)
+                                }
+                                EpisodeNotesSection(episode: episode, paragraphs: paragraphs)
+                            }
+                        }
+                        .frame(maxWidth: 1100, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 28)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            .modifier(ArtworkBackdrop(url: episode.artworkURL, artworkSize: wide ? 180 : 112, headerHeight: wide ? 360 : 320, fallbackURL: URL(string: episode.cover)))
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if episode.publicLink != nil {
@@ -463,6 +480,181 @@ struct EpisodeDetailView: View {
                 }
             }
         }
+        .task(id: chapterKey) {
+            let key = chapterKey
+            let fallback = ShowNotesParser.chapters(ShowNotesParser.notes(of: episode))
+            loaded = (key, EpisodeChapters(chapters: fallback, source: fallback.isEmpty ? .none : .shownotes))
+            guard let result = try? await api.chapters(for: episode), !Task.isCancelled, key == chapterKey else { return }
+            if !result.chapters.isEmpty { loaded = (key, result) }
+        }
+        .task(id: notes) {
+            rendered = (notes, ShowNotesParser.paragraphs(notes))
+        }
+    }
+
+    @available(iOS 27.1, *)
+    private func hasFold(in geometry: GeometryProxy) -> Bool {
+        geometry.reservedRegions(kind: .division).contains { region in
+            let frame = region.frame
+            let size = geometry.size
+            return frame.height > frame.width
+                ? frame.minX > 80 && size.width - frame.maxX > 80
+                : frame.minY > 80 && size.height - frame.maxY > 80
+        }
+    }
+}
+
+private struct EpisodeHeader: View {
+    let episode: Episode
+    let wide: Bool
+
+    var body: some View {
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .bottom, spacing: 28)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 20))
+        layout {
+            ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: wide ? 180 : 112)
+                .shadow(color: .black.opacity(0.18), radius: 18, y: 12)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(episode.dateline).eyebrow()
+                Text(episode.title)
+                    .font(.serif(wide ? .largeTitle : .title))
+                    .tracking(-0.4)
+                    .fixedSize(horizontal: false, vertical: true)
+                NavigationLink(value: Route.podcast(episode.podcast)) {
+                    Text(episode.byline)
+                        .font(.sans(.subheadline))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
+                EpisodeDetailActions(episode: episode)
+                    .frame(maxWidth: 520)
+                    .padding(.top, 12)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct EpisodeDetailActions: View {
+    @Environment(PlaybackController.self) private var playback
+    @Environment(StarStore.self) private var stars
+    @Environment(Router.self) private var router
+    let episode: Episode
+
+    var body: some View {
+        HStack(spacing: 10) {
+            EpisodePlayButton(episode: episode)
+            let starred = stars.contains(episode)
+            Menu {
+                Button("Add to list…", systemImage: "text.badge.plus") { router.listing = episode }
+            } label: {
+                Image(systemName: starred ? "star.fill" : "star")
+                    .foregroundStyle(starred ? PodcstPalette.accent : PodcstPalette.ink)
+            } primaryAction: {
+                router.star(episode, !starred, in: stars)
+            }
+            .menuStyle(.button)
+            .buttonStyle(PodcstButtonStyle(kind: .surface))
+            .frame(width: 48)
+            .accessibilityLabel(starred ? "Unstar" : "Star")
+            DownloadButton(episode: episode, compact: true)
+            let queued = playback.queue.contains { $0.identity == episode.identity }
+            Button {
+                playback.enqueue(episode, next: true)
+            } label: {
+                Image(systemName: queued ? "checkmark" : "text.line.first.and.arrowtriangle.forward")
+                    .foregroundStyle(queued ? PodcstPalette.accent : PodcstPalette.ink)
+            }
+            .buttonStyle(PodcstButtonStyle(kind: .surface))
+            .frame(width: 48)
+            .disabled(queued)
+            .accessibilityLabel(queued ? "In queue" : "Play next")
+        }
+    }
+}
+
+private struct EpisodeNotesSection: View {
+    let episode: Episode
+    let paragraphs: [AttributedString]?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            SectionHeader("Show notes")
+            ShowNotesText(episode: episode, paragraphs: paragraphs)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct EpisodeChapterCard: View {
+    @Environment(PlaybackController.self) private var playback
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let episode: Episode
+    let content: EpisodeChapters
+
+    var body: some View {
+        let position = playback.position(of: episode)
+        let duration = position != nil ? max(playback.duration, episode.duration ?? 0) : episode.duration ?? 0
+        let current = position.flatMap { content.chapters.index(at: $0) }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Chapters").eyebrow()
+                Spacer()
+                Text(content.chapters.count, format: .number).eyebrow()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            if content.source == .shownotes {
+                Text("Chapters from show notes")
+                    .font(.sans(.caption))
+                    .foregroundStyle(PodcstPalette.tertiary)
+                    .padding(.horizontal, 12)
+            }
+            ForEach(Array(content.chapters.enumerated()), id: \.element.start) { index, chapter in
+                let length = max(0, content.chapters.end(of: index, duration: duration) - chapter.start)
+                Button {
+                    if playback.currentEpisode?.identity == episode.identity {
+                        playback.seek(to: chapter.start)
+                        if !playback.isPlaybackRequested { playback.resume() }
+                    } else {
+                        playback.play(episode, at: chapter.start)
+                    }
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(Duration.clock(chapter.start))
+                            .font(.sans(.caption).weight(.medium))
+                            .monospacedDigit()
+                            .foregroundStyle(current == index ? PodcstPalette.accent : PodcstPalette.tertiary)
+                            .frame(minWidth: 40, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(chapter.title)
+                                .font(.serif(.body))
+                                .lineSpacing(2)
+                                .lineLimit(typeSize.isAccessibilitySize ? nil : 3)
+                                .foregroundStyle(PodcstPalette.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if length > 0 {
+                                Text(Duration.seconds(length))
+                                    .font(.sans(.caption))
+                                    .foregroundStyle(PodcstPalette.tertiary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(12)
+                    .frame(minHeight: 44)
+                    .background(current == index ? PodcstPalette.accentSoft : .clear, in: RoundedRectangle(cornerRadius: 10))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .multilineTextAlignment(.leading)
+                .accessibilityLabel("Play \(chapter.title) at \(Duration.clock(chapter.start))")
+                .accessibilityAddTraits(current == index ? .isSelected : [])
+            }
+        }
+        .padding(8)
+        .background(PodcstPalette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(PodcstPalette.rule) }
     }
 }
 
@@ -477,9 +669,14 @@ private struct EpisodePlayButton: View {
         Button {
             if position != nil { playback.toggle() } else { playback.play(episode) }
         } label: {
-            Label(title(position: position, playing: playing), systemImage: playing ? "pause.fill" : "play.fill")
+            ViewThatFits(in: .horizontal) {
+                Label(title(position: position, playing: playing), systemImage: playing ? "pause.fill" : "play.fill")
+                    .fixedSize()
+                Label(playing ? "Pause" : position.map { $0 > 0 } == true ? "Resume" : "Play", systemImage: playing ? "pause.fill" : "play.fill")
+            }
         }
         .buttonStyle(PodcstButtonStyle(kind: .accent))
+        .accessibilityLabel(title(position: position, playing: playing))
         .overlay(alignment: .bottomLeading) {
             if fraction > 0 {
                 GeometryReader { geometry in
@@ -501,9 +698,22 @@ private struct EpisodePlayButton: View {
 }
 
 struct ShowNotesContent: View {
+    let episode: Episode
+    @State private var rendered: (notes: String, paragraphs: [AttributedString])?
+
+    var body: some View {
+        let notes = ShowNotesParser.notes(of: episode)
+        ShowNotesText(episode: episode, paragraphs: rendered?.notes == notes ? rendered?.paragraphs : nil)
+            .task(id: notes) {
+                rendered = (notes, ShowNotesParser.paragraphs(notes))
+            }
+    }
+}
+
+private struct ShowNotesText: View {
     @Environment(PlaybackController.self) private var playback
     let episode: Episode
-    @State private var rendered: (identity: String, text: AttributedString)?
+    let paragraphs: [AttributedString]?
 
     var body: some View {
         let notes = ShowNotesParser.notes(of: episode)
@@ -511,13 +721,20 @@ struct ShowNotesContent: View {
             if notes.isEmpty {
                 Text("No show notes were provided for this episode.")
                     .foregroundStyle(PodcstPalette.secondary)
-            } else if let rendered, rendered.identity == episode.identity {
-                Text(rendered.text)
-                    .font(.sans(.body))
-                    .lineSpacing(6)
-                    .foregroundStyle(PodcstPalette.secondary)
-                    .tint(PodcstPalette.accent)
-                    .textSelection(.enabled)
+            } else if let paragraphs {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
+                        Text(paragraph)
+                            .font(.sans(.body))
+                            .lineSpacing(8)
+                            .foregroundStyle(PodcstPalette.secondary)
+                            .tint(PodcstPalette.accent)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id("notes-\(index)")
+                    }
+                }
+                .scrollTargetLayout()
             } else {
                 ProgressView().frame(maxWidth: .infinity)
             }
@@ -526,9 +743,6 @@ struct ShowNotesContent: View {
                     .font(.sans(.subheadline).weight(.medium))
                     .foregroundStyle(PodcstPalette.accent)
             }
-        }
-        .task(id: episode.identity) {
-            rendered = (episode.identity, ShowNotesParser.attributedString(notes))
         }
         .environment(\.openURL, OpenURLAction { url in
             guard let seconds = ShowNotesParser.timestamp(from: url) else { return .systemAction }

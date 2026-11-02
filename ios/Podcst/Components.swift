@@ -354,6 +354,39 @@ private struct ScreenHeader<Trailing: View>: ViewModifier {
     }
 }
 
+struct AnchoredScroll<Content: View>: View {
+    @Binding var position: String?
+    @State private var visiblePosition: String?
+    @State private var phase = ScrollPhase.idle
+    let content: Content
+
+    init(position: Binding<String?>, @ViewBuilder content: () -> Content) {
+        _position = position
+        _visiblePosition = State(initialValue: position.wrappedValue)
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView { content }
+                .scrollPosition(id: $visiblePosition, anchor: .top)
+                .onAppear {
+                    if let position { proxy.scrollTo(position, anchor: .top) }
+                }
+                .onChange(of: visiblePosition) { _, value in
+                    if phase.isScrolling, let value { position = value }
+                }
+                .onChange(of: position) { _, value in
+                    if value != visiblePosition { visiblePosition = value }
+                }
+                .onScrollPhaseChange { _, value in
+                    phase = value
+                    if value == .idle, let visiblePosition { position = visiblePosition }
+                }
+        }
+    }
+}
+
 struct SectionHeader<Trailing: View>: View {
     let title: String
     let trailing: Trailing

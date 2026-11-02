@@ -333,6 +333,30 @@ final class ContractFixtureTests: XCTestCase {
         }
     }
 
+    func testShowNotesParagraphsSeparateBlocksAndPreserveInlineLinks() throws {
+        let html = #"<p>Read <a href="https://example.test/guide">the guide</a> and jump to 12:34.</p><p>Closing notes.</p>"#
+        let paragraphs = ShowNotesParser.paragraphs(html)
+        XCTAssertEqual(paragraphs.map { String($0.characters) }, ["Read the guide and jump to 12:34.", "Closing notes."])
+        let first = try XCTUnwrap(paragraphs.first)
+        let guide = try XCTUnwrap(first.runs.first { $0.link?.absoluteString == "https://example.test/guide" })
+        XCTAssertEqual(String(first[guide.range].characters), "the guide")
+        let timestamp = try XCTUnwrap(first.runs.first { $0.link.flatMap(ShowNotesParser.timestamp(from:)) == 754 })
+        XCTAssertEqual(String(first[timestamp.range].characters), "12:34")
+    }
+
+    func testShowNotesParagraphsPreserveSoftLineBreaksAndIgnoreEmptyBlocks() {
+        let html = "<p>First line.<br>Second line.</p><p> </p><p>Last paragraph.</p>"
+        let imported = String(ShowNotesParser.attributedString(html).characters)
+        let paragraphs = ShowNotesParser.paragraphs(html).map { String($0.characters) }
+        XCTAssertEqual(paragraphs.last, "Last paragraph.")
+        XCTAssertFalse(paragraphs.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        if imported.contains("\u{2028}") {
+            XCTAssertEqual(paragraphs, ["First line.\u{2028}Second line.", "Last paragraph."])
+        } else {
+            XCTAssertEqual(paragraphs, ["First line.", "Second line.", "Last paragraph."])
+        }
+    }
+
     func testShowNotesIgnoreLongNonChapterLines() {
         let whitespace = String(repeating: " ", count: 100_000)
         XCTAssertEqual(ShowNotesParser.chapters("Prose\(whitespace)without a chapter"), [])
