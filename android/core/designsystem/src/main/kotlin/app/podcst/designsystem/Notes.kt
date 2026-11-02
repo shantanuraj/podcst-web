@@ -1,8 +1,12 @@
 package app.podcst.designsystem
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -12,6 +16,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
 import app.podcst.model.ShowNotes
 import kotlin.time.Duration
 
@@ -22,13 +27,28 @@ fun NotesText(
     modifier: Modifier = Modifier,
 ) {
     val colors = Podcst.colors
-    val text = remember(html, colors.accent) { annotate(html, colors.accent, onTimestamp) }
-    Text(text, style = Podcst.type.notes, color = colors.secondary, modifier = modifier)
+    val seek by rememberUpdatedState(onTimestamp)
+    val paragraphs = remember(html, colors.accent) { noteParagraphs(annotatedNotes(html, colors.accent) { seek(it) }) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        paragraphs.forEach { Text(it, style = Podcst.type.notes, color = colors.secondary) }
+    }
 }
 
-private fun annotate(html: String, accent: Color, onTimestamp: (Duration) -> Unit): AnnotatedString {
+internal fun noteParagraphs(text: AnnotatedString): List<AnnotatedString> {
+    val paragraphs = mutableListOf<AnnotatedString>()
+    var start = 0
+    Regex("\\n[\\t ]*\\n+").findAll(text.text).forEach { separator ->
+        text.subSequence(start, separator.range.first).trimmed().takeIf { it.isNotEmpty() }?.let(paragraphs::add)
+        start = separator.range.last + 1
+    }
+    text.subSequence(start, text.length).trimmed().takeIf { it.isNotEmpty() }?.let(paragraphs::add)
+    return paragraphs
+}
+
+internal fun annotatedNotes(html: String, accent: Color, onTimestamp: (Duration) -> Unit): AnnotatedString {
     val links = TextLinkStyles(SpanStyle(color = accent, textDecoration = TextDecoration.Underline))
-    val parsed = AnnotatedString.fromHtml(html.trim(), linkStyles = links).trimmed()
+    val paragraphs = html.trim().replace(Regex("(?i)</p\\s*>"), "</p><br>")
+    val parsed = AnnotatedString.fromHtml(paragraphs, linkStyles = links).trimmed()
     val stamps = TextLinkStyles(SpanStyle(color = accent, fontFeatureSettings = "tnum"))
     return buildAnnotatedString {
         append(parsed)

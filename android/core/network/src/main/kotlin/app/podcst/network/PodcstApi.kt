@@ -30,6 +30,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.serializer
 import okhttp3.Call
+import okhttp3.CacheControl
 import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -97,6 +98,12 @@ class PodcstApi(
             require(found.podcast.id == podcastId && found.episode.id == episodeId && found.episode.podcastId == podcastId && found.podcast.isPrivate != true && found.episode.isPrivate != true)
             found.episode.domain(found.podcast.id, found.podcast.feed, found.podcast.cover, found.podcast.title)
         }
+
+    suspend fun episodeChapters(episode: Episode): EpisodeChapters {
+        val id = episode.id ?: return EpisodeChapters()
+        if (episode.isPrivate && !hasSession) throw CancellationException("Private episode requires a session")
+        return request("GET", url("api/episodes/$id/chapters"), null, true, WireEpisodeChapters.serializer(), uncached = true).domain()
+    }
 
     suspend fun resolve(itunesId: Long, locale: String): Long =
         post<WireIdentity>("api/feed/resolve", body { put("itunes_id", itunesId.toString()); put("locale", locale) }).id
@@ -250,6 +257,7 @@ class PodcstApi(
         body: JsonElement?,
         session: Boolean,
         strategy: DeserializationStrategy<T>,
+        uncached: Boolean = false,
     ): T {
         check(!session || !deletionBlocked() || url.encodedPath.startsWith("/api/account/deletion") || url.encodedPath.startsWith("/api/auth/")) { "Account deletion is pending" }
         val token = revision.get()
@@ -258,6 +266,7 @@ class PodcstApi(
             .header("X-Podcst-Client", "native")
             .method(method, body?.toString()?.toRequestBody(JSON))
             .apply { if (session) cookies.read()?.let { header("Cookie", "session=$it") } }
+            .apply { if (uncached) cacheControl(CacheControl.Builder().noCache().noStore().build()) }
             .build()
         return client.newCall(request).await().use { response ->
             if (session && revision.get() != token) throw CancellationException("Session changed")

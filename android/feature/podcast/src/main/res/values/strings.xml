@@ -39,6 +39,9 @@
     <string name="play_again">Play again</string>
     <string name="last_played">Last played %1$s</string>
     <string name="no_notes">No show notes were provided for this episode.</string>
+    <string name="show_notes">Show notes</string>
+    <string name="chapters">Chapters</string>
+    <string name="chapters_from_notes">Chapters from show notes</string>
     <string name="open_episode_website">Open episode website</string>
     <string name="go_to_podcast">Go to podcast</string>
 </resources>

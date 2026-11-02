@@ -6,6 +6,7 @@ import app.podcst.database.PodcastEntity
 import app.podcst.database.domain
 import app.podcst.database.entity
 import app.podcst.model.Episode
+import app.podcst.model.EpisodeChapters
 import app.podcst.model.FeedFreshness
 import app.podcst.model.PlaybackRules
 import app.podcst.model.Podcast
@@ -72,6 +73,15 @@ class CatalogRepository(
 
     fun episode(identity: String): Flow<Episode?> = scopes.current.flatMapLatest { scope ->
         scope.database.episodes().observe(identity).map { it?.domain() }
+    }
+
+    suspend fun chapters(episode: Episode): EpisodeChapters {
+        val active = readerActive()
+        if (!active() || episode.isPrivate && scopes.current.value.accountId == null) throw CancellationException("Account changed")
+        val result = api.episodeChapters(episode)
+        currentCoroutineContext().ensureActive()
+        if (!active()) throw CancellationException("Account changed")
+        return result
     }
 
     fun episodes(identities: List<String>): Flow<List<Episode>> = scopes.current.flatMapLatest { scope ->

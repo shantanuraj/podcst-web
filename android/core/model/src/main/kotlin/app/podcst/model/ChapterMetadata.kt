@@ -3,6 +3,10 @@ package app.podcst.model
 import java.security.MessageDigest
 import kotlin.time.Duration
 
+enum class ChapterSource { Embedded, ShowNotes, None }
+
+data class EpisodeChapters(val chapters: List<Chapter> = emptyList(), val source: ChapterSource = ChapterSource.None)
+
 class ChapterArtwork(data: ByteArray) {
     val data: ByteArray = data.copyOf()
     val id: String = MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }

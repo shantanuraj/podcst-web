@@ -60,7 +60,7 @@ data class PodcstType(
     val coverTitle: TextStyle = serif(17.sp, 1.05f, italic = true),
     val lede: TextStyle = serif(20.sp, 1.35f),
     val body: TextStyle = sans(15.sp, height = 1.5f),
-    val notes: TextStyle = sans(15.sp, height = 1.75f),
+    val notes: TextStyle = sans(16.sp, height = 1.7f),
     val callout: TextStyle = sans(16.sp, FontWeight.Medium),
     val label: TextStyle = sans(14.sp, FontWeight.Medium),
     val button: TextStyle = sans(15.sp, FontWeight.SemiBold),
