@@ -190,7 +190,7 @@ private struct PodcastHeader: View {
 
     var body: some View {
         VStack(alignment: wide ? .leading : .center, spacing: 20) {
-            HStack(alignment: .bottom, spacing: 32) {
+            HStack(alignment: .top, spacing: 32) {
                 let layout = wide ? AnyLayout(HStackLayout(alignment: .bottom, spacing: 24)) : AnyLayout(VStackLayout(spacing: 18))
                 layout {
                     ArtworkView(url: podcast.artworkURL, size: wide ? 160 : 180)
