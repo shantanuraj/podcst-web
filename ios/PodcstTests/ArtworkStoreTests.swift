@@ -137,6 +137,119 @@ final class ArtworkStoreTests: XCTestCase {
         XCTAssertEqual(fixture.requests.count, 2)
     }
 
+    func testLegacyProxyTintMetadataRevalidatesWithoutBlockingArtworkAndServesEverySize() async throws {
+        let fixture = makeFixture(width: 1024)
+        fixture.headers = ["ETag": "\"cover\"", "Cache-Control": "max-age=604800"]
+        let url = proxyURL(for: fixture)
+        let root = temporaryDirectory()
+        let seeded = await makeStore(fixture, root: root).image(url, pixelSize: 1024)
+        XCTAssertNotNil(seeded)
+        try removeTintMetadata(root)
+        let store = makeStore(fixture, root: root)
+        let large = await store.image(url, pixelSize: 1024)
+        let small = await store.image(url, pixelSize: 160)
+        XCTAssertNotNil(large)
+        XCTAssertNotNil(small)
+        XCTAssertEqual(fixture.requests.count, 1)
+        fixture.status = 304
+        fixture.headers = ["X-Artwork-Tint-Light": "#c0e0d8", "X-Artwork-Tint-Dark": "#00b8e0"]
+        let tint = await store.tint(url, pixelSize: 1024)
+        XCTAssertEqual(tint, ArtworkTint(light: 0xC0E0D8, dark: 0x00B8E0))
+        XCTAssertEqual(fixture.requests.count, 2)
+        XCTAssertEqual(fixture.requests.last?.value(forHTTPHeaderField: "If-None-Match"), "\"cover\"")
+        let resized = await store.tint(url, pixelSize: 160)
+        XCTAssertEqual(resized, tint)
+        XCTAssertEqual(fixture.requests.count, 2)
+        fixture.failure = URLError(.notConnectedToInternet)
+        let relaunched = await makeStore(fixture, root: root).tint(url, pixelSize: 384)
+        XCTAssertEqual(relaunched, tint)
+        XCTAssertEqual(fixture.requests.count, 2)
+    }
+
+    func testLegacyProxyWithoutPaletteProbesOnceAcrossRevisitsAndRelaunch() async throws {
+        let fixture = makeFixture(width: 1024)
+        fixture.headers = ["ETag": "\"cover\""]
+        let url = proxyURL(for: fixture)
+        let root = temporaryDirectory()
+        let seeded = await makeStore(fixture, root: root).image(url, pixelSize: 1024)
+        XCTAssertNotNil(seeded)
+        try removeTintMetadata(root)
+        fixture.status = 304
+        let store = makeStore(fixture, root: root)
+        let fallback = await store.tint(url, pixelSize: 1024)
+        XCTAssertNotNil(fallback)
+        XCTAssertEqual(fixture.requests.count, 2)
+        _ = await store.tint(url, pixelSize: 160)
+        _ = await makeStore(fixture, root: root).tint(url, pixelSize: 384)
+        XCTAssertEqual(fixture.requests.count, 2)
+    }
+
+    func testConcurrentLegacyTintConsumersAwaitOneCanonicalMetadataProbe() async throws {
+        let fixture = makeFixture(width: 1024)
+        fixture.headers = ["ETag": "\"cover\""]
+        let url = proxyURL(for: fixture)
+        let root = temporaryDirectory()
+        let seeded = await makeStore(fixture, root: root).image(url, pixelSize: 1024)
+        XCTAssertNotNil(seeded)
+        try removeTintMetadata(root)
+        let store = makeStore(fixture, root: root)
+        _ = await store.image(url, pixelSize: 1024)
+        _ = await store.image(url, pixelSize: 160)
+        fixture.status = 304
+        fixture.headers = ["X-Artwork-Tint-Light": "#c0e0d8", "X-Artwork-Tint-Dark": "#00b8e0"]
+        fixture.holdResponses = true
+        let first = Task { await store.tint(url, pixelSize: 1024) }
+        try await wait { fixture.requests.count == 2 }
+        var secondFinished = false
+        let second = Task {
+            let result = await store.tint(url, pixelSize: 160)
+            secondFinished = true
+            return result
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(secondFinished)
+        XCTAssertEqual(fixture.requests.count, 2)
+        fixture.releaseResponses()
+        let results = await [first.value, second.value]
+        XCTAssertEqual(results, [ArtworkTint(light: 0xC0E0D8, dark: 0x00B8E0), ArtworkTint(light: 0xC0E0D8, dark: 0x00B8E0)])
+        XCTAssertEqual(fixture.requests.count, 2)
+    }
+
+    func testFailedLegacyTintProbeKeepsOfflineArtworkAndRetriesAfterRelaunch() async throws {
+        let fixture = makeFixture(width: 1024)
+        fixture.headers = ["ETag": "\"cover\""]
+        let url = proxyURL(for: fixture)
+        let root = temporaryDirectory()
+        let seeded = await makeStore(fixture, root: root).image(url, pixelSize: 1024)
+        XCTAssertNotNil(seeded)
+        try removeTintMetadata(root)
+        fixture.failure = URLError(.notConnectedToInternet)
+        let store = makeStore(fixture, root: root)
+        let fallback = await store.tint(url, pixelSize: 384)
+        XCTAssertNotNil(fallback)
+        XCTAssertNotNil(store.cached(url, pixelSize: 384))
+        _ = await store.tint(url, pixelSize: 384)
+        _ = await store.tint(url, pixelSize: 160)
+        XCTAssertEqual(fixture.requests.count, 2)
+        fixture.failure = nil
+        fixture.status = 304
+        fixture.headers = ["X-Artwork-Tint-Light": "#c0e0d8", "X-Artwork-Tint-Dark": "#00b8e0"]
+        let recovered = await makeStore(fixture, root: root).tint(url, pixelSize: 384)
+        XCTAssertEqual(recovered, ArtworkTint(light: 0xC0E0D8, dark: 0x00B8E0))
+        XCTAssertEqual(fixture.requests.count, 3)
+    }
+
+    func testLegacyDirectArtworkDoesNotProbeForProxyMetadata() async throws {
+        let fixture = makeFixture(width: 384)
+        let root = temporaryDirectory()
+        let seeded = await makeStore(fixture, root: root).image(fixture.url, pixelSize: 384)
+        XCTAssertNotNil(seeded)
+        try removeTintMetadata(root)
+        let fallback = await makeStore(fixture, root: root).tint(fixture.url, pixelSize: 384)
+        XCTAssertNotNil(fallback)
+        XCTAssertEqual(fixture.requests.count, 1)
+    }
+
     func testMalformedTintMetadataFallsBackToTheImage() async throws {
         let fixture = makeFixture(width: 384)
         let expected = await makeStore(fixture).tint(fixture.url, pixelSize: 384)
@@ -485,6 +598,17 @@ final class ArtworkStoreTests: XCTestCase {
 
     private func makeStore(_ fixture: ArtworkFixture, root: URL? = nil, diskBudget: Int = 64 * 1024 * 1024, now: Date = Date(timeIntervalSince1970: 100)) -> ArtworkStore {
         ArtworkStore(accountID: "listener", rootURL: root ?? temporaryDirectory(), session: fixture.session, now: { now }, diskBudget: diskBudget)
+    }
+
+    private func removeTintMetadata(_ root: URL) throws {
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? []
+        let index = try XCTUnwrap(files.first { $0.lastPathComponent == "index.json" })
+        var entries = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [String: [String: Any]])
+        for key in entries.keys {
+            entries[key]?.removeValue(forKey: "tint")
+            entries[key]?.removeValue(forKey: "tintMetadataVersion")
+        }
+        try JSONSerialization.data(withJSONObject: entries).write(to: index)
     }
 
     private func makeFixture(width: Int, height: Int? = nil) -> ArtworkFixture {

@@ -119,12 +119,12 @@ final class ArtworkStore {
         _ = load(url, pixelSize: pixelSize, policy: policy, refreshing: true)
     }
 
-    private func load(_ url: URL, pixelSize: Int, policy: ArtworkPolicy, refreshing: Bool) -> Task<UIImage?, Never> {
+    private func load(_ url: URL, pixelSize: Int, policy: ArtworkPolicy, refreshing: Bool, cachedOnly: Bool = false) -> Task<UIImage?, Never> {
         let key = key(url, pixelSize)
         let generation = scope
         let storage = storage
         let task = Task { [weak self] in
-            let payload = await storage.load(url, pixelSize: pixelSize, policy: policy, refreshing: refreshing)
+            let payload = cachedOnly ? await storage.cachedPayload(url) : await storage.load(url, pixelSize: pixelSize, policy: policy, refreshing: refreshing)
             guard let payload, !Task.isCancelled else {
                 if self?.scope == generation { self?.requests[key] = nil }
                 return self?.scope == generation ? self?.cached(url, pixelSize: pixelSize) : nil
@@ -147,15 +147,29 @@ final class ArtworkStore {
     }
 
     func tint(_ url: URL?, fallbackURL: URL? = nil, pixelSize: Int = 160) async -> ArtworkTint? {
+        let generation = scope
+        let storage = storage
         var source = url
         var image = await image(url, pixelSize: pixelSize)
         if image == nil, fallbackURL != url {
             source = fallbackURL
             image = await self.image(fallbackURL, pixelSize: pixelSize)
         }
-        guard !Task.isCancelled, let image else { return nil }
+        guard self.scope == generation, !Task.isCancelled, let image else { return nil }
+        var paletteImage = image
         if let source, let tint = images.object(forKey: key(source, pixelSize) as NSString)?.tint { return tint }
-        return await Task.detached(priority: .utility) { image.cgImage.flatMap { ArtworkPalette($0).tint } }.value
+        if let source {
+            let metadata = await storage.tintMetadata(source, pixelSize: pixelSize)
+            guard self.scope == generation, !Task.isCancelled else { return nil }
+            if metadata.refreshed {
+                if let refreshed = await load(source, pixelSize: pixelSize, policy: .disk, refreshing: true, cachedOnly: true).value { paletteImage = refreshed }
+                guard self.scope == generation, !Task.isCancelled else { return nil }
+            }
+            if let tint = metadata.tint { return tint }
+        }
+        let resolvedImage = paletteImage
+        let tint = await Task.detached(priority: .utility) { resolvedImage.cgImage.flatMap { ArtworkPalette($0).tint } }.value
+        return self.scope == generation && !Task.isCancelled ? tint : nil
     }
 
     private func key(_ url: URL, _ pixels: Int) -> String {
@@ -207,6 +221,7 @@ private struct ArtworkMetadata: Codable, Sendable {
     let etag: String?
     let modified: String?
     let tint: ArtworkTint?
+    var tintMetadataVersion: Int? = nil
 }
 
 private struct ArtworkPayload: Sendable {
@@ -231,6 +246,8 @@ private actor ArtworkStorage {
     private var loaded = false
     private var active = true
     private var requests: [String: Task<ArtworkPayload?, Never>] = [:]
+    private var tintProbes: Set<String> = []
+    private var tintRequests: [String: Task<Void, Never>] = [:]
     private var activeTransfers = 0
     private var waiting: [CheckedContinuation<Bool, Never>] = []
     private let transient = NSCache<NSString, ArtworkPayloadBox>()
@@ -249,6 +266,9 @@ private actor ArtworkStorage {
         active = false
         requests.values.forEach { $0.cancel() }
         requests.removeAll()
+        tintProbes.removeAll()
+        tintRequests.values.forEach { $0.cancel() }
+        tintRequests.removeAll()
         waiting.forEach { $0.resume(returning: false) }
         waiting.removeAll()
         transient.removeAllObjects()
@@ -258,6 +278,35 @@ private actor ArtworkStorage {
 
     func promote(_ url: URL, pixelSize: Int) async {
         _ = await load(url, pixelSize: pixelSize, policy: .disk, refreshing: false)
+    }
+
+    func cachedPayload(_ url: URL) -> ArtworkPayload? {
+        guard active else { return nil }
+        restore()
+        return read(ArtworkSource.identity(url))
+    }
+
+    func tintMetadata(_ url: URL, pixelSize: Int) async -> (tint: ArtworkTint?, refreshed: Bool) {
+        guard active else { return (nil, false) }
+        restore()
+        let key = ArtworkSource.identity(url)
+        func metadata() -> ArtworkMetadata? { entries[key] ?? transient.object(forKey: key as NSString)?.payload.metadata }
+        guard let cached = metadata() else { return (nil, false) }
+        guard cached.tint == nil, cached.tintMetadataVersion == nil,
+              cached.requestURL.host == "assets.podcst.app",
+              URLComponents(url: cached.requestURL, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { $0.name == "p" }) == true else { return (cached.tint, false) }
+        if let pending = tintRequests[key] {
+            await pending.value
+        } else if tintProbes.insert(key).inserted {
+            let task = Task { _ = await self.load(url, pixelSize: pixelSize, policy: .disk, refreshing: true, refreshingMetadata: true) }
+            tintRequests[key] = task
+            await task.value
+            tintRequests[key] = nil
+        } else {
+            return (nil, false)
+        }
+        guard active, let refreshed = metadata() else { return (nil, false) }
+        return (refreshed.tint, refreshed.tintMetadataVersion != nil)
     }
 
     func retain(_ urls: Set<URL>) async {
@@ -283,12 +332,12 @@ private actor ArtworkStorage {
         }
     }
 
-    func load(_ url: URL, pixelSize: Int, policy: ArtworkPolicy, refreshing: Bool) async -> ArtworkPayload? {
+    func load(_ url: URL, pixelSize: Int, policy: ArtworkPolicy, refreshing: Bool, refreshingMetadata: Bool = false) async -> ArtworkPayload? {
         guard active, !Task.isCancelled, ["http", "https"].contains(url.scheme) else { return nil }
         restore()
         let key = ArtworkSource.identity(url)
         let cached = read(key)
-        if let cached, !refreshing || (cached.capacity >= pixelSize && cached.expiresAt > now()) {
+        if let cached, !refreshingMetadata, !refreshing || (cached.capacity >= pixelSize && cached.expiresAt > now()) {
             if pinned?.contains(key) == true || policy == .disk || entries[key] != nil {
                 persist(cached, key: key, replacing: false)
             }
@@ -300,7 +349,7 @@ private actor ArtworkStorage {
                 if pinned?.contains(key) == true || policy == .disk { persist(result, key: key, replacing: false) }
                 return result
             }
-            return await load(url, pixelSize: pixelSize, policy: policy, refreshing: refreshing)
+            return await load(url, pixelSize: pixelSize, policy: policy, refreshing: refreshing, refreshingMetadata: refreshingMetadata)
         }
         let refreshSource = cached.flatMap { $0.capacity >= pixelSize ? $0.metadata.requestURL : nil } ?? url
         let requestedSize = max(pixelSize, pinned?.contains(key) == true ? 1024 : 0, cached?.metadata.requestedSize == Int.max ? 0 : cached?.metadata.requestedSize ?? 0)
@@ -363,7 +412,8 @@ private actor ArtworkStorage {
                                        requestedSize: capacity,
                                        etag: response.value(forHTTPHeaderField: "ETag") ?? (response.statusCode == 304 ? cached?.metadata.etag : nil),
                                        modified: response.value(forHTTPHeaderField: "Last-Modified") ?? (response.statusCode == 304 ? cached?.metadata.modified : nil),
-                                       tint: ArtworkTint(lightHeader: response.value(forHTTPHeaderField: "X-Artwork-Tint-Light"), darkHeader: response.value(forHTTPHeaderField: "X-Artwork-Tint-Dark")) ?? (response.statusCode == 304 ? cached?.metadata.tint : nil))
+                                       tint: ArtworkTint(lightHeader: response.value(forHTTPHeaderField: "X-Artwork-Tint-Light"), darkHeader: response.value(forHTTPHeaderField: "X-Artwork-Tint-Dark")) ?? (response.statusCode == 304 ? cached?.metadata.tint : nil),
+                                       tintMetadataVersion: 1)
         let payload = ArtworkPayload(data: bytes, metadata: metadata)
         if policy == .disk || pinned?.contains(key) == true || entries[key] != nil {
             persist(payload, key: key, replacing: response.statusCode != 304)
