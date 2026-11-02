@@ -40,6 +40,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -395,6 +396,33 @@ private fun LazyListScope.episodes(
             }
         }
     }
+    if (state.episodes.isNotEmpty() && (state.hasMore || state.loadingMore || state.pageFailed)) {
+        item(key = "episode-pagination") {
+            EpisodePagination(state, viewModel)
+        }
+    }
+}
+
+@Composable
+private fun EpisodePagination(state: PodcastScreenState, viewModel: PodcastViewModel) {
+    val now by produceState(System.currentTimeMillis(), state.retryAt) {
+        delay((state.retryAt - System.currentTimeMillis()).coerceAtLeast(0))
+        value = System.currentTimeMillis()
+    }
+    LaunchedEffect(state.episodes.size, state.hasMore) {
+        if (state.hasMore && !state.pageFailed) viewModel.loadMore()
+    }
+    when {
+        state.loadingMore -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(Modifier.size(24.dp), color = Podcst.colors.accent, strokeWidth = 2.dp)
+        }
+        state.pageFailed -> Message(
+            stringResource(R.string.more_episodes_unavailable),
+            action = stringResource(DesignR.string.retry).takeIf { now >= state.retryAt },
+            onAction = { if (state.hasMore) viewModel.loadMore() else viewModel.retry() },
+        )
+        state.hasMore -> Message(stringResource(R.string.more_episodes), action = stringResource(R.string.load_more), onAction = viewModel::loadMore)
+    }
 }
 
 @Composable
@@ -415,14 +443,15 @@ private fun RelatedPodcast(podcast: Podcast, onOpen: (Podcast) -> Unit) {
 @Composable
 private fun EmptyEpisodes(state: PodcastScreenState, query: String, onRetry: () -> Unit) {
     when {
+        state.pageFailed -> EpisodeUnavailable(state, onRetry)
         state.episodeNotice == EpisodeNotice.Preparing -> Message(stringResource(R.string.episodes_preparing))
         state.episodeNotice == EpisodeNotice.Unavailable -> EpisodeUnavailable(state, onRetry)
-        state.podcast.episodes.isEmpty() && state.load in listOf(LoadState.Loading, LoadState.Refreshing) ->
+        state.loadingMore || state.load in listOf(LoadState.Loading, LoadState.Refreshing) ->
             Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(24.dp), color = Podcst.colors.accent, strokeWidth = 2.dp)
             }
         query.isNotBlank() -> Message(stringResource(R.string.no_matches, query.trim()))
-        state.podcast.episodes.isEmpty() && state.load == LoadState.Loaded && state.podcast.freshness?.content != FeedFreshness.Content.missing -> Message(stringResource(R.string.no_episodes))
+        state.episodes.isEmpty() && state.load == LoadState.Loaded && state.podcast.freshness?.content != FeedFreshness.Content.missing -> Message(stringResource(R.string.no_episodes))
     }
 }
 
@@ -433,7 +462,7 @@ private fun EpisodesHeader(state: PodcastScreenState, query: String, viewModel: 
     val sortLabel = stringResource(R.string.sort_episodes)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val wide = maxWidth >= 840.dp && LocalDensity.current.fontScale <= 1.3f
-        val filterable = state.podcast.episodes.size > FILTER_THRESHOLD
+        val filterable = state.count > FILTER_THRESHOLD || query.isNotEmpty()
         Column {
             Row(
                 Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp),
@@ -456,6 +485,10 @@ private fun EpisodesHeader(state: PodcastScreenState, query: String, viewModel: 
                         Text(stringResource(state.order.label), style = Podcst.type.caption, color = colors.secondary)
                     }
                     DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(14.dp), containerColor = colors.elevated) {
+                        if (state.canFilterUnplayed) MenuEntry(stringResource(R.string.unplayed_only), PodcstIcons.Check.takeIf { state.unplayed }, tint = colors.accent, emphasized = state.unplayed) {
+                            open = false
+                            viewModel.unplayed()
+                        }
                         EpisodeOrder.all.forEach { order ->
                             val chosen = order == state.order
                             MenuEntry(stringResource(order.label), PodcstIcons.Check.takeIf { chosen }, tint = colors.accent, emphasized = chosen) {
@@ -509,7 +542,7 @@ private fun FilterField(query: String, onQuery: (String) -> Unit, modifier: Modi
 
 @Composable
 private fun EpisodeUnavailable(state: PodcastScreenState, onRetry: () -> Unit) {
-    val retryAt = state.podcast.freshness?.retryAtMs ?: 0
+    val retryAt = maxOf(state.podcast.freshness?.retryAtMs ?: 0, state.retryAt)
     val now by produceState(System.currentTimeMillis(), retryAt) {
         delay((retryAt - System.currentTimeMillis()).coerceAtLeast(0))
         value = System.currentTimeMillis()

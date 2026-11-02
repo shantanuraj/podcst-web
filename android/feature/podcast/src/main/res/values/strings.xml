@@ -45,4 +45,8 @@
     <string name="chapters_from_notes">Chapters from show notes</string>
     <string name="open_episode_website">Open episode website</string>
     <string name="go_to_podcast">Go to podcast</string>
+    <string name="unplayed_only">Unplayed only</string>
+    <string name="more_episodes">More episodes available</string>
+    <string name="load_more">Load more</string>
+    <string name="more_episodes_unavailable">Couldn’t load more episodes. Your loaded episodes are still available.</string>
 </resources>

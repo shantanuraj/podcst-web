@@ -31,6 +31,9 @@ interface PodcastDao {
     @Upsert
     suspend fun upsert(podcasts: List<PodcastEntity>)
 
+    @Query("UPDATE podcasts SET detailEpisodeIds = :identities WHERE id = :id")
+    suspend fun detailPage(id: Long, identities: String?)
+
     @Query("SELECT p.* FROM podcasts p JOIN subscriptions s ON s.feed = p.feed ORDER BY s.subscribedAt DESC")
     fun observeSubscribed(): Flow<List<PodcastEntity>>
 
@@ -56,6 +59,9 @@ interface EpisodeDao {
 
     @Query("SELECT * FROM episodes WHERE feed = :feed")
     suspend fun catalog(feed: String): List<EpisodeEntity>
+
+    @Query("SELECT * FROM episodes WHERE feed = :feed ORDER BY published DESC, id DESC LIMIT :limit")
+    suspend fun recent(feed: String, limit: Int): List<EpisodeEntity>
 
     @Query("SELECT * FROM episodes WHERE identity = :identity")
     fun observe(identity: String): Flow<EpisodeEntity?>

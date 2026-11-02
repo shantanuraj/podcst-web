@@ -18,10 +18,8 @@ import app.podcst.model.ShowNotes
 import app.podcst.playback.PlaybackCoordinator
 import app.podcst.playback.media.Downloads
 import app.podcst.playback.media.MediaStore
-import java.text.Collator
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,7 +30,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -72,6 +69,12 @@ data class PodcastScreenState(
     val load: LoadState = LoadState.Loading,
     val marks: EpisodeMarks = EpisodeMarks(),
     val related: List<Podcast> = emptyList(),
+    val loadingMore: Boolean = false,
+    val pageFailed: Boolean = false,
+    val hasMore: Boolean = false,
+    val retryAt: Long = 0,
+    val unplayed: Boolean = false,
+    val canFilterUnplayed: Boolean = false,
 ) {
     val latest: Episode? by lazy { podcast.episodes.maxByOrNull { it.published ?: Instant.DISTANT_PAST } }
     val updated: Instant? get() = listOfNotNull(podcast.published, latest?.published).maxOrNull()
@@ -85,7 +88,7 @@ data class PodcastScreenState(
         else -> null
     }
 
-    fun canRetryEpisodes(now: Long): Boolean = episodeNotice == EpisodeNotice.Unavailable && (podcast.freshness?.retryAtMs ?: 0) <= now
+    fun canRetryEpisodes(now: Long): Boolean = (episodeNotice == EpisodeNotice.Unavailable || pageFailed) && maxOf(podcast.freshness?.retryAtMs ?: 0, retryAt) <= now
 
     private companion object {
         val whitespace = Regex("\\s+")
@@ -104,27 +107,19 @@ class PodcastViewModel(
     preferences: Preferences,
 ) : ViewModel() {
     private val reader = PodcastReader(route, viewModelScope, session.session, catalog::readerActive,
-        read = { podcast, force, publish -> catalog.load(podcast, force, recheck = true, refreshIfStale = !force, onRead = publish) },
-        recheck = { catalog.load(it, recheck = true) },
+        cached = catalog::cachedDetail,
+        resolve = catalog::resolveDetail,
+        metadata = catalog::detailInfo,
+        page = catalog::detailPage,
+        refreshFeed = catalog::refreshDetail,
     )
-    private val source = reader.source
     private val inaccessible = reader.inaccessible
     private val load = reader.load
     private val subscribing = MutableStateFlow(false)
-    private val order = MutableStateFlow(EpisodeOrder())
     private val filter = MutableStateFlow("")
 
     val query: StateFlow<String> = filter.asStateFlow()
-
-    private val podcast: StateFlow<Podcast> = combine(
-        source.map { it.feed }.distinctUntilChanged().flatMapLatest { feed -> catalog.podcast(feed) },
-        source,
-        inaccessible,
-    ) { stored, fallback, denied -> if (denied) Podcast(id = fallback.id, feed = "", title = "Podcast unavailable", isPrivate = fallback.isPrivate) else stored?.copy(freshness = stored.freshness ?: fallback.freshness) ?: fallback }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), route)
-
-    private val episodes: Flow<List<Episode>> = combine(podcast.map { it.episodes }.distinctUntilChanged(), order, filter) { episodes, order, query ->
-        episodes.arranged(order, query, Collator.getInstance())
-    }.flowOn(Dispatchers.Default)
+    private val podcast: StateFlow<Podcast> = reader.source
 
     private val subscription = combine(library.subscribed, subscribing, load, ::Triple)
 
@@ -157,26 +152,36 @@ class PodcastViewModel(
         playback.state.map { player -> player.episode?.takeIf { player.active }?.let { Current(it.identity.value, player.requested) } }.distinctUntilChanged(),
     ) { progress, starred, entries, current -> EpisodeMarks(progress, starred, entries.mapValues { it.value.state }, current) }
 
-    val state: StateFlow<PodcastScreenState> = combine(podcast, episodes, order, subscription, marks) { podcast, episodes, order, (subscribed, subscribing, load), marks ->
-        PodcastScreenState(podcast, episodes, order, podcast.identity in subscribed, subscribing, load, marks)
+    val state: StateFlow<PodcastScreenState> = combine(podcast, reader.paging, subscription, marks) { podcast, page, (subscribed, subscribing, load), marks ->
+        PodcastScreenState(
+            podcast, page.episodes, EpisodeOrder(page.query.sort, page.query.direction),
+            podcast.identity in subscribed, subscribing, load, marks,
+            loadingMore = page.loading,
+            pageFailed = page.failed,
+            hasMore = page.nextCursor != null,
+            retryAt = page.retryAt,
+            unplayed = page.query.unplayed,
+        )
     }.combine(related) { state, related -> state.copy(related = related) }
+        .combine(session.session) { state, session -> state.copy(canFilterUnplayed = !session.loading && session.user != null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PodcastScreenState(route))
 
     fun refresh() = reader.refresh()
-
     fun retry() = reader.retry()
-
+    fun loadMore() = reader.loadMore()
     fun suspendReads() = reader.suspendReads()
-
     fun resumeReads() = reader.resumeReads()
 
     fun order(order: EpisodeOrder) {
-        this.order.value = order
+        reader.query(reader.paging.value.query.copy(sort = order.sort, direction = order.direction))
     }
 
     fun filter(query: String) {
         filter.value = query
+        reader.query(reader.paging.value.query.copy(search = query))
     }
+
+    fun unplayed() = reader.query(reader.paging.value.query.let { it.copy(unplayed = !it.unplayed) })
 
     fun toggleSubscription(onFailure: (Exception) -> Unit) {
         if (subscribing.value) return

@@ -61,7 +61,7 @@ class IdentityMigrationTest {
         db.close()
         db = PodcstDatabase.open(context, key).also { opened = it }
         assertEquals(2, db.episodes().queue().size)
-        assertEquals(3, db.openHelper.readableDatabase.version)
+        assertEquals(4, db.openHelper.readableDatabase.version)
     }
 
     @Test fun exactSourceResolutionMovesQueueProgressAndPreservesFallbackMediaWithoutCrossGuidGuess() = runTest {
@@ -105,7 +105,7 @@ class IdentityMigrationTest {
                     PodcstDatabase.IDENTITY_MIGRATION.migrate(db)
                     throw java.io.IOException("synthetic activation failure")
                 }
-            }, PodcstDatabase.PROGRESS_SOURCE_MIGRATION).build()
+            }, PodcstDatabase.PROGRESS_SOURCE_MIGRATION, PodcstDatabase.DETAIL_PAGE_MIGRATION).build()
         assertTrue(runCatching { failed.episodes().catalog("https://a.test") }.isFailure)
         failed.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(PodcstDatabase.name(key)).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
@@ -126,7 +126,7 @@ class IdentityMigrationTest {
                     PodcstDatabase.PROGRESS_SOURCE_MIGRATION.migrate(db)
                     throw java.io.IOException("source token activation denied")
                 }
-            }).build()
+            }, PodcstDatabase.DETAIL_PAGE_MIGRATION).build()
         assertTrue(runCatching { failed.progress().get("episode:42") }.isFailure)
         failed.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(PodcstDatabase.name(key)).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
@@ -159,4 +159,21 @@ class IdentityMigrationTest {
         assertEquals(2, db.episodes().queue().size)
         assertTrue(db.episodes().queue().all { it.id == null && it.identity.startsWith("local:") })
     }
+    @Test fun detailMembershipMigrationRetainsExistingCatalogueAndProgress() = runTest {
+        oldDatabase(3).use { db ->
+            db.execSQL("INSERT INTO podcasts(feed,id,itunesId,title,author,cover,thumbnail,description,link,published,explicit,keywords,episodeCount,isPrivate,refreshedAt,complete) VALUES('https://test/rss',152,NULL,'Podcast','','','','',NULL,NULL,0,'',100,0,1000,1)")
+            db.execSQL("INSERT INTO progress VALUES('episode:42',95000,100000,0,1000,'token')")
+        }
+        val migrated = PodcstDatabase.open(context, key).also { opened = it }
+        assertEquals(4, migrated.openHelper.readableDatabase.version)
+        val podcast = migrated.podcasts().byId(152)!!
+        assertTrue(podcast.complete)
+        assertNull(podcast.detailEpisodeIds)
+        assertEquals(95000L, migrated.progress().get("episode:42")!!.positionMs)
+        migrated.podcasts().detailPage(152, "episode:42,episode:41")
+        migrated.close()
+        val restarted = PodcstDatabase.open(context, key).also { opened = it }
+        assertEquals("episode:42,episode:41", restarted.podcasts().byId(152)!!.detailEpisodeIds)
+    }
+
 }

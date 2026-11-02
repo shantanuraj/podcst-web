@@ -46,3 +46,11 @@ enum class SortDirection(val value: String) {
     Ascending("asc"),
     Descending("desc"),
 }
+
+
+data class EpisodeQuery(
+    val search: String = "",
+    val sort: EpisodeSort = EpisodeSort.Published,
+    val direction: SortDirection = SortDirection.Descending,
+    val unplayed: Boolean = false,
+)

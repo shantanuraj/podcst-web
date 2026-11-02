@@ -22,6 +22,7 @@ data class PodcastEntity(
     val isPrivate: Boolean,
     val refreshedAt: Long?,
     val complete: Boolean,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val detailEpisodeIds: String? = null,
 )
 
 @Entity(tableName = "episodes", indices = [Index("feed", "published"), Index("id")])

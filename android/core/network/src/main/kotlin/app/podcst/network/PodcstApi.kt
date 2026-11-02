@@ -89,6 +89,7 @@ class PodcstApi(
         sort: EpisodeSort = EpisodeSort.Published,
         direction: SortDirection = SortDirection.Descending,
         limit: Int = 20,
+        unplayed: Boolean = false,
     ): EpisodePage = get<WireEpisodePage>(
         "api/feed/episodes",
         "podcastId" to "$podcastId",
@@ -97,6 +98,7 @@ class PodcstApi(
         "sortDir" to direction.value,
         "cursor" to cursor?.toString(),
         "search" to search?.takeIf { it.isNotEmpty() },
+        "unplayed" to "true".takeIf { unplayed },
     ).domain(podcastId)
 
     suspend fun publicEpisode(episodeId: Long, podcastId: Long): Episode =

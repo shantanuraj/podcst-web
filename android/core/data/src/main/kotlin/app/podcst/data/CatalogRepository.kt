@@ -6,6 +6,8 @@ import app.podcst.database.PodcastEntity
 import app.podcst.database.domain
 import app.podcst.database.entity
 import app.podcst.model.Episode
+import app.podcst.model.EpisodePage
+import app.podcst.model.EpisodeQuery
 import app.podcst.model.EpisodeChapters
 import app.podcst.model.FeedFreshness
 import app.podcst.model.PlaybackRules
@@ -32,6 +34,8 @@ class CatalogRepository(
 ) {
     private data class Seen(val owner: Scope, val epoch: Long, val values: Map<Long, FeedFreshness>)
     private val seen = MutableStateFlow<Seen?>(null)
+    private data class DetailPages(val owner: Scope, val epoch: Long, val pages: Map<Long, EpisodePage>, val denied: Set<Long> = emptySet())
+    private val detailPages = MutableStateFlow<DetailPages?>(null)
     val freshness: Flow<Map<Long, FeedFreshness>> = combine(scopes.current, scopes.verification, seen) { owner, verified, snapshot ->
         if (snapshot?.owner === owner && snapshot.epoch == scopes.epoch && (owner.accountId == null || verified)) snapshot.values else emptyMap()
     }
@@ -97,6 +101,145 @@ class CatalogRepository(
             podcastTitle = result.podcastTitle ?: podcast.title,
             cover = result.cover.ifEmpty { podcast.cover },
         )
+    }
+
+    suspend fun cachedDetail(podcast: Podcast): Podcast? {
+        val owner = scopes.current.value
+        val active = readerActive()
+        checkDetail(active, podcast)
+        if (detailPages.value?.takeIf { it.owner === owner && it.epoch == scopes.epoch }?.denied?.contains(podcast.id) == true) return null
+        val row = podcast.id?.let { owner.database.podcasts().byId(it) } ?: owner.database.podcasts().get(podcast.feed)
+        checkDetail(active, podcast)
+        val snapshot = detailPages.value?.takeIf { it.owner === owner && it.epoch == scopes.epoch }?.pages?.get(podcast.id)
+        val membership = row?.detailEpisodeIds?.split(',')?.filter { it.isNotEmpty() }
+        val persisted = membership?.let { ids ->
+            val episodes = ids.chunked(400).flatMap { owner.database.episodes().get(it) }.associateBy { it.identity }
+            ids.takeIf { ids.all(episodes::containsKey) }?.map { episodes.getValue(it).domain() }
+        }
+        val episodes = if (row?.complete == true) owner.database.episodes().recent(row.feed, Int.MAX_VALUE).map { it.domain() }
+            else persisted ?: snapshot?.episodes.orEmpty()
+        val cached = row?.domain(episodes) ?: snapshot?.let { podcast.copy(episodes = episodes, episodeCount = it.total) }
+        checkDetail(active, cached ?: podcast)
+        return cached?.copy(freshness = snapshot?.freshness)
+    }
+
+    suspend fun resolveDetail(podcast: Podcast): Podcast {
+        val owner = scopes.current.value
+        val active = readerActive()
+        checkDetail(active, podcast)
+        if ((podcast.id ?: 0) > 0) return podcast
+        val resolved = podcast.itunesId?.let {
+            podcast.copy(id = api.resolve(it, podcast.itunesLocale ?: Region.DEFAULT.code))
+        } ?: api.podcast(podcast.feed)
+        checkDetail(active, resolved)
+        if (resolved.feed.isNotEmpty()) store(listOf(resolved), complete = false, owner = owner)
+        checkDetail(active, resolved)
+        return resolved
+    }
+
+    suspend fun detailInfo(podcast: Podcast): Podcast {
+        val owner = scopes.current.value
+        val active = readerActive()
+        checkDetail(active, podcast)
+        val info = detailRequest(podcast) { api.podcastInfo(requireNotNull(podcast.id)) }
+        checkDetail(active, info)
+        val snapshot = detailPages.value?.takeIf { it.owner === owner && it.epoch == scopes.epoch }?.pages?.get(info.id)
+        val episodes = snapshot?.episodes.orEmpty().map { it.detailContext(info) }
+        store(listOf(info.copy(episodes = episodes)), owner = owner)
+        checkDetail(active, info)
+        if (snapshot != null) rememberDetailWindow(owner, requireNotNull(info.id), episodes, prepend = true)
+        checkDetail(active, info)
+        return info
+    }
+
+    suspend fun detailPage(podcast: Podcast, query: EpisodeQuery, cursor: Int?): EpisodePage {
+        val owner = scopes.current.value
+        val active = readerActive()
+        checkDetail(active, podcast)
+        val page = detailRequest(podcast) { api.episodes(requireNotNull(podcast.id), cursor, query.search, query.sort, query.direction, 30, query.unplayed) }
+        checkDetail(active, podcast)
+        val context = owner.database.podcasts().byId(requireNotNull(podcast.id))?.domain() ?: podcast
+        checkDetail(active, context)
+        val episodes = page.episodes.map { it.detailContext(context) }
+        if (episodes.any { it.isPrivate } && owner.accountId == null) throw CancellationException("Private catalogue requires a verified account")
+        if (context.feed.isNotEmpty() && page.freshness?.content != FeedFreshness.Content.missing) store(listOf(context.copy(
+            episodes = episodes,
+            episodeCount = if (query == EpisodeQuery()) page.total else context.episodeCount,
+            freshness = page.freshness,
+        )), complete = false, owner = owner)
+        checkDetail(active, podcast)
+        val result = page.copy(episodes = episodes)
+        if (query == EpisodeQuery() && page.freshness?.content != FeedFreshness.Content.missing) {
+            val epoch = scopes.epoch
+            val id = requireNotNull(podcast.id)
+            if (context.feed.isNotEmpty()) rememberDetailWindow(owner, id, episodes, prepend = cursor == null)
+            checkDetail(active, podcast)
+            detailPages.update { previous ->
+                val current = previous?.takeIf { it.owner === owner && it.epoch == epoch }
+                val existing = current?.pages?.get(id)
+                if (cursor != null && existing == null) current
+                else {
+                    val rows = if (cursor == null) episodes + existing?.episodes.orEmpty() else existing?.episodes.orEmpty() + episodes
+                    DetailPages(owner, epoch,
+                        ((current?.pages.orEmpty() - id) + (id to result.copy(episodes = rows.distinctBy { it.identity }))).entries.toList().takeLast(40).associate { it.toPair() },
+                        current?.denied.orEmpty() - id,
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    private suspend fun rememberDetailWindow(owner: Scope, id: Long, episodes: List<Episode>, prepend: Boolean) {
+        owner.database.withTransaction {
+            val row = owner.database.podcasts().byId(id) ?: return@withTransaction
+            val known = if (row.complete) owner.database.episodes().recent(row.feed, Int.MAX_VALUE).map { it.identity }
+                else row.detailEpisodeIds?.split(',')?.filter { it.isNotEmpty() }
+            if (prepend || known != null) {
+                val incoming = episodes.map { it.identity.value }
+                val identities = if (prepend) incoming + known.orEmpty() else known.orEmpty() + incoming
+                owner.database.podcasts().detailPage(id, identities.distinct().joinToString(","))
+            }
+        }
+    }
+
+    suspend fun refreshDetail(podcast: Podcast): FeedFreshness {
+        val active = readerActive()
+        checkDetail(active, podcast)
+        val freshness = detailRequest(podcast) { api.refresh(requireNotNull(podcast.id)).freshness }
+        checkDetail(active, podcast)
+        return freshness
+    }
+
+    private suspend fun <T> detailRequest(podcast: Podcast, request: suspend () -> T): T {
+        val owner = scopes.current.value
+        val epoch = scopes.epoch
+        val active = readerActive()
+        return try { request() } catch (failure: ApiException) {
+            checkDetail(active, podcast)
+            if (failure.status in listOf(401, 403, 404)) {
+                val id = requireNotNull(podcast.id)
+                detailPages.update { previous ->
+                    val current = previous?.takeIf { it.owner === owner && it.epoch == epoch }
+                    DetailPages(owner, epoch, current?.pages.orEmpty() - id, (current?.denied.orEmpty() + id).toList().takeLast(40).toSet())
+                }
+                owner.database.podcasts().byId(id)?.let { owner.database.podcasts().upsert(listOf(it.copy(complete = false, detailEpisodeIds = null))) }
+                checkDetail(active, podcast)
+            }
+            throw failure
+        }
+    }
+
+    private fun Episode.detailContext(podcast: Podcast) = copy(
+        feed = feed.ifEmpty { podcast.feed },
+        podcastTitle = podcastTitle ?: podcast.title,
+        cover = cover.ifEmpty { podcast.cover },
+        isPrivate = isPrivate || podcast.isPrivate,
+    )
+
+    private suspend fun checkDetail(active: () -> Boolean, podcast: Podcast) {
+        currentCoroutineContext().ensureActive()
+        if (!active() || podcast.isPrivate && scopes.current.value.accountId == null) throw CancellationException("Account changed")
     }
 
     suspend fun chapters(episode: Episode): EpisodeChapters {
@@ -202,7 +345,10 @@ class CatalogRepository(
                     db.execSQL("UPDATE episodes SET feed = ? WHERE podcastId = ?", arrayOf<Any?>(podcast.feed, podcast.id))
                     db.execSQL("DELETE FROM podcasts WHERE feed = ?", arrayOf(previous.feed))
                 }
-                database.podcasts().upsert(listOf(merged(previous ?: database.podcasts().get(podcast.feed), podcast, complete)))
+                val existing = previous ?: database.podcasts().get(podcast.feed)
+                val membership = if (complete == false && existing?.complete == true) database.episodes().recent(podcast.feed, Int.MAX_VALUE).joinToString(",") { it.identity }
+                    else existing?.detailEpisodeIds
+                database.podcasts().upsert(listOf(merged(existing, podcast, complete).copy(detailEpisodeIds = membership)))
                 database.episodes().upsert(podcast.episodes.map { it.entity() })
                 val db = database.openHelper.writableDatabase
                 val archived = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='legacy_episode_source'").use { it.moveToFirst() }
@@ -254,6 +400,7 @@ class CatalogRepository(
             published = entity.published ?: existing.published,
             keywords = entity.keywords.ifEmpty { existing.keywords },
             episodeCount = maxOf(entity.episodeCount, existing.episodeCount),
+            detailEpisodeIds = existing.detailEpisodeIds,
         )
     }
 
