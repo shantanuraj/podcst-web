@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -160,7 +164,7 @@ fun PodcastScreen(
             onRefresh = viewModel::refresh,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
-            LazyColumn(Modifier.fillMaxSize(), state = list) {
+            LazyColumn(Modifier.widthIn(max = 1120.dp).fillMaxSize().align(Alignment.TopCenter), state = list) {
                 item(key = "hero") { Hero(state, viewModel, actions, tint, Modifier.onSizeChanged { headerHeight = it.height }) }
                 stickyHeader(key = "tabs") { Tabs(tab) { tab = it } }
                 when (tab) {
@@ -188,67 +192,96 @@ private fun Overflow(state: PodcastScreenState, viewModel: PodcastViewModel) {
 
 @Composable
 private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, tint: ArtworkTint, modifier: Modifier) {
-    val colors = Podcst.colors
-    val podcast = state.podcast
-    val toaster = LocalToaster.current
-    val failure = stringResource(R.string.subscription_failed)
     var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp)) {
-        Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
-            Artwork(podcast.cover, 132.dp, corner = 16.dp, tint = tint)
-            Column(Modifier.padding(bottom = 4.dp)) {
-                Text(
-                    podcast.title,
-                    style = Podcst.type.title.copy(fontSize = 30.sp),
-                    color = colors.ink,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { heading() },
-                )
-                if (podcast.author.isNotBlank()) {
-                    Text(podcast.author, style = Podcst.type.body, color = colors.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+    BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 24.dp)) {
+        val wide = maxWidth >= 800.dp && LocalDensity.current.fontScale <= 1.3f
+        if (wide) {
+            Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
+                Artwork(state.podcast.cover, 176.dp, corner = 16.dp, tint = tint)
+                Column(Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    PodcastIdentity(state, wide = true)
+                    PodcastActions(state, viewModel, actions, Modifier.widthIn(max = 360.dp))
                 }
-                state.updated?.let { Eyebrow(stringResource(R.string.updated, Format.date(it)), Modifier.padding(top = 4.dp)) }
+                if (state.description.isNotEmpty()) {
+                    PodcastDescription(state.description, expanded, { expanded = !expanded }, 7, Modifier.weight(1f).padding(top = 6.dp))
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
+                    Artwork(state.podcast.cover, 132.dp, corner = 16.dp, tint = tint)
+                    PodcastIdentity(state, wide = false, Modifier.weight(1f).padding(bottom = 4.dp))
+                }
+                PodcastActions(state, viewModel, actions)
+                if (state.description.isNotEmpty()) {
+                    PodcastDescription(state.description, expanded, { expanded = !expanded }, 3)
+                }
             }
         }
-        Row(Modifier.padding(horizontal = 20.dp).padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PodcstButton(
-                stringResource(if (state.subscribed) R.string.subscribed else R.string.subscribe),
-                onClick = { viewModel.toggleSubscription { toaster.show(failure, it.message) } },
-                modifier = Modifier.weight(1f),
-                kind = if (state.subscribed) ButtonKind.Outline else ButtonKind.Accent,
-                icon = PodcstIcons.Check.takeIf { state.subscribed },
-                iconTint = colors.accent,
-                height = 44.dp,
-                corner = 22.dp,
-                loading = state.subscribing,
-            )
-            PodcstButton(
-                stringResource(R.string.play_latest),
-                onClick = { state.latest?.let(actions::play) },
-                modifier = Modifier.weight(1f),
-                kind = ButtonKind.Outline,
-                icon = PodcstIcons.Play,
-                height = 44.dp,
-                corner = 22.dp,
-                enabled = state.latest != null,
-            )
-        }
-        if (state.description.isNotEmpty()) {
-            Text(
-                state.description,
-                style = Podcst.type.body,
-                color = colors.secondary,
-                maxLines = if (expanded) Int.MAX_VALUE else 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(top = 16.dp)
-                    .clickable(onClickLabel = stringResource(if (expanded) R.string.collapse_description else R.string.expand_description)) { expanded = !expanded }
-                    .animateContentSize()
-                    .padding(horizontal = 20.dp),
-            )
-        }
     }
+}
+
+@Composable
+private fun PodcastIdentity(state: PodcastScreenState, wide: Boolean, modifier: Modifier = Modifier) {
+    val podcast = state.podcast
+    val colors = Podcst.colors
+    Column(modifier) {
+        Text(
+            podcast.title,
+            style = if (wide) Podcst.type.largeTitle else Podcst.type.title.copy(fontSize = 30.sp),
+            color = colors.ink,
+            maxLines = if (LocalDensity.current.fontScale > 1.3f) Int.MAX_VALUE else 4,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.semantics { heading() },
+        )
+        if (podcast.author.isNotBlank()) {
+            Text(podcast.author, style = Podcst.type.body, color = colors.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+        }
+        state.updated?.let { Eyebrow(stringResource(R.string.updated, Format.date(it)), Modifier.padding(top = 8.dp)) }
+    }
+}
+
+@Composable
+private fun PodcastActions(state: PodcastScreenState, viewModel: PodcastViewModel, actions: EpisodeActions, modifier: Modifier = Modifier) {
+    val toaster = LocalToaster.current
+    val failure = stringResource(R.string.subscription_failed)
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        PodcstButton(
+            stringResource(if (state.subscribed) R.string.subscribed else R.string.subscribe),
+            onClick = { viewModel.toggleSubscription { toaster.show(failure, it.message) } },
+            modifier = Modifier.weight(1f),
+            kind = if (state.subscribed) ButtonKind.Outline else ButtonKind.Accent,
+            icon = PodcstIcons.Check.takeIf { state.subscribed },
+            iconTint = Podcst.colors.accent,
+            height = 44.dp,
+            corner = 22.dp,
+            loading = state.subscribing,
+        )
+        PodcstButton(
+            stringResource(R.string.play_latest),
+            onClick = { state.latest?.let(actions::play) },
+            modifier = Modifier.weight(1f),
+            kind = ButtonKind.Outline,
+            icon = PodcstIcons.Play,
+            height = 44.dp,
+            corner = 22.dp,
+            enabled = state.latest != null,
+        )
+    }
+}
+
+@Composable
+private fun PodcastDescription(description: String, expanded: Boolean, onToggle: () -> Unit, lines: Int, modifier: Modifier = Modifier) {
+    Text(
+        description,
+        style = Podcst.type.body,
+        color = Podcst.colors.secondary,
+        maxLines = if (expanded || LocalDensity.current.fontScale > 1.3f) Int.MAX_VALUE else lines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .clickable(onClickLabel = stringResource(if (expanded) R.string.collapse_description else R.string.expand_description), onClick = onToggle)
+            .animateContentSize(),
+    )
 }
 
 @Composable
@@ -283,8 +316,7 @@ private fun Tabs(selected: PodcastTab, onSelect: (PodcastTab) -> Unit) {
 }
 
 private fun LazyListScope.episodes(state: PodcastScreenState, query: String, viewModel: PodcastViewModel, actions: EpisodeActions) {
-    item(key = "episodes-header") { EpisodesHeader(state, viewModel) }
-    if (state.podcast.episodes.size > FILTER_THRESHOLD) item(key = "filter") { FilterField(query, viewModel::filter) }
+    item(key = "episodes-header") { EpisodesHeader(state, query, viewModel) }
     items(state.episodes, key = { it.identity.value }, contentType = { "episode" }) { episode ->
         DatedEpisodeRow(state.marks.row(episode), actions, Modifier.animateItem())
     }
@@ -305,44 +337,52 @@ private fun LazyListScope.episodes(state: PodcastScreenState, query: String, vie
 }
 
 @Composable
-private fun EpisodesHeader(state: PodcastScreenState, viewModel: PodcastViewModel) {
+private fun EpisodesHeader(state: PodcastScreenState, query: String, viewModel: PodcastViewModel) {
     val colors = Podcst.colors
     var open by remember { mutableStateOf(false) }
     val sortLabel = stringResource(R.string.sort_episodes)
-    Row(
-        Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(pluralStringResource(R.plurals.episode_count, state.count, state.count), style = Podcst.type.caption, color = colors.tertiary, modifier = Modifier.weight(1f))
-        if (state.load == LoadState.Loading) CircularProgressIndicator(Modifier.size(14.dp), color = colors.tertiary, strokeWidth = 1.5.dp)
-        Box {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 840.dp && LocalDensity.current.fontScale <= 1.3f
+        val filterable = state.podcast.episodes.size > FILTER_THRESHOLD
+        Column {
             Row(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .clickable(onClickLabel = sortLabel, role = Role.DropdownList) { open = true }
-                    .padding(horizontal = 12.dp),
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(PodcstIcons.Sort, null, Modifier.size(16.dp), tint = colors.secondary)
-                Text(stringResource(state.order.label), style = Podcst.type.caption, color = colors.secondary)
-            }
-            DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(14.dp), containerColor = colors.elevated) {
-                EpisodeOrder.all.forEach { order ->
-                    val chosen = order == state.order
-                    MenuEntry(stringResource(order.label), PodcstIcons.Check.takeIf { chosen }, tint = colors.accent, emphasized = chosen) {
-                        open = false
-                        viewModel.order(order)
+                Text(pluralStringResource(R.plurals.episode_count, state.count, state.count), style = Podcst.type.caption, color = colors.tertiary, modifier = Modifier.weight(1f))
+                if (wide && filterable) FilterField(query, viewModel::filter, Modifier.width(280.dp))
+                if (state.load == LoadState.Loading) CircularProgressIndicator(Modifier.size(14.dp), color = colors.tertiary, strokeWidth = 1.5.dp)
+                Box {
+                    Row(
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .clickable(onClickLabel = sortLabel, role = Role.DropdownList) { open = true }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(PodcstIcons.Sort, null, Modifier.size(16.dp), tint = colors.secondary)
+                        Text(stringResource(state.order.label), style = Podcst.type.caption, color = colors.secondary)
+                    }
+                    DropdownMenu(open, onDismissRequest = { open = false }, shape = RoundedCornerShape(14.dp), containerColor = colors.elevated) {
+                        EpisodeOrder.all.forEach { order ->
+                            val chosen = order == state.order
+                            MenuEntry(stringResource(order.label), PodcstIcons.Check.takeIf { chosen }, tint = colors.accent, emphasized = chosen) {
+                                open = false
+                                viewModel.order(order)
+                            }
+                        }
                     }
                 }
             }
+            if (!wide && filterable) FilterField(query, viewModel::filter)
         }
     }
 }
 
 @Composable
-private fun FilterField(query: String, onQuery: (String) -> Unit) {
+private fun FilterField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
     val colors = Podcst.colors
     val shape = RoundedCornerShape(12.dp)
     val placeholder = stringResource(R.string.filter_episodes)
@@ -352,7 +392,7 @@ private fun FilterField(query: String, onQuery: (String) -> Unit) {
         singleLine = true,
         textStyle = Podcst.type.body.copy(color = colors.ink),
         cursorBrush = SolidColor(colors.accent),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .semantics { contentDescription = placeholder },
@@ -397,7 +437,7 @@ private fun About(state: PodcastScreenState) {
     val podcast = state.podcast
     val uri = LocalUriHandler.current
     val website = webpage(podcast.link)
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         if (state.description.isNotEmpty()) Text(state.description, style = Podcst.type.notes, color = colors.secondary)
         Column {
             if (website != null) {
