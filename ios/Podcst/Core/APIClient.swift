@@ -6,7 +6,7 @@ import UIKit
 
 @MainActor
 @Observable
-public final class APIClient {
+public final class APIClient: PodcastDetailService {
     public nonisolated static let productionBaseURL = URL(string: "https://www.podcst.app")!
 
     private let baseURL: URL
@@ -27,6 +27,7 @@ public final class APIClient {
     }
     private let keychain: any SessionCredentialStore
     private let feedCache = FeedCache(storageURL: FeedCache.defaultStorageURL())
+    let podcastPages = PodcastPageCache()
     private let topCache = PodcastSnapshotCache(namespace: "top", lifetime: 3600)
     private let subscriptionCache = PodcastSnapshotCache(namespace: "subscriptions", lifetime: 86400)
     private var topRequests: [String: Task<[Podcast], Error>] = [:]
@@ -166,6 +167,45 @@ public final class APIClient {
         let resolved = try await self.podcast(feed: podcast.feed, forceRefresh: forceRefresh)
         guard resolved.id != nil else { return resolved }
         return try await detail(of: resolved, forceRefresh: forceRefresh, recheck: recheck, refreshIfStale: refreshIfStale)
+    }
+
+    func persistPodcastPage(id: Int) {
+        guard let info = podcastPages.info(id), let page = podcastPages.page(id, query: PodcastEpisodeQuery()) else { return }
+        feedCache.storePage(page, podcast: info)
+    }
+
+    func retainPodcast(_ podcast: Podcast, followed: Bool) {
+        if followed { feedCache.markSubscribed([podcast]) }
+        else if let id = podcast.id { feedCache.removeSubscription(id: id) }
+    }
+
+    func invalidatePodcast(id: Int) {
+        podcastPages.remove(id)
+        feedCache.invalidate(id)
+    }
+
+    func resolvePodcast(_ podcast: Podcast) async throws -> Podcast {
+        if podcast.id != nil { return podcast }
+        if let itunesId = podcast.itunesId {
+            let identity: RawPodcastIdentity = try await post(path: "/api/feed/resolve", body: ResolvePodcastBody(itunes_id: String(itunesId), locale: podcast.itunesLocale ?? "us"))
+            var resolved = podcast
+            resolved.id = identity.id
+            return resolved
+        }
+        return try await self.podcast(feed: podcast.feed)
+    }
+
+    func latestEpisode(of podcast: Podcast) async throws -> Episode? {
+        let token = activityToken
+        let resolved = try await resolvePodcast(podcast)
+        guard let id = resolved.id, activityToken == token else { throw CancellationError() }
+        return try await awaitFeedContent(read: {
+            let page = try await self.episodes(podcastID: id, limit: 1)
+            if page.freshness?.content == .missing {
+                throw APIError(statusCode: 202, message: "Preparing episodes", freshness: page.freshness)
+            }
+            return page.episodes.first
+        }, active: { self.activityToken == token }, pending: { _ in })
     }
 
     public func podcastInfo(id: Int) async throws -> Podcast {
@@ -338,6 +378,7 @@ public final class APIClient {
     func beginAuthentication() {
         authorizationCoordinator?.cancel()
         sessionRevision = UUID()
+        podcastPages.clear()
         subscriptionRequest?.cancel()
         subscriptionRequest = nil
     }
@@ -355,6 +396,7 @@ public final class APIClient {
     func clearSession() {
         authorizationCoordinator?.cancel()
         sessionRevision = UUID()
+        podcastPages.clear()
         sessionCookie = nil
         currentUserID = nil
         try? keychain.delete()
@@ -726,10 +768,36 @@ final class FeedCache {
         }
     }
 
+    func storePage(_ page: EpisodePage, podcast: Podcast) {
+        guard let id = podcast.id, page.freshness?.content != .missing else { return }
+        identify(id: id, feed: podcast.feed)
+        var snapshot = podcast
+        snapshot.episodes = retainingEpisodes(page.episodes, previous: entries[.id(id)]?.podcast.episodes ?? [])
+        snapshot.episodeCount = max(podcast.episodeCount, page.total)
+        snapshot.freshness = page.freshness
+        let date = now()
+        entries[.id(id)] = Entry(podcast: snapshot, expires: date.addingTimeInterval(lifetime), lastAccess: date, persistent: persistentIDs.contains(id), complete: !page.hasMore && snapshot.episodeCount <= page.episodes.count && snapshot.episodes.count == page.episodes.count)
+        evictIfNeeded()
+        persist()
+    }
+
+    func invalidate(_ id: Int) {
+        let feeds = feedIDs.filter { $0.value == id }.map(\.key)
+        let keys = [Key.id(id)] + feeds.map(Key.feed)
+        for key in keys {
+            pending[key]?.task.cancel()
+            pending[key] = nil
+            entries[key] = nil
+        }
+        for feed in feeds { feedIDs[feed] = nil }
+        persistentIDs.remove(id)
+        persist()
+    }
+
     func load(_ requestedKey: Key, refreshing: Bool = false, fetch: @escaping @MainActor () async throws -> Podcast) async throws -> Podcast {
         let resolved = key(requestedKey)
         if !refreshing, var entry = entries[resolved] {
-            let usable = entry.expires > now() && (!entry.persistent || entry.complete)
+            let usable = entry.expires > now() && entry.complete
             if usable {
                 entry.lastAccess = now()
                 entries[resolved] = entry
@@ -773,7 +841,7 @@ final class FeedCache {
                 persist()
                 throw error
             }
-            if !refreshing, let stale = entries[resolved]?.podcast { return stale }
+            if !refreshing, let entry = entries[resolved], entry.complete { return entry.podcast }
             throw error
         }
     }
@@ -785,12 +853,24 @@ final class FeedCache {
         let key = Key.id(id)
         if var entry = entries[key] {
             entry.persistent = true
-            if !entry.complete { entry.podcast = podcast }
+            if !entry.complete {
+                var snapshot = podcast
+                snapshot.episodes = retainingEpisodes(podcast.episodes, previous: entry.podcast.episodes)
+                snapshot.episodeCount = max(podcast.episodeCount, entry.podcast.episodeCount)
+                if snapshot.description.isEmpty { snapshot.description = entry.podcast.description }
+                entry.podcast = snapshot
+            }
             entries[key] = entry
         } else {
             let date = now()
             entries[key] = Entry(podcast: podcast, expires: .distantPast, lastAccess: date, persistent: true, complete: false)
         }
+    }
+
+    private func retainingEpisodes(_ incoming: [Episode], previous: [Episode]) -> [Episode] {
+        var known = Set(incoming.map(\.identity))
+        return (incoming + previous.filter { known.insert($0.identity).inserted })
+            .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
     }
 
     private func key(_ requested: Key) -> Key {

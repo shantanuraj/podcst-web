@@ -234,7 +234,7 @@ private struct PlayLatestButton: View {
     var body: some View {
         Button {
             Task {
-                if let latest = try? await api.detail(of: podcast).episodes.first { playback.play(latest) }
+                if let latest = try? await api.latestEpisode(of: podcast) { playback.play(latest) }
             }
         } label: {
             if expanded {

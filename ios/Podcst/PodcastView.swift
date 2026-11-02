@@ -9,36 +9,26 @@ struct PodcastDetailView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     let podcast: Podcast
-    @State private var detail: Podcast?
-    @State private var isLoading = false
-    @State private var detailError = false
+    @State private var store = PodcastDetailStore()
     @State private var filter = ""
     @State private var newestFirst = true
     @State private var expanded = false
     @State private var titleVisible = false
     @State private var readAttempt = UUID()
-    @State private var readOwner = UUID()
-    @State private var recheckOwner = UUID()
-    @State private var isRechecking = false
+    @State private var forceRefresh = false
     @State private var episodePosition: String? = "podcast-top"
     @State private var recommendations: (key: String, podcasts: [Podcast])?
     @AppStorage(DiscoveryRegion.key) private var region = DiscoveryRegion.detected.rawValue
 
-    private var content: Podcast { detail ?? podcast }
-
+    private var currentScope: Bool { store.scope == nil || store.scope == api.activityToken }
+    private var content: Podcast {
+        guard currentScope else { return Podcast(id: podcast.id, feed: "", title: "Podcast unavailable") }
+        return store.podcast ?? podcast
+    }
+    private var query: PodcastEpisodeQuery { PodcastEpisodeQuery(search: filter.trimmingCharacters(in: .whitespacesAndNewlines), newestFirst: newestFirst) }
     private var relatedKey: String { "\(content.identity):\(content.isPrivate == true):\(region):\(api.activityToken)" }
-
     private var relatedPodcasts: [Podcast] {
         recommendations?.key == relatedKey ? recommendations?.podcasts ?? [] : []
-    }
-
-    private var episodes: [Episode] {
-        let sorted = content.episodes.sorted {
-            let order = ($0.published ?? .distantPast) > ($1.published ?? .distantPast)
-            return newestFirst ? order : !order
-        }
-        guard !filter.isEmpty else { return sorted }
-        return sorted.filter { $0.title.localizedCaseInsensitiveContains(filter) }
     }
 
     var body: some View {
@@ -49,7 +39,7 @@ struct PodcastDetailView: View {
                 if #available(iOS 27.1, *), geometry.hasInteriorFold {
                     ArrangementView {
                         ScrollView {
-                            PodcastHeader(podcast: content, latest: episodes.first, wide: false, aboutWidth: nil, expanded: $expanded)
+                            PodcastHeader(podcast: content, latest: currentScope ? store.latest : nil, wide: false, aboutWidth: nil, expanded: $expanded)
                                 .padding(20)
                         }
                         .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: 180, headerHeight: 360))
@@ -76,21 +66,13 @@ struct PodcastDetailView: View {
             guard !Task.isCancelled, relatedKey == key else { return }
             recommendations = (key, podcasts)
         }
-        .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt)") {
+        .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt):\(query)") {
             guard scenePhase == .active else { return }
-            let owner = UUID()
-            recheckOwner = owner
-            isRechecking = true
-            defer { if recheckOwner == owner { isRechecking = false } }
-            let startedAt = Date()
-            await loadDetails(recheck: true, refreshIfStale: true)
-            while !Task.isCancelled, scenePhase == .active, let delay = content.freshness?.recheckDelay(startedAt: startedAt) {
-                do { try await Task.sleep(for: .seconds(delay)); try Task.checkCancellation() }
-                catch { return }
-                await loadDetails(recheck: true)
-                if detailError { return }
-            }
+            let refresh = forceRefresh
+            forceRefresh = false
+            await store.load(podcast, api: api, query: query, forceRefresh: refresh)
         }
+        .onChange(of: query) { _, _ in episodePosition = "podcast-episodes" }
     }
 
     private func episodeScroll(wide: Bool, showsHeader: Bool, aboutWidth: CGFloat?, relatedWidth: CGFloat?) -> some View {
@@ -98,71 +80,16 @@ struct PodcastDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if showsHeader {
                     VStack {
-                        PodcastHeader(podcast: content, latest: episodes.first, wide: wide, aboutWidth: aboutWidth, expanded: $expanded)
+                        PodcastHeader(podcast: content, latest: currentScope ? store.latest : nil, wide: wide, aboutWidth: aboutWidth, expanded: $expanded)
                             .padding(.bottom, 28)
                             .id("podcast-top")
                     }
                     .scrollTargetLayout()
                 }
                 HStack(alignment: .top, spacing: 32) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        SectionHeader("Episodes") {
-                            HStack(spacing: 14) {
-                                if wide, relatedWidth == nil, content.episodes.count > 10 {
-                                    episodeFilter
-                                        .frame(maxWidth: 240)
-                                }
-                                if isLoading, !content.episodes.isEmpty { ProgressView().controlSize(.small) }
-                                Menu {
-                                    Picker("Order", selection: $newestFirst) {
-                                        Text("Newest first").tag(true)
-                                        Text("Oldest first").tag(false)
-                                    }
-                                } label: {
-                                    Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
-                                        .font(.sans(.footnote))
-                                        .foregroundStyle(PodcstPalette.tertiary)
-                                }
-                            }
-                        }
-                        .id(showsHeader ? "podcast-episodes" : "podcast-top")
-                        if !detailError || isRechecking, content.awaitsEpisodes {
-                            if content.freshness?.state == .pending || isRechecking || isLoading {
-                                HStack(spacing: 10) {
-                                    ProgressView().controlSize(.small)
-                                    Text("Preparing episodes…")
-                                }
-                                .font(.sans(.subheadline))
-                                .foregroundStyle(PodcstPalette.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 30)
-                            } else {
-                                ErrorRow(message: "Episodes couldn’t be loaded right now.") { readAttempt = UUID() }
-                                    .padding(.vertical, 12)
-                            }
-                        }
-                        if detailError && content.episodes.isEmpty && !isRechecking {
-                            ErrorRow(message: "Couldn't load episodes.") {
-                                await loadDetails(forceRefresh: true)
-                            }
-                        }
-                        if !wide || relatedWidth != nil, content.episodes.count > 10 {
-                            episodeFilter.padding(.vertical, 12)
-                        }
-                        if !content.episodes.isEmpty {
-                            ForEach(episodes, id: \.identity) { episode in
-                                EpisodeRow(episode: episode, showsSummary: wide)
-                                    .id(episode.identity)
-                            }
-                        } else if isLoading, !content.awaitsEpisodes {
-                            ProgressView().frame(maxWidth: .infinity).padding(30)
-                        } else if !detailError && content.freshness?.content != .missing {
-                            Text("No episodes available.")
-                                .foregroundStyle(PodcstPalette.secondary)
-                                .padding(.vertical, 20)
-                        }
+                    PodcastEpisodesView(store: store, query: query, filter: $filter, newestFirst: $newestFirst, wide: wide, inlineFilter: wide && relatedWidth == nil, showsHeader: showsHeader) {
+                        readAttempt = UUID()
                     }
-                    .scrollTargetLayout()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if let relatedWidth {
                         RelatedPodcastsView(podcasts: relatedPodcasts)
@@ -176,7 +103,7 @@ struct PodcastDetailView: View {
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }
-        .refreshable { await loadDetails(forceRefresh: true) }
+        .refreshable { forceRefresh = true; readAttempt = UUID() }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > 250
         } action: { _, visible in
@@ -184,34 +111,104 @@ struct PodcastDetailView: View {
         }
     }
 
-    private var episodeFilter: some View {
-        TextField("Filter episodes", text: $filter)
+}
+
+private struct PodcastEpisodesView: View {
+    @Environment(APIClient.self) private var api
+    let store: PodcastDetailStore
+    let query: PodcastEpisodeQuery
+    @Binding var filter: String
+    @Binding var newestFirst: Bool
+    let wide: Bool
+    let inlineFilter: Bool
+    let showsHeader: Bool
+    let retry: () -> Void
+
+    private var visible: Bool { store.scope == api.activityToken && store.query == query }
+    private var episodes: [Episode] { visible ? store.episodes : [] }
+    private var total: Int { max(store.podcast?.episodeCount ?? 0, store.page?.total ?? 0) }
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            SectionHeader("Episodes") {
+                HStack(spacing: 14) {
+                    if inlineFilter, total > 10 || !filter.isEmpty {
+                        PodcastEpisodeFilter(text: $filter).frame(maxWidth: 240)
+                    }
+                    if store.isLoading, !episodes.isEmpty { ProgressView().controlSize(.small) }
+                    Menu {
+                        Picker("Order", selection: $newestFirst) {
+                            Text("Newest first").tag(true)
+                            Text("Oldest first").tag(false)
+                        }
+                    } label: {
+                        Text("\(total) · \(newestFirst ? "Newest first" : "Oldest first")")
+                            .font(.sans(.footnote))
+                            .foregroundStyle(PodcstPalette.tertiary)
+                    }
+                }
+            }
+            .id(showsHeader ? "podcast-episodes" : "podcast-top")
+            if !inlineFilter, total > 10 || !filter.isEmpty {
+                PodcastEpisodeFilter(text: $filter).padding(.vertical, 12)
+            }
+            if visible, store.loadFailed || store.updateFailed {
+                ErrorRow(message: episodes.isEmpty ? "Couldn't load episodes." : "Couldn't check for updates. Showing saved episodes.") { retry() }
+                    .padding(.vertical, 12)
+            }
+            ForEach(episodes, id: \.identity) { episode in
+                EpisodeRow(episode: episode, showsSummary: wide)
+                    .id(episode.identity)
+            }
+            if episodes.isEmpty {
+                if !visible || store.isLoading || store.isRechecking {
+                    HStack(spacing: 10) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading episodes…")
+                    }
+                    .font(.sans(.subheadline))
+                    .foregroundStyle(PodcstPalette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 30)
+                } else if !store.loadFailed {
+                    Text(query.search.isEmpty ? "No episodes available." : "No episodes match your search.")
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .padding(.vertical, 20)
+                }
+            }
+            if visible, store.hasMore {
+                if store.moreFailed {
+                    ErrorRow(message: "Couldn't load more episodes.") {
+                        if store.loadFailed { retry() }
+                        else { await store.loadMore(api: api) }
+                    }
+                        .padding(.vertical, 12)
+                } else {
+                    Button {
+                        Task { await store.loadMore(api: api) }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if store.isLoadingMore { ProgressView().controlSize(.small) }
+                            Text("Load more episodes")
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .disabled(store.isLoading || store.isLoadingMore || store.loadFailed)
+                    .task(id: store.page?.nextCursor) { await store.loadMore(api: api) }
+                }
+            }
+        }
+        .scrollTargetLayout()
+    }
+}
+
+private struct PodcastEpisodeFilter: View {
+    @Binding var text: String
+
+    var body: some View {
+        TextField("Filter episodes", text: $text)
             .modifier(FieldChrome())
             .accessibilityLabel("Filter episodes")
-    }
-
-    private func loadDetails(forceRefresh: Bool = false, recheck: Bool = false, refreshIfStale: Bool = false) async {
-        if forceRefresh, Double(content.freshness?.retryAtMs ?? 0) > Date().timeIntervalSince1970 * 1000 { return }
-        let token = api.activityToken
-        let owner = UUID()
-        readOwner = owner
-        detail = detail ?? api.cachedPodcast(id: podcast.id, feed: podcast.feed)
-        let source = detail ?? podcast
-        isLoading = forceRefresh || source.episodes.count <= 2 || source.episodes.count < source.episodeCount
-        detailError = false
-        defer { if readOwner == owner { isLoading = false } }
-        do {
-            let result = try await api.detail(of: source, forceRefresh: forceRefresh, recheck: recheck, refreshIfStale: refreshIfStale)
-            guard !Task.isCancelled, api.activityToken == token, readOwner == owner else { return }
-            detail = result
-            if forceRefresh { readAttempt = UUID() }
-        } catch {
-            guard !Task.isCancelled, api.activityToken == token, readOwner == owner else { return }
-            if let failure = error as? APIError, [401, 403, 404].contains(failure.statusCode) {
-                detail = Podcast(id: source.id, feed: "", title: "Podcast unavailable", isPrivate: source.isPrivate ?? false)
-            }
-            detailError = true
-        }
     }
 }
 

@@ -157,6 +157,7 @@ public final class LibraryStore {
             }
             let followed = !isSubscribed(podcast)
             try durable.setFollow(podcast, followed: followed)
+            api.retainPodcast(podcast, followed: followed)
             if followed { podcasts.append(podcast) } else { podcasts.removeAll { $0.identity == podcast.identity } }
             error = nil
             if accountID == nil, followed { try await loadGuestPodcast(podcast) }

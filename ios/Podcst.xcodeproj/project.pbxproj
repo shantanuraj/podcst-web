@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        F11000000000000000000002 = {isa = PBXBuildFile; fileRef = F11000000000000000000001; };
+        F11000000000000000000003 = {isa = PBXBuildFile; fileRef = F11000000000000000000001; };
+        F11000000000000000000005 = {isa = PBXBuildFile; fileRef = F11000000000000000000004; };
 		D31100000000000000000003 = {isa = PBXBuildFile; fileRef = D31100000000000000000004; };
 		D31100000000000000000001 = {isa = PBXBuildFile; fileRef = D31100000000000000000002; };
         D04000000000000000000001 = {isa = PBXBuildFile; fileRef = D01000000000000000000001; };
@@ -192,6 +195,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+        F11000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/PodcastDetailStore.swift; sourceTree = "<group>"; };
+        F11000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastDetailStoreTests.swift; sourceTree = "<group>"; };
 		D31100000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
 		D31100000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/AccountDeletionStore.swift; sourceTree = "<group>"; };
 		AC3200000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ChapterMetadata.swift; sourceTree = "<group>"; };
@@ -373,6 +378,7 @@
 				A01500000000000000000001 /* Playback/Native/PodcstLimiterAudioUnit.h */,
 				9E3F6A07B2D14C85E6A1F3D9 /* Assets.xcassets */,
 				3C2869B1B1D5A358576E332C /* Core/APIClient.swift */,
+                F11000000000000000000001,
 				60117ACA4B7F8539E828D834 /* Core/LibraryStore.swift */,
 				F01200000000000000000003 /* Feed limits */,
 				F01200000000000000000001 /* Core/FeedContract.swift */,
@@ -456,6 +462,7 @@
 				A01500000000000000000008 /* NativeRenderTests.mm */,
 				A01500000000000000000007 /* LocalAudioTests.swift */,
 				B8D72E4C0F614A5C9E2F1D36 /* FeedCacheTests.swift */,
+                F11000000000000000000004,
 				20A41063775FC41C3DF79D8A /* PlaybackTests.swift */,
 				AC4000000000000000000001 /* ContractFixtureTests.swift */,
 				D03000000000000000000001,
@@ -698,6 +705,7 @@
 				A01500000000000000000018 /* NativeRenderTests.mm in Sources */,
 				A01500000000000000000017 /* LocalAudioTests.swift in Sources */,
 				A3E541D0B85A4C6F9D3E7B21 /* FeedCacheTests.swift in Sources */,
+                F11000000000000000000005,
 				6F68F06B673CE6B12194ED83 /* PlaybackTests.swift in Sources */,
 				AC4000000000000000000002 /* ContractFixtureTests.swift in Sources */,
 				D03000000000000000000002,
@@ -743,6 +751,7 @@
 				A01500000000000000000014 /* Playback/LocalAudioDecoder.swift in Sources */,
 				A01500000000000000000012 /* Playback/Native/PodcstLimiterAudioUnit.mm in Sources */,
 				7B593FE8762E76C85CC81150 /* Core/APIClient.swift in Sources */,
+                F11000000000000000000002,
 				A9F95465554040AFD6737C4A /* Core/LibraryStore.swift in Sources */,
 				F01200000000000000000002 /* Core/FeedContract.swift in Sources */,
 				D01000000000000000000002 /* Core/StateContract.swift in Sources */,
@@ -814,6 +823,7 @@
 				AB2000000000000000000115,
 				AB2000000000000000000116,
 				AB2000000000000000000117,
+                F11000000000000000000003,
 				AB2000000000000000000118,
 				AB2000000000000000000119,
 				AB2000000000000000000120,
