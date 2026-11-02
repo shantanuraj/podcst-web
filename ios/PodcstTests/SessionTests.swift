@@ -6,6 +6,134 @@ import XCTest
 @testable import Podcst
 
 @MainActor
+final class EpisodeChaptersAPITests: XCTestCase {
+    func testReadsChaptersByDatabaseIdentityWithCurrentAccountCredentials() async throws {
+        for accountID: String? in [nil, "listener"] {
+            let (api, _) = fixture(accountID: accountID)
+            defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+            for source in ["embedded", "shownotes", "none"] {
+                GuestLibraryURLProtocol.handler = { pending in
+                    XCTAssertEqual(pending.request.url?.path, "/api/episodes/42/chapters")
+                    XCTAssertNil(pending.request.url?.query)
+                    XCTAssertEqual(pending.request.httpMethod, "GET")
+                    XCTAssertEqual(pending.request.cachePolicy, .reloadIgnoringLocalCacheData)
+                    XCTAssertFalse(pending.request.httpShouldHandleCookies)
+                    XCTAssertEqual(pending.request.value(forHTTPHeaderField: "Cookie"), accountID.map { "session=\($0)-session" })
+                    let body = source == "none"
+                        ? #"{"source":"none","chapters":[]}"#
+                        : #"{"source":"SOURCE","chapters":[{"title":"Opening","start":0},{"title":"Topic","start":12.5}]}"#.replacingOccurrences(of: "SOURCE", with: source)
+                    pending.complete(.success((Data(body.utf8), ["Cache-Control": "private, no-store"])))
+                }
+                let result = try await api.chapters(for: episode(isPrivate: accountID != nil))
+                XCTAssertEqual(result.source.rawValue, source)
+                XCTAssertEqual(result.chapters, source == "none" ? [] : [Chapter(title: "Opening", start: 0), Chapter(title: "Topic", start: 12.5)])
+            }
+        }
+    }
+
+    func testUnavailableIdentityPrivateGuestsAndDeletionBlockDoNotRequestChapters() async throws {
+        let (api, credentials) = fixture()
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Unavailable chapters must not make a request") }
+        var local = episode()
+        local.id = nil
+        let missing = try await api.chapters(for: local)
+        XCTAssertEqual(missing, EpisodeChapters(chapters: [], source: .none))
+        do {
+            _ = try await api.chapters(for: episode(isPrivate: true))
+            XCTFail("Private episodes require a restored account")
+        } catch {
+            XCTAssertEqual((error as? APIError)?.statusCode, 401)
+        }
+        credentials.write("listener-session")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GuestLibraryURLProtocol.self]
+        let restoring = APIClient(baseURL: URL(string: "https://chapters.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        do {
+            _ = try await restoring.chapters(for: episode(isPrivate: true))
+            XCTFail("Saved credentials alone must not grant private access")
+        } catch {
+            XCTAssertEqual((error as? APIError)?.statusCode, 401)
+        }
+        restoring.restoreAccount("listener")
+        restoring.deletionBlocked = { $0 == "listener" }
+        do {
+            _ = try await restoring.chapters(for: episode(isPrivate: true))
+            XCTFail("Deletion-blocked accounts must not request chapters")
+        } catch {
+            XCTAssertEqual(error as? DurableStateFailure, .suspended)
+        }
+    }
+
+    func testRetiredChapterResponsesCannotCrossAccountsOrRestoreCookies() async throws {
+        for next: String? in [nil, "other"] {
+            let (api, credentials) = fixture(accountID: "listener")
+            defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+            let started = expectation(description: "Chapter request started")
+            var pending: GuestLibraryRequest?
+            GuestLibraryURLProtocol.handler = { request in
+                pending = request
+                started.fulfill()
+            }
+            let episode = episode(isPrivate: true)
+            let chapters = Task { try await api.chapters(for: episode) }
+            await fulfillment(of: [started], timeout: 2)
+            if let next { api.restoreAccount(next) }
+            else { api.clearSession() }
+            let body = Data(#"{"source":"embedded","chapters":[{"title":"Opening","start":0},{"title":"Private topic","start":15}]}"#.utf8)
+            try XCTUnwrap(pending).complete(.success((body, ["Set-Cookie": "session=retired-session; Path=/; HttpOnly"])))
+            do {
+                _ = try await chapters.value
+                XCTFail("Retired account chapters must be discarded")
+            } catch {
+                XCTAssertTrue(error is CancellationError)
+            }
+            XCTAssertEqual(api.accountID, next)
+            XCTAssertEqual(credentials.read(), next == nil ? nil : "listener-session")
+        }
+    }
+
+    func testRejectsMalformedChapterTimelines() async throws {
+        let (api, _) = fixture()
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        let payloads = [
+            #"{"source":"embedded","chapters":[]}"#,
+            #"{"source":"embedded","chapters":[{"title":"Opening","start":0}]}"#,
+            #"{"source":"embedded","chapters":[{"title":"Opening","start":-1},{"title":"Topic","start":15}]}"#,
+            #"{"source":"shownotes","chapters":[{"title":"Opening","start":15},{"title":"Topic","start":15}]}"#,
+            #"{"source":"shownotes","chapters":[{"title":"Opening","start":30},{"title":"Topic","start":15}]}"#,
+            #"{"source":"none","chapters":[{"title":"Opening","start":0},{"title":"Topic","start":15}]}"#,
+            #"{"source":"unknown","chapters":[]}"#,
+        ]
+        for body in payloads {
+            GuestLibraryURLProtocol.handler = { pending in
+                pending.complete(.success((Data(body.utf8), [:])))
+            }
+            do {
+                _ = try await api.chapters(for: episode())
+                XCTFail("Malformed chapter response must be rejected: \(body)")
+            } catch {
+                XCTAssertEqual(error as? DurableStateFailure, .protocolViolation)
+            }
+        }
+    }
+
+    private func fixture(accountID: String? = nil) -> (APIClient, MemorySessionCredentials) {
+        let credentials = MemorySessionCredentials()
+        if let accountID { credentials.write("\(accountID)-session") }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GuestLibraryURLProtocol.self]
+        let api = APIClient(baseURL: URL(string: "https://chapters.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        api.restoreAccount(accountID)
+        return (api, credentials)
+    }
+
+    private func episode(isPrivate: Bool = false) -> Episode {
+        Episode(id: 42, podcastId: 7, guid: "episode-42", feed: "https://example.test/private-feed", title: "Example", file: EpisodeFile(url: "https://example.test/private-audio.mp3"), isPrivate: isPrivate)
+    }
+}
+
+@MainActor
 final class SessionTests: XCTestCase {
     func testPasskeyRegistrationBindsFlowAndRetiresCancelledOrChangedAccounts() async throws {
         for outcome in ["success", "cancel", "switch"] {

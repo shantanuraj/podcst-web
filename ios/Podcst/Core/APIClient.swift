@@ -173,6 +173,23 @@ public final class APIClient {
         return episode
     }
 
+    func chapters(for episode: Episode) async throws -> EpisodeChapters {
+        try Task.checkCancellation()
+        guard let id = episode.id else { return EpisodeChapters(chapters: [], source: .none) }
+        guard episode.isPrivate != true || hasSession && currentUserID != nil else {
+            throw APIError(statusCode: 401, message: "Authentication required")
+        }
+        let raw: RawEpisodeChapters = try await get(path: "/api/episodes/\(id)/chapters", cachePolicy: .reloadIgnoringLocalCacheData)
+        try Task.checkCancellation()
+        let chapters = raw.chapters.map { Chapter(title: $0.title, start: $0.start) }
+        guard raw.source == .none ? chapters.isEmpty : chapters.count >= 2,
+              chapters.allSatisfy({ $0.start.isFinite && $0.start >= 0 }),
+              zip(chapters, chapters.dropFirst()).allSatisfy({ $0.start < $1.start }) else {
+            throw DurableStateFailure.protocolViolation
+        }
+        return EpisodeChapters(chapters: chapters, source: raw.source)
+    }
+
     public func episodes(podcastID: Int, cursor: Int? = nil, search: String? = nil, sortBy: String = "published", sortDirection: String = "desc", limit: Int = 20) async throws -> EpisodePage {
         var query = [URLQueryItem(name: "podcastId", value: String(podcastID)), URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "sortBy", value: sortBy), URLQueryItem(name: "sortDir", value: sortDirection)]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: String(cursor))) }
@@ -509,8 +526,8 @@ public final class APIClient {
         try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value)
     }
 
-    private func get<T: Decodable>(path: String, query: [URLQueryItem] = [], usesSession: Bool = true) async throws -> T {
-        try await request(method: "GET", path: path, query: query, body: Optional<EmptyBody>.none, usesSession: usesSession)
+    private func get<T: Decodable>(path: String, query: [URLQueryItem] = [], usesSession: Bool = true, cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy) async throws -> T {
+        try await request(method: "GET", path: path, query: query, body: Optional<EmptyBody>.none, usesSession: usesSession, cachePolicy: cachePolicy)
     }
 
     private func post<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
@@ -525,13 +542,13 @@ public final class APIClient {
         try await request(method: "DELETE", path: path, query: query, body: Optional<EmptyBody>.none)
     }
 
-    private func request<T: Decodable, B: Encodable>(method: String, path: String, query: [URLQueryItem], body: B?, usesSession: Bool = true) async throws -> T {
+    private func request<T: Decodable, B: Encodable>(method: String, path: String, query: [URLQueryItem], body: B?, usesSession: Bool = true, cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy) async throws -> T {
         if usesSession, let currentUserID, deletionBlocked?(currentUserID) == true,
            !path.hasPrefix("/api/account/deletion"), !path.hasPrefix("/api/auth/") { throw DurableStateFailure.suspended }
         var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
         components?.queryItems = query.isEmpty ? nil : query
         guard let url = components?.url else { throw APIError(statusCode: 0, message: "Invalid API URL") }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: cachePolicy)
         request.httpMethod = method
         request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -998,6 +1015,18 @@ private struct RawPreferences: Codable {
 }
 private struct RawPasskey: Decodable { var id: String; var provider: String?; var createdAt: String; var lastUsedAt: String? }
 private struct RawAccount: Decodable { var createdAt: String?; var passkeys: [RawPasskey]; var preferences: RawPreferences? }
+struct EpisodeChapters: Equatable, Sendable {
+    enum Source: String, Decodable, Sendable { case embedded, shownotes, none }
+    let chapters: [Chapter]
+    let source: Source
+}
+
+private struct RawEpisodeChapters: Decodable {
+    struct Entry: Decodable { let title: String; let start: TimeInterval }
+    let chapters: [Entry]
+    let source: EpisodeChapters.Source
+}
+
 private struct RawPublicEpisode: Decodable { var podcast: RawPodcastInfo; var episode: RawEpisode }
 private struct RawPodcastInfo: Decodable { var isPrivate: Bool?; @CatalogueID var id: Int; var feed: String; var title: String; var author: String; var cover: String; var description: String; var link: String?; var published: Double?; var explicit: BoolOrString; var keywords: [String]; var episodeCount: Int }
 
