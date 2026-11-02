@@ -134,7 +134,7 @@ final class ArtworkStore {
             self.requests[key] = nil
             if let image {
                 let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
-                self.images.setObject(DecodedArtwork(image: image, expiresAt: payload.expiresAt, capacity: payload.capacity), forKey: key as NSString, cost: cost)
+                self.images.setObject(DecodedArtwork(image: image, tint: payload.metadata.tint, expiresAt: payload.expiresAt, capacity: payload.capacity), forKey: key as NSString, cost: cost)
                 self.revision += 1
             }
             if !refreshing, payload.expiresAt <= self.now() || payload.capacity < pixelSize {
@@ -147,11 +147,14 @@ final class ArtworkStore {
     }
 
     func tint(_ url: URL?, fallbackURL: URL? = nil, pixelSize: Int = 160) async -> ArtworkTint? {
+        var source = url
         var image = await image(url, pixelSize: pixelSize)
         if image == nil, fallbackURL != url {
+            source = fallbackURL
             image = await self.image(fallbackURL, pixelSize: pixelSize)
         }
         guard !Task.isCancelled, let image else { return nil }
+        if let source, let tint = images.object(forKey: key(source, pixelSize) as NSString)?.tint { return tint }
         return await Task.detached(priority: .utility) { image.cgImage.flatMap { ArtworkPalette($0).tint } }.value
     }
 
@@ -162,11 +165,13 @@ final class ArtworkStore {
 
 private final class DecodedArtwork: NSObject {
     let image: UIImage
+    let tint: ArtworkTint?
     let expiresAt: Date
     let capacity: Int
 
-    init(image: UIImage, expiresAt: Date, capacity: Int) {
+    init(image: UIImage, tint: ArtworkTint?, expiresAt: Date, capacity: Int) {
         self.image = image
+        self.tint = tint
         self.expiresAt = expiresAt
         self.capacity = capacity
     }
@@ -201,6 +206,7 @@ private struct ArtworkMetadata: Codable, Sendable {
     let requestedSize: Int
     let etag: String?
     let modified: String?
+    let tint: ArtworkTint?
 }
 
 private struct ArtworkPayload: Sendable {
@@ -356,7 +362,8 @@ private actor ArtworkStorage {
         let metadata = ArtworkMetadata(expiresAt: expires, accessedAt: now(), requestURL: requestURL,
                                        requestedSize: capacity,
                                        etag: response.value(forHTTPHeaderField: "ETag") ?? (response.statusCode == 304 ? cached?.metadata.etag : nil),
-                                       modified: response.value(forHTTPHeaderField: "Last-Modified") ?? (response.statusCode == 304 ? cached?.metadata.modified : nil))
+                                       modified: response.value(forHTTPHeaderField: "Last-Modified") ?? (response.statusCode == 304 ? cached?.metadata.modified : nil),
+                                       tint: ArtworkTint(lightHeader: response.value(forHTTPHeaderField: "X-Artwork-Tint-Light"), darkHeader: response.value(forHTTPHeaderField: "X-Artwork-Tint-Dark")) ?? (response.statusCode == 304 ? cached?.metadata.tint : nil))
         let payload = ArtworkPayload(data: bytes, metadata: metadata)
         if policy == .disk || pinned?.contains(key) == true || entries[key] != nil {
             persist(payload, key: key, replacing: response.statusCode != 304)

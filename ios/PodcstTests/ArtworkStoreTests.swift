@@ -19,7 +19,7 @@ final class ArtworkStoreTests: XCTestCase {
             environment.colorScheme = scheme
             let text = PodcstPalette.secondary.resolve(in: environment)
             let foreground = 0.2126 * text.linearRed + 0.7152 * text.linearGreen + 0.0722 * text.linearBlue
-            for rgb: UInt32 in [0x101010, 0xF0F0F0, 0x0000FF, 0xFFFF00, 0x306060] {
+            for rgb: UInt32 in [0x101010, 0xF0F0F0, 0x0000FF, 0xFFFF00, 0xFF0000, 0xFF00FF, 0x306060, 0xB8A8B0] {
                 let color = ArtworkTint(light: rgb, dark: rgb).headerColor(in: environment)
                 XCTAssertGreaterThan(color.resolve(in: environment).opacity, 0)
                 let renderer = ImageRenderer(content: color.frame(width: 2, height: 2)
@@ -38,6 +38,15 @@ final class ArtworkStoreTests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(contrast, 4.5, "\(scheme) \(String(rgb, radix: 16))")
             }
         }
+    }
+
+    func testHeaderTintKeepsTheArtworkHueVisible() {
+        var environment = EnvironmentValues()
+        environment.colorScheme = .light
+        let color = ArtworkTint(light: 0xB8A8B0, dark: 0x706878).headerColor(in: environment).resolve(in: environment)
+        XCTAssertEqual(color.opacity, 1)
+        XCTAssertGreaterThan(color.red - color.green, 0.025)
+        XCTAssertGreaterThan(color.blue - color.green, 0.01)
     }
 
     func testFramePixelsSelectSmallestSufficientVariant() {
@@ -89,6 +98,7 @@ final class ArtworkStoreTests: XCTestCase {
 
     func testHeaderTintSharesDisplayedArtworkAndSurvivesOfflineRelaunch() async throws {
         let fixture = makeFixture(width: 1024)
+        fixture.headers = ["X-Artwork-Tint-Light": "#b8a8b0", "X-Artwork-Tint-Dark": "#706878"]
         fixture.holdResponses = true
         let root = temporaryDirectory()
         let store = makeStore(fixture, root: root)
@@ -99,13 +109,41 @@ final class ArtworkStoreTests: XCTestCase {
         let image = await art.value
         let color = await tint.value
         XCTAssertNotNil(image)
-        XCTAssertNotNil(color)
+        XCTAssertEqual(color, ArtworkTint(light: 0xB8A8B0, dark: 0x706878))
         XCTAssertEqual(fixture.requests.count, 1)
         fixture.failure = URLError(.notConnectedToInternet)
         let relaunched = makeStore(fixture, root: root)
         let offline = await relaunched.tint(fixture.url, pixelSize: 1024)
         XCTAssertEqual(offline, color)
         XCTAssertEqual(fixture.requests.count, 1)
+    }
+
+    func testTintMetadataSurvivesNotModifiedRevalidation() async throws {
+        let fixture = makeFixture(width: 384)
+        fixture.headers = ["ETag": "\"cover\"", "X-Artwork-Tint-Light": "#b8a8b0", "X-Artwork-Tint-Dark": "#706878"]
+        let root = temporaryDirectory()
+        let store = makeStore(fixture, root: root)
+        let expected = await store.tint(fixture.url, pixelSize: 384)
+        fixture.status = 304
+        fixture.headers = [:]
+        let revalidated = makeStore(fixture, root: root, now: Date(timeIntervalSince1970: 100_000_000))
+        let stale = await revalidated.tint(fixture.url, pixelSize: 384)
+        XCTAssertEqual(stale, expected)
+        try await wait { revalidated.revision >= 2 }
+        fixture.failure = URLError(.notConnectedToInternet)
+        let relaunched = makeStore(fixture, root: root)
+        let retained = await relaunched.tint(fixture.url, pixelSize: 384)
+        XCTAssertEqual(retained, expected)
+        XCTAssertEqual(fixture.requests.count, 2)
+    }
+
+    func testMalformedTintMetadataFallsBackToTheImage() async throws {
+        let fixture = makeFixture(width: 384)
+        let expected = await makeStore(fixture).tint(fixture.url, pixelSize: 384)
+        XCTAssertNotNil(expected)
+        fixture.headers = ["X-Artwork-Tint-Light": "#b8a8b0", "X-Artwork-Tint-Dark": "invalid"]
+        let fallback = await makeStore(fixture).tint(fixture.url, pixelSize: 384)
+        XCTAssertEqual(fallback, expected)
     }
 
     func testEpisodeTintUsesCoverOnlyWhenEpisodeArtworkIsUnavailable() async throws {

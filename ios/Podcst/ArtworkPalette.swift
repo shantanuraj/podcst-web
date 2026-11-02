@@ -1,8 +1,19 @@
 import CoreGraphics
 
-struct ArtworkTint: Hashable, Sendable {
+struct ArtworkTint: Codable, Hashable, Sendable {
     let light: UInt32
     let dark: UInt32
+}
+
+extension ArtworkTint {
+    init?(lightHeader: String?, darkHeader: String?) {
+        guard let lightHeader, let darkHeader,
+              lightHeader.count == 7, darkHeader.count == 7,
+              lightHeader.first == "#", darkHeader.first == "#",
+              let light = UInt32(lightHeader.dropFirst(), radix: 16),
+              let dark = UInt32(darkHeader.dropFirst(), radix: 16) else { return nil }
+        self.init(light: light, dark: dark)
+    }
 }
 
 struct ArtworkPalette {

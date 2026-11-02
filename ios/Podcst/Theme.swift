@@ -53,25 +53,30 @@ extension ArtworkTint {
     func headerColor(in environment: EnvironmentValues) -> Color {
         let color = Color(light: light, dark: dark)
         let source = color.resolve(in: environment)
-        let paper = PodcstPalette.paper.resolve(in: environment)
         let text = PodcstPalette.secondary.resolve(in: environment)
-        func luminance(_ color: Color.Resolved) -> Float {
-            0.2126 * color.linearRed + 0.7152 * color.linearGreen + 0.0722 * color.linearBlue
-        }
-        let foreground = luminance(text)
-        var opacity: Float = environment.colorScheme == .dark ? 0.32 : 0.24
-        for _ in 0..<8 {
-            let background = luminance(Color.Resolved(
-                red: source.red * opacity + paper.red * (1 - opacity),
-                green: source.green * opacity + paper.green * (1 - opacity),
-                blue: source.blue * opacity + paper.blue * (1 - opacity)
-            ))
-            if (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05) >= 4.5 {
-                return color.opacity(Double(opacity))
+        let l = cbrtf(0.4122214708 * source.linearRed + 0.5363325363 * source.linearGreen + 0.0514459929 * source.linearBlue)
+        let m = cbrtf(0.2119034982 * source.linearRed + 0.6806995451 * source.linearGreen + 0.1073969566 * source.linearBlue)
+        let s = cbrtf(0.0883024619 * source.linearRed + 0.2817188376 * source.linearGreen + 0.6299787005 * source.linearBlue)
+        let original = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s
+        let a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s
+        let b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+        let dark = environment.colorScheme == .dark
+        var lightness = dark ? min(original, 0.35) : max(original, 0.88)
+        let foreground = 0.2126 * text.linearRed + 0.7152 * text.linearGreen + 0.0722 * text.linearBlue
+        for _ in 0..<20 {
+            let l = lightness + 0.3963377774 * a + 0.2158037573 * b
+            let m = lightness - 0.1055613458 * a - 0.0638541728 * b
+            let s = lightness - 0.0894841775 * a - 1.2914855480 * b
+            let red = min(1, max(0, 4.0767416621 * l * l * l - 3.3077115913 * m * m * m + 0.2309699292 * s * s * s))
+            let green = min(1, max(0, -1.2684380046 * l * l * l + 2.6097574011 * m * m * m - 0.3413193965 * s * s * s))
+            let blue = min(1, max(0, -0.0041960863 * l * l * l - 0.7034186147 * m * m * m + 1.7076147010 * s * s * s))
+            let background = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+            if (max(foreground, background) + 0.05) / (min(foreground, background) + 0.05) >= 4.6 {
+                return Color(.sRGBLinear, red: Double(red), green: Double(green), blue: Double(blue))
             }
-            opacity *= 0.75
+            lightness = min(1, max(0, lightness + (dark ? -0.01 : 0.01)))
         }
-        return .clear
+        return PodcstPalette.paper
     }
 }
 
