@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -159,7 +158,7 @@ private fun EpisodeHeader(
     val episode = state.episode
     Column(modifier.fillMaxWidth().padding(top = 14.dp)) {
         if (wide) {
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Bottom) {
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Top) {
                 Artwork(episode.artwork, if (contentWidth >= 800.dp) 160.dp else 144.dp, corner = 14.dp, tint = tint)
                 EpisodeSummary(state, actions, true, onOpenPodcast, Modifier.weight(1f))
             }
@@ -187,20 +186,31 @@ private fun EpisodeSummary(
     BoxWithConstraints(modifier) {
         val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
         val actionsWidth = maxWidth.coerceAtMost(440.dp * scale)
-        val primaryWidth = if (actionsWidth >= 220.dp * scale + 116.dp) actionsWidth - 116.dp else actionsWidth
+        val inlineActions = actionsWidth >= 220.dp * scale + 116.dp
         val titleStyle = if (wide && maxWidth >= 560.dp) Podcst.type.largeTitle else Podcst.type.title
+        val primaryAction: @Composable (Modifier) -> Unit = { buttonModifier ->
+            PrimaryAction(state.button, onClick = { actions.play(episode) }, modifier = buttonModifier)
+        }
+        val secondaryActions: @Composable () -> Unit = {
+            StarButton(state.starred, onStar = { actions.star(episode, !state.starred) }, onAddToList = { actions.addToList(episode) })
+            Square(PodcstIcons.Queue, stringResource(DesignR.string.add_to_queue), onClick = { actions.enqueue(episode) })
+        }
         Column {
             if (wide) Eyebrow(dateline(episode), Modifier.padding(bottom = 10.dp))
             Text(episode.title, style = titleStyle, color = Podcst.colors.ink, modifier = Modifier.semantics { heading() })
             Byline(episode, onOpenPodcast, Modifier.padding(top = 8.dp))
-            FlowRow(
-                Modifier.width(actionsWidth).padding(top = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                PrimaryAction(state.button, onClick = { actions.play(episode) }, modifier = Modifier.width(primaryWidth))
-                StarButton(state.starred, onStar = { actions.star(episode, !state.starred) }, onAddToList = { actions.addToList(episode) })
-                Square(PodcstIcons.Queue, stringResource(DesignR.string.add_to_queue), onClick = { actions.enqueue(episode) })
+            Box(Modifier.width(actionsWidth).padding(top = 20.dp)) {
+                if (inlineActions) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        primaryAction(Modifier.weight(1f))
+                        secondaryActions()
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        primaryAction(Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { secondaryActions() }
+                    }
+                }
             }
         }
     }
