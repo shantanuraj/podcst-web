@@ -354,6 +354,18 @@ private struct ScreenHeader<Trailing: View>: ViewModifier {
     }
 }
 
+@available(iOS 27.1, *)
+extension GeometryProxy {
+    var hasInteriorFold: Bool {
+        reservedRegions(kind: .division).contains { region in
+            let frame = region.frame
+            return frame.height > frame.width
+                ? frame.minX > 80 && size.width - frame.maxX > 80
+                : frame.minY > 80 && size.height - frame.maxY > 80
+        }
+    }
+}
+
 struct AnchoredScroll<Content: View>: View {
     @Binding var position: String?
     @State private var visiblePosition: String?

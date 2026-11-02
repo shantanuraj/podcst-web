@@ -13,7 +13,7 @@ struct DiscoverView: View {
         GeometryReader { geometry in
             let wide = sizeClass == .regular && geometry.size.width >= 700 && !typeSize.isAccessibilitySize
             Group {
-                if #available(iOS 27.1, *), hasFold(in: geometry) {
+                if #available(iOS 27.1, *), geometry.hasInteriorFold {
                     ArrangementView {
                         ScrollView {
                             DiscoverFeature(podcast: topPodcasts.first, region: region, expanded: true)
@@ -78,17 +78,6 @@ struct DiscoverView: View {
             if let first = urls.first { await ArtworkStore.shared.prefetch([first], pixelSize: 768) }
             guard !Task.isCancelled else { return }
             await ArtworkStore.shared.prefetch(Array(urls.dropFirst()), pixelSize: 160)
-        }
-    }
-
-    @available(iOS 27.1, *)
-    private func hasFold(in geometry: GeometryProxy) -> Bool {
-        geometry.reservedRegions(kind: .division).contains { region in
-            let frame = region.frame
-            let size = geometry.size
-            return frame.height > frame.width
-                ? frame.minX > 80 && size.width - frame.maxX > 80
-                : frame.minY > 80 && size.height - frame.maxY > 80
         }
     }
 

@@ -6,6 +6,8 @@ struct PodcastDetailView: View {
     @Environment(PlaybackController.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
     let podcast: Podcast
     @State private var detail: Podcast?
     @State private var isLoading = false
@@ -18,6 +20,7 @@ struct PodcastDetailView: View {
     @State private var readOwner = UUID()
     @State private var recheckOwner = UUID()
     @State private var isRechecking = false
+    @State private var episodePosition: String? = "podcast-top"
 
     private var content: Podcast { detail ?? podcast }
 
@@ -30,143 +33,29 @@ struct PodcastDetailView: View {
         return sorted.filter { $0.title.localizedCaseInsensitiveContains(filter) }
     }
 
-    private var host: String? {
-        content.link.flatMap(URL.init(string:))?.host()?.replacingOccurrences(of: "www.", with: "")
-    }
-
     var body: some View {
-        let subscribed = library.isSubscribed(content)
-        let artworkSize: CGFloat = 180
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ArtworkView(url: content.artworkURL, size: artworkSize)
-                    .shadow(color: .black.opacity(0.3), radius: 20, y: 14)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
-                VStack(spacing: 6) {
-                    Text(content.title)
-                        .font(.serif(.title))
-                        .tracking(-0.4)
-                    HStack(spacing: 4) {
-                        Text(content.author)
-                            .foregroundStyle(PodcstPalette.secondary)
-                        if let host, let link = content.link.flatMap(URL.init(string:)) {
-                            Text("·").foregroundStyle(PodcstPalette.secondary)
-                            Link(host, destination: link)
-                                .foregroundStyle(PodcstPalette.accent)
+        GeometryReader { geometry in
+            let wide = sizeClass == .regular && geometry.size.width >= 700 && !typeSize.isAccessibilitySize
+            Group {
+                if #available(iOS 27.1, *), geometry.hasInteriorFold {
+                    ArrangementView {
+                        ScrollView {
+                            PodcastHeader(podcast: content, latest: episodes.first, wide: false, aboutWidth: nil, expanded: $expanded)
+                                .padding(20)
                         }
+                        .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: 180, headerHeight: 360))
+                    } secondary: {
+                        episodeScroll(wide: false, showsHeader: false, aboutWidth: nil)
+                            .podcstPage()
                     }
-                    .font(.sans(.subheadline))
-                    .lineLimit(1)
-                    if let published = ([content.published] + content.episodes.map(\.published)).compactMap({ $0 }).max() {
-                        Text("Updated \(published.formatted(.dateTime.year().month(.wide).day()))")
-                            .eyebrow()
-                    }
-                }
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 18)
-                HStack(spacing: 10) {
-                    Button {
-                        Task { await library.toggleSubscription(content) }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if subscribed { Image(systemName: "checkmark").foregroundStyle(PodcstPalette.accent) }
-                            Text(subscribed ? "Subscribed" : "Subscribe")
-                        }
-                    }
-                    .buttonStyle(PodcstButtonStyle(kind: subscribed ? .surface : .ink, height: 44))
-                    Button {
-                        if let latest = episodes.first { playback.play(latest) }
-                    } label: {
-                        Label("Latest", systemImage: "play.fill")
-                    }
-                    .buttonStyle(PodcstButtonStyle(kind: .surface, height: 44))
-                    .disabled(content.episodes.isEmpty)
-                    if content.publicLink != nil {
-                        Button { router.sharing = .podcast(content) } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .frame(width: 20)
-                        }
-                        .buttonStyle(PodcstButtonStyle(kind: .surface, height: 44))
-                        .frame(width: 44)
-                        .accessibilityLabel("Share podcast")
-                    }
-                }
-                .padding(.top, 16)
-                if !content.description.isEmpty {
-                    Text(content.description.strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines))
-                        .font(.sans(.subheadline))
-                        .lineSpacing(4)
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .lineLimit(expanded ? nil : 2)
-                        .padding(.top, 16)
-                        .onTapGesture { withAnimation(.snappy) { expanded.toggle() } }
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityHint(expanded ? "Collapse description" : "Expand description")
-                }
-                SectionHeader("Episodes") {
-                    HStack(spacing: 10) {
-                        if isLoading {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Menu {
-                            Picker("Order", selection: $newestFirst) {
-                                Text("Newest first").tag(true)
-                                Text("Oldest first").tag(false)
-                            }
-                        } label: {
-                            Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
-                                .font(.sans(.footnote))
-                                .foregroundStyle(PodcstPalette.tertiary)
-                        }
-                    }
-                }
-                .padding(.top, 20)
-                if !detailError || isRechecking, let message = content.episodeStatusMessage {
-                    VStack(alignment: .leading) {
-                        Text(message).font(.footnote)
-                        if !isRechecking && !isLoading {
-                            TimelineView(.periodic(from: .now, by: 1)) { context in
-                                Button("Retry") { readAttempt = UUID() }
-                                    .disabled(Double(content.freshness?.retryAtMs ?? 0) > context.date.timeIntervalSince1970 * 1000)
-                            }
-                        }
-                    }.padding(.vertical, 12)
-                }
-                if detailError && content.episodes.isEmpty && !isRechecking {
-                    ErrorRow(message: "Couldn't load episodes.") {
-                        await loadDetails(forceRefresh: true)
-                    }
-                }
-                if content.episodes.count > 10 {
-                    TextField("Filter episodes", text: $filter)
-                        .modifier(FieldChrome())
-                        .padding(.vertical, 12)
-                }
-                if !content.episodes.isEmpty {
-                    ForEach(episodes, id: \.identity) { episode in
-                        EpisodeRow(episode: episode)
-                    }
-                } else if isLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding(30)
-                } else if !detailError && content.freshness?.content != .missing {
-                    Text("No episodes available.")
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .padding(.vertical, 20)
+                    .arrangementViewStyle(.split)
+                } else {
+                    episodeScroll(wide: wide, showsHeader: true, aboutWidth: wide && geometry.size.width >= 820 ? min(300, (geometry.size.width - 72) * 0.3) : nil)
+                        .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: 180, headerHeight: wide ? 300 : 360))
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .podcstPage()
         }
-        .refreshable { await loadDetails(forceRefresh: true) }
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top > 250
-        } action: { _, visible in
-            withAnimation(.easeInOut(duration: 0.2)) { titleVisible = visible }
-        }
-        .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: artworkSize, headerHeight: 360))
         .navigationTitle(titleVisible ? content.title : "")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(podcast.identity):\(api.activityToken):\(scenePhase):\(readAttempt)") {
@@ -184,6 +73,87 @@ struct PodcastDetailView: View {
                 if detailError { return }
             }
         }
+    }
+
+    private func episodeScroll(wide: Bool, showsHeader: Bool, aboutWidth: CGFloat?) -> some View {
+        AnchoredScroll(position: $episodePosition) {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if showsHeader {
+                    PodcastHeader(podcast: content, latest: episodes.first, wide: wide, aboutWidth: aboutWidth, expanded: $expanded)
+                        .padding(.bottom, 28)
+                        .id("podcast-top")
+                }
+                SectionHeader("Episodes") {
+                    HStack(spacing: 14) {
+                        if wide, content.episodes.count > 10 {
+                            episodeFilter
+                                .frame(maxWidth: 240)
+                        }
+                        if isLoading { ProgressView().controlSize(.small) }
+                        Menu {
+                            Picker("Order", selection: $newestFirst) {
+                                Text("Newest first").tag(true)
+                                Text("Oldest first").tag(false)
+                            }
+                        } label: {
+                            Text("\(max(content.episodeCount, content.episodes.count)) · \(newestFirst ? "Newest first" : "Oldest first")")
+                                .font(.sans(.footnote))
+                                .foregroundStyle(PodcstPalette.tertiary)
+                        }
+                    }
+                }
+                .id(showsHeader ? "podcast-episodes" : "podcast-top")
+                if !detailError || isRechecking, let message = content.episodeStatusMessage {
+                    VStack(alignment: .leading) {
+                        Text(message).font(.footnote)
+                        if !isRechecking && !isLoading {
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                Button("Retry") { readAttempt = UUID() }
+                                    .disabled(Double(content.freshness?.retryAtMs ?? 0) > context.date.timeIntervalSince1970 * 1000)
+                            }
+                        }
+                    }.padding(.vertical, 12)
+                }
+                if detailError && content.episodes.isEmpty && !isRechecking {
+                    ErrorRow(message: "Couldn't load episodes.") {
+                        await loadDetails(forceRefresh: true)
+                    }
+                }
+                if !wide, content.episodes.count > 10 {
+                    episodeFilter.padding(.vertical, 12)
+                }
+                if !content.episodes.isEmpty {
+                    ForEach(episodes, id: \.identity) { episode in
+                        EpisodeRow(episode: episode, showsSummary: wide)
+                            .id(episode.identity)
+                    }
+                } else if isLoading {
+                    ProgressView().frame(maxWidth: .infinity).padding(30)
+                } else if !detailError && content.freshness?.content != .missing {
+                    Text("No episodes available.")
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .padding(.vertical, 20)
+                }
+            }
+            .scrollTargetLayout()
+            .frame(maxWidth: 1100)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity)
+        }
+        .refreshable { await loadDetails(forceRefresh: true) }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top > 250
+        } action: { _, visible in
+            withAnimation(.easeInOut(duration: 0.2)) { titleVisible = visible }
+        }
+    }
+
+    private var episodeFilter: some View {
+        TextField("Filter episodes", text: $filter)
+            .modifier(FieldChrome())
+            .accessibilityLabel("Filter episodes")
     }
 
     private func loadDetails(forceRefresh: Bool = false, recheck: Bool = false, refreshIfStale: Bool = false) async {
@@ -211,6 +181,126 @@ struct PodcastDetailView: View {
     }
 }
 
+private struct PodcastHeader: View {
+    let podcast: Podcast
+    let latest: Episode?
+    let wide: Bool
+    let aboutWidth: CGFloat?
+    @Binding var expanded: Bool
+
+    var body: some View {
+        VStack(alignment: wide ? .leading : .center, spacing: 20) {
+            HStack(alignment: .bottom, spacing: 32) {
+                let layout = wide ? AnyLayout(HStackLayout(alignment: .bottom, spacing: 24)) : AnyLayout(VStackLayout(spacing: 18))
+                layout {
+                    ArtworkView(url: podcast.artworkURL, size: wide ? 160 : 180)
+                        .shadow(color: .black.opacity(0.22), radius: 20, y: 14)
+                    VStack(alignment: wide ? .leading : .center, spacing: 8) {
+                        if let published = ([podcast.published] + podcast.episodes.map(\.published)).compactMap({ $0 }).max() {
+                            Text("Updated \(published.formatted(.dateTime.year().month(.wide).day()))")
+                                .eyebrow()
+                        }
+                        Text(podcast.title)
+                            .font(.serif(wide ? .largeTitle : .title))
+                            .tracking(-0.4)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(podcast.author)
+                            .font(.sans(.subheadline))
+                            .foregroundStyle(PodcstPalette.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        PodcastActions(podcast: podcast, latest: latest)
+                            .frame(maxWidth: 440)
+                            .padding(.top, 10)
+                    }
+                    .multilineTextAlignment(wide ? .leading : .center)
+                    .frame(maxWidth: .infinity, alignment: wide ? .leading : .center)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let aboutWidth {
+                    PodcastAbout(podcast: podcast, expanded: $expanded, lineLimit: 6)
+                        .frame(width: aboutWidth, alignment: .leading)
+                }
+            }
+            if aboutWidth == nil {
+                PodcastAbout(podcast: podcast, expanded: $expanded, lineLimit: wide ? 3 : 2)
+                    .frame(maxWidth: 680, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+private struct PodcastActions: View {
+    @Environment(LibraryStore.self) private var library
+    @Environment(PlaybackController.self) private var playback
+    @Environment(Router.self) private var router
+    let podcast: Podcast
+    let latest: Episode?
+
+    var body: some View {
+        let subscribed = library.isSubscribed(podcast)
+        HStack(spacing: 10) {
+            Button {
+                Task { await library.toggleSubscription(podcast) }
+            } label: {
+                HStack(spacing: 6) {
+                    if subscribed { Image(systemName: "checkmark").foregroundStyle(PodcstPalette.accent) }
+                    Text(subscribed ? "Subscribed" : "Subscribe")
+                }
+            }
+            .buttonStyle(PodcstButtonStyle(kind: subscribed ? .surface : .ink, height: 44))
+            Button {
+                if let latest { playback.play(latest) }
+            } label: {
+                Label("Latest", systemImage: "play.fill")
+            }
+            .buttonStyle(PodcstButtonStyle(kind: .surface, height: 44))
+            .disabled(latest == nil)
+            .accessibilityLabel("Play latest episode")
+            if podcast.publicLink != nil {
+                Button { router.sharing = .podcast(podcast) } label: {
+                    Image(systemName: "square.and.arrow.up").frame(width: 20)
+                }
+                .buttonStyle(PodcstButtonStyle(kind: .surface, height: 44))
+                .frame(width: 44)
+                .accessibilityLabel("Share podcast")
+            }
+        }
+    }
+}
+
+private struct PodcastAbout: View {
+    let podcast: Podcast
+    @Binding var expanded: Bool
+    let lineLimit: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !podcast.description.isEmpty {
+                Button {
+                    withAnimation(.snappy) { expanded.toggle() }
+                } label: {
+                    Text(podcast.description.strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines))
+                        .font(.sans(.subheadline))
+                        .lineSpacing(5)
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .lineLimit(expanded ? nil : lineLimit)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(expanded ? "Collapse description" : "Expand description")
+            }
+            if let link = podcast.link.flatMap(URL.init(string:)), let host = link.host()?.replacingOccurrences(of: "www.", with: "") {
+                Link(host, destination: link)
+                    .font(.sans(.footnote))
+                    .foregroundStyle(PodcstPalette.accent)
+                    .frame(minHeight: 44, alignment: .leading)
+            }
+        }
+    }
+}
+
 struct EpisodeRow: View {
     enum Context {
         case podcast
@@ -229,6 +319,7 @@ struct EpisodeRow: View {
     let episode: Episode
     var context: Context = .podcast
     var showsSeparator = true
+    var showsSummary = false
 
     private var duration: TimeInterval? { episode.duration.flatMap { $0 > 0 ? $0 : nil } }
 
@@ -280,6 +371,12 @@ struct EpisodeRow: View {
                             .font(.serif(.body))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
+                        if showsSummary, let summary = episode.summary, !summary.isEmpty {
+                            Text(summary.strippingHTML.trimmingCharacters(in: .whitespacesAndNewlines))
+                                .font(.sans(.caption))
+                                .foregroundStyle(PodcstPalette.secondary)
+                                .lineLimit(1)
+                        }
                         HStack(spacing: 8) {
                             if context != .podcast, let fraction {
                                 Capsule()
@@ -417,7 +514,7 @@ struct EpisodeDetailView: View {
         GeometryReader { geometry in
             let wide = sizeClass == .regular && geometry.size.width >= 700 && !typeSize.isAccessibilitySize
             Group {
-                if #available(iOS 27.1, *), hasFold(in: geometry), !chapters.chapters.isEmpty {
+                if #available(iOS 27.1, *), geometry.hasInteriorFold, !chapters.chapters.isEmpty {
                     ArrangementView {
                         AnchoredScroll(position: $readingPosition) {
                             VStack(alignment: .leading, spacing: 32) {
@@ -492,16 +589,6 @@ struct EpisodeDetailView: View {
         }
     }
 
-    @available(iOS 27.1, *)
-    private func hasFold(in geometry: GeometryProxy) -> Bool {
-        geometry.reservedRegions(kind: .division).contains { region in
-            let frame = region.frame
-            let size = geometry.size
-            return frame.height > frame.width
-                ? frame.minX > 80 && size.width - frame.maxX > 80
-                : frame.minY > 80 && size.height - frame.maxY > 80
-        }
-    }
 }
 
 private struct EpisodeHeader: View {
