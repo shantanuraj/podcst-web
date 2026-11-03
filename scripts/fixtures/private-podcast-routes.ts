@@ -404,6 +404,19 @@ try {
       (error as { digest?: string }).digest ===
       `NEXT_REDIRECT;replace;/episodes/${id}/${episodeId};307;`,
   );
+  for (const [link, destination] of [
+    [{ feed: alias, guid: 'missing-episode' }, `/episodes/${id}`],
+    [{ feed: 'https://example.invalid/unknown', guid: episode.guid }, '/'],
+    [null, '/'],
+  ] as const) {
+    shortLink = link;
+    await assert.rejects(
+      shortPage({ params: Promise.resolve({ slug: 'synthetic' }) }),
+      (error: unknown) =>
+        (error as { digest?: string }).digest ===
+        `NEXT_REDIRECT;replace;${destination};307;`,
+    );
+  }
   assert.equal(
     (
       await refresh.POST(

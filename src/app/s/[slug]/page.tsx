@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { cache } from '@/app/api/redis';
-import { getPodcastByFeedUrl } from '@/server/ingest/podcast';
+import { sql } from '@/server/db';
+import { resolveShortUrl } from '@/server/ingest/short-url';
 
 interface ShortUrlPageProps {
   params: Promise<{ slug: string }>;
@@ -9,12 +10,11 @@ interface ShortUrlPageProps {
 export default async function ShortUrlPage({ params }: ShortUrlPageProps) {
   const { slug } = await params;
   const link = await cache.getShortUrl(slug);
-  const podcast = link ? await getPodcastByFeedUrl(link.feed) : null;
-  if (!podcast?.id || !link) redirect('/');
-  const episode = podcast.episodes.find((item) => item.guid === link.guid);
+  const target = link ? await resolveShortUrl(sql, link) : null;
+  if (!target) redirect('/');
   redirect(
-    episode?.id
-      ? `/episodes/${podcast.id}/${episode.id}`
-      : `/episodes/${podcast.id}`,
+    target.episodeId
+      ? `/episodes/${target.podcastId}/${target.episodeId}`
+      : `/episodes/${target.podcastId}`,
   );
 }
