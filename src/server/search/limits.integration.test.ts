@@ -131,4 +131,74 @@ describe.skipIf(!executable)('search budgets on disposable Redis', () => {
     ).rejects.toMatchObject({ status: 503 });
     expect(await first.keys('search:*')).toEqual([]);
   });
+
+  test('a restricted app identity needs the exact search namespace and retains other denials', async () => {
+    const username = 'synthetic_search_app';
+    const password = 'synthetic-local-only-password';
+    // Mirror the existing app command/prefix allowlist before search was added.
+    await first.acl(
+      'SETUSER',
+      username,
+      'reset',
+      'on',
+      `>${password}`,
+      '~auth:*',
+      '~lists:*',
+      '~chapters:*',
+      '~top@2/*',
+      '~feed-*',
+      '~short-*',
+      '+ping',
+      '+quit',
+      '+info',
+      '+client|setname',
+      '+get',
+      '+getrange',
+      '+getdel',
+      '+set',
+      '+del',
+      '+incr',
+      '+expire',
+      '+pexpire',
+      '+zremrangebyscore',
+      '+zcard',
+      '+zrange',
+      '+zadd',
+      '+time',
+      '+eval',
+    );
+    const app = first.duplicate({
+      username,
+      password,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+      autoResendUnfulfilledCommands: false,
+      connectTimeout: 1000,
+      commandTimeout: 1000,
+      maxRetriesPerRequest: 0,
+      retryStrategy: () => null,
+    });
+    app.on('error', () => {});
+    try {
+      await app.connect();
+      expect(app.status).toBe('ready');
+      const limit = createSearchLimiter(app, secret, policy);
+      await expect(limit('192.0.2.1')).rejects.toMatchObject({
+        status: 503,
+        message: 'Search unavailable',
+      });
+      expect(await first.keys('search:*')).toEqual([]);
+
+      await first.acl('SETUSER', username, '~search:{budget}:*');
+      for (let i = 0; i < policy.sourcePerMinute; i++)
+        await expect(limit('192.0.2.1')).resolves.toBeUndefined();
+      await expect(limit('192.0.2.1')).rejects.toMatchObject({ status: 429 });
+      expect(await first.zcard('search:{budget}:global')).toBe(3);
+      await expect(app.get('search:outside-budget')).rejects.toThrow('NOPERM');
+      await expect(app.get('unrelated:synthetic')).rejects.toThrow('NOPERM');
+    } finally {
+      app.disconnect();
+      await first.acl('DELUSER', username);
+    }
+  });
 });
