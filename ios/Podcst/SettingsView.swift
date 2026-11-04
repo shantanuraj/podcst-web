@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
@@ -30,6 +31,11 @@ struct SettingsView: View {
                 Section {
                     AccountCard(user: session.user) { showingLogin = true }
                         .listRowInsets(EdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 14))
+                }
+                Section {
+                    NavigationLink("Contact us") { ContactView() }
+                } header: {
+                    Text("Support").eyebrow()
                 }
                 if let user = session.user {
                     Section {
@@ -138,6 +144,120 @@ struct SettingsView: View {
         }
         .tint(PodcstPalette.accent)
         .presentationDragIndicator(.visible)
+    }
+}
+
+private enum ContactDetails {
+    static let email = "support@podcst.app"
+    static let emailURL = URL(string: "mailto:\(email)")!
+    static let website = URL(string: "https://www.podcst.app/support")!
+    static var websiteLabel: String {
+        website.absoluteString.replacingOccurrences(of: "https://www.", with: "")
+    }
+}
+
+private struct ContactView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("For help with Podcst, feedback, or a problem with the app, get in touch.")
+                    .font(.sans(.body))
+                    .foregroundStyle(PodcstPalette.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Developer").eyebrow()
+                    Text(verbatim: "Watercooler Labs")
+                        .font(.sans(.body).weight(.medium))
+                }
+                ContactEmailCard()
+                ContactWebsiteCard()
+            }
+            .frame(maxWidth: 640, alignment: .leading)
+            .padding(20)
+            .frame(maxWidth: .infinity)
+        }
+        .podcstPage()
+        .navigationTitle("Contact us")
+    }
+}
+
+private struct ContactCard<Content: View>: View {
+    let title: LocalizedStringKey
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title)
+                .eyebrow()
+                .accessibilityAddTraits(.isHeader)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(PodcstPalette.surface, in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct ContactEmailCard: View {
+    @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var copied = false
+    @State private var showingEmailUnavailable = false
+
+    var body: some View {
+        ContactCard(title: "Email") {
+            Text(verbatim: ContactDetails.email)
+                .font(.sans(.callout))
+                .textSelection(.enabled)
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                : AnyLayout(HStackLayout(spacing: 16))
+            layout {
+                Button("Email us") {
+                    openURL(ContactDetails.emailURL) { accepted in
+                        showingEmailUnavailable = !accepted
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .foregroundStyle(.white)
+                Button(copied ? "Copied" : "Copy email", action: copyEmail)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(PodcstPalette.accent)
+                    .frame(minHeight: 44)
+            }
+            .font(.sans(.subheadline).weight(.semibold))
+        }
+        .sensoryFeedback(.success, trigger: copied) { _, copied in copied }
+        .task(id: copied) {
+            guard copied, (try? await Task.sleep(for: .seconds(1.6))) != nil else { return }
+            copied = false
+        }
+        .alert("No email app found", isPresented: $showingEmailUnavailable) {
+            Button("Copy email", action: copyEmail)
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Use Copy email to contact us.")
+        }
+    }
+
+    private func copyEmail() {
+        UIPasteboard.general.string = ContactDetails.email
+        copied = true
+    }
+}
+
+private struct ContactWebsiteCard: View {
+    var body: some View {
+        ContactCard(title: "Support website") {
+            Text(verbatim: ContactDetails.websiteLabel)
+                .font(.sans(.callout))
+                .textSelection(.enabled)
+            Link("Open support website", destination: ContactDetails.website)
+                .font(.sans(.subheadline).weight(.semibold))
+                .foregroundStyle(PodcstPalette.accent)
+                .frame(minHeight: 44, alignment: .leading)
+        }
     }
 }
 
