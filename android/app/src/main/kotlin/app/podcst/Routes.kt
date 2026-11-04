@@ -18,6 +18,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object SettingsRoute : Route
 
+@Serializable data object ContactRoute : Route
+
 @Serializable data class PodcastRoute(val podcast: Podcast) : Route
 
 @Serializable data class EpisodeRoute(val episode: Episode) : Route

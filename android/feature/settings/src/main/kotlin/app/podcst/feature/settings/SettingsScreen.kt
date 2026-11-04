@@ -95,6 +95,7 @@ fun SettingsScreen(
     version: String,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
+    onContact: () -> Unit,
     createPasskey: suspend (String) -> String,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -151,6 +152,7 @@ fun SettingsScreen(
         version,
         onBack = onBack,
         onSignIn = onSignIn,
+        onContact = onContact,
         onAddPasskey = { viewModel.addPasskey(createPasskey) },
         onRemovePasskey = viewModel::removePasskey,
         onSignOut = viewModel::signOut,
@@ -174,6 +176,7 @@ private fun SettingsContent(
     version: String,
     onBack: () -> Unit,
     onSignIn: () -> Unit,
+    onContact: () -> Unit,
     onAddPasskey: () -> Unit,
     onRemovePasskey: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -213,6 +216,9 @@ private fun SettingsContent(
                 .padding(bottom = 32.dp),
         ) {
             AccountCard(state.user, onSignIn)
+            Section(stringResource(R.string.support)) {
+                SettingRow(stringResource(R.string.contact_us), onClick = onContact, divider = false)
+            }
             state.user?.let { user ->
                 Section(stringResource(R.string.account)) {
                     if (state.passkeys.isEmpty() && user.hasPasskey) {
@@ -468,6 +474,7 @@ private fun SettingsPreview() {
             version = "1.0",
             onBack = {},
             onSignIn = {},
+            onContact = {},
             onAddPasskey = {},
             onRemovePasskey = {},
             onSignOut = {},

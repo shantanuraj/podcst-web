@@ -4,3 +4,28 @@
   min-height: 100vh;
   padding-bottom: 120px;
 }
+
+.footer {
+  max-width: 1440px;
+  margin: var(--space-8) auto 0;
+  padding: var(--space-6) var(--dimen-page-padding);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-rule);
+}
+
+.footer a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.footer a:hover {
+  color: var(--color-accent);
+}

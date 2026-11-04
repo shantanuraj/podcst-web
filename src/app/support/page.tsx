@@ -3,7 +3,7 @@ import Link from 'next/link';
 import styles from './Support.module.css';
 
 export const metadata: Metadata = {
-  title: 'Support',
+  title: 'Contact us and support',
   description:
     'Get help with Podcst on the web, iPhone, iPad and Android. Contact us about playback, downloads, your account, or a feature you would like to see.',
   alternates: { canonical: '/support' },
@@ -14,7 +14,7 @@ export default function SupportPage() {
     <article className={styles.page}>
       <header className={styles.header}>
         <p className={styles.eyebrow}>Podcst support</p>
-        <h1 className={styles.title}>Here to help.</h1>
+        <h1 className={styles.title}>Contact us</h1>
         <p className={styles.intro}>
           A playback problem, an account question, or an idea for Podcst? We’d
           like to hear from you.
@@ -23,11 +23,12 @@ export default function SupportPage() {
 
       <section className={styles.contact} aria-labelledby="contact-heading">
         <h2 id="contact-heading" className={styles.sectionTitle}>
-          Get in touch
+          Contact Podcst
         </h2>
         <a className={styles.email} href="mailto:support@podcst.app">
           support@podcst.app
         </a>
+        <p>Podcst is developed and operated by Watercooler Labs.</p>
         <p>
           For help with the web, iPhone, iPad or Android app, email us with a
           description of what happened. General feedback and feature requests
@@ -37,6 +38,24 @@ export default function SupportPage() {
           If something isn’t working, include your device, app or browser
           version, and the podcast or episode name when relevant. A screenshot
           can help us understand the problem.
+        </p>
+      </section>
+
+      <section className={styles.section} aria-labelledby="podcasts-heading">
+        <h2 id="podcasts-heading" className={styles.sectionTitle}>
+          About the podcasts
+        </h2>
+        <p>
+          Podcst is a podcast player and directory. Podcasts, including news
+          shows, are published by independent creators. The podcast and episode
+          pages identify the show and publisher, and show the publication date
+          and original show notes supplied in the podcast feed.
+        </p>
+        <p>
+          For a question about an episode, contact its publisher through the
+          podcast’s website or show notes. To report a problem with a listing in
+          Podcst, use the support email above and include the podcast or episode
+          link.
         </p>
       </section>
 

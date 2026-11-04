@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import Script from 'next/script';
 import { CastManager } from '@/components/CastManager/CastManager';
 import { getSession } from '@/server/auth/session';
@@ -95,6 +96,12 @@ export default async function App({ children }: { children: React.ReactNode }) {
             <main className={styles.main}>
               <div id="page-loading" />
               {children}
+              <footer className={styles.footer}>
+                <nav aria-label="Help and privacy">
+                  <Link href="/support">Contact us</Link>
+                  <Link href="/privacy">Privacy policy</Link>
+                </nav>
+              </footer>
             </main>
             <Player />
             <Toast />
