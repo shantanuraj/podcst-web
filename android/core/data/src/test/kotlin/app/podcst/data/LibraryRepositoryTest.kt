@@ -7,6 +7,7 @@ import app.podcst.model.*
 import app.podcst.network.testing.FakeServer
 import app.podcst.network.testing.Reply
 import java.io.IOException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -84,6 +85,34 @@ class LibraryRepositoryTest {
         scopes.durable.installFollows("owner", StateSnapshot(1, "owner", generation, StateRevision("1"), listOf(StateFollowItem(StateID(guest.id.toString()), StateID("1"), null, StateAvailability.unavailable))))
         assertTrue(failed.podcasts.first().isEmpty())
         assertEquals(listOf(guest.id), failed.unavailable.first())
+    }
+
+    @Test fun successfulSubscriptionRetryClearsTimeoutAfterBackoff() = runTest {
+        scopes.switch("owner"); scopes.resumeSync("owner")
+        for (failedQuery in listOf("view=membership", null)) {
+            var now = 0L
+            var failing = true
+            val server = FakeServer { call ->
+                if (failing && call.query == failedQuery) throw SocketTimeoutException("The request timed out")
+                if (call.query == "view=membership") Reply(json.encodeToString(StateSnapshot<StateFollowItem>(1, "owner", generation, StateRevision("0"), emptyList())))
+                else Reply("[]")
+            }
+            val library = LibraryRepository(server.api, scopes, CatalogRepository(server.api, scopes), clock = { now })
+            assertTrue(runCatching { library.refresh() }.exceptionOrNull() is SocketTimeoutException)
+            assertTrue(library.status.value.error!!.contains("The request timed out"))
+            val requests = server.calls.size
+
+            failing = false
+            library.refresh()
+            assertEquals(requests, server.calls.size)
+            assertNotNull(library.status.value.error)
+
+            now += 30_000
+            library.refresh()
+            assertTrue(server.calls.size > requests)
+            assertNull(library.status.value.error)
+            assertFalse(library.status.value.blocked)
+        }
     }
 
     @Test fun blockedIdleFollowsRecoverFromMembershipWithoutSendingCachedState() = runTest {

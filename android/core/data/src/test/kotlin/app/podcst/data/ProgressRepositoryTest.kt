@@ -6,6 +6,7 @@ import app.podcst.network.testing.*
 import app.podcst.network.testing.PlaybackFixtures.episode
 import app.podcst.network.testing.PlaybackFixtures.progress
 import java.io.IOException
+import java.net.SocketTimeoutException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.*
 import app.podcst.model.StateBatch
@@ -202,6 +203,35 @@ class ProgressRepositoryTest {
         assertEquals(2, server.calls.count { it.body.isNotEmpty() })
         assertEquals(server.calls.filter { it.body.isNotEmpty() }.first().body, server.calls.filter { it.body.isNotEmpty() }.last().body)
         assertEquals(frozen?.batch?.clientId, scopes.durable.account("owner").progressClient)
+    }
+
+    @Test fun successfulProgressRetryClearsTimeoutAndRetiresPendingWork() = runTest {
+        var now = 0L
+        var failing = true
+        val remote = StateFixtures { Reply("null") }
+        val server = FakeServer { call ->
+            if (failing && call.body.isNotEmpty()) throw SocketTimeoutException("The request timed out")
+            remote.route(call)
+        }
+        val repository = ProgressRepository(server.api, scopes, scheduler) { now }
+        repository.record(phone, 9.seconds, false)
+        assertEquals(SyncOutcome.Retry, repository.sync())
+        assertTrue(repository.status.value.error!!.contains("The request timed out"))
+        assertTrue(repository.status.value.pending)
+        val requests = server.calls.size
+        val frozen = server.calls.single { it.body.isNotEmpty() }.body
+
+        failing = false
+        assertEquals(SyncOutcome.Retry, repository.sync())
+        assertEquals(requests, server.calls.size)
+        assertNotNull(repository.status.value.error)
+
+        now += 30_000
+        assertEquals(SyncOutcome.Done, repository.sync())
+        assertEquals(listOf(frozen, frozen), server.calls.filter { it.body.isNotEmpty() }.map { it.body })
+        assertNull(repository.status.value.error)
+        assertFalse(repository.status.value.pending)
+        assertEquals(9.seconds, repository.progress.first().getValue(phone.identity.value).position)
     }
 
     @Test fun expiredAuthenticationPausesAndProtocolConflictsBlockWithoutResetting() = runTest {
