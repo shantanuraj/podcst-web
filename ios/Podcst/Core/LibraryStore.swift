@@ -16,12 +16,20 @@ public final class LibraryStore {
     private let progressDirectory: URL
     private let guestKey = "guest.library.podcasts"
     private static let releasesPerPodcast = 2
+    private enum ProgressOperation: Hashable { case refresh, restore, sync }
+    private struct ProgressRequest {
+        let id = UUID()
+        let activity: UUID
+        let accountID: String
+    }
+    private var progressErrors: [ProgressOperation: String] = [:]
+    @ObservationIgnored private var progressRequests: [ProgressOperation: UUID] = [:]
     @ObservationIgnored private var unsavedProgress: [Int: PlaybackUpdate] = [:]
     let durable: DurableStateStore
     var syncPending: Bool { durable.pending }
     var syncBlocked: Bool { durable.blocked }
     var canUseSyncedState: Bool { durable.canUseSyncedState && unsavedProgress.isEmpty }
-    var syncError: String? { durable.error ?? error }
+    var syncError: String? { durable.error ?? error ?? progressErrors[.refresh] ?? progressErrors[.restore] ?? progressErrors[.sync] }
     var legacyProgress: [PlaybackProgressWriter.Update] { durable.legacyProgress }
     var unresolvedCount: Int { durable.unresolvedCount }
 
@@ -73,17 +81,38 @@ public final class LibraryStore {
         }
     }
 
+    private func beginProgressRequest(_ operation: ProgressOperation) -> ProgressRequest? {
+        guard !Task.isCancelled, !session.isLoading, let accountID = session.user?.id,
+              api.accountID == accountID else { return nil }
+        let request = ProgressRequest(activity: api.activityToken, accountID: accountID)
+        progressRequests[operation] = request.id
+        return request
+    }
+
+    private func isCurrent(_ request: ProgressRequest, operation: ProgressOperation) -> Bool {
+        !Task.isCancelled && !session.isLoading && session.user?.id == request.accountID &&
+            api.activityToken == request.activity && progressRequests[operation] == request.id
+    }
+
+    private func finishProgressRequest(_ request: ProgressRequest, operation: ProgressOperation, failure: Error? = nil, durableActivity: UUID? = nil) {
+        guard isCurrent(request, operation: operation), !(failure is CancellationError),
+              (failure as? URLError)?.code != .cancelled,
+              durableActivity == nil || durableActivity == durable.activityToken else { return }
+        progressErrors[operation] = failure?.localizedDescription
+    }
+
     func loadProgress(for episodes: [Episode]) async {
-        let accountID = session.user?.id
+        let ids = episodes.compactMap(\.id)
+        guard !ids.isEmpty, let request = beginProgressRequest(.refresh) else { return }
         var activity: UUID?
         do {
             try await activateState()
+            guard isCurrent(request, operation: .refresh) else { return }
             activity = durable.activityToken
-            try await durable.refreshProgress(ids: episodes.compactMap(\.id))
+            try await durable.refreshProgress(ids: ids)
+            finishProgressRequest(request, operation: .refresh)
         } catch {
-            guard !Task.isCancelled, session.user?.id == accountID, !session.isLoading,
-                  activity == nil || activity == durable.activityToken else { return }
-            self.error = error.localizedDescription
+            finishProgressRequest(request, operation: .refresh, failure: error, durableActivity: activity)
         }
     }
 
@@ -182,17 +211,19 @@ public final class LibraryStore {
     }
 
     func restoreProgress() async -> PlaybackProgress? {
-        guard !Task.isCancelled, !session.isLoading, let accountID = session.user?.id, api.accountID == accountID else { return nil }
+        guard let request = beginProgressRequest(.restore) else { return nil }
         do {
             try await activateState()
+            guard isCurrent(request, operation: .restore) else { return nil }
             await durable.flush(includeFollows: false)
-            guard !durable.progressPending, !durable.progressBlocked, durable.verified else { return nil }
+            guard isCurrent(request, operation: .restore), !durable.progressPending,
+                  !durable.progressBlocked, durable.verified else { return nil }
             let latest = try await api.currentProgress()
-            guard !Task.isCancelled, !session.isLoading, session.user?.id == accountID, !durable.progressPending else { return nil }
+            guard isCurrent(request, operation: .restore), !durable.progressPending else { return nil }
+            finishProgressRequest(request, operation: .restore)
             return latest
         } catch {
-            guard !Task.isCancelled, session.user?.id == accountID, !session.isLoading else { return nil }
-            self.error = error.localizedDescription
+            finishProgressRequest(request, operation: .restore, failure: error)
             return nil
         }
     }
@@ -223,9 +254,15 @@ public final class LibraryStore {
     }
 
     func flushProgress() async {
-        guard !session.isLoading else { return }
-        do { try await activateState(); await durable.flush(includeFollows: false) }
-        catch { self.error = error.localizedDescription }
+        guard let request = beginProgressRequest(.sync) else { return }
+        do {
+            try await activateState()
+            guard isCurrent(request, operation: .sync) else { return }
+            await durable.flush(includeFollows: false)
+            finishProgressRequest(request, operation: .sync)
+        } catch {
+            finishProgressRequest(request, operation: .sync, failure: error)
+        }
     }
 
     func checkpointAndSuspend() throws {
@@ -251,6 +288,8 @@ public final class LibraryStore {
         guard unsavedProgress.isEmpty else { error = "Unable to suspend: playback changes still need device storage."; return }
         durable.selectAccount(accountID)
         error = nil
+        progressErrors = [:]
+        progressRequests = [:]
         podcasts = []
     }
 

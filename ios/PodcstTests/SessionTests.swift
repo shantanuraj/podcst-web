@@ -1084,6 +1084,249 @@ final class SessionTests: XCTestCase {
         XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [episode], isActive: false))
     }
 
+    func testLibraryProgressRefreshClearsItsTimeoutOnlyAfterARealSuccessfulRetry() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let timeout = URLError(.timedOut)
+        GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+        XCTAssertNil(fixture.library.error)
+
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("An empty refresh must not make a request") }
+        await fixture.library.loadProgress(for: [])
+        XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+
+        GuestLibraryURLProtocol.handler = { request in
+            try request.respond([EpisodeProgress(episodeId: 42, position: 12, completed: false)])
+        }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.progress(for: episode)?.position, 12)
+        XCTAssertNil(fixture.library.syncError)
+    }
+
+    func testLibraryPlaybackRestorationClearsItsTimeoutWhenRetryReturnsNoCurrentEpisode() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let timeout = URLError(.timedOut)
+        GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+        _ = await fixture.library.restoreProgress()
+        XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+        XCTAssertNil(fixture.library.error)
+
+        GuestLibraryURLProtocol.handler = { try $0.respond(Optional<PlaybackProgress>.none) }
+        let latest = await fixture.library.restoreProgress()
+        XCTAssertNil(latest)
+        XCTAssertNil(fixture.library.syncError)
+    }
+
+    func testLibraryProgressReadRetriesDoNotClearEachOthersFailures() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let timeout = URLError(.timedOut)
+        let disconnected = URLError(.networkConnectionLost)
+        GuestLibraryURLProtocol.handler = { $0.fail(disconnected) }
+        _ = await fixture.library.restoreProgress()
+        GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+        await fixture.library.loadProgress(for: [episode])
+
+        GuestLibraryURLProtocol.handler = {
+            try $0.respondState(items: [["episodeId": "42", "progress": NSNull()]], revision: 0)
+        }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.syncError, disconnected.localizedDescription)
+        GuestLibraryURLProtocol.handler = { try $0.respond(Optional<PlaybackProgress>.none) }
+        _ = await fixture.library.restoreProgress()
+        XCTAssertNil(fixture.library.syncError)
+
+        GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+        await fixture.library.loadProgress(for: [episode])
+        GuestLibraryURLProtocol.handler = { try $0.respond(Optional<PlaybackProgress>.none) }
+        _ = await fixture.library.restoreProgress()
+        XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+    }
+
+    func testLibraryProgressRefreshPreservesSubscriptionFailure() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let timeout = URLError(.timedOut)
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/subscriptions")
+            request.fail(timeout)
+        }
+        await fixture.library.load()
+        XCTAssertEqual(fixture.library.error, timeout.localizedDescription)
+
+        GuestLibraryURLProtocol.handler = { try $0.respond([EpisodeProgress]()) }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.error, timeout.localizedDescription)
+        XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+    }
+
+    func testLibraryProgressRefreshPreservesPendingWriteFailure() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        let disconnected = URLError(.networkConnectionLost)
+        try fixture.library.durable.setProgress(id: 42, position: 12, event: .checkpoint)
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.httpMethod, "PUT")
+            request.fail(disconnected)
+        }
+        await fixture.library.flushProgress()
+        XCTAssertTrue(fixture.library.durable.progressPending)
+        XCTAssertEqual(fixture.library.durable.error, disconnected.localizedDescription)
+
+        GuestLibraryURLProtocol.handler = { try $0.respond([EpisodeProgress]()) }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.syncError, disconnected.localizedDescription)
+        XCTAssertTrue(fixture.library.durable.progressPending)
+        XCTAssertEqual(fixture.library.progress(for: episode)?.position, 12)
+    }
+
+    func testLibraryProgressRefreshErrorsRespectDurableGenerationRecovery() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "recovery", feed: "https://example.test/feed", title: "Recovery", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        await fixture.library.durable.flush(includeFollows: false)
+        let originalActivity = fixture.library.durable.activityToken
+        let started = expectation(description: "Retired generation progress read started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in pending = request; started.fulfill() }
+        let older = Task { await fixture.library.loadProgress(for: [episode]) }
+        await fulfillment(of: [started], timeout: 2)
+
+        GuestLibraryURLProtocol.stateGeneration = "27adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        await fixture.library.durable.flush(includeFollows: false)
+        XCTAssertEqual(fixture.library.durable.scope?.generation, GuestLibraryURLProtocol.stateGeneration)
+        XCTAssertNotEqual(fixture.library.durable.activityToken, originalActivity)
+        XCTAssertNil(fixture.library.syncError)
+        let timeout = URLError(.timedOut)
+        try XCTUnwrap(pending).fail(timeout)
+        await older.value
+        XCTAssertNil(fixture.library.syncError)
+
+        GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+        let previousActivity = fixture.library.durable.activityToken
+        GuestLibraryURLProtocol.stateGeneration = "37adbd84-d0e4-4e2d-ad9f-b084efee3211"
+        GuestLibraryURLProtocol.handler = { try $0.respond([EpisodeProgress]()) }
+        await fixture.library.loadProgress(for: [episode])
+        XCTAssertEqual(fixture.library.durable.scope?.generation, GuestLibraryURLProtocol.stateGeneration)
+        XCTAssertNotEqual(fixture.library.durable.activityToken, previousActivity)
+        XCTAssertEqual(fixture.library.progress(for: episode)?.position, 0)
+        XCTAssertNil(fixture.library.syncError)
+    }
+
+    func testLibraryProgressReadErrorsUseTheLatestRequestOutcome() async throws {
+        for restoring in [false, true] {
+            for oldFails in [false, true] {
+                let fixture = try await progressFixture()
+                defer { fixture.cleanUp() }
+                let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+                let read: @MainActor () async -> Void = {
+                    if restoring { _ = await fixture.library.restoreProgress() }
+                    else { await fixture.library.loadProgress(for: [episode]) }
+                }
+                let started = expectation(description: "Older progress read started")
+                var pending: GuestLibraryRequest?
+                GuestLibraryURLProtocol.handler = { request in pending = request; started.fulfill() }
+                let older = Task { await read() }
+                await fulfillment(of: [started], timeout: 2)
+                let timeout = URLError(.timedOut)
+                GuestLibraryURLProtocol.handler = { request in
+                    if !oldFails { request.fail(timeout) }
+                    else if restoring { try request.respond(Optional<PlaybackProgress>.none) }
+                    else { try request.respond([EpisodeProgress]()) }
+                }
+                await read()
+                let expected = oldFails ? nil : timeout.localizedDescription
+                XCTAssertEqual(fixture.library.syncError, expected)
+
+                let request = try XCTUnwrap(pending)
+                if oldFails { request.fail(timeout) }
+                else if restoring { try request.respond(Optional<PlaybackProgress>.none) }
+                else { try request.respond([EpisodeProgress]()) }
+                await older.value
+                XCTAssertEqual(fixture.library.syncError, expected)
+                XCTAssertNil(fixture.library.error)
+            }
+        }
+    }
+
+    func testLibraryCancelledProgressReadsPreserveTheirPreviousFailure() async throws {
+        for restoring in [false, true] {
+            let fixture = try await progressFixture()
+            defer { fixture.cleanUp() }
+            let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+            let read: @MainActor () async -> Void = {
+                if restoring { _ = await fixture.library.restoreProgress() }
+                else { await fixture.library.loadProgress(for: [episode]) }
+            }
+            let timeout = URLError(.timedOut)
+            GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+            await read()
+            XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+            GuestLibraryURLProtocol.handler = { $0.fail(URLError(.cancelled)) }
+            await read()
+            XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+
+            let started = expectation(description: "Progress retry started")
+            var pending: GuestLibraryRequest?
+            GuestLibraryURLProtocol.handler = { request in pending = request; started.fulfill() }
+            let retry = Task { await read() }
+            await fulfillment(of: [started], timeout: 2)
+            retry.cancel()
+            let request = try XCTUnwrap(pending)
+            if restoring { try request.respond(Optional<PlaybackProgress>.none) }
+            else { try request.respond([EpisodeProgress]()) }
+            await retry.value
+            XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+        }
+    }
+
+    func testLibraryProgressReadErrorsCannotCrossAnAccountRoundTrip() async throws {
+        for restoring in [false, true] {
+            let fixture = try await progressFixture()
+            defer { fixture.cleanUp() }
+            fixture.session.prepareAccountChange = { _ in await fixture.library.resetProgressSync() }
+            let episode = Episode(id: 42, guid: "retry", feed: "https://example.test/feed", title: "Retry", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+            let read: @MainActor () async -> Void = {
+                if restoring { _ = await fixture.library.restoreProgress() }
+                else { await fixture.library.loadProgress(for: [episode]) }
+            }
+            let timeout = URLError(.timedOut)
+            GuestLibraryURLProtocol.handler = { $0.fail(timeout) }
+            await read()
+            XCTAssertEqual(fixture.library.syncError, timeout.localizedDescription)
+            let started = expectation(description: "Previous account progress read started")
+            var pending: GuestLibraryRequest?
+            GuestLibraryURLProtocol.handler = { request in pending = request; started.fulfill() }
+            let old = Task { await read() }
+            await fulfillment(of: [started], timeout: 2)
+            for accountID in ["other", "listener"] {
+                GuestLibraryURLProtocol.handler = { request in
+                    XCTAssertEqual(request.request.url?.path, "/api/auth/session")
+                    try request.respond(["user": User(id: accountID, email: "listener@example.test")])
+                }
+                await fixture.session.restore()
+                XCTAssertNil(fixture.library.syncError)
+            }
+            let disconnected = URLError(.networkConnectionLost)
+            GuestLibraryURLProtocol.handler = { $0.fail(disconnected) }
+            await read()
+            XCTAssertEqual(fixture.library.syncError, disconnected.localizedDescription)
+            try XCTUnwrap(pending).fail(timeout)
+            await old.value
+            XCTAssertEqual(fixture.library.syncError, disconnected.localizedDescription)
+            XCTAssertNil(fixture.library.error)
+        }
+    }
+
     func testLibraryListeningEpisodesIncludesCurrentAndDeduplicatesNewReleases() async throws {
         var podcast = Podcast(id: 7, feed: "https://example.test/feed", title: "Show")
         let episodes = (1...3).map { release($0, podcast: podcast) }
@@ -1289,6 +1532,7 @@ final class SessionTests: XCTestCase {
     private func guestFixture(podcasts: [Podcast], restoreSession: Bool = true) async throws -> GuestLibraryFixture {
         GuestLibraryURLProtocol.stateAccountID = "listener"
         GuestLibraryURLProtocol.stateRevision = 0
+        GuestLibraryURLProtocol.stateGeneration = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
         let defaultsName = "GuestLibrary-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsName)!
         defaults.set(try JSONEncoder().encode(podcasts), forKey: "guest.library.podcasts")
@@ -1327,7 +1571,7 @@ private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
     @MainActor static var handler: (@MainActor (GuestLibraryRequest) throws -> Void)?
     @MainActor static var stateAccountID = "listener"
     @MainActor static var stateRevision = 0
-    static let stateGeneration = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
+    @MainActor static var stateGeneration = "17adbd84-d0e4-4e2d-ad9f-b084efee3211"
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
