@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { invalidateProgress } from '@/data/progress';
-import { stateRuntime } from '@/data/state-browser';
+import { stateRuntime, useDurableState } from '@/data/state-browser';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
 import { progress } from '../../../contracts/playback/rules.json';
 import { sameEpisode } from './episode-identity';
@@ -21,6 +21,7 @@ const SEEK_JUMP_SECONDS = 2;
 export function usePlaybackSync() {
   const session = useAccountSession();
   const token = session.token();
+  const { canRestoreProgress } = useDurableState();
   const restoredRef = useRef<number | null>(null);
   const lastSavedRef = useRef<{
     revision: number;
@@ -28,18 +29,23 @@ export function usePlaybackSync() {
     position: number;
     completed: boolean;
   } | null>(null);
-  const saved = useQuery(playbackQueryOptions(session));
+  const options = playbackQueryOptions(session);
+  const saved = useQuery({
+    ...options,
+    enabled: options.enabled && canRestoreProgress,
+  });
 
   useEffect(() => {
     if (
       !session.current(token) ||
+      !canRestoreProgress ||
       !saved.isSuccess ||
       restoredRef.current === token.revision
     )
       return;
     restoredRef.current = token.revision;
     if (saved.data) restoreAccountProgress(session, token, saved.data);
-  }, [session, token, saved.data, saved.isSuccess]);
+  }, [session, token, canRestoreProgress, saved.data, saved.isSuccess]);
 
   const owns = useCallback(
     (state: IPlayerState) =>

@@ -7,13 +7,14 @@ export interface PlaybackProgress {
   position: number;
 }
 
-export async function getRecentProgress(
+async function getPlaybackProgress(
   userId: string,
-  limit: number,
+  selection: 'current' | { recent: number },
 ): Promise<PlaybackProgress[]> {
   const rows = await sql`
     SELECT
       pp.position,
+      pp.completed,
       e.id as episode_id,
       e.guid,
       c.title,
@@ -37,43 +38,52 @@ export async function getRecentProgress(
     JOIN authors a ON a.id = p.author_id
     JOIN episode_content c ON c.episode_id = e.id
     WHERE pp.user_id = ${userId} AND ${podcastAccess(sql, userId)}
-      AND pp.completed = false
+      ${selection === 'current' ? sql`` : sql`AND pp.completed = false`}
     ORDER BY pp.revision DESC
-    LIMIT ${limit}
+    LIMIT ${selection === 'current' ? 1 : selection.recent}
   `;
 
-  return rows.map((row) => ({
-    position: row.position,
-    episode: {
-      id: row.episode_id,
-      podcastId: row.podcast_id,
-      isPrivate: row.owner_user_id !== null,
-      guid: row.guid,
-      title: row.title,
-      summary: row.summary,
-      published: row.published ? new Date(row.published).getTime() : null,
-      duration: row.duration,
-      episodeArt: row.episode_art,
-      cover: row.cover,
-      explicit: row.explicit,
-      link: null,
-      showNotes: row.summary || '',
-      author: row.author,
-      feed: row.feed_url,
-      podcastTitle: row.podcast_title,
-      file: {
-        url: row.file_url,
-        length: Number(row.file_length) || 0,
-        type: row.file_type || 'audio/mpeg',
+  return rows
+    .filter((row) => !row.completed)
+    .map((row) => ({
+      position: row.position,
+      episode: {
+        id: row.episode_id,
+        podcastId: row.podcast_id,
+        isPrivate: row.owner_user_id !== null,
+        guid: row.guid,
+        title: row.title,
+        summary: row.summary,
+        published: row.published ? new Date(row.published).getTime() : null,
+        duration: row.duration,
+        episodeArt: row.episode_art,
+        cover: row.cover,
+        explicit: row.explicit,
+        link: null,
+        showNotes: row.summary || '',
+        author: row.author,
+        feed: row.feed_url,
+        podcastTitle: row.podcast_title,
+        file: {
+          url: row.file_url,
+          length: Number(row.file_length) || 0,
+          type: row.file_type || 'audio/mpeg',
+        },
       },
-    },
-  }));
+    }));
+}
+
+export function getRecentProgress(
+  userId: string,
+  limit: number,
+): Promise<PlaybackProgress[]> {
+  return getPlaybackProgress(userId, { recent: limit });
 }
 
 export async function getCurrentProgress(
   userId: string,
 ): Promise<PlaybackProgress | null> {
-  return (await getRecentProgress(userId, 1))[0] ?? null;
+  return (await getPlaybackProgress(userId, 'current'))[0] ?? null;
 }
 
 export async function getEpisodeProgress(

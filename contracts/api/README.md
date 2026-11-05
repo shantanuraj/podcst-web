@@ -368,9 +368,11 @@ See the [feed contract](../feeds/README.md) for exact shapes and limits.
 
 ### `GET /api/progress` — required
 
-Presentation reads remain: no query returns `{position, episode}` or `null` for the
-latest playable incomplete row, ordered by accepted revision; `recent=1..10` returns
-such rows; `episodeIds` (1–200 distinct decimal strings) or `podcastId` returns
+Presentation reads remain: no query selects the latest playable row by accepted
+revision and returns `{position, episode}` when incomplete, or `null` when completed
+or absent. Completing the latest episode does not restore an older unfinished one.
+`recent=1..10` returns playable incomplete rows ordered by accepted revision;
+`episodeIds` (1–200 distinct decimal strings) or `podcastId` returns
 `{episodeId:string, position, completed}` rows. These presentation responses do not
 acknowledge pending work.
 

@@ -1,7 +1,11 @@
 import { get } from 'idb-keyval';
 import { useSyncExternalStore } from 'react';
 import { responseData } from '@/data/api';
-import { type StateFailures, StateRuntime } from '@/data/state-runtime';
+import {
+  type StateFailures,
+  StateRuntime,
+  type StateView,
+} from '@/data/state-runtime';
 import { blockedSyncStatus, progressSyncStatus } from '@/data/state-status';
 import { browserStateStorage, convertGuestFollows } from '@/data/state-storage';
 import { useAccountSession } from '@/shared/auth/AccountBoundary';
@@ -13,6 +17,23 @@ const runtimes = new WeakMap<
   AccountSession,
   { sync: StateRuntime; notify: () => void }
 >();
+export function progressRestorationReady(
+  view: StateView,
+  account: string | null,
+) {
+  const progress = account
+    ? view.state?.accounts[account]?.progress
+    : undefined;
+  return (
+    account !== null &&
+    view.account === account &&
+    progress?.scope?.accountId === account &&
+    !progress.blocked &&
+    !progress.flight &&
+    progress.queued.length === 0
+  );
+}
+
 export function stateRuntime(session: AccountSession) {
   const existing = runtimes.get(session);
   if (existing) return existing;
@@ -156,6 +177,8 @@ export function useDurableState() {
   const followsPending = !!(follows?.flight || follows?.queued.length);
   const token = session.token();
   return {
+    canRestoreProgress:
+      current && progressRestorationReady(view, session.scope),
     guestProgress: state
       ? [...progressProjection(state.guest.progress).values()]
       : [],

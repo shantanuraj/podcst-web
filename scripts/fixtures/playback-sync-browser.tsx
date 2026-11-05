@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
 import { connectState, stateRuntime } from '../../src/data/state-browser';
 import { AccountContext } from '../../src/shared/auth/AccountBoundary';
+import { accountQueryKey } from '../../src/shared/auth/account';
 import { AccountSession } from '../../src/shared/auth/account-session';
 import AudioUtils from '../../src/shared/player/AudioUtils';
 import {
@@ -66,7 +67,8 @@ async function run() {
   AudioUtils.play = () => {};
   AudioUtils.pause = () => {};
   AudioUtils.stop = () => {};
-  const reloaded = sessionStorage.getItem('reloaded') === 'true';
+  const phase = sessionStorage.getItem('phase');
+  const reloaded = phase !== null;
   if (!reloaded) {
     await writeSession({
       scope: owner.id,
@@ -98,7 +100,6 @@ async function run() {
   });
   session.synchronizePlayer();
   const disconnect = connectState(session);
-  await stateRuntime(session).sync.activate(owner.id);
   const container = document.getElementById('app');
   if (!container) throw new Error('Missing fixture container');
   const root = createRoot(container);
@@ -109,6 +110,45 @@ async function run() {
       </AccountContext.Provider>
     </QueryClientProvider>,
   );
+  if (phase === 'completed') {
+    await waitFor(
+      () =>
+        client.getQueryState(accountQueryKey(owner.id, 'playback', 'playback'))
+          ?.status === 'success',
+    );
+    await tick();
+    assert(
+      getCurrentEpisode(usePlayer.getState()) === undefined &&
+        usePlayer.getState().queue.length === 0 &&
+        readSession(owner.id) === null,
+      'Completed playback was restored after an empty-queue reload',
+    );
+    assert(
+      (await writes()).length === 6,
+      'Pending completion was not retried before restoring playback',
+    );
+    disconnect();
+    root.unmount();
+    client.clear();
+    await fetch('/result', {
+      method: 'POST',
+      body: JSON.stringify({
+        passed: true,
+        checks: {
+          restoredDifferentEpisode: true,
+          restoredSameEpisode: true,
+          preservedQueue: true,
+          scopedQueuePreserved: true,
+          unchangedRefreshIsReadOnly: true,
+          unsavedProgressFlushed: true,
+          failedSaveRetried: true,
+          completionSaved: true,
+          completedQueueStaysEmptyAfterReload: true,
+        },
+      }),
+    });
+    return;
+  }
   await waitFor(
     () =>
       mounted && usePlayer.getState().seekPosition === (reloaded ? 2100 : 1438),
@@ -152,7 +192,7 @@ async function run() {
       (await writes()).length === 1,
       'An unchanged pause promoted stale progress',
     );
-    sessionStorage.setItem('reloaded', 'true');
+    sessionStorage.setItem('phase', 'resumed');
     location.reload();
     return;
   }
@@ -178,28 +218,17 @@ async function run() {
   await stateRuntime(session).sync.refresh();
   await waitFor(async () => (await writes()).length === 4);
   await tick();
+  usePlayer.getState().removeUpNext([0, 1]);
+  await fetch('/fail', { method: 'POST' });
   usePlayer.getState().markPlayed();
   await waitFor(async () => (await writes()).length === 5);
   await tick();
-  disconnect();
-  root.unmount();
-  client.clear();
-  await fetch('/result', {
-    method: 'POST',
-    body: JSON.stringify({
-      passed: true,
-      checks: {
-        restoredDifferentEpisode: true,
-        restoredSameEpisode: true,
-        preservedQueue: true,
-        scopedQueuePreserved: true,
-        unchangedRefreshIsReadOnly: true,
-        unsavedProgressFlushed: true,
-        failedSaveRetried: true,
-        completionSaved: true,
-      },
-    }),
-  });
+  assert(
+    usePlayer.getState().queue.length === 0,
+    'Final completion kept a queue',
+  );
+  sessionStorage.setItem('phase', 'completed');
+  location.reload();
 }
 
 void run().catch((error) => {

@@ -43,7 +43,7 @@ test.skipIf(!chrome)(
           if (request.method === 'GET') {
             const url = new URL(request.url);
             if (url.searchParams.get('view') !== 'state')
-              return Response.json(current);
+              return Response.json(completed ? null : current);
             const ids = url.searchParams.get('episodeIds')?.split(',') ?? [];
             const row = current as { position: number } | null;
             return Response.json({
@@ -99,16 +99,19 @@ test.skipIf(!chrome)(
       unsavedProgressFlushed: true,
       failedSaveRetried: true,
       completionSaved: true,
+      completedQueueStaysEmptyAfterReload: true,
     });
-    expect(outcome.requests.filter((path) => path === '/')).toHaveLength(2);
+    expect(outcome.requests.filter((path) => path === '/')).toHaveLength(3);
     expect(writes.map((batch) => batch.changes)).toEqual([
       [{ episodeId: '2', positionSeconds: 1439, completed: null }],
       [{ episodeId: '2', positionSeconds: 2101, completed: null }],
       [{ episodeId: '2', positionSeconds: 2140, completed: null }],
       [{ episodeId: '2', positionSeconds: 2140, completed: null }],
       [{ episodeId: '2', positionSeconds: 3600, completed: true }],
+      [{ episodeId: '2', positionSeconds: 3600, completed: true }],
     ]);
     expect(writes[3]).toEqual(writes[2]);
+    expect(writes[5]).toEqual(writes[4]);
     expect(
       writes.every(
         (batch) => batch.protocol === 1 && batch.accountId === 'owner',

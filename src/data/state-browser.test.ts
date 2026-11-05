@@ -4,10 +4,64 @@ import { IDBFactory } from 'fake-indexeddb';
 import type { AccountUser } from '@/shared/auth/account';
 import { AccountSession } from '@/shared/auth/account-session';
 import type { FollowBatch, ProgressBatch } from '@/shared/state-contract';
-import { connectState, stateRuntime } from './state-browser';
+import {
+  emptyProgress,
+  freezeProgress,
+  queueProgress,
+} from './progress-outbox';
+import {
+  connectState,
+  progressRestorationReady,
+  stateRuntime,
+} from './state-browser';
+import type { StateView } from './state-runtime';
+import { accountState, type BrowserState } from './state-storage';
 
 const generation = '17adbd84-d0e4-4e2d-ad9f-b084efee3211';
 const accountId = 'state-browser-fixture';
+
+test('playback restoration waits for progress from the current verified account', () => {
+  const state: BrowserState = {
+    version: 1,
+    accounts: {},
+    guest: { follows: [], progress: emptyProgress() },
+    erased: [],
+  };
+  const view: StateView = { account: accountId, syncing: false };
+  expect(progressRestorationReady(view, accountId)).toBe(false);
+  view.state = state;
+  const progress = accountState(state, accountId).progress;
+  expect(progressRestorationReady(view, accountId)).toBe(false);
+  progress.scope = { protocol: 1, accountId, generation };
+  expect(progressRestorationReady(view, accountId)).toBe(true);
+  expect(progressRestorationReady(view, null)).toBe(false);
+  expect(progressRestorationReady(view, 'other-account')).toBe(false);
+  expect(
+    progressRestorationReady({ ...view, account: undefined }, accountId),
+  ).toBe(false);
+});
+
+test('pending completions and blocked progress prevent playback restoration', () => {
+  const state: BrowserState = {
+    version: 1,
+    accounts: {},
+    guest: { follows: [], progress: emptyProgress() },
+    erased: [],
+  };
+  const progress = accountState(state, accountId).progress;
+  progress.scope = { protocol: 1, accountId, generation };
+  const view: StateView = { account: accountId, state, syncing: false };
+  queueProgress(progress, '42', 'ended', 3600);
+  expect(progressRestorationReady(view, accountId)).toBe(false);
+  freezeProgress(progress);
+  expect(progress.queued).toEqual([]);
+  expect(progressRestorationReady(view, accountId)).toBe(false);
+  delete progress.flight;
+  progress.blocked = 'Scope needs recovery';
+  expect(progressRestorationReady(view, accountId)).toBe(false);
+  delete progress.blocked;
+  expect(progressRestorationReady(view, accountId)).toBe(true);
+});
 
 async function fixture() {
   const originals = new Map(
