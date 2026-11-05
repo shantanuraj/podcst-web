@@ -354,6 +354,7 @@ struct EpisodeRow: View {
     enum Context {
         case podcast
         case library
+        case continuing
         case releases
         case starred
         case downloads
@@ -376,7 +377,11 @@ struct EpisodeRow: View {
         library.progress(for: episode)?.completed == true && !(playback.position(of: episode) != nil && playback.isPlaybackRequested)
     }
 
-    private var position: TimeInterval? { playback.position(of: episode) ?? library.progress(for: episode)?.position }
+    private var position: TimeInterval? {
+        let current = playback.position(of: episode)
+        let saved = library.progress(for: episode)?.position
+        return playback.isActive ? current ?? saved : saved ?? current
+    }
 
     private var fraction: Double? {
         guard !completed, let position, position > 0, let duration else { return nil }
@@ -385,7 +390,7 @@ struct EpisodeRow: View {
 
     private var metadata: [String] {
         if completed {
-            return [context == .podcast || context == .library ? nil : episode.podcastTitle, duration.map(Duration.seconds), "Played"].compactMap { $0 }
+            return [context == .podcast || context == .library || context == .continuing ? nil : episode.podcastTitle, duration.map(Duration.seconds), "Played"].compactMap { $0 }
         }
         let remaining = position.flatMap { position in
             duration.flatMap { position > 0 ? "\(Duration.seconds(max(0, $0 - position))) left" : nil }
@@ -393,7 +398,7 @@ struct EpisodeRow: View {
         switch context {
         case .podcast:
             return [duration.map(Duration.seconds), remaining].compactMap { $0 }
-        case .library:
+        case .library, .continuing:
             if let remaining { return [remaining] }
             let isNew = episode.published.map { $0 > .now.addingTimeInterval(-7 * 86400) } ?? false
             return [isNew ? "New" : episode.podcastTitle, duration.map(Duration.seconds)].compactMap { $0 }
@@ -405,7 +410,7 @@ struct EpisodeRow: View {
     }
 
     var body: some View {
-        let isCurrent = playback.position(of: episode) != nil
+        let isCurrent = playback.isActive && playback.position(of: episode) != nil
         let starred = stars.contains(episode)
         let metadata = metadata
         HStack(spacing: 14) {
@@ -413,7 +418,7 @@ struct EpisodeRow: View {
                 HStack(spacing: 14) {
                     switch context {
                     case .podcast: DateBlock(date: episode.published)
-                    case .library, .releases, .starred, .downloads: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
+                    case .library, .continuing, .releases, .starred, .downloads: ArtworkView(url: episode.artworkURL, fallbackURL: URL(string: episode.cover), size: 48)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(episode.title)
@@ -460,6 +465,18 @@ struct EpisodeRow: View {
             .accessibilityLabel(([episode.title] + metadata + (starred ? ["Starred"] : [])).joined(separator: ", "))
             .accessibilityAction(named: starred ? "Unstar" : "Star") { router.star(episode, !starred, in: stars) }
             trailing(isCurrent: isCurrent)
+            if context == .continuing {
+                Menu {
+                    EpisodeMenuActions(episode: episode)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(PodcstPalette.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("More actions for \(episode.title)")
+            }
         }
         .padding(.vertical, 12)
         .hairline(showsSeparator)
@@ -499,7 +516,7 @@ struct EpisodeRow: View {
             } else {
                 DownloadButton(episode: episode, compact: true)
             }
-        case .podcast, .library, .releases:
+        case .podcast, .library, .continuing, .releases:
             Button {
                 if isCurrent && !completed { playback.toggle() } else { playback.play(episode, at: completed ? 0 : position ?? 0) }
             } label: {

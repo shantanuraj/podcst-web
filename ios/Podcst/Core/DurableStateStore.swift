@@ -389,7 +389,7 @@ private struct DurableRoot: Codable {
             state.positions = [:]
             try state.progress.install(revision: progress.revision.number, retire: false)
             for item in progress.items {
-                state.positions[item.episodeId.number] = item.progress.map { LocalProgress(episodeId: item.episodeId, positionSeconds: $0.positionSeconds, completed: $0.completed) }
+                state.positions[item.episodeId.number] = LocalProgress(episodeId: item.episodeId, positionSeconds: item.progress?.positionSeconds ?? 0, completed: item.progress?.completed ?? false)
             }
             try state.follows.install(revision: follows.revision.number, retire: false)
             state.memberships = follows.items
@@ -477,7 +477,7 @@ private struct DurableRoot: Codable {
             state.scope = StateScope(protocol: snapshot.protocol, accountId: snapshot.accountId, generation: snapshot.generation)
             try state.progress.install(revision: snapshot.revision.number, retire: retire)
             for item in snapshot.items {
-                state.positions[item.episodeId.number] = item.progress.map { LocalProgress(episodeId: item.episodeId, positionSeconds: $0.positionSeconds, completed: $0.completed) }
+                state.positions[item.episodeId.number] = LocalProgress(episodeId: item.episodeId, positionSeconds: item.progress?.positionSeconds ?? 0, completed: item.progress?.completed ?? false)
             }
         }
     }

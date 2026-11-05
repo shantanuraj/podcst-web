@@ -1084,6 +1084,84 @@ final class SessionTests: XCTestCase {
         XCTAssertNotEqual(downloaded, ArtworkRetentionSnapshot(accountID: "listener", podcasts: [], episodes: [episode], isActive: false))
     }
 
+    func testLibraryListeningEpisodesIncludesCurrentAndDeduplicatesNewReleases() async throws {
+        var podcast = Podcast(id: 7, feed: "https://example.test/feed", title: "Show")
+        let episodes = (1...3).map { release($0, podcast: podcast) }
+        podcast.episodes = episodes
+        let fixture = try await guestFixture(podcasts: [podcast])
+        defer { fixture.cleanUp() }
+
+        XCTAssertEqual(fixture.library.listeningEpisodes(including: episodes[0]), [episodes[0], episodes[2], episodes[1]])
+        XCTAssertEqual(fixture.library.listeningEpisodes(including: episodes[1]), [episodes[1], episodes[2]])
+        XCTAssertEqual(fixture.library.listeningEpisodes(including: nil), [episodes[2], episodes[1]])
+    }
+
+    func testLibraryRefreshRemovesRemotelyCompletedStoppedEpisodeOutsideNewReleases() async throws {
+        let fixture = try await progressFixture()
+        defer { fixture.cleanUp() }
+        let episode = Episode(id: 42, guid: "older", feed: "https://example.test/feed", title: "Older episode", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+        XCTAssertFalse(fixture.library.newReleases.contains(episode))
+        XCTAssertEqual(fixture.library.continuingEpisode(episode, position: 4644), episode)
+        var requested: [Int] = []
+        GuestLibraryURLProtocol.handler = { request in
+            XCTAssertEqual(request.request.url?.path, "/api/progress")
+            XCTAssertEqual(request.request.httpMethod, "GET")
+            let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+            requested = try XCTUnwrap(query.first { $0.name == "episodeIds" }?.value).split(separator: ",").compactMap { Int($0) }
+            try request.respond([EpisodeProgress(episodeId: 42, position: 4644, completed: true)])
+        }
+
+        await fixture.library.loadProgress(for: fixture.library.listeningEpisodes(including: episode))
+
+        XCTAssertEqual(requested, [42])
+        XCTAssertNil(fixture.library.continuingEpisode(episode, position: 4644))
+        XCTAssertFalse(fixture.library.durable.progressPending)
+    }
+
+    func testLibraryKnownUnplayedProgressDoesNotReuseCachedPlayerPosition() async throws {
+        let snapshots: [EpisodeProgress?] = [EpisodeProgress(episodeId: 42, position: 0, completed: false), nil]
+        for snapshot in snapshots {
+            let fixture = try await progressFixture()
+            defer { fixture.cleanUp() }
+            let episode = Episode(id: 42, guid: "reset", feed: "https://example.test/feed", title: "Reset episode", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+            XCTAssertEqual(fixture.library.continuingEpisode(episode, position: 120), episode)
+            GuestLibraryURLProtocol.handler = { request in
+                try request.respond(snapshot.map { [$0] } ?? [])
+            }
+
+            await fixture.library.loadProgress(for: fixture.library.listeningEpisodes(including: episode))
+
+            XCTAssertEqual(fixture.library.progress(for: episode)?.position, 0)
+            XCTAssertEqual(fixture.library.progress(for: episode)?.completed, false)
+            XCTAssertNil(fixture.library.continuingEpisode(episode, position: 120))
+            let restored = LibraryStore(api: fixture.api, session: fixture.session, defaults: fixture.defaults, progressDirectory: fixture.url.appendingPathExtension("progress"))
+            try await restored.durable.activate(accountID: "listener", verifiedAccountID: "listener")
+            XCTAssertNil(restored.continuingEpisode(episode, position: 120))
+            XCTAssertEqual(restored.progress(for: episode)?.position, 0)
+        }
+    }
+
+    func testLibraryPendingReplayRemainsContinuingAfterAuthoritativeRefresh() async throws {
+        let snapshots: [EpisodeProgress?] = [EpisodeProgress(episodeId: 42, position: 4644, completed: true), nil]
+        for snapshot in snapshots {
+            let fixture = try await progressFixture()
+            defer { fixture.cleanUp() }
+            let episode = Episode(id: 42, guid: "replay", feed: "https://example.test/feed", title: "Replay episode", file: EpisodeFile(url: "https://example.test/audio.mp3"))
+            try fixture.library.durable.setProgress(id: 42, position: 12, event: .replay)
+            GuestLibraryURLProtocol.handler = { request in
+                XCTAssertEqual(request.request.httpMethod, "GET")
+                try request.respond(snapshot.map { [$0] } ?? [])
+            }
+
+            await fixture.library.loadProgress(for: fixture.library.listeningEpisodes(including: episode))
+
+            XCTAssertEqual(fixture.library.continuingEpisode(episode, position: 4644), episode)
+            XCTAssertEqual(fixture.library.progress(for: episode)?.position, 12)
+            XCTAssertEqual(fixture.library.progress(for: episode)?.completed, false)
+            XCTAssertTrue(fixture.library.durable.progressPending)
+        }
+    }
+
     func testLibraryReadsCompletedAndUnfinishedEpisodesInBoundedBatches() async throws {
         let fixture = try await progressFixture()
         defer { fixture.cleanUp() }

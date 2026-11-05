@@ -10,12 +10,9 @@ struct LibraryView: View {
     @State private var showingSyncRecovery = false
     @State private var feedWindow = Date()
 
-    private var continueAndNew: [Episode] {
-        let current = playback.currentEpisode.flatMap {
-            playback.currentTime > 0 && library.progress(for: $0)?.completed != true ? $0 : nil
-        }
-        return (current.map { [$0] } ?? []) + library.newReleases.filter { $0.identity != current?.identity }
-    }
+    private var continuing: Episode? { library.continuingEpisode(playback.currentEpisode, position: playback.currentTime) }
+    private var progressEpisodes: [Episode] { library.listeningEpisodes(including: playback.currentEpisode) }
+    private var continueAndNew: [Episode] { library.listeningEpisodes(including: continuing) }
 
     var body: some View {
         GeometryReader { geometry in
@@ -73,7 +70,7 @@ struct LibraryView: View {
                             }
                             .padding(.top, 22)
                             ForEach(continueAndNew.prefix(3), id: \.identity) { episode in
-                                EpisodeRow(episode: episode, context: .library)
+                                EpisodeRow(episode: episode, context: episode.identity == continuing?.identity ? .continuing : .library)
                             }
                         }
                         SectionHeader("Subscriptions") {
@@ -101,10 +98,10 @@ struct LibraryView: View {
             .refreshable {
                 feedWindow = Date()
                 await library.load(forceRefresh: true)
-                await library.loadProgress(for: library.newReleases)
+                await library.loadProgress(for: progressEpisodes)
             }
-            .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
-                if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
+            .task(id: scenePhase == .active && !session.isLoading ? progressEpisodes.compactMap(\.id) : []) {
+                if scenePhase == .active { await library.loadProgress(for: progressEpisodes) }
             }
             .task(id: "\(api.activityToken):\(scenePhase):\(library.podcasts.compactMap { $0.freshness?.retryAtMs }.min() ?? 0)") {
                 guard scenePhase == .active, let delay = library.podcasts.compactMap({ $0.freshness?.recheckDelay(startedAt: feedWindow) }).min() else { return }
@@ -181,14 +178,24 @@ private struct LibraryLists: View {
 struct ReleasesView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
+    @Environment(PlaybackController.self) private var playback
     @Environment(\.locale) private var locale
     @Environment(\.scenePhase) private var scenePhase
 
+    private var continuing: Episode? { library.continuingEpisode(playback.currentEpisode, position: playback.currentTime) }
+    private var progressEpisodes: [Episode] { library.listeningEpisodes(including: playback.currentEpisode) }
+
     var body: some View {
         TimelineView(.periodic(from: ReleaseSection.calendar.startOfDay(for: .now), by: 86400)) { timeline in
-            let sections = ReleaseSection.grouping(library.newReleases)
+            let continuing = continuing
+            let sections = ReleaseSection.grouping(library.newReleases.filter { $0.identity != continuing?.identity })
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    if let continuing {
+                        SectionHeader("Continue listening")
+                            .padding(.top, 8)
+                        EpisodeRow(episode: continuing, context: .continuing)
+                    }
                     ForEach(sections) { section in
                         Section {
                             ForEach(section.episodes, id: \.identity) { episode in
@@ -204,7 +211,7 @@ struct ReleasesView: View {
                                 .font(.sans(recent ? .subheadline : .footnote).weight(.medium))
                                 .foregroundStyle(recent ? PodcstPalette.ink : PodcstPalette.secondary)
                                 .accessibilityAddTraits(.isHeader)
-                                .padding(.top, section.id == sections.first?.id ? 8 : 20)
+                                .padding(.top, continuing == nil && section.id == sections.first?.id ? 8 : 20)
                                 .padding(.bottom, 4)
                         }
                     }
@@ -214,14 +221,14 @@ struct ReleasesView: View {
             }
             .refreshable {
                 await library.load(forceRefresh: true)
-                await library.loadProgress(for: library.newReleases)
+                await library.loadProgress(for: progressEpisodes)
             }
         }
-        .task(id: scenePhase == .active && !session.isLoading ? library.newReleases.compactMap(\.id) : []) {
-            if scenePhase == .active { await library.loadProgress(for: library.newReleases) }
+        .task(id: scenePhase == .active && !session.isLoading ? progressEpisodes.compactMap(\.id) : []) {
+            if scenePhase == .active { await library.loadProgress(for: progressEpisodes) }
         }
         .podcstPage()
-        .navigationTitle("New releases")
+        .navigationTitle("Continue & new")
     }
 }
 

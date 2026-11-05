@@ -47,6 +47,18 @@ public final class LibraryStore {
         .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
     }
 
+    func listeningEpisodes(including current: Episode?) -> [Episode] {
+        var identities = Set<String>()
+        return ((current.map { [$0] } ?? []) + newReleases).filter { identities.insert($0.identity).inserted }
+    }
+
+    func continuingEpisode(_ current: Episode?, position: TimeInterval) -> Episode? {
+        guard let current else { return nil }
+        let progress = progress(for: current)
+        guard progress?.completed != true, (progress?.position ?? position) > 0 else { return nil }
+        return current
+    }
+
     func progress(for episode: Episode) -> EpisodeProgress? {
         guard !session.isLoading, let id = episode.id, let value = durable.position(id) else { return nil }
         return EpisodeProgress(episodeId: id, position: Double(value.positionSeconds), completed: value.completed)
