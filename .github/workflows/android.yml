@@ -152,7 +152,6 @@ jobs:
           releaseFiles: ${{ runner.temp }}/podcst-play-release/app-release.aab
           tracks: internal
           status: completed
-          changesNotSentForReview: true
           releaseName: ${{ steps.prepare.outputs.version_name }} (${{ steps.prepare.outputs.version_code }})
           mappingFile: ${{ runner.temp }}/podcst-play-release/mapping.txt
       - name: Remove temporary signing material
