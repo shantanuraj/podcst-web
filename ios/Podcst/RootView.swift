@@ -1,5 +1,4 @@
 import SwiftUI
-import Network
 
 enum AppTab: Hashable {
     case discover
@@ -71,7 +70,6 @@ struct RootView: View {
     @Environment(APIClient.self) private var api
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
-    @Environment(AccountStore.self) private var account
     @Environment(PlaybackController.self) private var playback
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Appearance.key) private var appearance = Appearance.system
@@ -130,16 +128,6 @@ struct RootView: View {
             router.reset()
             if userID != nil { onboarded = true }
         }
-        .task(id: session.isLoading) {
-            guard !session.isLoading else { return }
-            await library.load()
-            guard !Task.isCancelled else { return }
-            await account.load(accountID: session.user?.id)
-        }
-        .task(id: scenePhase == .active && !session.isLoading) {
-            guard scenePhase == .active, !session.isLoading else { return }
-            await playback.restoreProgress { await library.restoreProgress() }
-        }
         .task(id: router.stoppedPlayback?.id) {
             guard router.stoppedPlayback != nil, (try? await Task.sleep(for: .seconds(5))) != nil else { return }
             router.stoppedPlayback = nil
@@ -162,10 +150,6 @@ struct RootView: View {
         }
         .onChange(of: playback.isActive) { _, active in
             if active { router.stoppedPlayback = nil }
-        }
-        .task(id: session.user?.id) {
-            guard session.user != nil else { return }
-            await retryProgressWhenConnected()
         }
         .alert("Queue storage remains blocked", isPresented: Binding(get: { queueRetryError != nil }, set: { if !$0 { queueRetryError = nil } })) {
             Button("OK", role: .cancel) { queueRetryError = nil }
@@ -236,21 +220,6 @@ struct RootView: View {
         case .chapter(let chapter, let start, let end):
             playback.playClip(episode, from: start, to: end, chapter: chapter)
             router.showingPlayer = true
-        }
-    }
-
-    private func retryProgressWhenConnected() async {
-        let monitor = NWPathMonitor()
-        let changes = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            monitor.pathUpdateHandler = { path in
-                if path.status == .satisfied { continuation.yield(()) }
-            }
-            continuation.onTermination = { _ in monitor.cancel() }
-            monitor.start(queue: DispatchQueue(label: "app.podcst.progress-connectivity"))
-        }
-        defer { monitor.cancel() }
-        for await _ in changes {
-            await library.flushProgress()
         }
     }
 

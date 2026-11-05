@@ -168,6 +168,11 @@
 		6B3FCD8A93C1FF724498BA7B = {isa = PBXBuildFile; fileRef = D5A7AB1D8FBB932075787C3E; };
 		4E7E521EC7785029944A6534 = {isa = PBXBuildFile; fileRef = 11A8DCAAA6B9BD4AA43F0DEC; };
 		D05000000000000000000002 = {isa = PBXBuildFile; fileRef = D05000000000000000000001; };
+		AC6000000000000000000011 = {isa = PBXBuildFile; fileRef = AC6000000000000000000001; };
+		AC6000000000000000000012 = {isa = PBXBuildFile; fileRef = AC6000000000000000000002; };
+		AC6000000000000000000013 = {isa = PBXBuildFile; fileRef = AC6000000000000000000003; };
+		AC6000000000000000000014 = {isa = PBXBuildFile; fileRef = AC6000000000000000000004; };
+		AC6000000000000000000015 = {isa = PBXBuildFile; fileRef = AC6000000000000000000005; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -308,6 +313,11 @@
 		D5A7AB1D8FBB932075787C3E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Playback/Media/DownloadedMediaFile.swift"; sourceTree = "<group>"; };
 		11A8DCAAA6B9BD4AA43F0DEC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadedMediaFileTests.swift"; sourceTree = "<group>"; };
 		D05000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		AC6000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/AppModel.swift; sourceTree = "<group>"; };
+		AC6000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlay/CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
+		AC6000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlay/CarPlayController.swift; sourceTree = "<group>"; };
+		AC6000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
+		AC6000000000000000000005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -338,6 +348,9 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				AC6000000000000000000003,
+				AC6000000000000000000002,
+				AC6000000000000000000001,
 				AC5000000000000000000001,
 				AC5000000000000000000002,
 				AC3200000000000000000001,
@@ -436,6 +449,8 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				AC6000000000000000000005,
+				AC6000000000000000000004,
 				AC5000000000000000000003,
 				AC3200000000000000000003,
 				11A8DCAAA6B9BD4AA43F0DEC,
@@ -679,6 +694,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC6000000000000000000015,
+				AC6000000000000000000014,
 				AC5000000000000000000015,
 				AC3200000000000000000013,
 				4E7E521EC7785029944A6534,
@@ -716,6 +733,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC6000000000000000000013,
+				AC6000000000000000000012,
+				AC6000000000000000000011,
 				AC5000000000000000000011,
 				AC5000000000000000000013,
 				AC3200000000000000000011,
