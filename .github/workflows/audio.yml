@@ -33,21 +33,7 @@ jobs:
       - run: audio-engine/scripts/build-apple.sh
       - run: audio-engine/scripts/test-native.sh --apple
       - name: Select an available iPhone simulator
-        run: |
-          python3 - <<'PY'
-          import json, os, subprocess
-          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '--json']))['devices']
-          candidates = [(tuple(map(int, runtime.split('iOS-')[1].split('-'))), device['udid'])
-                        for runtime, entries in devices.items() if 'iOS-' in runtime
-                        for device in entries if device['name'].startswith('iPhone')]
-          if not candidates:
-              raise SystemExit('No available iPhone simulator')
-          version, identifier = max(candidates)
-          if version < (18, 0):
-              raise SystemExit('An iOS 18 or later simulator is required')
-          with open(os.environ['GITHUB_ENV'], 'a') as output:
-              output.write(f'PODCST_TEST_DEVICE={identifier}\n')
-          PY
+        run: python3 ios/scripts/select-test-simulator.py
       - name: Exercise the packaged bridge on iOS
         run: |
           xcrun simctl bootstatus "$PODCST_TEST_DEVICE" -b
