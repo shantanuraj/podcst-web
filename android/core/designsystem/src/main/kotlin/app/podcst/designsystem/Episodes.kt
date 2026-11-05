@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -130,9 +131,10 @@ fun ArtworkEpisodeRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     remove: SwipeAction? = null,
+    showActions: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    EpisodeGestures(state, actions, modifier, remove) {
+    EpisodeGestures(state, actions, modifier, remove) { openMenu ->
         Row(
             Modifier.heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -140,18 +142,28 @@ fun ArtworkEpisodeRow(
         ) {
             Artwork(state.episode.artwork, 48.dp, modifier = Modifier.alpha(if (state.played) 0.5f else 1f))
             Column(Modifier.weight(1f).alpha(if (state.played) 0.5f else 1f)) {
-                Text(state.episode.title, style = Podcst.type.compactTitle, color = Podcst.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                MetaLine(state, Modifier.padding(top = 4.dp), subtitle)
+                Text(state.episode.title, style = Podcst.type.compactTitle, color = Podcst.colors.ink, maxLines = if (showActions) 2 else 1, overflow = TextOverflow.Ellipsis)
+                MetaLine(state, Modifier.padding(top = 4.dp), subtitle, includeLength = !showActions)
             }
             trailing?.invoke() ?: PlayCircle(state, actions, size = 32)
+            if (showActions) {
+                RoundIcon(
+                    PodcstIcons.More,
+                    stringResource(R.string.episode_actions, state.episode.title),
+                    openMenu,
+                    Modifier.minimumInteractiveComponentSize(),
+                    background = Color.Transparent,
+                    tint = Podcst.colors.secondary,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun MetaLine(state: EpisodeRowState, modifier: Modifier = Modifier, subtitle: String? = null) {
+private fun MetaLine(state: EpisodeRowState, modifier: Modifier = Modifier, subtitle: String? = null, includeLength: Boolean = true) {
     val colors = Podcst.colors
-    val meta = listOfNotNull(subtitle, episodeMeta(state).takeIf { it.isNotEmpty() }).joinToString(" · ")
+    val meta = listOfNotNull(subtitle, episodeMeta(state, includeLength).takeIf { it.isNotEmpty() }).joinToString(" · ")
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         val progress = state.progress
         if (progress?.started == true) progress.fraction?.let { MiniProgress(it) }
@@ -193,7 +205,7 @@ private fun EpisodeGestures(
     actions: EpisodeActions,
     modifier: Modifier,
     remove: SwipeAction? = null,
-    content: @Composable () -> Unit,
+    content: @Composable (() -> Unit) -> Unit,
 ) {
     val colors = Podcst.colors
     var menu by remember { mutableStateOf(false) }
@@ -239,7 +251,7 @@ private fun EpisodeGestures(
                     )
                 },
         ) {
-            content()
+            content { menu = true }
             EpisodeMenu(state, actions, menu, onDismiss = { menu = false })
         }
     }
@@ -271,7 +283,7 @@ fun EpisodeMenu(state: EpisodeRowState, actions: EpisodeActions, expanded: Boole
             MenuEntry(stringResource(R.string.remove_download), PodcstIcons.Download) { onDismiss(); actions.removeDownload(episode) }
         }
         MenuEntry("Reapply saved progress", PodcstIcons.CheckCircle) { onDismiss(); actions.reapplyProgress(episode) }
-        if (state.progress?.completed == true) MenuEntry("Mark unplayed", PodcstIcons.CheckCircle) { onDismiss(); actions.markUnplayed(episode) }
+        if (state.progress?.completed == true || state.progress?.started == true) MenuEntry(stringResource(R.string.mark_unplayed), PodcstIcons.CheckCircle) { onDismiss(); actions.markUnplayed(episode) }
         if (state.progress?.completed != true) MenuEntry(stringResource(R.string.mark_played), PodcstIcons.CheckCircle) { onDismiss(); actions.markPlayed(episode) }
         if (episode.shareUrl() != null) MenuEntry(stringResource(R.string.share), PodcstIcons.Share) { onDismiss(); actions.share(episode) }
     }

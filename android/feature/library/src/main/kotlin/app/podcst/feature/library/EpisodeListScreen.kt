@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -67,11 +68,11 @@ import app.podcst.designsystem.Podcst
 import app.podcst.designsystem.PodcstButton
 import app.podcst.designsystem.PodcstIcons
 import app.podcst.designsystem.RoundIcon
+import app.podcst.designsystem.SectionHeader
 import app.podcst.model.DownloadState
 import app.podcst.model.ReleaseSection
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.util.Locale
 import kotlin.time.Clock
 import kotlin.time.Duration
 import app.podcst.designsystem.R as DesignR
@@ -364,16 +365,25 @@ private fun DownloadControl(download: DownloadState, onPause: () -> Unit, onResu
 }
 
 private fun LazyListScope.releases(state: EpisodeListState, actions: EpisodeActions) {
-    val rows = state.visible.associateBy { it.episode.identity }
+    val (continuing, releases) = state.visible.partition { it.progress?.started == true }
+    if (continuing.isNotEmpty()) {
+        item(key = "continue-listening") {
+            SectionHeader(stringResource(R.string.continue_listening), Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp))
+        }
+        items(continuing, key = { it.episode.identity.value }) { row ->
+            ArtworkEpisodeRow(row, actions, showActions = true)
+        }
+    }
+    val rows = releases.associateBy { it.episode.identity }
     val now = Clock.System.now()
-    ReleaseSection.group(state.visible.map { it.episode }).forEachIndexed { index, section ->
+    ReleaseSection.group(releases.map { it.episode }).forEachIndexed { index, section ->
         item(key = "section:${section.day}") {
             val recent = section.recent(now)
             Text(
                 section.title(now).text(),
                 style = if (recent) Podcst.type.label else Podcst.type.caption,
                 color = if (recent) Podcst.colors.ink else Podcst.colors.secondary,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = if (index == 0) 16.dp else 24.dp, bottom = 4.dp).semantics { heading() },
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = if (index == 0 && continuing.isEmpty()) 16.dp else 24.dp, bottom = 4.dp).semantics { heading() },
             )
         }
         items(section.episodes, key = { it.identity.value }) { episode ->
@@ -383,12 +393,15 @@ private fun LazyListScope.releases(state: EpisodeListState, actions: EpisodeActi
 }
 
 @Composable
-private fun ReleaseSection.Title.text(): String = when (this) {
-    ReleaseSection.Title.Today -> stringResource(DesignR.string.today)
-    ReleaseSection.Title.Yesterday -> stringResource(DesignR.string.yesterday)
-    is ReleaseSection.Title.Weekday -> day.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault())
-    is ReleaseSection.Title.Date -> DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).format(day)
-    ReleaseSection.Title.Unavailable -> stringResource(DesignR.string.date_unavailable)
+private fun ReleaseSection.Title.text(): String {
+    val locale = LocalLocale.current.platformLocale
+    return when (this) {
+        ReleaseSection.Title.Today -> stringResource(DesignR.string.today)
+        ReleaseSection.Title.Yesterday -> stringResource(DesignR.string.yesterday)
+        is ReleaseSection.Title.Weekday -> day.getDisplayName(java.time.format.TextStyle.FULL, locale)
+        is ReleaseSection.Title.Date -> DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale).format(day)
+        ReleaseSection.Title.Unavailable -> stringResource(DesignR.string.date_unavailable)
+    }
 }
 
 @Composable

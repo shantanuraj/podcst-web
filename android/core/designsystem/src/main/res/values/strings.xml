@@ -14,6 +14,8 @@
     <string name="download">Download</string>
     <string name="remove_download">Remove download</string>
     <string name="mark_played">Mark as played</string>
+    <string name="mark_unplayed">Mark unplayed</string>
+    <string name="episode_actions">More actions for %1$s</string>
     <string name="share">Share</string>
     <string name="retry">Try again</string>
     <string name="undo">Undo</string>

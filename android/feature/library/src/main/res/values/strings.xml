@@ -3,8 +3,8 @@
     <string name="library">Library</string>
     <string name="settings">Settings</string>
     <string name="downloads">Downloads</string>
-    <string name="new_releases">New releases</string>
     <string name="continue_and_new">Continue &amp; new</string>
+    <string name="continue_listening">Continue listening</string>
     <string name="see_all">See all</string>
     <string name="subscriptions">Subscriptions</string>
     <plurals name="shows">
@@ -40,8 +40,8 @@
     <string name="starred_empty_detail">Swipe right on any episode, or tap its star, to keep it here.</string>
     <string name="downloads_empty">Listen anywhere</string>
     <string name="downloads_empty_detail">Download episodes from their details or episode menu to keep listening offline.</string>
-    <string name="releases_empty">No new releases</string>
-    <string name="releases_empty_detail">New episodes from the shows you follow will appear here.</string>
+    <string name="releases_empty">No episodes yet</string>
+    <string name="releases_empty_detail">Episodes you start and new releases from the shows you follow will appear here.</string>
     <string name="storage_podcst">Podcst %1$s</string>
     <string name="storage_free">%1$s free on this device</string>
     <string name="storage_description">Podcst uses %1$s. %2$s free on this device.</string>

@@ -72,10 +72,11 @@ internal fun listening(
     Listening(saved, starred, entries, current, playing, clock())
 }
 
+internal fun listeningEpisodes(unfinished: List<Episode>, releases: List<Episode>): List<Episode> =
+    (unfinished + releases).distinctBy { it.identity }
+
 internal fun continueAndNew(unfinished: List<Episode>, releases: List<Episode>, progress: Map<String, EpisodeProgress>): List<Episode> =
-    (unfinished.filterNot { progress[it.identity.value]?.completed == true } + releases)
-        .distinctBy { it.identity }
-        .take(CONTINUE_LIMIT)
+    listeningEpisodes(unfinished.filter { progress[it.identity.value]?.started == true }, releases)
 
 internal fun downloaded(entries: Collection<DownloadEntry>, episodes: List<Episode>): List<Episode> {
     val byIdentity = episodes.mapNotNull { episode -> episode.mediaReferenceIdentity?.let { it to episode } }.toMap() + episodes.associateBy { it.identity.value }
@@ -145,5 +146,3 @@ internal fun CoroutineScope.refresh(state: MutableStateFlow<Refresh>, work: susp
         }
     }
 }
-
-private const val CONTINUE_LIMIT = 5

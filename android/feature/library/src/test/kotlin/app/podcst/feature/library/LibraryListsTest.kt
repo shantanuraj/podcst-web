@@ -56,10 +56,65 @@ class EpisodeListsTest {
     }
 
     @Test
-    fun continueAndNewIsLimitedToFiveRows() {
+    fun aRemotelyCompletedOldEpisodeLeavesContinueAndNew() {
+        val old = episode("old", published = now - 40.days)
+        val fresh = episode("fresh")
+        val unfinished = listOf(old)
+        val releases = listOf(fresh)
+        assertEquals(listOf(old, fresh), continueAndNew(unfinished, releases, mapOf(old.key() to progress(10))))
+        assertEquals(listOf(fresh), continueAndNew(unfinished, releases, mapOf(old.key() to progress(60, completed = true))))
+    }
+
+    @Test
+    fun zeroOrMissingEffectiveProgressDoesNotPromoteStaleUnfinishedRows() {
+        val reset = episode("reset", published = now - 40.days)
+        val removed = episode("removed", published = now - 40.days)
+        val continuing = episode("continuing")
+        val fresh = episode("fresh")
+        val saved = mapOf(reset.key() to progress(0), continuing.key() to progress(10))
+        assertEquals(listOf(continuing, fresh), continueAndNew(listOf(reset, removed, continuing), listOf(fresh), saved))
+    }
+
+    @Test
+    fun effectiveReplayProgressKeepsAnOldEpisodeInContinue() {
+        val old = episode("old", published = now - 40.days)
+        val fresh = episode("fresh")
+        val saved = mapOf(old.key() to progress(60, completed = true))
+        val replayed = saved + (old.key() to progress(5))
+        assertEquals(listOf(fresh), continueAndNew(listOf(old), listOf(fresh), saved))
+        assertEquals(listOf(old, fresh), continueAndNew(listOf(old), listOf(fresh), replayed))
+        assertFalse(Listening(progress = replayed, now = now).row(old).played)
+    }
+
+    @Test
+    fun progressRefreshIncludesOldUnfinishedAndReleasesOnce() {
+        val old = episode("old", published = now - 40.days)
+        val shared = episode("shared")
+        val releases = (1..6).map { episode("r$it") }
+        assertEquals(
+            listOf(old, shared) + releases,
+            listeningEpisodes(listOf(old, shared), listOf(shared) + releases + shared),
+        )
+    }
+
+    @Test
+    fun continueAndNewRetainsAllRowsWithoutDuplicatingContinuingReleases() {
         val unfinished = (1..3).map { episode("u$it") }
         val releases = (1..4).map { episode("r$it") }
-        assertEquals(listOf("u1", "u2", "u3", "r1", "r2"), continueAndNew(unfinished, releases, emptyMap()).map { it.guid })
+        val saved = unfinished.associate { it.key() to progress(10) }
+        assertEquals(
+            listOf("u1", "u2", "u3", "r1", "r2", "r3", "r4"),
+            continueAndNew(unfinished, listOf(unfinished[1]) + releases, saved).map { it.guid },
+        )
+    }
+
+    @Test
+    fun libraryPreviewIsLimitedToFiveRows() {
+        val unfinished = (1..3).map { episode("u$it") }
+        val releases = (1..4).map { episode("r$it") }
+        val listening = Listening(progress = unfinished.associate { it.key() to progress(10) }, now = now)
+        val state = library(emptyList(), releases, unfinished, listening, Refresh.Idle)
+        assertEquals(listOf("u1", "u2", "u3", "r1", "r2"), state.episodes.map { it.episode.guid })
     }
 
     @Test

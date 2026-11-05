@@ -42,6 +42,7 @@ class LibraryViewModel(
     clock: () -> Instant = Clock.System::now,
 ) : ViewModel() {
     private val refresh = MutableStateFlow(Refresh.Idle)
+    private val progressEpisodes = combine(progress.unfinished, library.newReleases, ::listeningEpisodes)
 
     val state: StateFlow<LibraryState> = combine(
         library.podcasts,
@@ -60,15 +61,18 @@ class LibraryViewModel(
 
     fun refresh(force: Boolean = true) = viewModelScope.refresh(refresh) {
         library.refresh(force)
-        progress.refresh(library.newReleases.first())
+        progress.refresh(progressEpisodes.first())
     }
 
     fun transferGuestProgress(selection: GuestProgressSelection) = viewModelScope.refresh(refresh) { progress.transferGuestProgress(selection) }
 
     fun removeUnavailable(id: Long) = viewModelScope.refresh(refresh) { library.removeUnavailable(id) }
 
-    fun refreshProgress() = viewModelScope.refresh(refresh) {
-        progress.refresh(library.newReleases.first())
+    suspend fun refreshProgress() {
+        refresh.first { it != Refresh.Running }
+        viewModelScope.refresh(refresh) {
+            progress.refresh(progressEpisodes.first())
+        }
     }
 }
 
@@ -81,9 +85,11 @@ internal fun library(
 ) = LibraryState(
     podcasts = podcasts,
     fresh = releases.filter(listening::fresh).mapTo(mutableSetOf()) { it.feed },
-    episodes = continueAndNew(unfinished, releases, listening.progress).map(listening::row),
+    episodes = continueAndNew(unfinished, releases, listening.progress).take(CONTINUE_LIMIT).map(listening::row),
     starred = listening.starred.size,
     downloads = listening.downloads.size,
     refresh = refresh,
     loaded = true,
 )
+
+private const val CONTINUE_LIMIT = 5

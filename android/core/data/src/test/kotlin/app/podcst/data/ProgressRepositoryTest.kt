@@ -76,6 +76,52 @@ class ProgressRepositoryTest {
         assertEquals(12000L, scopes.database.progress().get(phone.identity.value)?.positionMs)
     }
 
+    @Test fun refreshingUnfinishedEpisodesReconcilesRemoteCompletionZeroAndMissingProgress() = runTest {
+        val remote = StateFixtures { Reply("null") }
+        remote.saveFromAnotherDevice(1, 120, true)
+        remote.saveFromAnotherDevice(2, 0, false)
+        val server = FakeServer(remote::route)
+        val repository = repository(server)
+        val episodes = listOf(phone, web, episode(3))
+        scopes.database.episodes().upsert(episodes.map { it.entity() })
+        episodes.forEach {
+            scopes.database.progress().upsert(ProgressEntity(it.identity.value, 120000, 200000, false, 1))
+        }
+        val unfinished = repository.unfinished.first()
+        assertEquals(episodes.map { it.identity }.toSet(), unfinished.map { it.identity }.toSet())
+
+        repository.refresh(unfinished)
+
+        val saved = repository.progress.first()
+        assertTrue(saved.getValue(phone.identity.value).completed)
+        assertEquals(0.seconds, saved.getValue(web.identity.value).position)
+        assertFalse(saved.getValue(web.identity.value).completed)
+        assertNull(saved[episodes[2].identity.value])
+        assertTrue(repository.unfinished.first().isEmpty())
+        assertTrue(server.calls.all { it.body.isEmpty() })
+    }
+
+    @Test fun refreshingContinuingEpisodesPreservesPendingReplayOverCompletedAndMissingSnapshots() = runTest {
+        val remote = StateFixtures { Reply("null") }
+        remote.saveFromAnotherDevice(1, 120, true)
+        val server = FakeServer(remote::route)
+        val repository = repository(server)
+        repository.event(phone, 12.seconds, StateProgressEvent.replay)
+        repository.event(web, 14.seconds, StateProgressEvent.replay)
+        val queued = scopes.durable.account("owner").progressQueued
+
+        repository.refresh(repository.unfinished.first())
+
+        val saved = repository.progress.first()
+        assertEquals(12.seconds, saved.getValue(phone.identity.value).position)
+        assertEquals(14.seconds, saved.getValue(web.identity.value).position)
+        assertTrue(saved.getValue(phone.identity.value).started)
+        assertTrue(saved.getValue(web.identity.value).started)
+        assertEquals(setOf(phone.identity, web.identity), repository.unfinished.first().map { it.identity }.toSet())
+        assertEquals(queued, scopes.durable.account("owner").progressQueued)
+        assertTrue(server.calls.all { it.body.isEmpty() })
+    }
+
     @Test fun offlineCheckpointRetainsRoomCompletionAndDurableProjectionAcrossAccountRoundTrip() = runTest {
         val repository = repository(server())
         scopes.database.episodes().upsert(listOf(phone.entity()))

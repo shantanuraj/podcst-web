@@ -3,6 +3,7 @@ package app.podcst.destinations
 import android.os.StatFs
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -28,9 +29,12 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
     entry<LibraryRoute> {
         val model = viewModel { LibraryViewModel(graph.library, graph.progress, graph.stars, graph.downloads, graph.playback) }
         val state by model.state.collectAsStateWithLifecycle()
-        LifecycleResumeEffect(model) {
-            model.refreshProgress()
-            onPauseOrDispose { }
+        val owner by graph.scopes.current.collectAsStateWithLifecycle()
+        val verified by graph.scopes.verification.collectAsStateWithLifecycle()
+        val scope = rememberCoroutineScope()
+        LifecycleResumeEffect(model, owner, verified) {
+            val refresh = if (verified) scope.launch { model.refreshProgress() } else null
+            onPauseOrDispose { refresh?.cancel() }
         }
         LibraryScreen(
             state,
@@ -59,9 +63,12 @@ fun EntryProviderScope<NavKey>.libraryEntries(graph: AppGraph, navigator: Naviga
             )
         }
         val state by model.state.collectAsStateWithLifecycle()
-        LifecycleResumeEffect(model) {
-            model.refreshProgress()
-            onPauseOrDispose { }
+        val owner by graph.scopes.current.collectAsStateWithLifecycle()
+        val verified by graph.scopes.verification.collectAsStateWithLifecycle()
+        val scope = rememberCoroutineScope()
+        LifecycleResumeEffect(model, owner, verified) {
+            val refresh = if (verified) scope.launch { model.refreshProgress() } else null
+            onPauseOrDispose { refresh?.cancel() }
         }
         EpisodeListScreen(state, model, actions, onBack = { navigator.back() })
     }

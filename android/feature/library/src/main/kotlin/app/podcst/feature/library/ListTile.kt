@@ -39,5 +39,5 @@ internal val EpisodeList.title: Int
     get() = when (this) {
         EpisodeList.Starred -> DesignR.string.starred
         EpisodeList.Downloads -> R.string.downloads
-        EpisodeList.NewReleases -> R.string.new_releases
+        EpisodeList.NewReleases -> R.string.continue_and_new
     }

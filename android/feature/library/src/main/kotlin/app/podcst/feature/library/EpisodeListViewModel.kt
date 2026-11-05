@@ -68,7 +68,7 @@ class EpisodeListViewModel(
 
     private val source: Flow<List<Episode>> = when (list) {
         EpisodeList.Starred -> stars.starred
-        EpisodeList.NewReleases -> library.newReleases
+        EpisodeList.NewReleases -> combine(progress.unfinished, library.newReleases, progress.progress, ::continueAndNew)
         EpisodeList.Downloads -> combine(
             downloads.states,
             downloads.states
@@ -77,6 +77,10 @@ class EpisodeListViewModel(
                 .flatMapLatest(catalog::episodes),
         ) { entries, episodes -> downloaded(entries.values, episodes) }
     }
+
+    private val progressEpisodes = if (list == EpisodeList.NewReleases) {
+        combine(progress.unfinished, library.newReleases, ::listeningEpisodes)
+    } else source
 
     private val storage: Flow<Storage?> =
         if (list == EpisodeList.Downloads) downloads.states.map { storage() }.flowOn(Dispatchers.IO) else flowOf(null)
@@ -110,11 +114,14 @@ class EpisodeListViewModel(
 
     fun refresh() = viewModelScope.refresh(refresh) {
         if (list == EpisodeList.Starred) stars.retry() else library.refresh(force = true)
-        progress.refresh(source.first())
+        progress.refresh(progressEpisodes.first())
     }
 
-    fun refreshProgress() = viewModelScope.refresh(refresh) {
-        progress.refresh(source.first())
+    suspend fun refreshProgress() {
+        refresh.first { it != Refresh.Running }
+        viewModelScope.refresh(refresh) {
+            progress.refresh(progressEpisodes.first())
+        }
     }
 
     fun retry() = viewModelScope.launch { stars.retry() }

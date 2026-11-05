@@ -110,7 +110,9 @@ fun LibraryScreen(
                         )
                     }
                 }
-                items(state.episodes, key = { it.episode.identity.value }) { row -> ArtworkEpisodeRow(row, actions) }
+                items(state.episodes, key = { it.episode.identity.value }) { row ->
+                    ArtworkEpisodeRow(row, actions, showActions = row.progress?.started == true)
+                }
             }
             when {
                 state.podcasts.isNotEmpty() -> {
