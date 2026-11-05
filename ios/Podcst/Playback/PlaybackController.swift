@@ -103,6 +103,8 @@ public final class PlaybackController {
     }
 
     public static let supportedRates: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2]
+    private static let backwardSkipInterval: TimeInterval = 10
+    private static let forwardSkipInterval: TimeInterval = 30
 
     private var assetChapters: (identity: String, metadata: ChapterMetadata)?
     @ObservationIgnored private let chapterLoader: (@MainActor (Episode) async -> ChapterMetadata?)?
@@ -445,11 +447,11 @@ public final class PlaybackController {
     }
 
     public func skipBackward() {
-        skip(by: -10)
+        skip(by: -Self.backwardSkipInterval)
     }
 
     public func skipForward() {
-        skip(by: 30)
+        skip(by: Self.forwardSkipInterval)
     }
 
     public func previousChapter() {
@@ -966,6 +968,10 @@ public final class PlaybackController {
         center.nextTrackCommand.isEnabled = true
         center.previousTrackCommand.isEnabled = true
         center.changePlaybackPositionCommand.isEnabled = true
+        center.skipBackwardCommand.isEnabled = true
+        center.skipBackwardCommand.preferredIntervals = [NSNumber(value: Self.backwardSkipInterval)]
+        center.skipForwardCommand.isEnabled = true
+        center.skipForwardCommand.preferredIntervals = [NSNumber(value: Self.forwardSkipInterval)]
         systemObservers?.remoteTargets.append((center.playCommand, center.playCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in self?.resume() }
             return .success
@@ -984,6 +990,18 @@ public final class PlaybackController {
         }))
         systemObservers?.remoteTargets.append((center.previousTrackCommand, center.previousTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in self?.previous() }
+            return .success
+        }))
+        systemObservers?.remoteTargets.append((center.skipBackwardCommand, center.skipBackwardCommand.addTarget { [weak self] event in
+            guard let interval = (event as? MPSkipIntervalCommandEvent)?.interval,
+                  interval.isFinite, interval > 0 else { return .commandFailed }
+            Task { @MainActor [weak self] in self?.skip(by: -interval) }
+            return .success
+        }))
+        systemObservers?.remoteTargets.append((center.skipForwardCommand, center.skipForwardCommand.addTarget { [weak self] event in
+            guard let interval = (event as? MPSkipIntervalCommandEvent)?.interval,
+                  interval.isFinite, interval > 0 else { return .commandFailed }
+            Task { @MainActor [weak self] in self?.skip(by: interval) }
             return .success
         }))
         systemObservers?.remoteTargets.append((center.changePlaybackPositionCommand, center.changePlaybackPositionCommand.addTarget { [weak self] event in

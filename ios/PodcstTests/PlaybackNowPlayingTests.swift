@@ -5,6 +5,71 @@ import XCTest
 
 @MainActor
 final class PlaybackNowPlayingTests: XCTestCase {
+    func testSystemCommandsOfferPodcastSkippingAlongsideEpisodeNavigation() {
+        let center = MPRemoteCommandCenter.shared()
+        let commands = [
+            center.playCommand, center.pauseCommand, center.togglePlayPauseCommand,
+            center.nextTrackCommand, center.previousTrackCommand, center.changePlaybackPositionCommand,
+            center.skipBackwardCommand, center.skipForwardCommand,
+        ]
+        let enabled = commands.map(\.isEnabled)
+        let backwardIntervals = center.skipBackwardCommand.preferredIntervals
+        let forwardIntervals = center.skipForwardCommand.preferredIntervals
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        center.skipBackwardCommand.isEnabled = false
+        center.skipForwardCommand.isEnabled = false
+        center.skipBackwardCommand.preferredIntervals = [15]
+        center.skipForwardCommand.preferredIntervals = [15]
+        let controller = PlaybackController(
+            transport: NowPlayingTransport(),
+            persistenceURL: directory.appendingPathComponent("playback.json"),
+            preferences: AudioPreferences(),
+            integratesWithSystem: true,
+            nowPlayingInfoSink: { _ in }
+        )
+        defer {
+            controller.shutdown()
+            for (command, wasEnabled) in zip(commands, enabled) { command.isEnabled = wasEnabled }
+            center.skipBackwardCommand.preferredIntervals = backwardIntervals
+            center.skipForwardCommand.preferredIntervals = forwardIntervals
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        XCTAssertTrue(center.skipBackwardCommand.isEnabled)
+        XCTAssertTrue(center.skipForwardCommand.isEnabled)
+        XCTAssertEqual(center.skipBackwardCommand.preferredIntervals, [10])
+        XCTAssertEqual(center.skipForwardCommand.preferredIntervals, [30])
+        XCTAssertTrue(center.nextTrackCommand.isEnabled)
+        XCTAssertTrue(center.previousTrackCommand.isEnabled)
+        XCTAssertFalse(controller.isPlaybackRequested)
+    }
+
+    func testPodcastSkippingKeepsTheEpisodeAndUpdatesNowPlayingImmediately() {
+        let (controller, transport, _, recorder) = makeController()
+        let current = episode("current")
+        controller.play(current, at: 40)
+        controller.enqueue(episode("next"))
+        transport.emit(.ready(duration: 300))
+
+        controller.skipBackward()
+        XCTAssertEqual(controller.currentTime, 30)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 30)
+        XCTAssertTrue(controller.isPlaybackRequested)
+
+        controller.skipForward()
+        XCTAssertEqual(controller.currentTime, 60)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 60)
+        XCTAssertEqual(controller.currentEpisode, current)
+        XCTAssertEqual(controller.upNext.map(\.title), ["next"])
+
+        controller.pause()
+        controller.seek(to: 5)
+        controller.skipBackward()
+        XCTAssertEqual(controller.currentTime, 0)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 0)
+    }
+
     func testFastPositionUpdatesPublishNowPlayingAtMostOncePerSecond() {
         let (controller, transport, clock, recorder) = makeController()
         controller.play(episode("first"))
