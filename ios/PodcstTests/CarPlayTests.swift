@@ -79,6 +79,80 @@ final class CarPlayTests: XCTestCase {
         XCTAssertEqual(ContractURLProtocol.requests().map { $0.url?.path }, ["/api/auth/session"])
     }
 
+    func testSpeedCyclesThroughSharedRatesWithoutStartingPausedPlayback() async throws {
+        let (app, car, _) = try fixture()
+        await ready(app)
+        let current = episode(1), next = episode(2)
+        app.playback.restore(current, at: 42)
+        app.playback.enqueue(next)
+        app.playback.setRate(PlaybackController.supportedRates.last!)
+
+        for rate in PlaybackController.supportedRates {
+            XCTAssertTrue(car.cyclePlaybackRate(for: current, scope: app.api.activityToken))
+            XCTAssertEqual(app.playback.rate, rate)
+            XCTAssertEqual(app.playback.audioPreferences.options(for: current.feed).speed, rate)
+            XCTAssertEqual(app.playback.currentTime, 42)
+            XCTAssertEqual(app.playback.upNext, [next])
+            XCTAssertFalse(app.playback.isPlaybackRequested)
+        }
+    }
+
+    func testStarToggleUsesSharedStoreAndLeavesPlaybackUntouched() async throws {
+        let (app, car, _) = try fixture()
+        await ready(app)
+        let current = episode(1), next = episode(2)
+        app.playback.restore(current, at: 42)
+        app.playback.enqueue(next)
+
+        XCTAssertTrue(car.toggleStar(for: current, scope: app.api.activityToken))
+        XCTAssertTrue(app.stars.contains(current))
+        XCTAssertEqual(car.episodes(for: .starred), [current])
+        XCTAssertTrue(car.toggleStar(for: current, scope: app.api.activityToken))
+        XCTAssertFalse(app.stars.contains(current))
+        app.stars.star(current)
+        XCTAssertTrue(car.toggleStar(for: current, scope: app.api.activityToken))
+        XCTAssertFalse(app.stars.contains(current))
+        XCTAssertEqual(app.playback.currentEpisode, current)
+        XCTAssertEqual(app.playback.currentTime, 42)
+        XCTAssertEqual(app.playback.upNext, [next])
+        XCTAssertFalse(app.playback.isPlaybackRequested)
+    }
+
+    func testNowPlayingActionsRejectOldEpisodeAndRetiredAccountCallbacks() async throws {
+        let (app, car, _) = try fixture()
+        let current = episode(1), previous = episode(2)
+        app.playback.restore(current, at: 42)
+        XCTAssertFalse(car.cyclePlaybackRate(for: current, scope: app.api.activityToken))
+        XCTAssertFalse(car.toggleStar(for: current, scope: app.api.activityToken))
+        await ready(app)
+
+        XCTAssertFalse(car.cyclePlaybackRate(for: previous, scope: app.api.activityToken))
+        XCTAssertFalse(car.toggleStar(for: previous, scope: app.api.activityToken))
+        let scope = app.api.activityToken
+        app.api.beginAuthentication()
+        XCTAssertFalse(car.cyclePlaybackRate(for: current, scope: scope))
+        XCTAssertFalse(car.toggleStar(for: current, scope: scope))
+        XCTAssertTrue(app.stars.stars.isEmpty)
+        XCTAssertEqual(app.playback.rate, 1)
+        XCTAssertEqual(app.playback.currentTime, 42)
+    }
+
+    func testStarRejectsMissingIDsSuspendedStoreAndMismatchedAccount() async throws {
+        let (app, car, _) = try fixture()
+        await ready(app)
+        var current = episode(1)
+        current.id = nil
+        app.playback.restore(current, at: 42)
+        XCTAssertFalse(car.toggleStar(for: current, scope: app.api.activityToken))
+        current = episode(1)
+        app.playback.restore(current, at: 42)
+        app.stars.suspend()
+        XCTAssertFalse(car.toggleStar(for: current, scope: app.api.activityToken))
+        try app.stars.switchAccount(to: "other")
+        XCTAssertFalse(car.toggleStar(for: current, scope: app.api.activityToken))
+        XCTAssertTrue(app.stars.stars.isEmpty)
+    }
+
     func testSceneManifestRegistersAudioConnectionAndDisconnectionCallbacks() throws {
         let manifest = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") as? [String: Any])
         let configurations = try XCTUnwrap(manifest["UISceneConfigurations"] as? [String: Any])

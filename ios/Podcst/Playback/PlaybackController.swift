@@ -968,6 +968,9 @@ public final class PlaybackController {
         center.nextTrackCommand.isEnabled = true
         center.previousTrackCommand.isEnabled = true
         center.changePlaybackPositionCommand.isEnabled = true
+        center.changePlaybackRateCommand.isEnabled = true
+        let supportedRates = Self.supportedRates
+        center.changePlaybackRateCommand.supportedPlaybackRates = supportedRates.map(NSNumber.init(value:))
         center.skipBackwardCommand.isEnabled = true
         center.skipBackwardCommand.preferredIntervals = [NSNumber(value: Self.backwardSkipInterval)]
         center.skipForwardCommand.isEnabled = true
@@ -1009,6 +1012,13 @@ public final class PlaybackController {
             Task { @MainActor [weak self] in self?.seek(to: event.positionTime) }
             return .success
         }))
+        systemObservers?.remoteTargets.append((center.changePlaybackRateCommand, center.changePlaybackRateCommand.addTarget { [weak self] event in
+            guard let event = event as? MPChangePlaybackRateCommandEvent,
+                  supportedRates.contains(Double(event.playbackRate)) else { return .commandFailed }
+            let rate = Double(event.playbackRate)
+            Task { @MainActor [weak self] in self?.setRate(rate) }
+            return .success
+        }))
     }
 
     private func updateNowPlayingInfo(periodic: Bool = false) {
@@ -1033,6 +1043,7 @@ public final class PlaybackController {
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: episode.title,
             MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? effectiveRate : 0,
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: rate,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime
         ]
         if let podcastTitle = episode.podcastTitle { info[MPMediaItemPropertyAlbumTitle] = podcastTitle }

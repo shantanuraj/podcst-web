@@ -10,16 +10,19 @@ final class PlaybackNowPlayingTests: XCTestCase {
         let commands = [
             center.playCommand, center.pauseCommand, center.togglePlayPauseCommand,
             center.nextTrackCommand, center.previousTrackCommand, center.changePlaybackPositionCommand,
-            center.skipBackwardCommand, center.skipForwardCommand,
+            center.skipBackwardCommand, center.skipForwardCommand, center.changePlaybackRateCommand,
         ]
         let enabled = commands.map(\.isEnabled)
         let backwardIntervals = center.skipBackwardCommand.preferredIntervals
         let forwardIntervals = center.skipForwardCommand.preferredIntervals
+        let supportedRates = center.changePlaybackRateCommand.supportedPlaybackRates
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         center.skipBackwardCommand.isEnabled = false
         center.skipForwardCommand.isEnabled = false
         center.skipBackwardCommand.preferredIntervals = [15]
         center.skipForwardCommand.preferredIntervals = [15]
+        center.changePlaybackRateCommand.isEnabled = false
+        center.changePlaybackRateCommand.supportedPlaybackRates = [1]
         let controller = PlaybackController(
             transport: NowPlayingTransport(),
             persistenceURL: directory.appendingPathComponent("playback.json"),
@@ -32,6 +35,7 @@ final class PlaybackNowPlayingTests: XCTestCase {
             for (command, wasEnabled) in zip(commands, enabled) { command.isEnabled = wasEnabled }
             center.skipBackwardCommand.preferredIntervals = backwardIntervals
             center.skipForwardCommand.preferredIntervals = forwardIntervals
+            center.changePlaybackRateCommand.supportedPlaybackRates = supportedRates
             try? FileManager.default.removeItem(at: directory)
         }
 
@@ -41,7 +45,35 @@ final class PlaybackNowPlayingTests: XCTestCase {
         XCTAssertEqual(center.skipForwardCommand.preferredIntervals, [30])
         XCTAssertTrue(center.nextTrackCommand.isEnabled)
         XCTAssertTrue(center.previousTrackCommand.isEnabled)
+        XCTAssertTrue(center.changePlaybackRateCommand.isEnabled)
+        XCTAssertEqual(center.changePlaybackRateCommand.supportedPlaybackRates, PlaybackController.supportedRates.map(NSNumber.init(value:)))
         XCTAssertFalse(controller.isPlaybackRequested)
+    }
+
+    func testPausedSpeedChangesPublishTheSelectedRateWithoutStartingPlayback() {
+        let (controller, transport, _, recorder) = makeController()
+        controller.restore(episode("current"), at: 40)
+        transport.emit(.ready(duration: 300))
+        controller.enqueue(episode("next"))
+
+        controller.setRate(1.5)
+
+        XCTAssertEqual(controller.rate, 1.5)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyDefaultPlaybackRate] as? Double, 1.5)
+        XCTAssertEqual((recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? NSNumber)?.doubleValue, 0)
+        XCTAssertEqual(controller.currentTime, 40)
+        XCTAssertEqual(controller.upNext.map(\.title), ["next"])
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+
+        controller.setRate(3)
+        XCTAssertEqual(controller.rate, 1.5)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyDefaultPlaybackRate] as? Double, 1.5)
+
+        controller.resume()
+        transport.emit(.ready(duration: 300))
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 1.5)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyDefaultPlaybackRate] as? Double, 1.5)
     }
 
     func testPodcastSkippingKeepsTheEpisodeAndUpdatesNowPlayingImmediately() {
@@ -113,6 +145,7 @@ final class PlaybackNowPlayingTests: XCTestCase {
         XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 1.5)
         controller.holdDoubleSpeed(true)
         XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 2)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyDefaultPlaybackRate] as? Double, 1.5)
         controller.holdDoubleSpeed(false)
         XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 1.5)
 

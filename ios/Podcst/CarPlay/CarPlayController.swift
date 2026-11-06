@@ -45,6 +45,15 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         var subtitle: String?
     }
 
+    private struct NowPlayingControls: Equatable {
+        let scope: UUID
+        let episode: Episode?
+        let enabled: Bool
+        let rate: Double
+        let canStar: Bool
+        let starred: Bool
+    }
+
     private final class Page {
         let screen: Screen
         let template: CPListTemplate
@@ -76,6 +85,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     private var scope: UUID?
     private var wasLoading = false
     private var selection: (identity: String, completion: () -> Void)?
+    private var nowPlayingControls: NowPlayingControls?
 
     init(app: AppModel) { self.app = app }
 
@@ -104,6 +114,8 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         pages.forEach { $0.cancelArtwork() }
         completeSelection()
         CPNowPlayingTemplate.shared.remove(self)
+        CPNowPlayingTemplate.shared.updateNowPlayingButtons([])
+        nowPlayingControls = nil
         interface?.delegate = nil
         interface = nil
         root = nil
@@ -148,6 +160,27 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             app.playback.play(episode, at: progress?.completed == true ? 0 : progress?.position ?? 0)
         }
         return app.playback.currentEpisode?.identity == episode.identity && app.playback.isPlaybackRequested
+    }
+
+    @discardableResult
+    func cyclePlaybackRate(for episode: Episode, scope: UUID) -> Bool {
+        guard canControl(episode, scope: scope) else { return false }
+        let rates = PlaybackController.supportedRates
+        let index = rates.firstIndex(of: app.playback.rate) ?? 0
+        app.playback.setRate(rates[(index + 1) % rates.count])
+        return true
+    }
+
+    @discardableResult
+    func toggleStar(for episode: Episode, scope: UUID) -> Bool {
+        guard canControl(episode, scope: scope), app.stars.ready,
+              app.stars.accountID == app.session.user?.id, StarStore.validID(episode.id) else { return false }
+        return app.stars.toggle(episode)
+    }
+
+    private func canControl(_ episode: Episode, scope: UUID) -> Bool {
+        canBrowse && app.api.activityToken == scope && app.playback.isActive &&
+            !app.playback.queueStorageBlocked && app.playback.currentEpisode?.identity == episode.identity
     }
 
     private var canBrowse: Bool {
@@ -198,6 +231,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         }
         wasLoading = app.session.isLoading
         for page in pages { update(page) }
+        updateNowPlayingControls()
         if let selection {
             if app.playback.currentEpisode?.identity != selection.identity || !canBrowse {
                 completeSelection()
@@ -210,6 +244,57 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             } else if !app.playback.isPlaybackRequested {
                 completeSelection()
             }
+        }
+    }
+
+    private func updateNowPlayingControls() {
+        let episode = app.playback.currentEpisode
+        let enabled = canBrowse && app.playback.isActive && !app.playback.queueStorageBlocked
+        let controls = NowPlayingControls(
+            scope: app.api.activityToken,
+            episode: episode,
+            enabled: enabled,
+            rate: app.playback.rate,
+            canStar: app.stars.ready && app.stars.accountID == app.session.user?.id && StarStore.validID(episode?.id),
+            starred: episode.map { app.stars.contains($0) } ?? false
+        )
+        guard nowPlayingControls != controls else { return }
+        nowPlayingControls = controls
+        guard enabled, let episode else {
+            CPNowPlayingTemplate.shared.updateNowPlayingButtons([])
+            return
+        }
+        let token = connection
+        let rateLabel = "\(controls.rate.formatted(.number.precision(.fractionLength(0...2))))×"
+        let rate = CPNowPlayingImageButton(image: playbackRateImage(rateLabel)) { [weak self] _ in
+            guard let self, self.isCurrent(token, scope: controls.scope) else { return }
+            self.cyclePlaybackRate(for: episode, scope: controls.scope)
+        }
+        rate.accessibilityLabel = String(localized: "Playback speed, \(rateLabel)")
+        let star = CPNowPlayingImageButton(image: UIImage(systemName: controls.starred ? "star.fill" : "star")!) { [weak self] _ in
+            guard let self, self.isCurrent(token, scope: controls.scope), self.canControl(episode, scope: controls.scope) else { return }
+            if !self.toggleStar(for: episode, scope: controls.scope) {
+                self.showError(String(localized: "Unable to update starred episodes"))
+            }
+        }
+        star.isEnabled = controls.canStar
+        star.isSelected = controls.starred
+        star.accessibilityLabel = controls.starred ? String(localized: "Unstar episode") : String(localized: "Star episode")
+        CPNowPlayingTemplate.shared.updateNowPlayingButtons([rate, star])
+    }
+
+    private func playbackRateImage(_ label: String) -> UIImage {
+        let size = CPNowPlayingButtonMaximumImageSize
+        let text = NSAttributedString(string: label, attributes: [
+            .font: UIFont.systemFont(ofSize: 20, weight: .medium),
+            .foregroundColor: UIColor.black
+        ])
+        let textSize = text.size()
+        let scale = min(1, (size.width - 2) / textSize.width, (size.height - 2) / textSize.height)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            context.cgContext.translateBy(x: (size.width - textSize.width * scale) / 2, y: (size.height - textSize.height * scale) / 2)
+            context.cgContext.scaleBy(x: scale, y: scale)
+            text.draw(at: .zero)
         }
     }
 
