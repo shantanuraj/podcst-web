@@ -79,16 +79,16 @@ final class CarPlayTests: XCTestCase {
         XCTAssertEqual(ContractURLProtocol.requests().map { $0.url?.path }, ["/api/auth/session"])
     }
 
-    func testSpeedCyclesThroughSharedRatesWithoutStartingPausedPlayback() async throws {
+    func testSpeedSelectionUsesSharedRatesWithoutStartingPausedPlayback() async throws {
         let (app, car, _) = try fixture()
         await ready(app)
         let current = episode(1), next = episode(2)
         app.playback.restore(current, at: 42)
         app.playback.enqueue(next)
-        app.playback.setRate(PlaybackController.supportedRates.last!)
 
+        XCTAssertFalse(car.setPlaybackRate(3, for: current, scope: app.api.activityToken))
         for rate in PlaybackController.supportedRates {
-            XCTAssertTrue(car.cyclePlaybackRate(for: current, scope: app.api.activityToken))
+            XCTAssertTrue(car.setPlaybackRate(rate, for: current, scope: app.api.activityToken))
             XCTAssertEqual(app.playback.rate, rate)
             XCTAssertEqual(app.playback.audioPreferences.options(for: current.feed).speed, rate)
             XCTAssertEqual(app.playback.currentTime, 42)
@@ -122,15 +122,15 @@ final class CarPlayTests: XCTestCase {
         let (app, car, _) = try fixture()
         let current = episode(1), previous = episode(2)
         app.playback.restore(current, at: 42)
-        XCTAssertFalse(car.cyclePlaybackRate(for: current, scope: app.api.activityToken))
+        XCTAssertFalse(car.setPlaybackRate(1.5, for: current, scope: app.api.activityToken))
         XCTAssertFalse(car.toggleStar(for: current, scope: app.api.activityToken))
         await ready(app)
 
-        XCTAssertFalse(car.cyclePlaybackRate(for: previous, scope: app.api.activityToken))
+        XCTAssertFalse(car.setPlaybackRate(1.5, for: previous, scope: app.api.activityToken))
         XCTAssertFalse(car.toggleStar(for: previous, scope: app.api.activityToken))
         let scope = app.api.activityToken
         app.api.beginAuthentication()
-        XCTAssertFalse(car.cyclePlaybackRate(for: current, scope: scope))
+        XCTAssertFalse(car.setPlaybackRate(1.5, for: current, scope: scope))
         XCTAssertFalse(car.toggleStar(for: current, scope: scope))
         XCTAssertTrue(app.stars.stars.isEmpty)
         XCTAssertEqual(app.playback.rate, 1)

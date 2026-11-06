@@ -50,6 +50,8 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         let episode: Episode?
         let enabled: Bool
         let rate: Double
+        let playing: Bool
+        let doubleSpeedHeld: Bool
         let canStar: Bool
         let starred: Bool
     }
@@ -86,6 +88,8 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     private var wasLoading = false
     private var selection: (identity: String, completion: () -> Void)?
     private var nowPlayingControls: NowPlayingControls?
+    private var playbackRateTemplate: CPListTemplate?
+    private var playbackRateButton: (scope: UUID, episode: String, button: CPNowPlayingPlaybackRateButton, rate: Double?)?
 
     init(app: AppModel) { self.app = app }
 
@@ -116,6 +120,8 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         CPNowPlayingTemplate.shared.remove(self)
         CPNowPlayingTemplate.shared.updateNowPlayingButtons([])
         nowPlayingControls = nil
+        playbackRateTemplate = nil
+        playbackRateButton = nil
         interface?.delegate = nil
         interface = nil
         root = nil
@@ -163,11 +169,9 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     }
 
     @discardableResult
-    func cyclePlaybackRate(for episode: Episode, scope: UUID) -> Bool {
-        guard canControl(episode, scope: scope) else { return false }
-        let rates = PlaybackController.supportedRates
-        let index = rates.firstIndex(of: app.playback.rate) ?? 0
-        app.playback.setRate(rates[(index + 1) % rates.count])
+    func setPlaybackRate(_ rate: Double, for episode: Episode, scope: UUID) -> Bool {
+        guard canControl(episode, scope: scope), PlaybackController.supportedRates.contains(rate) else { return false }
+        app.playback.setRate(rate)
         return true
     }
 
@@ -255,21 +259,35 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             episode: episode,
             enabled: enabled,
             rate: app.playback.rate,
+            playing: app.playback.isPlaying,
+            doubleSpeedHeld: app.playback.isDoubleSpeedHeld,
             canStar: app.stars.ready && app.stars.accountID == app.session.user?.id && StarStore.validID(episode?.id),
             starred: episode.map { app.stars.contains($0) } ?? false
         )
         guard nowPlayingControls != controls else { return }
         nowPlayingControls = controls
+        if let playbackRateTemplate {
+            updatePlaybackRates(playbackRateTemplate, controls: controls)
+        }
         guard enabled, let episode else {
+            playbackRateButton = nil
             CPNowPlayingTemplate.shared.updateNowPlayingButtons([])
             return
         }
         let token = connection
         let rateLabel = playbackRateLabel(controls.rate)
-        let rate = CPNowPlayingImageButton(image: playbackRateImage(rateLabel)) { [weak self] _ in
-            guard let self, self.isCurrent(token, scope: controls.scope) else { return }
-            self.cyclePlaybackRate(for: episode, scope: controls.scope)
+        let chooseRate: (CPNowPlayingButton) -> Void = { [weak self] _ in
+            guard let self, self.isCurrent(token, scope: controls.scope),
+                  self.canControl(episode, scope: controls.scope), let current = self.nowPlayingControls else { return }
+            self.showPlaybackRates(current)
         }
+        if playbackRateButton?.scope != controls.scope || playbackRateButton?.episode != episode.identity {
+            playbackRateButton = (controls.scope, episode.identity, CPNowPlayingPlaybackRateButton(handler: chooseRate), nil)
+        }
+        if controls.playing { playbackRateButton?.rate = controls.doubleSpeedHeld ? nil : controls.rate }
+        let rate: CPNowPlayingButton = playbackRateButton?.rate == controls.rate
+            ? playbackRateButton!.button
+            : CPNowPlayingImageButton(image: UIImage(systemName: "speedometer")!, handler: chooseRate)
         rate.accessibilityLabel = String(localized: "Playback speed, \(rateLabel)")
         let star = CPNowPlayingImageButton(image: UIImage(systemName: controls.starred ? "star.fill" : "star")!) { [weak self] _ in
             guard let self, self.isCurrent(token, scope: controls.scope), self.canControl(episode, scope: controls.scope) else { return }
@@ -287,25 +305,34 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
 
-    private func playbackRateImage(_ label: String) -> UIImage {
-        let size = CPNowPlayingButtonMaximumImageSize
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 20, weight: .medium),
-            .foregroundColor: UIColor.black
-        ]
-        let text = NSAttributedString(string: label, attributes: attributes)
-        let textSize = text.size()
-        let labelSizes = PlaybackController.supportedRates.map {
-            NSAttributedString(string: playbackRateLabel($0), attributes: attributes).size()
+    private func showPlaybackRates(_ controls: NowPlayingControls) {
+        guard let interface else { return }
+        let template = CPListTemplate(title: String(localized: "Playback speed"), sections: [])
+        updatePlaybackRates(template, controls: controls)
+        playbackRateTemplate = template
+        interface.pushTemplate(template, animated: true) { [weak self, weak template] success, _ in
+            if !success, self?.playbackRateTemplate === template { self?.playbackRateTemplate = nil }
         }
-        let width = labelSizes.map(\.width).max() ?? textSize.width
-        let height = labelSizes.map(\.height).max() ?? textSize.height
-        let scale = min(1, (size.width - 2) / width, (size.height - 2) / height)
-        return UIGraphicsImageRenderer(size: size).image { context in
-            context.cgContext.translateBy(x: (size.width - textSize.width * scale) / 2, y: (size.height - textSize.height * scale) / 2)
-            context.cgContext.scaleBy(x: scale, y: scale)
-            text.draw(at: .zero)
+    }
+
+    private func updatePlaybackRates(_ template: CPListTemplate, controls: NowPlayingControls) {
+        let token = connection
+        let items = PlaybackController.supportedRates.map { rate in
+            let item = CPListItem(text: playbackRateLabel(rate), detailText: nil)
+            item.isEnabled = controls.enabled && controls.episode != nil
+            item.setAccessoryImage(rate == controls.rate ? UIImage(systemName: "checkmark") : nil)
+            item.handler = { [weak self, weak template] _, completion in
+                defer { completion() }
+                guard let self, let template, let episode = controls.episode,
+                      self.isCurrent(token, scope: controls.scope),
+                      self.setPlaybackRate(rate, for: episode, scope: controls.scope) else { return }
+                if self.interface?.topTemplate === template {
+                    self.interface?.popTemplate(animated: true) { _, _ in }
+                }
+            }
+            return item
         }
+        template.updateSections([CPListSection(items: items)])
     }
 
     private func update(_ page: Page) {
@@ -551,6 +578,9 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     func templateDidAppear(_ aTemplate: CPTemplate, animated: Bool) {
         guard let interface, let root else { return }
         let visible = interface.templates + root.templates
+        if let playbackRateTemplate, !visible.contains(where: { $0 === playbackRateTemplate }) {
+            self.playbackRateTemplate = nil
+        }
         removePages { page in !visible.contains { $0 === page.template } }
         if !pages.contains(where: { if case .podcast = $0.screen { true } else { false } }) {
             contentTask?.cancel()
