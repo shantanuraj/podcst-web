@@ -1,4 +1,5 @@
 import CarPlay
+import MediaPlayer
 import Observation
 
 @MainActor
@@ -89,7 +90,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     private var selection: (identity: String, completion: () -> Void)?
     private var nowPlayingControls: NowPlayingControls?
     private var playbackRateTemplate: CPListTemplate?
-    private var playbackRateButton: (scope: UUID, episode: String, button: CPNowPlayingPlaybackRateButton, rate: Double?)?
+    private var playbackRateButton: (scope: UUID, episode: String, button: CPNowPlayingPlaybackRateButton, rate: Double?, pendingPosition: TimeInterval?)?
 
     init(app: AppModel) { self.app = app }
 
@@ -264,7 +265,17 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             canStar: app.stars.ready && app.stars.accountID == app.session.user?.id && StarStore.validID(episode?.id),
             starred: episode.map { app.stars.contains($0) } ?? false
         )
-        guard nowPlayingControls != controls else { return }
+        let position = app.playback.currentTime
+        var ratePublished = false
+        if controls.playing, !controls.doubleSpeedHeld, nowPlayingControls?.rate == controls.rate,
+           playbackRateButton?.scope == controls.scope, playbackRateButton?.episode == episode?.identity,
+           let pendingPosition = playbackRateButton?.pendingPosition, position > pendingPosition {
+            let info = MPNowPlayingInfoCenter.default().nowPlayingInfo
+            ratePublished = (info?[MPNowPlayingInfoPropertyPlaybackRate] as? NSNumber)?.doubleValue == controls.rate &&
+                ((info?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? NSNumber)?.doubleValue ?? 0) > pendingPosition
+        }
+        guard nowPlayingControls != controls || ratePublished else { return }
+        let previous = nowPlayingControls
         nowPlayingControls = controls
         if let playbackRateTemplate {
             updatePlaybackRates(playbackRateTemplate, controls: controls)
@@ -282,9 +293,21 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             self.showPlaybackRates(current)
         }
         if playbackRateButton?.scope != controls.scope || playbackRateButton?.episode != episode.identity {
-            playbackRateButton = (controls.scope, episode.identity, CPNowPlayingPlaybackRateButton(handler: chooseRate), nil)
+            playbackRateButton = (controls.scope, episode.identity, CPNowPlayingPlaybackRateButton(handler: chooseRate), nil, nil)
         }
-        if controls.playing { playbackRateButton?.rate = controls.doubleSpeedHeld ? nil : controls.rate }
+        if controls.doubleSpeedHeld {
+            playbackRateButton?.rate = nil
+            playbackRateButton?.pendingPosition = nil
+        } else if controls.playing, playbackRateButton?.rate != controls.rate {
+            if ratePublished {
+                playbackRateButton?.rate = controls.rate
+                playbackRateButton?.pendingPosition = nil
+            } else if previous?.playing != true || previous?.rate != controls.rate || playbackRateButton?.pendingPosition == nil {
+                playbackRateButton?.pendingPosition = position
+            }
+        } else {
+            playbackRateButton?.pendingPosition = nil
+        }
         let rate: CPNowPlayingButton = playbackRateButton?.rate == controls.rate
             ? playbackRateButton!.button
             : CPNowPlayingImageButton(image: UIImage(systemName: "speedometer")!, handler: chooseRate)
