@@ -265,7 +265,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             return
         }
         let token = connection
-        let rateLabel = "\(controls.rate.formatted(.number.precision(.fractionLength(0...2))))×"
+        let rateLabel = playbackRateLabel(controls.rate)
         let rate = CPNowPlayingImageButton(image: playbackRateImage(rateLabel)) { [weak self] _ in
             guard let self, self.isCurrent(token, scope: controls.scope) else { return }
             self.cyclePlaybackRate(for: episode, scope: controls.scope)
@@ -283,14 +283,24 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         CPNowPlayingTemplate.shared.updateNowPlayingButtons([rate, star])
     }
 
+    private func playbackRateLabel(_ rate: Double) -> String {
+        "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
+    }
+
     private func playbackRateImage(_ label: String) -> UIImage {
         let size = CPNowPlayingButtonMaximumImageSize
-        let text = NSAttributedString(string: label, attributes: [
+        let attributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 20, weight: .medium),
             .foregroundColor: UIColor.black
-        ])
+        ]
+        let text = NSAttributedString(string: label, attributes: attributes)
         let textSize = text.size()
-        let scale = min(1, (size.width - 2) / textSize.width, (size.height - 2) / textSize.height)
+        let labelSizes = PlaybackController.supportedRates.map {
+            NSAttributedString(string: playbackRateLabel($0), attributes: attributes).size()
+        }
+        let width = labelSizes.map(\.width).max() ?? textSize.width
+        let height = labelSizes.map(\.height).max() ?? textSize.height
+        let scale = min(1, (size.width - 2) / width, (size.height - 2) / height)
         return UIGraphicsImageRenderer(size: size).image { context in
             context.cgContext.translateBy(x: (size.width - textSize.width * scale) / 2, y: (size.height - textSize.height * scale) / 2)
             context.cgContext.scaleBy(x: scale, y: scale)
