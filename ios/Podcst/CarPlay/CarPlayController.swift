@@ -7,6 +7,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     enum Screen: Hashable {
         case queue, library, downloads, starred, listening, podcasts
         case podcast(Podcast)
+        case chapters(Episode, offset: Int)
 
         var title: String {
             switch self {
@@ -17,6 +18,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             case .listening: String(localized: "Continue & new")
             case .podcasts: String(localized: "Subscriptions")
             case .podcast(let podcast): podcast.title
+            case .chapters: String(localized: "Chapters")
             }
         }
 
@@ -28,6 +30,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             case .starred: "star"
             case .listening: "play.circle"
             case .podcasts, .podcast: "mic"
+            case .chapters: "book"
             }
         }
     }
@@ -35,6 +38,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     private enum Row: Equatable {
         case destination(Screen)
         case episode(Episode)
+        case chapter(Int, Chapter)
         case more(enabled: Bool)
         case message(String)
     }
@@ -55,13 +59,15 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         let doubleSpeedHeld: Bool
         let canStar: Bool
         let starred: Bool
+        let hasChapters: Bool
     }
 
     private final class Page {
-        let screen: Screen
+        var screen: Screen
         let template: CPListTemplate
         var contents: Contents?
         var episodes: [(Episode, CPListItem)] = []
+        var chapters: [(Int, CPListItem)] = []
         var artwork: [Task<Void, Never>] = []
 
         init(screen: Screen, template: CPListTemplate) {
@@ -152,7 +158,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             guard podcastStore?.scope == app.api.activityToken,
                   podcastScreen == screen else { return podcast.episodes }
             return podcastStore?.episodes ?? []
-        case .library, .podcasts:
+        case .library, .podcasts, .chapters:
             return []
         }
     }
@@ -181,6 +187,15 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         guard canControl(episode, scope: scope), app.stars.ready,
               app.stars.accountID == app.session.user?.id, StarStore.validID(episode.id) else { return false }
         return app.stars.toggle(episode)
+    }
+
+    @discardableResult
+    func playChapter(_ chapter: Chapter, for episode: Episode, scope: UUID) -> Bool {
+        guard canControl(episode, scope: scope), app.playback.clip == nil,
+              app.playback.chapters.contains(chapter) else { return false }
+        app.playback.seek(to: chapter.start)
+        app.playback.resume()
+        return app.playback.isPlaybackRequested
     }
 
     private func canControl(_ episode: Episode, scope: UUID) -> Bool {
@@ -263,7 +278,8 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             playing: app.playback.isPlaying,
             doubleSpeedHeld: app.playback.isDoubleSpeedHeld,
             canStar: app.stars.ready && app.stars.accountID == app.session.user?.id && StarStore.validID(episode?.id),
-            starred: episode.map { app.stars.contains($0) } ?? false
+            starred: episode.map { app.stars.contains($0) } ?? false,
+            hasChapters: app.playback.clip == nil && !app.playback.chapters.isEmpty
         )
         let position = app.playback.currentTime
         var ratePublished = false
@@ -321,7 +337,19 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         star.isEnabled = controls.canStar
         star.isSelected = controls.starred
         star.accessibilityLabel = controls.starred ? String(localized: "Unstar episode") : String(localized: "Star episode")
-        CPNowPlayingTemplate.shared.updateNowPlayingButtons([rate, star])
+        var buttons: [CPNowPlayingButton] = [rate]
+        if controls.hasChapters {
+            let chapters = CPNowPlayingImageButton(image: UIImage(systemName: "book")!) { [weak self] _ in
+                guard let self, self.isCurrent(token, scope: controls.scope),
+                      self.canControl(episode, scope: controls.scope), self.app.playback.clip == nil,
+                      !self.app.playback.chapters.isEmpty else { return }
+                self.open(.chapters(episode, offset: 0))
+            }
+            chapters.accessibilityLabel = String(localized: "Chapters")
+            buttons.append(chapters)
+        }
+        buttons.append(star)
+        CPNowPlayingTemplate.shared.updateNowPlayingButtons(buttons)
     }
 
     private func playbackRateLabel(_ rate: Double) -> String {
@@ -363,15 +391,27 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         if page.contents != contents {
             page.cancelArtwork()
             page.episodes = []
+            page.chapters = []
             page.contents = contents
             page.template.emptyViewTitleVariants = [contents.title]
             page.template.emptyViewSubtitleVariants = contents.subtitle.map { [$0] } ?? []
             let token = connection
             let scope = app.api.activityToken
-            page.template.trailingNavigationBarButtons = [CPBarButton(image: UIImage(systemName: "arrow.clockwise")!) { [weak self, weak page] _ in
+            let refresh = CPBarButton(image: UIImage(systemName: "arrow.clockwise")!) { [weak self, weak page] _ in
                 guard let self, let page, self.isCurrent(token, scope: scope) else { return }
                 self.refresh(page.screen)
-            }]
+            }
+            if case .chapters(let episode, let offset) = page.screen {
+                let limit = CPListTemplate.maximumItemCount
+                var buttons: [CPBarButton] = []
+                if offset > 0 {
+                    buttons.append(chapterPageButton(String(localized: "Previous"), episode: episode, offset: max(0, offset - limit), page: page))
+                }
+                if offset + limit < app.playback.chapters.count {
+                    buttons.append(chapterPageButton(String(localized: "Next"), episode: episode, offset: offset + limit, page: page))
+                }
+                page.template.trailingNavigationBarButtons = buttons
+            } else { page.template.trailingNavigationBarButtons = [refresh] }
             let items = contents.rows.map { makeItem($0, page: page) }
             page.template.updateSections(items.isEmpty ? [] : [CPListSection(items: items)])
         }
@@ -384,6 +424,15 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             if item.isPlaying != playing { item.isPlaying = playing }
             let displayedProgress = floor(fraction * 100) / 100
             if item.playbackProgress != displayedProgress { item.playbackProgress = displayedProgress }
+        }
+        for (index, item) in page.chapters {
+            let current = app.playback.currentChapterIndex == index
+            let playing = current && app.playback.isPlaying
+            if item.isPlaying != playing { item.isPlaying = playing }
+            let selected = current && !playing
+            if (item.accessoryImage != nil) != selected {
+                item.setAccessoryImage(selected ? UIImage(systemName: "checkmark") : nil)
+            }
         }
     }
 
@@ -400,6 +449,15 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         case .podcasts:
             contents.rows = app.library.podcasts.prefix(limit).map { .destination(.podcast($0)) }
             contents.title = String(localized: "No subscriptions")
+        case .chapters(let episode, let offset):
+            contents.title = String(localized: "No chapters")
+            guard canControl(episode, scope: contents.scope), app.playback.clip == nil else { return contents }
+            let chapters = app.playback.chapters
+            contents.subtitle = String(localized: "\(chapters.count) chapters")
+            let end = min(chapters.count, offset + limit)
+            if offset < end {
+                contents.rows = (offset..<end).map { .chapter($0, chapters[$0]) }
+            }
         default:
             contents.rows = episodes(for: screen).prefix(limit).map(Row.episode)
         }
@@ -458,6 +516,20 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             page.episodes.append((episode, item))
             loadArtwork(episode.artworkURL, into: item, page: page)
             return item
+        case .chapter(let index, let chapter):
+            guard case .chapters(let episode, _) = page.screen else { preconditionFailure() }
+            let title = chapter.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let item = CPListItem(text: title.isEmpty ? String(localized: "Chapter \(index + 1)") : title,
+                                  detailText: String(localized: "\(index + 1) of \(app.playback.chapters.count) · \(Duration.clock(chapter.start))"))
+            item.playingIndicatorLocation = .trailing
+            page.chapters.append((index, item))
+            item.handler = { [weak self] _, completion in
+                guard let self, self.isCurrent(token, scope: scope) else { completion(); return }
+                self.completeSelection()
+                guard self.playChapter(chapter, for: episode, scope: scope) else { completion(); return }
+                self.waitForPlayback(episode, completion: completion)
+            }
+            return item
         case .message(let message):
             let item = CPListItem(text: message, detailText: nil)
             item.isEnabled = false
@@ -493,14 +565,20 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
                 if self.isCurrent(token, scope: scope) { self.showError(String(localized: "Playback unavailable")) }
                 return
             }
-            if self.app.playback.isPlaying {
-                completion()
-                self.showNowPlaying()
-            } else {
-                self.selection = (episode.identity, completion)
-            }
+            self.waitForPlayback(episode, completion: completion)
         }
         return item
+    }
+
+    private func chapterPageButton(_ title: String, episode: Episode, offset: Int, page: Page) -> CPBarButton {
+        let token = connection
+        let scope = app.api.activityToken
+        return CPBarButton(title: title) { [weak self, weak page] _ in
+            guard let self, let page, self.isCurrent(token, scope: scope),
+                  self.canControl(episode, scope: scope), self.app.playback.clip == nil else { return }
+            page.screen = .chapters(episode, offset: offset)
+            self.update(page)
+        }
     }
 
     private func loadArtwork(_ url: URL?, into item: CPListItem, page: Page) {
@@ -568,6 +646,15 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
         let completion = selection?.completion
         selection = nil
         completion?()
+    }
+
+    private func waitForPlayback(_ episode: Episode, completion: @escaping () -> Void) {
+        if app.playback.isPlaying {
+            completion()
+            showNowPlaying()
+        } else {
+            selection = (episode.identity, completion)
+        }
     }
 
     private func showNowPlaying() {

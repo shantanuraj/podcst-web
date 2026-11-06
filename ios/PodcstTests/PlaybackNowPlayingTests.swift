@@ -200,7 +200,102 @@ final class PlaybackNowPlayingTests: XCTestCase {
         XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 40)
     }
 
-    private func makeController() -> (PlaybackController, NowPlayingTransport, NowPlayingClock, NowPlayingRecorder) {
+    func testChapterTitlesFollowBoundariesAndSeeksWithoutLosingEpisodeContext() {
+        let (controller, transport, clock, recorder) = makeController()
+        var current = episode("Diner Lobster")
+        current.podcastTitle = "Accidental Tech Podcast"
+        current.author = "Podcast authors"
+        current.showNotes = "00:10 Opening\n00:20 Duo acquisition"
+        controller.play(current)
+        transport.emit(.ready(duration: 300))
+        controller.enqueue(episode("next"))
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, current.title)
+        recorder.entries.removeAll()
+
+        clock.time = 0.1
+        transport.emit(.position(10))
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Opening")
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyAlbumTitle] as? String, current.title)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyArtist] as? String, current.podcastTitle)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyPlaybackDuration] as? Double, 300)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 10)
+        XCTAssertEqual(recorder.entries.count, 1)
+
+        clock.time = 0.2
+        transport.emit(.position(15))
+        XCTAssertEqual(recorder.entries.count, 1)
+        transport.emit(.position(20))
+        XCTAssertEqual(recorder.entries.count, 2)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Duo acquisition")
+
+        controller.pause()
+        controller.seek(to: 10)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Opening")
+        XCTAssertEqual((recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? NSNumber)?.doubleValue, 0)
+        XCTAssertFalse(controller.isPlaybackRequested)
+        XCTAssertEqual(controller.upNext.map(\.title), ["next"])
+
+        controller.seek(to: 0)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, current.title)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyAlbumTitle] as? String, current.podcastTitle)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyArtist] as? String, current.author)
+        controller.play(episode("next"))
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "next")
+        XCTAssertNil(recorder.last?[MPMediaItemPropertyAlbumTitle])
+    }
+
+    func testNativeChaptersArrivingAfterASeekUpdatePausedNowPlaying() async throws {
+        var continuation: CheckedContinuation<ChapterMetadata?, Never>?
+        let (controller, transport, _, recorder) = makeController(chapterLoader: { _ in
+            await withCheckedContinuation { continuation = $0 }
+        })
+        controller.restore(episode("current"), at: 5)
+        try await wait { continuation != nil }
+        controller.seek(to: 25)
+        transport.emit(.ready(duration: 300))
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "current")
+
+        continuation?.resume(returning: ChapterMetadata([
+            Chapter(title: "Opening", start: 10),
+            Chapter(title: "Hidden cue", start: 15, isHidden: true),
+            Chapter(title: "Duo acquisition", start: 20),
+            Chapter(title: " \n ", start: 30),
+        ]))
+        try await wait { controller.chapters.count == 3 }
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Duo acquisition")
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 25)
+        XCTAssertEqual((recorder.last?[MPNowPlayingInfoPropertyPlaybackRate] as? NSNumber)?.doubleValue, 0)
+        XCTAssertEqual(controller.state, .paused)
+        XCTAssertFalse(controller.isPlaybackRequested)
+
+        controller.seek(to: 15)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Opening")
+        controller.seek(to: 35)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "current")
+    }
+
+    func testLateChapterTitlesCannotCrossEpisodeOrAccountBoundaries() async throws {
+        var continuations: [CheckedContinuation<ChapterMetadata?, Never>] = []
+        let (controller, _, _, recorder) = makeController(chapterLoader: { _ in
+            await withCheckedContinuation { continuations.append($0) }
+        })
+        let metadata = ChapterMetadata([Chapter(title: "Opening", start: 0), Chapter(title: "Ending", start: 20)])
+        controller.play(episode("first"))
+        try await wait { continuations.count == 1 }
+        controller.play(episode("second"))
+        continuations[0].resume(returning: metadata)
+        try await wait { continuations.count == 2 }
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "second")
+        XCTAssertTrue(controller.chapters.isEmpty)
+
+        controller.beginAccountChange()
+        continuations[1].resume(returning: metadata)
+        await controller.releaseChapterMetadata()
+        XCTAssertNil(recorder.last)
+        XCTAssertTrue(controller.chapters.isEmpty)
+    }
+
+    private func makeController(chapterLoader: (@MainActor (Episode) async -> ChapterMetadata?)? = nil) -> (PlaybackController, NowPlayingTransport, NowPlayingClock, NowPlayingRecorder) {
         let transport = NowPlayingTransport()
         let clock = NowPlayingClock()
         let recorder = NowPlayingRecorder()
@@ -210,7 +305,8 @@ final class PlaybackNowPlayingTests: XCTestCase {
             persistenceURL: directory.appendingPathComponent("playback.json"),
             preferences: AudioPreferences(),
             monotonicTime: { clock.time },
-            nowPlayingInfoSink: { recorder.entries.append((clock.time, $0)) }
+            nowPlayingInfoSink: { recorder.entries.append((clock.time, $0)) },
+            chapterLoader: chapterLoader
         )
         addTeardownBlock {
             await MainActor.run { controller.shutdown() }
@@ -221,6 +317,14 @@ final class PlaybackNowPlayingTests: XCTestCase {
 
     private func episode(_ title: String) -> Episode {
         Episode(guid: title, feed: "https://example.com/feed", title: title, file: EpisodeFile(url: "https://example.com/\(title).mp3"))
+    }
+
+    private func wait(_ condition: () -> Bool) async throws {
+        for _ in 0..<200 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw NSError(domain: "PlaybackNowPlayingTests", code: 1)
     }
 }
 

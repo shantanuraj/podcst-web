@@ -732,6 +732,7 @@ public final class PlaybackController {
             }
         case .position(let position):
             guard position.isFinite, position >= 0 else { return }
+            let previousChapterIndex = currentChapterIndex
             currentTime = position
             if let clip, !clip.ended, shouldPlay, position >= clip.end {
                 reachClipEnd()
@@ -741,7 +742,7 @@ public final class PlaybackController {
                 emitProgress(completed: false)
                 persist()
             }
-            updateNowPlayingInfo(periodic: true)
+            updateNowPlayingInfo(periodic: currentChapterIndex == previousChapterIndex)
             return
         case .playback(let isPlaying):
             transition(to: shouldPlay ? (isPlaying ? .playing : .loading) : .paused)
@@ -912,7 +913,6 @@ public final class PlaybackController {
     private func loadChapters(for episode: Episode) {
         chaptersTask?.cancel()
         let previous = chaptersTask
-        let token = generation
         let loader = chapterLoader
         chaptersTask = Task { [weak self] in
             await previous?.value
@@ -926,7 +926,7 @@ public final class PlaybackController {
                     asset.cancelLoading()
                 }
             }
-            guard !Task.isCancelled, let self, self.generation == token,
+            guard !Task.isCancelled, let self,
                   self.currentEpisode?.identity == episode.identity else { return }
             self.assetChapters = (episode.identity, metadata ?? ChapterMetadata())
             self.updateNowPlayingInfo()
@@ -1040,14 +1040,21 @@ public final class PlaybackController {
             nowPlayingArtwork = nil
             requestArtwork(for: episode, key: key)
         }
+        let chapterTitle = currentChapterIndex.map { chapters[$0].title.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .flatMap { $0.isEmpty ? nil : $0 }
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: episode.title,
+            MPMediaItemPropertyTitle: chapterTitle ?? episode.title,
             MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? effectiveRate : 0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: rate,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime
         ]
-        if let podcastTitle = episode.podcastTitle { info[MPMediaItemPropertyAlbumTitle] = podcastTitle }
-        if let author = episode.author { info[MPMediaItemPropertyArtist] = author }
+        if chapterTitle != nil {
+            info[MPMediaItemPropertyAlbumTitle] = episode.title
+            if let podcastTitle = episode.podcastTitle ?? episode.author { info[MPMediaItemPropertyArtist] = podcastTitle }
+        } else {
+            if let podcastTitle = episode.podcastTitle { info[MPMediaItemPropertyAlbumTitle] = podcastTitle }
+            if let author = episode.author { info[MPMediaItemPropertyArtist] = author }
+        }
         if effectiveDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = effectiveDuration }
         if let nowPlayingArtwork { info[MPMediaItemPropertyArtwork] = nowPlayingArtwork }
         nowPlayingInfoSink(info)

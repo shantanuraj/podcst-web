@@ -118,6 +118,54 @@ final class CarPlayTests: XCTestCase {
         XCTAssertFalse(app.playback.isPlaybackRequested)
     }
 
+    func testChapterSelectionSeeksAndResumesWithoutChangingEpisodeQueueOrRate() async throws {
+        let (app, car, transport) = try fixture()
+        await ready(app)
+        var current = episode(1)
+        current.showNotes = "00:00 Opening\n00:20 Duo acquisition\n02:00 Closing"
+        app.playback.restore(current, at: 42)
+        transport.emit(.ready(duration: 300))
+        app.playback.enqueue(episode(2))
+        app.playback.setRate(1.5)
+        let chapters = app.playback.chapters
+
+        XCTAssertEqual(chapters.count, 3)
+        XCTAssertTrue(car.playChapter(chapters[2], for: current, scope: app.api.activityToken))
+        XCTAssertEqual(app.playback.currentTime, 120)
+        XCTAssertEqual(transport.position, 120)
+        XCTAssertEqual(app.playback.currentChapterIndex, 2)
+        XCTAssertTrue(app.playback.isPlaybackRequested)
+        transport.emit(.seeked(120))
+        transport.emit(.playback(isPlaying: true))
+        XCTAssertTrue(car.playChapter(chapters[0], for: current, scope: app.api.activityToken))
+        XCTAssertEqual(app.playback.currentTime, 0)
+        XCTAssertEqual(app.playback.currentChapterIndex, 0)
+        XCTAssertEqual(app.playback.currentEpisode, current)
+        XCTAssertEqual(app.playback.upNext, [episode(2)])
+        XCTAssertEqual(app.playback.rate, 1.5)
+    }
+
+    func testChapterSelectionRejectsUnknownChaptersOldEpisodesAndRetiredAccounts() async throws {
+        let (app, car, _) = try fixture()
+        var current = episode(1)
+        current.showNotes = "00:00 Opening\n00:20 Duo acquisition"
+        app.playback.restore(current, at: 42)
+        let chapter = try XCTUnwrap(app.playback.chapters.first)
+        XCTAssertFalse(car.playChapter(chapter, for: current, scope: app.api.activityToken))
+        await ready(app)
+        XCTAssertFalse(car.playChapter(Chapter(title: "Old chapter", start: 0), for: current, scope: app.api.activityToken))
+        XCTAssertFalse(car.playChapter(chapter, for: episode(2), scope: app.api.activityToken))
+        let scope = app.api.activityToken
+        app.api.beginAuthentication()
+        XCTAssertFalse(car.playChapter(chapter, for: current, scope: scope))
+        XCTAssertEqual(app.playback.currentTime, 42)
+        XCTAssertFalse(app.playback.isPlaybackRequested)
+
+        app.playback.restore(episode(2), at: 10)
+        XCTAssertFalse(car.playChapter(chapter, for: current, scope: app.api.activityToken))
+        XCTAssertEqual(app.playback.currentTime, 10)
+    }
+
     func testNowPlayingActionsRejectOldEpisodeAndRetiredAccountCallbacks() async throws {
         let (app, car, _) = try fixture()
         let current = episode(1), previous = episode(2)
@@ -210,15 +258,18 @@ private final class CarPlayTransport: PlaybackTransport {
     var onUpdate: (@MainActor (PlaybackTransportUpdate) -> Void)?
     var hasSource = false
     var position: TimeInterval = 0
+    private var generation = UUID()
     func load(source: PlaybackSource, at position: TimeInterval, generation: UUID) {
         self.position = position
+        self.generation = generation
         hasSource = true
     }
     func play(atRate rate: Double) {}
     func pause() {}
     func setRate(_ rate: Double) {}
     func setEffects(_ effects: AudioEffects) {}
-    func seek(to position: TimeInterval, generation: UUID) { self.position = position }
+    func seek(to position: TimeInterval, generation: UUID) { self.position = position; self.generation = generation }
+    func emit(_ event: PlaybackTransportEvent) { onUpdate?(.init(generation: generation, event: event)) }
     func stop() { hasSource = false }
     func shutdown() { stop() }
 }
