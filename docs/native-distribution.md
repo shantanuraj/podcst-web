@@ -33,6 +33,12 @@ values. Install the reviewed distribution certificate/profile using the approved
 custody process, not a key or password in a shell argument. Avoid automatic
 provisioning changes unless separately authorized.
 
+The App ID must have Associated Domains and Apple-approved CarPlay Audio enabled.
+Development and distribution profiles must authorize
+`com.apple.developer.carplay-audio=true`. Automatic signing can refresh profiles
+when provisioning access is authorized; manual signing requires installing
+regenerated profiles after capability changes.
+
 ```sh
 umask 077
 xcodebuild -project ios/Podcst.xcodeproj -scheme Podcst \
@@ -57,8 +63,10 @@ shasum -a 256 "$RELEASE_DIR/export/Podcst.ipa"
 ```
 
 Check the archive **and exported IPA** (export can re-sign): signature validity,
-application identifier, team identifier, `get-task-allow=false`, associated domains
-and embedded profile. Compare `dwarfdump --uuid` for the app and its dSYM. Release
+application identifier, team identifier, associated domains, and
+`com.apple.developer.carplay-audio=true` in both the signed app's entitlements and
+its embedded profile. Require `get-task-allow=false` on the exported distribution
+app. Compare `dwarfdump --uuid` for the app and its dSYM. Release
 builds generate dSYMs; retain the `.xcarchive`, exported IPA, dSYMs, export options,
 checksums and sanitized toolchain/build receipt together. Missing or mismatched
 symbols block distribution; do not regenerate them from a different build.

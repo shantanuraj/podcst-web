@@ -27,6 +27,11 @@ Record available Bluetooth, AirPlay and Cast routes separately. A simulator cann
 fill a physical hardware slot. Explicit owner approval is needed to change device
 scope or declare a combination not applicable.
 
+For CarPlay, also record the receiver model and wired or wireless connection.
+Connect the signed iPhone build to a real CarPlay display and verify Podcst appears
+and opens there. A successful build, matching entitlements or simulator tests do
+not establish CarPlay activation or playback acceptance.
+
 ## Per-case evidence
 
 Each row must identify the candidate above and record:
@@ -55,6 +60,9 @@ affected evidence; final store-installed smoke tests cannot be inherited.
 | A03 | Duration/end-of-episode timers, seek/speed/trim, background expiry, interruption resume, manual next and account change; no timer-generated completion |
 | A04 | Two completed downloads in airplane-mode relaunch: seek and queue advance; partial/cancel/retry/remove, low disk and no false offline availability |
 | A05 | Suspension versus force-quit transfer behavior, file protection and restart; distinguish OS limitations from app promises |
+| C01 | Open Podcst from CarPlay before opening the phone app, then repeat with the phone app already running; Queue, Library, Downloads and Starred load without automatic playback |
+| C02 | Start a streaming episode from CarPlay; verify the same current episode and position on the phone, Now Playing play/pause and 10-second back/30-second forward controls, Up Next and exactly-once queue advance; repeat with completed downloads offline |
+| C03 | Disconnect/reconnect CarPlay while paused and playing, then change accounts or expire the session on the phone; respect pause intent, retain valid shared playback state and show no retired-account library or media |
 | S01 | Offline rewind, process death, reconnect and another-client resume; retry is not new intent, including completed/null checkpoints |
 | S02 | Lost-ack star/follow then another-client removal, restart/replay; no resurrection or stale-cache upload |
 | S03 | Account A → B → A with pending work, offline departure and session expiry; no wrong-account writes, metadata or media |

@@ -125,8 +125,14 @@ specific version. The existing native-audio build phase compiles and links the
 library from source; no prebuilt library needs to be committed. Keep the hook
 executable and beside `Podcst.xcodeproj` in `ios/ci_scripts` so Cloud discovers it.
 
-For a physical device, select your own signing team in Xcode. Associated Domains
-requires a team that supports the capability.
+For a physical device, select your own signing team and App ID in Xcode. The app
+requires Associated Domains and Apple-approved CarPlay Audio on that App ID.
+Automatic signing is supported; after enabling capabilities, refresh provisioning
+profiles so they authorize the app's entitlements. See
+[native distribution](docs/native-distribution.md#ios-archive-and-export) for
+signed-artifact checks and the
+[CarPlay acceptance cases](docs/native-release-validation.md#acceptance-cases)
+for testing on a connected CarPlay display.
 
 ```sh
 xcrun devicectl list devices
