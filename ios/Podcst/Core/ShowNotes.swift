@@ -15,6 +15,15 @@ public struct Chapter: Hashable, Sendable {
         self.artwork = artwork
         self.isHidden = isHidden
     }
+
+    var compactTitle: String {
+        let text = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard text.count > 80 else { return text }
+        let end = text.index(text.startIndex, offsetBy: 79)
+        let prefix = text[..<end]
+        let boundary = text[end].isWhitespace ? end : prefix.lastIndex(of: " ") ?? end
+        return text[..<boundary].trimmingCharacters(in: .whitespaces) + "…"
+    }
 }
 
 extension [Chapter] {

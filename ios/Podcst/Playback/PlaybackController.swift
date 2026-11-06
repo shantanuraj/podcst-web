@@ -82,9 +82,7 @@ public final class PlaybackController {
 
     public var chapters: [Chapter] {
         guard let episode = currentEpisode else { return [] }
-        if let assetChapters, assetChapters.identity == episode.identity, assetChapters.metadata.navigation.count >= 2 {
-            return assetChapters.metadata.navigation
-        }
+        if let embeddedChapters { return embeddedChapters }
         if let parsedChapters, parsedChapters.identity == episode.identity { return parsedChapters.chapters }
         let chapters = ShowNotesParser.chapters(ShowNotesParser.notes(of: episode))
         parsedChapters = (episode.identity, chapters)
@@ -92,6 +90,21 @@ public final class PlaybackController {
     }
 
     public var currentChapterIndex: Int? { chapters.index(at: currentTime) }
+
+    func chapterTitle(at index: Int) -> String? {
+        let chapters = chapters
+        guard chapters.indices.contains(index) else { return nil }
+        let title = embeddedChapters == nil
+            ? chapters[index].compactTitle
+            : chapters[index].title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? nil : title
+    }
+
+    private var embeddedChapters: [Chapter]? {
+        guard let assetChapters, assetChapters.identity == currentEpisode?.identity,
+              assetChapters.metadata.navigation.count >= 2 else { return nil }
+        return assetChapters.metadata.navigation
+    }
 
     public var currentChapterArtwork: ChapterArtwork? {
         guard let assetChapters, assetChapters.identity == currentEpisode?.identity else { return nil }
@@ -1040,8 +1053,7 @@ public final class PlaybackController {
             nowPlayingArtwork = nil
             requestArtwork(for: episode, key: key)
         }
-        let chapterTitle = currentChapterIndex.map { chapters[$0].title.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .flatMap { $0.isEmpty ? nil : $0 }
+        let chapterTitle = currentChapterIndex.flatMap { self.chapterTitle(at: $0) }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: chapterTitle ?? episode.title,
             MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? effectiveRate : 0,

@@ -295,6 +295,87 @@ final class PlaybackNowPlayingTests: XCTestCase {
         XCTAssertTrue(controller.chapters.isEmpty)
     }
 
+    func testDerivedChapterTitlesAreCompactWithoutChangingNotesOrSeekPositions() {
+        let (controller, transport, _, recorder) = makeController()
+        let title = "Act One: A family searches for a missing keepsake while neighbors offer surprising clues and conflicting memories about its journey."
+        let expected = "Act One: A family searches for a missing keepsake while neighbors offer…"
+        var current = episode("Stories")
+        current.showNotes = "<p>(00:00:00) Prologue:   A\tshort introduction.</p><p>(00:07:30) \(title)</p>"
+        controller.restore(current, at: 450)
+        transport.emit(.ready(duration: 3600))
+        controller.enqueue(episode("next"))
+
+        XCTAssertEqual(controller.chapters.map(\.start), [0, 450])
+        XCTAssertEqual(controller.chapters[1].title, title)
+        XCTAssertEqual(controller.currentEpisode?.showNotes, current.showNotes)
+        XCTAssertEqual(controller.chapterTitle(at: 1), expected)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, expected)
+        XCTAssertEqual(recorder.last?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double, 450)
+        XCTAssertNil(controller.chapterTitle(at: -1))
+        XCTAssertNil(controller.chapterTitle(at: 2))
+
+        controller.seek(to: 0)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Prologue: A short introduction.")
+        XCTAssertEqual(controller.upNext.map(\.title), ["next"])
+        XCTAssertFalse(controller.isPlaybackRequested)
+    }
+
+    func testCompactChapterTitlesRespectWholeWordsAndGraphemeBoundaries() {
+        XCTAssertEqual(Chapter(title: " \t Opening\n sequence \u{00a0} ", start: 0).compactTitle, "Opening sequence")
+        let exact = String(repeating: "é", count: 80)
+        XCTAssertEqual(Chapter(title: exact, start: 0).compactTitle, exact)
+        let emoji = "👨🏽‍👩🏾‍👧🏻‍👦🏼"
+        let longWord = String(repeating: emoji, count: 81)
+        XCTAssertEqual(Chapter(title: longWord, start: 0).compactTitle, String(repeating: emoji, count: 79) + "…")
+        XCTAssertEqual(Chapter(title: " \n\t ", start: 0).compactTitle, "")
+    }
+
+    func testLateEmbeddedChaptersReplaceCompactTitlesWithoutLosingFullNativeTitles() async throws {
+        var continuation: CheckedContinuation<ChapterMetadata?, Never>?
+        let (controller, transport, _, recorder) = makeController(chapterLoader: { _ in
+            await withCheckedContinuation { continuation = $0 }
+        })
+        let title = "Act One: A family searches for a missing keepsake while neighbors offer surprising clues and conflicting memories about its journey."
+        var current = episode("Stories")
+        current.showNotes = "00:00 Opening\n07:30 \(title)"
+        controller.restore(current, at: 450)
+        transport.emit(.ready(duration: 3600))
+        try await wait { continuation != nil }
+        let chapters = controller.chapters
+        XCTAssertNotEqual(controller.chapterTitle(at: 1), title)
+
+        continuation?.resume(returning: ChapterMetadata(chapters))
+        try await wait { controller.chapterTitle(at: 1) == title }
+        XCTAssertEqual(controller.chapters, chapters)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, title)
+        XCTAssertEqual(controller.currentTime, 450)
+        XCTAssertFalse(controller.isPlaybackRequested)
+
+        controller.play(episode("Without chapters"))
+        XCTAssertNil(controller.chapterTitle(at: 1))
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, "Without chapters")
+        await controller.releaseChapterMetadata()
+    }
+
+    func testSingleEmbeddedChapterDoesNotDisableDerivedTitleLimit() async throws {
+        let (controller, transport, _, recorder) = makeController(chapterLoader: { _ in
+            ChapterMetadata([Chapter(title: "Single cue", start: 0)])
+        })
+        let title = String(repeating: "story ", count: 20).trimmingCharacters(in: .whitespaces)
+        var current = episode("Stories")
+        current.showNotes = "00:00 Opening\n07:30 \(title)"
+        controller.restore(current, at: 450)
+        transport.emit(.ready(duration: 3600))
+        let published = recorder.entries.count
+        try await wait { recorder.entries.count > published }
+
+        XCTAssertEqual(controller.chapters.count, 2)
+        XCTAssertEqual(controller.chapters[1].title, title)
+        XCTAssertEqual(controller.chapterTitle(at: 1), Chapter(title: title, start: 450).compactTitle)
+        XCTAssertEqual(recorder.last?[MPMediaItemPropertyTitle] as? String, controller.chapterTitle(at: 1))
+        XCTAssertLessThanOrEqual(controller.chapterTitle(at: 1)?.count ?? 0, 80)
+    }
+
     private func makeController(chapterLoader: (@MainActor (Episode) async -> ChapterMetadata?)? = nil) -> (PlaybackController, NowPlayingTransport, NowPlayingClock, NowPlayingRecorder) {
         let transport = NowPlayingTransport()
         let clock = NowPlayingClock()

@@ -38,7 +38,7 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
     private enum Row: Equatable {
         case destination(Screen)
         case episode(Episode)
-        case chapter(Int, Chapter)
+        case chapter(Int, Chapter, title: String)
         case more(enabled: Bool)
         case message(String)
     }
@@ -456,7 +456,9 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             contents.subtitle = String(localized: "\(chapters.count) chapters")
             let end = min(chapters.count, offset + limit)
             if offset < end {
-                contents.rows = (offset..<end).map { .chapter($0, chapters[$0]) }
+                contents.rows = (offset..<end).map {
+                    .chapter($0, chapters[$0], title: app.playback.chapterTitle(at: $0) ?? String(localized: "Chapter \($0 + 1)"))
+                }
             }
         default:
             contents.rows = episodes(for: screen).prefix(limit).map(Row.episode)
@@ -516,10 +518,9 @@ final class CarPlayController: NSObject, @preconcurrency CPNowPlayingTemplateObs
             page.episodes.append((episode, item))
             loadArtwork(episode.artworkURL, into: item, page: page)
             return item
-        case .chapter(let index, let chapter):
+        case .chapter(let index, let chapter, let title):
             guard case .chapters(let episode, _) = page.screen else { preconditionFailure() }
-            let title = chapter.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let item = CPListItem(text: title.isEmpty ? String(localized: "Chapter \(index + 1)") : title,
+            let item = CPListItem(text: title,
                                   detailText: String(localized: "\(index + 1) of \(app.playback.chapters.count) · \(Duration.clock(chapter.start))"))
             item.playingIndicatorLocation = .trailing
             page.chapters.append((index, item))
