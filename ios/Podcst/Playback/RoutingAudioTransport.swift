@@ -35,6 +35,7 @@ final class RoutingAudioTransport: PlaybackTransport {
     private var fallbackReason: String?
     private var needsDownloadForEffects = false
     private var inspectionEnabled = false
+    private var lastTraceSample: TimeInterval = 0
 
     init(media: MediaStore, preferSystemPlayback: Bool = false) {
         self.media = media
@@ -62,6 +63,7 @@ final class RoutingAudioTransport: PlaybackTransport {
         self.source = source
         self.generation = generation
         targetPosition = position
+        trace("route_load", values: ["position": position, "preferSystem": preferSystemPlayback ? 1 : 0])
         let token = session
         let pendingRetirements = Array(retirements.values)
         preparation = Task { [weak self] in
@@ -81,6 +83,7 @@ final class RoutingAudioTransport: PlaybackTransport {
                     let lease = try await self.media.pin(episode)
                     guard self.session == token, !Task.isCancelled else { await lease.release(); return }
                     self.lease = lease
+                    self.trace("route_pinned", values: ["completeFile": lease.completeFileURL == nil ? 0 : 1])
                     if self.preferSystemPlayback {
                         if let file = lease.completeFileURL {
                             let snapshot = await lease.byteSource.snapshot()
@@ -114,6 +117,8 @@ final class RoutingAudioTransport: PlaybackTransport {
                 }
             } catch {
                 guard self.session == token, !Task.isCancelled else { return }
+                let failure = error as NSError
+                self.trace("route_prepare_failed", values: ["code": Double(failure.code)], labels: ["domain": failure.domain])
                 let failedLease = self.lease
                 self.lease = nil
                 await failedLease?.release()
@@ -125,25 +130,32 @@ final class RoutingAudioTransport: PlaybackTransport {
 
     func play(atRate rate: Double) {
         self.rate = rate
+        trace("route_play", values: ["rate": rate, "position": position])
         backend?.play(atRate: rate)
     }
 
-    func pause() { backend?.pause() }
+    func pause() {
+        trace("route_pause", values: ["position": position])
+        backend?.pause()
+    }
 
     func seek(to position: TimeInterval, generation: UUID) {
         targetPosition = position
         self.generation = generation
+        trace("route_seek", values: ["position": position])
         if let backend { backend.seek(to: position, generation: generation) }
         else if let source { load(source: source, at: position, generation: generation) }
     }
 
     func setRate(_ rate: Double) {
         self.rate = rate
+        trace("route_rate", values: ["rate": rate])
         backend?.setRate(rate)
     }
 
     func setEffects(_ effects: AudioEffects) {
         self.effects = effects
+        trace("route_effects", values: ["boost": effects.volumeBoost ? 1 : 0, "trim": effects.trimSilence ? 1 : 0])
         if preferSystemPlayback {
             if backend != nil { emit(.effects(systemEffectState)) }
         } else if fallbackReason != nil {
@@ -156,6 +168,7 @@ final class RoutingAudioTransport: PlaybackTransport {
     }
 
     func stop() {
+        if source != nil || backend != nil { trace("route_stop", values: ["position": position]) }
         session = UUID()
         if let preparation {
             preparation.cancel()
@@ -194,9 +207,11 @@ final class RoutingAudioTransport: PlaybackTransport {
         let transport = LocalAudioTransport(sourceDecoder: decoder)
         transport.configureInspection(enabled: inspectionEnabled)
         backend = transport
+        trace("route_install", labels: ["backend": "custom", "input": decoder == nil ? "file" : "progressive"])
         transport.onUpdate = { [weak self, weak transport] update in
             guard let self, let transport, self.backend === transport, self.session == token, update.generation == self.generation else { return }
             if case .failed = update.event, transport.diagnostics.failure == .unsupportedFormat {
+                self.trace("route_unsupported_format")
                 self.targetPosition = transport.position
                 self.installSystem(reason: "Audio effects are unavailable for this format.", token: token, effectiveSource: source)
                 return
@@ -210,11 +225,13 @@ final class RoutingAudioTransport: PlaybackTransport {
 
     private func installSystem(reason: String? = nil, token: UUID, effectiveSource: PlaybackSource? = nil, needsDownload: Bool = false) {
         guard session == token, let source = effectiveSource ?? source else { return }
+        if backend != nil { trace("route_retire", values: ["releaseLease": source.url?.isFileURL == true ? 0 : 1]) }
         retire(backend, releasingLease: source.url?.isFileURL != true)
         let transport = AVPlayerTransport()
         backend = transport
         fallbackReason = reason
         needsDownloadForEffects = needsDownload
+        trace("route_install", values: ["needsDownload": needsDownload ? 1 : 0], labels: ["backend": reason == nil ? "system" : "systemFallback", "input": source.url?.isFileURL == true ? "file" : "remote"])
         transport.onUpdate = { [weak self, weak transport] update in
             guard let self, let transport, self.backend === transport, self.session == token, update.generation == self.generation else { return }
             if case .effects = update.event { return }
@@ -249,6 +266,7 @@ final class RoutingAudioTransport: PlaybackTransport {
               let source, case .episode(let episode) = source,
               case .available = media.status(for: episode) else { return false }
         let position = self.position
+        trace("route_download_promotion", values: ["position": position])
         let token = session
         emit(.playback(isPlaying: false))
         guard session == token else { return true }
@@ -275,6 +293,51 @@ final class RoutingAudioTransport: PlaybackTransport {
     }
 
     private func emit(_ event: PlaybackTransportEvent) {
+        switch event {
+        case .ready(let duration): trace("route_ready", values: ["duration": duration])
+        case .playback(let isPlaying): trace("route_playback", values: ["playing": isPlaying ? 1 : 0, "position": position])
+        case .seeked(let position): trace("route_seeked", values: ["position": position])
+        case .ended: trace("route_ended")
+        case .failed: trace("route_failed")
+        case .position(let position):
+            if PlaybackTraceRecorder.shared.isRecording, PlaybackTraceRecorder.now - lastTraceSample >= 1 {
+                lastTraceSample = PlaybackTraceRecorder.now
+                trace("route_sample", values: ["position": position, "rate": rate, "boost": effects.volumeBoost ? 1 : 0, "trim": effects.trimSilence ? 1 : 0])
+            }
+        default: break
+        }
         onUpdate?(PlaybackTransportUpdate(generation: generation, event: event))
+    }
+
+    private func trace(_ event: String, values: [String: Double] = [:], labels: [String: String] = [:]) {
+        guard PlaybackTraceRecorder.shared.isRecording else { return }
+        var values = values
+        var context = ["session": session.uuidString, "generation": generation.uuidString]
+        if case .episode(let episode) = source {
+            if let id = episode.id { values["episodeId"] = Double(id) }
+            if let id = episode.podcastId { values["podcastId"] = Double(id) }
+            switch media.status(for: episode) {
+            case .notDownloaded:
+                context["downloadState"] = "notDownloaded"
+            case .downloading(let received, let total):
+                context["downloadState"] = "downloading"
+                values["downloadReceivedBytes"] = Double(received)
+                if let total { values["downloadTotalBytes"] = Double(total) }
+            case .paused(let received, let total):
+                context["downloadState"] = "paused"
+                values["downloadReceivedBytes"] = Double(received)
+                if let total { values["downloadTotalBytes"] = Double(total) }
+            case .available(let bytes):
+                context["downloadState"] = "available"
+                values["downloadReceivedBytes"] = Double(bytes)
+                values["downloadTotalBytes"] = Double(bytes)
+            case .failed:
+                context["downloadState"] = "failed"
+            }
+        }
+        if let backend = activeBackend { context["backend"] = backend.rawValue }
+        if let sourceID = lease?.byteSource.traceID { context["sourceId"] = sourceID.uuidString }
+        context.merge(labels) { _, new in new }
+        PlaybackTraceRecorder.shared.record(event, values: values, labels: context)
     }
 }

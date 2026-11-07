@@ -298,4 +298,69 @@ struct PodcstTestPlanarList {
     [unit deallocateRenderResources];
 }
 
+- (void)testPerformanceDiagnosticsAreGatedAndDistinguishSilenceFailuresAndTimestampChanges {
+    NSError *error = nil;
+    auto *unit = [[PodcstLimiterAudioUnit alloc] initWithComponentDescription:[PodcstLimiterAudioUnit componentDescription] options:0 error:&error];
+    XCTAssertTrue([unit configureLimiterEnabled:NO error:&error]);
+    unit.maximumFramesToRender = 128;
+    XCTAssertTrue([unit allocateRenderResourcesAndReturnError:&error]);
+    XCTAssertNil(error);
+    auto render = unit.internalRenderBlock;
+    float output[256] = {};
+    PodcstTestPlanarList list = {2, {{1, 512, output}, {1, 512, output + 128}}};
+    auto *buffers = reinterpret_cast<AudioBufferList *>(&list);
+    AudioTimeStamp stamp = {};
+    stamp.mFlags = kAudioTimeStampSampleTimeValid;
+    AudioUnitRenderActionFlags flags = 0;
+    auto pull = ^AUAudioUnitStatus(AudioUnitRenderActionFlags *, const AudioTimeStamp *, AUAudioFrameCount frames, NSInteger, AudioBufferList *input) {
+        for (uint32_t channel = 0; channel < 2; ++channel) {
+            std::fill_n(static_cast<float *>(input->mBuffers[channel].mData), frames, 0.25f);
+        }
+        return noErr;
+    };
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, pull), noErr);
+    XCTAssertEqual(unit.renderDiagnostics.callbacks, 0);
+    unit.performanceDiagnosticsEnabled = YES;
+    stamp.mSampleTime = 128;
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, pull), noErr);
+    stamp.mSampleTime += 128;
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, pull), noErr);
+    XCTAssertEqual(unit.renderDiagnostics.callbacks, 2);
+    XCTAssertEqual(unit.renderDiagnostics.frames, 256);
+    XCTAssertEqual(unit.renderDiagnostics.silentFrames, 0);
+    XCTAssertEqual(unit.renderDiagnostics.sampleTimeDiscontinuities, 0);
+    for (float sample : output) { XCTAssertEqual(sample, 0.25f); }
+    auto silentPull = ^AUAudioUnitStatus(AudioUnitRenderActionFlags *inputFlags, const AudioTimeStamp *, AUAudioFrameCount, NSInteger, AudioBufferList *) {
+        *inputFlags |= kAudioUnitRenderAction_OutputIsSilence;
+        return noErr;
+    };
+    stamp.mSampleTime += 256;
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, silentPull), noErr);
+    XCTAssertEqual(unit.renderDiagnostics.silentFrames, 128);
+    XCTAssertEqual(unit.renderDiagnostics.sampleTimeDiscontinuities, 1);
+    XCTAssertEqual(unit.renderDiagnostics.maximumSampleTimeDiscontinuity, 128);
+    stamp.mSampleTime += 128;
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, nil), kAudioUnitErr_NoConnection);
+    XCTAssertEqual(unit.renderDiagnostics.failedFrames, 128);
+    XCTAssertEqual(unit.renderDiagnostics.silentFrames, 128);
+    unit.performanceDiagnosticsEnabled = NO;
+    const uint64_t callbacks = unit.renderDiagnostics.callbacks;
+    stamp.mSampleTime += 128;
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, pull), noErr);
+    XCTAssertEqual(unit.renderDiagnostics.callbacks, callbacks);
+    unit.performanceDiagnosticsEnabled = YES;
+    stamp.mSampleTime += 48000;
+    XCTAssertEqual(render(&flags, &stamp, 128, 0, buffers, nullptr, pull), noErr);
+    XCTAssertEqual(unit.renderDiagnostics.sampleTimeDiscontinuities, 1);
+    XCTAssertEqual(unit.renderDiagnostics.callbacks, callbacks + 1);
+    [unit reset];
+    XCTAssertEqual(unit.renderDiagnostics.callbacks, 0);
+    XCTAssertEqual(unit.renderDiagnostics.failedFrames, 0);
+    XCTAssertEqual(unit.renderDiagnostics.silentFrames, 0);
+    XCTAssertEqual(unit.renderDiagnostics.sampleTimeDiscontinuities, 0);
+    XCTAssertEqual(unit.renderDiagnostics.maximumCallbackInterval, 0);
+    XCTAssertEqual(unit.renderDiagnostics.maximumCallbackOverrun, 0);
+    [unit deallocateRenderResources];
+}
+
 @end

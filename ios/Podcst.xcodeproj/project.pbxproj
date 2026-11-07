@@ -7,11 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AC7000000000000000000015 = {isa = PBXBuildFile; fileRef = AC7000000000000000000002; };
+		AC7000000000000000000011 = {isa = PBXBuildFile; fileRef = AC7000000000000000000001; };
+		AC7000000000000000000012 = {isa = PBXBuildFile; fileRef = AC7000000000000000000001; };
+		AC7000000000000000000013 = {isa = PBXBuildFile; fileRef = AC7000000000000000000002; };
+		AC7000000000000000000014 = {isa = PBXBuildFile; fileRef = AC7000000000000000000003; };
         F11000000000000000000002 = {isa = PBXBuildFile; fileRef = F11000000000000000000001; };
         F11000000000000000000003 = {isa = PBXBuildFile; fileRef = F11000000000000000000001; };
         F11000000000000000000005 = {isa = PBXBuildFile; fileRef = F11000000000000000000004; };
 		D31100000000000000000003 = {isa = PBXBuildFile; fileRef = D31100000000000000000004; };
 		D31100000000000000000001 = {isa = PBXBuildFile; fileRef = D31100000000000000000002; };
+		D31100000000000000000005 = {isa = PBXBuildFile; fileRef = D31100000000000000000002; };
         D04000000000000000000001 = {isa = PBXBuildFile; fileRef = D01000000000000000000001; };
         D04000000000000000000002 = {isa = PBXBuildFile; fileRef = D02000000000000000000001; };
 		AC3200000000000000000011 = {isa = PBXBuildFile; fileRef = AC3200000000000000000001; };
@@ -36,6 +42,8 @@
 		87A60D1E5A97DF14FF9FB808 = {isa = PBXBuildFile; fileRef = 751258073276A4561FB50C12; };
 		F01200000000000000000004 /* Feed limits in Resources */ = {isa = PBXBuildFile; fileRef = F01200000000000000000003 /* Feed limits */; };
 		F01200000000000000000002 /* Core/FeedContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = F01200000000000000000001 /* Core/FeedContract.swift */; };
+		F01200000000000000000005 = {isa = PBXBuildFile; fileRef = F01200000000000000000001; };
+		F01200000000000000000006 = {isa = PBXBuildFile; fileRef = F01200000000000000000003; };
 		D01000000000000000000002 /* Core/StateContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = D01000000000000000000001 /* Core/StateContract.swift */; };
 		D02000000000000000000002 = {isa = PBXBuildFile; fileRef = D02000000000000000000001; };
 		8DAEA6A3A34B7B9C8E55EB45 /* Core/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A357A35D6089D818A2411D /* Core/Models.swift */; };
@@ -200,6 +208,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AC7000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playback/PlaybackTrace.swift; sourceTree = "<group>"; };
+		AC7000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTraceView.swift; sourceTree = "<group>"; };
+		AC7000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTraceTests.swift; sourceTree = "<group>"; };
         F11000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/PodcastDetailStore.swift; sourceTree = "<group>"; };
         F11000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastDetailStoreTests.swift; sourceTree = "<group>"; };
 		D31100000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionTests.swift; sourceTree = "<group>"; };
@@ -348,6 +359,8 @@
 		3C3B0F03DC089F93B8457928 /* Podcst */ = {
 			isa = PBXGroup;
 			children = (
+				AC7000000000000000000001,
+				AC7000000000000000000002,
 				AC6000000000000000000003,
 				AC6000000000000000000002,
 				AC6000000000000000000001,
@@ -449,6 +462,7 @@
 		A619C04D8A87AB070162A099 /* PodcstTests */ = {
 			isa = PBXGroup;
 			children = (
+				AC7000000000000000000003,
 				AC6000000000000000000005,
 				AC6000000000000000000004,
 				AC5000000000000000000003,
@@ -540,6 +554,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9B6672C266C16D03628B29C8 /* Build configuration list for PBXNativeTarget "Podcst" */;
 			buildPhases = (
+				AC7000000000000000000040,
 				92D7B756AF3AA5E88F7FDB23 /* Sources */,
 				326A678791C89F5FAABDFBFA /* Frameworks */,
 				650A1135D1611B9D2FFB37C0 /* Resources */,
@@ -636,6 +651,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F01200000000000000000006,
 				AB1000000000000000000033,
 				AB1000000000000000000034,
 				AB1000000000000000000035,
@@ -679,12 +695,25 @@
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = ();
-			inputPaths = ("$(SRCROOT)/scripts/audio-lab-build-metadata.sh");
+			inputPaths = ("$(SRCROOT)/scripts/build-metadata.sh");
 			name = "Stamp Audio Lab build";
 			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/AudioLabBuild.json");
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "/bin/bash \"$SRCROOT/scripts/audio-lab-build-metadata.sh\"";
+			shellScript = "/bin/bash \"$SRCROOT/scripts/build-metadata.sh\" AudioLabBuild";
+			showEnvVarsInLog = 0;
+		};
+		AC7000000000000000000040 = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/scripts/build-metadata.sh");
+			name = "Stamp playback diagnostic build";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/PlaybackTraceBuild.json");
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "/bin/bash \"$SRCROOT/scripts/build-metadata.sh\" PlaybackTraceBuild";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -694,6 +723,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC7000000000000000000014,
 				AC6000000000000000000015,
 				AC6000000000000000000014,
 				AC5000000000000000000015,
@@ -733,6 +763,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC7000000000000000000011,
+				AC7000000000000000000013,
 				AC6000000000000000000013,
 				AC6000000000000000000012,
 				AC6000000000000000000011,
@@ -802,6 +834,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D31100000000000000000005,
+				F01200000000000000000005,
+				AC7000000000000000000015,
+				AC7000000000000000000012,
 				AC5000000000000000000012,
 				AC5000000000000000000014,
 				AC3200000000000000000014,

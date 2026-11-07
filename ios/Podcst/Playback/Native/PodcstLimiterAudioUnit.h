@@ -10,6 +10,18 @@ typedef struct PodcstOutputTelemetryInfo {
     float limiterReductionDB;
 } PodcstOutputTelemetryInfo;
 
+typedef struct PodcstRenderDiagnostics {
+    uint64_t callbacks;
+    uint64_t frames;
+    uint64_t silentFrames;
+    uint64_t failedFrames;
+    uint64_t callbackGapCandidates;
+    uint64_t sampleTimeDiscontinuities;
+    double maximumCallbackInterval;
+    double maximumCallbackOverrun;
+    double maximumSampleTimeDiscontinuity;
+} PodcstRenderDiagnostics;
+
 @interface PodcstLimiterAudioUnit : AUAudioUnit
 
 + (AudioComponentDescription)componentDescription;
@@ -28,6 +40,8 @@ typedef struct PodcstOutputTelemetryInfo {
 @property(nonatomic, readonly) BOOL isDrained;
 @property(nonatomic) BOOL telemetryEnabled;
 @property(nonatomic, readonly) uint64_t droppedTelemetryFrames;
+@property(nonatomic) BOOL performanceDiagnosticsEnabled;
+@property(nonatomic, readonly) PodcstRenderDiagnostics renderDiagnostics;
 
 - (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity throughOutputFrame:(uint64_t)throughOutputFrame info:(PodcstOutputTelemetryInfo *)info NS_SWIFT_NAME(copyTelemetryFrames(_:capacity:throughOutputFrame:info:));
 

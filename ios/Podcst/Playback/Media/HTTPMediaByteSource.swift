@@ -2,6 +2,7 @@ import Foundation
 
 actor HTTPMediaByteSource {
     static let blockSize = 262_144
+    nonisolated let traceID = UUID()
     private let directory: URL
     private let session: URLSession
     private let maximumAssetBytes: Int64
@@ -52,6 +53,9 @@ actor HTTPMediaByteSource {
             let aligned = offset / Int64(Self.blockSize) * Int64(Self.blockSize)
             let upper = min(total, max(requested.upper, aligned + Int64(Self.blockSize)))
             if prioritizing { readPriority &+= 1 }
+            let started = PlaybackTraceRecorder.now
+            trace("media_cache_miss", values: ["offset": Double(requested.lower), "bytes": Double(requested.count), "priority": prioritizing ? 1 : 0])
+            defer { trace("media_range_wait", values: ["seconds": PlaybackTraceRecorder.now - started, "offset": Double(requested.lower), "bytes": Double(requested.count)]) }
             try await ensure(MediaByteRange(lower: aligned, upper: upper), priority: prioritizing ? readPriority : 0)
         }
         try Task.checkCancellation()
@@ -102,6 +106,7 @@ actor HTTPMediaByteSource {
         manifest.lastAccess = Date()
         try persist()
         pins += 1
+        trace("media_pin", values: ["storedBytes": Double(manifest.storedBytes), "totalBytes": Double(manifest.metadata?.totalBytes ?? 0), "complete": manifest.isComplete ? 1 : 0, "durable": manifest.durable ? 1 : 0])
     }
 
     func unpin() { pins = max(0, pins - 1) }
@@ -119,6 +124,7 @@ actor HTTPMediaByteSource {
     }
 
     func cancel() {
+        trace("media_cancel")
         epoch = UUID()
         transfer?.task.cancel()
         transfer = nil
@@ -168,9 +174,15 @@ actor HTTPMediaByteSource {
             if range == nil, manifest.isComplete { return }
             if let active = transfer {
                 if priority > active.priority, let range, active.range?.contains(range) != true {
+                    trace("media_transfer_preempt", values: ["offset": Double(range.lower), "bytes": Double(range.count)])
                     active.task.cancel()
                     transfer = nil
                 } else {
+                    let started = PlaybackTraceRecorder.now
+                    defer {
+                        let elapsed = PlaybackTraceRecorder.now - started
+                        if elapsed >= 0.02 { trace("media_transfer_wait", values: ["seconds": elapsed]) }
+                    }
                     do {
                         try await Self.awaitTransfer(active.task)
                         if transfer?.id == active.id { transfer = nil }
@@ -233,12 +245,18 @@ actor HTTPMediaByteSource {
             request.setValue("bytes=\(range.lower)-\(range.upper - 1)", forHTTPHeaderField: "Range")
             if let validator = manifest.metadata?.validator { request.setValue(validator, forHTTPHeaderField: "If-Range") }
         }
-        let delegate = MediaTransferLimit(maximumBytes: maximumAssetBytes, requiresRange: range != nil)
+        let requestID = UUID()
+        let started = PlaybackTraceRecorder.now
+        let requestLabels = ["requestId": requestID.uuidString]
+        trace("media_request_start", values: ["offset": Double(range?.lower ?? 0), "bytes": Double(range?.count ?? 0), "range": range == nil ? 0 : 1], labels: requestLabels)
+        let delegate = MediaTransferLimit(maximumBytes: maximumAssetBytes, requiresRange: range != nil, sourceID: traceID, requestID: requestID)
         let temporary: URL
         let response: URLResponse
         do {
             (temporary, response) = try await session.download(for: request, delegate: delegate)
         } catch {
+            let failure = error as NSError
+            trace("media_request_failed", values: ["seconds": PlaybackTraceRecorder.now - started, "code": Double(failure.code)], labels: requestLabels.merging(["domain": failure.domain]) { _, new in new })
             guard token == epoch, !Task.isCancelled else { throw MediaFailure.cancelled }
             if let response = delegate.completeFileResponse {
                 try requireCompleteFile(response)
@@ -246,6 +264,7 @@ actor HTTPMediaByteSource {
             }
             throw error
         }
+        trace("media_request_complete", values: ["seconds": PlaybackTraceRecorder.now - started, "status": Double((response as? HTTPURLResponse)?.statusCode ?? 0), "bytes": Double(delegate.receivedBytes)], labels: requestLabels)
         defer { try? FileManager.default.removeItem(at: temporary) }
         guard token == epoch, !Task.isCancelled else { throw MediaFailure.cancelled }
         guard let response = response as? HTTPURLResponse else { throw MediaFailure.invalidResponse }
@@ -288,6 +307,7 @@ actor HTTPMediaByteSource {
     }
 
     private func requireCompleteFile(_ response: HTTPURLResponse) throws {
+        trace("media_requires_complete", values: ["status": Double(response.statusCode)])
         let encoding = response.value(forHTTPHeaderField: "Content-Encoding")?.lowercased()
         guard encoding == nil || encoding == "identity" else { throw MediaFailure.invalidResponse }
         let validator = Self.validator(response)
@@ -369,17 +389,33 @@ actor HTTPMediaByteSource {
         guard bounds.count == 2, let lower = Int64(bounds[0]), let last = Int64(bounds[1]), lower >= 0, last >= lower, last < total else { return nil }
         return (MediaByteRange(lower: lower, upper: last + 1), total)
     }
+
+    private func trace(_ event: String, values: [String: Double] = [:], labels: [String: String] = [:]) {
+        guard PlaybackTraceRecorder.shared.isRecording else { return }
+        PlaybackTraceRecorder.shared.record(event, values: values, labels: labels.merging(["sourceId": traceID.uuidString]) { _, new in new })
+    }
 }
 
 private final class MediaTransferLimit: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let maximumBytes: Int64
     private let requiresRange: Bool
+    private let sourceID: UUID
+    private let requestID: UUID
     private let lock = NSLock()
     private var rejectedRangeResponse: HTTPURLResponse?
+    private var bytesReceived: Int64 = 0
 
-    init(maximumBytes: Int64, requiresRange: Bool) {
+    init(maximumBytes: Int64, requiresRange: Bool, sourceID: UUID, requestID: UUID) {
         self.maximumBytes = maximumBytes
         self.requiresRange = requiresRange
+        self.sourceID = sourceID
+        self.requestID = requestID
+    }
+
+    var receivedBytes: Int64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return bytesReceived
     }
 
     var completeFileResponse: HTTPURLResponse? {
@@ -391,6 +427,9 @@ private final class MediaTransferLimit: NSObject, URLSessionDownloadDelegate, @u
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        lock.lock()
+        bytesReceived = totalBytesWritten
+        lock.unlock()
         if requiresRange, let response = downloadTask.response as? HTTPURLResponse, response.statusCode == 200 {
             lock.lock()
             rejectedRangeResponse = response
@@ -398,6 +437,28 @@ private final class MediaTransferLimit: NSObject, URLSessionDownloadDelegate, @u
             downloadTask.cancel()
         }
         if totalBytesWritten > maximumBytes || totalBytesExpectedToWrite > maximumBytes { downloadTask.cancel() }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        guard PlaybackTraceRecorder.shared.isRecording else { return }
+        let transactions = metrics.transactionMetrics
+        var values: [String: Double] = [
+            "seconds": metrics.taskInterval.duration,
+            "redirects": Double(metrics.redirectCount),
+            "transactions": Double(transactions.count),
+            "reusedConnections": Double(transactions.filter(\.isReusedConnection).count),
+            "bytesReceived": Double(transactions.reduce(Int64(0)) { $0 + $1.countOfResponseBodyBytesReceived })
+        ]
+        if let last = transactions.last {
+            values["status"] = Double((last.response as? HTTPURLResponse)?.statusCode ?? 0)
+            values["reusedConnection"] = last.isReusedConnection ? 1 : 0
+            if let start = last.fetchStartDate, let response = last.responseStartDate { values["responseStartSeconds"] = response.timeIntervalSince(start) }
+            if let start = last.requestEndDate, let response = last.responseStartDate { values["ttfbSeconds"] = response.timeIntervalSince(start) }
+            if let start = last.domainLookupStartDate, let end = last.domainLookupEndDate { values["dnsSeconds"] = end.timeIntervalSince(start) }
+            if let start = last.connectStartDate, let end = last.connectEndDate { values["connectSeconds"] = end.timeIntervalSince(start) }
+            if let start = last.responseStartDate, let end = last.responseEndDate { values["bodySeconds"] = end.timeIntervalSince(start) }
+        }
+        PlaybackTraceRecorder.shared.record("media_request_metrics", values: values, labels: ["sourceId": sourceID.uuidString, "requestId": requestID.uuidString])
     }
 }
 

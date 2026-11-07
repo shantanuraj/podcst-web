@@ -13,6 +13,9 @@ actor ProgressiveAudioDecoder: PCMDecoder {
     }
 
     func open(url: URL, at position: TimeInterval, generation: UUID) async throws -> LocalAudioFileInfo {
+        let started = PlaybackTraceRecorder.now
+        trace("decoder_open_start", generation: generation, values: ["position": position])
+        defer { trace("decoder_open_end", generation: generation, values: ["seconds": PlaybackTraceRecorder.now - started]) }
         active?.cancellation.cancel()
         let cancellation = MediaReadCancellation()
         active = (generation, cancellation)
@@ -24,11 +27,17 @@ actor ProgressiveAudioDecoder: PCMDecoder {
         guard let bytes = metadata.totalBytes else { throw MediaFailure.requiresCompleteFile }
         let info = try await worker.perform { try $0.open(position: position, generation: generation, totalBytes: bytes, contentType: metadata.contentType, cancellation: cancellation) }
         guard active?.generation == generation else { throw MediaFailure.cancelled }
+        trace("decoder_ready", generation: generation, values: ["sampleRate": info.sampleRate, "channels": Double(info.channels), "frames": Double(info.frameCount)])
         return info
     }
 
     func read(slot: Int, generation: UUID) async throws -> LocalAudioDecodedBlock {
-        try await worker.perform { try $0.read(slot: slot, generation: generation) }
+        let started = PlaybackTraceRecorder.now
+        defer {
+            let elapsed = PlaybackTraceRecorder.now - started
+            if elapsed >= 0.02 { trace("decoder_read_wait", generation: generation, values: ["seconds": elapsed]) }
+        }
+        return try await worker.perform { try $0.read(slot: slot, generation: generation) }
     }
 
     func allocatedBytes() async -> UInt64 {
@@ -45,9 +54,15 @@ actor ProgressiveAudioDecoder: PCMDecoder {
 
     func close(generation: UUID) async {
         guard active?.generation == generation else { return }
+        trace("decoder_close", generation: generation)
         active?.cancellation.cancel()
         active = nil
         _ = try? await worker.perform(checkingCancellation: false) { $0.close(generation: generation) }
+    }
+
+    private func trace(_ event: String, generation: UUID, values: [String: Double] = [:]) {
+        guard PlaybackTraceRecorder.shared.isRecording else { return }
+        PlaybackTraceRecorder.shared.record(event, values: values, labels: ["sourceId": source.traceID.uuidString, "generation": generation.uuidString])
     }
 }
 
@@ -97,7 +112,7 @@ private final class ProgressiveAudioWorker: @unchecked Sendable {
               blockFrames > 0, blockFrames <= 8192, (2...16).contains(bufferCount) else { throw LocalAudioError.invalidConfiguration }
         close(generation: self.generation)
         self.generation = generation
-        let reader = ProgressiveByteReader(source: source, totalBytes: totalBytes, cancellation: cancellation)
+        let reader = ProgressiveByteReader(source: source, totalBytes: totalBytes, generation: generation, cancellation: cancellation)
         self.reader = reader
         let type: AudioFileTypeID
         switch contentType?.lowercased() {
@@ -148,6 +163,13 @@ private final class ProgressiveAudioWorker: @unchecked Sendable {
 
     func read(slot: Int, generation: UUID) throws -> LocalAudioDecodedBlock {
         guard self.generation == generation, let extendedFile, buffers.indices.contains(slot), !leased.contains(slot) else { throw LocalAudioError.notReady }
+        let started = PlaybackTraceRecorder.now
+        defer {
+            let elapsed = PlaybackTraceRecorder.now - started
+            if elapsed >= 0.02, PlaybackTraceRecorder.shared.isRecording {
+                PlaybackTraceRecorder.shared.record("decoder_decode_wait", values: ["seconds": elapsed], labels: ["sourceId": source.traceID.uuidString, "generation": generation.uuidString])
+            }
+        }
         var start: Int64 = 0
         try check(ExtAudioFileTell(extendedFile, &start))
         let buffer = buffers[slot]
@@ -187,6 +209,9 @@ private final class ProgressiveAudioWorker: @unchecked Sendable {
     }
 
     private func check(_ status: OSStatus) throws {
+        if status != noErr, PlaybackTraceRecorder.shared.isRecording {
+            PlaybackTraceRecorder.shared.record("decoder_status_failed", values: ["status": Double(status)], labels: ["sourceId": source.traceID.uuidString, "generation": generation.uuidString])
+        }
         guard status == noErr else { throw reader?.failure ?? MediaFailure.unsupportedMedia }
     }
 }
@@ -196,13 +221,15 @@ private final class ProgressiveByteReader {
     let totalBytes: Int64
     var failure: MediaFailure?
     private let cancellation: MediaReadCancellation
+    private let generation: UUID
     private var cached = Data()
     private var cachedOffset: Int64 = 0
     var cachedBytes: Int { cached.count }
 
-    init(source: HTTPMediaByteSource, totalBytes: Int64, cancellation: MediaReadCancellation) {
+    init(source: HTTPMediaByteSource, totalBytes: Int64, generation: UUID, cancellation: MediaReadCancellation) {
         self.source = source
         self.totalBytes = totalBytes
+        self.generation = generation
         self.cancellation = cancellation
     }
 
@@ -215,16 +242,26 @@ private final class ProgressiveByteReader {
         while copied < Int(available) {
             let position = position + Int64(copied)
             if position < cachedOffset || position >= cachedOffset + Int64(cached.count) {
+                let started = PlaybackTraceRecorder.now
                 let box = MediaReadResult()
                 cancellation.install(box)
                 let source = source
                 let offset = position / Int64(HTTPMediaByteSource.blockSize) * Int64(HTTPMediaByteSource.blockSize)
                 let count = Int(min(Int64(HTTPMediaByteSource.blockSize), totalBytes - offset))
+                defer {
+                    let elapsed = PlaybackTraceRecorder.now - started
+                    if elapsed >= 0.02, PlaybackTraceRecorder.shared.isRecording {
+                        PlaybackTraceRecorder.shared.record("decoder_byte_wait", values: ["seconds": elapsed, "offset": Double(offset), "requestedBytes": Double(count), "cachedBytes": Double(cached.count)], labels: ["sourceId": source.traceID.uuidString, "generation": generation.uuidString])
+                    }
+                }
                 let task = Task.detached(priority: .userInitiated) {
                     do { box.finish(.success(try await source.read(offset: offset, count: count))) }
                     catch { box.finish(.failure(error as? MediaFailure ?? .invalidResponse)) }
                 }
                 guard box.semaphore.wait(timeout: .now() + 45) == .success else {
+                    if PlaybackTraceRecorder.shared.isRecording {
+                        PlaybackTraceRecorder.shared.record("decoder_byte_timeout", values: ["offset": Double(offset), "bytes": Double(count)], labels: ["sourceId": source.traceID.uuidString, "generation": generation.uuidString])
+                    }
                     task.cancel()
                     failure = .invalidResponse
                     return kAudioFileUnspecifiedError

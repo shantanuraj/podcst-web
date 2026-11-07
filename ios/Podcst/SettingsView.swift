@@ -81,6 +81,7 @@ struct SettingsView: View {
                         }
                     }
                     Button("Audio defaults") { showingAudio = true }
+                    NavigationLink("Playback diagnostics") { PlaybackTraceView() }
                 } header: {
                     Text("Listening").eyebrow()
                 }

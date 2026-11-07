@@ -12,6 +12,7 @@
 #include <memory>
 #include <new>
 #include <vector>
+#include <mach/mach_time.h>
 
 static_assert(std::atomic<uint64_t>::is_always_lock_free);
 static_assert(std::atomic<bool>::is_always_lock_free);
@@ -50,6 +51,23 @@ struct RenderContext {
     std::atomic<uint64_t> firstRenderHostFrameOffset{0};
     std::atomic<uint64_t> renderFailures{0};
     std::atomic<int32_t> lastRenderStatus{noErr};
+    std::atomic<bool> performanceDiagnosticsEnabled{false};
+    std::atomic<uint64_t> diagnosticsEpoch{0};
+    std::atomic<uint64_t> diagnosticCallbacks{0};
+    std::atomic<uint64_t> diagnosticFrames{0};
+    std::atomic<uint64_t> diagnosticSilentFrames{0};
+    std::atomic<uint64_t> diagnosticFailedFrames{0};
+    std::atomic<uint64_t> callbackGapCandidates{0};
+    std::atomic<uint64_t> sampleTimeDiscontinuities{0};
+    std::atomic<uint64_t> maximumCallbackIntervalNanos{0};
+    std::atomic<uint64_t> maximumCallbackOverrunNanos{0};
+    std::atomic<uint64_t> maximumSampleTimeDiscontinuityFrames{0};
+    uint64_t observedDiagnosticsEpoch = 0;
+    uint64_t previousCallbackTime = 0;
+    uint32_t previousCallbackFrames = 0;
+    double expectedSampleTime = 0;
+    bool hasExpectedSampleTime = false;
+    double hostTimeNanos = 0;
     uint32_t channels = 0;
     uint32_t maximumFrames = 0;
     uint32_t latencyFrames = 0;
@@ -94,11 +112,26 @@ struct RenderContext {
         firstRenderHostFrameOffset.store(0, std::memory_order_relaxed);
         renderFailures.store(0, std::memory_order_relaxed);
         lastRenderStatus.store(noErr, std::memory_order_relaxed);
+        diagnosticCallbacks.store(0, std::memory_order_relaxed);
+        diagnosticFrames.store(0, std::memory_order_relaxed);
+        diagnosticSilentFrames.store(0, std::memory_order_relaxed);
+        diagnosticFailedFrames.store(0, std::memory_order_relaxed);
+        callbackGapCandidates.store(0, std::memory_order_relaxed);
+        sampleTimeDiscontinuities.store(0, std::memory_order_relaxed);
+        maximumCallbackIntervalNanos.store(0, std::memory_order_relaxed);
+        maximumCallbackOverrunNanos.store(0, std::memory_order_relaxed);
+        maximumSampleTimeDiscontinuityFrames.store(0, std::memory_order_relaxed);
+        previousCallbackTime = 0;
+        previousCallbackFrames = 0;
+        hasExpectedSampleTime = false;
     }
 
     bool prepare(double rate, uint32_t channelCount, uint32_t maximum, bool limiterEnabled) {
         release();
         sampleRate = rate;
+        mach_timebase_info_data_t timebase = {};
+        mach_timebase_info(&timebase);
+        hostTimeNanos = double(timebase.numer) / timebase.denom;
         channels = channelCount;
         maximumFrames = maximum;
         PodcstAudioConfig config;
@@ -142,6 +175,60 @@ struct RenderContext {
         return processorBytes + sizeof(RenderContext)
             + (inputPlanar.capacity() + outputPlanar.capacity() + interleaved.capacity() + processed.capacity() + telemetrySamples.capacity()) * sizeof(float)
             + (inputList ? offsetof(AudioBufferList, mBuffers) + channels * sizeof(AudioBuffer) : 0);
+    }
+
+    static void storeMaximum(std::atomic<uint64_t> &value, uint64_t candidate) {
+        if (candidate > value.load(std::memory_order_relaxed)) {
+            value.store(candidate, std::memory_order_relaxed);
+        }
+    }
+
+    bool beginDiagnostics(const AudioTimeStamp *timestamp, uint32_t frames) {
+        if (!performanceDiagnosticsEnabled.load(std::memory_order_acquire)) { return false; }
+        const auto epoch = diagnosticsEpoch.load(std::memory_order_acquire);
+        if (epoch != observedDiagnosticsEpoch) {
+            observedDiagnosticsEpoch = epoch;
+            previousCallbackTime = 0;
+            hasExpectedSampleTime = false;
+        }
+        const uint64_t now = mach_absolute_time();
+        if (previousCallbackTime != 0 && now >= previousCallbackTime && sampleRate > 0) {
+            const double interval = double(now - previousCallbackTime) * hostTimeNanos;
+            const double expected = double(previousCallbackFrames) / sampleRate * 1e9;
+            storeMaximum(maximumCallbackIntervalNanos, uint64_t(interval));
+            if (interval > expected) {
+                storeMaximum(maximumCallbackOverrunNanos, uint64_t(interval - expected));
+                if (interval - expected > std::max(2e6, expected * 0.5)) {
+                    callbackGapCandidates.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+        }
+        previousCallbackTime = now;
+        previousCallbackFrames = frames;
+        if (timestamp && (timestamp->mFlags & kAudioTimeStampSampleTimeValid) && std::isfinite(timestamp->mSampleTime)) {
+            if (hasExpectedSampleTime) {
+                const double difference = std::abs(timestamp->mSampleTime - expectedSampleTime);
+                if (difference > 1) {
+                    sampleTimeDiscontinuities.fetch_add(1, std::memory_order_relaxed);
+                    storeMaximum(maximumSampleTimeDiscontinuityFrames, uint64_t(std::min(std::ceil(difference), double(UINT64_MAX / 2))));
+                }
+            }
+            expectedSampleTime = timestamp->mSampleTime + frames;
+            hasExpectedSampleTime = true;
+        } else {
+            hasExpectedSampleTime = false;
+        }
+        diagnosticCallbacks.fetch_add(1, std::memory_order_relaxed);
+        diagnosticFrames.fetch_add(frames, std::memory_order_relaxed);
+        return true;
+    }
+
+    void finishDiagnostics(AUAudioUnitStatus status, AudioUnitRenderActionFlags *flags, uint32_t frames) {
+        if (status != noErr) {
+            diagnosticFailedFrames.fetch_add(frames, std::memory_order_relaxed);
+        } else if (flags && (*flags & kAudioUnitRenderAction_OutputIsSilence)) {
+            diagnosticSilentFrames.fetch_add(frames, std::memory_order_relaxed);
+        }
     }
 
     void captureOutput(AudioBufferList *output, uint32_t frames, uint64_t outputStartFrame) {
@@ -388,6 +475,26 @@ bool SupportedFormat(AVAudioFormat *format) {
 - (BOOL)telemetryEnabled { return _context->telemetryEnabled.load(std::memory_order_relaxed); }
 - (void)setTelemetryEnabled:(BOOL)enabled { _context->telemetryEnabled.store(enabled, std::memory_order_relaxed); }
 - (uint64_t)droppedTelemetryFrames { return _context->droppedTelemetryFrames.load(std::memory_order_relaxed); }
+- (BOOL)performanceDiagnosticsEnabled { return _context->performanceDiagnosticsEnabled.load(std::memory_order_relaxed); }
+- (void)setPerformanceDiagnosticsEnabled:(BOOL)enabled {
+    if (_context->performanceDiagnosticsEnabled.load(std::memory_order_relaxed) != enabled) {
+        _context->diagnosticsEpoch.fetch_add(1, std::memory_order_release);
+        _context->performanceDiagnosticsEnabled.store(enabled, std::memory_order_release);
+    }
+}
+- (PodcstRenderDiagnostics)renderDiagnostics {
+    return {
+        _context->diagnosticCallbacks.load(std::memory_order_relaxed),
+        _context->diagnosticFrames.load(std::memory_order_relaxed),
+        _context->diagnosticSilentFrames.load(std::memory_order_relaxed),
+        _context->diagnosticFailedFrames.load(std::memory_order_relaxed),
+        _context->callbackGapCandidates.load(std::memory_order_relaxed),
+        _context->sampleTimeDiscontinuities.load(std::memory_order_relaxed),
+        double(_context->maximumCallbackIntervalNanos.load(std::memory_order_relaxed)) / 1e9,
+        double(_context->maximumCallbackOverrunNanos.load(std::memory_order_relaxed)) / 1e9,
+        double(_context->maximumSampleTimeDiscontinuityFrames.load(std::memory_order_relaxed))
+    };
+}
 
 - (uint32_t)copyTelemetryFrames:(float *)samples capacity:(uint32_t)capacity throughOutputFrame:(uint64_t)throughOutputFrame info:(PodcstOutputTelemetryInfo *)info {
     return _context->copyTelemetry(samples, capacity, throughOutputFrame, info);
@@ -446,7 +553,9 @@ bool SupportedFormat(AVAudioFormat *format) {
 - (AUInternalRenderBlock)internalRenderBlock {
     RenderContext *context = _context.get();
     return ^AUAudioUnitStatus(AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, AUAudioFrameCount frames, NSInteger bus, AudioBufferList *output, const AURenderEvent *, AURenderPullInputBlock __unsafe_unretained pullInput) {
+        const bool diagnostics = context->beginDiagnostics(timestamp, frames);
         const AUAudioUnitStatus status = context->render(flags, timestamp, frames, bus, output, pullInput);
+        if (diagnostics) { context->finishDiagnostics(status, flags, frames); }
         if (status != noErr) {
             context->lastRenderStatus.store(status, std::memory_order_relaxed);
             context->renderFailures.fetch_add(1, std::memory_order_release);

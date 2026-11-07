@@ -205,6 +205,14 @@ final class LocalAudioWorker {
     private var outputInspectionScratch: [Float] = []
     private var outputInspectionStartFrame: UInt64 = 0
     private var outputInspectionDroppedBaseline: UInt64 = 0
+    private var traceNextSnapshot: TimeInterval = 0
+    private var traceLastTick: TimeInterval?
+    private var traceMaximumTickInterval: TimeInterval = 0
+    private var traceReadStarted: TimeInterval?
+    private var traceReadCount = 0
+    private var traceReadSeconds: TimeInterval = 0
+    private var traceMaximumReadSeconds: TimeInterval = 0
+    private var traceRecoveryStarted: TimeInterval?
 
     nonisolated init(configuration: LocalAudioConfiguration, sourceDecoder: (any PCMDecoder)?, mailbox: LocalAudioMailbox) {
         self.mailbox = mailbox
@@ -234,30 +242,35 @@ final class LocalAudioWorker {
         stop()
         self.generation = generation
         sourceURL = source.url
-        prepare(at: position)
+        prepare(at: position, reason: "load")
     }
 
     func play(atRate rate: Double) {
         guard hasSource, !reachedEnd, rate.isFinite, (0.5...2).contains(rate) else { return }
         wantsPlayback = true
+        trace("audio_play_requested", values: ["requestedRate": rate])
         setRate(rate)
         startPlayback()
     }
 
     func pause() {
+        finishTraceRecovery(reason: "pause")
+        trace("audio_pause_requested")
         wantsPlayback = false
         pauseGraph()
     }
 
     func seek(to position: TimeInterval, generation: UUID) {
         guard hasSource else { return }
+        finishTraceRecovery(reason: "seek")
         self.generation = generation
-        prepare(at: position)
+        prepare(at: position, reason: "seek")
     }
 
     func setRate(_ rate: Double) {
         guard rate.isFinite, (0.5...2).contains(rate), abs(self.rate - rate) > 0.0001 else { return }
         self.rate = rate
+        trace("audio_rate_requested")
         inspection?.record(AudioInspectionEvent(kind: .rate, sourceTime: position, value: rate))
         guard let graph else { return }
         if !hasStarted {
@@ -272,6 +285,7 @@ final class LocalAudioWorker {
     func setEffects(_ effects: AudioEffects) {
         guard self.effects != effects else { return }
         self.effects = effects
+        trace("audio_effects_requested", values: ["volumeBoost": effects.volumeBoost ? 1 : 0, "trimSilence": effects.trimSilence ? 1 : 0])
         effectsRevision &+= 1
         inspection?.record(AudioInspectionEvent(kind: .requested, sourceTime: position, revision: effectsRevision, effects: effects))
         let revision = effectsRevision
@@ -340,6 +354,7 @@ final class LocalAudioWorker {
     }
 
     func publishSnapshot() {
+        traceSnapshot()
         mailbox.publish(snapshot)
     }
 
@@ -348,13 +363,16 @@ final class LocalAudioWorker {
     }
 
     func stop() {
+        finishTraceRecovery(reason: "stop")
+        traceSnapshot(force: true)
+        trace("audio_stop")
         let oldGeneration = graphGeneration
         graphGeneration = UUID()
         generation = UUID()
         wantsPlayback = false
         preparation?.cancel()
         preparation = nil
-        tearDownGraph()
+        tearDownGraph(retiring: oldGeneration)
         sourceURL = nil
         info = nil
         workerAllocatedBytes = 0
@@ -432,12 +450,14 @@ final class LocalAudioWorker {
         return status
     }
 
-    private func prepare(at position: TimeInterval) {
+    private func prepare(at position: TimeInterval, reason: String) {
+        traceSnapshot(force: true)
+        trace("audio_prepare", values: ["targetPosition": position], labels: ["reason": reason])
         preparation?.cancel()
         let oldGeneration = graphGeneration
         graphGeneration = UUID()
         let token = graphGeneration
-        tearDownGraph()
+        tearDownGraph(retiring: oldGeneration)
         heldPosition = position.isFinite ? max(0, position) : 0
         inspectionEpoch = UUID()
         inspection = nil
@@ -481,6 +501,7 @@ final class LocalAudioWorker {
                 let graph = try await LocalAudioGraph.make(info: info, configuration: self.configuration, rate: self.rate)
                 guard self.graphGeneration == token, !Task.isCancelled else { graph.stop(); return }
                 self.graph = graph
+                self.trace("audio_graph_created", values: ["sourceRate": info.sampleRate, "outputRate": graph.format.sampleRate, "pitchRate": graph.pitchFormat.sampleRate, "offline": graph.offline ? 1 : 0])
                 self.configureOutputInspection()
                 self.replay = AudioReplayWindow(channels: Int(info.channels), capacity: max(Int(info.sampleRate * 1.5), Int(self.configuration.blockFrames) * self.configuration.bufferCount * 4))
                 self.configureObservers(graph: graph, token: token)
@@ -488,6 +509,7 @@ final class LocalAudioWorker {
                 await self.fillTask?.value
                 guard self.graphGeneration == token, !Task.isCancelled, self.failure == nil else { return }
                 self.ready = true
+                self.trace("audio_ready")
                 self.preparation = nil
                 self.emit(.seeked(self.heldPosition))
                 guard self.graphGeneration == token else { return }
@@ -508,8 +530,20 @@ final class LocalAudioWorker {
                 while !Task.isCancelled, self.graphGeneration == token,
                       self.starvationFrame == nil, !self.decoderEnded,
                       let replay = self.replay, replay.end < self.requiredContentEnd() {
+                    let readStarted = PlaybackTraceRecorder.shared.isRecording ? PlaybackTraceRecorder.now : nil
+                    self.traceReadStarted = readStarted
                     let block = try await self.decoder.read(slot: 0, generation: token)
                     guard self.graphGeneration == token, !Task.isCancelled else { return }
+                    if let readStarted, PlaybackTraceRecorder.shared.isRecording {
+                        let elapsed = PlaybackTraceRecorder.now - readStarted
+                        self.traceReadCount += 1
+                        self.traceReadSeconds += elapsed
+                        self.traceMaximumReadSeconds = max(self.traceMaximumReadSeconds, elapsed)
+                        if elapsed >= 0.05 {
+                            self.trace("audio_decode_read_wait", values: ["seconds": elapsed, "frames": Double(block.lease.buffer.frameLength)])
+                        }
+                    }
+                    self.traceReadStarted = nil
                     if self.detectStarvation() {
                         await self.decoder.release(slot: 0, generation: token)
                         break
@@ -647,6 +681,7 @@ final class LocalAudioWorker {
         let branch = graph.branches[incoming]
         branch.reset(rate: rate, origin: origin, startFrame: prime)
         transition = AudioRateTransition(outgoing: active, incoming: incoming, previous: old.clock, next: branch.clock, fadeFrame: fade, fadeFrames: max(2, UInt32(graph.pitchFormat.sampleRate * 0.008)))
+        trace("audio_rate_transition_started", values: ["outgoing": Double(active), "incoming": Double(incoming), "previousRate": old.rate, "fadeFrame": fade])
         fillBranches(token: graphGeneration)
         requestFill(token: graphGeneration)
     }
@@ -673,10 +708,12 @@ final class LocalAudioWorker {
             }
             change.scheduled = true
             transition = change
+            trace("audio_rate_transition_scheduled")
         }
         guard !graph.handoff.transitionPending, Int(graph.handoff.activeInput) == change.incoming else { return }
         graph.branches[change.outgoing].retire()
         if audibleGateFrame(in: graph) >= change.fadeFrame + Double(change.fadeFrames) {
+            trace("audio_rate_transition_completed")
             transition = nil
             beginRateTransition()
         }
@@ -699,9 +736,13 @@ final class LocalAudioWorker {
                 graph.branches[0].pitch.rate = Float(rate)
                 graph.branches[0].pitch.bypass = abs(rate - 1) < 0.0001
             }
+            graph.limiter.performanceDiagnosticsEnabled = PlaybackTraceRecorder.shared.isRecording && !graph.offline
             try graph.engine.start()
             hasStarted = true
             playing = true
+            traceLastTick = nil
+            trace("audio_graph_started")
+            finishTraceRecovery(reason: "restarted")
             inspection?.record(AudioInspectionEvent(kind: .started, sourceTime: position))
             emit(.playback(isPlaying: true))
             guard graphGeneration == token, playing, wantsPlayback else { return }
@@ -712,16 +753,21 @@ final class LocalAudioWorker {
     }
 
     private func pauseGraph() {
+        graph?.limiter.performanceDiagnosticsEnabled = false
         graph?.engine.pause()
         heldPosition = position
         playing = false
         inspection?.record(AudioInspectionEvent(kind: .paused, sourceTime: heldPosition))
         ticker?.cancel()
         ticker = nil
+        traceLastTick = nil
+        trace("audio_graph_paused")
         emit(.playback(isPlaying: false))
     }
 
-    private func tearDownGraph() {
+    private func tearDownGraph(retiring token: UUID) {
+        trace("audio_graph_teardown", labels: ["graph": token.uuidString])
+        graph?.limiter.performanceDiagnosticsEnabled = false
         fillTask?.cancel()
         fillTask = nil
         ticker?.cancel()
@@ -732,6 +778,8 @@ final class LocalAudioWorker {
         replay = nil
         transition = nil
         playing = false
+        traceLastTick = nil
+        traceReadStarted = nil
     }
 
     private func startTicker() {
@@ -748,6 +796,14 @@ final class LocalAudioWorker {
 
     private func publishPosition() {
         guard let graph else { return }
+        if PlaybackTraceRecorder.shared.isRecording {
+            let now = PlaybackTraceRecorder.now
+            if let last = traceLastTick { traceMaximumTickInterval = max(traceMaximumTickInterval, now - last) }
+            traceLastTick = now
+        } else {
+            traceLastTick = nil
+        }
+        traceSnapshot()
         let token = graphGeneration
         if graph.limiter.renderFailureCount > 0 || graph.handoff.renderFailureCount > 0 || graph.branches.contains(where: { $0.source.renderFailureCount > 0 }) {
             fail(.cannotRender, token: token)
@@ -767,7 +823,7 @@ final class LocalAudioWorker {
         if let starvationRecoveryOutputFrame,
            Double(graph.limiter.renderedFrameCount) >= starvationRecoveryOutputFrame,
            let starvationFrame, let info {
-            prepare(at: Double(starvationFrame) / info.sampleRate)
+            prepare(at: Double(starvationFrame) / info.sampleRate, reason: "starvation")
             return
         }
         advanceDrain()
@@ -781,6 +837,11 @@ final class LocalAudioWorker {
         guard active.source.underrunFrameCount > 0 else { return false }
         starvationFrame = Int64(sourceFrame(at: Double(active.cursor)))
         underruns += 1
+        if PlaybackTraceRecorder.shared.isRecording {
+            traceRecoveryStarted = PlaybackTraceRecorder.now
+            trace("audio_underrun_started", values: ["sourceFrame": Double(starvationFrame ?? 0), "activeBranch": Double(graph.handoff.activeInput), "missingFrames": Double(active.source.underrunFrameCount), "availableFrames": Double(active.source.availableFrames), "transitionActive": transition != nil ? 1 : 0, "decoderEnded": decoderEnded ? 1 : 0])
+            traceSnapshot(force: true)
+        }
         Self.logger.error("Audio source underrun count=\(self.underruns)")
         inspection?.record(AudioInspectionEvent(kind: .underrun, sourceTime: Double(starvationFrame ?? 0) / info.sampleRate, value: Double(underruns)))
         let end = active.startFrame + Double(active.cursor - active.origin) / info.sampleRate / active.rate * graph.pitchFormat.sampleRate
@@ -801,6 +862,7 @@ final class LocalAudioWorker {
         let rendered = Double(graph.limiter.renderedFrameCount)
         if !draining, rendered >= completion {
             draining = true
+            trace("audio_drain_started")
             graph.limiter.beginDraining()
         }
         guard draining, graph.limiter.isDrained else { return }
@@ -813,8 +875,11 @@ final class LocalAudioWorker {
 
     private func finish(token: UUID) {
         guard graphGeneration == token, !reachedEnd, decoderEnded else { return }
+        finishTraceRecovery(reason: "end")
+        trace("audio_ended")
         reachedEnd = true
         heldPosition = info?.duration ?? heldPosition
+        graph?.limiter.performanceDiagnosticsEnabled = false
         graph?.engine.pause()
         playing = false
         ticker?.cancel()
@@ -826,6 +891,9 @@ final class LocalAudioWorker {
 
     private func fail(_ error: LocalAudioError, token: UUID) {
         guard graphGeneration == token, error != .cancelled else { return }
+        finishTraceRecovery(reason: "failure")
+        traceSnapshot(force: true)
+        trace("audio_failure", labels: ["kind": String(describing: error)])
         failure = error
         inspection?.record(AudioInspectionEvent(kind: .failed, sourceTime: position))
         graphGeneration = UUID()
@@ -833,7 +901,7 @@ final class LocalAudioWorker {
         ready = false
         wantsPlayback = false
         preparation = nil
-        tearDownGraph()
+        tearDownGraph(retiring: token)
         retireDecoder(generation: token)
         emit(.failed)
     }
@@ -869,7 +937,8 @@ final class LocalAudioWorker {
                 guard let self, self.graphGeneration == token else { return }
                 let output = self.graph?.engine.outputNode.inputFormat(forBus: 0)
                 Self.logger.notice("Audio engine configuration changed running=\(self.graph?.engine.isRunning ?? false) outputRate=\(output?.sampleRate ?? 0) channels=\(output?.channelCount ?? 0)")
-                self.prepare(at: self.position)
+                self.finishTraceRecovery(reason: "configuration_change")
+                self.prepare(at: self.position, reason: "configuration_change")
             }
         }
         observers.reset = NotificationCenter.default.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil) { [weak self] _ in
@@ -879,13 +948,92 @@ final class LocalAudioWorker {
                 self.wantsPlayback = false
                 self.emit(.failed)
                 guard self.graphGeneration == token else { return }
-                self.prepare(at: position)
+                self.finishTraceRecovery(reason: "media_services_reset")
+                self.prepare(at: position, reason: "media_services_reset")
             }
         }
     }
 
     private func emit(_ event: PlaybackTransportEvent) {
+        traceSnapshot()
         mailbox.publish(snapshot, event: event)
+    }
+
+    private func trace(_ event: String, values: [String: Double] = [:], labels: [String: String] = [:]) {
+        guard PlaybackTraceRecorder.shared.isRecording else { return }
+        PlaybackTraceRecorder.shared.record(event, values: values.merging(["position": position, "rate": rate, "playing": playing ? 1 : 0, "wantsPlayback": wantsPlayback ? 1 : 0]) { value, _ in value }, labels: labels.merging(["generation": generation.uuidString, "graph": graphGeneration.uuidString]) { value, _ in value })
+    }
+
+    private func finishTraceRecovery(reason: String) {
+        guard let start = traceRecoveryStarted else { return }
+        trace("audio_underrun_recovery_finished", values: ["seconds": PlaybackTraceRecorder.now - start], labels: ["reason": reason])
+        traceRecoveryStarted = nil
+    }
+
+    private func traceSnapshot(force: Bool = false) {
+        let enabled = PlaybackTraceRecorder.shared.isRecording
+        graph?.limiter.performanceDiagnosticsEnabled = enabled && playing && graph?.offline == false
+        guard enabled else {
+            traceNextSnapshot = 0
+            traceMaximumTickInterval = 0
+            traceReadCount = 0
+            traceReadSeconds = 0
+            traceMaximumReadSeconds = 0
+            traceRecoveryStarted = nil
+            return
+        }
+        let now = PlaybackTraceRecorder.now
+        guard force || now >= traceNextSnapshot else { return }
+        traceNextSnapshot = now + 1
+        let state = diagnostics
+        var values: [String: Double] = [
+            "sourceRate": state.sourceSampleRate, "outputRate": state.outputSampleRate,
+            "decodedFrame": Double(decodedThroughFrame), "scheduledContentFrames": Double(scheduledContentFrames),
+            "consumedFrame": Double(state.consumedFrame), "renderedFrames": Double(state.renderedFrames),
+            "bufferCapacityFrames": Double(state.bufferCapacityFrames), "scheduledBuffers": Double(state.scheduledBuffers),
+            "underruns": Double(underruns), "starvationFrame": Double(starvationFrame ?? -1),
+            "ready": ready ? 1 : 0, "decoderEnded": decoderEnded ? 1 : 0, "draining": draining ? 1 : 0,
+            "volumeBoost": effects.volumeBoost ? 1 : 0, "trimSilence": effects.trimSilence ? 1 : 0,
+            "transitionActive": transition != nil ? 1 : 0, "transitionScheduled": transition?.scheduled == true ? 1 : 0,
+            "maximumTickIntervalSeconds": traceMaximumTickInterval,
+            "decodeReadCount": Double(traceReadCount), "decodeReadSeconds": traceReadSeconds,
+            "fillPending": fillTask != nil ? 1 : 0,
+            "maximumDecodeReadSeconds": traceMaximumReadSeconds,
+            "pendingDecodeReadSeconds": traceReadStarted.map { now - $0 } ?? 0,
+            "replayAvailableFrames": Double((replay?.end ?? 0) - (replay?.start ?? 0)),
+            "replayCapacityFrames": Double(replay?.capacity ?? 0)
+        ]
+        if let graph {
+            values["activeBranch"] = Double(graph.handoff.activeInput)
+            values["limiterFailures"] = Double(graph.limiter.renderFailureCount)
+            values["limiterStatus"] = Double(graph.limiter.lastRenderStatus)
+            values["handoffFailures"] = Double(graph.handoff.renderFailureCount)
+            values["offline"] = graph.offline ? 1 : 0
+            for (index, branch) in graph.branches.enumerated() {
+                values["branch\(index)AvailableFrames"] = Double(branch.source.availableFrames)
+                values["branch\(index)FreeFrames"] = Double(branch.source.freeFrames)
+                values["branch\(index)ConsumedFrames"] = Double(branch.source.consumedFrameCount)
+                values["branch\(index)UnderrunFrames"] = Double(branch.source.underrunFrameCount)
+                values["branch\(index)Failures"] = Double(branch.source.renderFailureCount)
+                values["branch\(index)Cursor"] = Double(branch.cursor)
+                values["branch\(index)Rate"] = branch.rate
+            }
+            let output = graph.limiter.renderDiagnostics
+            values["outputCallbacks"] = Double(output.callbacks)
+            values["outputFrames"] = Double(output.frames)
+            values["outputSilentFrames"] = Double(output.silentFrames)
+            values["outputFailedFrames"] = Double(output.failedFrames)
+            values["callbackGapCandidates"] = Double(output.callbackGapCandidates)
+            values["sampleTimeDiscontinuities"] = Double(output.sampleTimeDiscontinuities)
+            values["maximumCallbackIntervalSeconds"] = output.maximumCallbackInterval
+            values["maximumCallbackOverrunSeconds"] = output.maximumCallbackOverrun
+            values["maximumSampleTimeDiscontinuityFrames"] = output.maximumSampleTimeDiscontinuity
+        }
+        trace("audio_snapshot", values: values)
+        traceMaximumTickInterval = 0
+        traceReadCount = 0
+        traceReadSeconds = 0
+        traceMaximumReadSeconds = 0
     }
 }
 

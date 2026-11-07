@@ -712,6 +712,7 @@ private struct EpisodeMenu: View {
             if episode.publicLink != nil {
                 Button("Share", systemImage: "square.and.arrow.up") { router.sharing = .episode(episode, mode: .time) }
             }
+            PlaybackGlitchAction()
             Section {
                 Button { router.stop(playback) } label: {
                     Label("Stop playback", systemImage: "stop.fill")
@@ -732,6 +733,16 @@ private struct EpisodeMenu: View {
                 .background(PodcstPalette.ink.opacity(0.1), in: Circle())
         }
         .accessibilityLabel("Episode actions")
+    }
+}
+
+private struct PlaybackGlitchAction: View {
+    var body: some View {
+        if PlaybackTraceController.shared.isRecording {
+            Button("Mark audio glitch", systemImage: "waveform.badge.exclamationmark") {
+                PlaybackTraceController.shared.markGlitch()
+            }
+        }
     }
 }
 
