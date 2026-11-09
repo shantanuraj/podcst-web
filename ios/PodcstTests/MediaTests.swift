@@ -422,6 +422,230 @@ final class MediaTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: file), body)
     }
 
+    func testReadAheadCachesOneBlockAndStopsAtCachedRangesAndEOF() async throws {
+        let size = HTTPMediaByteSource.blockSize
+        let body = payload(count: size * 3 + 71)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        await source.prefetch(offset: Int64(size))
+        XCTAssertTrue(server.requests.isEmpty)
+        _ = try await source.read(offset: 0, count: 100)
+        await source.prefetch(offset: Int64(size + 17))
+        let partial = await source.snapshot()
+        XCTAssertEqual(partial.storedBytes, Int64(size * 2))
+        XCTAssertFalse(partial.isComplete)
+        XCTAssertEqual(server.requests.compactMap { $0["range"] }, ["bytes=0-0", "bytes=0-262143", "bytes=262144-524287"])
+        XCTAssertEqual(server.requests.last?["if-range"], "\"version-1\"")
+        XCTAssertEqual(server.requests.last?["accept-encoding"], "identity")
+        await source.prefetch(offset: Int64(size))
+        await source.prefetch(offset: -1)
+        await source.prefetch(offset: Int64(body.count))
+        await source.prefetch(offset: Int64.max)
+        let cached = try await source.read(offset: Int64(size + 11), count: 101)
+        XCTAssertEqual(cached, body.subdata(in: (size + 11)..<(size + 112)))
+        XCTAssertEqual(server.requests.count, 3)
+        await source.prefetch(offset: Int64(body.count - 1))
+        XCTAssertEqual(server.requests.last?["range"], "bytes=786432-786502")
+        let tail = try await source.read(offset: Int64(size * 3), count: 100)
+        XCTAssertEqual(tail, body.suffix(71))
+        let end = try await source.read(offset: Int64(body.count), count: 100)
+        XCTAssertTrue(end.isEmpty)
+        XCTAssertEqual(server.requests.count, 4)
+        let final = await source.snapshot()
+        XCTAssertEqual(final.storedBytes, Int64(size * 2 + 71))
+        XCTAssertFalse(final.isComplete)
+    }
+
+    func testReadAheadRequiresValidatedRandomAccess() async throws {
+        for mode in [MediaHTTPServer.Mode.ignoreRange, .weakValidator] {
+            let server = try MediaHTTPServer(data: payload(count: 600_000), mode: mode)
+            let url = try await server.start()
+            defer { server.stop() }
+            let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+            let metadata = try await source.metadata()
+            XCTAssertEqual(metadata.capability, .completeFileRequired)
+            let count = server.requests.count
+            await source.prefetch(offset: Int64(HTTPMediaByteSource.blockSize))
+            XCTAssertEqual(server.requests.count, count)
+            let snapshot = await source.snapshot()
+            XCTAssertEqual(snapshot.storedBytes, 0)
+        }
+    }
+
+    func testReadAndDownloadShareReadAheadWhenItsCallerCancels() async throws {
+        for materializing in [false, true] {
+            let size = HTTPMediaByteSource.blockSize
+            let body = payload(count: size * 2 + 111)
+            let server = try MediaHTTPServer(data: body)
+            let url = try await server.start()
+            defer { server.stop() }
+            let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+            _ = try await source.read(offset: 0, count: 100)
+            let range = "bytes=262144-524287"
+            server.hold(range: range)
+            let prefetch = Task { await source.prefetch(offset: Int64(size)) }
+            defer { prefetch.cancel() }
+            try await waitForRequests(server, count: 1, range: range)
+            let started = expectation(description: "Demand started")
+            let demand = Task {
+                started.fulfill()
+                if materializing { return try Data(contentsOf: await source.materialize()) }
+                return try await source.read(offset: Int64(size + 17), count: 113)
+            }
+            defer { demand.cancel() }
+            await fulfillment(of: [started], timeout: 1)
+            try await Task.sleep(for: .milliseconds(50))
+            prefetch.cancel()
+            await prefetch.value
+            server.release(range: range)
+            let result = try await demand.value
+            XCTAssertEqual(result, materializing ? body : body.subdata(in: (size + 17)..<(size + 130)))
+            XCTAssertEqual(server.requests.filter { $0["range"] == range }.count, 1)
+        }
+    }
+
+    func testPlaybackReadPreemptsUnrelatedReadAheadWithoutRetryingIt() async throws {
+        let size = HTTPMediaByteSource.blockSize
+        let body = payload(count: size * 4)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        _ = try await source.read(offset: 0, count: 100)
+        let range = "bytes=262144-524287"
+        server.hold(range: range)
+        let prefetch = Task { await source.prefetch(offset: Int64(size)) }
+        defer { prefetch.cancel() }
+        try await waitForRequests(server, count: 1, range: range)
+        let bytes = try await source.read(offset: Int64(size * 3 + 11), count: 101)
+        XCTAssertEqual(bytes, body.subdata(in: (size * 3 + 11)..<(size * 3 + 112)))
+        await prefetch.value
+        server.release(range: range)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(server.requests.compactMap { $0["range"] }, ["bytes=0-0", "bytes=0-262143", range, "bytes=786432-1048575"])
+        let snapshot = await source.snapshot()
+        XCTAssertEqual(snapshot.storedBytes, Int64(size * 2))
+    }
+
+    func testReadAheadWaitsBehindUnrelatedDemandOrDownload() async throws {
+        for materializing in [false, true] {
+            let size = HTTPMediaByteSource.blockSize
+            let body = payload(count: size * 4)
+            let server = try MediaHTTPServer(data: body)
+            let url = try await server.start()
+            defer { server.stop() }
+            let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+            _ = try await source.read(offset: 0, count: 100)
+            let range = "bytes=262144-524287"
+            server.hold(range: range)
+            let demand = Task {
+                if materializing { return try Data(contentsOf: await source.materialize()) }
+                return try await source.read(offset: Int64(size), count: 100)
+            }
+            defer { demand.cancel() }
+            try await waitForRequests(server, count: 1, range: range)
+            let prefetch = Task { await source.prefetch(offset: Int64(size * 3)) }
+            defer { prefetch.cancel() }
+            try await Task.sleep(for: .milliseconds(50))
+            XCTAssertEqual(server.requests.count, 3)
+            server.release(range: range)
+            let result = try await demand.value
+            await prefetch.value
+            XCTAssertEqual(result, materializing ? body : body.subdata(in: size..<(size + 100)))
+            XCTAssertEqual(server.requests.filter { $0["range"] == range }.count, 1)
+            XCTAssertEqual(server.requests.filter { $0["range"] == "bytes=786432-1048575" }.count, 1)
+        }
+    }
+
+    func testCancellingReadAheadWhileWaitingLeavesRealDemandRunning() async throws {
+        let size = HTTPMediaByteSource.blockSize
+        let body = payload(count: size * 4)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        _ = try await source.read(offset: 0, count: 100)
+        let range = "bytes=262144-524287"
+        server.hold(range: range)
+        let demand = Task { try await source.read(offset: Int64(size), count: 100) }
+        defer { demand.cancel() }
+        try await waitForRequests(server, count: 1, range: range)
+        let prefetch = Task { await source.prefetch(offset: Int64(size * 3)) }
+        defer { prefetch.cancel() }
+        try await Task.sleep(for: .milliseconds(50))
+        prefetch.cancel()
+        await prefetch.value
+        XCTAssertEqual(server.requests.count, 3)
+        server.release(range: range)
+        let result = try await demand.value
+        XCTAssertEqual(result, body.subdata(in: size..<(size + 100)))
+        XCTAssertEqual(server.requests.count, 3)
+    }
+
+    func testCancelledReadAheadCannotPublishLateBytesOrResurrectRetiredStorage() async throws {
+        for cancellation in 0..<3 {
+            let size = HTTPMediaByteSource.blockSize
+            let server = try MediaHTTPServer(data: payload(count: size * 3))
+            let url = try await server.start()
+            defer { server.stop() }
+            let directory = temporaryDirectory()
+            let source = try HTTPMediaByteSource(url: url, directory: directory)
+            _ = try await source.read(offset: 0, count: 100)
+            let range = "bytes=262144-524287"
+            server.hold(range: range)
+            let prefetch = Task { await source.prefetch(offset: Int64(size)) }
+            defer { prefetch.cancel() }
+            try await waitForRequests(server, count: 1, range: range)
+            switch cancellation {
+            case 0: prefetch.cancel()
+            case 1: await source.cancel()
+            default: try await source.retire()
+            }
+            await prefetch.value
+            server.release(range: range)
+            try await Task.sleep(for: .milliseconds(50))
+            let snapshot = await source.snapshot()
+            XCTAssertEqual(snapshot.storedBytes, cancellation == 2 ? 0 : Int64(size))
+            XCTAssertEqual(server.requests.count, 3)
+            if cancellation == 2 {
+                XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+                await source.prefetch(offset: Int64(size))
+                XCTAssertEqual(server.requests.count, 3)
+            } else {
+                let retry = try await source.read(offset: Int64(size), count: 100)
+                XCTAssertEqual(retry.count, 100)
+                XCTAssertEqual(server.requests.filter { $0["range"] == range }.count, 2)
+            }
+        }
+    }
+
+    func testChangedReadAheadValidatorNeverMixesCachedRepresentations() async throws {
+        let size = HTTPMediaByteSource.blockSize
+        let body = payload(count: size * 3)
+        let server = try MediaHTTPServer(data: body)
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        _ = try await source.read(offset: 0, count: 100)
+        server.replace(data: Data(repeating: 99, count: body.count), etag: "\"version-2\"")
+        await source.prefetch(offset: Int64(size))
+        let snapshot = await source.snapshot()
+        XCTAssertEqual(snapshot.storedBytes, Int64(size))
+        XCTAssertEqual(snapshot.metadata?.validator, "\"version-1\"")
+        let original = try await source.read(offset: 17, count: 100)
+        XCTAssertEqual(original, body.subdata(in: 17..<117))
+        do {
+            _ = try await source.read(offset: Int64(size), count: 100)
+            XCTFail("A changed speculative representation must still fail a subsequent demand read")
+        } catch {
+            XCTAssertEqual(error as? MediaFailure, .representationChanged)
+        }
+        let unchanged = await source.snapshot()
+        XCTAssertEqual(unchanged.storedBytes, Int64(size))
+    }
+
     func testMalformedRangesAuthorizationAndConnectionLossNeverBecomeCachedAudio() async throws {
         for mode in [MediaHTTPServer.Mode.badRange, .unauthorized, .truncated] {
             let server = try MediaHTTPServer(data: payload(count: 350_000), mode: mode)
@@ -997,6 +1221,79 @@ final class MediaTests: XCTestCase {
         XCTAssertEqual(remaining, 0)
     }
 
+    func testProgressiveDecoderReadAheadStopsWhenClosed() async throws {
+        let data = try pcmFixture(frames: 480_000)
+        let server = try MediaHTTPServer(data: data, contentType: "audio/wav")
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        let decoder = ProgressiveAudioDecoder(source: source, blockFrames: 1024, bufferCount: 2)
+        let generation = UUID()
+        _ = try await decoder.open(url: url, at: 0, generation: generation)
+        let range = "bytes=262144-524287"
+        XCTAssertFalse(server.requests.contains { $0["range"] == range })
+        server.hold(range: range)
+        let block = try await decoder.read(slot: 0, generation: generation)
+        XCTAssertEqual(block.lease.buffer.frameLength, 1024)
+        await decoder.release(slot: 0, generation: generation)
+        try await waitForRequests(server, count: 1, range: range)
+        let before = await source.snapshot()
+        await decoder.close(generation: generation)
+        try await Task.sleep(for: .milliseconds(50))
+        server.release(range: range)
+        try await Task.sleep(for: .milliseconds(50))
+        let after = await source.snapshot()
+        XCTAssertEqual(after.ranges, before.ranges)
+        XCTAssertEqual(server.requests.filter { $0["range"] == range }.count, 1)
+        let allocated = await decoder.allocatedBytes()
+        XCTAssertEqual(allocated, 0)
+        let retry = try await source.read(offset: Int64(HTTPMediaByteSource.blockSize), count: 100)
+        XCTAssertEqual(retry, data.subdata(in: 262144..<262244))
+        XCTAssertEqual(server.requests.filter { $0["range"] == range }.count, 2)
+    }
+
+    func testProgressiveSeekCancelsOldReadAheadAndPreservesNewGeneration() async throws {
+        let data = try pcmFixture(frames: 480_000)
+        let server = try MediaHTTPServer(data: data, contentType: "audio/wav")
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        let decoder = ProgressiveAudioDecoder(source: source, blockFrames: 1024, bufferCount: 2)
+        let first = UUID()
+        _ = try await decoder.open(url: url, at: 0, generation: first)
+        let oldRange = "bytes=262144-524287"
+        server.hold(range: oldRange)
+        _ = try await decoder.read(slot: 0, generation: first)
+        await decoder.release(slot: 0, generation: first)
+        try await waitForRequests(server, count: 1, range: oldRange)
+        let next = UUID()
+        _ = try await decoder.open(url: url, at: 6, generation: next)
+        let newRange = "bytes=1310720-1572863"
+        server.hold(range: newRange)
+        let sought = try await decoder.read(slot: 0, generation: next)
+        XCTAssertEqual(sought.sourceStart, 288_000)
+        let samples = try XCTUnwrap(sought.lease.buffer.floatChannelData)
+        for frame in 0..<1024 { XCTAssertEqual(samples[0][frame], sample(frame + 288_000), accuracy: 0.000001) }
+        await decoder.release(slot: 0, generation: next)
+        try await waitForRequests(server, count: 1, range: newRange)
+        await decoder.close(generation: first)
+        server.release(range: newRange)
+        let cachedRange = MediaByteRange(lower: 1_310_720, upper: 1_572_864)
+        for _ in 0..<500 {
+            let snapshot = await source.snapshot()
+            if snapshot.ranges.contains(where: { $0.contains(cachedRange) }) { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await decoder.close(generation: next)
+        server.release(range: oldRange)
+        try await Task.sleep(for: .milliseconds(50))
+        let snapshot = await source.snapshot()
+        XCTAssertTrue(snapshot.ranges.contains { $0.contains(cachedRange) })
+        XCTAssertFalse(snapshot.ranges.contains { $0.contains(MediaByteRange(lower: 262_144, upper: 524_288)) })
+        XCTAssertEqual(server.requests.filter { $0["range"] == oldRange }.count, 1)
+        XCTAssertEqual(server.requests.filter { $0["range"] == newRange }.count, 1)
+    }
+
     func testRealVBRMP3ProgressiveSeeksMatchLocalAppleDecoder() async throws {
         let fixture = try XCTUnwrap(Bundle(for: MediaTests.self).url(forResource: "progressive-vbr", withExtension: "mp3"))
         let data = try Data(contentsOf: fixture)
@@ -1109,9 +1406,9 @@ final class MediaTests: XCTestCase {
         Episode(id: 42, podcastId: 7, guid: "episode-42", feed: "https://example.test/private-feed?key=private", podcastTitle: "Test", title: "Private episode", file: EpisodeFile(url: url.absoluteString))
     }
 
-    private func waitForRequests(_ server: MediaHTTPServer, count: Int) async throws {
+    private func waitForRequests(_ server: MediaHTTPServer, count: Int, range: String? = nil) async throws {
         for _ in 0..<500 {
-            if server.requests.count >= count { return }
+            if server.requests.filter({ range == nil || $0["range"] == range }).count >= count { return }
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("The controlled HTTP server did not receive a request")
@@ -1140,7 +1437,7 @@ final class MediaTests: XCTestCase {
     }
 }
 
-private final class MediaHTTPServer: @unchecked Sendable {
+final class MediaHTTPServer: @unchecked Sendable {
     enum Mode { case ranges, ignoreRange, weakValidator, badRange, unauthorized, truncated, redirect, missingLength }
     private let listener: NWListener
     private let queue = DispatchQueue(label: "app.podcst.tests.http")
@@ -1149,6 +1446,8 @@ private final class MediaHTTPServer: @unchecked Sendable {
     private var etag = "\"version-1\""
     private var recorded: [[String: String]] = []
     private var connections: [NWConnection] = []
+    private var heldRanges: Set<String> = []
+    private var heldResponses: [String: [(NWConnection, Data)]] = [:]
     private let mode: Mode
     private let delay: TimeInterval
     private let contentType: String
@@ -1172,6 +1471,20 @@ private final class MediaHTTPServer: @unchecked Sendable {
         self.data = data
         self.etag = etag
         lock.unlock()
+    }
+
+    func hold(range: String) {
+        lock.lock()
+        heldRanges.insert(range)
+        lock.unlock()
+    }
+
+    func release(range: String) {
+        lock.lock()
+        heldRanges.remove(range)
+        let responses = heldResponses.removeValue(forKey: range) ?? []
+        lock.unlock()
+        for (connection, data) in responses { send(data, to: connection) }
     }
 
     func start() async throws -> URL {
@@ -1205,6 +1518,8 @@ private final class MediaHTTPServer: @unchecked Sendable {
         lock.lock()
         let connections = connections
         self.connections = []
+        heldResponses = [:]
+        heldRanges = []
         lock.unlock()
         for connection in connections { connection.cancel() }
     }
@@ -1259,6 +1574,19 @@ private final class MediaHTTPServer: @unchecked Sendable {
         let length = mode == .missingLength ? "" : "Content-Length: \(mode == .truncated ? body.count + 10 : body.count)\r\n"
         let response = "HTTP/1.1 \(status)\r\n\(length)Content-Type: \(contentType)\r\nETag: \(validator)\r\n\(extra)Connection: close\r\n\r\n"
         let responseData = Data(response.utf8) + body
+        if let range = headers["range"] {
+            lock.lock()
+            if heldRanges.contains(range) {
+                heldResponses[range, default: []].append((connection, responseData))
+                lock.unlock()
+                return
+            }
+            lock.unlock()
+        }
+        send(responseData, to: connection)
+    }
+
+    private func send(_ responseData: Data, to connection: NWConnection) {
         queue.asyncAfter(deadline: .now() + delay) {
             connection.send(content: responseData, completion: .contentProcessed { _ in connection.cancel() })
         }

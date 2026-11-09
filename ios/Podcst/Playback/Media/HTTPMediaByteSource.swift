@@ -12,7 +12,7 @@ actor HTTPMediaByteSource {
     private var retired = false
     private var epoch = UUID()
     private var readPriority: UInt64 = 0
-    private var transfer: (id: UUID, priority: UInt64, range: MediaByteRange?, task: Task<Void, Error>)?
+    private var transfer: (id: UUID, priority: UInt64, range: MediaByteRange?, speculative: UUID?, task: Task<Void, Error>)?
 
     init(url: URL, directory: URL, session: URLSession = .shared, maximumAssetBytes: Int64 = 4 * 1024 * 1024 * 1024) throws {
         guard ["https", "http"].contains(url.scheme?.lowercased() ?? ""), maximumAssetBytes > 0 else { throw MediaFailure.invalidSource }
@@ -70,6 +70,25 @@ actor HTTPMediaByteSource {
         } catch {
             throw MediaFailure.storageUnavailable
         }
+    }
+
+    func prefetch(offset: Int64) async {
+        guard !Task.isCancelled, !retired, offset >= 0,
+              let metadata = manifest.metadata, metadata.capability == .randomAccess,
+              let total = metadata.totalBytes, offset < total else { return }
+        let lower = offset / Int64(Self.blockSize) * Int64(Self.blockSize)
+        let range = MediaByteRange(lower: lower, upper: lower + min(total - lower, Int64(Self.blockSize)))
+        guard !manifest.ranges.contains(where: { $0.contains(range) }) else { return }
+        let id = UUID()
+        trace("media_prefetch_start", values: ["offset": Double(range.lower), "bytes": Double(range.count)])
+        await withTaskCancellationHandler {
+            do { try await ensure(range, speculative: id) }
+            catch {}
+            cancelPrefetch(id: id)
+        } onCancel: {
+            Task { await self.cancelPrefetch(id: id) }
+        }
+        trace("media_prefetch_end", values: ["offset": Double(range.lower), "cached": manifest.ranges.contains(where: { $0.contains(range) }) ? 1 : 0, "cancelled": Task.isCancelled ? 1 : 0])
     }
 
     func materialize(progress: @escaping @Sendable (Int64, Int64?) async -> Void = { _, _ in }) async throws -> URL {
@@ -164,7 +183,14 @@ actor HTTPMediaByteSource {
 
     private var mediaURL: URL { directory.appendingPathComponent("media") }
 
-    private func ensure(_ range: MediaByteRange?, priority: UInt64 = 0) async throws {
+    private func cancelPrefetch(id: UUID) {
+        guard transfer?.speculative == id else { return }
+        trace("media_prefetch_cancel", values: ["offset": Double(transfer?.range?.lower ?? 0)])
+        transfer?.task.cancel()
+        transfer = nil
+    }
+
+    private func ensure(_ range: MediaByteRange?, priority: UInt64 = 0, speculative: UUID? = nil) async throws {
         let token = epoch
         while true {
             try Task.checkCancellation()
@@ -173,11 +199,16 @@ actor HTTPMediaByteSource {
             if let range, manifest.ranges.contains(where: { $0.contains(range) }) { return }
             if range == nil, manifest.isComplete { return }
             if let active = transfer {
-                if priority > active.priority, let range, active.range?.contains(range) != true {
+                let supersedingPrefetch = speculative != nil && active.speculative != nil
+                if priority > active.priority || supersedingPrefetch, let range, active.range?.contains(range) != true {
                     trace("media_transfer_preempt", values: ["offset": Double(range.lower), "bytes": Double(range.count)])
                     active.task.cancel()
                     transfer = nil
                 } else {
+                    if let range, active.range?.contains(range) == true, active.speculative != nil {
+                        transfer?.speculative = speculative
+                        transfer?.priority = max(active.priority, priority)
+                    }
                     let started = PlaybackTraceRecorder.now
                     defer {
                         let elapsed = PlaybackTraceRecorder.now - started
@@ -194,13 +225,14 @@ actor HTTPMediaByteSource {
                             transfer = nil
                             throw error
                         }
+                        if speculative != nil { throw MediaFailure.cancelled }
                     }
                     continue
                 }
             }
             let id = UUID()
             let task = Task { try await self.fetch(range: range, token: token) }
-            transfer = (id, priority, range, task)
+            transfer = (id, priority, range, speculative, task)
             do {
                 try await Self.awaitTransfer(task)
                 if transfer?.id == id { transfer = nil }
@@ -211,6 +243,7 @@ actor HTTPMediaByteSource {
                 if transfer?.id == id { transfer = nil }
                 guard token == epoch else { throw MediaFailure.cancelled }
                 if Self.isCancellation(error) {
+                    if speculative != nil { throw MediaFailure.cancelled }
                     if superseded { continue }
                     throw MediaFailure.cancelled
                 }
@@ -264,9 +297,10 @@ actor HTTPMediaByteSource {
             }
             throw error
         }
-        trace("media_request_complete", values: ["seconds": PlaybackTraceRecorder.now - started, "status": Double((response as? HTTPURLResponse)?.statusCode ?? 0), "bytes": Double(delegate.receivedBytes)], labels: requestLabels)
         defer { try? FileManager.default.removeItem(at: temporary) }
         guard token == epoch, !Task.isCancelled else { throw MediaFailure.cancelled }
+        let size = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+        trace("media_request_complete", values: ["seconds": PlaybackTraceRecorder.now - started, "status": Double((response as? HTTPURLResponse)?.statusCode ?? 0), "bytes": Double(size)], labels: requestLabels)
         guard let response = response as? HTTPURLResponse else { throw MediaFailure.invalidResponse }
         guard [200, 206].contains(response.statusCode) else { throw MediaFailure.unavailable(response.statusCode) }
         if response.statusCode == 200, range != nil {
@@ -275,7 +309,6 @@ actor HTTPMediaByteSource {
         }
         let encoding = response.value(forHTTPHeaderField: "Content-Encoding")?.lowercased()
         guard encoding == nil || encoding == "identity" else { throw MediaFailure.invalidResponse }
-        let size = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
         guard size > 0, size <= maximumAssetBytes else { throw MediaFailure.invalidResponse }
         let validator = Self.validator(response)
         if let old = manifest.metadata?.validator, validator != old { throw MediaFailure.representationChanged }
@@ -403,19 +436,12 @@ private final class MediaTransferLimit: NSObject, URLSessionDownloadDelegate, @u
     private let requestID: UUID
     private let lock = NSLock()
     private var rejectedRangeResponse: HTTPURLResponse?
-    private var bytesReceived: Int64 = 0
 
     init(maximumBytes: Int64, requiresRange: Bool, sourceID: UUID, requestID: UUID) {
         self.maximumBytes = maximumBytes
         self.requiresRange = requiresRange
         self.sourceID = sourceID
         self.requestID = requestID
-    }
-
-    var receivedBytes: Int64 {
-        lock.lock()
-        defer { lock.unlock() }
-        return bytesReceived
     }
 
     var completeFileResponse: HTTPURLResponse? {
@@ -427,9 +453,6 @@ private final class MediaTransferLimit: NSObject, URLSessionDownloadDelegate, @u
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        lock.lock()
-        bytesReceived = totalBytesWritten
-        lock.unlock()
         if requiresRange, let response = downloadTask.response as? HTTPURLResponse, response.statusCode == 200 {
             lock.lock()
             rejectedRangeResponse = response

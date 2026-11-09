@@ -445,7 +445,7 @@ final class LocalAudioWorker {
         await Task.yield()
         guard graphGeneration == token else { throw LocalAudioError.cancelled }
         publishPosition()
-        await fillTask?.value
+        if awaitingDecodedBuffers { await fillTask?.value }
         finishOfflineIfNeeded()
         return status
     }

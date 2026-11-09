@@ -175,7 +175,11 @@ private final class ProgressiveAudioWorker: @unchecked Sendable {
         let buffer = buffers[slot]
         var frames = blockFrames
         buffer.frameLength = frames
-        if frames > 0 { try check(ExtAudioFileRead(extendedFile, &frames, buffer.mutableAudioBufferList)) }
+        if frames > 0 {
+            reader?.readingAudio = true
+            defer { reader?.readingAudio = false }
+            try check(ExtAudioFileRead(extendedFile, &frames, buffer.mutableAudioBufferList))
+        }
         buffer.frameLength = frames
         leased.insert(slot)
         return LocalAudioDecodedBlock(lease: LocalAudioBufferLease(slot: slot, buffer: buffer), sourceStart: start, endOfFile: frames == 0)
@@ -220,10 +224,12 @@ private final class ProgressiveByteReader {
     let source: HTTPMediaByteSource
     let totalBytes: Int64
     var failure: MediaFailure?
+    var readingAudio = false
     private let cancellation: MediaReadCancellation
     private let generation: UUID
     private var cached = Data()
     private var cachedOffset: Int64 = 0
+    private var prefetchOffset: Int64?
     var cachedBytes: Int { cached.count }
 
     init(source: HTTPMediaByteSource, totalBytes: Int64, generation: UUID, cancellation: MediaReadCancellation) {
@@ -277,6 +283,7 @@ private final class ProgressiveByteReader {
                     return kAudioFileUnspecifiedError
                 }
             }
+            if readingAudio { prefetch(after: cachedOffset + Int64(cached.count)) }
             let offset = Int(position - cachedOffset)
             let count = min(Int(available) - copied, cached.count - offset)
             cached.withUnsafeBytes { bytes in
@@ -286,6 +293,15 @@ private final class ProgressiveByteReader {
         }
         actual.pointee = UInt32(copied)
         return noErr
+    }
+
+    private func prefetch(after offset: Int64) {
+        guard offset < totalBytes && offset > (prefetchOffset ?? -1) else { return }
+        prefetchOffset = offset
+        let source = source
+        cancellation.installPrefetch(Task.detached(priority: .utility) {
+            await source.prefetch(offset: offset)
+        })
     }
 }
 
@@ -313,6 +329,7 @@ private final class MediaReadCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
     private var pending: MediaReadResult?
+    private var prefetch: Task<Void, Never>?
 
     var isCancelled: Bool {
         lock.lock()
@@ -332,8 +349,21 @@ private final class MediaReadCancellation: @unchecked Sendable {
         lock.lock()
         cancelled = true
         let pending = pending
+        let prefetch = prefetch
+        self.prefetch = nil
         lock.unlock()
         pending?.finish(.failure(.cancelled))
+        prefetch?.cancel()
+    }
+
+    func installPrefetch(_ task: Task<Void, Never>?) {
+        lock.lock()
+        let previous = prefetch
+        prefetch = cancelled ? nil : task
+        let cancelled = cancelled
+        lock.unlock()
+        previous?.cancel()
+        if cancelled { task?.cancel() }
     }
 }
 
