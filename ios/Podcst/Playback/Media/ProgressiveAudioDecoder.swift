@@ -37,7 +37,23 @@ actor ProgressiveAudioDecoder: PCMDecoder {
             let elapsed = PlaybackTraceRecorder.now - started
             if elapsed >= 0.02 { trace("decoder_read_wait", generation: generation, values: ["seconds": elapsed]) }
         }
-        return try await worker.perform { try $0.read(slot: slot, generation: generation) }
+        let block = try await worker.perform { try $0.read(slot: slot, generation: generation) }
+        guard let active, active.generation == generation else {
+            await release(slot: slot, generation: generation)
+            throw MediaFailure.cancelled
+        }
+        if let prefetch = active.cancellation.takeInitialPrefetch() {
+            await withTaskCancellationHandler {
+                await prefetch.value
+            } onCancel: {
+                prefetch.cancel()
+            }
+        }
+        guard self.active?.generation == generation, !Task.isCancelled else {
+            await release(slot: slot, generation: generation)
+            throw MediaFailure.cancelled
+        }
+        return block
     }
 
     func allocatedBytes() async -> UInt64 {
@@ -299,7 +315,7 @@ private final class ProgressiveByteReader {
         guard offset < totalBytes && offset > (prefetchOffset ?? -1) else { return }
         prefetchOffset = offset
         let source = source
-        cancellation.installPrefetch(Task.detached(priority: .utility) {
+        cancellation.installPrefetch(Task.detached(priority: .userInitiated) {
             await source.prefetch(offset: offset)
         })
     }
@@ -330,6 +346,7 @@ private final class MediaReadCancellation: @unchecked Sendable {
     private var cancelled = false
     private var pending: MediaReadResult?
     private var prefetch: Task<Void, Never>?
+    private var waitingForInitialPrefetch = true
 
     var isCancelled: Bool {
         lock.lock()
@@ -364,6 +381,14 @@ private final class MediaReadCancellation: @unchecked Sendable {
         lock.unlock()
         previous?.cancel()
         if cancelled { task?.cancel() }
+    }
+
+    func takeInitialPrefetch() -> Task<Void, Never>? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard waitingForInitialPrefetch else { return nil }
+        waitingForInitialPrefetch = false
+        return prefetch
     }
 }
 

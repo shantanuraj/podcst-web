@@ -1233,12 +1233,25 @@ final class MediaTests: XCTestCase {
         let range = "bytes=262144-524287"
         XCTAssertFalse(server.requests.contains { $0["range"] == range })
         server.hold(range: range)
-        let block = try await decoder.read(slot: 0, generation: generation)
-        XCTAssertEqual(block.lease.buffer.frameLength, 1024)
-        await decoder.release(slot: 0, generation: generation)
+        var completed = false
+        let pending = Task {
+            defer { completed = true }
+            return try await decoder.read(slot: 0, generation: generation)
+        }
+        defer { pending.cancel() }
         try await waitForRequests(server, count: 1, range: range)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(completed, "Initial PCM must wait for its first lookahead range")
         let before = await source.snapshot()
+        let closing = ContinuousClock.now
         await decoder.close(generation: generation)
+        do {
+            _ = try await pending.value
+            XCTFail("Closing during startup must reject the pending decoded block")
+        } catch {
+            XCTAssertEqual(error as? MediaFailure, .cancelled)
+        }
+        XCTAssertLessThan(closing.duration(to: .now), .seconds(1))
         try await Task.sleep(for: .milliseconds(50))
         server.release(range: range)
         try await Task.sleep(for: .milliseconds(50))
@@ -1263,27 +1276,36 @@ final class MediaTests: XCTestCase {
         _ = try await decoder.open(url: url, at: 0, generation: first)
         let oldRange = "bytes=262144-524287"
         server.hold(range: oldRange)
-        _ = try await decoder.read(slot: 0, generation: first)
-        await decoder.release(slot: 0, generation: first)
+        let original = Task { try await decoder.read(slot: 0, generation: first) }
+        defer { original.cancel() }
         try await waitForRequests(server, count: 1, range: oldRange)
         let next = UUID()
         _ = try await decoder.open(url: url, at: 6, generation: next)
+        do {
+            _ = try await original.value
+            XCTFail("Seeking during startup must reject the previous generation's decoded block")
+        } catch {
+            XCTAssertEqual(error as? MediaFailure, .cancelled)
+        }
         let newRange = "bytes=1310720-1572863"
         server.hold(range: newRange)
-        let sought = try await decoder.read(slot: 0, generation: next)
+        var completed = false
+        let pending = Task {
+            defer { completed = true }
+            return try await decoder.read(slot: 0, generation: next)
+        }
+        defer { pending.cancel() }
+        try await waitForRequests(server, count: 1, range: newRange)
+        await decoder.close(generation: first)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(completed, "A seek must prime its own lookahead, independently of the closed generation")
+        server.release(range: newRange)
+        let sought = try await pending.value
         XCTAssertEqual(sought.sourceStart, 288_000)
         let samples = try XCTUnwrap(sought.lease.buffer.floatChannelData)
         for frame in 0..<1024 { XCTAssertEqual(samples[0][frame], sample(frame + 288_000), accuracy: 0.000001) }
         await decoder.release(slot: 0, generation: next)
-        try await waitForRequests(server, count: 1, range: newRange)
-        await decoder.close(generation: first)
-        server.release(range: newRange)
         let cachedRange = MediaByteRange(lower: 1_310_720, upper: 1_572_864)
-        for _ in 0..<500 {
-            let snapshot = await source.snapshot()
-            if snapshot.ranges.contains(where: { $0.contains(cachedRange) }) { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
         await decoder.close(generation: next)
         server.release(range: oldRange)
         try await Task.sleep(for: .milliseconds(50))
@@ -1292,6 +1314,48 @@ final class MediaTests: XCTestCase {
         XCTAssertFalse(snapshot.ranges.contains { $0.contains(MediaByteRange(lower: 262_144, upper: 524_288)) })
         XCTAssertEqual(server.requests.filter { $0["range"] == oldRange }.count, 1)
         XCTAssertEqual(server.requests.filter { $0["range"] == newRange }.count, 1)
+    }
+
+    func testCancellingInitialDecoderReadDoesNotWaitForLookaheadResponse() async throws {
+        let data = try pcmFixture(frames: 480_000)
+        let server = try MediaHTTPServer(data: data, contentType: "audio/wav")
+        let url = try await server.start()
+        defer { server.stop() }
+        let source = try HTTPMediaByteSource(url: url, directory: temporaryDirectory())
+        let decoder = ProgressiveAudioDecoder(source: source, blockFrames: 1024, bufferCount: 2)
+        let generation = UUID()
+        _ = try await decoder.open(url: url, at: 0, generation: generation)
+        let range = "bytes=262144-524287"
+        server.hold(range: range)
+        let finished = expectation(description: "Cancelled initial decode finishes before its HTTP response")
+        var result: Result<LocalAudioDecodedBlock, Error>?
+        let pending = Task {
+            do { result = .success(try await decoder.read(slot: 0, generation: generation)) }
+            catch { result = .failure(error) }
+            finished.fulfill()
+        }
+        defer { pending.cancel() }
+        try await waitForRequests(server, count: 1, range: range)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertNil(result, "Initial decode must still be waiting for its held lookahead response")
+        let before = await source.snapshot()
+        pending.cancel()
+        await fulfillment(of: [finished], timeout: 1)
+        await decoder.close(generation: generation)
+        server.release(range: range)
+        guard let result else { return }
+        switch result {
+        case .success:
+            XCTFail("A cancelled initial read must not publish its decoded block")
+        case .failure(let error):
+            XCTAssertTrue(error is CancellationError || error as? MediaFailure == .cancelled)
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        let after = await source.snapshot()
+        XCTAssertEqual(after.ranges, before.ranges)
+        let allocated = await decoder.allocatedBytes()
+        XCTAssertEqual(allocated, 0)
+        XCTAssertEqual(server.requests.filter { $0["range"] == range }.count, 1)
     }
 
     func testRealVBRMP3ProgressiveSeeksMatchLocalAppleDecoder() async throws {

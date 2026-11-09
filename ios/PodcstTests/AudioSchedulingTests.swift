@@ -13,6 +13,10 @@ final class AudioSchedulingTests: XCTestCase {
         try await delayedProgressivePlayback(rate: 2, effects: AudioEffects(volumeBoost: true, trimSilence: true))
     }
 
+    func testProgressiveResumeNearRangeBoundaryWaitsForColdReadAhead() async throws {
+        try await delayedProgressivePlayback(rate: 1, effects: AudioEffects(), position: 6, delay: 1.4)
+    }
+
     func testDevicePlaybackSurvivesRepeatedMainThreadStallsWithBothEffects() async throws {
         let url = try fixture()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -41,10 +45,10 @@ final class AudioSchedulingTests: XCTestCase {
         XCTAssertGreaterThan(transport.position - start, 2.7)
     }
 
-    private func delayedProgressivePlayback(rate: Double, effects: AudioEffects) async throws {
+    private func delayedProgressivePlayback(rate: Double, effects: AudioEffects, position: Double = 0, delay: TimeInterval = 0.3) async throws {
         let fixture = try XCTUnwrap(Bundle(for: AudioSchedulingTests.self).url(forResource: "progressive-cbr", withExtension: "mp3"))
         let data = try Data(contentsOf: fixture)
-        let server = try MediaHTTPServer(data: data, delay: 0.3)
+        let server = try MediaHTTPServer(data: data, delay: delay)
         let url = try await server.start()
         defer { server.stop() }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("streaming-regression-\(UUID())")
@@ -61,7 +65,7 @@ final class AudioSchedulingTests: XCTestCase {
         }
         transport.setEffects(effects)
         transport.setRate(rate)
-        transport.load(source: .url(url), at: 0, generation: UUID())
+        transport.load(source: .url(url), at: position, generation: UUID())
         try await transport.waitUntilReady()
         transport.play(atRate: rate)
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
@@ -70,7 +74,8 @@ final class AudioSchedulingTests: XCTestCase {
         let started = clock.now
         var deadline = started
         var rendered: UInt64 = 0
-        let target = UInt64(ceil(35 / rate * 48_000))
+        let duration = (35 - position) / rate
+        let target = UInt64(ceil(duration * 48_000))
         while rendered < target {
             let status = try await transport.renderOffline(frames: 480, into: buffer, awaitingDecodedBuffers: false)
             XCTAssertNotEqual(status, .error)
@@ -80,7 +85,7 @@ final class AudioSchedulingTests: XCTestCase {
             try await clock.sleep(until: deadline)
         }
         let state = transport.diagnostics
-        let position = transport.position
+        let finalPosition = transport.position
         await transport.shutdownAndWait()
         await source.cancel()
         _ = await PlaybackTraceRecorder.shared.stop()
@@ -93,9 +98,9 @@ final class AudioSchedulingTests: XCTestCase {
         XCTAssertNil(state.failure)
         XCTAssertEqual(state.underruns, 0, "Rendering must continue while delayed ranges are fetched")
         XCTAssertEqual(preparations, 1, "Streaming must not rebuild the graph at range boundaries")
-        XCTAssertGreaterThan(position, 34)
+        XCTAssertGreaterThan(finalPosition, 34)
         XCTAssertEqual(rendered, target)
-        XCTAssertLessThan(started.duration(to: clock.now), .seconds(35 / rate + 3), "The driver must not hide network waits by pausing rendering")
+        XCTAssertLessThan(started.duration(to: clock.now), .seconds(duration + 3), "The driver must not hide network waits by pausing rendering")
         for index in 1...5 {
             let first = index * HTTPMediaByteSource.blockSize
             let range = "bytes=\(first)-\(first + HTTPMediaByteSource.blockSize - 1)"
