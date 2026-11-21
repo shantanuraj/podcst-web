@@ -284,22 +284,27 @@ private struct RankedPodcastRow: View {
                 Text("\(rank)")
                     .font(.serif(.title2, italic: true))
                     .foregroundStyle(PodcstPalette.muted)
+                    .chartTouchTarget(.blue, in: Rectangle())
                     .frame(minWidth: 26)
                 ArtworkView(url: podcast.artworkURL, size: 52)
+                    .chartTouchTarget(.blue, in: Rectangle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(podcast.title)
                         .font(.serif(.body))
                         .lineLimit(1)
+                        .chartTouchTarget(.blue, in: Rectangle())
                     Text(podcast.author)
                         .font(.sans(.caption))
                         .foregroundStyle(PodcstPalette.secondary)
                         .lineLimit(1)
+                        .chartTouchTarget(.blue, in: Rectangle())
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Button {
                     Task { await library.toggleSubscription(podcast) }
                 } label: {
                     RoundIcon(systemName: subscribed ? "checkmark" : "plus", diameter: 32, tint: subscribed ? PodcstPalette.accent : PodcstPalette.secondary)
+                        .chartTouchTarget(.orange, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(subscribed ? "Unsubscribe from \(podcast.title)" : "Subscribe to \(podcast.title)")
@@ -309,6 +314,22 @@ private struct RankedPodcastRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Number \(rank), \(podcast.title), \(podcast.author)")
+    }
+}
+
+private extension View {
+    func chartTouchTarget<S: InsettableShape>(_ color: Color, in shape: S) -> some View {
+        #if DEBUG
+        overlay {
+            shape
+                .fill(color.opacity(0.25))
+                .overlay { shape.strokeBorder(color, lineWidth: 1) }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+        #else
+        self
+        #endif
     }
 }
 
