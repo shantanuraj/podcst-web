@@ -107,6 +107,9 @@ The shared Redis admission implementation atomically enforces principal/global
 refresh budgets, import-start budgets and expiring import concurrency permits.
 Principal keys are keyed hashes; no locators are stored. A stale permit cannot pass
 its publication check or release a replacement. Limiter failure refuses new work.
+The Redis application user needs `TIME`, `EVAL`, `ZREMRANGEBYSCORE`, `ZCARD`,
+`ZRANGE`, `ZADD`, `PEXPIRE`, `ZSCORE` and `ZREM` on `feed-{admission}:*` keys.
+`ZSCORE` verifies import ownership before publication; `ZREM` releases permits.
 The scoped follow resolver supplies session binding and acquires a permit only
 when the existing indexer needs network work. It checks ownership before its short
 commit and releases the permit afterward, including failures. A fatal scope change

@@ -173,7 +173,7 @@ describe.skipIf(!executable)(
       });
     });
 
-    test('refresh admission runs under the production application ACL', async () => {
+    test('refresh and import lifecycle run under the production application ACL', async () => {
       await redis.acl(
         'SETUSER',
         'podcst_app',
@@ -202,6 +202,8 @@ describe.skipIf(!executable)(
         '+zcard',
         '+zrange',
         '+zadd',
+        '+zscore',
+        '+zrem',
         '+time',
         '+eval',
       );
@@ -216,6 +218,10 @@ describe.skipIf(!executable)(
         const limited = createFeedAdmission(restricted, secret);
         await expect(limited.refresh(owner)).resolves.toBeUndefined();
         await expect(limited.importRequest(owner)).resolves.toBeUndefined();
+        const lease = await limited.importLease(owner);
+        await expect(lease.assertOwned()).resolves.toBeUndefined();
+        await expect(lease.release()).resolves.toBeUndefined();
+        expect(await redis.keys('feed-*:import-active:*')).toHaveLength(0);
       } finally {
         restricted.disconnect();
         await redis.acl('DELUSER', 'podcst_app');
