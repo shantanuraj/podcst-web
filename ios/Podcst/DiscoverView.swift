@@ -279,41 +279,40 @@ private struct RankedPodcastRow: View {
 
     var body: some View {
         let subscribed = library.isSubscribed(podcast)
-        NavigationLink(value: Route.podcast(podcast)) {
-            HStack(spacing: 14) {
-                Text("\(rank)")
-                    .font(.serif(.title2, italic: true))
-                    .foregroundStyle(PodcstPalette.muted)
-                    .chartTouchTarget(.blue, in: Rectangle())
-                    .frame(minWidth: 26)
-                ArtworkView(url: podcast.artworkURL, size: 52)
-                    .chartTouchTarget(.blue, in: Rectangle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(podcast.title)
-                        .font(.serif(.body))
-                        .lineLimit(1)
-                        .chartTouchTarget(.blue, in: Rectangle())
-                    Text(podcast.author)
-                        .font(.sans(.caption))
-                        .foregroundStyle(PodcstPalette.secondary)
-                        .lineLimit(1)
-                        .chartTouchTarget(.blue, in: Rectangle())
+        HStack(spacing: 8) {
+            NavigationLink(value: Route.podcast(podcast)) {
+                HStack(spacing: 14) {
+                    Text("\(rank)")
+                        .font(.serif(.title2, italic: true))
+                        .foregroundStyle(PodcstPalette.muted)
+                        .frame(minWidth: 26)
+                    ArtworkView(url: podcast.artworkURL, size: 52)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(podcast.title)
+                            .font(.serif(.body))
+                            .lineLimit(1)
+                        Text(podcast.author)
+                            .font(.sans(.caption))
+                            .foregroundStyle(PodcstPalette.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
-                    Task { await library.toggleSubscription(podcast) }
-                } label: {
-                    RoundIcon(systemName: subscribed ? "checkmark" : "plus", diameter: 32, tint: subscribed ? PodcstPalette.accent : PodcstPalette.secondary)
-                        .chartTouchTarget(.orange, in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(subscribed ? "Unsubscribe from \(podcast.title)" : "Subscribe to \(podcast.title)")
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+                .chartTouchTarget(.blue, in: Rectangle())
             }
-            .padding(.vertical, 11)
-            .hairline()
+            .accessibilityLabel("Number \(rank), \(podcast.title), \(podcast.author)")
+            Button {
+                Task { await library.toggleSubscription(podcast) }
+            } label: {
+                RoundIcon(systemName: subscribed ? "checkmark" : "plus", diameter: 32, tint: subscribed ? PodcstPalette.accent : PodcstPalette.secondary)
+                    .chartTouchTarget(.orange, in: Circle())
+            }
+            .accessibilityLabel(subscribed ? "Unsubscribe from \(podcast.title)" : "Subscribe to \(podcast.title)")
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Number \(rank), \(podcast.title), \(podcast.author)")
+        .hairline()
     }
 }
 
