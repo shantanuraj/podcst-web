@@ -36,18 +36,22 @@ final class RelatedPodcastsAPITests: XCTestCase {
         }
     }
 
-    func testEmptyRecommendationsAndTransportErrorsRemainDistinct() async throws {
+    func testEmptyRecommendationsAreCachedAndUncachedErrorsRemainDistinct() async throws {
         let (api, _) = fixture()
         defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        XCTAssertNil(api.cachedRelated(podcastID: 42))
         GuestLibraryURLProtocol.handler = { pending in
             pending.complete(.success((Data("[]".utf8), [:])))
         }
         let empty = try await api.related(podcastID: 42)
         XCTAssertTrue(empty.isEmpty)
+        XCTAssertEqual(api.cachedRelated(podcastID: 42), [])
 
         GuestLibraryURLProtocol.handler = { pending in pending.fail(URLError(.notConnectedToInternet)) }
+        let cached = try await api.related(podcastID: 42)
+        XCTAssertTrue(cached.isEmpty)
         do {
-            _ = try await api.related(podcastID: 42)
+            _ = try await api.related(podcastID: 43)
             XCTFail("Transport failures must remain available to the caller")
         } catch {
             XCTAssertEqual((error as? URLError)?.code, .notConnectedToInternet)
@@ -55,7 +59,7 @@ final class RelatedPodcastsAPITests: XCTestCase {
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SessionURLProtocol.self]
-        let failing = APIClient(baseURL: URL(string: "https://status-401.example.test")!, session: URLSession(configuration: configuration), keychain: MemorySessionCredentials())
+        let failing = APIClient(baseURL: URL(string: "https://status-401.example.test")!, session: URLSession(configuration: configuration), keychain: MemorySessionCredentials(), defaults: cacheDefaults())
         do {
             _ = try await failing.related(podcastID: 42)
             XCTFail("HTTP failures must retain their status and message")
@@ -65,11 +69,159 @@ final class RelatedPodcastsAPITests: XCTestCase {
         }
     }
 
+    func testCachedRecommendationsSurviveClientRestartAndPublicSessionChanges() async throws {
+        let defaults = cacheDefaults()
+        let (api, _) = fixture(defaults: defaults)
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { pending in try pending.respond(self.recommendations) }
+        let loaded = try await api.related(podcastID: 42, locale: "NL")
+        XCTAssertEqual(api.cachedRelated(podcastID: 42, locale: "nl"), loaded)
+        api.clearSession()
+        let (restored, _) = fixture(signedIn: true, defaults: defaults)
+        defer { restored.clearSession() }
+        XCTAssertEqual(restored.cachedRelated(podcastID: 42, locale: "NL"), loaded)
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Fresh persisted recommendations must not request again") }
+        let reused = try await restored.related(podcastID: 42, locale: "nl")
+        XCTAssertEqual(reused, loaded)
+    }
+
+    func testRecommendationCacheSeparatesSourcesLocalesAndServers() async throws {
+        let defaults = cacheDefaults()
+        let (api, _) = fixture(defaults: defaults)
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        var requests = 0
+        GuestLibraryURLProtocol.handler = { pending in
+            requests += 1
+            let query = try XCTUnwrap(URLComponents(url: XCTUnwrap(pending.request.url), resolvingAgainstBaseURL: false)?.queryItems)
+            XCTAssertTrue(query.contains(URLQueryItem(name: "locale", value: "nl")) || query.contains(URLQueryItem(name: "locale", value: "us")))
+            try pending.respond(self.recommendations)
+        }
+        _ = try await api.related(podcastID: 42, locale: "NL")
+        XCTAssertNil(api.cachedRelated(podcastID: 43, locale: "nl"))
+        XCTAssertNil(api.cachedRelated(podcastID: 42, locale: "us"))
+        _ = try await api.related(podcastID: 42, locale: "nl")
+        XCTAssertEqual(requests, 1)
+        _ = try await api.related(podcastID: 43, locale: "nl")
+        _ = try await api.related(podcastID: 42, locale: "us")
+        XCTAssertEqual(requests, 3)
+        let (otherServer, _) = fixture(defaults: defaults, baseURL: "https://other-related.example.test")
+        let (otherDefaults, _) = fixture()
+        XCTAssertNil(otherServer.cachedRelated(podcastID: 42, locale: "nl"))
+        XCTAssertNil(otherDefaults.cachedRelated(podcastID: 42, locale: "nl"))
+    }
+
+    func testStaleRecommendationsRemainVisibleWhileRefreshingAndAreReplaced() async throws {
+        var date = Date(timeIntervalSince1970: 1000)
+        let (api, _) = fixture(now: { date })
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { pending in try pending.respond(self.recommendations) }
+        let first = try await api.related(podcastID: 42)
+        date.addTimeInterval(3600)
+        let started = expectation(description: "Stale recommendations refresh started")
+        var pending: GuestLibraryRequest?
+        GuestLibraryURLProtocol.handler = { request in pending = request; started.fulfill() }
+        let refresh = Task { try await api.related(podcastID: 42) }
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertEqual(api.cachedRelated(podcastID: 42), first)
+        try XCTUnwrap(pending).respond([Podcast]())
+        let updated = try await refresh.value
+        XCTAssertTrue(updated.isEmpty)
+        XCTAssertEqual(api.cachedRelated(podcastID: 42), [])
+        GuestLibraryURLProtocol.handler = { _ in XCTFail("Successful refresh must renew cache freshness") }
+        let cached = try await api.related(podcastID: 42)
+        XCTAssertTrue(cached.isEmpty)
+    }
+
+    func testStaleRecommendationsSurviveTransientFailuresButNotAccessDenials() async throws {
+        var date = Date(timeIntervalSince1970: 1000)
+        let (api, _) = fixture(now: { date })
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { pending in try pending.respond(self.recommendations) }
+        let first = try await api.related(podcastID: 42)
+        date.addTimeInterval(3600)
+        GuestLibraryURLProtocol.handler = { pending in pending.fail(URLError(.notConnectedToInternet)) }
+        let offline = try await api.related(podcastID: 42)
+        XCTAssertEqual(offline, first)
+        for status in [429, 503] {
+            GuestLibraryURLProtocol.handler = { pending in pending.respondHTTP(status, Data(#"{"message":"Try later"}"#.utf8), [:]) }
+            let retained = try await api.related(podcastID: 42)
+            XCTAssertEqual(retained, first)
+        }
+        GuestLibraryURLProtocol.handler = { pending in pending.fail(URLError(.cancelled)) }
+        do {
+            _ = try await api.related(podcastID: 42)
+            XCTFail("Cancellation must not return cached success")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .cancelled)
+        }
+        XCTAssertEqual(api.cachedRelated(podcastID: 42), first)
+        GuestLibraryURLProtocol.handler = { pending in pending.respondHTTP(404, Data(#"{"message":"Podcast not found"}"#.utf8), [:]) }
+        do {
+            _ = try await api.related(podcastID: 42)
+            XCTFail("Unavailable podcasts must not retain cached recommendations")
+        } catch {
+            XCTAssertEqual((error as? APIError)?.statusCode, 404)
+        }
+        XCTAssertNil(api.cachedRelated(podcastID: 42))
+    }
+
+    func testConcurrentRecommendationsShareRequestAndCancelledCallerDoesNotSucceed() async throws {
+        let (api, _) = fixture()
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        let started = expectation(description: "Recommendations request started")
+        let joined = expectation(description: "Second recommendations caller joined")
+        var pending: GuestLibraryRequest?
+        var requests = 0
+        GuestLibraryURLProtocol.handler = { request in
+            requests += 1
+            pending = request
+            started.fulfill()
+        }
+        let first = Task { try await api.related(podcastID: 42, locale: "NL") }
+        await fulfillment(of: [started], timeout: 2)
+        let second = Task {
+            joined.fulfill()
+            return try await api.related(podcastID: 42, locale: "nl")
+        }
+        await fulfillment(of: [joined], timeout: 2)
+        first.cancel()
+        try XCTUnwrap(pending).respond(recommendations)
+        do {
+            _ = try await first.value
+            XCTFail("Cancelled caller must not return success")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        let result = try await second.value
+        XCTAssertEqual(result, recommendations)
+        XCTAssertEqual(requests, 1)
+        XCTAssertEqual(api.cachedRelated(podcastID: 42, locale: "nl"), recommendations)
+    }
+
+    func testRecommendationCacheRetainsOnlyFortyNewestSources() async throws {
+        var date = Date(timeIntervalSince1970: 1000)
+        let defaults = cacheDefaults()
+        let (api, _) = fixture(defaults: defaults, now: { date })
+        defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
+        GuestLibraryURLProtocol.handler = { pending in try pending.respond(self.recommendations) }
+        let (otherServer, _) = fixture(defaults: defaults, now: { date }, baseURL: "https://related.example.test.other")
+        _ = try await otherServer.related(podcastID: 1)
+        for id in 1...41 {
+            _ = try await api.related(podcastID: id)
+            date.addTimeInterval(1)
+        }
+        let (restored, _) = fixture(defaults: defaults, now: { date })
+        XCTAssertNil(restored.cachedRelated(podcastID: 1))
+        for id in 2...41 { XCTAssertEqual(restored.cachedRelated(podcastID: id), recommendations) }
+        XCTAssertEqual(otherServer.cachedRelated(podcastID: 1), recommendations)
+    }
+
     func testInvalidSourceIdentityDoesNotMakeARequest() async throws {
         let (api, _) = fixture()
         defer { api.clearSession(); GuestLibraryURLProtocol.handler = nil }
         GuestLibraryURLProtocol.handler = { _ in XCTFail("Invalid podcast identities must not be requested") }
         for id in [0, -1] {
+            XCTAssertNil(api.cachedRelated(podcastID: id))
             do {
                 _ = try await api.related(podcastID: id)
                 XCTFail("Invalid podcast identity must be rejected")
@@ -79,12 +231,20 @@ final class RelatedPodcastsAPITests: XCTestCase {
         }
     }
 
-    private func fixture(signedIn: Bool = false) -> (APIClient, MemorySessionCredentials) {
+    private var recommendations: [Podcast] { [Podcast(id: 51, feed: "https://example.test/related.xml", title: "Related show")] }
+
+    private func cacheDefaults() -> UserDefaults {
+        let name = "RelatedPodcasts-\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults(suiteName: name)?.removePersistentDomain(forName: name) }
+        return UserDefaults(suiteName: name)!
+    }
+
+    private func fixture(signedIn: Bool = false, defaults: UserDefaults? = nil, now: @escaping () -> Date = Date.init, baseURL: String = "https://related.example.test") -> (APIClient, MemorySessionCredentials) {
         let credentials = MemorySessionCredentials()
         if signedIn { credentials.write("listener-session") }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [GuestLibraryURLProtocol.self]
-        let api = APIClient(baseURL: URL(string: "https://related.example.test")!, session: URLSession(configuration: configuration), keychain: credentials)
+        let api = APIClient(baseURL: URL(string: baseURL)!, session: URLSession(configuration: configuration), keychain: credentials, defaults: defaults ?? cacheDefaults(), now: now)
         api.restoreAccount(signedIn ? "listener" : nil)
         return (api, credentials)
     }
@@ -1577,13 +1737,16 @@ private final class GuestLibraryURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        let request = GuestLibraryRequest(request: request) { [self] result in
+        let respond: @Sendable (Int, Data, [String: String]) -> Void = { [self] status, data, headers in
+            let response = HTTPURLResponse(url: self.request.url!, statusCode: status, httpVersion: nil, headerFields: headers)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        let request = GuestLibraryRequest(request: request, respondHTTP: respond) { [self] result in
             switch result {
             case .success(let (data, headers)):
-                let response = HTTPURLResponse(url: self.request.url!, statusCode: 200, httpVersion: nil, headerFields: headers)!
-                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: data)
-                client?.urlProtocolDidFinishLoading(self)
+                respond(200, data, headers)
             case .failure(let error):
                 client?.urlProtocol(self, didFailWithError: error)
             }
@@ -1607,6 +1770,7 @@ private let fixtureFreshness = try! JSONDecoder().decode(FeedFreshness.self, fro
 
 private struct GuestLibraryRequest: Sendable {
     let request: URLRequest
+    let respondHTTP: @Sendable (Int, Data, [String: String]) -> Void
     let complete: @Sendable (Result<(Data, [String: String]), Error>) -> Void
 
     @MainActor func respondState(items: [[String: Any]], revision: Int) throws {

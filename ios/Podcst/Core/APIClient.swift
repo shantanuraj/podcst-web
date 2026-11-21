@@ -28,16 +28,21 @@ public final class APIClient: PodcastDetailService {
     private let keychain: any SessionCredentialStore
     private let feedCache = FeedCache(storageURL: FeedCache.defaultStorageURL())
     let podcastPages = PodcastPageCache()
-    private let topCache = PodcastSnapshotCache(namespace: "top", lifetime: 3600)
-    private let subscriptionCache = PodcastSnapshotCache(namespace: "subscriptions", lifetime: 86400)
+    private let topCache: PodcastSnapshotCache
+    private let subscriptionCache: PodcastSnapshotCache
+    private let relatedCache: PodcastSnapshotCache
     private var topRequests: [String: Task<[Podcast], Error>] = [:]
+    private var relatedRequests: [String: Task<[Podcast], Error>] = [:]
     private var subscriptionRequest: Task<[Podcast], Error>?
 
-    public init(baseURL: URL = APIClient.productionBaseURL, session: URLSession = .shared, keychain: any SessionCredentialStore = KeychainStore()) {
+    public init(baseURL: URL = APIClient.productionBaseURL, session: URLSession = .shared, keychain: any SessionCredentialStore = KeychainStore(), defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
         self.baseURL = baseURL
         self.session = session
         self.keychain = keychain
         self.sessionCookie = keychain.read()
+        self.topCache = PodcastSnapshotCache(namespace: "top", lifetime: 3600, defaults: defaults, now: now)
+        self.subscriptionCache = PodcastSnapshotCache(namespace: "subscriptions", lifetime: 86400, defaults: defaults, now: now)
+        self.relatedCache = PodcastSnapshotCache(namespace: "related.\(Data(baseURL.absoluteString.utf8).base64URL)", lifetime: 3600, defaults: defaults, capacity: 40, now: now)
     }
 
     public func top(locale: String = "us", limit: Int = 30) async throws -> [Podcast] {
@@ -77,12 +82,45 @@ public final class APIClient: PodcastDetailService {
         return rows.map { Podcast(id: $0.id, itunesId: $0.itunesId, itunesLocale: locale, feed: $0.feed, title: $0.title, author: $0.author, cover: $0.cover, thumbnail: $0.thumbnail, isPrivate: $0.isPrivate ?? false) }
     }
 
+    func cachedRelated(podcastID: Int, locale: String = "us") -> [Podcast]? {
+        guard podcastID > 0 else { return nil }
+        return relatedCache.load("\(podcastID):\(locale.lowercased())")?.value
+    }
+
     public func related(podcastID: Int, locale: String = "us") async throws -> [Podcast] {
         try Task.checkCancellation()
         guard podcastID > 0 else { throw APIError(statusCode: 400, message: "Invalid podcast identity") }
-        let rows: [RawPodcast] = try await get(path: "/api/feed/related", query: [URLQueryItem(name: "id", value: String(podcastID)), URLQueryItem(name: "locale", value: locale)], usesSession: false)
+        let locale = locale.lowercased()
+        let key = "\(podcastID):\(locale)"
+        if let snapshot = relatedCache.load(key), !snapshot.isStale { return snapshot.value }
+        let request: Task<[Podcast], Error>
+        if let pending = relatedRequests[key] {
+            request = pending
+        } else {
+            request = Task { @MainActor [weak self] in
+                guard let self else { throw CancellationError() }
+                defer { self.relatedRequests[key] = nil }
+                do {
+                    let rows: [RawPodcast] = try await self.get(path: "/api/feed/related", query: [URLQueryItem(name: "id", value: String(podcastID)), URLQueryItem(name: "locale", value: locale)], usesSession: false)
+                    try Task.checkCancellation()
+                    let podcasts = rows.map { self.mapPodcast($0) }
+                    self.relatedCache.store(podcasts, key: key)
+                    return podcasts
+                } catch {
+                    if let failure = error as? APIError, [401, 403, 404].contains(failure.statusCode) {
+                        self.relatedCache.remove(key)
+                    }
+                    let transient = (error as? URLError).map { $0.code != .cancelled } == true
+                        || (error as? APIError).map { $0.statusCode == 429 || $0.statusCode >= 500 } == true
+                    if transient, let saved = self.relatedCache.load(key) { return saved.value }
+                    throw error
+                }
+            }
+            relatedRequests[key] = request
+        }
+        let podcasts = try await request.value
         try Task.checkCancellation()
-        return rows.map { mapPodcast($0) }
+        return podcasts
     }
 
     public func cachedPodcast(id: Int? = nil, feed: String) -> Podcast? {
@@ -944,21 +982,34 @@ final class PodcastSnapshotCache {
     private let namespace: String
     private let lifetime: TimeInterval
     private let defaults: UserDefaults
+    private let capacity: Int?
+    private let now: () -> Date
 
-    init(namespace: String, lifetime: TimeInterval, defaults: UserDefaults = .standard) {
+    init(namespace: String, lifetime: TimeInterval, defaults: UserDefaults = .standard, capacity: Int? = nil, now: @escaping () -> Date = Date.init) {
         self.namespace = namespace
         self.lifetime = lifetime
         self.defaults = defaults
+        self.capacity = capacity.map { max(1, $0) }
+        self.now = now
     }
 
     func load(_ key: String) -> Snapshot? {
         guard let data = defaults.data(forKey: storageKey(key)), let stored = try? JSONDecoder().decode(Stored.self, from: data) else { return nil }
-        return Snapshot(value: stored.value, isStale: Date().timeIntervalSince(stored.storedAt) >= lifetime)
+        return Snapshot(value: stored.value, isStale: now().timeIntervalSince(stored.storedAt) >= lifetime)
     }
 
     func store(_ value: [Podcast], key: String) {
-        guard let data = try? JSONEncoder().encode(Stored(value: value, storedAt: Date())) else { return }
-        defaults.set(data, forKey: storageKey(key))
+        guard let data = try? JSONEncoder().encode(Stored(value: value, storedAt: now())) else { return }
+        let savedKey = storageKey(key)
+        defaults.set(data, forKey: savedKey)
+        if let capacity {
+            let stored = defaults.dictionaryRepresentation().compactMap { key, value -> (String, Date)? in
+                guard key != savedKey, key.hasPrefix(namespace + "."), let data = value as? Data,
+                      let snapshot = try? JSONDecoder().decode(Stored.self, from: data) else { return nil }
+                return (key, snapshot.storedAt)
+            }
+            stored.sorted { $0.1 > $1.1 }.dropFirst(capacity - 1).forEach { defaults.removeObject(forKey: $0.0) }
+        }
     }
 
     func remove(_ key: String) {

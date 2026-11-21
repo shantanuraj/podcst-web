@@ -23,12 +23,16 @@ struct PodcastDetailView: View {
     private var currentScope: Bool { store.scope == nil || store.scope == api.activityToken }
     private var content: Podcast {
         guard currentScope else { return Podcast(id: podcast.id, feed: "", title: "Podcast unavailable") }
-        return store.podcast ?? podcast
+        if let loaded = store.podcast { return loaded }
+        if let id = podcast.id, let cached = api.podcastPages.info(id) { return cached }
+        return api.cachedPodcast(id: podcast.id, feed: podcast.feed) ?? podcast
     }
     private var query: PodcastEpisodeQuery { PodcastEpisodeQuery(search: filter.trimmingCharacters(in: .whitespacesAndNewlines), newestFirst: newestFirst) }
     private var relatedKey: String { "\(content.identity):\(content.isPrivate == true):\(region):\(api.activityToken)" }
     private var relatedPodcasts: [Podcast] {
-        recommendations?.key == relatedKey ? recommendations?.podcasts ?? [] : []
+        guard currentScope, let id = content.id, id > 0, content.isPrivate != true else { return [] }
+        if let recommendations, recommendations.key == relatedKey { return recommendations.podcasts }
+        return api.cachedRelated(podcastID: id, locale: region) ?? []
     }
 
     var body: some View {
@@ -49,7 +53,7 @@ struct PodcastDetailView: View {
                     }
                     .arrangementViewStyle(.split)
                 } else {
-                    episodeScroll(wide: wide, showsHeader: true, aboutWidth: columnWidth, relatedWidth: relatedPodcasts.isEmpty ? nil : columnWidth)
+                    episodeScroll(wide: wide, showsHeader: true, aboutWidth: columnWidth, relatedWidth: columnWidth)
                         .modifier(ArtworkBackdrop(url: content.artworkURL, artworkSize: 180, headerHeight: wide ? 300 : 360))
                 }
             }
@@ -62,7 +66,7 @@ struct PodcastDetailView: View {
             guard recommendations?.key != key else { return }
             recommendations = nil
             guard let id = content.id, id > 0, content.isPrivate != true else { return }
-            guard let podcasts = try? await api.related(podcastID: id, locale: region) else { return }
+            let podcasts = (try? await api.related(podcastID: id, locale: region)) ?? []
             guard !Task.isCancelled, relatedKey == key else { return }
             recommendations = (key, podcasts)
         }
@@ -92,8 +96,12 @@ struct PodcastDetailView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if let relatedWidth {
-                        RelatedPodcastsView(podcasts: relatedPodcasts)
-                            .frame(width: relatedWidth)
+                        VStack(alignment: .leading, spacing: 0) {
+                            if !relatedPodcasts.isEmpty {
+                                RelatedPodcastsView(podcasts: relatedPodcasts)
+                            }
+                        }
+                        .frame(width: relatedWidth)
                     }
                 }
             }
