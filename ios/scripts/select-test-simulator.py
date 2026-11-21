@@ -3,6 +3,9 @@ import os
 import subprocess
 
 
+sdk_version = tuple(map(int, subprocess.check_output(
+    ["xcrun", "--sdk", "iphonesimulator", "--show-sdk-version"], text=True
+).strip().split(".")))[:2]
 inventory = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "--json"]))
 runtimes = {
     runtime["identifier"]: tuple(map(int, runtime["version"].split(".")))
@@ -17,12 +20,14 @@ iphones = {
 candidates = [
     (runtimes[runtime], device["udid"], device["name"], runtime)
     for runtime, devices in inventory["devices"].items()
-    if runtime in runtimes
+    if runtime in runtimes and runtimes[runtime][:2] == sdk_version
     for device in devices
     if device["isAvailable"] and device["deviceTypeIdentifier"] in iphones
 ]
 if not candidates:
-    raise SystemExit("No available iPhone simulator")
+    raise SystemExit(
+        f"No available iPhone simulator matching iOS {'.'.join(map(str, sdk_version))} SDK"
+    )
 version, identifier, name, runtime = max(candidates)
 if version < (18,):
     raise SystemExit("An iOS 18 or later simulator is required")
