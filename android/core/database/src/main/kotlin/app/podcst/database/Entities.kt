@@ -70,6 +70,15 @@ data class ChartRefreshEntity(
     val refreshedAt: Long,
 )
 
+@Entity(tableName = "related_podcasts", primaryKeys = ["server", "podcastId", "locale"])
+data class RelatedPodcastsEntity(
+    val server: String,
+    val podcastId: Long,
+    val locale: String,
+    val podcasts: String,
+    val refreshedAt: Long,
+)
+
 @Entity(tableName = "queue")
 data class QueueEntity(
     @PrimaryKey val position: Int,

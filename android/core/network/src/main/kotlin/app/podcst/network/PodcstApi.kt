@@ -58,6 +58,7 @@ class PodcstApi(
     private val revision = AtomicLong()
 
     val hasSession: Boolean get() = !cookies.read().isNullOrEmpty()
+    val cacheNamespace: String get() = baseUrl.toString()
 
     var deletionBlocked: () -> Boolean = { false }
 

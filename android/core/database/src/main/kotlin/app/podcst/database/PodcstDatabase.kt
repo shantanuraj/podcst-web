@@ -13,13 +13,14 @@ import androidx.room.TypeConverters
         SubscriptionEntity::class,
         ChartEntity::class,
         ChartRefreshEntity::class,
+        RelatedPodcastsEntity::class,
         QueueEntity::class,
         PlayerEntity::class,
         ProgressEntity::class,
         OutboxEntity::class,
         StarEntity::class,
     ],
-    version = 4,
+    version = 5,
 )
 @TypeConverters(Converters::class)
 abstract class PodcstDatabase : RoomDatabase() {
@@ -27,6 +28,7 @@ abstract class PodcstDatabase : RoomDatabase() {
     abstract fun episodes(): EpisodeDao
     abstract fun subscriptions(): SubscriptionDao
     abstract fun charts(): ChartDao
+    abstract fun relatedPodcasts(): RelatedPodcastsDao
     abstract fun player(): PlayerDao
     abstract fun progress(): ProgressDao
     abstract fun outbox(): OutboxDao
@@ -67,10 +69,16 @@ abstract class PodcstDatabase : RoomDatabase() {
             }
         }
 
+        val RELATED_PODCASTS_MIGRATION = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS related_podcasts (server TEXT NOT NULL, podcastId INTEGER NOT NULL, locale TEXT NOT NULL, podcasts TEXT NOT NULL, refreshedAt INTEGER NOT NULL, PRIMARY KEY(server, podcastId, locale))")
+            }
+        }
+
         fun name(scope: String) = "podcst-$scope.db"
 
         fun open(context: Context, scope: String): PodcstDatabase =
-            Room.databaseBuilder(context, PodcstDatabase::class.java, name(scope)).addMigrations(IDENTITY_MIGRATION, PROGRESS_SOURCE_MIGRATION, DETAIL_PAGE_MIGRATION).build()
+            Room.databaseBuilder(context, PodcstDatabase::class.java, name(scope)).addMigrations(IDENTITY_MIGRATION, PROGRESS_SOURCE_MIGRATION, DETAIL_PAGE_MIGRATION, RELATED_PODCASTS_MIGRATION).build()
 
         fun delete(context: Context, scope: String) {
             val removed = context.deleteDatabase(name(scope))

@@ -171,7 +171,7 @@ fun PodcastScreen(
         ) {
             BoxWithConstraints(Modifier.widthIn(max = 1120.dp).fillMaxSize().align(Alignment.TopCenter)) {
                 val layout = ContentLayout(maxWidth - 40.dp, LocalDensity.current.fontScale)
-                val sidebarWidth = (layout.supportingWidth + 20.dp).takeIf { layout.twoColumns && state.related.isNotEmpty() }
+                val sidebarWidth = (layout.supportingWidth + 20.dp).takeIf { layout.twoColumns }
                 LazyColumn(Modifier.fillMaxSize(), state = list) {
                     item(key = "hero") { Hero(state, viewModel, actions, tint, layout, Modifier.onSizeChanged { headerHeight = it.height }) }
                     stickyHeader(key = "tabs") { Tabs(tab) { tab = it } }
@@ -206,8 +206,8 @@ private fun Hero(state: PodcastScreenState, viewModel: PodcastViewModel, actions
         if (layout.twoColumns) {
             Row(horizontalArrangement = Arrangement.spacedBy(layout.gutter), verticalAlignment = Alignment.Top) {
                 PodcastSummary(state, viewModel, actions, tint, Modifier.weight(1f))
-                if (state.description.isNotEmpty()) {
-                    Column(Modifier.width(layout.supportingWidth), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.width(layout.supportingWidth), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (state.description.isNotEmpty()) {
                         PodcastDescription(state.description, expanded, { expanded = !expanded }, 7)
                         PodcastWebsite(state.podcast)
                     }
@@ -369,12 +369,16 @@ private fun LazyListScope.episodes(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Box(Modifier.weight(1f)) { EpisodesHeader(state, query, viewModel) }
             if (sidebarWidth != null) {
-                Text(
-                    stringResource(R.string.listeners_also_follow),
-                    style = Podcst.type.rowTitle,
-                    color = Podcst.colors.ink,
-                    modifier = Modifier.width(sidebarWidth).padding(end = 20.dp).padding(bottom = 18.dp).semantics { heading() },
-                )
+                Box(Modifier.width(sidebarWidth)) {
+                    if (related.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.listeners_also_follow),
+                            style = Podcst.type.rowTitle,
+                            color = Podcst.colors.ink,
+                            modifier = Modifier.padding(end = 20.dp).padding(bottom = 18.dp).semantics { heading() },
+                        )
+                    }
+                }
             }
         }
     }
@@ -391,7 +395,7 @@ private fun LazyListScope.episodes(
             }
             if (sidebarWidth != null) {
                 Box(Modifier.width(sidebarWidth)) {
-                    related.getOrNull(index)?.let { RelatedPodcast(it, onOpenPodcast) }
+                    RelatedPodcast(related.getOrNull(index), onOpenPodcast)
                 }
             }
         }
@@ -426,16 +430,27 @@ private fun EpisodePagination(state: PodcastScreenState, viewModel: PodcastViewM
 }
 
 @Composable
-private fun RelatedPodcast(podcast: Podcast, onOpen: (Podcast) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(podcast) }.padding(end = 20.dp).padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Artwork(podcast.cover, 52.dp, corner = 8.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(podcast.title, style = Podcst.type.compactTitle, color = Podcst.colors.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (podcast.author.isNotBlank()) Text(podcast.author, style = Podcst.type.meta, color = Podcst.colors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun RelatedPodcast(podcast: Podcast?, onOpen: (Podcast) -> Unit) {
+    val artworkSize = 52.dp
+    val verticalPadding = 12.dp
+    val textSpacing = 4.dp
+    val titleLines = 2
+    val textHeight = with(LocalDensity.current) {
+        Podcst.type.compactTitle.lineHeight.toDp() * titleLines + Podcst.type.meta.lineHeight.toDp()
+    } + textSpacing
+    Box(Modifier.fillMaxWidth().heightIn(min = maxOf(artworkSize, textHeight) + verticalPadding * 2)) {
+        if (podcast != null) {
+            Row(
+                Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(podcast) }.padding(end = 20.dp).padding(vertical = verticalPadding),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Artwork(podcast.cover, artworkSize, corner = 8.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(textSpacing)) {
+                    Text(podcast.title, style = Podcst.type.compactTitle, color = Podcst.colors.ink, maxLines = titleLines, overflow = TextOverflow.Ellipsis)
+                    if (podcast.author.isNotBlank()) Text(podcast.author, style = Podcst.type.meta, color = Podcst.colors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }

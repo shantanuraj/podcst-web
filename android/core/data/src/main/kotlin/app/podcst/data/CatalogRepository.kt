@@ -3,6 +3,7 @@ package app.podcst.data
 import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import app.podcst.database.PodcastEntity
+import app.podcst.database.RelatedPodcastsEntity
 import app.podcst.database.domain
 import app.podcst.database.entity
 import app.podcst.model.Episode
@@ -25,7 +26,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.completeWith
 import kotlinx.coroutines.ensureActive
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class CatalogRepository(
     private val api: PodcstApi,
@@ -36,6 +41,8 @@ class CatalogRepository(
     private val seen = MutableStateFlow<Seen?>(null)
     private data class DetailPages(val owner: Scope, val epoch: Long, val pages: Map<Long, EpisodePage>, val denied: Set<Long> = emptySet())
     private val detailPages = MutableStateFlow<DetailPages?>(null)
+    private data class RelatedKey(val owner: Scope, val epoch: Long, val id: Long, val locale: String)
+    private val relatedRequests = mutableMapOf<RelatedKey, CompletableDeferred<List<Podcast>>>()
     val freshness: Flow<Map<Long, FeedFreshness>> = combine(scopes.current, scopes.verification, seen) { owner, verified, snapshot ->
         if (snapshot?.owner === owner && snapshot.epoch == scopes.epoch && (owner.accountId == null || verified)) snapshot.values else emptyMap()
     }
@@ -43,6 +50,10 @@ class CatalogRepository(
     fun readerActive(): () -> Boolean {
         val owner = scopes.current.value
         val epoch = scopes.epoch
+        return readerActive(owner, epoch)
+    }
+
+    private fun readerActive(owner: Scope, epoch: Long): () -> Boolean {
         return { scopes.current.value === owner && scopes.epoch == epoch && (owner.accountId == null || scopes.verified) }
     }
 
@@ -251,15 +262,77 @@ class CatalogRepository(
         return result
     }
 
-    suspend fun related(podcast: Podcast, region: Region): List<Podcast> {
-        if (podcast.isPrivate || (podcast.id ?: 0) <= 0) return emptyList()
-        val active = readerActive()
-        if (!active()) throw CancellationException("Account changed")
-        val result = api.related(podcast, region.code)
+    suspend fun cachedRelated(podcast: Podcast, region: Region): List<Podcast>? {
         currentCoroutineContext().ensureActive()
-        if (!active()) throw CancellationException("Account changed")
+        val id = podcast.id?.takeIf { it > 0 && !podcast.isPrivate } ?: return null
+        val owner = scopes.current.value
+        val active = readerActive(owner, scopes.epoch)
+        checkDetail(active, podcast)
+        val saved = owner.database.relatedPodcasts().get(api.cacheNamespace, id, region.code.lowercase())
+        checkDetail(active, podcast)
+        return saved?.decode()
+    }
+
+    suspend fun related(podcast: Podcast, region: Region): List<Podcast> {
+        currentCoroutineContext().ensureActive()
+        if (podcast.isPrivate || (podcast.id ?: 0) <= 0) return emptyList()
+        val key = RelatedKey(scopes.current.value, scopes.epoch, requireNotNull(podcast.id), region.code.lowercase())
+        val active = readerActive(key.owner, key.epoch)
+        while (true) {
+            checkDetail(active, podcast)
+            val pending = CompletableDeferred<List<Podcast>>()
+            val existing = synchronized(relatedRequests) { relatedRequests.putIfAbsent(key, pending) }
+            if (existing != null) {
+                try {
+                    val result = existing.await()
+                    checkDetail(active, podcast)
+                    return result
+                } catch (cancelled: CancellationException) {
+                    checkDetail(active, podcast)
+                    continue
+                }
+            }
+            val result = runCatching { readRelated(podcast, key, active) }
+            synchronized(relatedRequests) { relatedRequests.remove(key, pending) }
+            pending.completeWith(result)
+            val podcasts = result.getOrThrow()
+            checkDetail(active, podcast)
+            return podcasts
+        }
+    }
+
+    private suspend fun readRelated(podcast: Podcast, key: RelatedKey, active: () -> Boolean): List<Podcast> {
+        val dao = key.owner.database.relatedPodcasts()
+        val snapshot = dao.get(api.cacheNamespace, key.id, key.locale)
+        checkDetail(active, podcast)
+        val saved = snapshot?.decode()
+        if (snapshot != null && saved != null && clock() - snapshot.refreshedAt < RELATED_LIFETIME) return saved
+        val result = try {
+            api.related(podcast, key.locale)
+        } catch (failure: IOException) {
+            checkDetail(active, podcast)
+            if (failure is ApiException && failure.status in listOf(401, 403, 404)) {
+                key.owner.database.withTransaction {
+                    checkDetail(active, podcast)
+                    dao.remove(api.cacheNamespace, key.id, key.locale)
+                    checkDetail(active, podcast)
+                }
+            }
+            if (saved != null && (failure !is ApiException || failure.status == 429 || failure.status >= 500)) return saved
+            throw failure
+        }
+        checkDetail(active, podcast)
+        key.owner.database.withTransaction {
+            checkDetail(active, podcast)
+            dao.write(RelatedPodcastsEntity(api.cacheNamespace, key.id, key.locale, Json.encodeToString(result), clock()))
+            dao.trim(api.cacheNamespace, 40)
+            checkDetail(active, podcast)
+        }
+        checkDetail(active, podcast)
         return result
     }
+
+    private fun RelatedPodcastsEntity.decode(): List<Podcast>? = runCatching { Json.decodeFromString<List<Podcast>>(podcasts) }.getOrNull()
 
     fun episodes(identities: List<String>): Flow<List<Episode>> = scopes.current.flatMapLatest { scope ->
         scope.database.episodes().observe(identities).map { rows -> rows.map { it.domain() } }
@@ -407,6 +480,7 @@ class CatalogRepository(
     private companion object {
         const val PAGE_SIZE = 200
         val CHART_LIFETIME = 1.hours.inWholeMilliseconds
+        val RELATED_LIFETIME = 1.hours.inWholeMilliseconds
         val DETAIL_LIFETIME = 5.minutes.inWholeMilliseconds
     }
 }

@@ -45,6 +45,21 @@ interface PodcastDao {
 }
 
 @Dao
+interface RelatedPodcastsDao {
+    @Query("SELECT * FROM related_podcasts WHERE server = :server AND podcastId = :id AND locale = :locale")
+    suspend fun get(server: String, id: Long, locale: String): RelatedPodcastsEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(snapshot: RelatedPodcastsEntity)
+
+    @Query("DELETE FROM related_podcasts WHERE server = :server AND podcastId = :id AND locale = :locale")
+    suspend fun remove(server: String, id: Long, locale: String)
+
+    @Query("DELETE FROM related_podcasts WHERE server = :server AND rowid NOT IN (SELECT rowid FROM related_podcasts WHERE server = :server ORDER BY refreshedAt DESC, rowid DESC LIMIT :limit)")
+    suspend fun trim(server: String, limit: Int)
+}
+
+@Dao
 interface EpisodeDao {
     @Query("SELECT e.* FROM episodes e JOIN progress_outbox o ON e.id = o.episodeId OR e.mediaIdentity = 'episode:' || o.episodeId")
     fun observeLegacyProgress(): Flow<List<EpisodeEntity>>

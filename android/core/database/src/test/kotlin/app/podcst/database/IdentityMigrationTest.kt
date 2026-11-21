@@ -61,7 +61,7 @@ class IdentityMigrationTest {
         db.close()
         db = PodcstDatabase.open(context, key).also { opened = it }
         assertEquals(2, db.episodes().queue().size)
-        assertEquals(4, db.openHelper.readableDatabase.version)
+        assertEquals(5, db.openHelper.readableDatabase.version)
     }
 
     @Test fun exactSourceResolutionMovesQueueProgressAndPreservesFallbackMediaWithoutCrossGuidGuess() = runTest {
@@ -105,7 +105,7 @@ class IdentityMigrationTest {
                     PodcstDatabase.IDENTITY_MIGRATION.migrate(db)
                     throw java.io.IOException("synthetic activation failure")
                 }
-            }, PodcstDatabase.PROGRESS_SOURCE_MIGRATION, PodcstDatabase.DETAIL_PAGE_MIGRATION).build()
+            }, PodcstDatabase.PROGRESS_SOURCE_MIGRATION, PodcstDatabase.DETAIL_PAGE_MIGRATION, PodcstDatabase.RELATED_PODCASTS_MIGRATION).build()
         assertTrue(runCatching { failed.episodes().catalog("https://a.test") }.isFailure)
         failed.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(PodcstDatabase.name(key)).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
@@ -126,7 +126,7 @@ class IdentityMigrationTest {
                     PodcstDatabase.PROGRESS_SOURCE_MIGRATION.migrate(db)
                     throw java.io.IOException("source token activation denied")
                 }
-            }, PodcstDatabase.DETAIL_PAGE_MIGRATION).build()
+            }, PodcstDatabase.DETAIL_PAGE_MIGRATION, PodcstDatabase.RELATED_PODCASTS_MIGRATION).build()
         assertTrue(runCatching { failed.progress().get("episode:42") }.isFailure)
         failed.close()
         SQLiteDatabase.openDatabase(context.getDatabasePath(PodcstDatabase.name(key)).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
@@ -165,7 +165,7 @@ class IdentityMigrationTest {
             db.execSQL("INSERT INTO progress VALUES('episode:42',95000,100000,0,1000,'token')")
         }
         val migrated = PodcstDatabase.open(context, key).also { opened = it }
-        assertEquals(4, migrated.openHelper.readableDatabase.version)
+        assertEquals(5, migrated.openHelper.readableDatabase.version)
         val podcast = migrated.podcasts().byId(152)!!
         assertTrue(podcast.complete)
         assertNull(podcast.detailEpisodeIds)
@@ -174,6 +174,23 @@ class IdentityMigrationTest {
         migrated.close()
         val restarted = PodcstDatabase.open(context, key).also { opened = it }
         assertEquals("episode:42,episode:41", restarted.podcasts().byId(152)!!.detailEpisodeIds)
+    }
+
+    @Test fun recommendationCacheMigrationPreservesExistingDataAndSurvivesRestart() = runTest {
+        oldDatabase(4).use { db ->
+            db.execSQL("INSERT INTO podcasts(feed,id,itunesId,title,author,cover,thumbnail,description,link,published,explicit,keywords,episodeCount,isPrivate,refreshedAt,complete,detailEpisodeIds) VALUES('https://test/rss',152,NULL,'Podcast','','','','Saved description',NULL,NULL,0,'',100,0,1000,1,'episode:42')")
+            db.execSQL("INSERT INTO progress VALUES('episode:42',95000,100000,0,1000,'token')")
+        }
+        val migrated = PodcstDatabase.open(context, key).also { opened = it }
+        assertEquals(5, migrated.openHelper.readableDatabase.version)
+        assertEquals("Saved description", migrated.podcasts().byId(152)!!.description)
+        assertEquals("episode:42", migrated.podcasts().byId(152)!!.detailEpisodeIds)
+        assertEquals(95000L, migrated.progress().get("episode:42")!!.positionMs)
+        val snapshot = RelatedPodcastsEntity("https://test/", 152, "us", "[]", 1000)
+        migrated.relatedPodcasts().write(snapshot)
+        migrated.close()
+        val restarted = PodcstDatabase.open(context, key).also { opened = it }
+        assertEquals(snapshot, restarted.relatedPodcasts().get("https://test/", 152, "us"))
     }
 
 }

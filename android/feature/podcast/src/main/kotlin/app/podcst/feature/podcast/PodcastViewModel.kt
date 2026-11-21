@@ -131,9 +131,11 @@ class PodcastViewModel(
     ) { podcast, region, session, denied -> Triple(podcast, region, session.first || denied) }
         .flatMapLatest { (podcast, region, loading) ->
             flow {
-                emit(emptyList<Podcast>())
-                if (!loading) {
+                if (loading) {
+                    emit(emptyList<Podcast>())
+                } else {
                     try {
+                        emit(catalog.cachedRelated(podcast, region).orEmpty())
                         emit(catalog.related(podcast, region))
                     } catch (cancelled: CancellationException) {
                         throw cancelled
