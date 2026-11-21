@@ -300,35 +300,17 @@ private struct RankedPodcastRow: View {
                 }
                 .padding(.vertical, 11)
                 .contentShape(Rectangle())
-                .chartTouchTarget(.blue, in: Rectangle())
             }
             .accessibilityLabel("Number \(rank), \(podcast.title), \(podcast.author)")
             Button {
                 Task { await library.toggleSubscription(podcast) }
             } label: {
                 RoundIcon(systemName: subscribed ? "checkmark" : "plus", diameter: 32, tint: subscribed ? PodcstPalette.accent : PodcstPalette.secondary)
-                    .chartTouchTarget(.orange, in: Circle())
             }
             .accessibilityLabel(subscribed ? "Unsubscribe from \(podcast.title)" : "Subscribe to \(podcast.title)")
         }
         .buttonStyle(.plain)
         .hairline()
-    }
-}
-
-private extension View {
-    func chartTouchTarget<S: InsettableShape>(_ color: Color, in shape: S) -> some View {
-        #if DEBUG
-        overlay {
-            shape
-                .fill(color.opacity(0.25))
-                .overlay { shape.strokeBorder(color, lineWidth: 1) }
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-        #else
-        self
-        #endif
     }
 }
 
