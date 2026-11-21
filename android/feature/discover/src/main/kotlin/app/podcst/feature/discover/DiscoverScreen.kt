@@ -343,14 +343,17 @@ private fun RankedRow(ranked: RankedPodcast, subscribed: Boolean, onPodcast: (Po
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onPodcast(podcast) }
-                .padding(horizontal = 4.dp, vertical = 10.dp),
+                .padding(end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = description },
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onPodcast(podcast) }
+                    .semantics { contentDescription = description }
+                    .padding(start = 4.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
